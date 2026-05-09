@@ -1,0 +1,394 @@
+@page "/agentenpakete"
+@rendermode InteractiveServer
+@using Softwareschmiede.Domain.ValueObjects
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Agentenpakete – Softwareschmiede</PageTitle>
+
+<div class="page-header">
+    <h2 class="page-title">
+        <svg class="icon" style="width:24px;height:24px"><use href="/sprite.svg#icon-package"/></svg>
+        Agentenpakete
+    </h2>
+</div>
+
+@if (_loading)
+{
+    <div class="loading"><div class="spinner"></div> Wird geladen...</div>
+}
+else
+{
+    @if (_showCreatePackage)
+    {
+        <div class="inline-form" style="margin-bottom:1rem">
+            <div class="card-title" style="margin-bottom:.5rem">Neues Agentenpaket</div>
+            <div style="display:flex;gap:.5rem;align-items:flex-start">
+                <input class="form-control" style="max-width:300px" placeholder="Paketname..." @bind="_newPackageName" @onkeydown="OnNewPackageKeyDown" />
+                <button class="btn btn-primary" @onclick="CreatePackageAsync">Erstellen</button>
+                <button class="btn btn-ghost" @onclick="() => { _showCreatePackage = false; _newPackageName = string.Empty; }">Abbrechen</button>
+            </div>
+            @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <div class="alert alert-success" style="margin-bottom:1rem">@_successMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-error" style="margin-bottom:1rem">@_errorMessage</div>
+    }
+
+    <div class="pakete-layout">
+        <!-- Linkes Panel: Baumstruktur -->
+        <div class="panel">
+            <div class="tree-header">
+                <span class="tree-header-title">Pakete</span>
+                <button class="btn btn-primary" style="padding:.25rem .6rem;font-size:.75rem" @onclick="() => { _showCreatePackage = true; _formError = null; }">
+                    <svg class="icon"><use href="/sprite.svg#icon-plus"/></svg>
+                    Neu
+                </button>
+            </div>
+
+            @if (_packageRoots.Count == 0)
+            {
+                <p style="color:#4b5563;font-size:.85rem;padding:.5rem 0">Keine Pakete vorhanden.</p>
+            }
+
+            @foreach (var (node, depth) in FlattenedTree)
+            {
+                var nodeRef = node;
+                <div class="tree-item @(IsSelected(nodeRef) ? "tree-item-selected" : "")"
+                     style="padding-left: @(depth * 16 + 8)px"
+                     @onclick="() => SelectNodeAsync(nodeRef)">
+
+                    @if (nodeRef.IsDirectory)
+                    {
+                        <svg class="tree-expand-btn" @onclick:stopPropagation @onclick="() => ToggleExpandAsync(nodeRef)">
+                            @if (nodeRef.IsExpanded)
+                            {
+                                <use href="/sprite.svg#icon-chevron-down"/>
+                            }
+                            else
+                            {
+                                <use href="/sprite.svg#icon-chevron-right"/>
+                            }
+                        </svg>
+                    }
+                    else
+                    {
+                        <span style="width:16px;display:inline-block"></span>
+                    }
+
+                    @if (nodeRef.IsPackageRoot)
+                    {
+                        <svg class="tree-item-icon"><use href="/sprite.svg#icon-package"/></svg>
+                    }
+                    else if (nodeRef.IsDirectory)
+                    {
+                        <svg class="tree-item-icon"><use href="/sprite.svg#icon-folder"/></svg>
+                    }
+                    else
+                    {
+                        <svg class="tree-item-icon"><use href="/sprite.svg#icon-file"/></svg>
+                    }
+
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@nodeRef.Name</span>
+                </div>
+            }
+        </div>
+
+        <!-- Rechtes Panel: Detail / Editor -->
+        <div class="panel editor-panel">
+            @if (_selectedNode is null)
+            {
+                <div style="color:#4b5563;padding:2rem;text-align:center">
+                    <svg style="width:48px;height:48px;opacity:.3"><use href="/sprite.svg#icon-package"/></svg>
+                    <p style="margin-top:.75rem">Wählen Sie ein Paket, Verzeichnis oder eine Datei aus.</p>
+                </div>
+            }
+            else if (_selectedNode.IsPackageRoot)
+            {
+                <div class="card-title">
+                    <svg class="icon"><use href="/sprite.svg#icon-package"/></svg>
+                    @_selectedNode.Name
+                </div>
+
+                <div class="action-bar">
+                    @if (!_showRename && !_showCreateDir && !_showCreateFile && !_showUpload)
+                    {
+                        <button class="btn btn-secondary" @onclick="() => { _showCreateDir = true; _newItemName = string.Empty; _formError = null; }">
+                            <svg class="icon"><use href="/sprite.svg#icon-folder-add"/></svg>
+                            Unterverzeichnis
+                        </button>
+                        <button class="btn btn-secondary" @onclick="() => { _showCreateFile = true; _newItemName = string.Empty; _formError = null; }">
+                            <svg class="icon"><use href="/sprite.svg#icon-file-add"/></svg>
+                            Neue Datei
+                        </button>
+                        <button class="btn btn-secondary" @onclick="() => { _showUpload = true; _formError = null; }">
+                            <svg class="icon"><use href="/sprite.svg#icon-upload"/></svg>
+                            Hochladen
+                        </button>
+                        <button class="btn btn-secondary" @onclick="ShowRename">
+                            <svg class="icon"><use href="/sprite.svg#icon-rename"/></svg>
+                            Umbenennen
+                        </button>
+                        <button class="btn btn-danger" @onclick="() => _showDeleteConfirm = true">
+                            <svg class="icon"><use href="/sprite.svg#icon-delete"/></svg>
+                            Löschen
+                        </button>
+                    }
+                </div>
+
+                @if (_showCreateDir)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Neues Unterverzeichnis</div>
+                        <div style="display:flex;gap:.5rem;align-items:flex-start">
+                            <input class="form-control" style="max-width:300px" @bind="_newItemName" placeholder="Verzeichnisname..." />
+                            <button class="btn btn-primary" @onclick="CreateDirectoryAsync">Erstellen</button>
+                            <button class="btn btn-ghost" @onclick="() => { _showCreateDir = false; _formError = null; }">Abbrechen</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                    </div>
+                }
+
+                @if (_showCreateFile)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Neue Datei</div>
+                        <div style="display:flex;gap:.5rem;align-items:flex-start">
+                            <input class="form-control" style="max-width:300px" @bind="_newItemName" placeholder="Dateiname (z.B. readme.md)..." />
+                            <button class="btn btn-primary" @onclick="CreateEmptyFileAsync">Erstellen</button>
+                            <button class="btn btn-ghost" @onclick="() => { _showCreateFile = false; _formError = null; }">Abbrechen</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                    </div>
+                }
+
+                @if (_showUpload)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Datei hochladen</div>
+                        <InputFile OnChange="HandleFileUpload" multiple style="color:#e2e8f0;margin-bottom:.5rem" />
+                        @if (_uploading) { <div class="loading"><div class="spinner"></div> Wird hochgeladen...</div> }
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                        <div style="margin-top:.5rem">
+                            <button class="btn btn-ghost" @onclick="() => { _showUpload = false; _formError = null; }">Schließen</button>
+                        </div>
+                    </div>
+                }
+
+                @if (_showRename)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Paket umbenennen</div>
+                        <div style="display:flex;gap:.5rem;align-items:flex-start">
+                            <input class="form-control" style="max-width:300px" @bind="_renameInput" placeholder="Neuer Name..." />
+                            <button class="btn btn-primary" @onclick="ExecuteRenameAsync">Speichern</button>
+                            <button class="btn btn-ghost" @onclick="CancelRename">Abbrechen</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                    </div>
+                }
+
+                @if (_showDeleteConfirm)
+                {
+                    <div class="alert alert-error">
+                        <strong>Paket "@_selectedNode.Name" wirklich löschen?</strong> Alle Dateien und Verzeichnisse werden unwiderruflich gelöscht.
+                        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                            <button class="btn btn-danger" @onclick="ExecuteDeleteAsync">Ja, löschen</button>
+                            <button class="btn btn-ghost" @onclick="() => _showDeleteConfirm = false">Abbrechen</button>
+                        </div>
+                    </div>
+                }
+
+                <p style="color:#94a3b8;font-size:.9rem">Paket-Verzeichnis: <code>@_selectedNode.PackageName</code></p>
+            }
+            else if (_selectedNode.IsDirectory)
+            {
+                <div class="card-title">
+                    <svg class="icon"><use href="/sprite.svg#icon-folder"/></svg>
+                    @_selectedNode.Name
+                    <span style="color:#4b5563;font-size:.8rem;font-weight:400;margin-left:.5rem">in @_selectedNode.PackageName</span>
+                </div>
+
+                <div class="action-bar">
+                    @if (!_showRename && !_showCreateDir && !_showCreateFile && !_showUpload)
+                    {
+                        <button class="btn btn-secondary" @onclick="() => { _showCreateDir = true; _newItemName = string.Empty; _formError = null; }">
+                            <svg class="icon"><use href="/sprite.svg#icon-folder-add"/></svg>
+                            Unterverzeichnis
+                        </button>
+                        <button class="btn btn-secondary" @onclick="() => { _showCreateFile = true; _newItemName = string.Empty; _formError = null; }">
+                            <svg class="icon"><use href="/sprite.svg#icon-file-add"/></svg>
+                            Neue Datei
+                        </button>
+                        <button class="btn btn-secondary" @onclick="() => { _showUpload = true; _formError = null; }">
+                            <svg class="icon"><use href="/sprite.svg#icon-upload"/></svg>
+                            Hochladen
+                        </button>
+                        <button class="btn btn-secondary" @onclick="ShowRename">
+                            <svg class="icon"><use href="/sprite.svg#icon-rename"/></svg>
+                            Umbenennen
+                        </button>
+                        <button class="btn btn-danger" @onclick="() => _showDeleteConfirm = true">
+                            <svg class="icon"><use href="/sprite.svg#icon-delete"/></svg>
+                            Löschen
+                        </button>
+                    }
+                </div>
+
+                @if (_showCreateDir)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Neues Unterverzeichnis</div>
+                        <div style="display:flex;gap:.5rem;align-items:flex-start">
+                            <input class="form-control" style="max-width:300px" @bind="_newItemName" placeholder="Verzeichnisname..." />
+                            <button class="btn btn-primary" @onclick="CreateDirectoryAsync">Erstellen</button>
+                            <button class="btn btn-ghost" @onclick="() => { _showCreateDir = false; _formError = null; }">Abbrechen</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                    </div>
+                }
+
+                @if (_showCreateFile)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Neue Datei</div>
+                        <div style="display:flex;gap:.5rem;align-items:flex-start">
+                            <input class="form-control" style="max-width:300px" @bind="_newItemName" placeholder="Dateiname (z.B. readme.md)..." />
+                            <button class="btn btn-primary" @onclick="CreateEmptyFileAsync">Erstellen</button>
+                            <button class="btn btn-ghost" @onclick="() => { _showCreateFile = false; _formError = null; }">Abbrechen</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                    </div>
+                }
+
+                @if (_showUpload)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Datei hochladen</div>
+                        <InputFile OnChange="HandleFileUpload" multiple style="color:#e2e8f0;margin-bottom:.5rem" />
+                        @if (_uploading) { <div class="loading"><div class="spinner"></div> Wird hochgeladen...</div> }
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                        <div style="margin-top:.5rem">
+                            <button class="btn btn-ghost" @onclick="() => { _showUpload = false; _formError = null; }">Schließen</button>
+                        </div>
+                    </div>
+                }
+
+                @if (_showRename)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Umbenennen</div>
+                        <div style="display:flex;gap:.5rem;align-items:flex-start">
+                            <input class="form-control" style="max-width:300px" @bind="_renameInput" placeholder="Neuer Name..." />
+                            <button class="btn btn-primary" @onclick="ExecuteRenameAsync">Speichern</button>
+                            <button class="btn btn-ghost" @onclick="CancelRename">Abbrechen</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                    </div>
+                }
+
+                @if (_showDeleteConfirm)
+                {
+                    <div class="alert alert-error">
+                        <strong>Verzeichnis "@_selectedNode.Name" wirklich löschen?</strong> Alle Inhalte werden unwiderruflich gelöscht.
+                        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                            <button class="btn btn-danger" @onclick="ExecuteDeleteAsync">Ja, löschen</button>
+                            <button class="btn btn-ghost" @onclick="() => _showDeleteConfirm = false">Abbrechen</button>
+                        </div>
+                    </div>
+                }
+
+                <p style="color:#94a3b8;font-size:.85rem">Pfad: <code>@_selectedNode.PackageName/@_selectedNode.RelativePath</code></p>
+                <p style="color:#4b5563;font-size:.8rem">@_selectedNode.Children.Count Eintrag/Einträge im Verzeichnis.</p>
+            }
+            else
+            {
+                <div class="card-title">
+                    <svg class="icon"><use href="/sprite.svg#icon-file"/></svg>
+                    @_selectedNode.Name
+                    <span style="color:#4b5563;font-size:.8rem;font-weight:400;margin-left:.5rem">in @_selectedNode.PackageName</span>
+                </div>
+
+                <div class="action-bar">
+                    @if (!_showRename)
+                    {
+                        @if (_isMarkdownFile)
+                        {
+                            @if (_isEditing)
+                            {
+                                <button class="btn btn-secondary" @onclick="SwitchToPreview">
+                                    <svg class="icon"><use href="/sprite.svg#icon-preview"/></svg>
+                                    Vorschau
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-secondary" @onclick="SwitchToEdit">
+                                    <svg class="icon"><use href="/sprite.svg#icon-edit"/></svg>
+                                    Bearbeiten
+                                </button>
+                            }
+                        }
+                        @if (_isEditing || !_isMarkdownFile)
+                        {
+                            <button class="btn btn-success" @onclick="SaveFileAsync" disabled="@_isSaving">
+                                <svg class="icon"><use href="/sprite.svg#icon-save"/></svg>
+                                @(_isSaving ? "Speichert..." : "Speichern")
+                            </button>
+                        }
+                        <button class="btn btn-secondary" @onclick="ShowRename">
+                            <svg class="icon"><use href="/sprite.svg#icon-rename"/></svg>
+                            Umbenennen
+                        </button>
+                        <button class="btn btn-danger" @onclick="() => _showDeleteConfirm = true">
+                            <svg class="icon"><use href="/sprite.svg#icon-delete"/></svg>
+                            Löschen
+                        </button>
+                    }
+                </div>
+
+                @if (_showRename)
+                {
+                    <div class="inline-form">
+                        <div class="card-title" style="margin-bottom:.5rem">Umbenennen</div>
+                        <div style="display:flex;gap:.5rem;align-items:flex-start">
+                            <input class="form-control" style="max-width:300px" @bind="_renameInput" placeholder="Neuer Dateiname..." />
+                            <button class="btn btn-primary" @onclick="ExecuteRenameAsync">Speichern</button>
+                            <button class="btn btn-ghost" @onclick="CancelRename">Abbrechen</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_formError)) { <div class="alert alert-error" style="margin-top:.5rem">@_formError</div> }
+                    </div>
+                }
+
+                @if (_showDeleteConfirm)
+                {
+                    <div class="alert alert-error">
+                        <strong>Datei "@_selectedNode.Name" wirklich löschen?</strong>
+                        <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                            <button class="btn btn-danger" @onclick="ExecuteDeleteAsync">Ja, löschen</button>
+                            <button class="btn btn-ghost" @onclick="() => _showDeleteConfirm = false">Abbrechen</button>
+                        </div>
+                    </div>
+                }
+
+                @if (_loadingFile)
+                {
+                    <div class="loading"><div class="spinner"></div> Datei wird geladen...</div>
+                }
+                else if (_isMarkdownFile && !_isEditing)
+                {
+                    <div class="markdown-preview">@((MarkupString)_markdownHtml)</div>
+                }
+                else
+                {
+                    <textarea class="editor-textarea" @bind="_editContent" @bind:event="oninput"></textarea>
+                }
+            }
+        </div>
+    </div>
+}

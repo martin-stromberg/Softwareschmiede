@@ -1,0 +1,31 @@
+@using Softwareschmiede.Domain.Enums
+
+<span class="badge @GetCssClass()">@GetLabel()</span>
+
+@code {
+    [Parameter] public AufgabeStatus Status { get; set; }
+
+    private string GetCssClass() => Status switch
+    {
+        AufgabeStatus.Offen => "badge-offen",
+        AufgabeStatus.InBearbeitung => "badge-in-bearbeitung",
+        AufgabeStatus.KiAktiv => "badge-ki-aktiv",
+        AufgabeStatus.TestsLaufen => "badge-tests-laufen",
+        AufgabeStatus.Abgeschlossen => "badge-abgeschlossen",
+        AufgabeStatus.Fehlgeschlagen => "badge-fehlgeschlagen",
+        AufgabeStatus.Archiviert => "badge-archiviert",
+        _ => ""
+    };
+
+    private string GetLabel() => Status switch
+    {
+        AufgabeStatus.Offen => "Offen",
+        AufgabeStatus.InBearbeitung => "In Bearbeitung",
+        AufgabeStatus.KiAktiv => "KI Aktiv",
+        AufgabeStatus.TestsLaufen => "Tests laufen",
+        AufgabeStatus.Abgeschlossen => "Abgeschlossen",
+        AufgabeStatus.Fehlgeschlagen => "Fehlgeschlagen",
+        AufgabeStatus.Archiviert => "Archiviert",
+        _ => Status.ToString()
+    };
+}

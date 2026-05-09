@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/Softwareschmiede.Client/Softwareschmiede.Client.csproj" />
+  <Project Path="src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj" />
+  <Project Path="src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj" />
+  <Project Path="src/Softwareschmiede/Softwareschmiede.csproj" />
+</Solution>

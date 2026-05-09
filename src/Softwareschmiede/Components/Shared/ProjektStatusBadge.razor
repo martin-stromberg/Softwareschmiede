@@ -1,0 +1,9 @@
+@using Softwareschmiede.Domain.Enums
+
+<span class="badge @(Status == ProjektStatus.Aktiv ? "badge-aktiv" : "badge-archiviert")">
+    @(Status == ProjektStatus.Aktiv ? "Aktiv" : "Archiviert")
+</span>
+
+@code {
+    [Parameter] public ProjektStatus Status { get; set; }
+}

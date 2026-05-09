@@ -1,0 +1,520 @@
+namespace Softwareschmiede.Infrastructure.Plugins;
+
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+
+/// <summary>
+/// GitHub Plugin – nutzt gh CLI und git CLI für alle GitHub-Operationen.
+/// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable übergeben, niemals als CLI-Argument.
+/// </summary>
+public sealed class GitHubPlugin : IGitPlugin
+{
+    private readonly ICliRunner _cliRunner;
+    private readonly ICredentialStore _credentialStore;
+    private readonly ILogger<GitHubPlugin> _logger;
+
+    /// <inheritdoc/>
+    public string PluginName => "GitHub";
+
+    /// <inheritdoc/>
+    public string PluginPrefix => "Softwareschmiede.GitHub";
+
+    /// <inheritdoc/>
+    public IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
+    [
+        new PluginSettingGroup("Authentifizierung",
+        [
+            new PluginSettingField(
+                Key: "Token",
+                Label: "Personal Access Token",
+                FieldType: PluginSettingFieldType.Secret,
+                Placeholder: "ghp_...",
+                Description: "GitHub Personal Access Token mit den Berechtigungen repo und read:org. Token erstellen: https://github.com/settings/tokens/new",
+                IsRequired: true)
+        ])
+    ];
+
+    /// <summary>Erstellt eine neue Instanz des <see cref="GitHubPlugin"/>.</summary>
+    public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger)
+    {
+        _cliRunner = cliRunner;
+        _credentialStore = credentialStore;
+        _logger = logger;
+    }
+
+    private IDictionary<string, string> GetGhEnvironment()
+    {
+        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        var env = new Dictionary<string, string>();
+        if (!string.IsNullOrEmpty(token))
+        {
+            env["GH_TOKEN"] = token;
+        }
+        return env;
+    }
+
+    private IDictionary<string, string> GetGitEnvironment()
+    {
+        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        var env = new Dictionary<string, string>();
+        
+        // Disable terminal prompts completely
+        env["GIT_TERMINAL_PROMPT"] = "0";
+        
+        // Disable SSH host key checking to prevent /dev/tty access
+        env["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+        
+        // Tell git to use .netrc for credentials
+        // GIT_CREDENTIAL_HELPER=store will use ~/.git-credentials if it exists
+        // But .netrc is more universal, so we make sure curl uses it too
+        if (!string.IsNullOrEmpty(token))
+        {
+            // For curl (which git uses under the hood for HTTPS)
+            env["NETRC"] = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
+        }
+        
+        return env;
+    }
+
+    private async Task EnsureRemoteCredentialsAsync(string localPath, CancellationToken ct = default)
+    {
+        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        if (string.IsNullOrEmpty(token))
+        {
+            _logger.LogWarning("Kein GitHub-Token verfügbar für Remote-Konfiguration.");
+            return;
+        }
+
+        // Get current remote URL
+        var getUrlResult = await _cliRunner.RunAsync(
+            "git",
+            ["config", "remote.origin.url"],
+            localPath,
+            null,
+            ct);
+
+        if (!getUrlResult.IsSuccess)
+        {
+            _logger.LogWarning("Konnte remote.origin.url nicht abrufen: {Error}", getUrlResult.StdErr);
+            return;
+        }
+
+        var currentUrl = getUrlResult.StdOut.Trim();
+
+        // If URL doesn't have credentials yet, add them
+        if (!currentUrl.Contains("@"))
+        {
+            // Check if it's an HTTPS URL
+            if (currentUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                var authUrl = currentUrl.Replace(
+                    "https://",
+                    $"https://oauth2:{Uri.EscapeDataString(token)}@",
+                    StringComparison.OrdinalIgnoreCase);
+
+                var setUrlResult = await _cliRunner.RunAsync(
+                    "git",
+                    ["remote", "set-url", "origin", authUrl],
+                    localPath,
+                    null,
+                    ct);
+
+                if (!setUrlResult.IsSuccess)
+                {
+                    _logger.LogWarning("Konnte remote.origin.url mit Token nicht aktualisieren: {Error}", setUrlResult.StdErr);
+                }
+                else
+                {
+                    _logger.LogInformation("Remote origin URL mit Token aktualisiert.");
+                }
+            }
+        }
+    }
+
+    private async Task ConfigureGitCredentialsAsync(string localPath, string repositoryUrl, CancellationToken ct = default)
+    {
+        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        if (string.IsNullOrEmpty(token))
+        {
+            _logger.LogWarning("Kein GitHub-Token verfügbar für Git-Konfiguration.");
+            return;
+        }
+
+        // Configure user name and email for commits
+        var userNameResult = await _cliRunner.RunAsync(
+            "git",
+            ["config", "user.name", "Softwareschmiede Bot"],
+            localPath,
+            null,
+            ct);
+
+        if (!userNameResult.IsSuccess)
+        {
+            _logger.LogWarning("Git user.name Konfiguration fehlgeschlagen: {Error}", userNameResult.StdErr);
+        }
+
+        var userEmailResult = await _cliRunner.RunAsync(
+            "git",
+            ["config", "user.email", "bot@softwareschmiede.local"],
+            localPath,
+            null,
+            ct);
+
+        if (!userEmailResult.IsSuccess)
+        {
+            _logger.LogWarning("Git user.email Konfiguration fehlgeschlagen: {Error}", userEmailResult.StdErr);
+        }
+
+        // Create .netrc file for backup credential storage
+        var netrcPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
+        
+        var netrcContent = $@"machine github.com
+login oauth2
+password {token}
+machine api.github.com
+login oauth2
+password {token}
+";
+
+        try
+        {
+            File.WriteAllText(netrcPath, netrcContent);
+            _logger.LogInformation("Git .netrc credentials file erstellt/aktualisiert: {Path}", netrcPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Git .netrc file konnte nicht erstellt werden");
+        }
+
+        // Embed token directly in remote URL
+        if (repositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            var authUrl = repositoryUrl.Replace(
+                "https://", 
+                $"https://oauth2:{Uri.EscapeDataString(token)}@",
+                StringComparison.OrdinalIgnoreCase);
+            
+            var setUrlResult = await _cliRunner.RunAsync(
+                "git",
+                ["remote", "set-url", "origin", authUrl],
+                localPath,
+                null,
+                ct);
+
+            if (!setUrlResult.IsSuccess)
+            {
+                _logger.LogWarning("Git remote URL Konfiguration fehlgeschlagen: {Error}", setUrlResult.StdErr);
+            }
+            else
+            {
+                _logger.LogInformation("Git remote origin URL aktualisiert mit eingebettetem Token.");
+            }
+        }
+
+        // Disable strict host key checking for git operations
+        var strictHostKeyResult = await _cliRunner.RunAsync(
+            "git",
+            ["config", "core.sshCommand", "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"],
+            localPath,
+            null,
+            ct);
+
+        if (!strictHostKeyResult.IsSuccess)
+        {
+            _logger.LogWarning("Git core.sshCommand Konfiguration fehlgeschlagen: {Error}", strictHostKeyResult.StdErr);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Rufe Issues für Repository {RepositoryId} ab.", repositoryId);
+
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            ["issue", "list", "--repo", repositoryId, "--json", "number,title,body,labels,milestone", "--limit", "100"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogError("gh issue list fehlgeschlagen für {RepositoryId}: {StdErr}", repositoryId, result.StdErr);
+            return [];
+        }
+
+        return ParseIssues(result.StdOut);
+    }
+
+    private static IEnumerable<Issue> ParseIssues(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var issues = new List<Issue>();
+        foreach (var element in doc.RootElement.EnumerateArray())
+        {
+            var number = element.GetProperty("number").GetInt32();
+            var title = element.GetProperty("title").GetString() ?? string.Empty;
+            var body = element.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() : null;
+            var labels = element.TryGetProperty("labels", out var labelsEl)
+                ? labelsEl.EnumerateArray()
+                    .Select(l => l.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty)
+                    .ToList()
+                : new List<string>();
+            var milestone = element.TryGetProperty("milestone", out var msEl) && msEl.ValueKind == JsonValueKind.Object
+                ? msEl.TryGetProperty("title", out var msTitle) ? msTitle.GetString() : null
+                : null;
+            var url = element.TryGetProperty("url", out var urlEl) ? urlEl.GetString() : null;
+            issues.Add(new Issue(number, title, body, labels, milestone, url));
+        }
+        return issues;
+    }
+
+    /// <inheritdoc/>
+    public async Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Klone Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
+
+        // Clone with environment that disables SSH prompts
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["clone", repositoryUrl, targetPath],
+            null,
+            GetGitEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"git clone fehlgeschlagen: {result.StdErr}");
+        }
+
+        // Configure git credentials for the cloned repository
+        await ConfigureGitCredentialsAsync(targetPath, repositoryUrl, ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Lege Branch {BranchName} in {LocalPath} an.", branchName, localPath);
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["checkout", "-b", branchName],
+            localPath,
+            null,
+            ct);
+
+        if (!result.IsSuccess)
+            throw new InvalidOperationException($"git checkout -b fehlgeschlagen: {result.StdErr}");
+    }
+
+    /// <inheritdoc/>
+    public async Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Pushe Branch {BranchName} in {LocalPath}.", branchName, localPath);
+
+        // Ensure credentials are configured before pushing
+        await EnsureRemoteCredentialsAsync(localPath, ct);
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["push", "--set-upstream", "origin", branchName],
+            localPath,
+            GetGitEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"git push fehlgeschlagen: {result.StdErr}");
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task PullAsync(string localPath, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Führe git pull in {LocalPath} durch.", localPath);
+
+        // Ensure credentials are configured before pulling
+        await EnsureRemoteCredentialsAsync(localPath, ct);
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["pull"],
+            localPath,
+            GetGitEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"git pull fehlgeschlagen: {result.StdErr}");
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<PullRequest> CreatePullRequestAsync(
+        string repositoryId,
+        string branchName,
+        string title,
+        string body,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Erstelle Pull Request für Branch {BranchName} in Repository {RepositoryId}.",
+            branchName, repositoryId);
+
+        // Use --fill flag to auto-fill from commits, or provide explicit title/body
+        var args = new List<string>
+        {
+            "pr", "create",
+            "--repo", repositoryId,
+            "--head", branchName,
+            "--title", title,
+            "--body", body
+        };
+
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            args.ToArray(),
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogError("gh pr create fehlgeschlagen: {StdErr}", result.StdErr);
+            throw new InvalidOperationException($"gh pr create fehlgeschlagen: {result.StdErr}");
+        }
+
+        // Parse the output text: "https://github.com/owner/repo/pull/123"
+        var prUrl = result.StdOut.Trim();
+        
+        // Extract PR number from URL
+        var lastSlashIndex = prUrl.LastIndexOf('/');
+        if (lastSlashIndex > 0 && int.TryParse(prUrl[(lastSlashIndex + 1)..], out var prNumber))
+        {
+            return new PullRequest(prNumber, title, prUrl, branchName);
+        }
+
+        // Fallback: if we can't parse, throw error
+        throw new InvalidOperationException($"PR created but could not parse response: {result.StdOut}");
+    }
+
+    /// <inheritdoc/>
+    public async Task CommitAsync(string localPath, string message, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Führe Commit in {LocalPath} durch: {Message}", localPath, message);
+
+        var addResult = await _cliRunner.RunAsync("git", ["add", "."], localPath, null, ct);
+        if (!addResult.IsSuccess)
+            throw new InvalidOperationException($"git add fehlgeschlagen: {addResult.StdErr}");
+
+        var commitResult = await _cliRunner.RunAsync("git", ["commit", "-m", message], localPath, null, ct);
+        if (!commitResult.IsSuccess)
+            throw new InvalidOperationException($"git commit fehlgeschlagen: {commitResult.StdErr}");
+    }
+
+    /// <inheritdoc/>
+    public async Task ResetAsync(string localPath, string resetType, string? targetRef, CancellationToken ct = default)
+    {
+        _logger.LogInformation("git reset --{ResetType} {TargetRef} in {LocalPath}.", resetType, targetRef, localPath);
+
+        var args = new List<string> { "reset", $"--{resetType}" };
+        if (!string.IsNullOrEmpty(targetRef))
+            args.Add(targetRef);
+
+        var result = await _cliRunner.RunAsync("git", args, localPath, null, ct);
+        if (!result.IsSuccess)
+            throw new InvalidOperationException($"git reset fehlgeschlagen: {result.StdErr}");
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        _logger.LogInformation("Prüfe GitHub-Plugin-Health.");
+        var result = await _cliRunner.RunAsync("gh", ["auth", "status"], null, GetGhEnvironment(), ct);
+        return result.IsSuccess;
+    }
+
+    /// <inheritdoc/>
+    public async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Rufe Remote-Branches für {RepositoryUrl} ab.", repositoryUrl);
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["ls-remote", "--heads", repositoryUrl],
+            null,
+            GetGitEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("git ls-remote fehlgeschlagen für {RepositoryUrl}: {StdErr}", repositoryUrl, result.StdErr);
+            return [];
+        }
+
+        // Ausgabe: "<hash>\trefs/heads/<branchname>"
+        return result.StdOut
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line =>
+            {
+                var parts = line.Split('\t', 2);
+                return parts.Length == 2 ? parts[1].Replace("refs/heads/", string.Empty).Trim() : null;
+            })
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Select(name => name!)
+            .OrderBy(name => name)
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Ermittle Standard-Branch für {RepositoryUrl}.", repositoryUrl);
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["ls-remote", "--symref", repositoryUrl, "HEAD"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (result.IsSuccess)
+        {
+            // Erste Zeile: "ref: refs/heads/main\tHEAD"
+            var firstLine = result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+            if (firstLine.StartsWith("ref: refs/heads/", StringComparison.Ordinal))
+            {
+                var branch = firstLine.Replace("ref: refs/heads/", string.Empty).Split('\t')[0].Trim();
+                if (!string.IsNullOrEmpty(branch))
+                {
+                    return branch;
+                }
+            }
+        }
+
+        _logger.LogWarning("Standard-Branch konnte nicht ermittelt werden, Fallback auf 'main'.");
+        return "main";
+    }
+
+    /// <inheritdoc/>
+    public async Task CheckoutRemoteBranchAsync(string localPath, string branchName, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Wechsle zu Remote-Branch {BranchName} in {LocalPath}.", branchName, localPath);
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["checkout", "-b", branchName, "--track", $"origin/{branchName}"],
+            localPath,
+            null,
+            ct);
+
+        if (!result.IsSuccess)
+            throw new InvalidOperationException($"git checkout (remote branch) fehlgeschlagen: {result.StdErr}");
+    }
+}

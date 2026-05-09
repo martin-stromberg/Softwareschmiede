@@ -1,0 +1,52 @@
+@page "/projekte/{ProjektId:guid}/aufgaben/neu"
+@rendermode InteractiveServer
+@using Softwareschmiede.Domain.ValueObjects
+
+<PageTitle>Neue Aufgabe – Softwareschmiede</PageTitle>
+
+<div class="page-header">
+    <button class="btn btn-ghost" @onclick="Zurueck">← Zurück</button>
+    <h2 class="page-title">➕ Neue Aufgabe</h2>
+</div>
+
+@if (_loadingIssues)
+{
+    <div class="loading"><div class="spinner"></div> Issues werden geladen...</div>
+}
+
+@if (!string.IsNullOrEmpty(_issuesFehler))
+{
+    <div class="alert alert-warning" style="font-size:.85rem">⚠️ @_issuesFehler</div>
+}
+
+@if (_issues.Count > 0)
+{
+    <div class="card">
+        <div class="card-title">Issue auswählen (optional)</div>
+        <select class="form-control" @onchange="IssueGewaehlt">
+            <option value="">– Freie Aufgabe –</option>
+            @foreach (var issue in _issues)
+            {
+                <option value="@issue.Nummer">#@issue.Nummer: @issue.Titel</option>
+            }
+        </select>
+    </div>
+}
+
+<div class="card">
+    <div class="form-group">
+        <label class="form-label">Titel *</label>
+        <input class="form-control" @bind="_titel" placeholder="Kurzer Aufgabentitel" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">Anforderungsbeschreibung</label>
+        <textarea class="form-control" @bind="_beschreibung" rows="5" placeholder="Detaillierte Anforderungsbeschreibung für die KI..."></textarea>
+    </div>
+    @if (!string.IsNullOrEmpty(_fehler)) { <div class="alert alert-error">@_fehler</div> }
+    <div style="display:flex;gap:.5rem">
+        <button class="btn btn-primary" @onclick="ErstellenAsync" disabled="@_saving">
+            @if (_saving) { <div class="spinner" style="width:14px;height:14px"></div> } else { <span>✅ Aufgabe anlegen</span> }
+        </button>
+        <button class="btn btn-ghost" @onclick="Zurueck">Abbrechen</button>
+    </div>
+</div>
