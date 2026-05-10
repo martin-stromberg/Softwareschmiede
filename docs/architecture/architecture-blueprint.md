@@ -35,7 +35,7 @@
 
 ## 1. Systemübersicht
 
-**Softwareschmiede** ist eine lokal betriebene Blazor Server-Webanwendung (.NET 9+), die den gesamten Workflow der KI-gestützten Softwareentwicklung orchestriert. Die Anwendung verbindet:
+**Softwareschmiede** ist eine lokal betriebene Blazor Server-Webanwendung (.NET 10+), die den gesamten Workflow der KI-gestützten Softwareentwicklung orchestriert. Die Anwendung verbindet:
 
 - **Projektmanagement** – Verwaltung von Softwareprojekten und deren Repositories
 - **Git-Integration** – Klonen, Branchen, Committen, Pushen und Pull Requests via austauschbarer Git-Plugins
@@ -61,11 +61,11 @@ graph TB
 
     subgraph Application["Application Layer (UseCases / Services)"]
         direction TB
-        APL1[ProjectService]
-        APL2[TaskService]
-        APL3[ProtocolService]
+        APL1[ProjektService]
+        APL2[AufgabeService]
+        APL3[ProtokollService]
         APL4[AgentPackageService]
-        APL5[KiOrchestrationService]
+        APL5[EntwicklungsprozessService]
         APL6[GitOrchestrationService]
     end
 
@@ -82,7 +82,7 @@ graph TB
         INL1[EF Core / SQLite]
         INL2[GitHub CLI Wrapper]
         INL3[Git CLI Wrapper]
-        INL4[gh copilot CLI Wrapper]
+        INL4[copilot CLI Wrapper]
         INL5[Windows Credential Store]
         INL6[AgentPackage FileSystem Reader]
     end
@@ -120,11 +120,11 @@ graph LR
     end
 
     subgraph AppServices["Application Services"]
-        ProjectService
-        TaskService
-        ProtocolService
+        ProjektService
+        AufgabeService
+        ProtokollService
         AgentPackageService
-        KiOrchestrationService
+        EntwicklungsprozessService
         GitOrchestrationService
     end
 
@@ -132,7 +132,7 @@ graph LR
         IGitPlugin
         IKiPlugin
         GitHubPlugin["GitHubPlugin\n(gh CLI)"]
-        CopilotPlugin["GitHubCopilotPlugin\n(gh copilot)"]
+        CopilotPlugin["GitHubCopilotPlugin\n(copilot)"]
     end
 
     subgraph Infra["Infrastructure"]
@@ -142,25 +142,25 @@ graph LR
         AgentPackageReader["AgentPackageReader\n(Dateisystem)"]
     end
 
-    Dashboard --> ProjectService
-    Dashboard --> TaskService
-    ProjektListe --> ProjectService
-    ProjektDetail --> ProjectService
+    Dashboard --> ProjektService
+    Dashboard --> AufgabeService
+    ProjektListe --> ProjektService
+    ProjektDetail --> ProjektService
     ProjektDetail --> GitOrchestrationService
-    AufgabeListe --> TaskService
-    AufgabeDetail --> TaskService
-    AufgabeDetail --> KiOrchestrationService
+    AufgabeListe --> AufgabeService
+    AufgabeDetail --> AufgabeService
+    AufgabeDetail --> EntwicklungsprozessService
     AufgabeDetail --> GitOrchestrationService
-    AufgabeDetail --> ProtocolService
+    AufgabeDetail --> ProtokollService
     AgentenpaketVorschau --> AgentPackageService
 
-    ProjectService --> SoftwareschmiededDb
-    TaskService --> SoftwareschmiededDb
-    ProtocolService --> SoftwareschmiededDb
+    ProjektService --> SoftwareschmiededDb
+    AufgabeService --> SoftwareschmiededDb
+    ProtokollService --> SoftwareschmiededDb
     AgentPackageService --> AgentPackageReader
 
     GitOrchestrationService --> IGitPlugin
-    KiOrchestrationService --> IKiPlugin
+    EntwicklungsprozessService --> IKiPlugin
 
     IGitPlugin --> GitHubPlugin
     IKiPlugin --> CopilotPlugin
@@ -409,11 +409,11 @@ stateDiagram-v2
 sequenceDiagram
     actor Nutzer
     participant AufgabeDetail as Aufgabe-Detailseite<br/>(Blazor)
-    participant KiService as KiOrchestrationService
+    participant KiService as EntwicklungsprozessService
     participant KiPlugin as IKiPlugin<br/>(GitHubCopilotPlugin)
     participant CliRunner as CliRunner
-    participant GhCopilot as gh copilot CLI
-    participant ProtokollService as ProtocolService
+    participant GhCopilot as copilot CLI
+    participant ProtokollService as ProtokollService
     participant DB as SQLite (EF Core)
     participant SignalR as SignalR Hub
 
@@ -423,7 +423,7 @@ sequenceDiagram
     ProtokollService->>DB: INSERT Protokolleintrag
     KiService->>KiPlugin: StartDevelopmentAsync(prompt, agent, localRepoPath, ct)
     KiPlugin->>CliRunner: StreamAsync("gh", "copilot ...", localRepoPath, ct)
-    CliRunner->>GhCopilot: Prozess starten (gh copilot suggest ...)
+    CliRunner->>GhCopilot: Prozess starten (copilot suggest ...)
     Note over CliRunner,GhCopilot: stdout wird zeilenweise gelesen
     loop Streaming-Schleife (IAsyncEnumerable)
         GhCopilot-->>CliRunner: stdout-Zeile
@@ -479,7 +479,7 @@ sequenceDiagram
 | Kriterium | Begründung |
 |---|---|
 | **gh CLI** | Offizielles GitHub-Tool; vollständige API-Abdeckung; stabil und gepflegt |
-| **gh copilot** | Einzige offizielle Schnittstelle für GitHub Copilot in der CLI; Streaming-Ausgabe verfügbar |
+| **copilot** | Einzige offizielle Schnittstelle für GitHub Copilot in der CLI; Streaming-Ausgabe verfügbar |
 | **git CLI** | Standard; verfügbar auf jedem Entwicklerrechner; keine Lib-Abhängigkeiten |
 | **Kein SDK** | GitHub .NET SDK wäre möglich, bindet aber an konkrete Implementation; CLI über Interface leichter austauschbar |
 
@@ -530,10 +530,10 @@ public interface ICliRunner
 ### 9.2 Streaming-Konzept (Ende-zu-Ende)
 
 ```
-gh copilot CLI (stdout)
+copilot CLI (stdout)
     → CliRunner (Channel<string> → IAsyncEnumerable<string>)
         → GitHubCopilotPlugin (IAsyncEnumerable<string> via yield)
-            → KiOrchestrationService (await foreach)
+            → EntwicklungsprozessService (await foreach)
                 → SignalR Hub (BroadcastChunk)
                     → Blazor Component (OnChunkReceived → StateHasChanged)
                         → Nutzer sieht Streaming-Ausgabe
@@ -833,11 +833,11 @@ Softwareschmiede/
 │   │
 │   ├── Softwareschmiede.Application/              # Application Layer
 │   │   ├── Services/
-│   │   │   ├── ProjectService.cs
-│   │   │   ├── TaskService.cs
-│   │   │   ├── ProtocolService.cs
+│   │   │   ├── ProjektService.cs
+│   │   │   ├── AufgabeService.cs
+│   │   │   ├── ProtokollService.cs
 │   │   │   ├── AgentPackageService.cs
-│   │   │   ├── KiOrchestrationService.cs
+│   │   │   ├── EntwicklungsprozessService.cs
 │   │   │   └── GitOrchestrationService.cs
 │   │   └── Dtos/
 │   │       ├── ProjektDto.cs
@@ -946,3 +946,4 @@ Der `<kurzname>` wird aus dem Aufgabentitel generiert (Kleinbuchstaben, Leerzeic
 ---
 
 *Dokument erstellt am: 2025 | Version 1.0 | Softwareschmiede Architektur-Team*
+

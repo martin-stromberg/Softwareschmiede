@@ -39,7 +39,7 @@
 | **SQLite via EF Core** | Eingebettete DB ohne Server-Overhead, ideal für Einzelnutzer-Betrieb; Migrations für Schemaevolution |
 | **Windows Credential Store (DPAPI)** | Sichere Token-Speicherung ohne Klartext in DB oder Code; betriebssystemintegriert |
 | **`gh` CLI für GitHub-Plugin** | Keine direkte REST-API-Implementierung nötig; CLI abstrahiert Authentifizierung und Protokoll |
-| **`gh copilot` CLI für KI-Plugin** | Direktzugang zu GitHub Copilot ohne proprietäre API-Integration |
+| **`copilot` CLI für KI-Plugin** | Direktzugang zu GitHub Copilot ohne proprietäre API-Integration |
 | **Channel-basiertes CLI-Streaming** | Deadlock-sichere parallele stdout/stderr-Verarbeitung; `IAsyncEnumerable` für Echtzeit-UI |
 | **Plugin-System via Interfaces** | `IGitPlugin` und `IKiPlugin` – austauschbar ohne Kernänderungen; vorbereitet für GitLab, Azure DevOps u.a. |
 | **Festes Agentenpaket-Verzeichnis** | `<Programmverzeichnis>/agent-packages/` – kein Download, rein manuell, keine Konfiguration nötig |
@@ -111,3 +111,4 @@ graph LR
 ---
 
 *Erstellt durch den planning-orchestrator auf Basis der vollständig geklärten Anforderungen in `docs/requirements.md`.*
+

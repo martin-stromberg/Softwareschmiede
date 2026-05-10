@@ -39,7 +39,7 @@
 
 ### Kontext
 
-**Softwareschmiede** ist eine lokal betriebene Blazor Server-Webanwendung (.NET 9+), die den gesamten Workflow der KI-gestützten Softwareentwicklung orchestriert. Die Anwendung verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung, KI-Steuerung und ein lückenloses Aufgabenprotokoll in einem einheitlichen System.
+**Softwareschmiede** ist eine lokal betriebene Blazor Server-Webanwendung (.NET 10+), die den gesamten Workflow der KI-gestützten Softwareentwicklung orchestriert. Die Anwendung verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung, KI-Steuerung und ein lückenloses Aufgabenprotokoll in einem einheitlichen System.
 
 Das vorliegende Entity-Relationship-Modell beschreibt die persistierte Datenstruktur der Anwendung. Es bildet die Grundlage für das EF Core–Datenbankschema (SQLite) und definiert alle Entitäten, deren Attribute sowie die Beziehungen zwischen ihnen.
 

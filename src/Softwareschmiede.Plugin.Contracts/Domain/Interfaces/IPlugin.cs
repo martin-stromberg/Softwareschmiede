@@ -1,4 +1,5 @@
 using Softwareschmiede.Domain.ValueObjects;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Domain.Interfaces;
 
@@ -23,4 +24,7 @@ public interface IPlugin
     /// Die Reihenfolge der Gruppen und Felder bestimmt die Anzeigereihenfolge in der UI.
     /// </summary>
     IReadOnlyList<PluginSettingGroup> GetSettingGroups();
+
+    /// <summary>Plugin-Typ zur automatischen Zuordnung im PluginManager.</summary>
+    PluginType PluginType { get; }
 }

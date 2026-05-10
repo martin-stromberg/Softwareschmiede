@@ -9,6 +9,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede.Client\Softwareschmiede.Client.csproj" />
+    <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="Markdig" Version="0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.*" />
@@ -17,5 +20,23 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+
+  <Target Name="CopyPluginsToHostOutput" AfterTargets="Build">
+    <ItemGroup>
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugins" />
+    <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(OutDir)plugins" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyPluginsToPublishOutput" AfterTargets="Publish">
+    <ItemGroup>
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)plugins" />
+    <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(PublishDir)plugins" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

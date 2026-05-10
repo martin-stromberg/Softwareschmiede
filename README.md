@@ -2,7 +2,7 @@
 
 > **KI-gestützter Softwareentwicklungs-Workflow — lokal, strukturiert und erweiterbar**
 
-[![.NET](https://img.shields.io/badge/.NET-9%2B-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor)](https://blazor.net/)
 [![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -17,21 +17,24 @@
 3. [Screenshots](#-screenshots)
 4. [Voraussetzungen](#-voraussetzungen)
 5. [Schnellstart](#-schnellstart)
-6. [Konfiguration & Plugin-Setup](#️-konfiguration--plugin-setup)
-7. [Agentenpakete](#-agentenpakete)
-8. [Projektstruktur](#-projektstruktur)
-9. [Architektur](#-architektur)
-10. [Tests](#-tests)
-11. [Roadmap](#-roadmap)
-12. [Dokumentation](#-dokumentation)
-13. [Beitragen](#-beitragen)
-14. [Lizenz](#-lizenz)
+6. [Usage](#-usage)
+7. [Konfiguration & Plugin-Setup](#️-konfiguration--plugin-setup)
+8. [Agentenpakete](#-agentenpakete)
+9. [Projektstruktur](#-projektstruktur)
+10. [Architektur](#-architektur)
+11. [Tests](#-tests)
+12. [Deployment](#-deployment)
+13. [Changelog](#-changelog)
+14. [Roadmap](#-roadmap)
+15. [Dokumentation](#-dokumentation)
+16. [Beitragen](#-beitragen)
+17. [Lizenz](#-lizenz)
 
 ---
 
 ## 📖 Projektbeschreibung
 
-**Softwareschmiede** ist eine webbasierte **Einzelnutzer-Anwendung** auf Basis von **Blazor Server (.NET 9+)**, die den vollständigen Workflow der **KI-gestützten Softwareentwicklung** in einer einheitlichen Oberfläche verwaltet.
+**Softwareschmiede** ist eine webbasierte **Einzelnutzer-Anwendung** auf Basis von **Blazor Server (.NET 10+)**, die den vollständigen Workflow der **KI-gestützten Softwareentwicklung** in einer einheitlichen Oberfläche verwaltet.
 
 Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Login** und verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung und KI-Steuerung an einem zentralen Ort.
 
@@ -70,7 +73,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ### 🤖 KI-Steuerung (Plugin-System)
 - **Plugin-Architektur** über `IKiPlugin`-Interface – austauschbar für verschiedene KI-Systeme
-- **GitHub Copilot-Plugin** (erstes Plugin): KI-Integration via `gh copilot` CLI
+- **GitHub Copilot-Plugin** (erstes Plugin): KI-Integration via `copilot` CLI
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
@@ -107,10 +110,11 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 | Voraussetzung | Version | Hinweis |
 |---------------|---------|---------|
 | **Windows** | 10 / 11 | Pflicht – Windows Credential Store wird benötigt |
-| **.NET SDK** | 9.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
-| **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für Git & Copilot |
+| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen |
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
-| **GitHub Copilot** | aktives Abo | Wird über `gh copilot` CLI angesprochen |
+| **Copilot CLI** (`copilot`) | aktuell | Für KI-Steuerung im Plugin (`copilot --version`) |
+| **GitHub Copilot** | aktives Abo | Wird über die Copilot-CLI genutzt |
 
 **GitHub CLI einrichten:**
 
@@ -121,8 +125,8 @@ winget install --id GitHub.cli
 # Authentifizieren
 gh auth login
 
-# Copilot-Extension sicherstellen
-gh extension list   # gh copilot muss vorhanden sein
+# Copilot-CLI prüfen
+copilot --version
 ```
 
 ---
@@ -140,13 +144,15 @@ cd Softwareschmiede
 
 ```powershell
 dotnet restore
-dotnet build
+dotnet build src/Softwareschmiede/Softwareschmiede.csproj
 ```
+
+Beim Build des Host-Projekts werden die Plugin-DLLs automatisch nach `bin/<Config>/<TFM>/plugins/` kopiert (inkl. Publish-Ausgabe).
 
 ### 3. Anwendung starten
 
 ```powershell
-dotnet run --project Softwareschmiede/Softwareschmiede.csproj
+dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj
 ```
 
 Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurierten Port) erreichbar.
@@ -161,7 +167,32 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 
 ---
 
+## 🖥️ Usage
+
+### Typischer Ablauf in der Anwendung
+
+1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
+2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
+3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch).
+4. **KI-Lauf ausführen** (Prompt + Agent aus Agentenpaket wählen).
+5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
+6. **Commits/Push/PR durchführen** und Aufgabe abschließen oder abbrechen.
+
+Details zu den einzelnen Schritten:
+- [Benutzerleitfaden](docs/user-guide.md)
+- [Feature-Dokumentation](docs/business/features.md)
+
+---
+
 ## ⚙️ Konfiguration & Plugin-Setup
+
+### Plugin-Architektur (kurz)
+
+- **Contracts:** `src/Softwareschmiede.Plugin.Contracts` definiert `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType`
+- **Plugin-Projekte:** liegen als eigenständige Klassenbibliotheken unter `plugins/`
+- **Host-Referenzen:** `src/Softwareschmiede/Softwareschmiede.csproj` referenziert Plugin-Projekte mit `ReferenceOutputAssembly="false"`
+- **Build/Publish-Kopie:** MSBuild-Targets kopieren Plugin-Artefakte nach `$(OutDir)plugins` bzw. `$(PublishDir)plugins`
+- **Discovery zur Laufzeit:** `PluginManager` lädt alle `*.dll` aus `AppContext.BaseDirectory/plugins` und registriert sie nach `PluginType`
 
 ### GitHub-Token im Windows Credential Store speichern
 
@@ -256,31 +287,36 @@ Eine `.agent.md`-Datei beschreibt einen einzelnen Agenten mit seinen Instruktion
 ## 🗂️ Projektstruktur
 
 ```
-Softwareschmiede/                        # Solution Root
-├── Softwareschmiede/                    # Blazor Server Hauptprojekt
-│   ├── Application/
-│   │   └── Services/                   # EntwicklungsprozessService, ProjektService,
-│   │                                   # AufgabeService, ProtokollService, ...
-│   ├── Domain/
-│   │   ├── Entities/                   # Projekt, Aufgabe, Protokolleintrag, ...
-│   │   ├── Interfaces/                 # IGitPlugin, IKiPlugin
-│   │   ├── ValueObjects/
-│   │   └── Enums/                      # AufgabeStatus, ProtokolleintragTyp, ...
-│   ├── Infrastructure/
-│   │   ├── Persistence/                # EF Core DbContext, Migrations
-│   │   ├── Plugins/
-│   │   │   ├── GitHub/                 # GitHubPlugin (gh CLI)
-│   │   │   └── GitHubCopilot/          # GitHubCopilotPlugin (gh copilot CLI)
-│   │   └── Security/                   # WindowsCredentialStore
-│   ├── Components/
-│   │   └── Pages/                      # Blazor Razor Pages
-│   │       ├── Home.razor              # Dashboard
-│   │       ├── Projekte/
-│   │       ├── Aufgaben/
-│   │       └── Agentenpakete/
-│   └── wwwroot/                        # Statische Assets (CSS, JS, Bilder)
-├── Softwareschmiede.Tests/             # Unit-Tests (xUnit, FluentAssertions, Moq)
-├── docs/                               # Planungsdokumente und Architektur
+Softwareschmiede/                            # Solution Root
+├── src/
+│   ├── Softwareschmiede/                    # Blazor Server Hauptprojekt (Host)
+│   │   ├── Application/
+│   │   │   └── Services/                    # EntwicklungsprozessService, ProjektService,
+│   │   │                                    # AufgabeService, ProtokollService, ...
+│   │   ├── Domain/
+│   │   │   ├── Entities/                    # Projekt, Aufgabe, Protokolleintrag, ...
+│   │   │   ├── Interfaces/                  # IPluginManager, ...
+│   │   │   ├── ValueObjects/
+│   │   │   └── Enums/                       # AufgabeStatus, ProtokolleintragTyp, ...
+│   │   ├── Infrastructure/
+│   │   │   ├── Data/                        # EF Core DbContext, Migrations
+│   │   │   ├── Plugins/                     # PluginManager (Discovery/Loading)
+│   │   │   └── Services/                    # CliRunner, WindowsCredentialStore, ...
+│   │   ├── Components/
+│   │   │   └── Pages/                       # Blazor Razor Pages
+│   │   │       ├── Home.razor               # Dashboard
+│   │   │       ├── Projekte/
+│   │   │       ├── Aufgaben/
+│   │   │       └── Agentenpakete/
+│   │   └── wwwroot/                         # Statische Assets (CSS, JS, Bilder)
+│   ├── Softwareschmiede.Client/             # Blazor WebAssembly Client Assembly
+│   ├── Softwareschmiede.IntegrationTests/   # Integrations-Tests
+│   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, PluginType
+│   └── Softwareschmiede.Tests/              # Unit-Tests (xUnit, FluentAssertions, Moq)
+├── plugins/                                 # Plugin-Projekte (separate Klassenbibliotheken)
+│   ├── Softwareschmiede.Plugin.GitHub/      # Git-Provider Plugin
+│   └── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin
+├── docs/                                    # Planungsdokumente und Architektur
 │   ├── requirements/
 │   │   └── requirements-analysis.md
 │   ├── architecture/
@@ -315,15 +351,15 @@ graph TB
 
     subgraph Domain["Domain Layer (Kern – keine äußeren Abhängigkeiten)"]
         DOL1[Entitäten: Projekt · Aufgabe · Protokolleintrag]
-        DOL2[IGitPlugin Interface]
-        DOL3[IKiPlugin Interface]
+        DOL2[IPlugin + PluginType]
+        DOL3[IGitPlugin / IKiPlugin]
         DOL4[Value Objects · Enums · Domänenregeln]
     end
-
+ 
     subgraph Infrastructure["Infrastructure Layer"]
         INL1[EF Core / SQLite]
-        INL2[GitHubPlugin – gh CLI]
-        INL3[GitHubCopilotPlugin – gh copilot CLI]
+        INL2[PluginManager (lädt DLLs aus plugins/)]
+        INL3[GitHubPlugin / GitHubCopilotPlugin als Plugin-Projekte]
         INL4[Windows Credential Store]
         INL5[AgentPackage FileSystem Reader]
     end
@@ -344,25 +380,27 @@ graph TB
 ### Plugin-Interfaces
 
 ```csharp
-// Git-Plugin – austauschbar für jeden Git-Provider
-public interface IGitPlugin
+// Basisvertrag für alle Plugins
+public interface IPlugin
 {
-    Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryUrl);
-    Task CloneAsync(string repositoryUrl, string localPath);
-    Task CreateBranchAsync(string localPath, string branchName);
-    Task PushAsync(string localPath, string branchName);
-    Task<PullRequest> CreatePullRequestAsync(string repositoryUrl, string branchName, string title, string body);
-    // ...
+    string PluginName { get; }
+    string PluginPrefix { get; }
+    PluginType PluginType { get; } // SourceCodeManagement | DevelopmentAutomation
 }
 
-// KI-Plugin – austauschbar für jedes KI-System
-public interface IKiPlugin
-{
-    IAsyncEnumerable<string> RunAsync(string prompt, string agentPackagePath, string agentName, string workingDirectory);
-    Task<IEnumerable<string>> GetAvailableAgentsAsync(string agentPackagePath);
-    // ...
-}
+public interface IGitPlugin : IPlugin { /* Git operations */ }
+public interface IKiPlugin : IPlugin { /* AI/Copilot operations */ }
 ```
+
+`IPluginManager` lädt Plugin-DLLs aus `plugins/` dynamisch und ordnet sie über `PluginType` den Kategorien zu.
+
+### Discovery- und Build-Flow
+
+1. Plugin-Projekte unter `plugins/*` referenzieren nur `Softwareschmiede.Plugin.Contracts`
+2. Das Host-Projekt baut Plugins als Projekt-Referenzen (ohne statisches Linken in den Host)
+3. Nach Build/Publish kopieren MSBuild-Targets die Plugin-DLLs in den `plugins`-Unterordner der Ausgabe
+4. `PluginManager` scannt beim ersten Zugriff den Ordner `AppContext.BaseDirectory/plugins` (`*.dll`, TopDirectoryOnly)
+5. Gefundene Typen werden per `ActivatorUtilities` instanziiert und anhand von `PluginType` als Git- oder KI-Plugin registriert
 
 ---
 
@@ -385,13 +423,31 @@ dotnet test --collect:"XPlat Code Coverage"
 
 ---
 
+## 🚀 Deployment
+
+Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
+
+- **Development:** `dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj`
+- **Publish:** `dotnet publish src/Softwareschmiede/Softwareschmiede.csproj -c Release`
+- Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
+
+Für die Inbetriebnahme müssen `gh`, `git` und `copilot` auf dem Zielsystem verfügbar sein.
+
+---
+
+## 📝 Changelog
+
+Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
+
+---
+
 ## 🗺️ Roadmap
 
 ### v1.0 – MVP (vollständig implementiert ✅)
 - [x] Anforderungsanalyse und Architektur-Blueprint
 - [x] Domänenmodell und EF Core Datenbankschema
 - [x] GitHub-Plugin (gh CLI) – vollständige Git-Integration
-- [x] GitHub Copilot-Plugin (gh copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
+- [x] GitHub Copilot-Plugin (copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
 - [x] Blazor UI: Dashboard, Projekte, Aufgaben, Protokoll, Agentenpakete
 - [x] Windows Credential Store Integration
 
@@ -415,10 +471,14 @@ dotnet test --collect:"XPlat Code Coverage"
 | [Benutzerleitfaden](docs/user-guide.md) | Schritt-für-Schritt-Anleitung für Endanwender |
 | [Feature-Dokumentation](docs/business/features.md) | Fachliche Beschreibung aller Features für nicht-technische Stakeholder |
 | [Feature F009: Arbeitsverzeichnis konfigurieren](docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md) | Fachliche Beschreibung des konfigurierbaren Arbeitsverzeichnisses inkl. Fallback und Migration |
+| [Feature F010: Plugin-Prinzip für Integrationen](docs/business/features/F010-plugin-prinzip-integrationen.md) | Fachliche Beschreibung der ausgelagerten GitHub-/Copilot-Plugins |
 | [Plugin-Interfaces](docs/api/plugin-interfaces.md) | Technische Dokumentation der Plugin-Schnittstellen für Plugin-Entwickler |
 | [Workdir-Konfiguration (technisch)](docs/api/workdir-configuration.md) | Technische Umsetzung von Settings, Resolver, Klonpfadbildung und Reason-Codes |
 | [Programmablaufpläne](docs/flows/development-process-flow.md) | Grafische Ablaufpläne und technische Prozessbeschreibungen |
 | [Flow: Arbeitsverzeichnis-Auflösung](docs/flows/workdir-resolution-flow.md) | Sequenzablauf für Konfiguration, Laufzeit-Auflösung und Fallback-Verhalten |
+| [Flow: Plugin-Discovery und Laden](docs/flows/plugin-discovery-load-flow.md) | Ablauf der dynamischen Plugin-Erkennung und robusten Registrierung |
+| [Testplan: Plugin-Klassenbibliotheken](docs/tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md) | Abgedeckte Testbereiche für Plugin-Discovery, Build-Kopie und Laufzeitverhalten |
+| [Testlücken: Plugin-Klassenbibliotheken](docs/tests/testluecken-plugin-klassenbibliotheken-github-und-copilot.md) | Aktueller Stand der offenen Testlücken für das Plugin-Feature |
 
 ---
 
@@ -466,7 +526,7 @@ refactor: KiOrchestrationService in kleinere Methoden aufgeteilt
 - **Naming:** PascalCase für Klassen/Methoden, camelCase für Parameter/Variablen, Präfix `I` für Interfaces
 - **Async:** Alle I/O-Operationen konsequent `async`/`await` – keine `.Result`- oder `.Wait()`-Aufrufe
 - **Logging:** `ILogger<T>` in allen Services – strukturiertes Logging mit aussagekräftigen Nachrichten und Parametern
-- **Plugin-Erweiterungen:** Neue Plugins implementieren `IGitPlugin` bzw. `IKiPlugin` und werden per DI registriert – keine Kernänderungen nötig
+- **Plugin-Erweiterungen:** Neue Plugins implementieren `IPlugin` + `IGitPlugin`/`IKiPlugin`, setzen `PluginType` und werden als eigenes Projekt unter `plugins/` eingebunden (Discovery via `PluginManager`, keine direkte `AddScoped<...>`-Bindung)
 
 ---
 
@@ -477,3 +537,4 @@ MIT License *(Platzhalter – wird vor erster Veröffentlichung festgelegt)*
 ---
 
 *Softwareschmiede – KI-gestützter Entwicklungsworkflow, lokal und unter Ihrer Kontrolle.*
+

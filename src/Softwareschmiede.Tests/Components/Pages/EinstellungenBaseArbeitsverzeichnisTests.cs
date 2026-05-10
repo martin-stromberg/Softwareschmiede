@@ -79,10 +79,12 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         IArbeitsverzeichnisResolver arbeitsverzeichnisResolver)
     {
         var credentialStoreMock = new Mock<ICredentialStore>();
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns(Array.Empty<IGitPlugin>());
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(Array.Empty<IKiPlugin>());
         var pluginSettings = new PluginSettingsService(credentialStoreMock.Object, NullLogger<PluginSettingsService>.Instance);
         var sut = new TestEinstellungenPage();
-        SetInjectedProperty(sut, "GitPlugins", Array.Empty<IGitPlugin>());
-        SetInjectedProperty(sut, "KiPlugins", Array.Empty<IKiPlugin>());
+        SetInjectedProperty(sut, "PluginManager", pluginManagerMock.Object);
         SetInjectedProperty(sut, "PluginSettings", pluginSettings);
         SetInjectedProperty(sut, "ArbeitsverzeichnisSettings", arbeitsverzeichnisSettings);
         SetInjectedProperty(sut, "ArbeitsverzeichnisResolver", arbeitsverzeichnisResolver);

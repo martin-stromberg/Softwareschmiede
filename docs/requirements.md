@@ -105,7 +105,7 @@
   - Ausführung von Tests und Auswertung der Ergebnisse
   - Liefern von Rückmeldungen / Ergebnissen an die Anwendung (Echtzeit-Streaming)
   - Liefern einer Liste verfügbarer Agenten aus dem gewählten Agentenpaket
-- **Erstes Plugin:** GitHub Copilot – gesteuert über die **GitHub CLI (`gh copilot`)**
+- **Erstes Plugin:** GitHub Copilot – gesteuert über die **GitHub CLI (`copilot`)**
   - Legt das Agentenpaket im `.github/`-Verzeichnis des Branches ab
 
 ### 3.6 Agentenpakete
@@ -194,7 +194,7 @@ Projekt (archivierbar)
 
 Plugin-System
  ├── IGitPlugin (z.B. GitHubPlugin via `gh` CLI)
- └── IKiPlugin  (z.B. GitHubCopilotPlugin via `gh copilot` CLI)
+ └── IKiPlugin  (z.B. GitHubCopilotPlugin via `copilot` CLI)
 
 Agentenpaket
  └── Verzeichnis
@@ -228,3 +228,4 @@ Agentenpaket
 ---
 
 *Erstellt: 2026-05-06 | Status: Entwurf – wird fortlaufend ergänzt*
+

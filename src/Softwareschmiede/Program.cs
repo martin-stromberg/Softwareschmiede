@@ -32,8 +32,9 @@ namespace Softwareschmiede
             builder.Services.AddScoped<IArbeitsverzeichnisResolver, ArbeitsverzeichnisResolver>();
 
             // Plugins
-            builder.Services.AddScoped<IGitPlugin, GitHubPlugin>();
-            builder.Services.AddScoped<IKiPlugin, GitHubCopilotPlugin>();
+            builder.Services.AddSingleton<IPluginManager, PluginManager>();
+            builder.Services.AddScoped<IGitPlugin>(sp => sp.GetRequiredService<IPluginManager>().GetDefaultSourceCodeManagementPlugin());
+            builder.Services.AddScoped<IKiPlugin>(sp => sp.GetRequiredService<IPluginManager>().GetDefaultDevelopmentAutomationPlugin());
 
             // Application Services
             builder.Services.AddScoped<ProjektService>();

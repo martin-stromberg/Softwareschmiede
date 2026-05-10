@@ -1,10 +1,10 @@
-namespace Softwareschmiede.Infrastructure.Plugins;
-
-using Softwareschmiede.Domain.Interfaces;
-using Softwareschmiede.Domain.ValueObjects;
-using Softwareschmiede.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
+
+namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>
 /// GitHub Copilot Plugin – nutzt das <c>copilot</c>-CLI für KI-gestützte Entwicklung.
@@ -22,6 +22,9 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
 
     /// <inheritdoc/>
     public string PluginPrefix => "Softwareschmiede.GitHubCopilot";
+
+    /// <inheritdoc/>
+    public PluginType PluginType => PluginType.DevelopmentAutomation;
 
     /// <inheritdoc/>
     public IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
