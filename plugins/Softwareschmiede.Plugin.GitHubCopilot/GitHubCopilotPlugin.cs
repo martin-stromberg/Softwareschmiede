@@ -153,7 +153,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     {
         _logger.LogInformation("Starte KI-Entwicklung mit Agent {AgentName} in {RepoPath}.", agent.Name, localRepoPath);
 
-        var promptFile = Path.Combine(localRepoPath, ".copilot-task.md");
+        var promptFile = Path.Combine(localRepoPath, $"{Guid.NewGuid()}.copilot-task.md");
         await File.WriteAllTextAsync(promptFile, prompt, ct);
 
         var args = BuildCopilotArgs(promptFile, agent, model);
