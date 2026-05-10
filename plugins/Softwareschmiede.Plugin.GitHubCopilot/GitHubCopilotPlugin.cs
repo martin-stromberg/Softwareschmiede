@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -13,6 +15,12 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// </summary>
 public sealed class GitHubCopilotPlugin : IKiPlugin
 {
+    private const string CopilotTaskFileSuffix = ".copilot-task.md";
+    private const string GitIgnoreFileName = ".gitignore";
+    private const string CopilotTaskGitIgnoreRule = "*.copilot-task.md";
+    private const int GitIgnoreWriteRetryCount = 3;
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubCopilotPlugin> _logger;
@@ -148,22 +156,158 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
         string prompt,
         AgentInfo agent,
         string localRepoPath,
-        string? model = null,
+        string? model,
+        string? executionId,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        _logger.LogInformation("Starte KI-Entwicklung mit Agent {AgentName} in {RepoPath}.", agent.Name, localRepoPath);
+        var totalStopwatch = Stopwatch.StartNew();
+        string? promptFile = null;
+        string normalizedExecutionId;
 
-        var promptFile = Path.Combine(localRepoPath, $"{Guid.NewGuid()}.copilot-task.md");
-        await File.WriteAllTextAsync(promptFile, prompt, ct);
-
-        var args = BuildCopilotArgs(promptFile, agent, model);
-        var env = GetGhEnvironment();
-
-        _logger.LogInformation("Rufe copilot CLI mit Agent {AgentName} auf.", agent.Name);
-
-        await foreach (var line in _cliRunner.StreamAsync("copilot", args, localRepoPath, env, ct))
+        try
         {
-            yield return line;
+            normalizedExecutionId = NormalizeAndValidateExecutionId(executionId);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(
+                ex,
+                "KI-Entwicklungsschritt fehlgeschlagen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, DurationMs: {DurationMs}.",
+                "validate-id",
+                "failed",
+                executionId,
+                totalStopwatch.ElapsedMilliseconds);
+            throw;
+        }
+
+        _logger.LogInformation(
+            "Starte KI-Entwicklung mit Agent {AgentName} in {RepoPath}. ExecutionId: {ExecutionId}.",
+            agent.Name,
+            localRepoPath,
+            normalizedExecutionId);
+
+        if (!Directory.Exists(localRepoPath))
+        {
+            throw new DirectoryNotFoundException($"Repository-Verzeichnis nicht gefunden: {localRepoPath}");
+        }
+
+        try
+        {
+            var validateStepDuration = totalStopwatch.ElapsedMilliseconds;
+            _logger.LogInformation(
+                "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, DurationMs: {DurationMs}.",
+                "validate-id",
+                "success",
+                normalizedExecutionId,
+                validateStepDuration);
+
+            promptFile = Path.Combine(localRepoPath, $"{normalizedExecutionId}{CopilotTaskFileSuffix}");
+            try
+            {
+                await File.WriteAllTextAsync(promptFile, prompt, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "KI-Entwicklungsschritt fehlgeschlagen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, TaskFilePath: {TaskFilePath}, DurationMs: {DurationMs}.",
+                    "write-task-file",
+                    "failed",
+                    normalizedExecutionId,
+                    promptFile,
+                    totalStopwatch.ElapsedMilliseconds);
+                throw;
+            }
+
+            _logger.LogInformation(
+                "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, TaskFilePath: {TaskFilePath}, DurationMs: {DurationMs}.",
+                "write-task-file",
+                "success",
+                normalizedExecutionId,
+                promptFile,
+                totalStopwatch.ElapsedMilliseconds);
+
+            var gitignorePath = Path.Combine(localRepoPath, GitIgnoreFileName);
+            bool ignoreRuleChanged;
+            try
+            {
+                ignoreRuleChanged = await EnsureGitIgnoreRuleAsync(gitignorePath, CopilotTaskGitIgnoreRule, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "KI-Entwicklungsschritt fehlgeschlagen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, Rule: {Rule}, DurationMs: {DurationMs}.",
+                    "sync-gitignore",
+                    "failed",
+                    normalizedExecutionId,
+                    CopilotTaskGitIgnoreRule,
+                    totalStopwatch.ElapsedMilliseconds);
+                throw;
+            }
+
+            _logger.LogInformation(
+                "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, Rule: {Rule}, Status: {Status}, DurationMs: {DurationMs}.",
+                "sync-gitignore",
+                "success",
+                normalizedExecutionId,
+                CopilotTaskGitIgnoreRule,
+                ignoreRuleChanged ? "updated" : "already-synced",
+                totalStopwatch.ElapsedMilliseconds);
+
+            var args = BuildCopilotArgs(promptFile, agent, model);
+            var env = GetGhEnvironment();
+            _logger.LogInformation(
+                "KI-Entwicklungsschritt gestartet. Step: {Step}, ExecutionId: {ExecutionId}, AgentName: {AgentName}, TaskFilePath: {TaskFilePath}, DurationMs: {DurationMs}.",
+                "invoke-cli",
+                normalizedExecutionId,
+                agent.Name,
+                promptFile,
+                totalStopwatch.ElapsedMilliseconds);
+
+            await using var cliEnumerator = _cliRunner.StreamAsync("copilot", args, localRepoPath, env, ct)
+                .GetAsyncEnumerator(ct);
+            while (true)
+            {
+                bool hasNext;
+                try
+                {
+                    hasNext = await cliEnumerator.MoveNextAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        ex,
+                        "KI-Entwicklungsschritt fehlgeschlagen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, DurationMs: {DurationMs}.",
+                        "invoke-cli",
+                        "failed",
+                        normalizedExecutionId,
+                        totalStopwatch.ElapsedMilliseconds);
+                    throw;
+                }
+
+                if (!hasNext)
+                {
+                    break;
+                }
+
+                yield return cliEnumerator.Current;
+            }
+
+            _logger.LogInformation(
+                "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, DurationMs: {DurationMs}.",
+                "invoke-cli",
+                "success",
+                normalizedExecutionId,
+                totalStopwatch.ElapsedMilliseconds);
+        }
+        finally
+        {
+            await CleanupTaskFileAsync(promptFile, normalizedExecutionId, ct);
+            _logger.LogInformation(
+                "KI-Entwicklung abgeschlossen. ExecutionId: {ExecutionId}, DurationMs: {DurationMs}.",
+                normalizedExecutionId,
+                totalStopwatch.ElapsedMilliseconds);
         }
     }
 
@@ -209,6 +353,197 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
         }
 
         return args;
+    }
+
+    private static async Task<bool> EnsureGitIgnoreRuleAsync(
+        string gitIgnorePath,
+        string requiredRule,
+        CancellationToken ct)
+    {
+        var normalizedRequiredRule = NormalizeGitIgnoreRule(requiredRule);
+
+        for (var attempt = 1; attempt <= GitIgnoreWriteRetryCount; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await using var stream = new FileStream(
+                    gitIgnorePath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None);
+
+                using var reader = new StreamReader(
+                    stream,
+                    Utf8NoBom,
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: 1024,
+                    leaveOpen: true);
+                var content = await reader.ReadToEndAsync(ct);
+                var normalizedContent = content.Replace("\r\n", "\n");
+                var lines = normalizedContent.Length == 0
+                    ? []
+                    : normalizedContent.Split('\n');
+
+                var filteredLines = lines
+                    .Select(line => line.TrimEnd('\r'))
+                    .Where(line => !ShouldConsolidateCopilotTaskRule(line))
+                    .ToList();
+
+                var hasRule = filteredLines.Any(line => IsEquivalentGitIgnoreRule(line, normalizedRequiredRule));
+                if (!hasRule)
+                {
+                    filteredLines.Add(requiredRule);
+                }
+
+                while (filteredLines.Count > 0 && string.IsNullOrEmpty(filteredLines[^1]))
+                {
+                    filteredLines.RemoveAt(filteredLines.Count - 1);
+                }
+
+                var updatedContent = string.Join('\n', filteredLines);
+                if (updatedContent.Length > 0 && !updatedContent.EndsWith('\n'))
+                {
+                    updatedContent += '\n';
+                }
+
+                if (string.Equals(updatedContent, normalizedContent, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                stream.Position = 0;
+                stream.SetLength(0);
+                await using var writer = new StreamWriter(
+                    stream,
+                    Utf8NoBom,
+                    bufferSize: 1024,
+                    leaveOpen: true);
+                await writer.WriteAsync(updatedContent.AsMemory(), ct);
+                await writer.FlushAsync(ct);
+
+                return true;
+            }
+            catch (IOException) when (attempt < GitIgnoreWriteRetryCount)
+            {
+                await Task.Delay(50 * attempt, ct);
+            }
+        }
+
+        throw new IOException($"Konnte .gitignore nicht aktualisieren: {gitIgnorePath}");
+    }
+
+    private static bool IsEquivalentGitIgnoreRule(string line, string normalizedRequiredRule)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        var trimmed = line.Trim();
+        if (trimmed.StartsWith('#'))
+        {
+            return false;
+        }
+
+        return string.Equals(
+            NormalizeGitIgnoreRule(trimmed),
+            normalizedRequiredRule,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeGitIgnoreRule(string value)
+    {
+        var normalized = value.Trim().Replace('\\', '/');
+        normalized = normalized.TrimStart('/');
+        normalized = normalized.TrimStart('.');
+        normalized = normalized.TrimStart('/');
+        return normalized;
+    }
+
+    private static bool ShouldConsolidateCopilotTaskRule(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        var trimmed = line.Trim();
+        if (trimmed.StartsWith('#'))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeGitIgnoreRule(trimmed);
+        return string.Equals(normalized, CopilotTaskGitIgnoreRule, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeAndValidateExecutionId(string? executionId)
+    {
+        if (string.IsNullOrWhiteSpace(executionId))
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+
+        var trimmed = executionId.Trim();
+        if (!Guid.TryParse(trimmed, out var guid))
+        {
+            throw new ArgumentException(
+                $"Invalid executionId format. Expected a GUID in .NET format (N, D, B or P), received: '{executionId}'.",
+                nameof(executionId));
+        }
+
+        return guid.ToString("N");
+    }
+
+    private async Task CleanupTaskFileAsync(string? taskFilePath, string executionId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(taskFilePath))
+        {
+            _logger.LogInformation(
+                "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, DurationMs: {DurationMs}.",
+                "cleanup",
+                "skipped",
+                executionId,
+                0);
+            return;
+        }
+
+        var cleanupStopwatch = Stopwatch.StartNew();
+        try
+        {
+            if (!File.Exists(taskFilePath))
+            {
+                _logger.LogInformation(
+                    "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, TaskFilePath: {TaskFilePath}, DurationMs: {DurationMs}.",
+                    "cleanup",
+                    "already-absent",
+                    executionId,
+                    taskFilePath,
+                    cleanupStopwatch.ElapsedMilliseconds);
+                return;
+            }
+
+            await Task.Run(() => File.Delete(taskFilePath), ct);
+            _logger.LogInformation(
+                "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, TaskFilePath: {TaskFilePath}, DurationMs: {DurationMs}.",
+                "cleanup",
+                "success",
+                executionId,
+                taskFilePath,
+                cleanupStopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "KI-Entwicklungsschritt abgeschlossen. Step: {Step}, Result: {Result}, ExecutionId: {ExecutionId}, TaskFilePath: {TaskFilePath}, DurationMs: {DurationMs}. Cleanup-Fehler ist non-blocking.",
+                "cleanup",
+                "warning",
+                executionId,
+                taskFilePath,
+                cleanupStopwatch.ElapsedMilliseconds);
+        }
     }
 
     /// <inheritdoc/>

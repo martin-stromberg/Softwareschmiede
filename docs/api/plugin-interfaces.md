@@ -347,7 +347,8 @@ public interface IKiPlugin : IPlugin
         string prompt,
         AgentInfo agent,
         string localRepoPath,
-        string? model = null,
+        string? model,
+        string? executionId,
         CancellationToken ct = default);
     Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default);
     Task<bool> CheckHealthAsync(CancellationToken ct = default);
@@ -420,7 +421,7 @@ Task DeployAgentPackageAsync(
     CancellationToken ct = default);
 ```
 
-**Beschreibung:** Kopiert alle Agenten-Dateien eines Pakets in das `.github/agents/`-Verzeichnis des geklonten Repositories. Erstellt das Zielverzeichnis, falls es nicht existiert.
+**Beschreibung:** Kopiert den vollständigen `.github`-Ordner eines Agentenpakets rekursiv in das `.github/`-Verzeichnis des geklonten Repositories. Bestehende Dateien werden überschrieben.
 
 **Parameter:**
 
@@ -432,7 +433,7 @@ Task DeployAgentPackageAsync(
 
 **Rückgabewert:** `Task` – abgeschlossen, wenn alle Dateien kopiert wurden.
 
-**Deployment-Ziel:** `{localRepoPath}/.github/agents/`
+**Deployment-Ziel:** `{localRepoPath}/.github/`
 
 **Fehlerverhalten:**
 - `DirectoryNotFoundException` – Quell- oder Zielpfad nicht erreichbar.
@@ -448,10 +449,14 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
     string prompt,
     AgentInfo agent,
     string localRepoPath,
+    string? model,
+    string? executionId,
     CancellationToken ct = default);
 ```
 
-**Beschreibung:** Startet den KI-gestützten Entwicklungsprozess für einen gegebenen Prompt und liefert die Ausgabe des KI-Systems als **Stream von Textfragmenten** zurück. Die Methode gibt `IAsyncEnumerable<string>` zurück, sodass die UI die Ausgabe schrittweise anzeigen kann.
+**Beschreibung:** Startet den KI-gestützten Entwicklungsprozess für einen gegebenen Prompt und liefert die Ausgabe als **Stream von Textfragmenten** zurück. Vor dem CLI-Aufruf wird der Prompt als `{executionId}.copilot-task.md` geschrieben; `.gitignore` wird auf `*.copilot-task.md` konsolidiert und idempotent synchronisiert.
+
+> **Vertragskonsolidierung:** Seit dem Feature `startdevelopmentasync-test-overload-removal` existiert kein test-spezifischer Kurz-Overload mehr. Alle Aufrufer (inkl. Tests) verwenden ausschließlich diese kanonische Signatur.
 
 **Parameter:**
 
@@ -460,6 +465,8 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 | `prompt` | `string` | *(required)* | Aufgabenbeschreibung / Entwicklungsauftrag für den Agenten |
 | `agent` | `AgentInfo` | *(required)* | Der zu verwendende Agent (aus [`GetAvailableAgentsAsync`](#getavailableagentsasync)) |
 | `localRepoPath` | `string` | *(required)* | Absoluter Pfad zum lokalen Repository, in dem entwickelt werden soll |
+| `model` | `string?` | optional | Modellname für das `copilot`-CLI; bei `null` wird `auto` gesetzt |
+| `executionId` | `string?` | optional | Optionale GUID zur Korrelation; erlaubt `N/D/B/P`, intern normalisiert auf `N` |
 | `ct` | `CancellationToken` | optional | Abbruch-Token – bricht den Stream ab |
 
 **Rückgabewert:** `IAsyncEnumerable<string>` – Sequenz von Textfragmenten (Streaming-Ausgabe des KI-Systems).
@@ -467,14 +474,22 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 **Streaming-Verwendung:**
 
 ```csharp
-await foreach (var fragment in kiPlugin.StartDevelopmentAsync(prompt, agent, repoPath, ct))
+await foreach (var fragment in kiPlugin.StartDevelopmentAsync(
+    prompt,
+    agent,
+    repoPath,
+    model: null,
+    executionId: "8934d257-5588-473e-9882-9b19d322851b",
+    ct))
 {
     Console.Write(fragment); // Schrittweise Ausgabe in der UI
 }
 ```
 
 **Fehlerverhalten:**
-- `InvalidOperationException` – KI-System nicht erreichbar oder Fehler beim Start.
+- `ArgumentException` – `executionId` ist keine gültige GUID.
+- `DirectoryNotFoundException` – Repository-Verzeichnis nicht gefunden.
+- `IOException` – `.gitignore` konnte nach Retry nicht aktualisiert werden.
 - `OperationCanceledException` – Abbruch über `ct` bricht den Stream sauber ab.
 
 > **Hinweis:** Da `IAsyncEnumerable<string>` keine `async` Signatur hat, muss die Implementierung intern `yield return` mit `await` kombinieren (z. B. via `IAsyncEnumerable` mit `await foreach` auf einem Prozess-Stream).
@@ -820,7 +835,7 @@ private static async Task<string?> ReadDescriptionFromFrontmatterAsync(
 
 ### Schritt 3: `DeployAgentPackageAsync` implementieren
 
-Kopiert alle Dateien des Pakets ins `.github/agents/`-Verzeichnis des Repositories:
+Kopiert den vorhandenen `.github`-Ordner des Pakets rekursiv nach `<repo>/.github`:
 
 ```csharp
 public async Task DeployAgentPackageAsync(
@@ -828,24 +843,24 @@ public async Task DeployAgentPackageAsync(
     string localRepoPath,
     CancellationToken ct = default)
 {
-    var targetDir = Path.Combine(localRepoPath, ".github", "agents");
-    Directory.CreateDirectory(targetDir);
-
-    var files = Directory.GetFiles(agentPackagePath);
-
-    foreach (var file in files)
+    var githubSourceDir = Path.Combine(agentPackagePath, ".github");
+    if (!Directory.Exists(githubSourceDir))
     {
-        ct.ThrowIfCancellationRequested();
-        var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
-        File.Copy(file, targetFile, overwrite: true);
-        _logger.LogDebug("Deployed {File} → {Target}", file, targetFile);
+        return;
     }
 
-    _logger.LogInformation(
-        "{Count} Dateien nach {Target} deployed",
-        files.Length, targetDir);
+    var githubTargetDir = Path.Combine(localRepoPath, ".github");
 
-    await Task.CompletedTask; // Für zukünftige async-Operationen
+    await Task.Run(() =>
+    {
+        foreach (var sourceFile in Directory.GetFiles(githubSourceDir, "*", SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(githubSourceDir, sourceFile);
+            var targetFile = Path.Combine(githubTargetDir, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetFile)!);
+            File.Copy(sourceFile, targetFile, overwrite: true);
+        }
+    }, ct);
 }
 ```
 
@@ -858,25 +873,26 @@ public async IAsyncEnumerable<string> StartDevelopmentAsync(
     string prompt,
     AgentInfo agent,
     string localRepoPath,
+    string? model = null,
+    string? executionId = null,
     [EnumeratorCancellation] CancellationToken ct = default)
 {
-    var token = _credentialStore.GetCredential(CredentialKey)
-        ?? throw new InvalidOperationException("Claude-Token nicht konfiguriert.");
+    var normalizedExecutionId = NormalizeAndValidateExecutionId(executionId);
+    var promptFile = Path.Combine(localRepoPath, $"{normalizedExecutionId}.copilot-task.md");
+    await File.WriteAllTextAsync(promptFile, prompt, ct);
 
-    // Token als Umgebungsvariable setzen (nie als CLI-Argument!)
-    Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", token);
+    var gitIgnorePath = Path.Combine(localRepoPath, ".gitignore");
+    await EnsureGitIgnoreRuleAsync(gitIgnorePath, "*.copilot-task.md", ct);
 
-    _logger.LogInformation(
-        "Starte Entwicklung mit Agent '{Agent}' in {RepoPath}",
-        agent.Name, localRepoPath);
+    var args = BuildCopilotArgs(promptFile, agent, model);
+    var env = GetGhEnvironment();
 
-    // Beispiel: Claude CLI oder API-Stream aufrufen
-    // Der Stream liefert die Ausgabe Fragment für Fragment
     await foreach (var fragment in _cliRunner.StreamAsync(
-        "claude",
-        $"--agent {agent.DateiPfad} \"{prompt}\"",
-        workingDirectory: localRepoPath,
-        ct: ct))
+        "copilot",
+        args,
+        localRepoPath,
+        env,
+        ct))
     {
         yield return fragment;
     }
@@ -1029,13 +1045,15 @@ Nach dem Aufruf von [`DeployAgentPackageAsync`](#deployagentpackageasync) werden
 ```
 {localRepoPath}/
 └── .github/
-    └── agents/
-        ├── planner.agent.md
-        ├── implementer.agent.md
-        └── README.md
+    ├── agents/
+    │   ├── planner.agent.md
+    │   ├── implementer.agent.md
+    │   └── README.md
+    └── workflows/
+        └── ci.yml
 ```
 
-Das Verzeichnis `.github/agents/` wird automatisch erstellt, falls es nicht existiert. Vorhandene Dateien werden **überschrieben**.
+Der `.github`-Ordner wird rekursiv synchronisiert. Vorhandene Dateien im Ziel werden überschrieben.
 
 ---
 

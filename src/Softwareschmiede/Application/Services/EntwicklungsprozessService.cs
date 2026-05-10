@@ -155,6 +155,7 @@ public sealed class EntwicklungsprozessService
         string prompt,
         AgentInfo agent,
         string? model = null,
+        string? executionId = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
@@ -174,7 +175,17 @@ public sealed class EntwicklungsprozessService
 
         // yield return inside a try-catch is not allowed in C#.
         // Workaround: manually advance the enumerator and catch MoveNextAsync separately.
-        var enumerator = _kiPlugin.StartDevelopmentAsync(prompt, agent, aufgabe.LokalerKlonPfad, model, ct)
+        var effectiveExecutionId = string.IsNullOrWhiteSpace(executionId)
+            ? null
+            : executionId;
+
+        var enumerator = _kiPlugin.StartDevelopmentAsync(
+                prompt,
+                agent,
+                aufgabe.LokalerKlonPfad,
+                model,
+                effectiveExecutionId,
+                ct)
             .GetAsyncEnumerator(ct);
 
         try

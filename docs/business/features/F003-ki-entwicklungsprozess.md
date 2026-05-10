@@ -85,6 +85,9 @@ Die KI läuft im Hintergrund auf Ihrem Rechner weiter. Beim nächsten Öffnen se
 **Kann ich der KI mehrere Nachrichten senden?**
 Ja. Sie können beliebig viele Folge-Anweisungen senden. Die KI berücksichtigt alle bisherigen Nachrichten.
 
+**Hat sich durch die technische `StartDevelopmentAsync`-Signaturkonsolidierung etwas in der Bedienung geändert?**  
+Nein. Das Verhalten in der Oberfläche bleibt unverändert; die Änderung verbessert intern nur Konsistenz und Wartbarkeit von Service- und Testaufrufen.
+
 **Wie lange braucht die KI für eine Aufgabe?**
 Das hängt von der Komplexität der Aufgabe ab. Einfache Änderungen dauern oft wenige Minuten, komplexe Vorhaben können länger dauern.
 
@@ -102,4 +105,5 @@ Klicken Sie auf **Aufgabe abbrechen** und formulieren Sie die Aufgabenbeschreibu
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Vorgang beenden ohne zu speichern
 - [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Speicherort der lokalen Klone steuern
 - [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Ausgelagerte GitHub- und Copilot-Anbindung verstehen
+- [F011 – Copilot-Task-Datei als bindende Anforderung](./F011-copilot-task-datei-bindung.md) – Prompt-Persistenz und automatischer `.gitignore`-Schutz
 - [Zurück zur Übersicht](../features.md)

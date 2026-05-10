@@ -74,6 +74,9 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 ### 🤖 KI-Steuerung (Plugin-System)
 - **Plugin-Architektur** über `IKiPlugin`-Interface – austauschbar für verschiedene KI-Systeme
 - **GitHub Copilot-Plugin** (erstes Plugin): KI-Integration via `copilot` CLI
+- Prompt-Persistenz pro Lauf in `{executionId}.copilot-task.md` mit dateibasierter CLI-Übergabe (`--prompt @...`)
+- Automatische, idempotente `.gitignore`-Konsolidierung auf `*.copilot-task.md`
+- Einheitlicher `StartDevelopmentAsync`-Vertrag ohne test-spezifischen Kurz-Overload (konsistente Service-/Test-Aufrufe)
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
@@ -242,6 +245,16 @@ gebildet, z. B.:
 
 - Konfiguriert: `D:/Repos` → `D:/Repos/softwareschmiede/<aufgabeId>`
 - Fallback: `Path.GetTempPath()` → `<temp>/softwareschmiede/<aufgabeId>`
+
+### Copilot-Task-Datei und `.gitignore`
+
+Beim Start eines KI-Laufs schreibt das GitHub-Copilot-Plugin den Prompt in:
+
+```
+<lokalerKlonPfad>/{executionId}.copilot-task.md
+```
+
+Anschließend wird in `<lokalerKlonPfad>/.gitignore` die Regel `*.copilot-task.md` idempotent sichergestellt. Ältere Varianten (`/.copilot-task.md`, `.copilot-task.md`) werden dabei konsolidiert.
 
 ---
 
@@ -439,6 +452,10 @@ Für die Inbetriebnahme müssen `gh`, `git` und `copilot` auf dem Zielsystem ver
 
 Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
+Letzte dokumentierte Feature-Ergänzung:
+- GUID-präfixierte Prompt-Datei `{executionId}.copilot-task.md` inkl. optionaler `executionId`, robustem Cleanup und `.gitignore`-Konsolidierung im `GitHubCopilotPlugin`
+- Konsolidierung auf die kanonische `StartDevelopmentAsync(..., model, executionId, ct)`-Signatur (Entfernung des test-spezifischen Overloads bei unverändertem Laufzeitverhalten)
+
 ---
 
 ## 🗺️ Roadmap
@@ -472,9 +489,12 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 | [Feature-Dokumentation](docs/business/features.md) | Fachliche Beschreibung aller Features für nicht-technische Stakeholder |
 | [Feature F009: Arbeitsverzeichnis konfigurieren](docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md) | Fachliche Beschreibung des konfigurierbaren Arbeitsverzeichnisses inkl. Fallback und Migration |
 | [Feature F010: Plugin-Prinzip für Integrationen](docs/business/features/F010-plugin-prinzip-integrationen.md) | Fachliche Beschreibung der ausgelagerten GitHub-/Copilot-Plugins |
+| [Feature F011: GUID-präfixierte Copilot-Task-Datei](docs/business/features/F011-copilot-task-datei-bindung.md) | Fachliche Beschreibung von `{executionId}.copilot-task.md`, wildcard-Ignore-Regel und Korrelation pro Lauf |
 | [Plugin-Interfaces](docs/api/plugin-interfaces.md) | Technische Dokumentation der Plugin-Schnittstellen für Plugin-Entwickler |
+| [Copilot-Task-Binding (technisch)](docs/api/copilot-task-binding.md) | Technische Detaildokumentation für `executionId`, `{executionId}.copilot-task.md`, `.gitignore`-Konsolidierung und CLI-Parameter |
 | [Workdir-Konfiguration (technisch)](docs/api/workdir-configuration.md) | Technische Umsetzung von Settings, Resolver, Klonpfadbildung und Reason-Codes |
 | [Programmablaufpläne](docs/flows/development-process-flow.md) | Grafische Ablaufpläne und technische Prozessbeschreibungen |
+| [Flow: Copilot-Task-Datei und Gitignore-Sync](docs/flows/copilot-task-binding-flow.md) | Sequenz- und Entscheidungsablauf für Prompt-Datei-Erstellung und idempotente Ignore-Regel |
 | [Flow: Arbeitsverzeichnis-Auflösung](docs/flows/workdir-resolution-flow.md) | Sequenzablauf für Konfiguration, Laufzeit-Auflösung und Fallback-Verhalten |
 | [Flow: Plugin-Discovery und Laden](docs/flows/plugin-discovery-load-flow.md) | Ablauf der dynamischen Plugin-Erkennung und robusten Registrierung |
 | [Testplan: Plugin-Klassenbibliotheken](docs/tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md) | Abgedeckte Testbereiche für Plugin-Discovery, Build-Kopie und Laufzeitverhalten |

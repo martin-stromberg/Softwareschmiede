@@ -423,7 +423,7 @@ sequenceDiagram
     ProtokollService->>DB: INSERT Protokolleintrag
     KiService->>KiPlugin: StartDevelopmentAsync(prompt, agent, localRepoPath, ct)
     KiPlugin->>CliRunner: StreamAsync("gh", "copilot ...", localRepoPath, ct)
-    CliRunner->>GhCopilot: Prozess starten (copilot suggest ...)
+    CliRunner->>GhCopilot: Prozess starten (copilot --prompt @.copilot-task.md ...)
     Note over CliRunner,GhCopilot: stdout wird zeilenweise gelesen
     loop Streaming-Schleife (IAsyncEnumerable)
         GhCopilot-->>CliRunner: stdout-Zeile

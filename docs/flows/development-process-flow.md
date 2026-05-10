@@ -70,7 +70,7 @@ sequenceDiagram
 | 3 | Repository klonen | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` → `GitHubPlugin`: `git clone {url} {targetPath}` | Eingabe: URL + Zielpfad; Seiteneffekt: lokales Verzeichnis wird erstellt |
 | 4 | Branch-Namen erzeugen | `EntwicklungsprozessService.ProzessStartenAsync` | Format: `task/<aufgabeId-ohne-Bindestriche>-<titel-slug>`, max. 30 Zeichen |
 | 5 | Branch anlegen | `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName)` → `GitHubPlugin`: `git checkout -b {branchName}` | Seiteneffekt: neuer Branch im lokalen Klon |
-| 6 | Agentenpaket deployen (optional) | `IKiPlugin.DeployAgentPackageAsync(paketPfad, lokalerKlonPfad)` → `GitHubCopilotPlugin`: Dateien nach `.github/agents/` kopieren | Nur wenn Paket konfiguriert |
+| 6 | Agentenpaket deployen (optional) | `IKiPlugin.DeployAgentPackageAsync(paketPfad, lokalerKlonPfad)` → `GitHubCopilotPlugin`: Paket-`.github` rekursiv nach `<repo>/.github` kopieren | Nur wenn Paket konfiguriert |
 | 7 | Aufgabe als gestartet markieren | `AufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad)` | Statusübergang: `Offen → InBearbeitung`; BranchName + Pfad werden persistiert |
 | 8 | Protokolleintrag schreiben | `EntwicklungsprozessService.ProzessStartenAsync` | GitAktion-Eintrag: "Klon und Branch angelegt: {branchName} in {pfad}" |
 
@@ -137,7 +137,7 @@ flowchart TD
 | 2 | Klon-Pfad validieren | `EntwicklungsprozessService.KiStartenAsync` | Wirft Exception wenn `LokalerKlonPfad` null oder leer |
 | 3 | Prompt protokollieren | `EntwicklungsprozessService.KiStartenAsync` | Protokolleintrag (Typ: Prompt): Prompt-Text + Agent-Name |
 | 4 | Status auf KiAktiv setzen | `AufgabeService.KiAktiviertAsync(aufgabeId)` | Statusübergang: `InBearbeitung → KiAktiv` |
-| 5 | KI starten und Stream öffnen | `IKiPlugin.StartDevelopmentAsync(prompt, agent, lokalerKlonPfad)` → `GitHubCopilotPlugin`: `copilot suggest --type shell {prompt}` | Rückgabe: `IAsyncEnumerable<string>` |
+| 5 | KI starten und Stream öffnen | `IKiPlugin.StartDevelopmentAsync(prompt, agent, lokalerKlonPfad, model, executionId, ct)` → `GitHubCopilotPlugin`: validiert/normalisiert `executionId`, schreibt `{executionId}.copilot-task.md`, konsolidiert `.gitignore` auf `*.copilot-task.md`, startet `copilot --prompt @<taskfile> ...` | Rückgabe: `IAsyncEnumerable<string>` |
 | 6 | Chunks protokollieren und weiterleiten | `EntwicklungsprozessService.KiStartenAsync` (Schleife) | Jeder Chunk wird protokolliert + per `yield return` an BlazorUI übergeben |
 | 7 | Abschluss-Protokolleintrag | `EntwicklungsprozessService.KiStartenAsync` | Gesamte Antwort als KiAntwort-Protokolleintrag (Typ: KiAntwort) |
 | 8 | Status zurücksetzen | `AufgabeService.KiAbgeschlossenAsync(aufgabeId)` | Statusübergang: `KiAktiv → InBearbeitung` |
@@ -154,7 +154,7 @@ flowchart TD
 
 - `EntwicklungsprozessService.KiStartenAsync`
 - `AufgabeService` (Status: `KiAktiviertAsync`, `KiAbgeschlossenAsync`, `FehlgeschlagenAsync`)
-- `IKiPlugin` / `GitHubCopilotPlugin` (`StartDevelopmentAsync` via `copilot suggest`)
+- `IKiPlugin` / `GitHubCopilotPlugin` (`StartDevelopmentAsync` via dateibasiertem Prompt `--prompt @...`)
 
 > **Verwandte Abläufe:** [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
 

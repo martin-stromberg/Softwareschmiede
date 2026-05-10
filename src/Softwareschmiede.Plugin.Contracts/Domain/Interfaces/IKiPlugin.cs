@@ -33,12 +33,17 @@ public interface IKiPlugin : IPlugin
     /// Optionales KI-Modell (z.B. <c>gpt-4o</c>, <c>claude-3-7-sonnet</c>).
     /// Wird <c>null</c> übergeben, erfolgt die Modellauswahl automatisch durch den Anbieter.
     /// </param>
+    /// <param name="executionId">
+    /// Optionale Ausführungs-ID zur Korrelation eines KI-Laufs.
+    /// Erwartet wird eine GUID (beliebiges .NET GUID-Format), intern normalisiert auf Format <c>N</c>.
+    /// </param>
     /// <param name="ct">Cancellation Token.</param>
     IAsyncEnumerable<string> StartDevelopmentAsync(
         string prompt,
         AgentInfo agent,
         string localRepoPath,
-        string? model = null,
+        string? model,
+        string? executionId,
         CancellationToken ct = default);
 
     /// <summary>Führt Tests im Repository aus.</summary>

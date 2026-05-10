@@ -17,6 +17,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F008 | Dashboard | Projektübergreifende Übersicht aller Aufgaben und deren Status | [F008 – Dashboard](./features/F008-dashboard.md) |
 | F009 | Arbeitsverzeichnis konfigurieren | Basis-Arbeitsverzeichnis für lokale Repository-Klone festlegen und Fallback verstehen | [F009 – Arbeitsverzeichnis konfigurieren](./features/F009-arbeitsverzeichnis-konfigurieren.md) |
 | F010 | Plugin-Prinzip für Integrationen | GitHub und Copilot laufen als ausgelagerte Plugins mit automatischer Erkennung | [F010 – Plugin-Prinzip für Integrationen](./features/F010-plugin-prinzip-integrationen.md) |
+| F011 | GUID-präfixierte Copilot-Task-Datei | Prompt wird als `{executionId}.copilot-task.md` gespeichert, per `*.copilot-task.md` geschützt und pro Lauf eindeutig korreliert | [F011 – GUID-präfixierte Copilot-Task-Datei](./features/F011-copilot-task-datei-bindung.md) |
 
 ---
 

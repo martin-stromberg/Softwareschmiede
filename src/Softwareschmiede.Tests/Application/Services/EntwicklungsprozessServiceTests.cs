@@ -160,6 +160,126 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .WithMessage("*lokalen Klonpfad*");
     }
 
+    [Fact]
+    public async Task KiStartenAsync_ShouldForwardExecutionIdToPlugin_WhenProvided()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "KI mit ExecutionId", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/pfad");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        const string executionId = "8934d2575588473e98829b19d322851b";
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                "prompt",
+                agent,
+                "/pfad",
+                null,
+                executionId,
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("line"));
+
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "prompt", agent, executionId: executionId))
+        {
+        }
+
+        _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
+            "prompt",
+            agent,
+            "/pfad",
+            null,
+            executionId,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldPassNullExecutionIdToPlugin_WhenNotProvided()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "KI ohne ExecutionId", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/pfad");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                "prompt",
+                agent,
+                "/pfad",
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("line"));
+
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "prompt", agent))
+        {
+        }
+
+        _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
+            "prompt",
+            agent,
+            "/pfad",
+            null,
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldPassNullExecutionIdToPlugin_WhenExecutionIdIsWhitespace()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "KI mit Whitespace ExecutionId", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/pfad");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                "prompt",
+                agent,
+                "/pfad",
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("line"));
+
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "prompt", agent, executionId: "   "))
+        {
+        }
+
+        _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
+            "prompt",
+            agent,
+            "/pfad",
+            null,
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldMarkTaskAsFailedAndWriteErrorLog_WhenPluginStreamThrows()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "KI Fehlerfall", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/pfad");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                "prompt",
+                agent,
+                "/pfad",
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .Returns(ToFailingAsyncEnumerable("CLI broken"));
+
+        var streamedLines = new List<string>();
+        await foreach (var line in _sut.KiStartenAsync(aufgabe.Id, "prompt", agent))
+        {
+            streamedLines.Add(line);
+        }
+
+        streamedLines.Should().ContainSingle().Which.Should().Be("partial");
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Fehlgeschlagen);
+
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(p =>
+            p.Typ == ProtokollTyp.KiAntwort &&
+            p.Inhalt.Contains("Fehler: CLI broken", StringComparison.Ordinal));
+    }
+
     /// <summary>AbschliessenAsync setzt Status auf Abgeschlossen und erstellt Protokolleintrag.</summary>
     [Fact]
     public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndAddProtokoll_WhenAufgabeExists()
@@ -354,5 +474,21 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Assert
         _kiPluginMock.Verify(k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         _agentPackageServiceMock.Verify(a => a.GetPackageAsync("missing-package", It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    private static async IAsyncEnumerable<string> ToAsyncEnumerable(params string[] lines)
+    {
+        foreach (var line in lines)
+        {
+            yield return line;
+            await Task.Yield();
+        }
+    }
+
+    private static async IAsyncEnumerable<string> ToFailingAsyncEnumerable(string message)
+    {
+        yield return "partial";
+        await Task.Yield();
+        throw new InvalidOperationException(message);
     }
 }

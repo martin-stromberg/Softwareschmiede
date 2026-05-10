@@ -7,6 +7,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | Ablauf | Datei | Beschreibung |
 |--------|-------|--------------|
 | [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (5 Kern-Flows) |
+| [Copilot-Task-Datei & Gitignore-Sync](./copilot-task-binding-flow.md) | `copilot-task-binding-flow.md` | GUID-präfixierte Task-Datei `{executionId}.copilot-task.md`, Legacy-Konsolidierung und idempotente Synchronisation auf `*.copilot-task.md` |
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 
@@ -63,6 +64,13 @@ Beschreibt den Ablauf von der DI-Registrierung bis zur Lazy-Discovery aus `<Prog
 
 ---
 
+### [Ablauf 8: GUID-präfixierte Copilot-Task-Datei und `.gitignore`-Synchronisation](./copilot-task-binding-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `GitHubCopilotPlugin`, `ICliRunner`
+
+Beschreibt die Erstellung von `{executionId}.copilot-task.md`, die Konsolidierung alter Regeln und die idempotente Pflege von `*.copilot-task.md` vor dem CLI-Start.
+
+---
+
 ## Statusübergänge (Kurzreferenz)
 
 ```
@@ -77,5 +85,7 @@ Vollständiges Zustandsdiagramm: [development-process-flow.md – Zustandsdiagra
 ## Verknüpfte Dokumentation
 
 - Technische Schnittstellen: [docs/api/plugin-interfaces.md](../api/plugin-interfaces.md)
+- Technische Schnittstellen: [docs/api/copilot-task-binding.md](../api/copilot-task-binding.md)
 - Fachliche Einordnung: [F010 – Plugin-Prinzip für Integrationen](../business/features/F010-plugin-prinzip-integrationen.md)
+- Fachliche Einordnung: [F011 – GUID-präfixierte Copilot-Task-Datei](../business/features/F011-copilot-task-datei-bindung.md)
 - Testabdeckung: [Testplan Plugin-Klassenbibliotheken](../tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md)

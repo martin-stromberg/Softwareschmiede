@@ -369,3 +369,5 @@ FodyWeavers.xsd
 
 /src/Softwareschmiede/agent-packages/*
 /.github/agents
+/.github/tools
+/.github/workflows

@@ -74,6 +74,7 @@ public sealed class KiAusfuehrungsService
         string prompt,
         AgentInfo agent,
         string? model = null,
+        string? executionId = null,
         Action? onStarted = null,
         Action? onStatus = null,
         Action<bool>? onCompleted = null)
@@ -124,7 +125,7 @@ public sealed class KiAusfuehrungsService
             {
                 // Scoped Service im Background-Task-Scope ausführen
                 await foreach (var line in entwicklungsprozessService.KiStartenAsync(
-                    aufgabeId, prompt, agent, model, session.CancellationToken))
+                    aufgabeId, prompt, agent, model, executionId, session.CancellationToken))
                 {
                     session.AddLine(line);
 
