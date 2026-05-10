@@ -325,12 +325,11 @@ public partial class AufgabeDetail : IDisposable
             prompt,
             agent,
             model: string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel,
-            onStarted: () => _ = InvokeAsync(async () =>
-            {
-                await LadeAsyncWithScope();
-                StateHasChanged();
-            }),
-            onCompleted: fehler => _ = InvokeAsync(async () =>
+            onStarted: async () => {
+                await LadeAsync();
+                await InvokeAsync(StateHasChanged);
+            },
+            onCompleted: fehler => InvokeAsync(async () =>
             {
                 _processing = false;
                 _kiSubscription?.Dispose();
