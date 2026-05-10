@@ -6,7 +6,8 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 
 | Ablauf | Datei | Beschreibung |
 |--------|-------|--------------|
-| [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (5 Flows) |
+| [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (5 Kern-Flows) |
+| [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 
 ---
 
@@ -44,6 +45,13 @@ Geordneter Abbruch einer laufenden Aufgabe: lokaler Klon wird gelöscht (ohne Pu
 **Typ:** `sequenceDiagram` · **Services:** `GitOrchestrationService`, `IGitPlugin`, `AufgabeService`
 
 Import von GitHub-Issues via `gh issue list` und direkte Übernahme als neue Aufgabe mit Titel, Body und Labels.
+
+---
+
+### [Ablauf 6: Arbeitsverzeichnis-Auflösung für lokale Klone](./workdir-resolution-flow.md)
+**Typ:** `sequenceDiagram` · **Services:** `ArbeitsverzeichnisSettingsService`, `ArbeitsverzeichnisResolver`, `EntwicklungsprozessService`
+
+Beschreibt, wie die Einstellung `repositories.workdir` gespeichert wird, wie der Laufzeit-Fallback funktioniert und wie der finale Klonpfad `<basis>/softwareschmiede/<aufgabeId>` gebildet wird.
 
 ---
 

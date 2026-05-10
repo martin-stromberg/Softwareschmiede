@@ -29,6 +29,7 @@ namespace Softwareschmiede
             builder.Services.AddSingleton<ICredentialStore, WindowsCredentialStore>();
             builder.Services.AddScoped<IAgentPackageService, AgentPackageReader>();
             builder.Services.AddScoped<IAgentPackageFileService, AgentPackageFileService>();
+            builder.Services.AddScoped<IArbeitsverzeichnisResolver, ArbeitsverzeichnisResolver>();
 
             // Plugins
             builder.Services.AddScoped<IGitPlugin, GitHubPlugin>();
@@ -41,6 +42,7 @@ namespace Softwareschmiede
             builder.Services.AddScoped<EntwicklungsprozessService>();
             builder.Services.AddScoped<GitOrchestrationService>();
             builder.Services.AddScoped<PluginSettingsService>();
+            builder.Services.AddScoped<ArbeitsverzeichnisSettingsService>();
             builder.Services.AddSingleton<KiAusfuehrungsService>();
 
             var app = builder.Build();

@@ -18,6 +18,7 @@ public sealed class EntwicklungsprozessService
     private readonly IGitPlugin _gitPlugin;
     private readonly IKiPlugin _kiPlugin;
     private readonly IAgentPackageService _agentPackageService;
+    private readonly IArbeitsverzeichnisResolver _arbeitsverzeichnisResolver;
     private readonly ILogger<EntwicklungsprozessService> _logger;
 
     /// <inheritdoc cref="EntwicklungsprozessService"/>
@@ -27,6 +28,7 @@ public sealed class EntwicklungsprozessService
         IGitPlugin gitPlugin,
         IKiPlugin kiPlugin,
         IAgentPackageService agentPackageService,
+        IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
         ILogger<EntwicklungsprozessService> logger)
     {
         _aufgabeService = aufgabeService;
@@ -34,6 +36,7 @@ public sealed class EntwicklungsprozessService
         _gitPlugin = gitPlugin;
         _kiPlugin = kiPlugin;
         _agentPackageService = agentPackageService;
+        _arbeitsverzeichnisResolver = arbeitsverzeichnisResolver;
         _logger = logger;
     }
 
@@ -70,7 +73,17 @@ public sealed class EntwicklungsprozessService
         }
 
         // Lokalen Klon-Pfad bestimmen
-        var lokalerKlonPfad = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabeId.ToString());
+        var workdirResult = await _arbeitsverzeichnisResolver.ResolveAsync(ct);
+        var lokalerKlonPfad = Path.Combine(workdirResult.ResolvedPath, "softwareschmiede", aufgabeId.ToString());
+
+        if (workdirResult.UsedFallback)
+        {
+            await _protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.GitAktion,
+                $"Arbeitsverzeichnis-Fallback aktiv ({workdirResult.ReasonCode}). Verwende {workdirResult.ResolvedPath}. Bitte Einstellung prüfen.",
+                ct: ct);
+        }
 
         // Zielverzeichnis löschen, falls es bereits existiert, um einen sauberen Klon sicherzustellen
         if (Directory.Exists(lokalerKlonPfad))

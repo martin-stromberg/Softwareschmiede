@@ -593,7 +593,10 @@ SoftwareschmiededDbContext (EF Core)
 ├── DbSet<GitRepository>     → Tabelle: GitRepositories
 ├── DbSet<Aufgabe>           → Tabelle: Aufgaben
 ├── DbSet<IssueReferenz>     → Tabelle: IssueReferenzen (owned entity)
-└── DbSet<Protokolleintrag>  → Tabelle: Protokolleintraege
+├── DbSet<Protokolleintrag>  → Tabelle: Protokolleintraege
+├── DbSet<TestErgebnis>      → Tabelle: TestErgebnisse
+├── DbSet<PluginKonfiguration> → Tabelle: PluginKonfigurationen
+└── DbSet<AppEinstellung>    → Tabelle: AppEinstellungen (z. B. repositories.workdir)
 ```
 
 ### 11.2 Migrations
@@ -601,7 +604,7 @@ SoftwareschmiededDbContext (EF Core)
 - **Code-First-Ansatz:** Schema wird aus den Entitätsklassen generiert
 - **EF Core Migrations:** Schemaänderungen werden als Migrationsskripte versioniert
 - **Automatische Migration beim Start:** `dbContext.Database.MigrateAsync()` in `Program.cs` (nur für Einzelnutzer-Lokalbetrieb akzeptabel)
-- **SQLite-Datei:** Standardpfad `%APPDATA%\Softwareschmiede\softwareschmiede.db`; konfigurierbar über `appsettings.json`
+- **SQLite-Datei:** Standardpfad `<ContentRoot>/softwareschmiede.db` (gemäß `Program.cs`)
 
 ### 11.3 Abfragestrategie
 

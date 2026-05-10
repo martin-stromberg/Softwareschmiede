@@ -53,6 +53,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 - Beliebig viele Softwareprojekte anlegen, bearbeiten, archivieren und löschen
 - Repositories aus dem Git-Provider verknüpfen und Issues automatisch laden
 - Projektübersicht mit Status und aktiven Aufgaben
+- Konfigurierbares Basis-Arbeitsverzeichnis für lokale Repository-Klone (persistiert als `repositories.workdir`, inkl. Runtime-Fallback)
 
 ### 🔗 Git-Integration (Plugin-System)
 - **Plugin-Architektur** über `IGitPlugin`-Interface – austauschbar für verschiedene Git-Provider
@@ -196,6 +197,20 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 ### Weitere Plugin-Konfiguration
 
 Alle weiteren Plugin-Einstellungen (Repository-URL, Organisations-URL) werden direkt in der Oberfläche unter *Projekte → Repository verknüpfen* konfiguriert und sicher in der lokalen SQLite-Datenbank gespeichert.
+
+### Arbeitsverzeichnis für lokale Klone
+
+Das Basis-Arbeitsverzeichnis für lokale Repository-Klone ist in den Einstellungen konfigurierbar und wird als globale App-Einstellung `repositories.workdir` in SQLite gespeichert.  
+Wenn keine Einstellung gesetzt ist oder der konfigurierte Pfad zur Laufzeit nicht nutzbar ist, verwendet die Anwendung automatisch den Fallback auf Basis von `Path.GetTempPath()`.
+
+Der finale Klonpfad wird immer unterhalb von:
+
+`<Basispfad>/softwareschmiede/<aufgabeId>`
+
+gebildet, z. B.:
+
+- Konfiguriert: `D:/Repos` → `D:/Repos/softwareschmiede/<aufgabeId>`
+- Fallback: `Path.GetTempPath()` → `<temp>/softwareschmiede/<aufgabeId>`
 
 ---
 
@@ -399,8 +414,11 @@ dotnet test --collect:"XPlat Code Coverage"
 | [Planungsübersicht](docs/planning-overview.md) | Projektplanung und Meilensteine |
 | [Benutzerleitfaden](docs/user-guide.md) | Schritt-für-Schritt-Anleitung für Endanwender |
 | [Feature-Dokumentation](docs/business/features.md) | Fachliche Beschreibung aller Features für nicht-technische Stakeholder |
+| [Feature F009: Arbeitsverzeichnis konfigurieren](docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md) | Fachliche Beschreibung des konfigurierbaren Arbeitsverzeichnisses inkl. Fallback und Migration |
 | [Plugin-Interfaces](docs/api/plugin-interfaces.md) | Technische Dokumentation der Plugin-Schnittstellen für Plugin-Entwickler |
+| [Workdir-Konfiguration (technisch)](docs/api/workdir-configuration.md) | Technische Umsetzung von Settings, Resolver, Klonpfadbildung und Reason-Codes |
 | [Programmablaufpläne](docs/flows/development-process-flow.md) | Grafische Ablaufpläne und technische Prozessbeschreibungen |
+| [Flow: Arbeitsverzeichnis-Auflösung](docs/flows/workdir-resolution-flow.md) | Sequenzablauf für Konfiguration, Laufzeit-Auflösung und Fallback-Verhalten |
 
 ---
 

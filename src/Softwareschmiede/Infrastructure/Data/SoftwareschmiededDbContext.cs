@@ -30,6 +30,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Plugin-Konfigurationen.</summary>
     public DbSet<PluginKonfiguration> PluginKonfigurationen => Set<PluginKonfiguration>();
 
+    /// <summary>Globale App-Einstellungen.</summary>
+    public DbSet<AppEinstellung> AppEinstellungen => Set<AppEinstellung>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -124,6 +127,21 @@ public sealed class SoftwareschmiededDbContext : DbContext
         {
             e.HasKey(p => p.Id);
             e.Property(p => p.PluginKategorie).HasConversion<string>();
+        });
+
+        // AppEinstellung
+        modelBuilder.Entity<AppEinstellung>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.Property(a => a.Schluessel)
+                .IsRequired()
+                .HasMaxLength(200);
+            e.HasIndex(a => a.Schluessel).IsUnique();
+            e.Property(a => a.Wert)
+                .HasMaxLength(2000);
+            e.Property(a => a.AktualisiertAm).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
         });
     }
 }

@@ -29,6 +29,15 @@ Aktive Projekte erscheinen im Dashboard, archivierte verschwinden aus der Ansich
 
 ---
 
+### Arbeitsverzeichnis für lokale Klone
+
+Sie können in den **Einstellungen** festlegen, in welchem Basisordner lokale Arbeitskopien Ihrer Repositories angelegt werden.
+Wenn keine eigene Angabe gespeichert ist oder der Pfad nicht nutzbar ist, verwendet die Softwareschmiede automatisch einen sicheren Default auf Basis des Temp-Verzeichnisses.
+
+👉 Mehr dazu: [F009 – Arbeitsverzeichnis konfigurieren](./business/features/F009-arbeitsverzeichnis-konfigurieren.md)
+
+---
+
 ### Aufgabenverwaltung
 
 Innerhalb eines Projekts legen Sie Aufgaben an.
@@ -77,14 +86,15 @@ Dieser Ablauf zeigt, wie eine Aufgabe von Anfang bis Ende bearbeitet wird.
 
 1. **Projekt anlegen** – Öffnen Sie die Softwareschmiede und klicken Sie auf **Neues Projekt**. Geben Sie Namen und Beschreibung ein.
 2. **GitHub-Ablage verknüpfen** – Tragen Sie im Projekt die Adresse Ihrer GitHub-Ablage ein. Die Softwareschmiede lädt den Code automatisch herunter, wenn eine Aufgabe startet.
-3. **Aufgabe erstellen** – Wählen Sie Ihr Projekt aus und klicken Sie auf **Neue Aufgabe**. Beschreiben Sie, was umgesetzt werden soll.
-4. **Agentenpaket wählen** – Wählen Sie aus der Liste das passende Agentenpaket für diese Aufgabe aus.
-5. **KI starten** – Klicken Sie auf **KI starten**. Die KI erhält Ihre Aufgabenbeschreibung und beginnt zu arbeiten.
-6. **Echtzeit-Ausgabe beobachten** – Verfolgen Sie auf dem Bildschirm, was die KI gerade tut. Sie sehen Nachrichten, Code-Änderungen und Zwischenergebnisse.
-7. **Folge-Anweisung geben** (optional) – Wenn Sie der KI etwas ergänzen möchten, tippen Sie eine Nachricht in das Eingabefeld und senden Sie sie ab.
-8. **Ergebnis prüfen** – Sobald die KI fertig ist, sehen Sie eine Zusammenfassung. Prüfen Sie, ob das Ergebnis Ihren Vorstellungen entspricht.
-9. **Pull Request erstellen** – Klicken Sie auf **Pull Request erstellen**. Die Änderungen werden als Vorschlag in Ihre GitHub-Ablage hochgeladen.
-10. **Aufgabe abschließen** – Bestätigen Sie den Abschluss. Die lokale Arbeitskopie wird gelöscht, die Aufgabe gilt als erledigt.
+3. **Arbeitsverzeichnis prüfen** (optional) – Öffnen Sie **Einstellungen** und setzen Sie bei Bedarf ein eigenes Basis-Arbeitsverzeichnis für lokale Klone.
+4. **Aufgabe erstellen** – Wählen Sie Ihr Projekt aus und klicken Sie auf **Neue Aufgabe**. Beschreiben Sie, was umgesetzt werden soll.
+5. **Agentenpaket wählen** – Wählen Sie aus der Liste das passende Agentenpaket für diese Aufgabe aus.
+6. **KI starten** – Klicken Sie auf **KI starten**. Die KI erhält Ihre Aufgabenbeschreibung und beginnt zu arbeiten.
+7. **Echtzeit-Ausgabe beobachten** – Verfolgen Sie auf dem Bildschirm, was die KI gerade tut. Sie sehen Nachrichten, Code-Änderungen und Zwischenergebnisse.
+8. **Folge-Anweisung geben** (optional) – Wenn Sie der KI etwas ergänzen möchten, tippen Sie eine Nachricht in das Eingabefeld und senden Sie sie ab.
+9. **Ergebnis prüfen** – Sobald die KI fertig ist, sehen Sie eine Zusammenfassung. Prüfen Sie, ob das Ergebnis Ihren Vorstellungen entspricht.
+10. **Pull Request erstellen** – Klicken Sie auf **Pull Request erstellen**. Die Änderungen werden als Vorschlag in Ihre GitHub-Ablage hochgeladen.
+11. **Aufgabe abschließen** – Bestätigen Sie den Abschluss. Die lokale Arbeitskopie wird gelöscht, die Aufgabe gilt als erledigt.
 
 ![Typischer Arbeitsablauf](./images/arbeitsablauf.png)
 
@@ -180,4 +190,5 @@ Sie können eine laufende oder offene Aufgabe jederzeit abbrechen.
 - [F005 – Aufgabenprotokoll](./business/features/F005-aufgabenprotokoll.md)
 - [F006 – Aufgabe abschließen](./business/features/F006-aufgabe-abschliessen.md)
 - [F007 – Aufgabe abbrechen](./business/features/F007-aufgabe-abbrechen.md)
+- [F009 – Arbeitsverzeichnis konfigurieren](./business/features/F009-arbeitsverzeichnis-konfigurieren.md)
 - [Feature-Übersicht](./business/features.md)

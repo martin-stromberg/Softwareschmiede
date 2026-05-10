@@ -68,6 +68,7 @@ Die KI arbeitet weiter und meldet schließlich den Abschluss.
 
 Beim Start der KI lädt die Softwareschmiede den Code aus Ihrer GitHub-Ablage auf Ihren Rechner.
 Es wird eine separate Arbeitskopie angelegt, damit der ursprüngliche Code unberührt bleibt.
+Das Basis-Arbeitsverzeichnis dieser Arbeitskopie kann in den Einstellungen konfiguriert werden.
 Die KI arbeitet in dieser Kopie. Alle Änderungen bleiben lokal, bis Sie den Abschluss bestätigen.
 Ihre Folge-Anweisungen werden direkt an die KI weitergeleitet – wie eine Unterhaltung.
 
@@ -99,4 +100,5 @@ Klicken Sie auf **Aufgabe abbrechen** und formulieren Sie die Aufgabenbeschreibu
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md) – Ausgabe der KI nachverfolgen
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md) – Ergebnis freigeben
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Vorgang beenden ohne zu speichern
+- [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Speicherort der lokalen Klone steuern
 - [Zurück zur Übersicht](../features.md)

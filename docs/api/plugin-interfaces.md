@@ -34,7 +34,7 @@ Das System definiert zwei Plugin-Schnittstellen:
 - `Softwareschmiede/Infrastructure/Plugins/GitHubPlugin.cs`
 - `Softwareschmiede/Infrastructure/Plugins/GitHubCopilotPlugin.cs`
 
-Beide Interfaces werden als **Singleton** über den DI-Container registriert (siehe [DI-Registrierung](#in-programcs-registrieren)).
+Beide Interfaces werden als **Scoped** über den DI-Container registriert (siehe `Program.cs`).
 
 ---
 
@@ -700,13 +700,13 @@ Ersetze die bisherige Bindung oder ergänze sie:
 // Program.cs
 
 // Bisherige Registrierung (GitHubPlugin):
-// builder.Services.AddSingleton<IGitPlugin, GitHubPlugin>();
+// builder.Services.AddScoped<IGitPlugin, GitHubPlugin>();
 
 // Neue Registrierung (GitLabPlugin):
-builder.Services.AddSingleton<IGitPlugin, GitLabPlugin>();
+builder.Services.AddScoped<IGitPlugin, GitLabPlugin>();
 ```
 
-> **Hinweis:** Da `IGitPlugin` als Singleton registriert wird, muss `GitLabPlugin` threadsicher sein. Zustandsbehaftete Ressourcen (z. B. HTTP-Clients) sollten über `IHttpClientFactory` oder als `Lazy<T>` verwaltet werden.
+> **Hinweis:** In der aktuellen Anwendung ist `IGitPlugin` als **Scoped** registriert.
 
 ---
 
@@ -910,10 +910,10 @@ private static List<TestErgebnisInfo> ParseTestOutput(string output)
 // Program.cs
 
 // Bisherige Registrierung:
-// builder.Services.AddSingleton<IKiPlugin, GitHubCopilotPlugin>();
+// builder.Services.AddScoped<IKiPlugin, GitHubCopilotPlugin>();
 
 // Neue Registrierung:
-builder.Services.AddSingleton<IKiPlugin, ClaudePlugin>();
+builder.Services.AddScoped<IKiPlugin, ClaudePlugin>();
 ```
 
 ---

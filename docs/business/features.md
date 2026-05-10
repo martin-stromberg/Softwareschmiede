@@ -15,6 +15,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F006 | Aufgabe abschließen | Änderungen hochladen, Pull Request erstellen, Aufgabe beenden | [F006 – Aufgabe abschließen](./features/F006-aufgabe-abschliessen.md) |
 | F007 | Aufgabe abbrechen | Aufgabe abbrechen ohne Änderungen zu speichern | [F007 – Aufgabe abbrechen](./features/F007-aufgabe-abbrechen.md) |
 | F008 | Dashboard | Projektübergreifende Übersicht aller Aufgaben und deren Status | [F008 – Dashboard](./features/F008-dashboard.md) |
+| F009 | Arbeitsverzeichnis konfigurieren | Basis-Arbeitsverzeichnis für lokale Repository-Klone festlegen und Fallback verstehen | [F009 – Arbeitsverzeichnis konfigurieren](./features/F009-arbeitsverzeichnis-konfigurieren.md) |
 
 ---
 

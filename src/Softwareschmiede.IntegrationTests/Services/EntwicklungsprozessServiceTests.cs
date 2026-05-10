@@ -3,10 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.IntegrationTests.Infrastructure;
+using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
@@ -34,10 +36,14 @@ public sealed class EntwicklungsprozessServiceTests
         DatabaseFixture db,
         Mock<IGitPlugin> gitMock,
         Mock<IKiPlugin> kiMock,
-        Mock<IAgentPackageService> packageMock)
+        Mock<IAgentPackageService> packageMock,
+        IArbeitsverzeichnisResolver? arbeitsverzeichnisResolver = null)
     {
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
+        arbeitsverzeichnisResolver ??= new ArbeitsverzeichnisResolver(
+            new ArbeitsverzeichnisSettingsService(db.Context, NullLogger<ArbeitsverzeichnisSettingsService>.Instance),
+            NullLogger<ArbeitsverzeichnisResolver>.Instance);
 
         return new EntwicklungsprozessService(
             aufgabeService,
@@ -45,6 +51,7 @@ public sealed class EntwicklungsprozessServiceTests
             gitMock.Object,
             kiMock.Object,
             packageMock.Object,
+            arbeitsverzeichnisResolver,
             NullLogger<EntwicklungsprozessService>.Instance);
     }
 
@@ -112,8 +119,7 @@ public sealed class EntwicklungsprozessServiceTests
             .Where(p => p.AufgabeId == aufgabeId && p.Typ == ProtokollTyp.GitAktion)
             .ToListAsync();
 
-        protokolle.Should().HaveCount(1);
-        protokolle[0].Inhalt.Should().Contain("Klon und Branch angelegt");
+        protokolle.Should().Contain(p => p.Inhalt.Contains("Klon und Branch angelegt"));
     }
 
     /// <summary>
@@ -206,6 +212,8 @@ public sealed class EntwicklungsprozessServiceTests
         var kiMock = new Mock<IKiPlugin>();
         kiMock.Setup(k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        kiMock.Setup(k => k.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var packageMock = new Mock<IAgentPackageService>();
         packageMock.Setup(p => p.GetPackageAsync("MeinPaket", It.IsAny<CancellationToken>()))
@@ -220,5 +228,134 @@ public sealed class EntwicklungsprozessServiceTests
         kiMock.Verify(
             k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldUseConfiguredBasePath_WhenWorkdirSettingExists()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var (_, aufgabeId) = await CreateTestDataAsync(db, "Konfiguriertes Arbeitsverzeichnis");
+        var configuredBasePath = Path.Combine(Path.GetTempPath(), $"workdir-config-{Guid.NewGuid():N}");
+
+        var workdirSettings = new ArbeitsverzeichnisSettingsService(db.Context, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        await workdirSettings.SaveArbeitsverzeichnisAsync(configuredBasePath);
+
+        var gitMock = new Mock<IGitPlugin>();
+        gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+
+        // Act
+        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
+
+        // Assert
+        var expected = Path.Combine(configuredBasePath, "softwareschmiede", aufgabeId.ToString());
+        gitMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expected, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Cleanup
+        if (Directory.Exists(configuredBasePath))
+        {
+            Directory.Delete(configuredBasePath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldUseTempFallback_WhenNoWorkdirSettingExists()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var (_, aufgabeId) = await CreateTestDataAsync(db, "Fallback ohne Konfiguration");
+
+        var gitMock = new Mock<IGitPlugin>();
+        gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+
+        // Act
+        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
+
+        // Assert
+        var expected = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabeId.ToString());
+        gitMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expected, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldFallbackToTemp_WhenConfiguredPathIsUnavailable()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var (_, aufgabeId) = await CreateTestDataAsync(db, "Fallback bei ungültigem Laufzeitpfad");
+
+        var invalidAsFile = Path.Combine(Path.GetTempPath(), $"workdir-file-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(invalidAsFile, "not-a-directory");
+
+        db.Context.AppEinstellungen.Add(new AppEinstellung
+        {
+            Id = Guid.NewGuid(),
+            Schluessel = ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey,
+            Wert = invalidAsFile,
+            AktualisiertAm = DateTimeOffset.UtcNow
+        });
+        await db.Context.SaveChangesAsync();
+
+        var gitMock = new Mock<IGitPlugin>();
+        gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+
+        // Act
+        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
+
+        // Assert
+        var expectedFallback = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabeId.ToString());
+        gitMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expectedFallback, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Cleanup
+        if (File.Exists(invalidAsFile))
+        {
+            File.Delete(invalidAsFile);
+        }
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldLogFallbackEntry_WhenResolverUsesFallback()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var (_, aufgabeId) = await CreateTestDataAsync(db, "Fallback Log");
+
+        var gitMock = new Mock<IGitPlugin>();
+        gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), true, "no-configured-path", null));
+
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>(), resolverMock.Object);
+
+        // Act
+        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
+
+        // Assert
+        await using var db2 = db.CreateNewContext();
+        var eintraege = await db2.Protokolleintraege
+            .Where(p => p.AufgabeId == aufgabeId && p.Typ == ProtokollTyp.GitAktion)
+            .Select(p => p.Inhalt)
+            .ToListAsync();
+
+        eintraege.Should().Contain(e => e.Contains("Arbeitsverzeichnis-Fallback aktiv"));
     }
 }
