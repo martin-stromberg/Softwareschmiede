@@ -237,7 +237,7 @@ else
                     <div class="streaming-output" id="streamingOutput">
                         @foreach (var line in _streamingLines)
                         {
-                            <div>@line</div>
+                            <div>@(string.IsNullOrEmpty(line) ? "\u00A0" : line)</div>
                         }
                     </div>
                 </div>

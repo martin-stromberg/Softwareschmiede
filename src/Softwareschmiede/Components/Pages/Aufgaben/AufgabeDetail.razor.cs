@@ -10,6 +10,7 @@ using Softwareschmiede.Domain.ValueObjects;
 public partial class AufgabeDetail : IDisposable
 {
     [Parameter] public Guid Id { get; set; }
+    [Inject] private IServiceScopeFactory ServiceScopeFactory { get; set; } = null!;
     [Inject] private AufgabeService AufgabeService { get; set; } = null!;
     [Inject] private EntwicklungsprozessService EntwicklungsprozessService { get; set; } = null!;
     [Inject] private KiAusfuehrungsService KiAusfuehrungsService { get; set; } = null!;
@@ -122,6 +123,52 @@ public partial class AufgabeDetail : IDisposable
             }
         }
         _loading = false;
+    }
+
+    /// <summary>Lädt die Aufgabendaten mit neuem Scope (für Background-Tasks).</summary>
+    private async Task LadeAsyncWithScope()
+    {
+        try
+        {
+            using var scope = ServiceScopeFactory.CreateScope();
+            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+            var protokollService = scope.ServiceProvider.GetRequiredService<ProtokollService>();
+
+            _loading = true;
+            _aufgabe = await aufgabeService.GetDetailAsync(Id);
+            if (_aufgabe is not null)
+            {
+                _protokoll = (await protokollService.GetByAufgabeAsync(Id)).ToList();
+                _prTitel = _aufgabe.Titel;
+                // Agenten laden wenn Paket gesetzt
+                if (!string.IsNullOrEmpty(_aufgabe.AgentenpaketName))
+                {
+                    _selectedPaketName = _aufgabe.AgentenpaketName;
+                    await AgentenLadenAsync();
+                }
+
+                // Ausgewählten Agenten wiederherstellen
+                if (!string.IsNullOrEmpty(_aufgabe.AgentenName))
+                {
+                    _kiAgentName = _aufgabe.AgentenName;
+                    _selectedAgentName = _aufgabe.AgentenName;
+                }
+
+                // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
+                if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
+                    && string.IsNullOrWhiteSpace(_prompt)
+                    && !_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
+                {
+                    _prompt = _aufgabe.AnforderungsBeschreibung;
+                }
+            }
+            _loading = false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Laden der Aufgabendaten");
+            _loading = false;
+        }
     }
 
     private async Task AgentenLadenAsync()
@@ -278,18 +325,19 @@ public partial class AufgabeDetail : IDisposable
             prompt,
             agent,
             model: string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel,
-            onStarted: async () => {
-                await LadeAsync();
+            onStarted: () => _ = InvokeAsync(async () =>
+            {
+                await LadeAsyncWithScope();
                 StateHasChanged();
-            },
-            onCompleted: fehler => InvokeAsync(async () =>
+            }),
+            onCompleted: fehler => _ = InvokeAsync(async () =>
             {
                 _processing = false;
                 _kiSubscription?.Dispose();
                 _kiSubscription = null;
                 if (fehler)
                     _fehler = "KI-Ausführung fehlgeschlagen. Siehe Protokoll für Details.";
-                await LadeAsync(); // Protokoll neu laden nach Abschluss
+                await LadeAsyncWithScope(); // Protokoll neu laden nach Abschluss
                 StateHasChanged();
             }));
 

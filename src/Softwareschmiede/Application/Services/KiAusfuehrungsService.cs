@@ -134,7 +134,7 @@ public sealed class KiAusfuehrungsService
                         onStarted?.Invoke();
                     }
                     statusEntryCount += 1;
-                    statusChanged = true;                     
+                    statusChanged = true;
                 }
             }
             catch (OperationCanceledException)
@@ -183,10 +183,13 @@ public sealed class KiAusfuehrungsService
 /// </summary>
 internal sealed class KiSession : IDisposable
 {
+    private static readonly TimeSpan BlockPause = TimeSpan.FromSeconds(2);
+    private readonly Func<DateTimeOffset> _nowProvider;
     private readonly List<string> _lines = [];
     private readonly List<Action<string>> _subscribers = [];
     private readonly Lock _lock = new();
     private readonly CancellationTokenSource _cts = new();
+    private DateTimeOffset? _lastLineAt;
 
     /// <summary>Gibt an, ob die Session noch aktiv ist.</summary>
     public bool IsRunning { get; private set; } = true;
@@ -196,6 +199,11 @@ internal sealed class KiSession : IDisposable
 
     /// <summary>CancellationToken für den Background-Task.</summary>
     public CancellationToken CancellationToken => _cts.Token;
+
+    internal KiSession(Func<DateTimeOffset>? nowProvider = null)
+    {
+        _nowProvider = nowProvider ?? (() => DateTimeOffset.Now);
+    }
 
     /// <summary>Gibt eine Kopie der bisher gepufferten Ausgabezeilen zurück.</summary>
     public IReadOnlyList<string> GetLines()
@@ -209,10 +217,18 @@ internal sealed class KiSession : IDisposable
     /// <summary>Fügt eine Ausgabezeile hinzu und benachrichtigt alle Subscriber.</summary>
     public void AddLine(string line)
     {
+        var now = _nowProvider();
         List<Action<string>> subscribers;
         lock (_lock)
         {
+            if (_lastLineAt is null || now - _lastLineAt >= BlockPause)
+            {
+                _lines.Add(string.Empty);
+                _lines.Add(now.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"));
+            }
+
             _lines.Add(line);
+            _lastLineAt = now;
             subscribers = [.. _subscribers];
         }
 
