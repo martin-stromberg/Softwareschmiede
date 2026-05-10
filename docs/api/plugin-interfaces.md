@@ -26,25 +26,29 @@ Das System definiert zwei Plugin-Schnittstellen:
 | `IGitPlugin` | Git-Operationen (Issues, Clone, Branch, Push, PR, …) | `GitHubPlugin` |
 | `IKiPlugin` | KI-Integration (Agenten, Entwicklung, Tests) | `GitHubCopilotPlugin` |
 
-**Dateipfade der Interfaces:**
-- `Softwareschmiede/Domain/Interfaces/IGitPlugin.cs`
-- `Softwareschmiede/Domain/Interfaces/IKiPlugin.cs`
+**Dateipfade der Verträge (Contracts):**
+- `src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IPlugin.cs`
+- `src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IGitPlugin.cs`
+- `src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IKiPlugin.cs`
+- `src/Softwareschmiede.Plugin.Contracts/Domain/Enums/PluginType.cs`
 
-**Dateipfade der Referenzimplementierungen:**
-- `Softwareschmiede/Infrastructure/Plugins/GitHubPlugin.cs`
-- `Softwareschmiede/Infrastructure/Plugins/GitHubCopilotPlugin.cs`
+**Dateipfade der Referenzimplementierungen (Plugin-Projekte):**
+- `plugins/Softwareschmiede.Plugin.GitHub/GitHubPlugin.cs`
+- `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs`
 
-Beide Interfaces werden als **Scoped** über den DI-Container registriert (siehe `Program.cs`).
+**Plugin-Discovery & DI:**
+- `IPluginManager` wird als **Singleton** registriert und lädt Plugin-DLLs dynamisch aus `<AppBase>/plugins`.
+- `IGitPlugin` und `IKiPlugin` werden als **Scoped** über den `PluginManager` auf die Default-Plugins aufgelöst.
+- Die Zuordnung erfolgt über `IPlugin.PluginType` (`SourceCodeManagement`, `DevelopmentAutomation`).
 
 ---
 
 ## 2. IGitPlugin – Schnittstellenreferenz
 
 ```csharp
-// Softwareschmiede/Domain/Interfaces/IGitPlugin.cs
-public interface IGitPlugin
+// src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IGitPlugin.cs
+public interface IGitPlugin : IPlugin
 {
-    string PluginName { get; }
     Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
     Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default);
     Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default);
@@ -54,6 +58,9 @@ public interface IGitPlugin
     Task CommitAsync(string localPath, string message, CancellationToken ct = default);
     Task ResetAsync(string localPath, string resetType, string? targetRef, CancellationToken ct = default);
     Task<bool> CheckHealthAsync(CancellationToken ct = default);
+    Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default);
+    Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default);
+    Task CheckoutRemoteBranchAsync(string localPath, string branchName, CancellationToken ct = default);
 }
 ```
 
@@ -330,13 +337,18 @@ Task<bool> CheckHealthAsync(CancellationToken ct = default);
 ## 3. IKiPlugin – Schnittstellenreferenz
 
 ```csharp
-// Softwareschmiede/Domain/Interfaces/IKiPlugin.cs
-public interface IKiPlugin
+// src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IKiPlugin.cs
+public interface IKiPlugin : IPlugin
 {
-    string PluginName { get; }
     Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default);
+    Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default);
     Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default);
-    IAsyncEnumerable<string> StartDevelopmentAsync(string prompt, AgentInfo agent, string localRepoPath, CancellationToken ct = default);
+    IAsyncEnumerable<string> StartDevelopmentAsync(
+        string prompt,
+        AgentInfo agent,
+        string localRepoPath,
+        string? model = null,
+        CancellationToken ct = default);
     Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default);
     Task<bool> CheckHealthAsync(CancellationToken ct = default);
 }
@@ -528,11 +540,12 @@ Dieser Abschnitt zeigt Schritt für Schritt, wie ein neues Git-Plugin erstellt w
 
 ### Schritt 1: Neue Klasse erstellen
 
-Erstelle eine neue Datei unter `Softwareschmiede/Infrastructure/Plugins/GitLabPlugin.cs`:
+Erstelle ein neues Plugin-Projekt unter `plugins/Softwareschmiede.Plugin.GitLab/` und darin z. B. die Datei `GitLabPlugin.cs`.
 
 ```csharp
 using Softwareschmiede.Domain.Interfaces;
-using Softwareschmiede.Domain.Models;
+using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
@@ -557,18 +570,22 @@ public sealed class GitLabPlugin : IGitPlugin
     }
 
     public string PluginName => "GitLab";
+    public string PluginPrefix => "Softwareschmiede.GitLab";
+    public PluginType PluginType => PluginType.SourceCodeManagement;
 
     // ... (weitere Methoden, siehe unten)
 }
 ```
 
-### Schritt 2: `PluginName`-Property implementieren
+### Schritt 2: `PluginName`, `PluginPrefix` und `PluginType` implementieren
 
 ```csharp
 public string PluginName => "GitLab";
+public string PluginPrefix => "Softwareschmiede.GitLab";
+public PluginType PluginType => PluginType.SourceCodeManagement;
 ```
 
-Der Name erscheint in der Benutzeroberfläche und in Log-Ausgaben. Er sollte stabil und eindeutig sein.
+Der Name erscheint in UI und Logs. `PluginPrefix` steuert die Credential-Store-Schlüssel, und `PluginType` muss zur Interface-Art passen (`IGitPlugin` → `SourceCodeManagement`), damit der `PluginManager` das Plugin korrekt registriert.
 
 ### Schritt 3: Alle Methoden implementieren
 
@@ -692,21 +709,19 @@ Environment.SetEnvironmentVariable("GITLAB_TOKEN", token);
 // → Token als Umgebungsvariable für den CLI-Prozess verfügbar machen
 ```
 
-### Schritt 5: In `Program.cs` registrieren
+### Schritt 5: Plugin-Projekt einbinden (statt direkter DI-Bindung)
 
-Ersetze die bisherige Bindung oder ergänze sie:
+Die Host-Anwendung lädt Plugins dynamisch über den `PluginManager`. Es gibt **keine direkte** Registrierung wie `AddScoped<IGitPlugin, ...>()`.
 
-```csharp
-// Program.cs
+Für ein neues Plugin-Projekt sind in `src/Softwareschmiede/Softwareschmiede.csproj` typischerweise zwei Anpassungen nötig:
 
-// Bisherige Registrierung (GitHubPlugin):
-// builder.Services.AddScoped<IGitPlugin, GitHubPlugin>();
-
-// Neue Registrierung (GitLabPlugin):
-builder.Services.AddScoped<IGitPlugin, GitLabPlugin>();
+```xml
+<ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitLab\Softwareschmiede.Plugin.GitLab.csproj" ReferenceOutputAssembly="false" />
 ```
 
-> **Hinweis:** In der aktuellen Anwendung ist `IGitPlugin` als **Scoped** registriert.
+und in den Copy-Targets ein zusätzlicher Artefakt-Eintrag, damit die DLL nach `<OutDir>/plugins` bzw. `<PublishDir>/plugins` kopiert wird.
+
+> **Hinweis:** Die Auflösung auf `IGitPlugin` bleibt im Host weiterhin `AddScoped(...GetDefaultSourceCodeManagementPlugin())` über den `IPluginManager`.
 
 ---
 
@@ -716,9 +731,12 @@ Dieser Abschnitt zeigt, wie ein neues KI-Plugin implementiert wird – am Beispi
 
 ### Schritt 1: Neue Klasse erstellen
 
+Erstelle ein neues Plugin-Projekt unter `plugins/Softwareschmiede.Plugin.Claude/` und darin die Plugin-Klasse.
+
 ```csharp
 using Softwareschmiede.Domain.Interfaces;
-using Softwareschmiede.Domain.Models;
+using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
@@ -742,6 +760,8 @@ public sealed class ClaudePlugin : IKiPlugin
     }
 
     public string PluginName => "Claude";
+    public string PluginPrefix => "Softwareschmiede.Claude";
+    public PluginType PluginType => PluginType.DevelopmentAutomation;
 
     // ... (weitere Methoden, siehe unten)
 }
@@ -904,17 +924,11 @@ private static List<TestErgebnisInfo> ParseTestOutput(string output)
 }
 ```
 
-### Schritt 6: In `Program.cs` registrieren
+### Schritt 6: Plugin-Projekt einbinden (statt direkter DI-Bindung)
 
-```csharp
-// Program.cs
+Analog zum Git-Plugin wird das KI-Plugin als eigenes Projekt unter `plugins/` angelegt, per `ProjectReference` im Host referenziert und per Copy-Target in den Runtime-Ordner `plugins` kopiert.
 
-// Bisherige Registrierung:
-// builder.Services.AddScoped<IKiPlugin, GitHubCopilotPlugin>();
-
-// Neue Registrierung:
-builder.Services.AddScoped<IKiPlugin, ClaudePlugin>();
-```
+> **Hinweis:** Die Auflösung auf `IKiPlugin` erfolgt weiterhin über `IPluginManager.GetDefaultDevelopmentAutomationPlugin()`.
 
 ---
 

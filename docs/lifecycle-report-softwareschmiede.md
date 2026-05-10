@@ -27,7 +27,7 @@ Vollständiger Entwicklungszyklus der **Softwareschmiede** – einer webbasierte
 - **Blazor Server** mit `@rendermode InteractiveServer`
 - **Schichtenmodell:** Presentation → Application → Domain → Infrastructure
 - **Plugin-System** über `IGitPlugin` / `IKiPlugin` Interfaces
-- **GitHub CLI (`gh`)** für GitHub-Plugin, **`gh copilot`** für Copilot-Plugin
+- **GitHub CLI (`gh`)** für GitHub-Plugin, **`copilot`** für Copilot-Plugin
 - **SQLite + EF Core** als lokale Persistenz
 - **Windows Credential Store** für sichere Token-Speicherung
 - **Echtzeit-Streaming** der KI-Ausgabe via asynchronem CLI-Prozess-Lesen
@@ -149,3 +149,4 @@ dotnet build → 0 Fehler, 0 Warnungen ✅
 ---
 
 *Alle vier Phasen erfolgreich abgeschlossen. Die Anwendung ist lauffähig und testbar.*
+

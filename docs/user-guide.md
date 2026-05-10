@@ -38,6 +38,17 @@ Wenn keine eigene Angabe gespeichert ist oder der Pfad nicht nutzbar ist, verwen
 
 ---
 
+### Plugin-Prinzip für Integrationen
+
+Die Anbindungen für GitHub und Copilot laufen als ausgelagerte Plugins.
+Die Softwareschmiede erkennt diese Plugins beim Start automatisch.
+Sie müssen keine Dateien selbst nachkopieren.
+Eine manuelle DLL-Kopie ist nicht nötig.
+
+👉 Mehr dazu: [F010 – Plugin-Prinzip für Integrationen](./business/features/F010-plugin-prinzip-integrationen.md)
+
+---
+
 ### Aufgabenverwaltung
 
 Innerhalb eines Projekts legen Sie Aufgaben an.
@@ -191,4 +202,5 @@ Sie können eine laufende oder offene Aufgabe jederzeit abbrechen.
 - [F006 – Aufgabe abschließen](./business/features/F006-aufgabe-abschliessen.md)
 - [F007 – Aufgabe abbrechen](./business/features/F007-aufgabe-abbrechen.md)
 - [F009 – Arbeitsverzeichnis konfigurieren](./business/features/F009-arbeitsverzeichnis-konfigurieren.md)
+- [F010 – Plugin-Prinzip für Integrationen](./business/features/F010-plugin-prinzip-integrationen.md)
 - [Feature-Übersicht](./business/features.md)

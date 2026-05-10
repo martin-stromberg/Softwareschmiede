@@ -12,8 +12,7 @@ public class EinstellungenBase : ComponentBase
     // TODO: Konstanten für Boolean-Werte in Einstellungsfeldern
     protected const string BoolTrue = "true";
     protected const string BoolFalse = "false";
-    [Inject] private IEnumerable<IGitPlugin> GitPlugins { get; set; } = default!;
-    [Inject] private IEnumerable<IKiPlugin> KiPlugins { get; set; } = default!;
+    [Inject] private IPluginManager PluginManager { get; set; } = default!;
     [Inject] private PluginSettingsService PluginSettings { get; set; } = default!;
     [Inject] private ArbeitsverzeichnisSettingsService ArbeitsverzeichnisSettings { get; set; } = default!;
     [Inject] private IArbeitsverzeichnisResolver ArbeitsverzeichnisResolver { get; set; } = default!;
@@ -45,7 +44,9 @@ public class EinstellungenBase : ComponentBase
     {
         Logger.LogInformation("Einstellungsseite geladen.");
 
-        var allPlugins = PluginSettings.GetAllPlugins(GitPlugins, KiPlugins);
+        var allPlugins = PluginSettings.GetAllPlugins(
+            PluginManager.GetSourceCodeManagementPlugins(),
+            PluginManager.GetDevelopmentAutomationPlugins());
         _plugins = allPlugins.Select(p => new PluginViewModel(p)).ToList();
 
         foreach (var plugin in allPlugins)

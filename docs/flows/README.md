@@ -8,6 +8,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 |--------|-------|--------------|
 | [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (5 Kern-Flows) |
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
+| [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 
 ---
 
@@ -55,6 +56,13 @@ Beschreibt, wie die Einstellung `repositories.workdir` gespeichert wird, wie der
 
 ---
 
+### [Ablauf 7: Plugin-Discovery und Laden](./plugin-discovery-load-flow.md)
+**Typ:** `flowchart TD` · **Services:** `Program`, `PluginManager`, `IPluginManager`
+
+Beschreibt den Ablauf von der DI-Registrierung bis zur Lazy-Discovery aus `<Programmverzeichnis>/plugins`, inklusive Fehlerbehandlung für defekte DLLs.
+
+---
+
 ## Statusübergänge (Kurzreferenz)
 
 ```
@@ -65,3 +73,9 @@ Offen → InBearbeitung → KiAktiv → InBearbeitung (nach KI-Abschluss)
 ```
 
 Vollständiges Zustandsdiagramm: [development-process-flow.md – Zustandsdiagramm](./development-process-flow.md#zustandsdiagramm-aufgabestatus)
+
+## Verknüpfte Dokumentation
+
+- Technische Schnittstellen: [docs/api/plugin-interfaces.md](../api/plugin-interfaces.md)
+- Fachliche Einordnung: [F010 – Plugin-Prinzip für Integrationen](../business/features/F010-plugin-prinzip-integrationen.md)
+- Testabdeckung: [Testplan Plugin-Klassenbibliotheken](../tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md)

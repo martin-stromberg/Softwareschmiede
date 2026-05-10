@@ -1,9 +1,11 @@
-namespace Softwareschmiede.Infrastructure.Plugins;
-
+using Microsoft.Extensions.Logging;
+using System.Text.RegularExpressions;
+using System.Text.Json;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
-using Microsoft.Extensions.Logging;
-using System.Text.Json;
+
+namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>
 /// GitHub Plugin – nutzt gh CLI und git CLI für alle GitHub-Operationen.
@@ -11,6 +13,7 @@ using System.Text.Json;
 /// </summary>
 public sealed class GitHubPlugin : IGitPlugin
 {
+    private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubPlugin> _logger;
@@ -20,6 +23,9 @@ public sealed class GitHubPlugin : IGitPlugin
 
     /// <inheritdoc/>
     public string PluginPrefix => "Softwareschmiede.GitHub";
+
+    /// <inheritdoc/>
+    public PluginType PluginType => PluginType.SourceCodeManagement;
 
     /// <inheritdoc/>
     public IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
@@ -46,7 +52,7 @@ public sealed class GitHubPlugin : IGitPlugin
 
     private IDictionary<string, string> GetGhEnvironment()
     {
-        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
         var env = new Dictionary<string, string>();
         if (!string.IsNullOrEmpty(token))
         {
@@ -55,9 +61,9 @@ public sealed class GitHubPlugin : IGitPlugin
         return env;
     }
 
-    private IDictionary<string, string> GetGitEnvironment()
+    private IDictionary<string, string> GetGitEnvironment(string? token = null)
     {
-        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        token ??= _credentialStore.GetCredential(GitHubTokenCredentialKey);
         var env = new Dictionary<string, string>();
         
         // Disable terminal prompts completely
@@ -80,9 +86,61 @@ public sealed class GitHubPlugin : IGitPlugin
         return env;
     }
 
+    private static bool IsHttpsRepositoryUrl(string repositoryUrl)
+        => Uri.TryCreate(repositoryUrl, UriKind.Absolute, out var uri)
+           && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildAuthenticatedCloneUrl(string repositoryUrl, string token)
+    {
+        var repositoryUri = new Uri(repositoryUrl, UriKind.Absolute);
+        var uriBuilder = new UriBuilder(repositoryUri)
+        {
+            UserName = "oauth2",
+            Password = token
+        };
+
+        return uriBuilder.Uri.AbsoluteUri;
+    }
+
+    private static bool IsAuthenticationFailure(string error)
+    {
+        var normalizedError = error.ToLowerInvariant();
+        return normalizedError.Contains("terminal prompts disabled", StringComparison.Ordinal)
+               || normalizedError.Contains("could not read username", StringComparison.Ordinal)
+               || normalizedError.Contains("authentication failed", StringComparison.Ordinal)
+               || normalizedError.Contains("invalid username or password", StringComparison.Ordinal)
+               || normalizedError.Contains("support for password authentication was removed", StringComparison.Ordinal)
+               || normalizedError.Contains("403", StringComparison.Ordinal)
+               || normalizedError.Contains("access denied", StringComparison.Ordinal)
+               || normalizedError.Contains("insufficient", StringComparison.Ordinal);
+    }
+
+    private static string SanitizeSensitiveOutput(string? message, string? token)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return "unbekannter Fehler";
+        }
+
+        var sanitizedMessage = message;
+
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            sanitizedMessage = sanitizedMessage.Replace(token, "***", StringComparison.Ordinal);
+        }
+
+        sanitizedMessage = Regex.Replace(
+            sanitizedMessage,
+            "oauth2:[^@\\s]+@",
+            "oauth2:***@",
+            RegexOptions.IgnoreCase);
+
+        return sanitizedMessage.Trim();
+    }
+
     private async Task EnsureRemoteCredentialsAsync(string localPath, CancellationToken ct = default)
     {
-        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
         if (string.IsNullOrEmpty(token))
         {
             _logger.LogWarning("Kein GitHub-Token verfügbar für Remote-Konfiguration.");
@@ -137,7 +195,7 @@ public sealed class GitHubPlugin : IGitPlugin
 
     private async Task ConfigureGitCredentialsAsync(string localPath, string repositoryUrl, CancellationToken ct = default)
     {
-        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
         if (string.IsNullOrEmpty(token))
         {
             _logger.LogWarning("Kein GitHub-Token verfügbar für Git-Konfiguration.");
@@ -280,17 +338,38 @@ password {token}
     {
         _logger.LogInformation("Klone Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
 
+        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
+        var cloneUrl = repositoryUrl;
+
+        if (IsHttpsRepositoryUrl(repositoryUrl))
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                throw new InvalidOperationException(
+                    "git clone abgebrochen: GitHub-Token fehlt. Bitte in den Plugin-Einstellungen einen gültigen Personal Access Token konfigurieren (Scope: repo, ggf. read:org).");
+            }
+
+            cloneUrl = BuildAuthenticatedCloneUrl(repositoryUrl, token);
+        }
+
         // Clone with environment that disables SSH prompts
         var result = await _cliRunner.RunAsync(
             "git",
-            ["clone", repositoryUrl, targetPath],
+            ["clone", cloneUrl, targetPath],
             null,
-            GetGitEnvironment(),
+            GetGitEnvironment(token),
             ct);
 
         if (!result.IsSuccess)
         {
-            throw new InvalidOperationException($"git clone fehlgeschlagen: {result.StdErr}");
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, token);
+            if (IsAuthenticationFailure(result.StdErr))
+            {
+                throw new InvalidOperationException(
+                    $"git clone fehlgeschlagen: Authentifizierung fehlgeschlagen. Bitte GitHub-Token prüfen/neu setzen und Scopes (repo, ggf. read:org) verifizieren. Details: {sanitizedError}");
+            }
+
+            throw new InvalidOperationException($"git clone fehlgeschlagen: {sanitizedError}");
         }
 
         // Configure git credentials for the cloned repository

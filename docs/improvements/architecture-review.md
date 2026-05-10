@@ -56,7 +56,7 @@
 1. **CLI-Deadlock-Risiko** – `RunAsync` liest stdout/stderr möglicherweise sequenziell, was bei großem Output zu Deadlocks führt (→ Abschnitt 4)
 2. **Token-Übergabe als CLI-Argument** – Tokens müssen zwingend als Umgebungsvariablen und **nicht** als Argument übergeben werden (→ Abschnitt 7)
 3. **SignalR-Reconnect bei laufendem Streaming** – Verbindungsabbruch während KI-Streaming führt zu unsauberem Zustand (→ Abschnitt 5)
-4. **Prozess-Cleanup bei Anwendungsabsturz** – Gestartete `gh copilot`-Prozesse können als Waisen zurückbleiben (→ Abschnitt 4)
+4. **Prozess-Cleanup bei Anwendungsabsturz** – Gestartete `copilot`-Prozesse können als Waisen zurückbleiben (→ Abschnitt 4)
 5. **Fehlender Abbruchmechanismus in der UI** – Der Nutzer hat keine Möglichkeit, eine laufende KI-Session zu unterbrechen (→ Abschnitt 8)
 
 ---
@@ -76,7 +76,7 @@ graph TB
     subgraph Application["✅ Application Layer"]
         APL1[ProjectService]
         APL2[TaskService]
-        APL3[KiOrchestrationService]
+        APL3[EntwicklungsprozessService]
         APL4[GitOrchestrationService]
     end
 
@@ -109,7 +109,7 @@ graph TB
 **Schwachstellen:**
 
 - **Application → Infrastructure direkt:** Im Blueprint greifen Application Services direkt auf `Infrastructure`-Klassen zu (z. B. `EF Core DbContext`). Eine Repository-Abstraktion (z. B. `IProjectRepository`) würde die Kopplung weiter reduzieren und die Testbarkeit deutlich verbessern.
-- **KiOrchestrationService trägt zu viel Verantwortung:** Der Service koordiniert Plugin-Aufruf, Protokollschreiben, SignalR-Broadcasting und Statusübergänge. Hier besteht das Risiko eines "God Object".
+- **EntwicklungsprozessService trägt zu viel Verantwortung:** Der Service koordiniert Plugin-Aufruf, Protokollschreiben, SignalR-Broadcasting und Statusübergänge. Hier besteht das Risiko eines "God Object".
 - **Fehlende explizite Fehler-Schicht:** Es ist nicht definiert, wie Fehler aus der Infrastructure nach oben propagiert werden und in welcher Schicht sie in UI-freundliche Meldungen übersetzt werden.
 
 ### 2.2 Separation of Concerns
@@ -155,12 +155,12 @@ classDiagram
     class GitOrchestrationService {
         -IGitPlugin _plugin
     }
-    class KiOrchestrationService {
+    class EntwicklungsprozessService {
         -IKiPlugin _plugin
     }
 
     GitOrchestrationService --> IGitPlugin
-    KiOrchestrationService --> IKiPlugin
+    EntwicklungsprozessService --> IKiPlugin
 ```
 
 **Stärken:**
@@ -177,7 +177,7 @@ classDiagram
 - **Empfehlung:** Plugin-Factory oder Named-Services-Ansatz (`IEnumerable<IGitPlugin>` + Auswahl nach `PluginTyp`).
 
 **Fehlerbehandlung in Plugins:**
-- Wirft ein Plugin eine unkategorisierte Exception, fängt der `KiOrchestrationService` diese ungefiltert. Es fehlen Plugin-spezifische Ausnahmetypen (z. B. `PluginException`, `AuthenticationException`).
+- Wirft ein Plugin eine unkategorisierte Exception, fängt der `EntwicklungsprozessService` diese ungefiltert. Es fehlen Plugin-spezifische Ausnahmetypen (z. B. `PluginException`, `AuthenticationException`).
 - **Empfehlung:** Basisklasse `PluginException` mit Untertypen; Application-Layer mappt auf Domänen-Fehlertypen.
 
 **Kein Health-Check / Verfügbarkeitsprüfung:**
@@ -250,7 +250,7 @@ sequenceDiagram
 - **Empfehlung:** stderr auf eine maximale Puffergröße begrenzen.
 
 **Prozess-Cleanup bei Anwendungsabsturz:**
-- Stürzt die Blazor-Anwendung ab, bleiben gestartete `gh copilot`-Prozesse als verwaiste Prozesse zurück.
+- Stürzt die Blazor-Anwendung ab, bleiben gestartete `copilot`-Prozesse als verwaiste Prozesse zurück.
 - **Empfehlung:** Eine Prozess-Registry implementieren, die alle gestarteten Prozesse verfolgt, und beim Anwendungsstart eventuell noch laufende Prozesse identifiziert und beendet.
 
 **Child-Prozess-Terminierung:**
@@ -290,9 +290,9 @@ stateDiagram-v2
 
 ```mermaid
 graph LR
-    CLI["gh copilot\n(stdout)"] -->|OutputDataReceived| Channel["Channel&lt;string&gt;"]
+    CLI["copilot\n(stdout)"] -->|OutputDataReceived| Channel["Channel&lt;string&gt;"]
     Channel -->|IAsyncEnumerable| Plugin["CopilotPlugin"]
-    Plugin -->|yield| Service["KiOrchestrationService"]
+    Plugin -->|yield| Service["EntwicklungsprozessService"]
     Service -->|BroadcastChunk| Hub["SignalR Hub"]
     Hub -->|OnChunkReceived| Blazor["Blazor Component"]
     Blazor -->|StateHasChanged| Nutzer["Nutzer-UI"]
@@ -311,13 +311,13 @@ graph LR
 
 Wenn der Nutzer den Prompt-Button doppelt drückt oder die Seite neu lädt, könnten zwei parallele KI-Prozesse gestartet werden, die beide in denselben `Protokolleintrag` schreiben.
 
-**Empfehlung:** Status-Guard im `KiOrchestrationService`: Nur wenn `Aufgabe.Status != KiAktiv` darf ein neuer Prozess gestartet werden; Button in UI während `KiAktiv` deaktivieren.
+**Empfehlung:** Status-Guard im `EntwicklungsprozessService`: Nur wenn `Aufgabe.Status != KiAktiv` darf ein neuer Prozess gestartet werden; Button in UI während `KiAktiv` deaktivieren.
 
 **Race Condition 2: Protokolleintrag vor Stream-Ende**
 
 ```mermaid
 sequenceDiagram
-    participant Service as KiOrchestrationService
+    participant Service as EntwicklungsprozessService
     participant DB as SQLite
     participant SignalR
 
@@ -573,7 +573,7 @@ Die Verwendung von `.resx`-Ressourcendateien ist vorgesehen – dies ist eine gu
 | R-05 | **SignalR-Reconnect** während laufendem Streaming | Streaming-Architektur | Nutzer sieht keine Ausgabe; KI-Status unklar |
 | R-06 | **Channel nicht bei Fehler abgeschlossen** | CLI-Prozesssteuerung | Consumer hängt ewig; kein Fehler-Feedback |
 | R-07 | **Kein Plugin-Health-Check** beim Start | Plugin-System | Fehler erst beim ersten Aufruf sichtbar |
-| R-08 | **KiOrchestrationService als God Object** | Systemarchitektur | Hohe Kopplung; schwer testbar; Änderungsrisiko |
+| R-08 | **EntwicklungsprozessService als God Object** | Systemarchitektur | Hohe Kopplung; schwer testbar; Änderungsrisiko |
 | R-09 | **Doppel-Click Schutz fehlt** für KI-Start | Streaming-Architektur | Zwei parallele KI-Prozesse für eine Aufgabe |
 
 #### 🟡 Mittel
@@ -683,7 +683,7 @@ Beim Anwendungsstart alle registrierten Plugins prüfen und dem Nutzer im Dashbo
 
 #### V-06: Guard gegen doppelten KI-Start (hoch, R-09)
 
-Im `KiOrchestrationService`:
+Im `EntwicklungsprozessService`:
 ```csharp
 public async Task StartDevelopmentAsync(...)
 {
@@ -813,9 +813,9 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 // In Services:
-public class KiOrchestrationService
+public class EntwicklungsprozessService
 {
-    private readonly ILogger<KiOrchestrationService> _logger;
+    private readonly ILogger<EntwicklungsprozessService> _logger;
     
     public async Task StartDevelopmentAsync(...)
     {
@@ -893,3 +893,4 @@ graph LR
 ---
 
 *Review erstellt auf Basis: [Architektur-Blueprint v1.0](../architecture/architecture-blueprint.md), [Entity-Relationship-Modell v1.0](../architecture/entity-relationship-model.md), [Anforderungsanalyse v1.0](../requirements/requirements-analysis.md)*
+

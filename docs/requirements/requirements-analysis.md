@@ -52,7 +52,7 @@
 - Die Anwendung ist eine **Einzelnutzer-Anwendung** – kein Login, keine Benutzerverwaltung.
 - KI-Aktionen finden ausschließlich auf dem **lokalen Repository-Klon** statt; die Hoheit über Push und Pull Request verbleibt beim Anwender.
 - **Erstes Git-Plugin:** GitHub (via `gh` CLI); weitere folgen.
-- **Erstes KI-Plugin:** GitHub Copilot (via `gh copilot` CLI); weitere folgen.
+- **Erstes KI-Plugin:** GitHub Copilot (via `copilot` CLI); weitere folgen.
 
 ---
 
@@ -92,7 +92,7 @@
 | **FR-4.6** | **Agenten-Auswahl pro Prompt:** Vor jedem KI-Lauf wählt der Anwender den zu verwendenden Agenten aus der vom KI-Plugin gelieferten Liste aus. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5** | **KI-Plugin-System:** Die Anwendung stellt ein erweiterbares Plugin-System für KI-Systeme bereit. Jedes KI-Plugin implementiert ein definiertes Interface. → [Architektur-Blueprint](../architecture/architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5.1** | **KI-Plugin-Interface:** Schnittstelle umfasst: Prompt entgegennehmen, Agentenpaket ablegen, KI steuern, Tests ausführen, Ergebnisse streamen, verfügbare Agenten liefern. | KI-Integration | MUST HAVE | 📋 Geplant |
-| **FR-5.2** | **GitHub-Copilot-Plugin (gh copilot CLI):** Erstes konkretes KI-Plugin; nutzt `gh copilot`-CLI; legt das Agentenpaket im `.github/`-Verzeichnis des Branches ab. | KI-Integration | MUST HAVE | 📋 Geplant |
+| **FR-5.2** | **GitHub-Copilot-Plugin (copilot CLI):** Erstes konkretes KI-Plugin; nutzt `copilot`-CLI; legt das Agentenpaket im `.github/`-Verzeichnis des Branches ab. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-6** | **Agentenpakete:** Die Anwendung verwaltet Agentenpakete aus dem festen Verzeichnis `<Programmverzeichnis>/agent-packages/`. Verzeichnis wird beim App-Start automatisch angelegt. Jeder Unterordner ist ein Agentenpaket. → [Architektur-Blueprint](../architecture/architecture-blueprint.md) | Datenverwaltung | MUST HAVE | 📋 Geplant |
 | **FR-6.1** | **Agentenpakete einlesen:** Beim App-Start und auf Anfrage werden alle Unterordner in `agent-packages/` als verfügbare Pakete geladen. | Datenverwaltung | MUST HAVE | 📋 Geplant |
 | **FR-6.2** | **Agentenpaket auswählen:** Anwender wählt pro Aufgabe ein Agentenpaket aus. | Datenverwaltung | MUST HAVE | 📋 Geplant |
@@ -233,7 +233,7 @@
 | # | Typ | Beschreibung | Auswirkung bei Nicht-Erfüllung |
 |---|-----|--------------|-------------------------------|
 | A-1 | Annahme | Die `gh`-CLI (GitHub CLI) ist auf dem Rechner des Anwenders installiert und konfiguriert. | GitHub-Plugin nicht funktionsfähig. |
-| A-2 | Annahme | Die `gh copilot`-Erweiterung der GitHub CLI ist verfügbar und lizenziert. | GitHub-Copilot-Plugin nicht funktionsfähig. |
+| A-2 | Annahme | Die `copilot`-Erweiterung der GitHub CLI ist verfügbar und lizenziert. | GitHub-Copilot-Plugin nicht funktionsfähig. |
 | A-3 | Annahme | Der Anwender betreibt die Anwendung unter Windows (für Windows Credential Store). | Token-Speicherung nicht verfügbar; muss für andere OS angepasst werden. |
 | A-4 | Annahme | Ausreichend lokaler Festplattenspeicher für Repository-Klone ist vorhanden. | Klonvorgang schlägt fehl; Fehlerbehandlung muss sauber reagieren. |
 | A-5 | Annahme | Git ist auf dem Rechner des Anwenders installiert und im PATH verfügbar. | Alle Git-Operationen nicht ausführbar. |
@@ -255,7 +255,7 @@
 | S-3 | Issue-Abruf aus GitHub (automatisch beim Projekt-Öffnen) |
 | S-4 | Aufgabenverwaltung (aus Issue oder frei; vollständiger Lebenszyklus) |
 | S-5 | Repository-Klon und Branch pro Aufgabe (Namenskonvention: `task/<id>-<kurzname>`) |
-| S-6 | KI-Plugin-System mit GitHub-Copilot-Plugin (gh copilot CLI) |
+| S-6 | KI-Plugin-System mit GitHub-Copilot-Plugin (copilot CLI) |
 | S-7 | Agentenpakete aus lokalem Verzeichnis (`agent-packages/`) |
 | S-8 | Echtzeit-Streaming der KI-Ausgabe im Aufgabenprotokoll |
 | S-9 | Iterativer KI-Dialog (Folge-Prompts aus dem Protokoll) |
@@ -415,7 +415,7 @@ classDiagram
 | **Pull Request (PR)** | Zusammenführungsanfrage auf dem Git-Provider; wird manuell durch den Anwender über das Git-Plugin erstellt. |
 | **Windows Credential Store** | Sicherer Speicher des Windows-Betriebssystems für Zugangsdaten; wird für API-Tokens genutzt. |
 | **gh CLI** | GitHub Command Line Interface; Basis für das GitHub-Git-Plugin. |
-| **gh copilot CLI** | GitHub Copilot Erweiterung der `gh` CLI; Basis für das GitHub-Copilot-KI-Plugin. |
+| **copilot CLI** | GitHub Copilot Erweiterung der `gh` CLI; Basis für das GitHub-Copilot-KI-Plugin. |
 | **Echtzeit-Streaming** | Kontinuierliche Ausgabe der KI-Antwort in Echtzeit über SignalR an die Blazor-Oberfläche, ohne auf die vollständige Antwort zu warten. |
 
 ---
@@ -541,7 +541,7 @@ classDiagram
 | NS-3 | Plugin-Interfaces (`IGitPlugin`, `IKiPlugin`) als C#-Interfaces definieren und dokumentieren | Entwickler | MUST HAVE |
 | NS-4 | Datenbankschema aus ERM ableiten und EF-Core-Migrations anlegen | Entwickler | MUST HAVE |
 | NS-5 | GitHub-Plugin-Implementierung (gh CLI): Klonen, Branch, Push, Pull, PR, Issues | Entwickler | MUST HAVE |
-| NS-6 | GitHub-Copilot-Plugin-Implementierung (gh copilot): Streaming, Agenten-Liste, Agentenpaket-Ablage | Entwickler | MUST HAVE |
+| NS-6 | GitHub-Copilot-Plugin-Implementierung (copilot): Streaming, Agenten-Liste, Agentenpaket-Ablage | Entwickler | MUST HAVE |
 | NS-7 | Blazor-UI: Projektverwaltung, Aufgabenverwaltung, Protokoll-Komponente | Entwickler | MUST HAVE |
 | NS-8 | Dashboard-Komponente mit Echtzeit-Status via SignalR | Entwickler | MUST HAVE |
 | NS-9 | Windows Credential Store Integration für Token-Verwaltung | Entwickler | MUST HAVE |
@@ -567,3 +567,4 @@ classDiagram
 ---
 
 *Dokument-Pfad: `docs/requirements/requirements-analysis.md` · Projekt: Softwareschmiede · Sprache: Deutsch*
+
