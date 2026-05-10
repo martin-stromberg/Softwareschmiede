@@ -1,9 +1,15 @@
 <Solution>
-  <Project Path="plugins/Softwareschmiede.Plugin.GitHub/Softwareschmiede.Plugin.GitHub.csproj" />
-  <Project Path="plugins/Softwareschmiede.Plugin.GitHubCopilot/Softwareschmiede.Plugin.GitHubCopilot.csproj" />
+  <Project Path="plugins/Softwareschmiede.Plugin.GitHub/Softwareschmiede.Plugin.GitHub.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
+  <Project Path="plugins/Softwareschmiede.Plugin.GitHubCopilot/Softwareschmiede.Plugin.GitHubCopilot.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
   <Project Path="src/Softwareschmiede.Client/Softwareschmiede.Client.csproj" />
   <Project Path="src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj" />
-  <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj" />
+  <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
   <Project Path="src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj" />
   <Project Path="src/Softwareschmiede/Softwareschmiede.csproj" />
 </Solution>
