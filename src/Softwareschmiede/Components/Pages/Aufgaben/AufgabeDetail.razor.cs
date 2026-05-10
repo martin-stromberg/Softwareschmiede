@@ -280,7 +280,7 @@ public partial class AufgabeDetail : IDisposable
             model: string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel,
             onStarted: async () => {
                 await LadeAsync();
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
             },
             onCompleted: fehler => InvokeAsync(async () =>
             {
