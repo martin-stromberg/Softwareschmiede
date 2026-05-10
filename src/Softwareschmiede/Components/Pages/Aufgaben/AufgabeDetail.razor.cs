@@ -278,7 +278,11 @@ public partial class AufgabeDetail : IDisposable
             prompt,
             agent,
             model: string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel,
-            onStarted: () => InvokeAsync(StateHasChanged),
+            onStarted: () => InvokeAsync(async () =>
+            {
+                await LadeAsync();
+                StateHasChanged();
+            }),
             onCompleted: fehler => InvokeAsync(async () =>
             {
                 _processing = false;
