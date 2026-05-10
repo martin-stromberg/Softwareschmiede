@@ -81,6 +81,8 @@
 
 - Für jede Aufgabe kann der Anwender den **Entwicklungsprozess starten**.
 - Die Anwendung klont das verknüpfte Repository in ein **aufgabenspezifisches Arbeitsverzeichnis** und legt einen eigenen Branch an.
+- Das Basis-Arbeitsverzeichnis für Klone ist benutzerseitig in den Einstellungen konfigurierbar (`repositories.workdir`).
+- Ist kein gültiger Pfad verfügbar, verwendet die Anwendung automatisch einen Fallback auf Basis von `Path.GetTempPath()`.
 - Das ausgewählte **KI-Plugin** wird mit den Anforderungen als Prompt gesteuert.
 - Das KI-Plugin erhält das ausgewählte **Agentenpaket** und legt dessen Dateien strukturiert im Branch ab (z. B. `.github/`-Ordner beim GitHub-Copilot-Plugin).
 - Der Fortschritt und die Ausgabe der KI wird in Echtzeit im Aufgabenprotokoll angezeigt.

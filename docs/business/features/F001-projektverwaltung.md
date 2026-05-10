@@ -71,6 +71,7 @@ Nach dem Speichern erscheint das Projekt sofort im Dashboard, und Sie können er
 
 Wenn Sie eine GitHub-Ablage-Adresse eintragen, merkt sich die Softwareschmiede diese.
 Sobald Sie später eine Aufgabe starten, lädt die Softwareschmiede den Code automatisch auf Ihren Rechner.
+Der Speicherort der lokalen Arbeitskopie wird über die globale Einstellung für das Arbeitsverzeichnis gesteuert.
 Beim Archivieren oder Löschen wird kein Code verändert – nur die Verwaltungseinträge in der Softwareschmiede werden angepasst.
 
 ---
@@ -98,4 +99,5 @@ Ja. Öffnen Sie das archivierte Projekt und klicken Sie auf **Reaktivieren**.
 
 - [F002 – Aufgabenverwaltung](./F002-aufgabenverwaltung.md) – Aufgaben innerhalb eines Projekts anlegen und verwalten
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – KI für eine Aufgabe starten
+- [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Basisverzeichnis lokaler Klone festlegen
 - [Zurück zur Übersicht](../features.md)

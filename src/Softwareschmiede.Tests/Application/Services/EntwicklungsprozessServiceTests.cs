@@ -19,6 +19,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Mock<IAgentPackageService> _agentPackageServiceMock;
+    private readonly Mock<IArbeitsverzeichnisResolver> _arbeitsverzeichnisResolverMock;
     private readonly EntwicklungsprozessService _sut;
     private readonly Guid _projektId = new Guid("44444444-4444-4444-4444-444444444444");
 
@@ -30,6 +31,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _gitPluginMock = new Mock<IGitPlugin>();
         _kiPluginMock = new Mock<IKiPlugin>();
         _agentPackageServiceMock = new Mock<IAgentPackageService>();
+        _arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
 
         _sut = new EntwicklungsprozessService(
             _aufgabeService,
@@ -37,6 +41,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _gitPluginMock.Object,
             _kiPluginMock.Object,
             _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
@@ -91,6 +96,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns(Task.CompletedTask);
         _kiPluginMock.Setup(k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        _kiPluginMock.Setup(k => k.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         // Act
         await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
@@ -219,5 +226,133 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Workdir Konfiguriert", null);
+        var configuredBase = Path.Combine(Path.GetTempPath(), "custom-workdir-base");
+        _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(configuredBase, false, "configured", configuredBase));
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        var expectedPath = Path.Combine(configuredBase, "softwareschmiede", aufgabe.Id.ToString());
+        _gitPluginMock.Verify(g => g.CloneRepositoryAsync(
+            "https://github.com/test/repo",
+            expectedPath,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Workdir Fallback", null);
+        var fallbackBase = Path.GetTempPath();
+        _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(fallbackBase, true, "no-configured-path", null));
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        var expectedPath = Path.Combine(fallbackBase, "softwareschmiede", aufgabe.Id.ToString());
+        _gitPluginMock.Verify(g => g.CloneRepositoryAsync(
+            "https://github.com/test/repo",
+            expectedPath,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Existing Branch", null);
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("main");
+        _gitPluginMock.Setup(g => g.CheckoutRemoteBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo", "feature/existing-branch");
+
+        // Assert
+        _gitPluginMock.Verify(g => g.CheckoutRemoteBranchAsync(
+            It.IsAny<string>(),
+            "feature/existing-branch",
+            It.IsAny<CancellationToken>()), Times.Once);
+        _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.BranchName.Should().Be("feature/existing-branch");
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Delete Existing Clone", null);
+        var configuredBase = Path.Combine(Path.GetTempPath(), $"workdir-existing-{Guid.NewGuid():N}");
+        var expectedClonePath = Path.Combine(configuredBase, "softwareschmiede", aufgabe.Id.ToString());
+        Directory.CreateDirectory(expectedClonePath);
+        var readOnlyFile = Path.Combine(expectedClonePath, "readonly.txt");
+        await File.WriteAllTextAsync(readOnlyFile, "content");
+        File.SetAttributes(readOnlyFile, FileAttributes.ReadOnly);
+
+        _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(configuredBase, false, "configured", configuredBase));
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        _gitPluginMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expectedClonePath, It.IsAny<CancellationToken>()), Times.Once);
+        Directory.Exists(expectedClonePath).Should().BeFalse();
+
+        if (Directory.Exists(configuredBase))
+        {
+            Directory.Delete(configuredBase, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldSkipDeploy_WhenAgentPackageIsMissing()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Missing Package", null);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "missing-package", null);
+
+        _agentPackageServiceMock.Setup(a => a.GetPackageAsync("missing-package", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AgentPackageInfo?)null);
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        _kiPluginMock.Verify(k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _agentPackageServiceMock.Verify(a => a.GetPackageAsync("missing-package", It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 }

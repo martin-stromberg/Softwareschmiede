@@ -1,7 +1,7 @@
 # Entwicklungsprozess-Ablauf
 
 **Modul:** `EntwicklungsprozessService`, `GitOrchestrationService`, `GitHubPlugin`, `GitHubCopilotPlugin`  
-**Letzte Aktualisierung:** 2026-05-07
+**Letzte Aktualisierung:** 2026-05-10
 
 Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Softwareentwicklung in **Softwareschmiede**. Die Abläufe umfassen den kompletten Lebenszyklus einer Aufgabe: vom Starten des Entwicklungsprozesses über das KI-Streaming bis zum Abschluss oder Abbruch. Querverweise auf verwandte Dokumentation sind am Ende jedes Abschnitts angegeben.
 
@@ -39,7 +39,7 @@ sequenceDiagram
 
     BlazorUI->>EntwicklungsprozessService: ProzessStartenAsync(aufgabeId, repositoryUrl)
     EntwicklungsprozessService->>EntwicklungsprozessService: AufgabeService.GetByIdAsync(aufgabeId)
-    EntwicklungsprozessService->>EntwicklungsprozessService: Klon-Pfad bestimmen (%TEMP%/softwareschmiede/<aufgabeId>)
+    EntwicklungsprozessService->>EntwicklungsprozessService: Basis-Pfad via Resolver ermitteln + Klon-Pfad bilden
     EntwicklungsprozessService->>IGitPlugin: CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)
     IGitPlugin-->>EntwicklungsprozessService: Klon erfolgreich
     EntwicklungsprozessService->>EntwicklungsprozessService: Branch-Name erzeugen (task/<id>-<slug>)
@@ -66,7 +66,7 @@ sequenceDiagram
 | # | Schritt | Quellcode-Referenz | Eingabe / Ausgabe |
 |---|---------|-------------------|-------------------|
 | 1 | Aufgabe aus Datenbank laden | `EntwicklungsprozessService.ProzessStartenAsync` → `AufgabeService.GetByIdAsync(aufgabeId)` | Eingabe: `aufgabeId` (Guid); Ausgabe: `Aufgabe`-Objekt |
-| 2 | Klon-Pfad bestimmen | `EntwicklungsprozessService.ProzessStartenAsync` | Pfad: `%TEMP%/softwareschmiede/<aufgabeId>` |
+| 2 | Basis-Pfad auflösen und Klon-Pfad bestimmen | `EntwicklungsprozessService.ProzessStartenAsync` + `IArbeitsverzeichnisResolver.ResolveAsync` | Pfad: `<resolvedBase>/softwareschmiede/<aufgabeId>`; bei Fallback: `Path.GetTempPath()/softwareschmiede/<aufgabeId>` |
 | 3 | Repository klonen | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` → `GitHubPlugin`: `git clone {url} {targetPath}` | Eingabe: URL + Zielpfad; Seiteneffekt: lokales Verzeichnis wird erstellt |
 | 4 | Branch-Namen erzeugen | `EntwicklungsprozessService.ProzessStartenAsync` | Format: `task/<aufgabeId-ohne-Bindestriche>-<titel-slug>`, max. 30 Zeichen |
 | 5 | Branch anlegen | `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName)` → `GitHubPlugin`: `git checkout -b {branchName}` | Seiteneffekt: neuer Branch im lokalen Klon |
@@ -80,6 +80,7 @@ sequenceDiagram
 |-----------|-----------|
 | Aufgabe nicht gefunden (`GetByIdAsync` wirft Exception) | Abbruch; Exception propagiert an BlazorUI |
 | `git clone` schlägt fehl (ungültige URL, fehlende Berechtigungen) | `IGitPlugin` wirft Exception; Klon-Verzeichnis verbleibt ggf. teilweise; Statuswechsel findet **nicht** statt |
+| Konfigurierter Workdir-Pfad nicht nutzbar | Resolver nutzt Fallback (`Path.GetTempPath()`), schreibt ReasonCode in Logs; Prozess läuft mit Fallback weiter |
 | `git checkout -b` schlägt fehl (Branch existiert bereits) | `IGitPlugin` wirft Exception; Prozess wird nicht als gestartet markiert |
 | `DeployAgentPackageAsync` schlägt fehl | Exception propagiert; Aufgabe bleibt im Status `Offen` |
 

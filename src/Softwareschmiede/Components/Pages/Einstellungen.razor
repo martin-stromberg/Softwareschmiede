@@ -1,10 +1,58 @@
 @page "/einstellungen"
 @rendermode InteractiveServer
+@using System.IO
 @using Softwareschmiede.Domain.ValueObjects
 @inherits EinstellungenBase
 
 <div class="page-header">
     <h2>⚙️ Einstellungen</h2>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
+    <div class="card-title">📁 Arbeitsverzeichnis für lokale Repositories</div>
+
+    @if (!string.IsNullOrEmpty(_arbeitsverzeichnisStatusMessage))
+    {
+        <div class="alert @(_arbeitsverzeichnisStatusIsError ? "alert-error" : "alert-success")" style="margin-bottom:1rem">
+            @_arbeitsverzeichnisStatusMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_arbeitsverzeichnisFallbackHinweis))
+    {
+        <div class="alert alert-error" style="margin-bottom:1rem">
+            @_arbeitsverzeichnisFallbackHinweis
+        </div>
+    }
+
+    <div class="form-group">
+        <label class="form-label">Arbeitsverzeichnis</label>
+        <input type="text"
+               class="form-input"
+               value="@_arbeitsverzeichnisInput"
+               @oninput="e => ArbeitsverzeichnisInputChanged(e.Value?.ToString() ?? string.Empty)"
+               placeholder="@Path.Combine(Path.GetTempPath(), "softwareschmiede")" />
+        <small style="color:#6b7280;font-size:.75rem">
+            Leer lassen für den Default: @Path.Combine(Path.GetTempPath(), "softwareschmiede")
+        </small>
+        @if (!string.IsNullOrEmpty(_arbeitsverzeichnisValidationError))
+        {
+            <small style="color:#f87171;display:block;margin-top:.25rem">@_arbeitsverzeichnisValidationError</small>
+        }
+    </div>
+
+    <div class="action-bar">
+        <button class="btn btn-primary"
+                @onclick="ArbeitsverzeichnisSpeichernAsync"
+                disabled="@(_saving || !string.IsNullOrEmpty(_arbeitsverzeichnisValidationError))">
+            💾 Speichern
+        </button>
+        <button class="btn btn-ghost"
+                @onclick="ArbeitsverzeichnisZuruecksetzenAsync"
+                disabled="@_saving">
+            ↩️ Default verwenden
+        </button>
+    </div>
 </div>
 
 @foreach (var plugin in _plugins)

@@ -101,4 +101,5 @@ Ja, sie sind weiterhin im Projekt einsehbar und enthalten das vollständige Prot
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md) – Den Verlauf einer Aufgabe einsehen
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md) – Ergebnis freigeben und Aufgabe beenden
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Aufgabe ohne Speichern beenden
+- [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Basispfad der lokalen Klone festlegen
 - [Zurück zur Übersicht](../features.md)

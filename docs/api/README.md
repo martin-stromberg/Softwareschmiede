@@ -9,6 +9,7 @@ Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der So
 | Dokument | Beschreibung |
 |---|---|
 | [plugin-interfaces.md](./plugin-interfaces.md) | Plugin-Entwickler-Dokumentation: `IGitPlugin` und `IKiPlugin` – Schnittstellenreferenz, Implementierungsanleitungen und Agentenpaket-Struktur |
+| [workdir-configuration.md](./workdir-configuration.md) | Technische Dokumentation des Features „konfigurierbares Arbeitsverzeichnis“ (Settings, Resolver, Fallback, Klonpfadbildung) |
 
 ---
 

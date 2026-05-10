@@ -1,7 +1,7 @@
 # Entity-Relationship-Modell: Softwareschmiede
 
-**Version:** 1.0  
-**Datum:** 2025  
+**Version:** 1.1  
+**Datum:** 2026-05-10  
 **Status:** Freigegeben  
 
 ---
@@ -26,6 +26,7 @@
    - 3.5 [Protokolleintrag](#35-protokolleintrag)
    - 3.6 [TestErgebnis](#36-testergebnis)
    - 3.7 [PluginKonfiguration](#37-pluginkonfiguration)
+   - 3.8 [AppEinstellung](#38-appeinstellung)
 4. [Beziehungsübersicht](#4-beziehungsübersicht)
 5. [Modellierungsentscheidungen](#5-modellierungsentscheidungen)
 6. [Konsistenzprüfung mit dem Architektur-Blueprint](#6-konsistenzprüfung-mit-dem-architektur-blueprint)
@@ -127,6 +128,13 @@ erDiagram
         string CredentialStoreKey "Schlüssel im Windows Credential Store"
         string BaseUrl "optional, z.B. GitHub Enterprise"
         bool Aktiviert
+    }
+
+    AppEinstellung {
+        Guid Id PK
+        string Schluessel "z.B. repositories.workdir"
+        string Wert "optional"
+        DateTimeOffset AktualisiertAm
     }
 
     Projekt ||--o{ GitRepository : "hat"
@@ -275,6 +283,23 @@ erDiagram
 
 ---
 
+### 3.8 AppEinstellung
+
+**Beschreibung:** Speichert globale, nicht-geheime Anwendungseinstellungen als Schlüssel/Wert-Paare. Für das Workdir-Feature wird der Schlüssel `repositories.workdir` verwendet.
+
+**Primärschlüssel:** `Id`  
+**Fremdschlüssel:** –  
+**Besonderheit:** `Schluessel` ist eindeutig (UNIQUE).
+
+| Attribut | Typ | Constraint | Beschreibung |
+|---|---|---|---|
+| `Id` | `Guid` | PK, NOT NULL | Eindeutiger Bezeichner der Einstellung |
+| `Schluessel` | `string` | NOT NULL, UNIQUE, max. 200 Zeichen | Maschinenlesbarer Schlüssel, z. B. `repositories.workdir` |
+| `Wert` | `string?` | NULL, max. 2000 Zeichen | Optionaler Wert; `null`/leer bedeutet „Default verwenden“ |
+| `AktualisiertAm` | `DateTimeOffset` | NOT NULL | Zeitpunkt der letzten Aktualisierung |
+
+---
+
 ## 4. Beziehungsübersicht
 
 | # | Von | Zu | Kardinalität | Typ | Beschreibung |
@@ -365,6 +390,7 @@ erDiagram
 | Keine Lazy Loading; explizite Includes | Das ERM definiert keine Navigation Properties, die implizit geladen werden müssten. Alle Beziehungen sind über FK-Spalten explizit und erfordern `.Include()` in Queries | ✅ Konform |
 | AsNoTracking für Leseabfragen | Keine Modellierungskonsequenz; wird auf Service-Ebene umgesetzt | ✅ Konform |
 | API-Tokens im Windows Credential Store | `PluginKonfiguration` speichert nur `CredentialStoreKey`; kein Token-Attribut im gesamten ERM | ✅ Konform |
+| Konfigurierbares Basis-Arbeitsverzeichnis | `AppEinstellung` speichert `repositories.workdir`; Laufzeit-Fallback wird außerhalb des ERM in Services umgesetzt | ✅ Konform |
 | Agentenpaket-Inhalte im Dateisystem | Nur `Aufgabe.AgentenpaketName` (string) im ERM; keine Paket-Entität | ✅ Konform |
 | Aufgaben-Lebenszyklus (Offen → ... → Abgeschlossen/Fehlgeschlagen) | `Aufgabe.Status` (Enum) bildet alle Zustände ab; `AbschlussDatum` wird bei Terminalzustand gesetzt | ✅ Konform |
 | Protokollierung aller Ereignisse (Prompt, Antwort, Status, Test) | `Protokolleintrag.Typ` (Enum) deckt alle vier Ereignistypen ab | ✅ Konform |
@@ -393,6 +419,7 @@ Die folgende Tabelle listet empfohlene Datenbankindizes auf Basis der erwarteten
 | `TestErgebnis` | `Status` | Non-Unique | Filterung fehlgeschlagener Tests über alle Aufgaben |
 | `PluginKonfiguration` | `PluginTyp` | Unique | Eindeutigkeit des Plugin-Bezeichners; schneller Lookup beim Starten |
 | `PluginKonfiguration` | `Aktiviert` | Non-Unique | Abfrage der aktiven Plugins beim Anwendungsstart |
+| `AppEinstellung` | `Schluessel` | Unique | Eindeutiger Zugriff auf globale Einstellungen (z. B. `repositories.workdir`) |
 
 ### EF Core–Konfigurationshinweise
 
@@ -409,6 +436,11 @@ modelBuilder.Entity<IssueReferenz>()
 // Beispiel: Unique Constraint für PluginKonfiguration
 modelBuilder.Entity<PluginKonfiguration>()
     .HasIndex(p => p.PluginTyp)
+    .IsUnique();
+
+// Beispiel: Unique Constraint für AppEinstellung
+modelBuilder.Entity<AppEinstellung>()
+    .HasIndex(a => a.Schluessel)
     .IsUnique();
 
 // Beispiel: TimeSpan → long (Ticks) Konvertierung
