@@ -44,6 +44,7 @@ Das Ergebnis können Sie prüfen, bevor es dauerhaft gespeichert wird.
 3. Sie klicken auf **Senden** oder drücken die **Eingabetaste**.
 4. Die KI liest Ihre Ergänzung und arbeitet daran weiter.
 5. Wenn Sie die Agentensteuerung im Detail brauchen, nutzen Sie [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md).
+6. Wenn Sie den Verlauf gezielt steuern möchten, nutzen Sie [F012 – Kontextsteuerung bei Folgeanweisungen](./F012-kontextsteuerung-folgeanweisungen.md).
 
 ### KI bei einem Fehler neu starten
 
@@ -84,7 +85,8 @@ Ja. Klicken Sie auf **Aufgabe abbrechen**. Die lokale Arbeitskopie wird dann gel
 Die KI läuft im Hintergrund auf Ihrem Rechner weiter. Beim nächsten Öffnen sehen Sie den aktuellen Stand im Protokoll.
 
 **Kann ich der KI mehrere Nachrichten senden?**
-Ja. Sie können beliebig viele Folge-Anweisungen senden. Die KI berücksichtigt alle bisherigen Nachrichten.
+Ja. Sie können beliebig viele Folge-Anweisungen senden.
+Je nach Einstellung kann der bisherige Verlauf genutzt, ignoriert oder neu begonnen werden.
 
 **Wie lange braucht die KI für eine Aufgabe?**
 Das hängt von der Komplexität der Aufgabe ab. Einfache Änderungen dauern oft wenige Minuten, komplexe Vorhaben können länger dauern.
@@ -104,4 +106,5 @@ Klicken Sie auf **Aufgabe abbrechen** und formulieren Sie die Aufgabenbeschreibu
 - [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Speicherort der lokalen Klone steuern
 - [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Ausgelagerte GitHub- und Copilot-Anbindung verstehen
 - [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md) – Agent je Folgeanweisung gezielt wählen
+- [F012 – Kontextsteuerung bei Folgeanweisungen](./F012-kontextsteuerung-folgeanweisungen.md) – Verlauf je Folgeanweisung bewusst mitgeben, ignorieren oder neu beginnen
 - [Zurück zur Übersicht](../features.md)

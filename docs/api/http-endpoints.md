@@ -19,21 +19,32 @@ Referenz: `src/Softwareschmiede/Program.cs`
   - Plugin-Schnittstellen (`IPlugin`, `IGitPlugin`, `IKiPlugin`)
   - Infrastruktur-Verträge und Laufzeitverhalten (z. B. Workdir-Resolution)
 
-## Feature-Impact: Agent-Auswahl bei Folgeanweisungen
+## Feature-Impact: Kontextsteuerung bei Folgeanweisungen
 
 **Ergebnis:** **kein API-Impact** auf öffentliche HTTP-Schnittstellen.
 
-Das Feature „Agent-Auswahl bei Folgeanweisungen“ wurde in der Blazor-UI und in der internen Orchestrierung umgesetzt (Aufgabe-Detailseite), ohne neue oder geänderte öffentliche HTTP-Endpunkte.
+Das Feature „Kontextsteuerung bei Folgeanweisungen (Kontext mitgeben / ignorieren / neu beginnen)“ wurde in der Blazor-UI und in der internen Orchestrierung umgesetzt (Aufgabe-Detailseite und Application-Service), ohne neue oder geänderte öffentliche HTTP-Endpunkte.
 
-### Nachvollziehbarkeit der Akzeptanzkriterien (ohne HTTP-Änderung)
+### API-relevante Umsetzung (ohne HTTP-Änderung)
 
-| Kriterium | Status | Umsetzung / Referenz |
+| Bereich | Status | Umsetzung / Referenz |
 |---|---|---|
-| 1) Agent-Auswahl bei Folgeanweisungen sichtbar/verfügbar | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (Select mit `@bind="_folgeAgentName"` im Folge-Prompt) |
-| 2) Standardwert = initial gewählter Agent | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`LadeAsync*`: `_folgeAgentName = _aufgabe.AgentenName`) |
-| 3) Auswahl vor Absenden änderbar | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (UI-Select für `_folgeAgentName`) |
-| 4) Folgeanweisung geht an tatsächlich ausgewählten Agenten | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`FolgePromptAsync` → `KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName)`), zusätzlich abgesichert durch `AufgabeDetailFolgePromptTests` und `EntwicklungsprozessServiceTests` |
-| 5) Initialprompt-Verhalten unverändert | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`KiStartenAsync` unverändert über `_kiAgentName`), abgesichert durch `AufgabeDetailFolgePromptTests.KiStartenAsync_ShouldKeepInitialPromptBehavior` |
+| UI-Kontextmodi vorhanden (3 feste Werte) | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (`FolgeanweisungsKontextmodus`: `KontextMitgeben`, `KontextIgnorieren`, `KontextNeuBeginnen`) |
+| Guardrail bei „Kontext neu beginnen“ | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` + `AufgabeDetail.razor.cs` (Bestätigung erforderlich vor Senden) |
+| Modusübergabe in den Laufstart | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`KiMitPromptStartenAsync(..., FolgeanweisungsKontextmodus?)`) |
+| Prompt-Building je Modus inkl. Kontextdatei-Lifecycle | Erfüllt | `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`KiStartenAsync`, `BuildFollowPromptWithContextAsync`) |
+| KI-Plugin-Contract unverändert | Erfüllt | `docs/api/plugin-interfaces.md#startdevelopmentasync` |
+| Testabdeckung erweitert | Erfüllt | `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/KiAusfuehrungsServiceTests.cs` |
+
+### Fachliche und architektonische Referenzen
+
+Zur Vermeidung von Redundanz werden Anforderungen, Architekturentscheidungen und Testdetails in den jeweiligen Fachdokumenten geführt:
+
+- Anforderungen: [`../requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md`](../requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md)
+- Architektur: [`../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md`](../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md)
+- Architektur-Review: [`../improvements/kontextsteuerung-folgeanweisungen-architecture-review.md`](../improvements/kontextsteuerung-folgeanweisungen-architecture-review.md)
+- Testplan: [`../tests/testplan-kontextsteuerung-folgeanweisungen.md`](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
+- Testlücken: [`../tests/testluecken-kontextsteuerung-folgeanweisungen.md`](../tests/testluecken-kontextsteuerung-folgeanweisungen.md)
 
 ## Nächste Erweiterung
 

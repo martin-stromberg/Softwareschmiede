@@ -464,10 +464,12 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 
 **Rückgabewert:** `IAsyncEnumerable<string>` – Sequenz von Textfragmenten (Streaming-Ausgabe des KI-Systems).
 
-**Feature-Hinweis „Agent-Auswahl bei Folgeanweisungen“ (kein Contract-Change):**
+**Feature-Hinweis „Kontextsteuerung bei Folgeanweisungen“ (kein Contract-Change):**
 - Die Signatur von `StartDevelopmentAsync` bleibt unverändert (**kein API-Impact auf Plugin-Contract-Ebene**).
-- Für Folgeanweisungen wird der in der UI tatsächlich ausgewählte Agent als `agent`-Parameter übergeben.
-- Das Verhalten des Initialprompts bleibt unverändert; auch dieser wird weiterhin über denselben Contract gestartet.
+- Die drei Kontextmodi (`KontextMitgeben`, `KontextIgnorieren`, `KontextNeuBeginnen`) werden in der Application-Schicht vor dem Plugin-Aufruf in den finalen Prompt überführt.
+- Der `agent`-Parameter bleibt weiterhin die einzige Agentensteuerung am Plugin-Contract; Initialprompt und Folgeanweisung nutzen denselben Startpfad.
+- HTTP-Status zum Feature: [http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen](./http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen)
+- Architektur- und Testreferenzen: [Kontextsteuerung-Blueprint](../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md), [Testplan](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
 
 **Streaming-Verwendung:**
 

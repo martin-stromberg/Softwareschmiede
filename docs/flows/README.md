@@ -7,6 +7,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | Ablauf | Datei | Beschreibung |
 |--------|-------|--------------|
 | [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (inkl. Agent-Auswahl bei Folgeanweisungen) |
+| [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md) | `follow-up-context-steering-flow.md` | Detaillierter Folgeanweisungsfluss für Kontext mitgeben/ignorieren/neu beginnen inkl. Komprimierung, Fehlerpfade und Persistenz |
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 
@@ -32,6 +33,13 @@ Zeigt den Streaming-Ablauf von `KiStartenAsync`: Statusprüfung, Prompt-Protokol
 **Typ:** `flowchart TD` · **Services:** `AufgabeDetail`, `EntwicklungsprozessService`, `IKiPlugin`
 
 Beschreibt die Folge-Prompt-Logik mit Agenten-Auswahl, Start-Agent als Standardwert, frei änderbarer Auswahl vor dem Senden, Versand an den gewählten Agenten und Reset auf den Start-Agenten.
+
+---
+
+### [Ablauf 2c: Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `KiAusfuehrungsService`, `EntwicklungsprozessService`, `IKiPlugin`
+
+Beschreibt die Moduslogik **Kontext mitgeben / ignorieren / neu beginnen** inkl. UI-Bestätigung, Soft-/Hard-Limit-Komprimierung, Fehlerpfaden und Persistenz in `{id}.copilot.context.md`.
 
 ---
 

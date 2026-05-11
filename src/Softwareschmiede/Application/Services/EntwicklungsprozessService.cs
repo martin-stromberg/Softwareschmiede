@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -19,7 +20,10 @@ public sealed class EntwicklungsprozessService
     private readonly IKiPlugin _kiPlugin;
     private readonly IAgentPackageService _agentPackageService;
     private readonly IArbeitsverzeichnisResolver _arbeitsverzeichnisResolver;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<EntwicklungsprozessService> _logger;
+    private const int DefaultContextCompressionSoftLimit = 12_000;
+    private const int DefaultContextCompressionHardLimit = 20_000;
 
     /// <inheritdoc cref="EntwicklungsprozessService"/>
     public EntwicklungsprozessService(
@@ -29,6 +33,7 @@ public sealed class EntwicklungsprozessService
         IKiPlugin kiPlugin,
         IAgentPackageService agentPackageService,
         IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
+        IConfiguration configuration,
         ILogger<EntwicklungsprozessService> logger)
     {
         _aufgabeService = aufgabeService;
@@ -37,6 +42,7 @@ public sealed class EntwicklungsprozessService
         _kiPlugin = kiPlugin;
         _agentPackageService = agentPackageService;
         _arbeitsverzeichnisResolver = arbeitsverzeichnisResolver;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -155,6 +161,7 @@ public sealed class EntwicklungsprozessService
         string prompt,
         AgentInfo agent,
         string? model = null,
+        FolgeanweisungsKontextmodus? kontextmodus = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
@@ -166,7 +173,52 @@ public sealed class EntwicklungsprozessService
         if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad. Bitte zuerst ProzessStartenAsync aufrufen.");
 
-        await _protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.Prompt, prompt, agent.Name, ct);
+        var runId = Guid.NewGuid();
+        var finalPrompt = prompt;
+        var contextFilePath = Path.Combine(aufgabe.LokalerKlonPfad, $"{aufgabeId}.copilot.context.md");
+
+        if (kontextmodus is not null)
+        {
+            try
+            {
+                finalPrompt = await BuildFollowPromptWithContextAsync(
+                    aufgabeId,
+                    prompt,
+                    agent,
+                    aufgabe.LokalerKlonPfad,
+                    contextFilePath,
+                    runId,
+                    kontextmodus.Value,
+                    model,
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                var preflightContextEventId = Guid.NewGuid();
+                var preflightEntry = BuildContextEntry(
+                    runId,
+                    preflightContextEventId,
+                    kontextmodus.Value,
+                    prompt,
+                    $"Vor dem KI-Start abgebrochen: {ex.Message}",
+                    isError: true);
+                await AppendContextEntryAsync(contextFilePath, preflightEntry, CancellationToken.None);
+                await _protokollService.AddEintragAsync(
+                    aufgabeId,
+                    ProtokollTyp.KiAntwort,
+                    $"[RunId:{runId}][ContextEventId:{preflightContextEventId}] Fehler vor KI-Start: {ex.Message}",
+                    agent.Name,
+                    CancellationToken.None);
+                throw;
+            }
+        }
+
+        await _protokollService.AddEintragAsync(
+            aufgabeId,
+            ProtokollTyp.Prompt,
+            $"[RunId:{runId}] {(kontextmodus is null ? "Initialprompt" : $"Kontextmodus={kontextmodus}")}\n{finalPrompt}",
+            agent.Name,
+            ct);
         await _aufgabeService.KiAktiviertAsync(aufgabeId, ct);
 
         var vollstaendigeAntwort = new StringBuilder();
@@ -174,7 +226,7 @@ public sealed class EntwicklungsprozessService
 
         // yield return inside a try-catch is not allowed in C#.
         // Workaround: manually advance the enumerator and catch MoveNextAsync separately.
-        var enumerator = _kiPlugin.StartDevelopmentAsync(prompt, agent, aufgabe.LokalerKlonPfad, model, ct)
+        var enumerator = _kiPlugin.StartDevelopmentAsync(finalPrompt, agent, aufgabe.LokalerKlonPfad, model, ct)
             .GetAsyncEnumerator(ct);
 
         try
@@ -210,7 +262,7 @@ public sealed class EntwicklungsprozessService
                 await _protokollService.AddEintragAsync(
                     aufgabeId,
                     ProtokollTyp.KiAntwort,
-                    $"Fehler: {fehler.Message}",
+                    $"[RunId:{runId}] Fehler: {fehler.Message}",
                     agent.Name,
                     CancellationToken.None);
             }
@@ -219,10 +271,20 @@ public sealed class EntwicklungsprozessService
                 await _protokollService.AddEintragAsync(
                     aufgabeId,
                     ProtokollTyp.KiAntwort,
-                    vollstaendigeAntwort.ToString(),
+                    $"[RunId:{runId}]\n{vollstaendigeAntwort}",
                     agent.Name,
                     CancellationToken.None);
                 await _aufgabeService.KiAbgeschlossenAsync(aufgabeId, CancellationToken.None);
+            }
+
+            if (kontextmodus is not null)
+            {
+                var contextEventId = Guid.NewGuid();
+                var responseContent = fehler is null
+                    ? vollstaendigeAntwort.ToString().Trim()
+                    : $"Fehler: {fehler.Message}";
+                var contextEntry = BuildContextEntry(runId, contextEventId, kontextmodus.Value, prompt, responseContent, fehler is not null);
+                await AppendContextEntryAsync(contextFilePath, contextEntry, CancellationToken.None);
             }
         }
     }
@@ -418,6 +480,264 @@ public sealed class EntwicklungsprozessService
     {
         _logger.LogInformation("Remote-Branches für {RepositoryUrl} abrufen.", repositoryUrl);
         return await _gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
+    }
+
+    private async Task<string> BuildFollowPromptWithContextAsync(
+        Guid aufgabeId,
+        string userPrompt,
+        AgentInfo agent,
+        string localRepoPath,
+        string contextFilePath,
+        Guid runId,
+        FolgeanweisungsKontextmodus kontextmodus,
+        string? model,
+        CancellationToken ct)
+    {
+        var contextEventId = Guid.NewGuid();
+
+        if (kontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen)
+        {
+            var resetHeader = $"# Kontextverlauf Aufgabe {aufgabeId}\n\nReset durch Folgeanweisung.\nRunId: {runId}\nContextEventId: {contextEventId}\nZeit: {DateTimeOffset.UtcNow:O}\n";
+            await WriteTextAtomicallyWithBackupAsync(contextFilePath, resetHeader, ct);
+            await _protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.StatusUebergang,
+                $"[RunId:{runId}][ContextEventId:{contextEventId}] Kontext wurde zurückgesetzt (Modus: Kontext neu beginnen).",
+                agent.Name,
+                ct);
+            return userPrompt;
+        }
+
+        if (kontextmodus == FolgeanweisungsKontextmodus.KontextIgnorieren)
+        {
+            await _protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.StatusUebergang,
+                $"[RunId:{runId}][ContextEventId:{contextEventId}] Folgeanweisung ohne Kontextpräfix (Modus: Kontext ignorieren).",
+                agent.Name,
+                ct);
+            return userPrompt;
+        }
+
+        var context = await ReadFileTextSafeAsync(contextFilePath, ct);
+        context = await EnsureContextWithinLimitsAsync(
+            aufgabeId,
+            context,
+            contextFilePath,
+            agent,
+            localRepoPath,
+            runId,
+            model,
+            ct);
+
+        await _protokollService.AddEintragAsync(
+            aufgabeId,
+            ProtokollTyp.StatusUebergang,
+            $"[RunId:{runId}][ContextEventId:{contextEventId}] Folgeanweisung mit Kontextpräfix gesendet.",
+            agent.Name,
+            ct);
+
+        if (string.IsNullOrWhiteSpace(context))
+        {
+            return userPrompt;
+        }
+
+        return $"{context.TrimEnd()}\n\n---\n\n{userPrompt}";
+    }
+
+    private async Task<string> EnsureContextWithinLimitsAsync(
+        Guid aufgabeId,
+        string context,
+        string contextFilePath,
+        AgentInfo agent,
+        string localRepoPath,
+        Guid runId,
+        string? model,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(context))
+        {
+            return string.Empty;
+        }
+
+        var softLimit = _configuration.GetValue<int?>("KiKontext:SoftLimitChars") ?? DefaultContextCompressionSoftLimit;
+        var hardLimit = _configuration.GetValue<int?>("KiKontext:HardLimitChars") ?? DefaultContextCompressionHardLimit;
+
+        var current = context;
+        if (current.Length > softLimit)
+        {
+            var compressionEventId = Guid.NewGuid();
+            await _protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.StatusUebergang,
+                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Soft-Limit ({softLimit}) überschritten, starte KI-Komprimierung.",
+                agent.Name,
+                ct);
+
+            current = await CompressContextAsync(current, agent, localRepoPath, model, ct);
+            await WriteTextAtomicallyWithBackupAsync(contextFilePath, current, ct);
+
+            await _protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.StatusUebergang,
+                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Kontext komprimiert auf {current.Length} Zeichen.",
+                agent.Name,
+                ct);
+        }
+
+        if (current.Length > hardLimit)
+        {
+            throw new InvalidOperationException(
+                $"Kontextdatei überschreitet das Hard-Limit ({hardLimit} Zeichen) trotz Komprimierung. " +
+                "Bitte mit 'Kontext ignorieren' fortsetzen oder 'Kontext neu beginnen'.");
+        }
+
+        return current;
+    }
+
+    private async Task<string> CompressContextAsync(
+        string context,
+        AgentInfo agent,
+        string localRepoPath,
+        string? model,
+        CancellationToken ct)
+    {
+        var compressionPrompt = $"""
+            Komprimiere den folgenden Projektkontext in eine knappe, strukturierte Markdown-Zusammenfassung.
+            Gib ausschließlich Markdown zurück, ohne Einleitung und ohne Codeblock.
+            Pflichtabschnitte:
+            - Ziel
+            - Offene Punkte
+            - Letzte Entscheidungen
+            - Relevante Randbedingungen
+
+            Kontext:
+            {context}
+            """;
+
+        var builder = new StringBuilder();
+        await foreach (var line in _kiPlugin.StartDevelopmentAsync(compressionPrompt, agent, localRepoPath, model, ct))
+        {
+            builder.AppendLine(line);
+        }
+
+        var compressed = builder.ToString().Trim();
+        if (string.IsNullOrWhiteSpace(compressed))
+        {
+            throw new InvalidOperationException("KI-Komprimierung hat keinen verwertbaren Kontext zurückgegeben.");
+        }
+        if (!ContainsMandatoryCompressionSections(compressed))
+        {
+            throw new InvalidOperationException(
+                "KI-Komprimierung enthält nicht alle Pflichtabschnitte (Ziel, Offene Punkte, Letzte Entscheidungen).");
+        }
+
+        return compressed;
+    }
+
+    private static bool ContainsMandatoryCompressionSections(string markdown)
+        => markdown.Contains("Ziel", StringComparison.OrdinalIgnoreCase)
+            && markdown.Contains("Offene Punkte", StringComparison.OrdinalIgnoreCase)
+            && markdown.Contains("Letzte Entscheidungen", StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildContextEntry(
+        Guid runId,
+        Guid contextEventId,
+        FolgeanweisungsKontextmodus kontextmodus,
+        string userPrompt,
+        string response,
+        bool isError)
+        => $"""
+            ## Verlaufseintrag
+            - RunId: {runId}
+            - ContextEventId: {contextEventId}
+            - Modus: {kontextmodus}
+            - Zeit: {DateTimeOffset.UtcNow:O}
+            - Status: {(isError ? "Fehler" : "Erfolgreich")}
+
+            ### Nutzeranweisung
+            {userPrompt}
+
+            ### KI-Rückmeldung
+            {response}
+
+            """;
+
+    private async Task AppendContextEntryAsync(string contextFilePath, string entry, CancellationToken ct)
+    {
+        var current = await ReadFileTextSafeAsync(contextFilePath, ct);
+        var next = string.IsNullOrWhiteSpace(current)
+            ? entry
+            : $"{current.TrimEnd()}\n\n{entry}";
+
+        await WriteTextAtomicallyWithBackupAsync(contextFilePath, next, ct);
+    }
+
+    private static async Task<string> ReadFileTextSafeAsync(string path, CancellationToken ct)
+    {
+        if (!File.Exists(path))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return await File.ReadAllTextAsync(path, ct);
+        }
+        catch
+        {
+            var backupPath = $"{path}.bak";
+            if (File.Exists(backupPath))
+            {
+                return await File.ReadAllTextAsync(backupPath, ct);
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task WriteTextAtomicallyWithBackupAsync(string targetPath, string content, CancellationToken ct)
+    {
+        var directory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var tempPath = $"{targetPath}.tmp";
+        var backupPath = $"{targetPath}.bak";
+
+        if (File.Exists(targetPath))
+        {
+            File.Copy(targetPath, backupPath, overwrite: true);
+        }
+
+        try
+        {
+            await using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            await using (var writer = new StreamWriter(stream, Encoding.UTF8))
+            {
+                await writer.WriteAsync(content.AsMemory(), ct);
+                await writer.FlushAsync(ct);
+                await stream.FlushAsync(ct);
+            }
+
+            if (File.Exists(targetPath))
+            {
+                File.Replace(tempPath, targetPath, backupPath, ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(tempPath, targetPath, overwrite: true);
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 
     /// <summary>Erstellt einen URL-freundlichen Slug aus dem Titel (max. 30 Zeichen).</summary>
