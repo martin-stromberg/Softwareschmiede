@@ -289,6 +289,8 @@ agent-packages/
 
 Eine `.agent.md`-Datei beschreibt einen einzelnen Agenten mit seinen Instruktionen, Werkzeugen und Rollen. Das Format folgt dem Standard für GitHub Copilot Custom Agents.
 
+Wichtig: Der **gesamte Inhalt eines Agentenpaket-Verzeichnisses** muss der Dateistruktur entsprechen, die das jeweils verwendete KI-Plugin erwartet. Diese Strukturvorgaben kommen vom jeweiligen KI-Anbieter und sind in dessen Dokumentation beschrieben (z. B. bei GitHub Copilot in den Vorgaben zu Custom Agents).
+
 ### Agentenpakete in der Oberfläche
 
 - Seite *Agentenpakete*: Liste aller verfügbaren Pakete mit Vorschau
@@ -346,35 +348,35 @@ Softwareschmiede/                            # Solution Root
 Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten:
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph Presentation["Presentation Layer (Blazor Server)"]
-        PRL1[Razor Pages / Components]
-        PRL2[ViewModels]
-        PRL3[SignalR – Echtzeit-Streaming]
+        PRL1["Razor Pages / Components"]
+        PRL2["ViewModels"]
+        PRL3["SignalR - Echtzeit-Streaming"]
     end
 
     subgraph Application["Application Layer (Services / Use Cases)"]
-        APL1[ProjektService]
-        APL2[AufgabeService]
-        APL3[ProtokollService]
-        APL4[KiOrchestrationService]
-        APL5[GitOrchestrationService]
-        APL6[AgentPackageService]
+        APL1["ProjektService"]
+        APL2["AufgabeService"]
+        APL3["ProtokollService"]
+        APL4["KiOrchestrationService"]
+        APL5["GitOrchestrationService"]
+        APL6["AgentPackageService"]
     end
 
-    subgraph Domain["Domain Layer (Kern – keine äußeren Abhängigkeiten)"]
-        DOL1[Entitäten: Projekt · Aufgabe · Protokolleintrag]
-        DOL2[IPlugin + PluginType]
-        DOL3[IGitPlugin / IKiPlugin]
-        DOL4[Value Objects · Enums · Domänenregeln]
+    subgraph Domain["Domain Layer (Kern - keine aeußeren Abhaengigkeiten)"]
+        DOL1["Entitaeten: Projekt, Aufgabe, Protokolleintrag"]
+        DOL2["IPlugin + PluginType"]
+        DOL3["IGitPlugin / IKiPlugin"]
+        DOL4["Value Objects, Enums, Domaenenregeln"]
     end
  
     subgraph Infrastructure["Infrastructure Layer"]
-        INL1[EF Core / SQLite]
-        INL2[PluginManager (lädt DLLs aus plugins/)]
-        INL3[GitHubPlugin / GitHubCopilotPlugin als Plugin-Projekte]
-        INL4[Windows Credential Store]
-        INL5[AgentPackage FileSystem Reader]
+        INL1["EF Core / SQLite"]
+        INL2["PluginManager laedt Plugin-DLLs aus dem plugins-Ordner"]
+        INL3["GitHubPlugin / GitHubCopilotPlugin als Plugin-Projekte"]
+        INL4["Windows Credential Store"]
+        INL5["AgentPackage FileSystem Reader"]
     end
 
     Presentation -->|ruft auf| Application
