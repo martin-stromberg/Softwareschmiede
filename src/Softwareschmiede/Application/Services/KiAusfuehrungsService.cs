@@ -222,7 +222,7 @@ internal sealed class KiSession : IDisposable
     {
         var now = _nowProvider();
         List<Action<string>> subscribers;
-        List<string> additionalLines = new List<string>
+        List<string> additionalLines = new List<string>();
         lock (_lock)
         {
             if (_lastLineAt is null || now - _lastLineAt >= BlockPause)
