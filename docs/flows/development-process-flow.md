@@ -1,7 +1,7 @@
 # Entwicklungsprozess-Ablauf
 
 **Modul:** `EntwicklungsprozessService`, `GitOrchestrationService`, `GitHubPlugin`, `GitHubCopilotPlugin`  
-**Letzte Aktualisierung:** 2026-05-10
+**Letzte Aktualisierung:** 2026-05-11
 
 Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Softwareentwicklung in **Softwareschmiede**. Die Abläufe umfassen den kompletten Lebenszyklus einer Aufgabe: vom Starten des Entwicklungsprozesses über das KI-Streaming bis zum Abschluss oder Abbruch. Querverweise auf verwandte Dokumentation sind am Ende jedes Abschnitts angegeben.
 
@@ -11,9 +11,10 @@ Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Sof
 
 1. [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten)
 2. [Ablauf 2: KI-Streaming und Protokollierung](#ablauf-2-ki-streaming-und-protokollierung)
-3. [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
-4. [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen)
-5. [Ablauf 5: Issue aus GitHub importieren und als Aufgabe anlegen](#ablauf-5-issue-aus-github-importieren-und-als-aufgabe-anlegen)
+3. [Ablauf 2b: Agent-Auswahl bei Folgeanweisungen](#ablauf-2b-agent-auswahl-bei-folgeanweisungen)
+4. [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
+5. [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen)
+6. [Ablauf 5: Issue aus GitHub importieren und als Aufgabe anlegen](#ablauf-5-issue-aus-github-importieren-und-als-aufgabe-anlegen)
 
 ---
 
@@ -157,6 +158,48 @@ flowchart TD
 - `IKiPlugin` / `GitHubCopilotPlugin` (`StartDevelopmentAsync` via `copilot suggest`)
 
 > **Verwandte Abläufe:** [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
+
+---
+
+## Ablauf 2b: Agent-Auswahl bei Folgeanweisungen
+
+### Kontext
+
+Dieser Ablauf beschreibt das Verhalten der Folgeanweisungen in `AufgabeDetail`. Nach mindestens einer KI-Antwort kann ein weiterer Prompt mit eigener Agenten-Auswahl gesendet werden. Der Start-Agent bleibt der Standardwert, die Auswahl ist vor dem Senden änderbar und wird nach dem Senden wieder auf den Start-Agenten gesetzt.
+
+### Diagramm
+
+```mermaid
+flowchart TD
+    A([Aufgabe in Bearbeitung]) --> B{KiAntwort vorhanden?}
+    B -- Nein --> C[Kein Folge-Prompt-Bereich]
+    B -- Ja --> D[Folge-Prompt + Agent-Auswahl anzeigen]
+    D --> E[_folgeAgentName = Start-Agent]
+    E --> F[Anwender kann Agent ändern]
+    F --> G[Prompt senden]
+    G --> H[KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName)]
+    H --> I[StartKiLauf -> EntwicklungsprozessService.KiStartenAsync]
+    I --> J[IKiPlugin.StartDevelopmentAsync mit gewähltem Agenten]
+    J --> K[_folgePrompt leeren]
+    K --> L[_folgeAgentName auf Start-Agent zurücksetzen]
+```
+
+### Akzeptanzkriterien und Nachweise
+
+| Kriterium | Umsetzung | Test-Nachweis |
+|---|---|---|
+| Agent-Auswahl bei Folgeanweisungen sichtbar/verfügbar | `AufgabeDetail.razor` (`@bind="_folgeAgentName"` im Folge-Prompt-Block) | `FolgePromptMarkup_ShouldContainAgentSelectionBinding` |
+| Standardwert = initial gewählter Agent | `AufgabeDetail.razor.cs` (`LadeAsync*`: `_folgeAgentName = _aufgabe.AgentenName`) | `OnInitializedAsync_ShouldDefaultFolgeAgentToInitialAgent` |
+| Auswahl vor Absenden änderbar | Select-Element im Folge-Prompt-Bereich (`_folgeAgentName`) | `FolgePromptAsync_ShouldUseSelectedFollowAgent_AndResetToInitialAgent` |
+| Folgeanweisung an ausgewählten Agenten | `FolgePromptAsync` → `KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName)` | `FolgePromptAsync_ShouldUseSelectedFollowAgent_AndResetToInitialAgent`, `KiStartenAsync_ShouldForwardSelectedAgentToPlugin` |
+| Initialprompt unverändert | Initialer KI-Start läuft weiterhin über `_kiAgentName` | `KiStartenAsync_ShouldKeepInitialPromptBehavior` |
+
+### Abhängigkeiten
+
+- `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor`
+- `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs`
+- `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
+- `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
 
 ---
 

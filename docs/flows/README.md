@@ -6,7 +6,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 
 | Ablauf | Datei | Beschreibung |
 |--------|-------|--------------|
-| [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (5 Kern-Flows) |
+| [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (inkl. Agent-Auswahl bei Folgeanweisungen) |
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 
@@ -25,6 +25,13 @@ Beschreibt den vollständigen Einstieg in einen KI-gestützten Entwicklungszyklu
 **Typ:** `flowchart TD` · **Services:** `EntwicklungsprozessService`, `IKiPlugin`, `AufgabeService`
 
 Zeigt den Streaming-Ablauf von `KiStartenAsync`: Statusprüfung, Prompt-Protokollierung, Chunk-weises Streamen der KI-Antwort und Statusrücksetzung – inklusive Fehlerfall (`Fehlgeschlagen`).
+
+---
+
+### [Ablauf 2b: Agent-Auswahl bei Folgeanweisungen](./development-process-flow.md#ablauf-2b-agent-auswahl-bei-folgeanweisungen)
+**Typ:** `flowchart TD` · **Services:** `AufgabeDetail`, `EntwicklungsprozessService`, `IKiPlugin`
+
+Beschreibt die Folge-Prompt-Logik mit Agenten-Auswahl, Start-Agent als Standardwert, frei änderbarer Auswahl vor dem Senden, Versand an den gewählten Agenten und Reset auf den Start-Agenten.
 
 ---
 

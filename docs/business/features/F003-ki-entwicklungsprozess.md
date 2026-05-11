@@ -43,6 +43,7 @@ Das Ergebnis können Sie prüfen, bevor es dauerhaft gespeichert wird.
 2. Sie tippen Ihre Ergänzung ein (z.B. „Bitte auch eine Fehlermeldung anzeigen, wenn das Passwort zu kurz ist.").
 3. Sie klicken auf **Senden** oder drücken die **Eingabetaste**.
 4. Die KI liest Ihre Ergänzung und arbeitet daran weiter.
+5. Wenn Sie die Agentensteuerung im Detail brauchen, nutzen Sie [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md).
 
 ### KI bei einem Fehler neu starten
 
@@ -102,4 +103,5 @@ Klicken Sie auf **Aufgabe abbrechen** und formulieren Sie die Aufgabenbeschreibu
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Vorgang beenden ohne zu speichern
 - [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Speicherort der lokalen Klone steuern
 - [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Ausgelagerte GitHub- und Copilot-Anbindung verstehen
+- [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md) – Agent je Folgeanweisung gezielt wählen
 - [Zurück zur Übersicht](../features.md)

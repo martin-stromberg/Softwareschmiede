@@ -86,10 +86,10 @@
 | **FR-4** | **Entwicklungsprozess (KI-gestützt):** Für jede Aufgabe kann der Anwender den KI-gestützten Entwicklungsprozess starten. Die Anwendung klont das Repository, legt einen Branch an, steuert das KI-Plugin und zeigt die Ausgabe in Echtzeit. → [Architektur-Blueprint](../architecture/architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.1** | **Prozess starten:** Anwender wählt Agentenpaket und Agenten aus, gibt Anforderungsprompt ein und startet den KI-Lauf. Das KI-Plugin erhält Prompt und Agenten-Kontext. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.2** | **Echtzeit-Ausgabe:** Ausgabe des KI-Plugins wird per Streaming in Echtzeit im Aufgabenprotokoll angezeigt (< 500 ms Latenz pro Stream-Chunk). | KI-Integration | MUST HAVE | 📋 Geplant |
-| **FR-4.3** | **Iterationen / Folge-Prompts:** Nach jedem KI-Lauf kann der Anwender direkt aus dem Protokoll heraus einen Folge-Prompt eingeben, ohne die Seite zu wechseln. | KI-Integration | MUST HAVE | 📋 Geplant |
+| **FR-4.3** | **Iterationen / Folge-Prompts:** Nach jedem KI-Lauf kann der Anwender direkt aus dem Protokoll heraus eine Folgeanweisung eingeben, ohne die Seite zu wechseln. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.4** | **Rollback:** Anwender kann Commits manuell zurücksetzen (soft/mixed/hard). KI kann eigenständig Rollbacks durchführen, sofern das KI-Plugin dies unterstützt. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.5** | **Tests ausführen und auswerten:** KI-Plugin führt Tests aus; Ergebnisse werden strukturiert im Protokoll abgelegt (Testname, Status, Fehlermeldung, Dauer). | KI-Integration | MUST HAVE | 📋 Geplant |
-| **FR-4.6** | **Agenten-Auswahl pro Prompt:** Vor jedem KI-Lauf wählt der Anwender den zu verwendenden Agenten aus der vom KI-Plugin gelieferten Liste aus. | KI-Integration | MUST HAVE | 📋 Geplant |
+| **FR-4.6** | **Agenten-Auswahl pro Prompt:** Vor jedem KI-Lauf wählt der Anwender den zu verwendenden Agenten aus der vom KI-Plugin gelieferten Liste aus. Bei Folgeanweisungen ist der Start-Agent vorbelegt, die Auswahl bleibt änderbar und wird nach dem Senden wieder auf den Start-Agenten gesetzt. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5** | **KI-Plugin-System:** Die Anwendung stellt ein erweiterbares Plugin-System für KI-Systeme bereit. Jedes KI-Plugin implementiert ein definiertes Interface. → [Architektur-Blueprint](../architecture/architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5.1** | **KI-Plugin-Interface:** Schnittstelle umfasst: Prompt entgegennehmen, Agentenpaket ablegen, KI steuern, Tests ausführen, Ergebnisse streamen, verfügbare Agenten liefern. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5.2** | **GitHub-Copilot-Plugin (copilot CLI):** Erstes konkretes KI-Plugin; nutzt `copilot`-CLI; legt das Agentenpaket im `.github/`-Verzeichnis des Branches ab. | KI-Integration | MUST HAVE | 📋 Geplant |
@@ -182,8 +182,11 @@
 
 | # | Akzeptanzkriterium | Messung |
 |---|--------------------|---------|
-| AC-4.1 | Das Protokoll zeigt am Ende ein Eingabefeld für den nächsten Prompt sowie eine Agenten-Auswahl. | UI-Element vorhanden und fokussierbar. |
-| AC-4.2 | Nach Absenden des Folge-Prompts wird die Ausgabe direkt an das bestehende Protokoll angehängt (kein Seitenwechsel, kein Reload). | Protokoll wächst kontinuierlich; URL bleibt gleich. |
+| AC-4.1 | Bei Status „In Bearbeitung" und vorhandener KI-Antwort ist das Feld für Folgeanweisungen mit Agenten-Auswahl sichtbar und nutzbar. | Eingabefeld und Auswahl sind vorhanden und bedienbar. |
+| AC-4.2 | Beim Laden der Aufgabe ist in der Agenten-Auswahl der Start-Agent als Standardwert gesetzt. | Vorauswahl entspricht dem in der Aufgabe gespeicherten Start-Agenten. |
+| AC-4.3 | Der Anwender kann den Agenten vor jeder Folgeanweisung manuell ändern. | Auswahl kann vor dem Senden auf einen anderen Agenten gestellt werden. |
+| AC-4.4 | Die Folgeanweisung wird an den aktuell gewählten Agenten gesendet und die Auswahl wird danach auf den Start-Agenten zurückgesetzt. | Protokoll/Verlauf zeigt gewählten Agenten; nach Senden ist wieder der Start-Agent ausgewählt. |
+| AC-4.5 | Das Verhalten des ersten Prompts bleibt unverändert. | Start-Prompt nutzt weiterhin den gewählten Start-Agenten und bleibt fachlich unverändert. |
 
 ---
 
@@ -479,10 +482,10 @@ classDiagram
 | **Name** | Folge-Prompt eingeben |
 | **Akteur** | Anwender |
 | **Vorbedingung** | Aufgabe ist im Status „In Bearbeitung"; mindestens ein KI-Lauf ist abgeschlossen. |
-| **Auslöser** | Anwender gibt Folge-Prompt im Protokoll-Eingabefeld ein und wählt Agenten. |
-| **Hauptszenario** | 1. Anwender tippt Prompt, wählt Agenten. 2. Klickt auf „Prompt senden". 3. KI-Plugin wird mit neuem Prompt und Agenten gestartet. 4. Ausgabe wird direkt an das bestehende Protokoll angehängt. |
-| **Nachbedingung** | Protokoll enthält zusätzlichen Prompt- und Antwort-Eintrag. |
-| **Anforderungen** | FR-4.3, FR-7.3 |
+| **Auslöser** | Anwender gibt eine Folgeanweisung im Protokoll-Eingabefeld ein und kann den Agenten anpassen. |
+| **Hauptszenario** | 1. Anwender sieht die Folgeanweisung nur bei Status „In Bearbeitung" und vorhandener KI-Antwort. 2. Start-Agent ist als Standardwert sichtbar. 3. Anwender tippt Folgeanweisung und kann einen anderen Agenten wählen. 4. Klickt auf „Prompt senden". 5. System startet den Lauf mit dem gewählten Agenten. 6. Ausgabe wird direkt an das bestehende Protokoll angehängt. 7. Agenten-Auswahl springt zurück auf den Start-Agenten. |
+| **Nachbedingung** | Protokoll enthält zusätzlichen Prompt- und Antwort-Eintrag; Folgeagent steht wieder auf Start-Agent; Start-Prompt-Verhalten bleibt unverändert. |
+| **Anforderungen** | FR-4.3, FR-4.6, FR-7.3 |
 
 ---
 

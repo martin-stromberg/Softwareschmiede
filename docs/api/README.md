@@ -12,6 +12,12 @@ Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der So
 | [workdir-configuration.md](./workdir-configuration.md) | Technische Dokumentation des Features „konfigurierbares Arbeitsverzeichnis“ (Settings, Resolver, Fallback, Klonpfadbildung) |
 | [http-endpoints.md](./http-endpoints.md) | Aktueller Stand der HTTP-Schnittstellen (keine öffentlichen REST-Endpoints, Blazor-Razor-Host) |
 
+## Feature-Hinweis: Agent-Auswahl bei Folgeanweisungen
+
+- **Kein API-Impact auf HTTP-Ebene:** Für das Feature wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
+- Details zum HTTP-Status und zur AC-Nachvollziehbarkeit: [http-endpoints.md](./http-endpoints.md#feature-impact-agent-auswahl-bei-folgeanweisungen)
+- Details zum unveränderten KI-Plugin-Contract (`IKiPlugin.StartDevelopmentAsync`): [plugin-interfaces.md](./plugin-interfaces.md#startdevelopmentasync)
+
 ---
 
 ## Überblick Plugin-System

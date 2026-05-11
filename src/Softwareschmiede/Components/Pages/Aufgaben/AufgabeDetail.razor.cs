@@ -49,6 +49,7 @@ public partial class AufgabeDetail : IDisposable
     private List<string> _remoteBranches = [];
     private string _selectedAgentName = string.Empty;
     private string _kiAgentName = string.Empty;
+    private string _folgeAgentName = string.Empty;
     private string _prompt = string.Empty;
     private string _folgePrompt = string.Empty;
     private string _commitMessage = string.Empty;
@@ -113,6 +114,11 @@ public partial class AufgabeDetail : IDisposable
                 _selectedAgentName = _aufgabe.AgentenName;
             }
 
+            if (string.IsNullOrWhiteSpace(_folgeAgentName))
+            {
+                _folgeAgentName = _aufgabe.AgentenName ?? string.Empty;
+            }
+
             // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
             if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
                 && string.IsNullOrWhiteSpace(_prompt)
@@ -151,6 +157,11 @@ public partial class AufgabeDetail : IDisposable
                 {
                     _kiAgentName = _aufgabe.AgentenName;
                     _selectedAgentName = _aufgabe.AgentenName;
+                }
+
+                if (string.IsNullOrWhiteSpace(_folgeAgentName))
+                {
+                    _folgeAgentName = _aufgabe.AgentenName ?? string.Empty;
                 }
 
                 // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
@@ -287,23 +298,25 @@ public partial class AufgabeDetail : IDisposable
 
     private async Task KiStartenAsync()
     {
-        await KiMitPromptStartenAsync(_prompt);
+        await KiMitPromptStartenAsync(_prompt, _kiAgentName);
         _prompt = string.Empty;
     }
 
     private async Task FolgePromptAsync()
     {
-        await KiMitPromptStartenAsync(_folgePrompt);
+        var initialAgent = _aufgabe?.AgentenName ?? string.Empty;
+        await KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName);
         _folgePrompt = string.Empty;
+        _folgeAgentName = initialAgent;
     }
 
-    private async Task KiMitPromptStartenAsync(string prompt)
+    private async Task KiMitPromptStartenAsync(string prompt, string selectedAgentName)
     {
         if (string.IsNullOrWhiteSpace(prompt)) return;
 
         // Keinen Agenten-Namen übergeben wenn kein passender Agent gefunden wurde –
         // AgentInfo mit leerem Name führt dazu, dass --agent weggelassen wird.
-        var agent = _agenten.FirstOrDefault(a => a.Name == _kiAgentName)
+        var agent = _agenten.FirstOrDefault(a => a.Name == selectedAgentName)
             ?? _agenten.FirstOrDefault()
             ?? new AgentInfo(string.Empty, null, string.Empty);
 
@@ -319,11 +332,34 @@ public partial class AufgabeDetail : IDisposable
         KiAusfuehrungsService.SessionBereinigen(Id);
 
         // Hintergrundlauf starten – kehrt sofort zurück
+        StartKiLauf(prompt, agent, string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel);
+
+        // Auf Live-Ausgabe subscriben – neue Zeilen werden direkt in _streamingLines eingefügt
+        KiLiveSubscribieren();
+
+        NotifyStateChanged();
+        await Task.CompletedTask;
+    }
+
+    /// <summary>Subscribed auf neue Ausgabezeilen des laufenden KI-Hintergrundlaufs.</summary>
+    private void KiLiveSubscribieren()
+    {
+        _kiSubscription?.Dispose();
+        _kiSubscription = KiAusfuehrungsService.Subscribe(Id, line =>
+        {
+            _streamingLines.Add(line);
+            // UI in den Blazor-Circuit-Thread marshalieren
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    protected virtual void StartKiLauf(string prompt, AgentInfo agent, string? model)
+    {
         KiAusfuehrungsService.StartKiLauf(
             Id,
             prompt,
             agent,
-            model: string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel,
+            model: model,
             onStarted: () => InvokeAsync(async () =>
             {
                 await LadeAsync();
@@ -339,25 +375,9 @@ public partial class AufgabeDetail : IDisposable
                 await LadeAsyncWithScope(); // Protokoll neu laden nach Abschluss
                 StateHasChanged();
             }));
-
-        // Auf Live-Ausgabe subscriben – neue Zeilen werden direkt in _streamingLines eingefügt
-        KiLiveSubscribieren();
-
-        StateHasChanged();
-        await Task.CompletedTask;
     }
 
-    /// <summary>Subscribed auf neue Ausgabezeilen des laufenden KI-Hintergrundlaufs.</summary>
-    private void KiLiveSubscribieren()
-    {
-        _kiSubscription?.Dispose();
-        _kiSubscription = KiAusfuehrungsService.Subscribe(Id, line =>
-        {
-            _streamingLines.Add(line);
-            // UI in den Blazor-Circuit-Thread marshalieren
-            InvokeAsync(StateHasChanged);
-        });
-    }
+    protected virtual void NotifyStateChanged() => StateHasChanged();
 
     private async Task CommitAsync()
     {

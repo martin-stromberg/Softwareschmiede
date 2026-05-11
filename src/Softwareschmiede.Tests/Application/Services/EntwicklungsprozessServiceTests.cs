@@ -160,6 +160,36 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .WithMessage("*lokalen Klonpfad*");
     }
 
+    [Fact]
+    public async Task KiStartenAsync_ShouldForwardSelectedAgentToPlugin()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Agent Forwarding", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var expectedAgent = new AgentInfo("agent-alt", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("ok"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Folgeprompt", expectedAgent))
+        {
+        }
+
+        // Assert
+        _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
+            "Folgeprompt",
+            It.Is<AgentInfo>(a => a.Name == "agent-alt"),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     /// <summary>AbschliessenAsync setzt Status auf Abgeschlossen und erstellt Protokolleintrag.</summary>
     [Fact]
     public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndAddProtokoll_WhenAufgabeExists()
@@ -354,5 +384,11 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Assert
         _kiPluginMock.Verify(k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         _agentPackageServiceMock.Verify(a => a.GetPackageAsync("missing-package", It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    private static async IAsyncEnumerable<string> StreamSingleLine(string line)
+    {
+        yield return line;
+        await Task.CompletedTask;
     }
 }
