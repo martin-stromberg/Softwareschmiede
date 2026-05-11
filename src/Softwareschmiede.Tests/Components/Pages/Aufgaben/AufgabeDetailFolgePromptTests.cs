@@ -1,5 +1,6 @@
 using System.Reflection;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -18,7 +19,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
 
     [Fact]
-    public void FolgePromptMarkup_ShouldContainAgentSelectionBinding()
+    public void FolgePromptMarkup_ShouldContainAgentSelectionBinding_AndExactContextModes()
     {
         var root = FindRepositoryRoot();
         var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Aufgaben", "AufgabeDetail.razor");
@@ -26,6 +27,10 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         markup.Should().Contain("@if (_aufgabe.Status == AufgabeStatus.InBearbeitung && _protokoll.Any(p => p.Typ == ProtokollTyp.KiAntwort))");
         markup.Should().Contain("@bind=\"_folgeAgentName\"");
+        markup.Should().Contain("Kontext mitgeben");
+        markup.Should().Contain("Kontext ignorieren");
+        markup.Should().Contain("Kontext neu beginnen");
+        markup.Should().NotContain("Kontext automatisch");
     }
 
     [Fact]
@@ -45,14 +50,17 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         await sut.InvokeOnInitializedAsync();
         SetPrivateField(sut, "_folgePrompt", "Bitte passe die Tests an.");
         SetPrivateField(sut, "_folgeAgentName", "agent-alt");
+        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextIgnorieren);
 
         await InvokePrivateAsync(sut, "FolgePromptAsync");
 
         sut.StartedRuns.Should().ContainSingle();
         sut.StartedRuns[0].Prompt.Should().Be("Bitte passe die Tests an.");
         sut.StartedRuns[0].Agent.Name.Should().Be("agent-alt");
+        sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextIgnorieren);
         GetPrivateField<string>(sut, "_folgePrompt").Should().BeEmpty();
         GetPrivateField<string>(sut, "_folgeAgentName").Should().Be("agent-initial");
+        GetPrivateField<FolgeanweisungsKontextmodus>(sut, "_folgeKontextmodus").Should().Be(FolgeanweisungsKontextmodus.KontextMitgeben);
     }
 
     [Fact]
@@ -68,7 +76,76 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.StartedRuns.Should().ContainSingle();
         sut.StartedRuns[0].Prompt.Should().Be("Initialer Prompt");
         sut.StartedRuns[0].Agent.Name.Should().Be("agent-alt");
+        sut.StartedRuns[0].Kontextmodus.Should().BeNull();
         GetPrivateField<string>(sut, "_prompt").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FolgePromptAsync_ShouldNotStart_WhenNeuBeginnenNotConfirmed()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_folgePrompt", "Neuer Start");
+        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextNeuBeginnen);
+        SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", false);
+
+        await InvokePrivateAsync(sut, "FolgePromptAsync");
+
+        sut.StartedRuns.Should().BeEmpty();
+        GetPrivateField<string?>(sut, "_fehler").Should().Contain("bestätigen");
+    }
+
+    [Fact]
+    public async Task FolgeKontextmodusGeaendert_ShouldResetConfirmation_WhenSwitchingAwayFromNeuBeginnen()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextNeuBeginnen);
+        SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", true);
+
+        await InvokePrivateAsync(
+            sut,
+            "FolgeKontextmodusGeaendert",
+            new Microsoft.AspNetCore.Components.ChangeEventArgs
+            {
+                Value = FolgeanweisungsKontextmodus.KontextIgnorieren.ToString()
+            });
+
+        GetPrivateField<FolgeanweisungsKontextmodus>(sut, "_folgeKontextmodus")
+            .Should().Be(FolgeanweisungsKontextmodus.KontextIgnorieren);
+        GetPrivateField<bool>(sut, "_folgeKontextNeuBeginnenBestaetigt").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task FolgeKontextmodusGeaendert_ShouldIgnoreInvalidValue_AndKeepState()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextMitgeben);
+        SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", true);
+
+        await InvokePrivateAsync(
+            sut,
+            "FolgeKontextmodusGeaendert",
+            new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "ungueltig" });
+
+        GetPrivateField<FolgeanweisungsKontextmodus>(sut, "_folgeKontextmodus")
+            .Should().Be(FolgeanweisungsKontextmodus.KontextMitgeben);
+    }
+
+    [Fact]
+    public async Task FolgePromptAsync_ShouldStart_WhenNeuBeginnenConfirmed()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_folgePrompt", "Bitte starte neu.");
+        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextNeuBeginnen);
+        SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", true);
+
+        await InvokePrivateAsync(sut, "FolgePromptAsync");
+
+        sut.StartedRuns.Should().ContainSingle();
+        sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextNeuBeginnen);
     }
 
     public void Dispose() => _db.Dispose();
@@ -139,6 +216,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             kiPluginMock.Object,
             agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
         var gitService = new GitOrchestrationService(
             aufgabeService,
@@ -162,18 +240,34 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         return sut;
     }
 
-    private static async Task InvokePrivateAsync(object target, string methodName)
+    private static async Task InvokePrivateAsync(object target, string methodName, params object?[] args)
     {
-        var method = typeof(AufgabeDetail).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        var method = typeof(AufgabeDetail)
+            .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .FirstOrDefault(m =>
+                m.Name.Equals(methodName, StringComparison.Ordinal)
+                && m.GetParameters().Length == args.Length
+                && m.GetParameters().Zip(args, (parameter, argument) => argument is null || parameter.ParameterType.IsInstanceOfType(argument)).All(x => x));
         method.Should().NotBeNull($"Method {methodName} should exist.");
-        var result = method!.Invoke(target, null);
+        var result = method!.Invoke(target, args);
+        if (result is null)
+        {
+            return;
+        }
+
         if (result is Task task)
         {
             await task;
             return;
         }
 
-        throw new InvalidOperationException($"{methodName} did not return Task.");
+        if (result is ValueTask valueTask)
+        {
+            await valueTask;
+            return;
+        }
+
+        throw new InvalidOperationException($"{methodName} did not return Task or ValueTask.");
     }
 
     private static void SetPrivateField(object target, string fieldName, object? value)
@@ -215,13 +309,13 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
     private sealed class TestAufgabeDetailPage : AufgabeDetail
     {
-        public List<(string Prompt, AgentInfo Agent, string? Model)> StartedRuns { get; } = [];
+        public List<(string Prompt, AgentInfo Agent, string? Model, FolgeanweisungsKontextmodus? Kontextmodus)> StartedRuns { get; } = [];
 
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
 
-        protected override void StartKiLauf(string prompt, AgentInfo agent, string? model)
+        protected override void StartKiLauf(string prompt, AgentInfo agent, string? model, FolgeanweisungsKontextmodus? kontextmodus)
         {
-            StartedRuns.Add((prompt, agent, model));
+            StartedRuns.Add((prompt, agent, model, kontextmodus));
         }
 
         protected override void NotifyStateChanged()

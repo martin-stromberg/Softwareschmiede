@@ -278,9 +278,29 @@ else
                         </select>
                     </div>
                     <div class="form-group">
+                        <label class="form-label">Kontextmodus</label>
+                        <select class="form-control" value="@_folgeKontextmodus" @onchange="FolgeKontextmodusGeaendert">
+                            <option value="@FolgeanweisungsKontextmodus.KontextMitgeben">Kontext mitgeben</option>
+                            <option value="@FolgeanweisungsKontextmodus.KontextIgnorieren">Kontext ignorieren</option>
+                            <option value="@FolgeanweisungsKontextmodus.KontextNeuBeginnen">Kontext neu beginnen</option>
+                        </select>
+                    </div>
+                    @if (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen)
+                    {
+                        <div class="alert alert-warning" style="margin-bottom:.75rem">
+                            <strong>Achtung:</strong> Der bisherige Kontextverlauf dieser Aufgabe wird beim Senden zurückgesetzt.
+                            <div style="margin-top:.5rem">
+                                <label style="display:flex;gap:.5rem;align-items:center;cursor:pointer">
+                                    <input type="checkbox" @bind="_folgeKontextNeuBeginnenBestaetigt" />
+                                    Ich habe verstanden, dass der bisherige Kontext verworfen wird.
+                                </label>
+                            </div>
+                        </div>
+                    }
+                    <div class="form-group">
                         <textarea class="form-control" @bind="_folgePrompt" rows="3" placeholder="Weiteren Prompt eingeben..."></textarea>
                     </div>
-                    <button class="btn btn-primary" @onclick="FolgePromptAsync" disabled="@(_processing || string.IsNullOrWhiteSpace(_folgePrompt))">
+                    <button class="btn btn-primary" @onclick="FolgePromptAsync" disabled="@(_processing || string.IsNullOrWhiteSpace(_folgePrompt) || (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen && !_folgeKontextNeuBeginnenBestaetigt))">
                         ▶️ Senden
                     </button>
                 </div>

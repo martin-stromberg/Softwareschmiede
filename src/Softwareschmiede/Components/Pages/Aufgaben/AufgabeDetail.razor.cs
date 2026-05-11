@@ -50,6 +50,8 @@ public partial class AufgabeDetail : IDisposable
     private string _selectedAgentName = string.Empty;
     private string _kiAgentName = string.Empty;
     private string _folgeAgentName = string.Empty;
+    private FolgeanweisungsKontextmodus _folgeKontextmodus = FolgeanweisungsKontextmodus.KontextMitgeben;
+    private bool _folgeKontextNeuBeginnenBestaetigt;
     private string _prompt = string.Empty;
     private string _folgePrompt = string.Empty;
     private string _commitMessage = string.Empty;
@@ -298,19 +300,27 @@ public partial class AufgabeDetail : IDisposable
 
     private async Task KiStartenAsync()
     {
-        await KiMitPromptStartenAsync(_prompt, _kiAgentName);
+        await KiMitPromptStartenAsync(_prompt, _kiAgentName, null);
         _prompt = string.Empty;
     }
 
     private async Task FolgePromptAsync()
     {
+        if (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen && !_folgeKontextNeuBeginnenBestaetigt)
+        {
+            _fehler = "Bitte bestätigen Sie zuerst, dass der bisherige Kontext zurückgesetzt werden soll.";
+            return;
+        }
+
         var initialAgent = _aufgabe?.AgentenName ?? string.Empty;
-        await KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName);
+        await KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName, _folgeKontextmodus);
         _folgePrompt = string.Empty;
         _folgeAgentName = initialAgent;
+        _folgeKontextmodus = FolgeanweisungsKontextmodus.KontextMitgeben;
+        _folgeKontextNeuBeginnenBestaetigt = false;
     }
 
-    private async Task KiMitPromptStartenAsync(string prompt, string selectedAgentName)
+    private async Task KiMitPromptStartenAsync(string prompt, string selectedAgentName, FolgeanweisungsKontextmodus? kontextmodus)
     {
         if (string.IsNullOrWhiteSpace(prompt)) return;
 
@@ -332,7 +342,7 @@ public partial class AufgabeDetail : IDisposable
         KiAusfuehrungsService.SessionBereinigen(Id);
 
         // Hintergrundlauf starten – kehrt sofort zurück
-        StartKiLauf(prompt, agent, string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel);
+        StartKiLauf(prompt, agent, string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel, kontextmodus);
 
         // Auf Live-Ausgabe subscriben – neue Zeilen werden direkt in _streamingLines eingefügt
         KiLiveSubscribieren();
@@ -353,13 +363,28 @@ public partial class AufgabeDetail : IDisposable
         });
     }
 
-    protected virtual void StartKiLauf(string prompt, AgentInfo agent, string? model)
+    private void FolgeKontextmodusGeaendert(ChangeEventArgs e)
+    {
+        if (e.Value is string value
+            && Enum.TryParse<FolgeanweisungsKontextmodus>(value, ignoreCase: false, out var parsed))
+        {
+            _folgeKontextmodus = parsed;
+        }
+
+        if (_folgeKontextmodus != FolgeanweisungsKontextmodus.KontextNeuBeginnen)
+        {
+            _folgeKontextNeuBeginnenBestaetigt = false;
+        }
+    }
+
+    protected virtual void StartKiLauf(string prompt, AgentInfo agent, string? model, FolgeanweisungsKontextmodus? kontextmodus)
     {
         KiAusfuehrungsService.StartKiLauf(
             Id,
             prompt,
             agent,
             model: model,
+            kontextmodus: kontextmodus,
             onStarted: () => InvokeAsync(async () =>
             {
                 await LadeAsync();

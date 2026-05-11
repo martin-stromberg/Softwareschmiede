@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
@@ -52,6 +53,7 @@ public sealed class EntwicklungsprozessServiceTests
             kiMock.Object,
             packageMock.Object,
             arbeitsverzeichnisResolver,
+            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
     }
 

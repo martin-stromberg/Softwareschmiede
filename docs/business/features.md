@@ -5,8 +5,8 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 
 ---
 
-| Kennung | Name | Kurzbeschreibung | Detaildokumentation |
-|---------|------|-----------------|---------------------|
+| Kennung | Name | Kurzbeschreibung | Pfad |
+|---------|------|-----------------|------|
 | F001 | Projektverwaltung | Projekte anlegen, bearbeiten, archivieren und löschen | [F001 – Projektverwaltung](./features/F001-projektverwaltung.md) |
 | F002 | Aufgabenverwaltung | Aufgaben anlegen, verfolgen und verwalten | [F002 – Aufgabenverwaltung](./features/F002-aufgabenverwaltung.md) |
 | F003 | KI-Entwicklungsprozess | KI starten, Echtzeit-Ausgabe beobachten, Folge-Prompts senden | [F003 – KI-Entwicklungsprozess](./features/F003-ki-entwicklungsprozess.md) |
@@ -18,6 +18,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F009 | Arbeitsverzeichnis konfigurieren | Basis-Arbeitsverzeichnis für lokale Repository-Klone festlegen und Fallback verstehen | [F009 – Arbeitsverzeichnis konfigurieren](./features/F009-arbeitsverzeichnis-konfigurieren.md) |
 | F010 | Plugin-Prinzip für Integrationen | GitHub und Copilot laufen als ausgelagerte Plugins mit automatischer Erkennung | [F010 – Plugin-Prinzip für Integrationen](./features/F010-plugin-prinzip-integrationen.md) |
 | F011 | Agent-Auswahl bei Folgeanweisungen | Bei jeder Folgeanweisung den passenden Agenten wählen und sicher senden | [F011 – Agent-Auswahl bei Folgeanweisungen](./features/F011-agent-auswahl-bei-folgeanweisungen.md) |
+| F012 | Kontextsteuerung bei Folgeanweisungen | Pro Folgeanweisung festlegen, ob bisheriger Kontext mitgegeben, ignoriert oder neu gestartet wird | [F012 – Kontextsteuerung bei Folgeanweisungen](./features/F012-kontextsteuerung-folgeanweisungen.md) |
 
 ---
 

@@ -12,11 +12,21 @@ Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der So
 | [workdir-configuration.md](./workdir-configuration.md) | Technische Dokumentation des Features „konfigurierbares Arbeitsverzeichnis“ (Settings, Resolver, Fallback, Klonpfadbildung) |
 | [http-endpoints.md](./http-endpoints.md) | Aktueller Stand der HTTP-Schnittstellen (keine öffentlichen REST-Endpoints, Blazor-Razor-Host) |
 
-## Feature-Hinweis: Agent-Auswahl bei Folgeanweisungen
+## Feature-Hinweis: Kontextsteuerung bei Folgeanweisungen
 
-- **Kein API-Impact auf HTTP-Ebene:** Für das Feature wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
-- Details zum HTTP-Status und zur AC-Nachvollziehbarkeit: [http-endpoints.md](./http-endpoints.md#feature-impact-agent-auswahl-bei-folgeanweisungen)
-- Details zum unveränderten KI-Plugin-Contract (`IKiPlugin.StartDevelopmentAsync`): [plugin-interfaces.md](./plugin-interfaces.md#startdevelopmentasync)
+- **Kein API-Impact auf HTTP-Ebene:** Für das implementierte Feature wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
+- **Interner Contract-Impact (Application-Schicht):** Der Folgeanweisungsfluss nutzt `FolgeanweisungsKontextmodus` (`KontextMitgeben`, `KontextIgnorieren`, `KontextNeuBeginnen`) beim Start eines KI-Laufs.
+- **Plugin-Contract bleibt stabil:** `IKiPlugin.StartDevelopmentAsync(...)` wurde nicht erweitert; die Kontextsteuerung wird vor dem Plugin-Aufruf im Prompt-Building verarbeitet.
+- Details zum HTTP-Status und zur technischen Nachvollziehbarkeit: [http-endpoints.md](./http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen)
+- Details zum unveränderten KI-Plugin-Contract: [plugin-interfaces.md](./plugin-interfaces.md#startdevelopmentasync)
+
+### Referenzdokumente (ohne Inhaltsduplikation)
+
+- Anforderungen: [kontextsteuerung-folgeanweisungen-requirements-analysis.md](../requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md)
+- Architektur: [kontextsteuerung-folgeanweisungen-architecture-blueprint.md](../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md)
+- Architecture Review: [kontextsteuerung-folgeanweisungen-architecture-review.md](../improvements/kontextsteuerung-folgeanweisungen-architecture-review.md)
+- Testplan: [testplan-kontextsteuerung-folgeanweisungen.md](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
+- Testlücken: [testluecken-kontextsteuerung-folgeanweisungen.md](../tests/testluecken-kontextsteuerung-folgeanweisungen.md)
 
 ---
 

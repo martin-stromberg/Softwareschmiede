@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Softwareschmiede.Application.Services;
@@ -42,6 +43,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _kiPluginMock.Object,
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
@@ -188,6 +190,281 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             "/repo",
             null,
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldAppendContextFile_ForKontextIgnorieren()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-ignore-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext ignorieren", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        {
+        }
+
+        // Assert
+        _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
+            "Neue Folgeanweisung",
+            It.IsAny<AgentInfo>(),
+            repoPath,
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        File.Exists(contextPath).Should().BeTrue();
+        var content = await File.ReadAllTextAsync(contextPath);
+        content.Should().Contain("Neue Folgeanweisung");
+        content.Should().Contain("Antwort");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldPrependContext_ForKontextMitgeben()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-include-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext mitgeben", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        await File.WriteAllTextAsync(contextPath, "Bisheriger Kontext");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        {
+        }
+
+        // Assert
+        _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
+            It.Is<string>(p => p.StartsWith("Bisheriger Kontext", StringComparison.Ordinal) && p.Contains("\n\n---\n\nNeue Folgeanweisung")),
+            It.IsAny<AgentInfo>(),
+            repoPath,
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldUsePromptOnly_WhenKontextMitgebenAndContextFileMissing()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-missing-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext fehlt", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Nur Prompt", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        {
+        }
+
+        // Assert
+        _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
+            "Nur Prompt",
+            It.IsAny<AgentInfo>(),
+            repoPath,
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldResetContext_ForKontextNeuBeginnen()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-reset-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext reset", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        await File.WriteAllTextAsync(contextPath, "Alter Verlauf");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
+        {
+        }
+
+        // Assert
+        var updated = await File.ReadAllTextAsync(contextPath);
+        updated.Should().NotContain("Alter Verlauf");
+        updated.Should().Contain("Neu anfangen");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldAbort_WhenHardLimitStillExceededAfterCompression()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-hardlimit-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Hard limit", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        await File.WriteAllTextAsync(contextPath, new string('x', 300));
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["KiKontext:SoftLimitChars"] = "100",
+                ["KiKontext:HardLimitChars"] = "150"
+            })
+            .Build();
+
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            _kiPluginMock.Object,
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            config,
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.Is<string>(p => p.Contains("Komprimiere den folgenden Projektkontext")),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine(
+                $"## Ziel{Environment.NewLine}{new string('a', 80)}{Environment.NewLine}{Environment.NewLine}" +
+                $"## Offene Punkte{Environment.NewLine}{new string('b', 80)}{Environment.NewLine}{Environment.NewLine}" +
+                $"## Letzte Entscheidungen{Environment.NewLine}{new string('c', 80)}"));
+
+        // Act
+        var act = async () =>
+        {
+            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Hard-Limit*");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldWritePreflightErrorContext_WhenCompressionMissesMandatorySections()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-mandatory-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Komprimierung Pflichtabschnitte", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        await File.WriteAllTextAsync(contextPath, new string('x', 260));
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["KiKontext:SoftLimitChars"] = "100",
+                ["KiKontext:HardLimitChars"] = "1000"
+            })
+            .Build();
+
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            _kiPluginMock.Object,
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            config,
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.Is<string>(p => p.Contains("Komprimiere den folgenden Projektkontext", StringComparison.Ordinal)),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("## Ziel"));
+
+        // Act
+        var act = async () =>
+        {
+            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Pflichtabschnitte*");
+        var written = await File.ReadAllTextAsync(contextPath);
+        written.Should().Contain("Status: Fehler");
+        written.Should().Contain("Vor dem KI-Start abgebrochen");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldAppendErrorContextEntry_WhenPluginThrowsDuringFollowUp()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-plugin-error-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Plugin Fehler", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamThrows("plugin boom"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Weiter", agent, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        {
+        }
+
+        // Assert
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var context = await File.ReadAllTextAsync(contextPath);
+        context.Should().Contain("Status: Fehler");
+        context.Should().Contain("plugin boom");
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Fehlgeschlagen);
     }
 
     /// <summary>AbschliessenAsync setzt Status auf Abgeschlossen und erstellt Protokolleintrag.</summary>
@@ -390,5 +667,14 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     {
         yield return line;
         await Task.CompletedTask;
+    }
+
+    private static async IAsyncEnumerable<string> StreamThrows(string message)
+    {
+        await Task.Yield();
+        throw new InvalidOperationException(message);
+#pragma warning disable CS0162
+        yield break;
+#pragma warning restore CS0162
     }
 }

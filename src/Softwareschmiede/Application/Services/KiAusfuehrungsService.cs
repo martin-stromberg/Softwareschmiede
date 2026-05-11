@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Application.Services;
@@ -74,6 +75,7 @@ public sealed class KiAusfuehrungsService
         string prompt,
         AgentInfo agent,
         string? model = null,
+        FolgeanweisungsKontextmodus? kontextmodus = null,
         Action? onStarted = null,
         Action? onStatus = null,
         Action<bool>? onCompleted = null)
@@ -124,7 +126,7 @@ public sealed class KiAusfuehrungsService
             {
                 // Scoped Service im Background-Task-Scope ausführen
                 await foreach (var line in entwicklungsprozessService.KiStartenAsync(
-                    aufgabeId, prompt, agent, model, session.CancellationToken))
+                    aufgabeId, prompt, agent, model, kontextmodus, session.CancellationToken))
                 {
                     var hasJustStarted = !session.GetLines().Any();
                     session.AddLine(line);

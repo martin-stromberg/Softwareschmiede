@@ -77,12 +77,9 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
-- **Agent-Auswahl bei Folgeanweisungen (AC-1 bis AC-5):**
-  - Folge-Prompt-Eingabe wird nur in `In Bearbeitung` und nach mindestens einer KI-Antwort angezeigt.
-  - Eigene Agenten-Auswahl im Folge-Prompt ist vorhanden und an die UI gebunden.
-  - Standardwert für Folgeanweisungen ist der beim Aufgabenstart gewählte Initial-Agent.
-  - Vor dem Senden kann auf einen anderen Agenten umgestellt werden; gesendet wird an den tatsächlich gewählten Agenten.
-  - Nach dem Senden wird der Folge-Prompt geleert und die Agenten-Auswahl auf den Initial-Agent zurückgesetzt (initialer Prompt-Flow bleibt unverändert).
+- Folgeanweisungen mit eigener Agenten-Auswahl (Initial-Agent als Standardwert, Rücksetzung nach dem Senden)
+- **Kontextsteuerung bei Folgeanweisungen (implementiert):** pro Folgeanweisung wählbar zwischen **Kontext mitgeben**, **Kontext ignorieren** und **Kontext neu beginnen**
+- Erweiterte Testabdeckung für Folgeanweisungen inkl. Kontextmodi in UI- und Service-Tests
 - Test-Ausführung und strukturierte Auswertung der Ergebnisse
 
 ### 📋 Aufgabenprotokoll
@@ -184,17 +181,19 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 6. **Commits/Push/PR durchführen** und Aufgabe abschließen oder abbrechen.
 
-### Folgeanweisungen mit Agent-Auswahl (Aufgabe-Detailseite)
+### Folgeanweisungen mit Agent- und Kontextsteuerung (Aufgabe-Detailseite)
 
-1. Wenn die Aufgabe auf `In Bearbeitung` steht und mindestens eine KI-Antwort vorliegt, erscheint im Bereich **🔄 Folge-Prompt** eine eigene Agenten-Auswahl.
-2. Diese Auswahl ist initial auf den beim Start gespeicherten Aufgaben-Agenten gesetzt.
-3. Für eine Folgeanweisung kann vor dem Senden ein anderer Agent gewählt werden.
-4. Beim Senden wird die Folgeanweisung mit genau diesem ausgewählten Agenten ausgeführt.
-5. Danach setzt die UI die Agenten-Auswahl wieder auf den Initial-Agenten zurück und leert das Folge-Prompt-Feld (der initiale Prompt-Flow bleibt unverändert).
+1. Wenn die Aufgabe auf `In Bearbeitung` steht und mindestens eine KI-Antwort vorliegt, erscheint im Bereich **🔄 Folge-Prompt** eine eigene Agenten- und Kontextauswahl.
+2. Die Agentenauswahl ist initial auf den beim Start gespeicherten Aufgaben-Agenten gesetzt.
+3. Für jede Folgeanweisung wählen Sie zusätzlich den Kontextmodus: **Kontext mitgeben**, **Kontext ignorieren** oder **Kontext neu beginnen**.
+4. Beim Senden wird die Folgeanweisung mit den aktuell gewählten Optionen ausgeführt.
+5. Danach setzt die UI den Folge-Prompt zurück; die Agentenauswahl wird wieder auf den Initial-Agenten gestellt.
 
 Details zu den einzelnen Schritten:
 - [Benutzerleitfaden](docs/user-guide.md)
 - [Feature-Dokumentation](docs/business/features.md)
+- [Requirements: Kontextsteuerung bei Folgeanweisungen](docs/requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md)
+- [Architektur: Kontextsteuerung bei Folgeanweisungen](docs/architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md)
 
 ---
 
@@ -435,6 +434,10 @@ dotnet test --collect:"XPlat Code Coverage"
 - [FluentAssertions](https://fluentassertions.com/) – Lesbare Assertions
 - [Moq](https://github.com/moq/moq4) – Mocking von Plugin-Interfaces und Services
 
+Feature-spezifische Testartefakte zur Kontextsteuerung bei Folgeanweisungen:
+- [Testplan: Kontextsteuerung bei Folgeanweisungen](docs/tests/testplan-kontextsteuerung-folgeanweisungen.md)
+- [Testlücken: Kontextsteuerung bei Folgeanweisungen](docs/tests/testluecken-kontextsteuerung-folgeanweisungen.md)
+
 ---
 
 ## 🚀 Deployment
@@ -463,6 +466,7 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 - [x] GitHub-Plugin (gh CLI) – vollständige Git-Integration
 - [x] GitHub Copilot-Plugin (copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
 - [x] Blazor UI: Dashboard, Projekte, Aufgaben, Protokoll, Agentenpakete
+- [x] Folgeanweisungen mit Agent- und Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
 - [x] Windows Credential Store Integration
 
 ### v1.x – Erweiterungen
@@ -486,6 +490,11 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 | [Feature-Dokumentation](docs/business/features.md) | Fachliche Beschreibung aller Features für nicht-technische Stakeholder |
 | [Feature F009: Arbeitsverzeichnis konfigurieren](docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md) | Fachliche Beschreibung des konfigurierbaren Arbeitsverzeichnisses inkl. Fallback und Migration |
 | [Feature F010: Plugin-Prinzip für Integrationen](docs/business/features/F010-plugin-prinzip-integrationen.md) | Fachliche Beschreibung der ausgelagerten GitHub-/Copilot-Plugins |
+| [Requirements: Kontextsteuerung bei Folgeanweisungen](docs/requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md) | Anforderungsbasis für Kontextmodi bei Folgeanweisungen |
+| [Architektur-Blueprint: Kontextsteuerung bei Folgeanweisungen](docs/architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md) | Technische Umsetzung der Kontextmodi, Persistenz und Prompt-Komposition |
+| [Architecture Review: Kontextsteuerung bei Folgeanweisungen](docs/improvements/kontextsteuerung-folgeanweisungen-architecture-review.md) | Review-Ergebnisse und Auflagen zur Robustheit/UX |
+| [Testplan: Kontextsteuerung bei Folgeanweisungen](docs/tests/testplan-kontextsteuerung-folgeanweisungen.md) | Testabdeckung für Kontextmodi in UI- und Service-Schicht |
+| [Testlücken: Kontextsteuerung bei Folgeanweisungen](docs/tests/testluecken-kontextsteuerung-folgeanweisungen.md) | Nachverfolgung offener Rand- und Fehlerpfade |
 | [Plugin-Interfaces](docs/api/plugin-interfaces.md) | Technische Dokumentation der Plugin-Schnittstellen für Plugin-Entwickler |
 | [Workdir-Konfiguration (technisch)](docs/api/workdir-configuration.md) | Technische Umsetzung von Settings, Resolver, Klonpfadbildung und Reason-Codes |
 | [Programmablaufpläne](docs/flows/development-process-flow.md) | Grafische Ablaufpläne und technische Prozessbeschreibungen |
