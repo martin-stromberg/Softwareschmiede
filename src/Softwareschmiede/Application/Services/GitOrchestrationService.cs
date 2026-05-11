@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -9,6 +10,7 @@ namespace Softwareschmiede.Application.Services;
 public sealed class GitOrchestrationService
 {
     private readonly AufgabeService _aufgabeService;
+    private readonly ProjektService _projektService;
     private readonly ProtokollService _protokollService;
     private readonly IGitPlugin _gitPlugin;
     private readonly ILogger<GitOrchestrationService> _logger;
@@ -16,11 +18,13 @@ public sealed class GitOrchestrationService
     /// <inheritdoc cref="GitOrchestrationService"/>
     public GitOrchestrationService(
         AufgabeService aufgabeService,
+        ProjektService projektService,
         ProtokollService protokollService,
         IGitPlugin gitPlugin,
         ILogger<GitOrchestrationService> logger)
     {
         _aufgabeService = aufgabeService;
+        _projektService = projektService;
         _protokollService = protokollService;
         _gitPlugin = gitPlugin;
         _logger = logger;
@@ -128,33 +132,19 @@ public sealed class GitOrchestrationService
     /// <summary>Erstellt einen Pull Request und protokolliert die Aktion.</summary>
     public async Task<PullRequest> PullRequestErstellenAsync(
         Guid aufgabeId,
-        string? repositoryIdOverride = null,
         string? title = null,
         string? body = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellen.", aufgabeId);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
+        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(aufgabe.BranchName))
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen Branch-Namen.");
 
-        // Bestimme die Repository-ID
-        var repositoryId = repositoryIdOverride;
-
-        if (string.IsNullOrEmpty(repositoryId))
-        {
-            // Versuche, sie aus dem verknüpften GitRepository zu erhalten
-            if (aufgabe.GitRepository != null)
-            {
-                repositoryId = ExtractRepositoryIdFromUrl(aufgabe.GitRepository.RepositoryUrl);
-            }
-
-            if (string.IsNullOrEmpty(repositoryId))
-                throw new InvalidOperationException($"Aufgabe {aufgabeId} hat kein verknüpftes Repository und keine Repository-ID angegeben.");
-        }
+        var repositoryId = await ResolveRepositoryIdAsync(aufgabe, ct);
 
         var prTitle = title ?? aufgabe.Titel;
         var prBody = body ?? $"Automatisch erstellt für Aufgabe: {aufgabe.Titel}";
@@ -170,6 +160,38 @@ public sealed class GitOrchestrationService
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellt.", aufgabeId);
 
         return pullRequest;
+    }
+
+    /// <summary>Ermittelt die Repository-ID aus der Aufgabe oder dem zugehörigen Projekt.</summary>
+    private async Task<string> ResolveRepositoryIdAsync(Aufgabe aufgabe, CancellationToken ct)
+    {
+        if (aufgabe.GitRepository is not null)
+        {
+            return ExtractRepositoryIdFromUrl(aufgabe.GitRepository.RepositoryUrl);
+        }
+
+        var projekt = await _projektService.GetDetailAsync(aufgabe.ProjektId, ct)
+            ?? throw new InvalidOperationException($"Projekt {aufgabe.ProjektId} nicht gefunden.");
+
+        var aktiveRepositories = projekt.Repositories
+            .Where(repository => repository.Aktiv)
+            .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(repository => repository.Id)
+            .ToList();
+
+        if (aktiveRepositories.Count == 1)
+        {
+            return ExtractRepositoryIdFromUrl(aktiveRepositories[0].RepositoryUrl);
+        }
+
+        if (aktiveRepositories.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Aufgabe {aufgabe.Id} kann keinen Pull Request erstellen, weil im Projekt '{projekt.Name}' kein aktives Repository vorhanden ist.");
+        }
+
+        throw new InvalidOperationException(
+            $"Aufgabe {aufgabe.Id} kann keinen Pull Request erstellen, weil im Projekt '{projekt.Name}' mehrere aktive Repositories vorhanden sind. Verknüpfen Sie die Aufgabe mit genau einem Repository.");
     }
 
     /// <summary>Extrahiert die Repository-ID (owner/repo) aus einer Repository-URL.</summary>

@@ -8,3 +8,4 @@
 | [testluecken-arbeitsverzeichnis.md](./testluecken-arbeitsverzeichnis.md) | Testlückenanalyse für das Workdir-Feature |
 | [testluecken-systemweit.md](./testluecken-systemweit.md) | Systematische, priorisierte Testlückenanalyse über Anforderungen, Architektur und Implementierung |
 | [testplan-systemweit.md](./testplan-systemweit.md) | Priorisierter Umsetzungsplan zur Schließung der systemweiten Testlücken |
+| [testluecken-pull-request-repository-id-removal.md](./testluecken-pull-request-repository-id-removal.md) | Testlückenanalyse für das Feature „PR-Repository-ID entfernen" |

@@ -54,7 +54,6 @@ public partial class AufgabeDetail : IDisposable
     private string _commitMessage = string.Empty;
     private string _resetType = "mixed";
     private string? _resetRef;
-    private string _prRepositoryId = string.Empty;
     private string _prTitel = string.Empty;
     private string? _prBody;
     private string? _fehler;
@@ -426,15 +425,12 @@ public partial class AufgabeDetail : IDisposable
         _processing = true;
         try
         {
-            // Repository-ID wird automatisch aus der Aufgabe ermittelt
             var pr = await GitService.PullRequestErstellenAsync(
                 Id,
-                repositoryIdOverride: !string.IsNullOrWhiteSpace(_prRepositoryId) ? _prRepositoryId : null,
                 title: _prTitel,
                 body: _prBody ?? string.Empty,
                 ct: _cts.Token);
             _showPullRequestForm = false;
-            _prRepositoryId = string.Empty;
             _prTitel = string.Empty;
             _prBody = null;
             _erfolg = $"Pull Request #{pr.Nummer} erstellt: {pr.Url}";
