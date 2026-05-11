@@ -258,20 +258,30 @@ public sealed class EntwicklungsprozessService
 
             if (fehler is not null)
             {
+                var markdownFehler = BuildKiArbeitsprotokollMarkdown(
+                    runId,
+                    DateTimeOffset.UtcNow,
+                    $"Fehler: {fehler.Message}");
+
                 await _aufgabeService.FehlgeschlagenAsync(aufgabeId, CancellationToken.None);
                 await _protokollService.AddEintragAsync(
                     aufgabeId,
                     ProtokollTyp.KiAntwort,
-                    $"[RunId:{runId}] Fehler: {fehler.Message}",
+                    markdownFehler,
                     agent.Name,
                     CancellationToken.None);
             }
             else
             {
+                var markdownAntwort = BuildKiArbeitsprotokollMarkdown(
+                    runId,
+                    DateTimeOffset.UtcNow,
+                    vollstaendigeAntwort.ToString());
+
                 await _protokollService.AddEintragAsync(
                     aufgabeId,
                     ProtokollTyp.KiAntwort,
-                    $"[RunId:{runId}]\n{vollstaendigeAntwort}",
+                    markdownAntwort,
                     agent.Name,
                     CancellationToken.None);
                 await _aufgabeService.KiAbgeschlossenAsync(aufgabeId, CancellationToken.None);
@@ -639,6 +649,38 @@ public sealed class EntwicklungsprozessService
         => markdown.Contains("Ziel", StringComparison.OrdinalIgnoreCase)
             && markdown.Contains("Offene Punkte", StringComparison.OrdinalIgnoreCase)
             && markdown.Contains("Letzte Entscheidungen", StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildKiArbeitsprotokollMarkdown(Guid runId, DateTimeOffset zeitpunktUtc, string antwortRohtext)
+    {
+        var zeilen = antwortRohtext
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.None)
+            .Where(zeile => !string.IsNullOrWhiteSpace(zeile))
+            .Select(zeile => zeile.TrimEnd())
+            .ToArray();
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"# {zeitpunktUtc:yyyy-MM-dd}");
+        builder.AppendLine();
+        builder.AppendLine($"- RunId: `{runId}`");
+        builder.AppendLine();
+
+        if (zeilen.Length == 0)
+        {
+            builder.AppendLine("## Schritt 1");
+            builder.AppendLine("Keine Ausgabe vorhanden.");
+            return builder.ToString().TrimEnd();
+        }
+
+        for (var i = 0; i < zeilen.Length; i++)
+        {
+            builder.AppendLine($"## Schritt {i + 1}");
+            builder.AppendLine(zeilen[i]);
+            builder.AppendLine();
+        }
+
+        return builder.ToString().TrimEnd();
+    }
 
     private static string BuildContextEntry(
         Guid runId,

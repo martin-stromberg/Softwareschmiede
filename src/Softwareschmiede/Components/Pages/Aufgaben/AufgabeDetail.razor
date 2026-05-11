@@ -254,7 +254,8 @@ else
                             <div class="protokoll-entry">
                                 <div class="protokoll-time">@eintrag.Zeitstempel.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") @(eintrag.AgentName is not null ? $"[{eintrag.AgentName}]" : "")</div>
                                 <div class="@GetProtokollCssClass(eintrag.Typ)">
-                                    <strong>@GetProtokollLabel(eintrag.Typ):</strong> @eintrag.Inhalt
+                                    <strong>@GetProtokollLabel(eintrag.Typ):</strong>
+                                    <div class="protokoll-markdown markdown-preview">@RenderProtokollInhalt(eintrag.Inhalt)</div>
                                 </div>
                             </div>
                         }

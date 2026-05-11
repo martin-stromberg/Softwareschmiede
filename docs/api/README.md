@@ -10,7 +10,7 @@ Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der So
 |---|---|
 | [plugin-interfaces.md](./plugin-interfaces.md) | Plugin-Entwickler-Dokumentation: `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType` und `PluginManager` – Schnittstellenreferenz, Discovery/DI und Implementierungsanleitungen |
 | [workdir-configuration.md](./workdir-configuration.md) | Technische Dokumentation des Features „konfigurierbares Arbeitsverzeichnis“ (Settings, Resolver, Fallback, Klonpfadbildung) |
-| [http-endpoints.md](./http-endpoints.md) | Aktueller Stand der HTTP-Schnittstellen (keine öffentlichen REST-Endpoints, Blazor-Razor-Host) |
+| [http-endpoints.md](./http-endpoints.md) | Aktueller Stand der HTTP-Schnittstellen (keine öffentlichen REST-Endpoints) inkl. interner technischer Contracts zu KI-Protokollformat und Rendering |
 
 ## Feature-Hinweis: Kontextsteuerung bei Folgeanweisungen
 
@@ -27,6 +27,18 @@ Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der So
 - Architecture Review: [kontextsteuerung-folgeanweisungen-architecture-review.md](../improvements/kontextsteuerung-folgeanweisungen-architecture-review.md)
 - Testplan: [testplan-kontextsteuerung-folgeanweisungen.md](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
 - Testlücken: [testluecken-kontextsteuerung-folgeanweisungen.md](../tests/testluecken-kontextsteuerung-folgeanweisungen.md)
+
+---
+
+## Feature-Hinweis: KI-Arbeitsprotokoll als Markdown
+
+- **Kein API-Impact auf HTTP-Ebene:** Es wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
+- **Interner technischer Contract-Impact:** KI-Antworten werden im Protokoll konsistent als Markdown persistiert (`# {Datum}`, `## Schritt n`, inkl. `RunId`) und in der UI als Markdown gerendert.
+- **Rendering-Sicherheitscontract:** Die Webausgabe verwendet Markdown-Rendering mit Sanitizing (`DisableHtml`, Entfernen von Event-Handler-Attributen, Neutralisieren unsicherer URI-Schemata) sowie einen `<pre>`-Fallback bei Fehlern oder leerem Ergebnis.
+- Technische Details: [http-endpoints.md](./http-endpoints.md#feature-impact-ki-arbeitsprotokoll-als-markdown-und-sichere-render-pipeline)
+- Flow-Referenz: [development-process-flow.md – Ablauf 2: KI-Streaming und Protokollierung](../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung)
+- Detaillierter Rendering-Flow: [ki-arbeitsprotokoll-rendering-flow.md](../flows/ki-arbeitsprotokoll-rendering-flow.md)
+- Fachliche Einordnung: [F005 – Aufgabenprotokoll](../business/features/F005-aufgabenprotokoll.md)
 
 ---
 

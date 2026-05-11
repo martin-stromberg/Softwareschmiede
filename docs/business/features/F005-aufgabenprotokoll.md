@@ -35,6 +35,17 @@ Jeder Eintrag zeigt:
 - **Typ** – Was für eine Art von Eintrag ist es? (siehe Tabelle unten)
 - **Inhalt** – Die eigentliche Nachricht oder Aktion
 
+### Neues Protokollformat verstehen
+
+Das Protokoll folgt jetzt einem festen, gut lesbaren Aufbau.
+Sie sehen oben immer eine Datumszeile wie **# 2026-05-11**.
+Darunter folgen einzelne Arbeitsschritte wie **## Schritt 1**, **## Schritt 2** und so weiter.
+So erkennen Sie sofort, wann die Arbeit stattfand und in welcher Reihenfolge die Schritte liefen.
+Die Webansicht zeigt diesen Aufbau klar formatiert an.
+Unsichere oder fremde Inhalte werden vor der Anzeige automatisch bereinigt.
+Falls die Formatierung einmal nicht korrekt geladen wird, zeigt die Seite den Inhalt in einer einfachen Ersatzansicht.
+So bleibt das Protokoll trotzdem lesbar.
+
 **Übersicht der Eintragstypen:**
 
 | Typ | Symbol | Bedeutung |
@@ -92,6 +103,12 @@ Solange das Projekt und die Aufgabe in der Softwareschmiede vorhanden sind, blei
 **Kann ich das Protokoll exportieren?**
 Diese Funktion ist derzeit nicht verfügbar.
 
+**Warum sehe ich Zeilen wie „# 2026-05-11“ und „## Schritt 3“?**
+Das ist das neue feste Protokollformat. Es zeigt Datum und Arbeitsschritte klar und einheitlich.
+
+**Was passiert bei einem Darstellungsfehler im Browser?**
+Die Seite nutzt automatisch eine einfache Ersatzansicht. So bleibt der Inhalt lesbar.
+
 **Was bedeutet es, wenn im Protokoll sehr viele Code-Änderungen stehen?**
 Das ist normal bei umfangreichen Aufgaben. Die KI bearbeitet viele Dateien, um eine Funktion vollständig umzusetzen.
 
@@ -105,4 +122,6 @@ Nein. Das Protokoll wächst mit der Dauer und Komplexität der Aufgabe mit.
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – Echtzeit-Ausgabe der KI beobachten
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md) – Aufgabe beenden und Protokoll abschließen
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Abbruch und Protokolleintrag
+- [Technischer Ablauf (Flow)](../../flows/README.md) – Kurzer Überblick über technische Abläufe
+- [Technische Schnittstellen (API)](../../api/README.md) – Kurzüberblick für technische Vertiefung
 - [Zurück zur Übersicht](../features.md)

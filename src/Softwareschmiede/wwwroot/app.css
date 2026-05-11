@@ -63,14 +63,16 @@ select.form-control option { background: #1a1d2e; }
 textarea.form-control { resize: vertical; min-height: 100px; }
 
 /* Protokoll / Log */
-.protokoll-container { background: #0a0d14; border: 1px solid #2d3748; border-radius: 0.5rem; padding: 1rem; max-height: 500px; overflow-y: auto; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.8rem; }
-.protokoll-entry { padding: 0.5rem; border-bottom: 1px solid #1a1d2e; margin-bottom: 0.25rem; }
+.protokoll-container { background: #0a0d14; border: 1px solid #2d3748; border-radius: 0.5rem; padding: 1rem; max-height: 500px; overflow-y: auto; font-size: 0.85rem; }
+.protokoll-entry { padding: 0.5rem; border-bottom: 1px solid #1a1d2e; margin-bottom: 0.5rem; }
 .protokoll-prompt { color: #7c3aed; }
-.protokoll-antwort { color: #34d399; white-space: pre-wrap; }
+.protokoll-antwort { color: #34d399; }
 .protokoll-status { color: #60a5fa; }
 .protokoll-git { color: #fb923c; }
 .protokoll-test { color: #f59e0b; }
 .protokoll-time { color: #4b5563; font-size: 0.75rem; }
+.protokoll-markdown { margin-top: 0.5rem; min-height: 0; padding: 0.75rem; line-height: 1.6; }
+.protokoll-markdown > :last-child { margin-bottom: 0; }
 
 /* Alerts */
 .alert { padding: 0.75rem 1rem; border-radius: 0.375rem; margin-bottom: 1rem; }
@@ -144,6 +146,7 @@ textarea.form-control { resize: vertical; min-height: 100px; }
 .markdown-preview th, .markdown-preview td { border: 1px solid #2d3748; padding: 0.5rem; }
 .markdown-preview th { background: #0f1117; }
 .markdown-preview hr { border: none; border-top: 1px solid #2d3748; margin: 1rem 0; }
+.markdown-preview.protokoll-markdown { min-height: 0; padding: 0.75rem; margin-bottom: 0; }
 
 /* SVG Icon */
 .icon { width: 16px; height: 16px; display: inline-block; vertical-align: middle; }

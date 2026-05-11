@@ -84,8 +84,10 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ### 📋 Aufgabenprotokoll
 - Lückenloses, chronologisches Protokoll aller Prompts, KI-Antworten und Zeitstempel
+- KI-Arbeitsprotokoll als strukturiertes Markdown mit Datumszeile (`# {Datum}`) und Schritttrennung
 - Status-Übergänge und Git-Aktionen werden protokolliert
 - Volltextsuche über alle Protokolleinträge einer Aufgabe
+- Webausgabe rendert Markdown inkl. Sanitizing und nutzt bei Bedarf eine lesbare Fallback-Ansicht
 - Test-Ergebnisse strukturiert: Testname, Status, Fehlermeldung, Dauer
 
 ### 📦 Agentenpakete
@@ -490,6 +492,7 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 | [Planungsübersicht](docs/planning-overview.md) | Projektplanung und Meilensteine |
 | [Benutzerleitfaden](docs/user-guide.md) | Schritt-für-Schritt-Anleitung für Endanwender |
 | [Feature-Dokumentation](docs/business/features.md) | Fachliche Beschreibung aller Features für nicht-technische Stakeholder |
+| [Feature F005: Aufgabenprotokoll](docs/business/features/F005-aufgabenprotokoll.md) | Fachliche Beschreibung des strukturierten Protokollformats mit Markdown-Darstellung, Sanitizing und Fallback |
 | [Feature F009: Arbeitsverzeichnis konfigurieren](docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md) | Fachliche Beschreibung des konfigurierbaren Arbeitsverzeichnisses inkl. Fallback und Migration |
 | [Feature F010: Plugin-Prinzip für Integrationen](docs/business/features/F010-plugin-prinzip-integrationen.md) | Fachliche Beschreibung der ausgelagerten GitHub-/Copilot-Plugins |
 | [Requirements: Kontextsteuerung bei Folgeanweisungen](docs/requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md) | Anforderungsbasis für Kontextmodi bei Folgeanweisungen |

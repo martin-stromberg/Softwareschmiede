@@ -222,12 +222,14 @@ internal sealed class KiSession : IDisposable
     {
         var now = _nowProvider();
         List<Action<string>> subscribers;
+        List<string> additionalLines = new List<string>
         lock (_lock)
         {
             if (_lastLineAt is null || now - _lastLineAt >= BlockPause)
             {
-                _lines.Add(string.Empty);
-                _lines.Add(now.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"));
+                additionalLines.Add(string.Empty);
+                additionalLines.Add(now.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"));
+                _lines.AddRange(additionalLines);
             }
 
             _lines.Add(line);
@@ -240,6 +242,10 @@ internal sealed class KiSession : IDisposable
         {
             try
             {
+                foreach (var addLine in additionalLines)
+                {
+                    subscriber(addLine);
+                }
                 subscriber(line);
             }
             catch (Exception)
