@@ -93,7 +93,11 @@
 #### Agenten-Auswahl pro Prompt
 - Das KI-Plugin liest das gewählte Agentenpaket und liefert eine **Liste verfügbarer Agenten**.
 - Vor jedem Prompt wählt der Anwender den **zu verwendenden Agenten** aus dieser Liste aus.
-- Der gewählte Agent wird für den nächsten KI-Lauf verwendet.
+- Bei Folgeanweisungen ist im Feld **Agent auswählen** zuerst der Start-Agent eingetragen.
+- Der Anwender kann diese Auswahl vor dem Senden jederzeit ändern.
+- Die Folgeanweisung wird an den aktuell gewählten Agenten gesendet.
+- Nach dem Senden springt die Auswahl wieder auf den Start-Agenten zurück.
+- Das Verhalten des ersten Prompts bleibt unverändert.
 
 ### 3.5 KI-Plugin-System
 

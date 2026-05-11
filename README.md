@@ -77,6 +77,12 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
+- **Agent-Auswahl bei Folgeanweisungen (AC-1 bis AC-5):**
+  - Folge-Prompt-Eingabe wird nur in `In Bearbeitung` und nach mindestens einer KI-Antwort angezeigt.
+  - Eigene Agenten-Auswahl im Folge-Prompt ist vorhanden und an die UI gebunden.
+  - Standardwert für Folgeanweisungen ist der beim Aufgabenstart gewählte Initial-Agent.
+  - Vor dem Senden kann auf einen anderen Agenten umgestellt werden; gesendet wird an den tatsächlich gewählten Agenten.
+  - Nach dem Senden wird der Folge-Prompt geleert und die Agenten-Auswahl auf den Initial-Agent zurückgesetzt (initialer Prompt-Flow bleibt unverändert).
 - Test-Ausführung und strukturierte Auswertung der Ergebnisse
 
 ### 📋 Aufgabenprotokoll
@@ -177,6 +183,14 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 4. **KI-Lauf ausführen** (Prompt + Agent aus Agentenpaket wählen).
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 6. **Commits/Push/PR durchführen** und Aufgabe abschließen oder abbrechen.
+
+### Folgeanweisungen mit Agent-Auswahl (Aufgabe-Detailseite)
+
+1. Wenn die Aufgabe auf `In Bearbeitung` steht und mindestens eine KI-Antwort vorliegt, erscheint im Bereich **🔄 Folge-Prompt** eine eigene Agenten-Auswahl.
+2. Diese Auswahl ist initial auf den beim Start gespeicherten Aufgaben-Agenten gesetzt.
+3. Für eine Folgeanweisung kann vor dem Senden ein anderer Agent gewählt werden.
+4. Beim Senden wird die Folgeanweisung mit genau diesem ausgewählten Agenten ausgeführt.
+5. Danach setzt die UI die Agenten-Auswahl wieder auf den Initial-Agenten zurück und leert das Folge-Prompt-Feld (der initiale Prompt-Flow bleibt unverändert).
 
 Details zu den einzelnen Schritten:
 - [Benutzerleitfaden](docs/user-guide.md)

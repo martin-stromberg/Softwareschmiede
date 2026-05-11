@@ -703,7 +703,12 @@ Die **Aktionsleiste** befindet sich zwischen Überschrift und Inhalt. Sie enthä
 - **Aktionsleiste (Git):** Push, Pull, Commit, Reset (soft/mixed/hard), Pull Request
 - **Prompt-Eingabe:** Textfeld + Agenten-Auswahl + Absenden-Button
 - **Protokoll-Viewer:** Chronologische Liste der Einträge; Echtzeit-Streaming wird am Ende angefügt; Einträge sind nach Typ farblich unterschieden
-- **Folge-Prompt:** Aus jedem Protokolleintrag (Typ: KiAntwort) heraus neuen Prompt starten
+- **Folge-Prompt:** Nach mindestens einer `KiAntwort` verfügbar; enthält eigene Agenten-Auswahl
+  - Standardwert der Folge-Auswahl ist der beim Aufgabenstart gewählte Agent (`Aufgabe.AgentenName`)
+  - Anwender kann Agent vor dem Senden ändern
+  - Gesendet wird an den tatsächlich gewählten Agenten
+  - Nach dem Senden wird die Folge-Agent-Auswahl auf den Start-Agenten zurückgesetzt
+  - Initialprompt-Verhalten (`_kiAgentName`) bleibt unverändert
 
 #### Agentenpaket-Vorschau
 - **Inhalt:** Liste der `agent-packages/`-Ordner; Klick → Dateiliste, README, enthaltene Agenten

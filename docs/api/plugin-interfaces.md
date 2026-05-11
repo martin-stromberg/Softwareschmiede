@@ -464,6 +464,11 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 
 **Rückgabewert:** `IAsyncEnumerable<string>` – Sequenz von Textfragmenten (Streaming-Ausgabe des KI-Systems).
 
+**Feature-Hinweis „Agent-Auswahl bei Folgeanweisungen“ (kein Contract-Change):**
+- Die Signatur von `StartDevelopmentAsync` bleibt unverändert (**kein API-Impact auf Plugin-Contract-Ebene**).
+- Für Folgeanweisungen wird der in der UI tatsächlich ausgewählte Agent als `agent`-Parameter übergeben.
+- Das Verhalten des Initialprompts bleibt unverändert; auch dieser wird weiterhin über denselben Contract gestartet.
+
 **Streaming-Verwendung:**
 
 ```csharp
