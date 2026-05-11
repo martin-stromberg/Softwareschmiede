@@ -126,10 +126,11 @@ public sealed class KiAusfuehrungsService
                 await foreach (var line in entwicklungsprozessService.KiStartenAsync(
                     aufgabeId, prompt, agent, model, session.CancellationToken))
                 {
+                    var hasJustStarted = !session.GetLines().Any();
                     session.AddLine(line);
 
                     // Einmalig nach der ersten Zeile den "gestartet"-Callback auslösen
-                    if (session.GetLines().Count == 1)
+                    if (hasJustStarted)
                     {
                         onStarted?.Invoke();
                     }
