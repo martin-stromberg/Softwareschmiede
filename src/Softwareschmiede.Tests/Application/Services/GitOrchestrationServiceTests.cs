@@ -15,6 +15,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AufgabeService _aufgabeService;
+    private readonly ProjektService _projektService;
     private readonly ProtokollService _protokollService;
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly GitOrchestrationService _sut;
@@ -24,10 +25,12 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object);
+        _projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
         _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
         _sut = new GitOrchestrationService(
             _aufgabeService,
+            _projektService,
             _protokollService,
             _gitPluginMock.Object,
             new Mock<ILogger<GitOrchestrationService>>().Object);
@@ -122,48 +125,97 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.PushBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>PullRequestErstellenAsync nutzt die angegebene Repository-ID und protokolliert den PR.</summary>
+    /// <summary>PullRequestErstellenAsync nutzt das Repository der Aufgabe und protokolliert den PR.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldUseRepositoryOverrideAndLog_WhenRepositoryOverrideProvided()
+    public async Task PullRequestErstellenAsync_ShouldUseTaskRepositoryAndLog_WhenAufgabeHasLinkedRepository()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR Aufgabe", null);
+        var projekt = await _projektService.CreateAsync("Git-Orchestration-Testprojekt", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/repo",
+            "test/repo");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR Aufgabe", null, repository.Id);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr", @"C:\repos\task-4");
         var expectedPr = new PullRequest(42, "PR Titel", "https://example/pr/42", "feature/pr");
 
         _gitPluginMock
-            .Setup(g => g.CreatePullRequestAsync("owner/override", "feature/pr", "Custom title", "Custom body", It.IsAny<CancellationToken>()))
+            .Setup(g => g.CreatePullRequestAsync("test/repo", "feature/pr", "Custom title", "Custom body", It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedPr);
 
         // Act
-        var result = await _sut.PullRequestErstellenAsync(
-            aufgabe.Id,
-            repositoryIdOverride: "owner/override",
-            title: "Custom title",
-            body: "Custom body");
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Custom title", body: "Custom body");
 
         // Assert
         result.Should().Be(expectedPr);
         _gitPluginMock.Verify(
-            g => g.CreatePullRequestAsync("owner/override", "feature/pr", "Custom title", "Custom body", It.IsAny<CancellationToken>()),
+            g => g.CreatePullRequestAsync("test/repo", "feature/pr", "Custom title", "Custom body", It.IsAny<CancellationToken>()),
             Times.Once);
         var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Pull Request erstellt: #42"));
     }
 
-    /// <summary>PullRequestErstellenAsync wirft eine Exception, wenn keine Repository-ID auflösbar ist.</summary>
+    /// <summary>PullRequestErstellenAsync nutzt das aktive Projekt-Repository, wenn die Aufgabe keines zugewiesen hat.</summary>
     [Fact]
-    public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenRepositoryIdIsNotResolvable()
+    public async Task PullRequestErstellenAsync_ShouldUseProjectRepository_WhenAufgabeHasNoLinkedRepository()
     {
         // Arrange
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR ohne Repo", null);
+        var projekt = await _projektService.CreateAsync("Projekt mit Repository", null);
+        await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/project-repo",
+            "test/project-repo");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Repo", null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-repo", @"C:\repos\task-5");
+        var expectedPr = new PullRequest(43, "PR Titel", "https://example/pr/43", "feature/no-repo");
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync("test/project-repo", "feature/no-repo", "Titel aus Aufgabe", "Body aus Aufgabe", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedPr);
 
         // Act
-        var act = () => _sut.PullRequestErstellenAsync(aufgabe.Id);
+        var result = await _sut.PullRequestErstellenAsync(
+            aufgabe.Id,
+            title: "Titel aus Aufgabe",
+            body: "Body aus Aufgabe");
 
         // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*keine Repository-ID angegeben*");
+        result.Should().Be(expectedPr);
+        _gitPluginMock.Verify(
+            g => g.CreatePullRequestAsync("test/project-repo", "feature/no-repo", "Titel aus Aufgabe", "Body aus Aufgabe", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync bricht bei mehrdeutiger Repository-Zuordnung kontrolliert ab.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenMultipleActiveRepositoriesExist()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null);
+        await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/repo-a",
+            "test/repo-a");
+        await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/repo-b",
+            "test/repo-b");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mehrdeutig", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ambiguous", @"C:\repos\task-6");
+
+        // Act
+        var act = () => _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*mehrere aktive Repositories*");
         _gitPluginMock.Verify(
             g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
