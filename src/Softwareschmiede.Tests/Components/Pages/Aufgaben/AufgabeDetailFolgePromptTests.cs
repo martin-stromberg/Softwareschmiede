@@ -148,6 +148,139 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextNeuBeginnen);
     }
 
+    [Fact]
+    public void RenderProtokollInhalt_ShouldRenderMarkdownHeadings()
+    {
+        var markdown = "# 2026-05-11\n\n## Schritt 1\nAnalyse";
+
+        var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", markdown);
+
+        result.Value.Should().Contain("<h1");
+        result.Value.Should().Contain(">2026-05-11</h1>");
+        result.Value.Should().Contain("<h2");
+        result.Value.Should().Contain(">Schritt 1</h2>");
+    }
+
+    [Fact]
+    public void RenderProtokollInhalt_ShouldSanitizeJavascriptLinks()
+    {
+        var markdown = "[Link](javascript:alert('xss'))";
+
+        var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", markdown);
+
+        result.Value.Should().NotContain("javascript:");
+        result.Value.Should().Contain("href=\"#\"");
+    }
+
+    [Theory]
+    [InlineData("[Data](data:text/html;base64,PHNjcmlwdD4=)", "data:")]
+    [InlineData("[Vbs](vbscript:msgbox(1))", "vbscript:")]
+    public void RenderProtokollInhalt_ShouldSanitizeUnsafeLinkSchemes(string markdown, string blockedScheme)
+    {
+        var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", markdown);
+
+        result.Value.Should().NotContain(blockedScheme);
+        result.Value.Should().Contain("href=\"#\"");
+    }
+
+    [Fact]
+    public void SanitizeMarkdownHtml_ShouldRemoveHtmlEventHandlerAttributes()
+    {
+        var html = "<a href=\"#\" onclick=\"alert(1)\" onmouseover='alert(2)'>x</a><img src=\"ok\" oNeRrOr=\"alert(3)\">";
+
+        var sanitized = InvokePrivateStatic<string>("SanitizeMarkdownHtml", html);
+        var normalized = sanitized.ToLowerInvariant();
+
+        normalized.Should().NotContain("onclick=");
+        normalized.Should().NotContain("onmouseover=");
+        normalized.Should().NotContain("onerror=");
+    }
+
+    [Fact]
+    public void RenderProtokollInhalt_ShouldReturnDashPre_WhenInputIsWhitespace()
+    {
+        var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", "  \n\t  ");
+
+        result.Value.Should().Be("<pre>&#x2013;</pre>");
+    }
+
+    [Fact]
+    public void BuildFallbackHtml_ShouldEncodeInput()
+    {
+        var fallback = InvokePrivateStatic<string>("BuildFallbackHtml", "<script>alert('xss')</script>");
+
+        fallback.Should().Contain("&lt;script&gt;alert");
+        fallback.Should().NotContain("<script>");
+    }
+
+    [Theory]
+    [InlineData(ProtokollTyp.Prompt, "protokoll-prompt")]
+    [InlineData(ProtokollTyp.KiAntwort, "protokoll-antwort")]
+    [InlineData(ProtokollTyp.StatusUebergang, "protokoll-status")]
+    [InlineData(ProtokollTyp.GitAktion, "protokoll-git")]
+    [InlineData(ProtokollTyp.TestErgebnis, "protokoll-test")]
+    public void GetProtokollCssClass_ShouldReturnExpectedCssClass(ProtokollTyp typ, string expectedClass)
+    {
+        var cssClass = InvokePrivateStatic<string>("GetProtokollCssClass", typ);
+
+        cssClass.Should().Be(expectedClass);
+    }
+
+    [Theory]
+    [InlineData(ProtokollTyp.Prompt, "Prompt")]
+    [InlineData(ProtokollTyp.KiAntwort, "KI")]
+    [InlineData(ProtokollTyp.StatusUebergang, "Status")]
+    [InlineData(ProtokollTyp.GitAktion, "Git")]
+    [InlineData(ProtokollTyp.TestErgebnis, "Test")]
+    public void GetProtokollLabel_ShouldReturnExpectedLabel(ProtokollTyp typ, string expectedLabel)
+    {
+        var label = InvokePrivateStatic<string>("GetProtokollLabel", typ);
+
+        label.Should().Be(expectedLabel);
+    }
+
+    [Fact]
+    public void AufgabeDetailMarkupAndCss_ShouldContainExpectedProtokollClasses()
+    {
+        var root = FindRepositoryRoot();
+        var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Aufgaben", "AufgabeDetail.razor");
+        var cssPath = Path.Combine(root, "src", "Softwareschmiede", "wwwroot", "app.css");
+        var markup = File.ReadAllText(razorPath);
+        var css = File.ReadAllText(cssPath);
+
+        markup.Should().Contain("protokoll-markdown markdown-preview");
+        markup.Should().Contain("class=\"@GetProtokollCssClass(eintrag.Typ)\"");
+        markup.Should().Contain("@GetProtokollLabel(eintrag.Typ):");
+
+        css.Should().Contain(".protokoll-markdown");
+        css.Should().Contain(".markdown-preview");
+        css.Should().Contain(".protokoll-antwort");
+        css.Should().Contain(".streaming-output");
+    }
+
+    [Fact]
+    public void ProtokollMarkup_ShouldRenderTimestampAndOptionalAgentName()
+    {
+        var root = FindRepositoryRoot();
+        var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Aufgaben", "AufgabeDetail.razor");
+        var markup = File.ReadAllText(razorPath);
+
+        markup.Should().Contain("ToLocalTime().ToString(\"dd.MM.yyyy HH:mm:ss\")");
+        markup.Should().Contain("eintrag.AgentName is not null ? $\"[{eintrag.AgentName}]\" : \"\"");
+    }
+
+    [Fact]
+    public async Task Dispose_ShouldDisposeExistingKiSubscription()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        var trackingDisposable = new TrackingDisposable();
+        SetPrivateField(sut, "_kiSubscription", trackingDisposable);
+
+        sut.Dispose();
+
+        trackingDisposable.IsDisposed.Should().BeTrue();
+    }
+
     public void Dispose() => _db.Dispose();
 
     private async Task<TestAufgabeDetailPage> CreateSutAsync(string initialAgent, IReadOnlyList<string> weitereAgenten)
@@ -270,6 +403,17 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         throw new InvalidOperationException($"{methodName} did not return Task or ValueTask.");
     }
 
+    private static T InvokePrivateStatic<T>(string methodName, params object?[] args)
+    {
+        var method = typeof(AufgabeDetail).GetMethod(
+            methodName,
+            BindingFlags.Static | BindingFlags.NonPublic);
+        method.Should().NotBeNull($"Static method {methodName} should exist.");
+        var result = method!.Invoke(null, args);
+        result.Should().NotBeNull($"{methodName} should return a value.");
+        return (T)result!;
+    }
+
     private static void SetPrivateField(object target, string fieldName, object? value)
     {
         var field = typeof(AufgabeDetail).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -334,6 +478,16 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         protected override void NavigateToCore(string uri, bool forceLoad)
         {
             Uri = ToAbsoluteUri(uri).ToString();
+        }
+    }
+
+    private sealed class TrackingDisposable : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
         }
     }
 }

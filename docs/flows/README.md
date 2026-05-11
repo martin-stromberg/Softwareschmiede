@@ -10,6 +10,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md) | `follow-up-context-steering-flow.md` | Detaillierter Folgeanweisungsfluss für Kontext mitgeben/ignorieren/neu beginnen inkl. Komprimierung, Fehlerpfade und Persistenz |
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
+| [KI-Arbeitsprotokoll: Persistierung und Rendering](./ki-arbeitsprotokoll-rendering-flow.md) | `ki-arbeitsprotokoll-rendering-flow.md` | Persistierung des Markdown-Protokolls mit Datumszeile/Schritten sowie sicheres Rendering mit Sanitizing und Fallback |
 
 ---
 
@@ -75,6 +76,13 @@ Beschreibt, wie die Einstellung `repositories.workdir` gespeichert wird, wie der
 **Typ:** `flowchart TD` · **Services:** `Program`, `PluginManager`, `IPluginManager`
 
 Beschreibt den Ablauf von der DI-Registrierung bis zur Lazy-Discovery aus `<Programmverzeichnis>/plugins`, inklusive Fehlerbehandlung für defekte DLLs.
+
+---
+
+### [Ablauf 8: KI-Arbeitsprotokoll – Persistierung, Rendering und Fallback](./ki-arbeitsprotokoll-rendering-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EntwicklungsprozessService`, `ProtokollService`, `AufgabeDetail`
+
+Beschreibt die Ende-zu-Ende-Pipeline vom Erzeugen des Markdown-Protokolls (`# Datum`, `## Schritt n`) über die DB-Persistierung bis zur sicheren HTML-Darstellung in der UI inklusive Sanitizing und `<pre>`-Fallback.
 
 ---
 

@@ -1,5 +1,8 @@
 namespace Softwareschmiede.Components.Pages.Aufgaben;
 
+using System.Text.Encodings.Web;
+using System.Text.RegularExpressions;
+using Markdig;
 using Microsoft.AspNetCore.Components;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -76,6 +79,15 @@ public partial class AufgabeDetail : IDisposable
     ];
 
     private string _selectedModel = string.Empty;
+
+    private static readonly MarkdownPipeline _protokollMarkdownPipeline =
+        new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
+
+    private static readonly Regex _unsafeHtmlEventAttributeRegex =
+        new(@"\s(on\w+)\s*=\s*(['""]).*?\2", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+
+    private static readonly Regex _unsafeHtmlUriRegex =
+        new(@"\s(href|src)\s*=\s*(['""])\s*(javascript:|data:|vbscript:)[^'""]*\2", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private CancellationTokenSource _cts = new();
 
@@ -566,6 +578,40 @@ public partial class AufgabeDetail : IDisposable
         ProtokollTyp.TestErgebnis => "Test",
         _ => typ.ToString()
     };
+
+    private static MarkupString RenderProtokollInhalt(string inhalt)
+    {
+        if (string.IsNullOrWhiteSpace(inhalt))
+        {
+            return new MarkupString($"<pre>{HtmlEncoder.Default.Encode("–")}</pre>");
+        }
+
+        try
+        {
+            var html = Markdown.ToHtml(inhalt, _protokollMarkdownPipeline);
+            var sanitized = SanitizeMarkdownHtml(html);
+            return new MarkupString(string.IsNullOrWhiteSpace(sanitized) ? BuildFallbackHtml(inhalt) : sanitized);
+        }
+        catch
+        {
+            return new MarkupString(BuildFallbackHtml(inhalt));
+        }
+    }
+
+    private static string SanitizeMarkdownHtml(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = _unsafeHtmlEventAttributeRegex.Replace(html, string.Empty);
+        sanitized = _unsafeHtmlUriRegex.Replace(sanitized, " $1=\"#\"");
+        return sanitized;
+    }
+
+    private static string BuildFallbackHtml(string inhalt)
+        => $"<pre>{HtmlEncoder.Default.Encode(inhalt)}</pre>";
 
     private async Task ClearErfolgAsync()
     {

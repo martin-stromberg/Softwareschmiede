@@ -46,6 +46,35 @@ Zur Vermeidung von Redundanz werden Anforderungen, Architekturentscheidungen und
 - Testplan: [`../tests/testplan-kontextsteuerung-folgeanweisungen.md`](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
 - Testlücken: [`../tests/testluecken-kontextsteuerung-folgeanweisungen.md`](../tests/testluecken-kontextsteuerung-folgeanweisungen.md)
 
+## Feature-Impact: KI-Arbeitsprotokoll als Markdown und sichere Render-Pipeline
+
+**Ergebnis:** **kein API-Impact** auf öffentliche HTTP-Schnittstellen, aber **interner Contract-Impact** in Persistenz- und Renderlogik des Protokollinhalts.
+
+Das Feature wurde in Application-Service und Blazor-Seite umgesetzt, ohne neue oder geänderte öffentliche HTTP-Endpunkte.
+
+### API-relevante Umsetzung (ohne HTTP-Änderung)
+
+| Bereich | Status | Umsetzung / Referenz |
+|---|---|---|
+| Persistenzformat KI-Antwort als Markdown | Erfüllt | `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`BuildKiArbeitsprotokollMarkdown`) mit Datumszeile `# yyyy-MM-dd`, `RunId` und Schritttrennung `## Schritt n` |
+| Fehlerfall nutzt identisches Protokollschema | Erfüllt | `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`KiStartenAsync` → `BuildKiArbeitsprotokollMarkdown` auch bei Exceptions) |
+| Markdown-Rendering in der Webausgabe | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`RenderProtokollInhalt`, `Markdown.ToHtml`) |
+| Sanitizing der gerenderten HTML-Ausgabe | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`MarkdownPipelineBuilder().DisableHtml()`, `SanitizeMarkdownHtml`) |
+| Fallback für robuste Lesbarkeit | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`BuildFallbackHtml` mit HTML-encoding in `<pre>`) |
+
+### Interner technischer Contract (Kurzform)
+
+- **Formatvertrag Protokollinhalt:** Jeder KI-Antworteintrag folgt dem Schema `# {Datum}` + `- RunId: ...` + `## Schritt n`.
+- **Rendervertrag UI:** Persistierter Markdown-Inhalt wird in HTML transformiert, danach sanitiziert und nur dann angezeigt; bei Fehlern/leerem Sanitizing greift ein sicherer `<pre>`-Fallback.
+- **HTTP-Vertrag unverändert:** Keine Änderung an `Program.cs`-Routing (`MapRazorComponents`) und keine öffentlichen API-Routen hinzugefügt.
+
+### Verknüpfte Dokumentation
+
+- Fachliche Sicht: [`../business/features/F005-aufgabenprotokoll.md`](../business/features/F005-aufgabenprotokoll.md)
+- Ablaufübersicht: [`../flows/README.md`](../flows/README.md)
+- Technischer Ablauf (KI-Streaming/Protokollierung): [`../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung`](../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung)
+- Detaillierter Rendering-Flow: [`../flows/ki-arbeitsprotokoll-rendering-flow.md`](../flows/ki-arbeitsprotokoll-rendering-flow.md)
+
 ## Nächste Erweiterung
 
 Falls künftig HTTP-Endpunkte eingeführt werden, sollte diese Datei um eine Endpoint-Matrix erweitert werden:

@@ -193,6 +193,103 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task KiStartenAsync_ShouldPersistMarkdownArbeitsprotokoll_WithDateHeadingAndSeparatedSteps()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Markdown Protokoll", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamLines("Analyse", "Implementierung"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Prompt", agent))
+        {
+        }
+
+        // Assert
+        var protokoll = (await _protokollService.GetByAufgabeAsync(aufgabe.Id)).ToList();
+        var kiAntwort = protokoll.Last(p => p.Typ == ProtokollTyp.KiAntwort).Inhalt;
+        kiAntwort.Should().MatchRegex(@"^# \d{4}-\d{2}-\d{2}");
+        kiAntwort.Should().MatchRegex(@"- RunId: `[0-9a-fA-F-]{36}`");
+        kiAntwort.Should().Contain("## Schritt 1");
+        kiAntwort.Should().Contain("Analyse");
+        kiAntwort.Should().Contain("## Schritt 2");
+        kiAntwort.Should().Contain("Implementierung");
+    }
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    [InlineData("   \t   ")]
+    public async Task KiStartenAsync_ShouldPersistFallbackStep_WhenKiOutputIsWhitespaceOnly(string kiAntwortRoh)
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Markdown Fallback", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine(kiAntwortRoh));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Prompt", agent))
+        {
+        }
+
+        // Assert
+        var protokoll = (await _protokollService.GetByAufgabeAsync(aufgabe.Id)).ToList();
+        var kiAntwort = protokoll.Last(p => p.Typ == ProtokollTyp.KiAntwort).Inhalt;
+        kiAntwort.Should().MatchRegex(@"- RunId: `[0-9a-fA-F-]{36}`");
+        kiAntwort.Should().Contain("## Schritt 1");
+        kiAntwort.Should().Contain("Keine Ausgabe vorhanden.");
+        kiAntwort.Should().NotContain("## Schritt 2");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldNormalizeLineBreaks_AndKeepStepOrder()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Markdown Normalisierung", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) =>
+                StreamSingleLine("Analyse   \r\n\r\nImplementierung\t  \n\nReview  "));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Prompt", agent))
+        {
+        }
+
+        // Assert
+        var protokoll = (await _protokollService.GetByAufgabeAsync(aufgabe.Id)).ToList();
+        var kiAntwort = protokoll.Last(p => p.Typ == ProtokollTyp.KiAntwort).Inhalt;
+        kiAntwort.Should().MatchRegex(@"## Schritt 1\s+Analyse\s+## Schritt 2\s+Implementierung\s+## Schritt 3\s+Review");
+        kiAntwort.Should().NotContain("## Schritt 4");
+        kiAntwort.Should().NotContain("Analyse   ");
+        kiAntwort.Should().NotContain("Implementierung\t");
+        kiAntwort.Should().NotContain("Review  ");
+    }
+
+    [Fact]
     public async Task KiStartenAsync_ShouldAppendContextFile_ForKontextIgnorieren()
     {
         // Arrange
@@ -465,6 +562,12 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         context.Should().Contain("plugin boom");
         var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         updatedAufgabe!.Status.Should().Be(AufgabeStatus.Fehlgeschlagen);
+        var protokoll = (await _protokollService.GetByAufgabeAsync(aufgabe.Id)).ToList();
+        var kiAntwort = protokoll.Last(p => p.Typ == ProtokollTyp.KiAntwort).Inhalt;
+        kiAntwort.Should().MatchRegex(@"^# \d{4}-\d{2}-\d{2}");
+        kiAntwort.Should().MatchRegex(@"- RunId: `[0-9a-fA-F-]{36}`");
+        kiAntwort.Should().Contain("## Schritt 1");
+        kiAntwort.Should().Contain("Fehler: plugin boom");
     }
 
     /// <summary>AbschliessenAsync setzt Status auf Abgeschlossen und erstellt Protokolleintrag.</summary>
@@ -666,6 +769,16 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     private static async IAsyncEnumerable<string> StreamSingleLine(string line)
     {
         yield return line;
+        await Task.CompletedTask;
+    }
+
+    private static async IAsyncEnumerable<string> StreamLines(params string[] lines)
+    {
+        foreach (var line in lines)
+        {
+            yield return line;
+        }
+
         await Task.CompletedTask;
     }
 
