@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Application.Services;
@@ -17,7 +18,7 @@ namespace Softwareschmiede.Application.Services;
 /// Abgeschlossene Sessions bleiben nach Ende kurzzeitig erhalten (bis die Komponente die Daten gelesen hat)
 /// und werden beim nächsten Laden der Seite bereinigt.
 /// </remarks>
-public sealed class KiAusfuehrungsService
+public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource
 {
     private readonly ConcurrentDictionary<Guid, KiSession> _sessions = new();
     private readonly IServiceScopeFactory _scopeFactory;
@@ -30,9 +31,19 @@ public sealed class KiAusfuehrungsService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Wird ausgelöst, wenn sich die Anzahl laufender Automatisierungen ändert.
+    /// Liefert den vorherigen und den aktuellen Wert.
+    /// </summary>
+    public event Action<int, int>? RunningCountChanged;
+
     /// <summary>Gibt an, ob für die Aufgabe aktuell eine KI-Ausführung läuft.</summary>
     public bool IsRunning(Guid aufgabeId)
         => _sessions.TryGetValue(aufgabeId, out var session) && session.IsRunning;
+
+    /// <summary>Gibt die Anzahl aktuell laufender KI-Ausführungen zurück.</summary>
+    public int GetRunningCount()
+        => _sessions.Values.Count(session => session.IsRunning);
 
     /// <summary>
     /// Gibt alle bisher gepufferten Ausgabezeilen einer laufenden oder gerade beendeten Session zurück.
@@ -87,7 +98,9 @@ public sealed class KiAusfuehrungsService
         }
 
         var session = new KiSession();
+        var previousRunningCount = GetRunningCount();
         _sessions[aufgabeId] = session;
+        RaiseRunningCountChanged(previousRunningCount);
 
         _logger.LogInformation("KI-Hintergrundlauf für Aufgabe {AufgabeId} mit Agent {AgentName} gestartet.", aufgabeId, agent.Name);
 
@@ -154,7 +167,9 @@ public sealed class KiAusfuehrungsService
             finally
             {
                 completed = true;
+                var previousCount = GetRunningCount();
                 session.Complete(fehler);
+                RaiseRunningCountChanged(previousCount);
                 onCompleted?.Invoke(fehler);
                 _logger.LogInformation("KI-Hintergrundlauf für Aufgabe {AufgabeId} beendet (Fehler: {Fehler}).", aufgabeId, fehler);
             }
@@ -177,6 +192,17 @@ public sealed class KiAusfuehrungsService
         {
             _sessions.TryRemove(aufgabeId, out _);
         }
+    }
+
+    private void RaiseRunningCountChanged(int previousRunningCount)
+    {
+        var currentRunningCount = GetRunningCount();
+        if (previousRunningCount == currentRunningCount)
+        {
+            return;
+        }
+
+        RunningCountChanged?.Invoke(previousRunningCount, currentRunningCount);
     }
 }
 
@@ -222,7 +248,11 @@ internal sealed class KiSession : IDisposable
     {
         var now = _nowProvider();
         List<Action<string>> subscribers;
+<<<<<<< task/ed190ee52bfa4a55b8e0a1eb3795d58b-shutdown-bei-abschluss
+        List<string> additionalLines = new();
+=======
         List<string> additionalLines = new List<string>();
+>>>>>>> main
         lock (_lock)
         {
             if (_lastLineAt is null || now - _lastLineAt >= BlockPause)

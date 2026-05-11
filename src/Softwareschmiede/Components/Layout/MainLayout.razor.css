@@ -1,3 +1,60 @@
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.sidebar-top {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid #2d3748;
+}
+
+.running-count-label {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #a0aec0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.running-count-value {
+    margin: 0.25rem 0 0.75rem 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.auto-shutdown-option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.auto-shutdown-checkbox {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    font-size: 0.8rem;
+    color: #f8fafc;
+    line-height: 1.3;
+}
+
+.auto-shutdown-checkbox input {
+    margin-top: 0.2rem;
+}
+
+.auto-shutdown-warning {
+    margin: 0;
+    font-size: 0.72rem;
+    color: #fbbf24;
+}
+
 #blazor-error-ui {
     color-scheme: light only;
     background: lightyellow;

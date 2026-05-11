@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using System.Collections.Concurrent;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -86,6 +87,29 @@ public sealed class KiAusfuehrungsServiceTests
         harness.Service.GetBufferedLines(harness.AufgabeId).Should().Contain(l => l.Contains("Zeile A", StringComparison.Ordinal));
     }
 
+    /// <summary>Sendet Running-Count-Änderungen bei Start und Abschluss eines Laufs.</summary>
+    [Fact]
+    public async Task StartKiLauf_ShouldPublishRunningCountChanged_OnStartAndCompletion()
+    {
+        // Arrange
+        await using var harness = await KiAusfuehrungsServiceHarness.CreateAsync(() => StreamFromLines("Zeile A"));
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var events = new ConcurrentQueue<(int Previous, int Current)>();
+        harness.Service.RunningCountChanged += (previous, current) => events.Enqueue((previous, current));
+
+        // Act
+        harness.Service.StartKiLauf(
+            harness.AufgabeId,
+            "Prompt",
+            harness.Agent,
+            onCompleted: hasError => completion.TrySetResult(hasError));
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Assert
+        events.Should().Contain((0, 1));
+        events.Should().Contain((1, 0));
+    }
+
     /// <summary>Verhindert Doppeltstart für dieselbe Aufgabe.</summary>
     [Fact]
     public async Task StartKiLauf_ShouldRejectSecondStart_WhenAlreadyRunning()
@@ -129,6 +153,41 @@ public sealed class KiAusfuehrungsServiceTests
             Times.Once);
     }
 
+    /// <summary>Veröffentlicht keine zusätzlichen Running-Count-Events bei abgewiesenem Zweitstart.</summary>
+    [Fact]
+    public async Task StartKiLauf_ShouldNotPublishAdditionalEvents_WhenSecondStartIsRejected()
+    {
+        // Arrange
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var harness = await KiAusfuehrungsServiceHarness.CreateAsync(() => StreamWithGate(release.Task));
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var events = new ConcurrentQueue<(int Previous, int Current)>();
+        harness.Service.RunningCountChanged += (previous, current) => events.Enqueue((previous, current));
+
+        // Act
+        harness.Service.StartKiLauf(
+            harness.AufgabeId,
+            "Prompt 1",
+            harness.Agent,
+            onStarted: () => firstStarted.TrySetResult(),
+            onCompleted: _ => firstCompleted.TrySetResult());
+        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        harness.Service.StartKiLauf(
+            harness.AufgabeId,
+            "Prompt 2",
+            harness.Agent);
+
+        release.TrySetResult();
+        await firstCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Assert
+        events.Count(e => e == (0, 1)).Should().Be(1);
+        events.Count(e => e == (1, 0)).Should().Be(1);
+        events.Should().HaveCount(2);
+    }
+
     /// <summary>Markiert Lauf als Fehler und puffert Fehlermeldung bei Ausnahme.</summary>
     [Fact]
     public async Task StartKiLauf_ShouldMarkError_WhenBackgroundRunThrows()
@@ -151,6 +210,46 @@ public sealed class KiAusfuehrungsServiceTests
         harness.Service.GetBufferedLines(harness.AufgabeId).Should().Contain(l => l.Contains("[Fehler]", StringComparison.Ordinal));
     }
 
+    /// <summary>Sendet Running-Count-Änderungen auch im Fehlerpfad bis zurück auf 0.</summary>
+    [Fact]
+    public async Task StartKiLauf_ShouldPublishRunningCountChanged_WhenBackgroundRunThrows()
+    {
+        // Arrange
+        await using var harness = await KiAusfuehrungsServiceHarness.CreateAsync(() => StreamFromLines("unused"), startTask: false);
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var events = new ConcurrentQueue<(int Previous, int Current)>();
+        harness.Service.RunningCountChanged += (previous, current) => events.Enqueue((previous, current));
+
+        // Act
+        harness.Service.StartKiLauf(
+            harness.AufgabeId,
+            "Prompt",
+            harness.Agent,
+            onCompleted: hasError => completion.TrySetResult(hasError));
+        var hasError = await completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Assert
+        hasError.Should().BeTrue();
+        events.Should().Contain((0, 1));
+        events.Should().Contain((1, 0));
+    }
+
+    /// <summary>Publiziert kein Event, wenn sich der Running Count nicht ändert.</summary>
+    [Fact]
+    public async Task RaiseRunningCountChanged_ShouldNotPublish_WhenPreviousEqualsCurrent()
+    {
+        // Arrange
+        await using var harness = await KiAusfuehrungsServiceHarness.CreateAsync(() => StreamFromLines("Zeile A"));
+        var events = new ConcurrentQueue<(int Previous, int Current)>();
+        harness.Service.RunningCountChanged += (previous, current) => events.Enqueue((previous, current));
+
+        // Act
+        InvokePrivate(harness.Service, "RaiseRunningCountChanged", 0);
+
+        // Assert
+        events.Should().BeEmpty();
+    }
+
     private static async IAsyncEnumerable<string> StreamFromLines(params string[] lines)
     {
         foreach (var line in lines)
@@ -165,6 +264,17 @@ public sealed class KiAusfuehrungsServiceTests
         yield return "läuft";
         await gate;
         yield return "fertig";
+    }
+
+    private static object? InvokePrivate(object target, string methodName, params object?[] args)
+    {
+        var method = typeof(KiAusfuehrungsService)
+            .GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .FirstOrDefault(m =>
+                m.Name.Equals(methodName, StringComparison.Ordinal)
+                && m.GetParameters().Length == args.Length);
+        method.Should().NotBeNull($"Method {methodName} should exist.");
+        return method!.Invoke(target, args);
     }
 
     private sealed class KiAusfuehrungsServiceHarness : IAsyncDisposable

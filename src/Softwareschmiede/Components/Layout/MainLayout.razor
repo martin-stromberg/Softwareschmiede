@@ -2,15 +2,36 @@
 
 <div class="layout">
     <nav class="sidebar">
-        <div class="sidebar-brand">
-            <h1>⚒️ Softwareschmiede</h1>
+        <div class="sidebar-top">
+            <div class="sidebar-brand">
+                <h1>⚒️ Softwareschmiede</h1>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/" class="nav-link">🏠 Dashboard</a></li>
+                <li><a href="/projekte" class="nav-link">📁 Projekte</a></li>
+                <li><a href="/agentenpakete" class="nav-link">🤖 Agentenpakete</a></li>
+                <li><a href="/einstellungen" class="nav-link">⚙️ Einstellungen</a></li>
+            </ul>
         </div>
-        <ul class="nav-menu">
-            <li><a href="/" class="nav-link">🏠 Dashboard</a></li>
-            <li><a href="/projekte" class="nav-link">📁 Projekte</a></li>
-            <li><a href="/agentenpakete" class="nav-link">🤖 Agentenpakete</a></li>
-            <li><a href="/einstellungen" class="nav-link">⚙️ Einstellungen</a></li>
-        </ul>
+
+        <div class="sidebar-footer">
+            <p class="running-count-label">Laufende Automatisierungen</p>
+            <p class="running-count-value">@_runningAutomationCount</p>
+
+            @if (_runningAutomationCount > 0)
+            {
+                <div class="auto-shutdown-option">
+                    <label for="autoShutdownToggle" class="auto-shutdown-checkbox">
+                        <input id="autoShutdownToggle"
+                               type="checkbox"
+                               checked="@_autoShutdownEnabled"
+                               @onchange="AutoShutdownChanged" />
+                        <span>Nach letztem Lauf System automatisch herunterfahren</span>
+                    </label>
+                    <p class="auto-shutdown-warning">⚠️ Löst einen OS-weiten Shutdown aus.</p>
+                </div>
+            }
+        </div>
     </nav>
 
     <main class="content">

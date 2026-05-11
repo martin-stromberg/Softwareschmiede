@@ -45,6 +45,9 @@ namespace Softwareschmiede
             builder.Services.AddScoped<PluginSettingsService>();
             builder.Services.AddScoped<ArbeitsverzeichnisSettingsService>();
             builder.Services.AddSingleton<KiAusfuehrungsService>();
+            builder.Services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
+            builder.Services.AddSingleton<IAutoShutdownOrchestrator, AutoShutdownOrchestrator>();
+            builder.Services.AddSingleton<ISystemShutdownService, SystemShutdownService>();
 
             var app = builder.Build();
 
