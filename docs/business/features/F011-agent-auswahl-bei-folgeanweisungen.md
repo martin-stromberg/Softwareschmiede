@@ -85,4 +85,5 @@ Nein. Das Verhalten des ersten Prompts bleibt unverändert.
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – Gesamtablauf der KI-Bearbeitung
 - [F004 – Agentenpakete](./F004-agentenpakete.md) – Agenten verstehen und bereitstellen
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md) – Verlauf und Antworten prüfen
+- [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – Standardauswahl für KI-Prompts verstehen
 - [Zurück zur Übersicht](../features.md)

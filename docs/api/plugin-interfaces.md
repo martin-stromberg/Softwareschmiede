@@ -7,6 +7,7 @@
 ## Inhaltsverzeichnis
 
 1. [Einleitung](#1-einleitung)
+   - [1.1 Standardplugin, Pluginart, KI-Plugin-Auswahl und Fallback](#11-standardplugin-pluginart-ki-plugin-auswahl-und-fallback)
 2. [IGitPlugin – Schnittstellenreferenz](#2-igitplugin--schnittstellenreferenz)
 3. [IKiPlugin – Schnittstellenreferenz](#3-ikiplugin--schnittstellenreferenz)
 4. [Neues Git-Plugin implementieren](#4-neues-git-plugin-implementieren)
@@ -50,6 +51,25 @@ Das System definiert zwei Plugin-Schnittstellen:
 | `ClaudeCliPlugin` | `Claude CLI` | `claude` | `ANTHROPIC_API_KEY` | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` |
 
 **Hinweis:** Beide Implementierungen erfüllen denselben `IKiPlugin`-Contract. Provider-spezifische Unterschiede (CLI-Parameter, Token-Variable, Health-Check) sind ausschließlich Implementierungsdetails.
+
+### 1.1 Standardplugin, Pluginart, KI-Plugin-Auswahl und Fallback
+
+Die Auswahl des effektiven Plugins erfolgt nicht im Plugin-Contract selbst, sondern in der Application-Schicht:
+
+- **Pluginart:** `PluginType.SourceCodeManagement` oder `PluginType.DevelopmentAutomation`
+- **Standardplugin:** Persistierter `PluginPrefix` je Pluginart
+- **KI-Plugin-Auswahl:** Optionale explizite Auswahl (`selectedKiPluginPrefix`) beim Prompt-Start
+- **Fallback:** Wenn Auswahl/Standard nicht gültig sind, wird ein verfügbares Plugin aufgelöst
+
+Verbindliche Reihenfolge:
+1. explizite Auswahl
+2. gespeichertes Standardplugin
+3. Fallback
+
+Diese Logik ist im Detail dokumentiert unter:
+- [plugin-default-selection.md](./plugin-default-selection.md)
+- [plugin-default-selection-flow.md](../flows/plugin-default-selection-flow.md)
+- [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)
 
 ---
 

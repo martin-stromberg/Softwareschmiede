@@ -55,6 +55,59 @@
     </div>
 </div>
 
+<div class="card" style="margin-bottom:1.5rem">
+    <div class="card-title">⭐ Standard-Plugins</div>
+
+    <div class="form-group">
+        <label class="form-label">Source Code Management</label>
+        <select class="form-control" @bind="_defaultPluginSelections[Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement]">
+            <option value="">– Kein Standard gesetzt –</option>
+            @foreach (var plugin in _sourceCodeManagementPlugins)
+            {
+                <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
+            }
+        </select>
+        @if (!string.IsNullOrEmpty(_defaultPluginStatusMessages.GetValueOrDefault(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement)))
+        {
+            var isError = _defaultPluginStatusIsError.GetValueOrDefault(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+            <small style="display:block;margin-top:.25rem;color:@(isError ? "#f87171" : "#34d399")">
+                @_defaultPluginStatusMessages[Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement]
+            </small>
+        }
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Development Automation (KI)</label>
+        <select class="form-control" @bind="_defaultPluginSelections[Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation]">
+            <option value="">– Kein Standard gesetzt –</option>
+            @foreach (var plugin in _developmentAutomationPlugins)
+            {
+                <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
+            }
+        </select>
+        @if (!string.IsNullOrEmpty(_defaultPluginStatusMessages.GetValueOrDefault(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation)))
+        {
+            var isError = _defaultPluginStatusIsError.GetValueOrDefault(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
+            <small style="display:block;margin-top:.25rem;color:@(isError ? "#f87171" : "#34d399")">
+                @_defaultPluginStatusMessages[Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation]
+            </small>
+        }
+    </div>
+
+    <div class="action-bar">
+        <button class="btn btn-primary"
+                @onclick="() => StandardPluginSpeichernAsync(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement)"
+                disabled="@_saving">
+            💾 SCM speichern
+        </button>
+        <button class="btn btn-primary"
+                @onclick="() => StandardPluginSpeichernAsync(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation)"
+                disabled="@_saving">
+            💾 KI speichern
+        </button>
+    </div>
+</div>
+
 @foreach (var plugin in _plugins)
 {
     <div class="card" style="margin-bottom:1.5rem">

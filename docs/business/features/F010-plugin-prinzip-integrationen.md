@@ -68,6 +68,7 @@ Ja. Ihr gewohnter Ablauf bleibt unverändert.
 
 - [F001 – Projektverwaltung](./F001-projektverwaltung.md) – Projekte mit GitHub-Ablage verwalten
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – Aufgaben mit Copilot bearbeiten
+- [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – Standard- und Ad-hoc-Auswahl von KI-Plugins
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md) – Ergebnisse in GitHub übergeben
 - [Technische Schnittstellen](../../api/plugin-interfaces.md) – Verträge und PluginManager-Verhalten
 - [Flow Plugin-Discovery](../../flows/plugin-discovery-load-flow.md) – Ablauf der dynamischen Plugin-Erkennung

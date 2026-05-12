@@ -32,6 +32,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
         _kiPluginMock = new Mock<IKiPlugin>();
+        _kiPluginMock.SetupGet(p => p.PluginName).Returns("Test KI");
+        _kiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestKi");
+        _kiPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+        _kiPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
         _agentPackageServiceMock = new Mock<IAgentPackageService>();
         _arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
@@ -41,7 +45,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            _kiPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             new ConfigurationBuilder().Build(),
@@ -58,6 +62,18 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     }
 
     public void Dispose() => _db.Dispose();
+
+    private PluginSelectionService CreatePluginSelectionService(params IKiPlugin[] kiPlugins)
+    {
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
+        pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPlugins.First());
+
+        var defaultService = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        return new PluginSelectionService(pluginManagerMock.Object, defaultService, new Mock<ILogger<PluginSelectionService>>().Object);
+    }
 
     /// <summary>ProzessStartenAsync klont das Repository und legt einen Branch an.</summary>
     [Fact]
@@ -333,7 +349,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
         {
         }
 
@@ -366,14 +382,14 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            plugin,
+            CreatePluginSelectionService(plugin),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             new ConfigurationBuilder().Build(),
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         // Act
-        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
         {
         }
 
@@ -402,14 +418,14 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            plugin,
+            CreatePluginSelectionService(plugin),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             new ConfigurationBuilder().Build(),
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         // Act
-        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
         {
         }
 
@@ -443,14 +459,14 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            plugin,
+            CreatePluginSelectionService(plugin),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             new ConfigurationBuilder().Build(),
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         // Act
-        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
         {
         }
 
@@ -484,7 +500,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
         {
         }
 
@@ -516,7 +532,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Nur Prompt", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Nur Prompt", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
         {
         }
 
@@ -550,7 +566,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
         {
         }
 
@@ -584,7 +600,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            _kiPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             config,
@@ -604,7 +620,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Act
         var act = async () =>
         {
-            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
             {
             }
         };
@@ -638,7 +654,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            _kiPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             config,
@@ -655,7 +671,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Act
         var act = async () =>
         {
-            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
             {
             }
         };
@@ -687,7 +703,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamThrows("plugin boom"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Weiter", agent, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Weiter", agent, null, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
         {
         }
 

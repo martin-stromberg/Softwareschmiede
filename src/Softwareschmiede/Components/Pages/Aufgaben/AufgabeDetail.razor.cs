@@ -14,6 +14,8 @@ public partial class AufgabeDetail : IDisposable
 {
     [Parameter] public Guid Id { get; set; }
     [Inject] private IServiceScopeFactory ServiceScopeFactory { get; set; } = null!;
+    [Inject] private IPluginManager PluginManager { get; set; } = null!;
+    [Inject] private PluginSelectionService PluginSelection { get; set; } = null!;
     [Inject] private AufgabeService AufgabeService { get; set; } = null!;
     [Inject] private EntwicklungsprozessService EntwicklungsprozessService { get; set; } = null!;
     [Inject] private KiAusfuehrungsService KiAusfuehrungsService { get; set; } = null!;
@@ -30,6 +32,7 @@ public partial class AufgabeDetail : IDisposable
     private List<Protokolleintrag> _protokoll = [];
     private List<AgentPackageInfo> _agentenpakete = [];
     private List<AgentInfo> _agenten = [];
+    private IReadOnlyList<IKiPlugin> _kiPlugins = [];
     private List<string> _streamingLines = [];
 
     // Subscription auf laufende KI-Session (wird beim Dispose freigegeben)
@@ -52,6 +55,7 @@ public partial class AufgabeDetail : IDisposable
     private List<string> _remoteBranches = [];
     private string _selectedAgentName = string.Empty;
     private string _kiAgentName = string.Empty;
+    private string _selectedKiPluginPrefix = string.Empty;
     private string _folgeAgentName = string.Empty;
     private FolgeanweisungsKontextmodus _folgeKontextmodus = FolgeanweisungsKontextmodus.KontextMitgeben;
     private bool _folgeKontextNeuBeginnenBestaetigt;
@@ -93,6 +97,7 @@ public partial class AufgabeDetail : IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        await LadeKiPluginsAsync();
         await LadeAsync();
         _agentenpakete = (await AgentPackageService.GetPackagesAsync()).ToList();
 
@@ -335,6 +340,11 @@ public partial class AufgabeDetail : IDisposable
     private async Task KiMitPromptStartenAsync(string prompt, string selectedAgentName, FolgeanweisungsKontextmodus? kontextmodus)
     {
         if (string.IsNullOrWhiteSpace(prompt)) return;
+        if (_kiPlugins.Count == 0)
+        {
+            _fehler = "Kein KI-Plugin verfügbar. Bitte Plugin-Konfiguration prüfen.";
+            return;
+        }
 
         // Keinen Agenten-Namen übergeben wenn kein passender Agent gefunden wurde –
         // AgentInfo mit leerem Name führt dazu, dass --agent weggelassen wird.
@@ -354,7 +364,12 @@ public partial class AufgabeDetail : IDisposable
         KiAusfuehrungsService.SessionBereinigen(Id);
 
         // Hintergrundlauf starten – kehrt sofort zurück
-        StartKiLauf(prompt, agent, string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel, kontextmodus);
+        StartKiLauf(
+            prompt,
+            agent,
+            string.IsNullOrEmpty(_selectedModel) ? null : _selectedModel,
+            kontextmodus,
+            string.IsNullOrWhiteSpace(_selectedKiPluginPrefix) ? null : _selectedKiPluginPrefix);
 
         // Auf Live-Ausgabe subscriben – neue Zeilen werden direkt in _streamingLines eingefügt
         KiLiveSubscribieren();
@@ -389,12 +404,18 @@ public partial class AufgabeDetail : IDisposable
         }
     }
 
-    protected virtual void StartKiLauf(string prompt, AgentInfo agent, string? model, FolgeanweisungsKontextmodus? kontextmodus)
+    protected virtual void StartKiLauf(
+        string prompt,
+        AgentInfo agent,
+        string? model,
+        FolgeanweisungsKontextmodus? kontextmodus,
+        string? selectedKiPluginPrefix)
     {
         KiAusfuehrungsService.StartKiLauf(
             Id,
             prompt,
             agent,
+            selectedKiPluginPrefix,
             model: model,
             kontextmodus: kontextmodus,
             onStarted: () => InvokeAsync(async () =>
@@ -415,6 +436,19 @@ public partial class AufgabeDetail : IDisposable
     }
 
     protected virtual void NotifyStateChanged() => StateHasChanged();
+
+    private async Task LadeKiPluginsAsync()
+    {
+        _kiPlugins = PluginManager.GetDevelopmentAutomationPlugins();
+        if (_kiPlugins.Count == 0)
+        {
+            _selectedKiPluginPrefix = string.Empty;
+            return;
+        }
+
+        var resolved = await PluginSelection.ResolveDevelopmentAutomationPluginAsync(null);
+        _selectedKiPluginPrefix = resolved.PluginPrefix;
+    }
 
     private async Task CommitAsync()
     {

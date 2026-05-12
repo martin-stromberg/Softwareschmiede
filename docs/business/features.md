@@ -20,6 +20,9 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F011 | Agent-Auswahl bei Folgeanweisungen | Bei jeder Folgeanweisung den passenden Agenten wählen und sicher senden | [F011 – Agent-Auswahl bei Folgeanweisungen](./features/F011-agent-auswahl-bei-folgeanweisungen.md) |
 | F012 | Kontextsteuerung bei Folgeanweisungen | Pro Folgeanweisung festlegen, ob bisheriger Kontext mitgegeben, ignoriert oder neu gestartet wird | [F012 – Kontextsteuerung bei Folgeanweisungen](./features/F012-kontextsteuerung-folgeanweisungen.md) |
 | F013 | Claude-CLI-Integration | Claude CLI in den Einstellungen hinterlegen und für KI-Läufe nutzen | [F013 – Claude-CLI-Integration](./features/F013-claude-cli-integration.md) |
+| F014 | Standardplugin & KI-Plugin-Auswahl | Standardplugin je Pluginart festlegen und beim Prompt das konkrete KI-Plugin auswählen | [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./features/F014-standardplugin-ki-plugin-auswahl.md) |
+| F015 | Einstellungen & Persistenz | Welche Einstellungen gespeichert werden und wie sie im Alltag wirken | [F015 – Einstellungen & Persistenz](./features/F015-einstellungen-und-persistenz.md) |
+| F016 | Fehlerbehandlung & Recovery | Wie Sie bei typischen Störungen sicher weiterarbeiten können | [F016 – Fehlerbehandlung & Recovery](./features/F016-fehlerbehandlung-und-recovery.md) |
 
 ---
 

@@ -16,9 +16,9 @@
 2. [Features](#-features)
 3. [Screenshots](#-screenshots)
 4. [Voraussetzungen](#-voraussetzungen)
-5. [Schnellstart](#-schnellstart)
+5. [Installation](#-installation)
 6. [Usage](#-usage)
-7. [Konfiguration & Plugin-Setup](#️-konfiguration--plugin-setup)
+7. [Konfiguration & Plugin-Setup](#-konfiguration--plugin-setup)
 8. [Agentenpakete](#-agentenpakete)
 9. [Projektstruktur](#-projektstruktur)
 10. [Architektur](#-architektur)
@@ -81,6 +81,8 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 - Sidebar-Footer zeigt live die Anzahl laufender Automatisierungen; optionaler Auto-Shutdown-Toggle erscheint nur bei aktiven Läufen
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
+- Standardplugin je Pluginart in den Einstellungen (SCM und KI) persistierbar
+- Explizite KI-Plugin-Auswahl beim Prompt-Senden, inkl. vorausgewähltem Standardplugin
 - Folgeanweisungen mit eigener Agenten-Auswahl (Initial-Agent als Standardwert, Rücksetzung nach dem Senden)
 - **Kontextsteuerung bei Folgeanweisungen (implementiert):** pro Folgeanweisung wählbar zwischen **Kontext mitgeben**, **Kontext ignorieren** und **Kontext neu beginnen**
 - Erweiterte Testabdeckung für Folgeanweisungen inkl. Kontextmodi in UI- und Service-Tests
@@ -145,7 +147,7 @@ claude --version
 
 ---
 
-## ⚡ Schnellstart
+## 🛠️ Installation
 
 ### 1. Repository klonen
 
@@ -173,7 +175,7 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 
 ### 4. Erste Schritte
 
-1. **GitHub-Token einrichten** – Credential Manager öffnen und Token speichern (siehe [Konfiguration](#️-konfiguration--plugin-setup))
+1. **GitHub-Token einrichten** – Credential Manager öffnen und Token speichern (siehe [Konfiguration](#-konfiguration--plugin-setup))
 2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
 3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt mit GitHub-Repository erstellen
 4. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
@@ -188,14 +190,16 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
 2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
-3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch, KI-Plugin wird über `PluginManager` ausgewählt).
-4. **KI-Lauf ausführen** (Prompt + Agent aus Agentenpaket wählen).
+3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch, KI-Plugin wird über Default/Fallback aufgelöst).
+4. **KI-Lauf ausführen** (Prompt + Agent + KI-Plugin wählen; Standardplugin ist vorausgewählt).
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 6. **Commits/Push/PR durchführen** und Aufgabe abschließen oder abbrechen.
 
 ### KI-Plugin-Auswahl (Copilot oder Claude CLI)
 
-- Standardmäßig wird das verfügbare Default-Plugin für `DevelopmentAutomation` verwendet.
+- In den Einstellungen kann je Pluginart (`SourceCodeManagement`, `DevelopmentAutomation`) ein Standardplugin gespeichert werden.
+- Beim Prompt-Senden kann das KI-Plugin explizit ausgewählt werden; in der UI ist das Standardplugin für `DevelopmentAutomation` vorausgewählt.
+- Auflösungskette zur Laufzeit: **explizite Auswahl → gespeichertes Standardplugin → Fallback auf verfügbares Plugin**.
 - Bei installierten Plugins stehen aktuell **GitHub Copilot** und **Claude CLI** zur Verfügung.
 - Claude-Läufe nutzen den Credential-Key `Softwareschmiede.ClaudeCli.Token` und setzen `ANTHROPIC_API_KEY` für den CLI-Prozess.
 - Agentenpakete müssen für Claude einen `.github`-Ordner enthalten, damit sie als kompatibel gelten.
@@ -268,6 +272,14 @@ Für das Claude-CLI-Plugin kann der API-Key alternativ per `cmdkey` gesetzt werd
 ```powershell
 cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANTHROPIC_API_KEY>
 ```
+
+### Standardplugin je Pluginart konfigurieren
+
+- In **Einstellungen** kann pro Pluginart genau ein Standardplugin gespeichert werden:
+  - `SourceCodeManagement` (z. B. GitHub)
+  - `DevelopmentAutomation` (z. B. GitHub Copilot oder Claude CLI)
+- Die Auswahl wird persistent in den App-Einstellungen gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt.
+- Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin.
 
 ### Arbeitsverzeichnis für lokale Klone
 
@@ -526,6 +538,9 @@ Zuletzt dokumentiert (README-/Doku-Update):
 
 | Dokument | Beschreibung |
 |----------|-------------|
+| [API-Dokumentation (Index)](docs/api/README.md) | Technische Schnittstellen, Plugin-Contracts und Auflösungslogik (inkl. Standardplugin-Mechanik) |
+| [Business-Dokumentation (Index)](docs/business/features.md) | Fachliche Feature-Sicht für Nutzer:innen und Stakeholder (inkl. F014) |
+| [Flow-Dokumentation (Index)](docs/flows/README.md) | Ablaufdiagramme für Services und End-to-End-Prozesse (inkl. Plugin-Default-Flow) |
 | [Anforderungsanalyse](docs/requirements/requirements-analysis.md) | Funktionale und nicht-funktionale Anforderungen, Use Cases, Domänenmodell |
 | [Architektur-Blueprint](docs/architecture/architecture-blueprint.md) | Schichtenarchitektur, Plugin-System, Sequenzdiagramme, Technologieentscheidungen |
 | [Entity-Relationship-Modell](docs/architecture/entity-relationship-model.md) | Datenbankstruktur und Entitäten-Beziehungen |

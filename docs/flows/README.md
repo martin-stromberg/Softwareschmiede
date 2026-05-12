@@ -14,6 +14,9 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 | [KI-Arbeitsprotokoll: Persistierung und Rendering](./ki-arbeitsprotokoll-rendering-flow.md) | `ki-arbeitsprotokoll-rendering-flow.md` | Persistierung des Markdown-Protokolls mit Datumszeile/Schritten sowie sicheres Rendering mit Sanitizing und Fallback |
+| [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
+| [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
+| [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
 
 ---
 
@@ -107,6 +110,27 @@ Beschreibt den Ablauf von der DI-Registrierung bis zur Lazy-Discovery aus `<Prog
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EntwicklungsprozessService`, `ProtokollService`, `AufgabeDetail`
 
 Beschreibt die Ende-zu-Ende-Pipeline vom Erzeugen des Markdown-Protokolls (`# Datum`, `## Schritt n`) über die DB-Persistierung bis zur sicheren HTML-Darstellung in der UI inklusive Sanitizing und `<pre>`-Fallback.
+
+---
+
+### [Ablauf 9: Standardplugin-Auflösung und KI-Plugin-Dispatch](./plugin-default-selection-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EinstellungenBase`, `PluginDefaultSettingsService`, `PluginSelectionService`, `AufgabeDetail`, `KiAusfuehrungsService`, `EntwicklungsprozessService`
+
+Beschreibt den End-to-End-Pfad von der Default-Konfiguration in den Einstellungen bis zur tatsächlichen Prompt-Ausführung mit klarer Auflösungskette (**explizit → Default → Fallback**) und KI-Fallback-Präferenz.
+
+---
+
+### [Ablauf 10: ProjektService – Projektverwaltung und Repository-Zuordnung](./projekt-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `ProjektService`, `ProjektListe`, `ProjektDetail`, `AufgabeService`
+
+Beschreibt die Trennung zwischen Übersichtsaktionen (Neu anlegen) und Einzelaktionen auf der Detailseite (Bearbeiten, Archivieren, Löschen, Repository hinzufügen) inklusive Persistenzpfaden.
+
+---
+
+### [Ablauf 11: AgentPackageFileService – Dateisystemoperationen und Pfadsicherheit](./agent-package-file-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `IAgentPackageFileService`, `AgentenpaketeSeite`
+
+Dokumentiert den vollständigen Datei-/Verzeichnis-Flow für Agentenpakete inklusive `ResolveSafePath`-Guard, Namensvalidierung und rekursivem Dateibaum.
 
 ---
 

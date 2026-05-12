@@ -107,4 +107,6 @@ Klicken Sie auf **Aufgabe abbrechen** und formulieren Sie die Aufgabenbeschreibu
 - [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Ausgelagerte GitHub- und Copilot-Anbindung verstehen
 - [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md) – Agent je Folgeanweisung gezielt wählen
 - [F012 – Kontextsteuerung bei Folgeanweisungen](./F012-kontextsteuerung-folgeanweisungen.md) – Verlauf je Folgeanweisung bewusst mitgeben, ignorieren oder neu beginnen
+- [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – KI-Plugin pro Prompt festlegen
+- [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md) – Vorgehen bei Störungen im Lauf
 - [Zurück zur Übersicht](../features.md)

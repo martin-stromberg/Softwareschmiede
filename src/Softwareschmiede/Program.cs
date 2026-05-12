@@ -43,6 +43,8 @@ namespace Softwareschmiede
             builder.Services.AddScoped<EntwicklungsprozessService>();
             builder.Services.AddScoped<GitOrchestrationService>();
             builder.Services.AddScoped<PluginSettingsService>();
+            builder.Services.AddScoped<PluginDefaultSettingsService>();
+            builder.Services.AddScoped<PluginSelectionService>();
             builder.Services.AddScoped<ArbeitsverzeichnisSettingsService>();
             builder.Services.AddSingleton<KiAusfuehrungsService>();
             builder.Services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());

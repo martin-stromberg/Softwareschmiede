@@ -85,6 +85,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource
         Guid aufgabeId,
         string prompt,
         AgentInfo agent,
+        string? selectedKiPluginPrefix = null,
         string? model = null,
         FolgeanweisungsKontextmodus? kontextmodus = null,
         Action? onStarted = null,
@@ -139,7 +140,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource
             {
                 // Scoped Service im Background-Task-Scope ausführen
                 await foreach (var line in entwicklungsprozessService.KiStartenAsync(
-                    aufgabeId, prompt, agent, model, kontextmodus, session.CancellationToken))
+                    aufgabeId,
+                    prompt,
+                    agent,
+                    selectedKiPluginPrefix,
+                    model,
+                    kontextmodus,
+                    session.CancellationToken))
                 {
                     var hasJustStarted = !session.GetLines().Any();
                     session.AddLine(line);

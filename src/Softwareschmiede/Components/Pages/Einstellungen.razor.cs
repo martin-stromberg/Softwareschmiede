@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
@@ -13,6 +14,7 @@ public class EinstellungenBase : ComponentBase
     protected const string BoolTrue = "true";
     protected const string BoolFalse = "false";
     [Inject] private IPluginManager PluginManager { get; set; } = default!;
+    [Inject] private PluginSelectionService PluginSelection { get; set; } = default!;
     [Inject] private PluginSettingsService PluginSettings { get; set; } = default!;
     [Inject] private ArbeitsverzeichnisSettingsService ArbeitsverzeichnisSettings { get; set; } = default!;
     [Inject] private IArbeitsverzeichnisResolver ArbeitsverzeichnisResolver { get; set; } = default!;
@@ -33,6 +35,15 @@ public class EinstellungenBase : ComponentBase
     protected Dictionary<string, string> _statusMessages = [];
     protected Dictionary<string, bool> _errorFlags = [];
     protected bool _saving;
+    protected IReadOnlyList<IGitPlugin> _sourceCodeManagementPlugins = [];
+    protected IReadOnlyList<IKiPlugin> _developmentAutomationPlugins = [];
+    protected Dictionary<PluginType, string?> _defaultPluginSelections = new()
+    {
+        [PluginType.SourceCodeManagement] = null,
+        [PluginType.DevelopmentAutomation] = null
+    };
+    protected Dictionary<PluginType, string> _defaultPluginStatusMessages = [];
+    protected Dictionary<PluginType, bool> _defaultPluginStatusIsError = [];
     protected string _arbeitsverzeichnisInput = string.Empty;
     protected string? _arbeitsverzeichnisValidationError;
     protected string? _arbeitsverzeichnisStatusMessage;
@@ -44,10 +55,13 @@ public class EinstellungenBase : ComponentBase
     {
         Logger.LogInformation("Einstellungsseite geladen.");
 
-        var allPlugins = PluginSettings.GetAllPlugins(
-            PluginManager.GetSourceCodeManagementPlugins(),
-            PluginManager.GetDevelopmentAutomationPlugins());
+        _sourceCodeManagementPlugins = PluginManager.GetSourceCodeManagementPlugins();
+        _developmentAutomationPlugins = PluginManager.GetDevelopmentAutomationPlugins();
+        var allPlugins = PluginSettings.GetAllPlugins(_sourceCodeManagementPlugins, _developmentAutomationPlugins);
         _plugins = allPlugins.Select(p => new PluginViewModel(p)).ToList();
+
+        await LadeDefaultPluginAuswahlAsync(PluginType.SourceCodeManagement, _sourceCodeManagementPlugins.Select(p => p.PluginPrefix));
+        await LadeDefaultPluginAuswahlAsync(PluginType.DevelopmentAutomation, _developmentAutomationPlugins.Select(p => p.PluginPrefix));
 
         foreach (var plugin in allPlugins)
         {
@@ -73,6 +87,39 @@ public class EinstellungenBase : ComponentBase
             _arbeitsverzeichnisFallbackHinweis =
                 $"Aktuell wird Fallback verwendet ({resolution.ReasonCode}): {Path.Combine(Path.GetTempPath(), "softwareschmiede")}. " +
                 "Bitte Pfad prüfen und neu speichern.";
+        }
+    }
+
+    /// <summary>Speichert das Standardplugin für den angegebenen Plugin-Typ.</summary>
+    protected async Task StandardPluginSpeichernAsync(PluginType pluginType)
+    {
+        _saving = true;
+        _defaultPluginStatusMessages[pluginType] = string.Empty;
+
+        try
+        {
+            var selectedPrefix = _defaultPluginSelections.GetValueOrDefault(pluginType);
+            if (!IstPluginPrefixGueltig(pluginType, selectedPrefix))
+            {
+                _defaultPluginStatusMessages[pluginType] = "Ungültige Plugin-Auswahl für diesen Plugin-Typ.";
+                _defaultPluginStatusIsError[pluginType] = true;
+                return;
+            }
+
+            await PluginSelection.SaveDefaultPluginPrefixAsync(pluginType, selectedPrefix);
+            _defaultPluginStatusMessages[pluginType] = "Standardplugin gespeichert.";
+            _defaultPluginStatusIsError[pluginType] = false;
+            Logger.LogInformation("Standardplugin gespeichert: {PluginType} => {PluginPrefix}", pluginType, selectedPrefix);
+        }
+        catch (Exception ex)
+        {
+            _defaultPluginStatusMessages[pluginType] = $"Fehler beim Speichern: {ex.Message}";
+            _defaultPluginStatusIsError[pluginType] = true;
+            Logger.LogError(ex, "Fehler beim Speichern des Standardplugins für {PluginType}.", pluginType);
+        }
+        finally
+        {
+            _saving = false;
         }
     }
 
@@ -235,5 +282,39 @@ public class EinstellungenBase : ComponentBase
     {
         _arbeitsverzeichnisInput = string.Empty;
         await ArbeitsverzeichnisSpeichernAsync();
+    }
+
+    private async Task LadeDefaultPluginAuswahlAsync(PluginType pluginType, IEnumerable<string> gueltigePluginPrefixe)
+    {
+        var gespeicherterPrefix = await PluginSelection.GetStoredDefaultPluginPrefixAsync(pluginType);
+        var normalized = string.IsNullOrWhiteSpace(gespeicherterPrefix)
+            ? null
+            : gespeicherterPrefix.Trim();
+
+        if (normalized is not null && !gueltigePluginPrefixe.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+        {
+            normalized = null;
+        }
+
+        _defaultPluginSelections[pluginType] = normalized;
+        _defaultPluginStatusMessages[pluginType] = string.Empty;
+        _defaultPluginStatusIsError[pluginType] = false;
+    }
+
+    private bool IstPluginPrefixGueltig(PluginType pluginType, string? pluginPrefix)
+    {
+        if (string.IsNullOrWhiteSpace(pluginPrefix))
+        {
+            return true;
+        }
+
+        return pluginType switch
+        {
+            PluginType.SourceCodeManagement => _sourceCodeManagementPlugins.Any(p =>
+                string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase)),
+            PluginType.DevelopmentAutomation => _developmentAutomationPlugins.Any(p =>
+                string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase)),
+            _ => false
+        };
     }
 }

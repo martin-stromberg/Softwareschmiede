@@ -70,6 +70,9 @@ Im Bereich **📜 Protokoll** der jeweiligen Aufgabe.
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – KI-Läufe im Alltag durchführen
 - [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Integrationen als austauschbare Bausteine verstehen
 - [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md) – je Folgeanweisung den passenden Agenten wählen
+- [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – Claude als Standard oder gezielte Prompt-Auswahl nutzen
+- [F015 – Einstellungen & Persistenz](./F015-einstellungen-und-persistenz.md) – gespeicherte Einstellungen und deren Wirkung
+- [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md) – Vorgehen bei ungültigen Schlüsseln und Laufproblemen
 - [Anforderungsanalyse](../../requirements/requirements-analysis.md) – fachliche Ziele und Rahmenbedingungen
 - [Architektur-Blueprint](../../architecture/architecture-blueprint.md) – Gesamtaufbau der Lösung
 - [Architektur-Review](../../improvements/architecture-review.md) – geprüfte Verbesserungen und Risiken

@@ -1,81 +1,29 @@
 # API-Dokumentation – Softwareschmiede
 
-Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der Softwareschmiede.
+Technische Dokumentation der öffentlichen Schnittstellen und internen API-Contracts.
 
----
+## API-Status (HTTP)
 
-## Dokumentierte Schnittstellen
+Die Softwareschmiede stellt aktuell **keine öffentlichen HTTP-Endpunkte** bereit (keine REST- und keine Minimal-API-Routen).  
+Details: [http-endpoints.md](./http-endpoints.md)
 
-| Dokument | Beschreibung |
+## Dokumentierte API-Bereiche
+
+| Dokument | Kurzbeschreibung |
 |---|---|
-| [plugin-interfaces.md](./plugin-interfaces.md) | Plugin-Entwickler-Dokumentation: `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType` und `PluginManager` – Schnittstellenreferenz, Discovery/DI und Implementierungsanleitungen inkl. unterstützter KI-Plugins `GitHubCopilotPlugin` und `ClaudeCliPlugin` |
-| [workdir-configuration.md](./workdir-configuration.md) | Technische Dokumentation des Features „konfigurierbares Arbeitsverzeichnis“ (Settings, Resolver, Fallback, Klonpfadbildung) |
-| [http-endpoints.md](./http-endpoints.md) | Aktueller Stand der HTTP-Schnittstellen (keine öffentlichen REST-Endpoints) inkl. interner technischer Contracts zu KI-Protokollformat und Rendering |
+| [http-endpoints.md](./http-endpoints.md) | Verbindlicher HTTP-Status: keine öffentlichen Endpunkte, inkl. einheitlicher Dokumentation für Request/Response = *nicht anwendbar*. |
+| [plugin-default-selection.md](./plugin-default-selection.md) | Interner API-Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** beim Prompt und **Fallback**-Regeln. |
+| [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType`, Plugin-Discovery und Implementierungsregeln. |
+| [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
 
-## Feature-Hinweis: Kontextsteuerung bei Folgeanweisungen
+## Feature-Fokus: Standardplugin je Pluginart & KI-Plugin-Auswahl
 
-- **Kein API-Impact auf HTTP-Ebene:** Für das implementierte Feature wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
-- **Interner Contract-Impact (Application-Schicht):** Der Folgeanweisungsfluss nutzt `FolgeanweisungsKontextmodus` (`KontextMitgeben`, `KontextIgnorieren`, `KontextNeuBeginnen`) beim Start eines KI-Laufs.
-- **Plugin-Contract bleibt stabil:** `IKiPlugin.StartDevelopmentAsync(...)` wurde nicht erweitert; die Kontextsteuerung wird vor dem Plugin-Aufruf im Prompt-Building verarbeitet.
-- Details zum HTTP-Status und zur technischen Nachvollziehbarkeit: [http-endpoints.md](./http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen)
-- Details zum unveränderten KI-Plugin-Contract: [plugin-interfaces.md](./plugin-interfaces.md#startdevelopmentasync)
-
-### Referenzdokumente (ohne Inhaltsduplikation)
-
-- Anforderungen: [kontextsteuerung-folgeanweisungen-requirements-analysis.md](../requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md)
-- Architektur: [kontextsteuerung-folgeanweisungen-architecture-blueprint.md](../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md)
-- Architecture Review: [kontextsteuerung-folgeanweisungen-architecture-review.md](../improvements/kontextsteuerung-folgeanweisungen-architecture-review.md)
-- Testplan: [testplan-kontextsteuerung-folgeanweisungen.md](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
-- Testlücken: [testluecken-kontextsteuerung-folgeanweisungen.md](../tests/testluecken-kontextsteuerung-folgeanweisungen.md)
-
----
-
-## Feature-Hinweis: KI-Arbeitsprotokoll als Markdown
-
-- **Kein API-Impact auf HTTP-Ebene:** Es wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
-- **Interner technischer Contract-Impact:** KI-Antworten werden im Protokoll konsistent als Markdown persistiert (`# {Datum}`, `## Schritt n`, inkl. `RunId`) und in der UI als Markdown gerendert.
-- **Rendering-Sicherheitscontract:** Die Webausgabe verwendet Markdown-Rendering mit Sanitizing (`DisableHtml`, Entfernen von Event-Handler-Attributen, Neutralisieren unsicherer URI-Schemata) sowie einen `<pre>`-Fallback bei Fehlern oder leerem Ergebnis.
-- Technische Details: [http-endpoints.md](./http-endpoints.md#feature-impact-ki-arbeitsprotokoll-als-markdown-und-sichere-render-pipeline)
-- Flow-Referenz: [development-process-flow.md – Ablauf 2: KI-Streaming und Protokollierung](../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung)
-- Detaillierter Rendering-Flow: [ki-arbeitsprotokoll-rendering-flow.md](../flows/ki-arbeitsprotokoll-rendering-flow.md)
-- Fachliche Einordnung: [F005 – Aufgabenprotokoll](../business/features/F005-aufgabenprotokoll.md)
-
----
-
-## Feature-Hinweis: Claude-CLI-Integration
-
-- **Kein API-Impact auf HTTP-Ebene:** Es wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
-- **Eindeutig unterstützte KI-Implementierung:** `IKiPlugin` wird produktiv sowohl durch `GitHubCopilotPlugin` als auch durch `ClaudeCliPlugin` umgesetzt.
-- **Contract-Stabilität:** Der Plugin-Vertrag (`IKiPlugin`, insbesondere `StartDevelopmentAsync`) bleibt stabil; provider-spezifische Unterschiede werden in der jeweiligen Plugin-Implementierung gekapselt.
-- **CLI-spezifische Ausführung:** `ClaudeCliPlugin` ruft `claude` mit Agent-/Model-Parametern auf und nutzt `ANTHROPIC_API_KEY` als Umgebungsvariable.
-- Technische Details: [plugin-interfaces.md](./plugin-interfaces.md#3-ikiplugin--schnittstellenreferenz), [http-endpoints.md](./http-endpoints.md#feature-impact-claude-cli-integration)
-
-### Referenzdokumente (Anforderungen/Architektur/Review/Tests)
-
-- Anforderungen: [plugin-klassenbibliotheken-github-und-copilot.md](../requirements/plugin-klassenbibliotheken-github-und-copilot.md)
-- Architektur: [plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md](../architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md)
-- Architecture Review: [plugin-klassenbibliotheken-github-und-copilot-architecture-review.md](../improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md)
-- Testplan: [testplan-claude-cli-integration.md](../tests/testplan-claude-cli-integration.md)
-- Testlücken: [testluecken-claude-cli-integration.md](../tests/testluecken-claude-cli-integration.md)
-
----
-
-## Überblick Plugin-System
-
-Die Softwareschmiede verwendet ein Plugin-System mit zwei fachlichen Schnittstellen und einer gemeinsamen Basis:
-
-- **`IPlugin`** – Gemeinsame Metadaten (`PluginName`, `PluginPrefix`, `PluginType`) und konfigurierbare Settings.
-- **`IGitPlugin`** – Kapselt alle Git-Operationen (Issues laden, Repository klonen, Branches verwalten, Pull Requests erstellen, …). Referenzimplementierung: `GitHubPlugin`.
-- **`IKiPlugin`** – Kapselt die KI-Integration (Agenten verwalten, Entwicklung starten, Tests ausführen, …). Unterstützte Implementierungen: `GitHubCopilotPlugin`, `ClaudeCliPlugin`.
-
-`IPluginManager` wird als **Singleton** registriert und lädt Plugins dynamisch aus dem `plugins`-Ordner.  
-`IGitPlugin` und `IKiPlugin` werden als **Scoped** aus dem Default-Plugin des `PluginManager` aufgelöst.
+- Technischer Contract: [plugin-default-selection.md](./plugin-default-selection.md)
+- Fachliche Einordnung: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)
+- Ablaufdarstellung: [plugin-default-selection-flow.md](../flows/plugin-default-selection-flow.md)
 
 ## Verknüpfte Dokumentation
 
-- Ablaufdiagramm: [Plugin-Discovery und Laden](../flows/plugin-discovery-load-flow.md)
-- Fachliche Sicht: [F010 – Plugin-Prinzip für Integrationen](../business/features/F010-plugin-prinzip-integrationen.md)
-- Testabdeckung: [Testplan Plugin-Klassenbibliotheken](../tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md)
-- HTTP-Schnittstellenstatus: [HTTP-Endpunkte](./http-endpoints.md)
-
-Weitere Informationen: [plugin-interfaces.md](./plugin-interfaces.md)
+- Flows-Index: [docs/flows/README.md](../flows/README.md)
+- Feature-Index: [docs/business/features.md](../business/features.md)
+- Plugin-Prinzip (Business): [F010 – Plugin-Prinzip für Integrationen](../business/features/F010-plugin-prinzip-integrationen.md)
