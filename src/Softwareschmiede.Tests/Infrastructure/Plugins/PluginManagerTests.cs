@@ -38,6 +38,7 @@ public sealed class PluginManagerTests : IDisposable
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHub.dll"), overwrite: true);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
+        File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 
@@ -45,7 +46,9 @@ public sealed class PluginManagerTests : IDisposable
         var kiPlugins = sut.GetDevelopmentAutomationPlugins();
 
         scmPlugins.Should().ContainSingle(p => p.PluginName == "GitHub");
-        kiPlugins.Should().ContainSingle(p => p.PluginName == "GitHub Copilot");
+        kiPlugins.Should().HaveCount(2);
+        kiPlugins.Should().Contain(p => p.PluginName == "GitHub Copilot");
+        kiPlugins.Should().Contain(p => p.PluginName == "Claude CLI");
     }
 
     [Fact]
@@ -71,11 +74,39 @@ public sealed class PluginManagerTests : IDisposable
     }
 
     [Fact]
+    public void GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded()
+    {
+        Directory.CreateDirectory(_tempDirectory);
+        File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
+        File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
+
+        var sut = CreateSut(_tempDirectory);
+
+        var result = sut.GetDefaultDevelopmentAutomationPlugin();
+
+        result.PluginName.Should().Be("GitHub Copilot");
+    }
+
+    [Fact]
+    public void GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded()
+    {
+        Directory.CreateDirectory(_tempDirectory);
+        File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
+
+        var sut = CreateSut(_tempDirectory);
+
+        var result = sut.GetDefaultDevelopmentAutomationPlugin();
+
+        result.PluginName.Should().Be("Claude CLI");
+    }
+
+    [Fact]
     public void GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes()
     {
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHub.dll"), overwrite: true);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
+        File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 
@@ -86,8 +117,8 @@ public sealed class PluginManagerTests : IDisposable
 
         firstCall.Should().HaveCount(1);
         secondCall.Should().HaveCount(1);
-        kiFirst.Should().HaveCount(1);
-        kiSecond.Should().HaveCount(1);
+        kiFirst.Should().HaveCount(2);
+        kiSecond.Should().HaveCount(2);
     }
 
     public void Dispose()

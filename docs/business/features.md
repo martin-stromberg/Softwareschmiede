@@ -19,6 +19,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F010 | Plugin-Prinzip für Integrationen | GitHub und Copilot laufen als ausgelagerte Plugins mit automatischer Erkennung | [F010 – Plugin-Prinzip für Integrationen](./features/F010-plugin-prinzip-integrationen.md) |
 | F011 | Agent-Auswahl bei Folgeanweisungen | Bei jeder Folgeanweisung den passenden Agenten wählen und sicher senden | [F011 – Agent-Auswahl bei Folgeanweisungen](./features/F011-agent-auswahl-bei-folgeanweisungen.md) |
 | F012 | Kontextsteuerung bei Folgeanweisungen | Pro Folgeanweisung festlegen, ob bisheriger Kontext mitgegeben, ignoriert oder neu gestartet wird | [F012 – Kontextsteuerung bei Folgeanweisungen](./features/F012-kontextsteuerung-folgeanweisungen.md) |
+| F013 | Claude-CLI-Integration | Claude CLI in den Einstellungen hinterlegen und für KI-Läufe nutzen | [F013 – Claude-CLI-Integration](./features/F013-claude-cli-integration.md) |
 
 ---
 

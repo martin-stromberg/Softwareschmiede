@@ -24,7 +24,7 @@ Das System definiert zwei Plugin-Schnittstellen:
 | Schnittstelle | Zweck | Referenzimplementierung |
 |---|---|---|
 | `IGitPlugin` | Git-Operationen (Issues, Clone, Branch, Push, PR, …) | `GitHubPlugin` |
-| `IKiPlugin` | KI-Integration (Agenten, Entwicklung, Tests) | `GitHubCopilotPlugin` |
+| `IKiPlugin` | KI-Integration (Agenten, Entwicklung, Tests) | `GitHubCopilotPlugin`, `ClaudeCliPlugin` |
 
 **Dateipfade der Verträge (Contracts):**
 - `src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IPlugin.cs`
@@ -35,11 +35,21 @@ Das System definiert zwei Plugin-Schnittstellen:
 **Dateipfade der Referenzimplementierungen (Plugin-Projekte):**
 - `plugins/Softwareschmiede.Plugin.GitHub/GitHubPlugin.cs`
 - `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs`
+- `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs`
 
 **Plugin-Discovery & DI:**
 - `IPluginManager` wird als **Singleton** registriert und lädt Plugin-DLLs dynamisch aus `<AppBase>/plugins`.
 - `IGitPlugin` und `IKiPlugin` werden als **Scoped** über den `PluginManager` auf die Default-Plugins aufgelöst.
 - Die Zuordnung erfolgt über `IPlugin.PluginType` (`SourceCodeManagement`, `DevelopmentAutomation`).
+
+### Unterstützte KI-Plugin-Implementierungen (Stand: claude-cli-integration)
+
+| Implementierung | PluginName | CLI-Binary | Env-Variable für Token | Quellcode |
+|---|---|---|---|---|
+| `GitHubCopilotPlugin` | `GitHub Copilot` | `copilot` | `GH_TOKEN` | `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs` |
+| `ClaudeCliPlugin` | `Claude CLI` | `claude` | `ANTHROPIC_API_KEY` | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` |
+
+**Hinweis:** Beide Implementierungen erfüllen denselben `IKiPlugin`-Contract. Provider-spezifische Unterschiede (CLI-Parameter, Token-Variable, Health-Check) sind ausschließlich Implementierungsdetails.
 
 ---
 
@@ -367,7 +377,7 @@ string PluginName { get; }
 | Element | Details |
 |---|---|
 | Typ | `string` |
-| Beispielwert | `"GitHub Copilot"`, `"Claude"`, `"OpenAI"` |
+| Beispielwert | `"GitHub Copilot"`, `"Claude CLI"`, `"OpenAI"` |
 
 ---
 
@@ -448,6 +458,7 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
     string prompt,
     AgentInfo agent,
     string localRepoPath,
+    string? model = null,
     CancellationToken ct = default);
 ```
 
@@ -460,6 +471,7 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 | `prompt` | `string` | *(required)* | Aufgabenbeschreibung / Entwicklungsauftrag für den Agenten |
 | `agent` | `AgentInfo` | *(required)* | Der zu verwendende Agent (aus [`GetAvailableAgentsAsync`](#getavailableagentsasync)) |
 | `localRepoPath` | `string` | *(required)* | Absoluter Pfad zum lokalen Repository, in dem entwickelt werden soll |
+| `model` | `string?` | optional | Optionales Modell-Override. Bei `null` verwenden die CLI-Implementierungen den Wert `auto`. |
 | `ct` | `CancellationToken` | optional | Abbruch-Token – bricht den Stream ab |
 
 **Rückgabewert:** `IAsyncEnumerable<string>` – Sequenz von Textfragmenten (Streaming-Ausgabe des KI-Systems).
@@ -471,10 +483,15 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 - HTTP-Status zum Feature: [http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen](./http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen)
 - Architektur- und Testreferenzen: [Kontextsteuerung-Blueprint](../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md), [Testplan](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
 
+**Feature-Hinweis „claude-cli-integration“:**
+- `ClaudeCliPlugin` ist als zusätzliche produktive `IKiPlugin`-Implementierung verfügbar, ohne Änderung des Contracts.
+- API-Status auf HTTP-Ebene: [http-endpoints.md#feature-impact-claude-cli-integration](./http-endpoints.md#feature-impact-claude-cli-integration)
+- Verknüpfte Nachweise: [Anforderungen](../requirements/plugin-klassenbibliotheken-github-und-copilot.md), [Architektur](../architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md), [Review](../improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md), [Testplan](../tests/testplan-claude-cli-integration.md), [Testlücken](../tests/testluecken-claude-cli-integration.md)
+
 **Streaming-Verwendung:**
 
 ```csharp
-await foreach (var fragment in kiPlugin.StartDevelopmentAsync(prompt, agent, repoPath, ct))
+await foreach (var fragment in kiPlugin.StartDevelopmentAsync(prompt, agent, repoPath, model: null, ct: ct))
 {
     Console.Write(fragment); // Schrittweise Ausgabe in der UI
 }
@@ -734,11 +751,11 @@ und in den Copy-Targets ein zusätzlicher Artefakt-Eintrag, damit die DLL nach `
 
 ## 5. Neues KI-Plugin implementieren
 
-Dieser Abschnitt zeigt, wie ein neues KI-Plugin implementiert wird – am Beispiel eines hypothetischen **ClaudePlugin**.
+Dieser Abschnitt zeigt die Implementierung eines KI-Plugins – am Beispiel des **ClaudeCliPlugin** (CLI-basiert, produktiv unterstützt).
 
 ### Schritt 1: Neue Klasse erstellen
 
-Erstelle ein neues Plugin-Projekt unter `plugins/Softwareschmiede.Plugin.Claude/` und darin die Plugin-Klasse.
+Erstelle ein neues Plugin-Projekt unter `plugins/Softwareschmiede.Plugin.ClaudeCli/` und darin die Plugin-Klasse.
 
 ```csharp
 using Softwareschmiede.Domain.Interfaces;
@@ -748,26 +765,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
 
-public sealed class ClaudePlugin : IKiPlugin
+public sealed class ClaudeCliPlugin : IKiPlugin
 {
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
-    private readonly ILogger<ClaudePlugin> _logger;
+    private readonly ILogger<ClaudeCliPlugin> _logger;
 
-    private const string CredentialKey = "Softwareschmiede.Claude.Token";
+    private const string CredentialKey = "Softwareschmiede.ClaudeCli.Token";
 
-    public ClaudePlugin(
+    public ClaudeCliPlugin(
         ICliRunner cliRunner,
         ICredentialStore credentialStore,
-        ILogger<ClaudePlugin> logger)
+        ILogger<ClaudeCliPlugin> logger)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
     }
 
-    public string PluginName => "Claude";
-    public string PluginPrefix => "Softwareschmiede.Claude";
+    public string PluginName => "Claude CLI";
+    public string PluginPrefix => "Softwareschmiede.ClaudeCli";
     public PluginType PluginType => PluginType.DevelopmentAutomation;
 
     // ... (weitere Methoden, siehe unten)
@@ -865,6 +882,7 @@ public async IAsyncEnumerable<string> StartDevelopmentAsync(
     string prompt,
     AgentInfo agent,
     string localRepoPath,
+    string? model = null,
     [EnumeratorCancellation] CancellationToken ct = default)
 {
     var token = _credentialStore.GetCredential(CredentialKey)
@@ -877,7 +895,7 @@ public async IAsyncEnumerable<string> StartDevelopmentAsync(
         "Starte Entwicklung mit Agent '{Agent}' in {RepoPath}",
         agent.Name, localRepoPath);
 
-    // Beispiel: Claude CLI oder API-Stream aufrufen
+    // Beispiel: Claude CLI-Stream aufrufen
     // Der Stream liefert die Ausgabe Fragment für Fragment
     await foreach (var fragment in _cliRunner.StreamAsync(
         "claude",

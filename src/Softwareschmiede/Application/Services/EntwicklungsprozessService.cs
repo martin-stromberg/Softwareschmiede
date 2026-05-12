@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -175,7 +176,7 @@ public sealed class EntwicklungsprozessService
 
         var runId = Guid.NewGuid();
         var finalPrompt = prompt;
-        var contextFilePath = Path.Combine(aufgabe.LokalerKlonPfad, $"{aufgabeId}.copilot.context.md");
+        var contextFilePath = ResolveContextFilePath(aufgabe.LokalerKlonPfad, aufgabeId);
 
         if (kontextmodus is not null)
         {
@@ -553,6 +554,16 @@ public sealed class EntwicklungsprozessService
         }
 
         return $"{context.TrimEnd()}\n\n---\n\n{userPrompt}";
+    }
+
+    private string ResolveContextFilePath(string localRepoPath, Guid aufgabeId)
+    {
+        if (_kiPlugin is CliKiPluginBase cliKiPlugin)
+        {
+            return cliKiPlugin.BuildContextFilePath(localRepoPath, aufgabeId);
+        }
+
+        return Path.Combine(localRepoPath, $"{aufgabeId}.copilot.context.md");
     }
 
     private async Task<string> EnsureContextWithinLimitsAsync(

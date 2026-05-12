@@ -16,7 +16,7 @@ Referenz: `src/Softwareschmiede/Program.cs`
 
 - Es gibt aktuell kein `src/ReceiptScanner.Api/Endpoints/` und kein alternatives Endpunkt-Verzeichnis in `src/`.
 - Die technische API-Dokumentation fokussiert daher auf:
-  - Plugin-Schnittstellen (`IPlugin`, `IGitPlugin`, `IKiPlugin`)
+  - Plugin-Schnittstellen (`IPlugin`, `IGitPlugin`, `IKiPlugin`) inkl. unterstützter KI-Provider (`GitHubCopilotPlugin`, `ClaudeCliPlugin`)
   - Infrastruktur-Verträge und Laufzeitverhalten (z. B. Workdir-Resolution)
 
 ## Feature-Impact: Kontextsteuerung bei Folgeanweisungen
@@ -74,6 +74,37 @@ Das Feature wurde in Application-Service und Blazor-Seite umgesetzt, ohne neue o
 - Ablaufübersicht: [`../flows/README.md`](../flows/README.md)
 - Technischer Ablauf (KI-Streaming/Protokollierung): [`../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung`](../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung)
 - Detaillierter Rendering-Flow: [`../flows/ki-arbeitsprotokoll-rendering-flow.md`](../flows/ki-arbeitsprotokoll-rendering-flow.md)
+
+## Feature-Impact: Claude-CLI-Integration
+
+**Ergebnis:** **kein API-Impact** auf öffentliche HTTP-Schnittstellen, aber **klarer interner Contract- und Provider-Impact** auf der `IKiPlugin`-Implementierungsebene.
+
+Die Integration wurde als zusätzliches Development-Automation-Plugin umgesetzt, ohne neue oder geänderte öffentliche HTTP-Endpunkte.
+
+### API-relevante Umsetzung (ohne HTTP-Änderung)
+
+| Bereich | Status | Umsetzung / Referenz |
+|---|---|---|
+| Zusätzliche produktive `IKiPlugin`-Implementierung | Erfüllt | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` (`PluginName = "Claude CLI"`, `PluginPrefix = "Softwareschmiede.ClaudeCli"`) |
+| Contract-Stabilität trotz Provider-Erweiterung | Erfüllt | `src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IKiPlugin.cs` (Signatur bleibt kompatibel, inkl. optionalem `model`) |
+| Agent-Discovery/Deploy über `.github`-Suchroot | Erfüllt | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` (`GetAvailableAgentsAsync`, `DeployAgentPackageAsync`) |
+| Streaming-Ausführung über `claude` CLI | Erfüllt | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` (`StartDevelopmentAsync`, `BuildClaudeArgs`) |
+| Health-Check und Testausführung provider-spezifisch | Erfüllt | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` (`CheckHealthAsync`, `RunTestsAsync`) |
+
+### Interner technischer Contract (Kurzform)
+
+- **Provider-Austauschbarkeit:** `EntwicklungsprozessService` konsumiert weiterhin nur `IKiPlugin`; die konkrete Auswahl erfolgt über `PluginManager`.
+- **CLI-Sicherheits-/Konfigurationsvertrag:** Authentifizierung läuft über `ANTHROPIC_API_KEY` (Credential-Store-basiert), nicht als Klartext-CLI-Argument.
+- **HTTP-Vertrag unverändert:** Routing bleibt auf `MapRazorComponents<App>()`; keine öffentliche API-Route hinzugefügt.
+
+### Verknüpfte Dokumentation
+
+- Anforderungen: [`../requirements/plugin-klassenbibliotheken-github-und-copilot.md`](../requirements/plugin-klassenbibliotheken-github-und-copilot.md)
+- Architektur: [`../architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md`](../architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md)
+- Architektur-Review: [`../improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md`](../improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md)
+- Testplan: [`../tests/testplan-claude-cli-integration.md`](../tests/testplan-claude-cli-integration.md)
+- Testlücken: [`../tests/testluecken-claude-cli-integration.md`](../tests/testluecken-claude-cli-integration.md)
+- Plugin-Contract-Referenz: [`./plugin-interfaces.md`](./plugin-interfaces.md)
 
 ## Nächste Erweiterung
 

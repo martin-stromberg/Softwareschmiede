@@ -7,67 +7,53 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
 
-/// <summary>
-/// GitHub Copilot Plugin – nutzt das <c>copilot</c>-CLI für KI-gestützte Entwicklung.
-/// Der Prozess läuft im Repository-Verzeichnis, sodass der Agent Dateien direkt anlegen und ändern kann.
-/// Die Agent-Datei wird als Kontext-Präambel an den Prompt angehängt.
-/// </summary>
-public sealed class GitHubCopilotPlugin : CliKiPluginBase
+/// <summary>Claude-CLI Plugin für KI-gestützte Entwicklung.</summary>
+public sealed class ClaudeCliPlugin : CliKiPluginBase
 {
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
-    private readonly ILogger<GitHubCopilotPlugin> _logger;
+    private readonly ILogger<ClaudeCliPlugin> _logger;
 
-    /// <inheritdoc/>
-    public override string PluginName => "GitHub Copilot";
-
-    /// <inheritdoc/>
-    public override string ProviderDateiPraefix => "copilot";
-
-    /// <inheritdoc/>
-    public override string PluginPrefix => "Softwareschmiede.GitHubCopilot";
-
-    /// <inheritdoc/>
+    public override string PluginName => "Claude CLI";
+    public override string ProviderDateiPraefix => "claude";
+    public override string PluginPrefix => "Softwareschmiede.ClaudeCli";
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
-    /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
     [
         new PluginSettingGroup("Authentifizierung",
         [
             new PluginSettingField(
                 Key: "Token",
-                Label: "GitHub Token",
+                Label: "Anthropic API Key",
                 FieldType: PluginSettingFieldType.Secret,
-                Placeholder: "ghp_...",
-                Description: "GitHub Personal Access Token. Wird als GH_TOKEN-Umgebungsvariable an das copilot-CLI übergeben.",
+                Placeholder: "sk-ant-...",
+                Description: "Anthropic API Key. Wird als ANTHROPIC_API_KEY-Umgebungsvariable an das claude-CLI übergeben.",
                 IsRequired: false)
         ])
     ];
 
-    /// <summary>Erstellt eine neue Instanz des <see cref="GitHubCopilotPlugin"/>.</summary>
-    public GitHubCopilotPlugin(
+    public ClaudeCliPlugin(
         ICliRunner cliRunner,
         ICredentialStore credentialStore,
-        ILogger<GitHubCopilotPlugin> logger)
+        ILogger<ClaudeCliPlugin> logger)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
     }
 
-    private IDictionary<string, string> GetGhEnvironment()
+    private IDictionary<string, string> GetClaudeEnvironment()
     {
-        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        var token = _credentialStore.GetCredential("Softwareschmiede.ClaudeCli.Token");
         var env = new Dictionary<string, string>();
         if (!string.IsNullOrEmpty(token))
         {
-            env["GH_TOKEN"] = token;
+            env["ANTHROPIC_API_KEY"] = token;
         }
         return env;
     }
 
-    /// <inheritdoc/>
     public override Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default)
     {
         _logger.LogInformation("Lese Agenten aus Paket {PackagePath}.", agentPackagePath);
@@ -93,7 +79,6 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         return Task.FromResult<IEnumerable<AgentInfo>>(agents);
     }
 
-    /// <inheritdoc/>
     public override Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default)
     {
         _logger.LogInformation("Prufe Kompatibilitat des Agentenpakets {PackagePath}.", agentPackagePath);
@@ -110,14 +95,13 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         if (!compatible)
         {
             _logger.LogWarning(
-                "Agentenpaket {PackagePath} ist nicht kompatibel mit GitHub Copilot: Kein '.github'-Ordner gefunden.",
+                "Agentenpaket {PackagePath} ist nicht kompatibel mit Claude CLI: Kein '.github'-Ordner gefunden.",
                 agentPackagePath);
         }
 
         return Task.FromResult(compatible);
     }
 
-    /// <inheritdoc/>
     public override async Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Deploye Agentenpaket {PackagePath} nach {RepoPath}.", agentPackagePath, localRepoPath);
@@ -147,7 +131,6 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         _logger.LogInformation("Agentenpaket '.github'-Ordner erfolgreich nach {TargetDir} deployed.", githubTargetDir);
     }
 
-    /// <inheritdoc/>
     public override async IAsyncEnumerable<string> StartDevelopmentAsync(
         string prompt,
         AgentInfo agent,
@@ -160,34 +143,19 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         var promptFile = BuildTaskFilePath(localRepoPath, Guid.NewGuid());
         await File.WriteAllTextAsync(promptFile, prompt, ct);
 
-        var args = BuildCopilotArgs(promptFile, agent, model);
-        var env = GetGhEnvironment();
+        var args = BuildClaudeArgs(promptFile, agent, model);
+        var env = GetClaudeEnvironment();
 
-        _logger.LogInformation("Rufe copilot CLI mit Agent {AgentName} auf.", agent.Name);
+        _logger.LogInformation("Rufe claude CLI mit Agent {AgentName} auf.", agent.Name);
 
-        await foreach (var line in _cliRunner.StreamAsync("copilot", args, localRepoPath, env, ct))
+        await foreach (var line in _cliRunner.StreamAsync("claude", args, localRepoPath, env, ct))
         {
             yield return line;
         }
     }
 
-    /// <summary>
-    /// Baut die Argument-Liste für den <c>copilot</c>-CLI-Aufruf zusammen.
-    /// <para>
-    /// Der Prompt wird als Dateireferenz übergeben (<c>@pfad</c>), damit Zeilenumbrüche
-    /// und beliebige Länge kein Problem für den Konsolenaufruf darstellen.
-    /// Für den nicht-interaktiven Skript-Modus sind folgende Flags erforderlich:
-    /// <list type="bullet">
-    ///   <item><c>--allow-all-tools</c> – alle Tool-Aufrufe ohne Bestätigung (Pflicht im Skript-Modus, sonst Exit-Code 1)</item>
-    ///   <item><c>--allow-all-paths</c> – Dateizugriff auf beliebige Pfade</item>
-    ///   <item><c>--no-ask-user</c> – deaktiviert Rückfragen, Agent arbeitet autonom</item>
-    ///   <item><c>--silent</c> – unterdrückt Statistik-Ausgaben, liefert nur die Agenten-Antwort</item>
-    /// </list>
-    /// </para>
-    /// </summary>
-    private static IEnumerable<string> BuildCopilotArgs(string promptFilePath, AgentInfo agent, string? model)
+    private static IEnumerable<string> BuildClaudeArgs(string promptFilePath, AgentInfo agent, string? model)
     {
-        // @<pfad> lässt copilot den Prompt aus der Datei lesen
         var args = new List<string>
         {
             "--prompt", $"@{promptFilePath}",
@@ -202,7 +170,6 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
             args.AddRange(["--agent", agent.Name]);
         }
 
-        // Kein --model-Flag → GitHub wählt automatisch das passende Modell
         if (!string.IsNullOrWhiteSpace(model))
         {
             args.AddRange(["--model", model]);
@@ -215,7 +182,6 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         return args;
     }
 
-    /// <inheritdoc/>
     public override async Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Fuhre Tests in {RepoPath} aus.", localRepoPath);
@@ -262,11 +228,10 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         return results;
     }
 
-    /// <inheritdoc/>
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
-        _logger.LogInformation("Prufe GitHub-Copilot-Plugin-Health.");
-        var result = await _cliRunner.RunAsync("copilot", ["--version"], null, null, ct);
+        _logger.LogInformation("Prufe Claude-CLI-Plugin-Health.");
+        var result = await _cliRunner.RunAsync("claude", ["--version"], null, null, ct);
         return result.IsSuccess;
     }
 

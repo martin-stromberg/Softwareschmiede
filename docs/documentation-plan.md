@@ -1,74 +1,85 @@
-# Dokumentationsplan – KI-Arbeitsprotokoll als Markdown (2026-05-11)
+# Dokumentationsplan – Vollständige Aktualisierung (claude-cli-integration) – 2026-05-12
 
 ## Phase 1 – Analyse
 
 ### API-Dokumentation (`docs/api/`)
-- `docs/api/` ist vorhanden und beschreibt Plugin-Schnittstellen sowie den Status ohne öffentliche HTTP-Endpunkte.
-- Für das umgesetzte Feature wurden keine REST-Endpunkte ergänzt.
-- Lücke: Explizite technische Einordnung des neuen Protokollformats (Markdown mit Datumszeile, Schritttrennung, Rendering-Sanitizing-Fallback) in der API-Dokumentation ist noch nicht konsistent verankert.
+- `docs/api/` existiert und ist grundsätzlich konsistent.
+- Öffentliche HTTP-Endpunkte sind weiterhin nicht vorhanden; die API-Dokumentation fokussiert korrekt auf Plugin-Verträge.
+- Lücke: Claude-CLI-Integration soll in den API-nahen Plugin-Dokumenten explizit als unterstützte KI-Plugin-Implementierung referenziert werden.
 
 ### Flow-Dokumentation (`docs/flows/`)
-- Vorhandene Flows decken Entwicklungsprozess, Kontextsteuerung, Plugin-Discovery und Workdir ab.
-- Lücke: Es fehlt ein dedizierter Ablaufplan für die Rendering-Pipeline des KI-Arbeitsprotokolls (Persistierung → Markdown-Render → Sanitizing → Fallback).
+- `docs/flows/` existiert mit mehreren Kernabläufen.
+- Lücken:
+  - Kein dedizierter Ablauf für `AufgabeService`-Statusübergänge.
+  - Kein dedizierter Ablauf für `AutoShutdownOrchestrator`.
+  - Kein dedizierter Ablauf für `PluginSettingsService`.
+  - Claude-CLI-Ausführung soll in den KI-relevanten Flows explizit sichtbar sein.
 
 ### Business-Dokumentation (`docs/business/`)
-- Funktionsübersicht und Feature-Seiten F001–F012 sind vorhanden.
-- Lücke: In `F005-aufgabenprotokoll.md` fehlt die verständliche Beschreibung des strukturierten Markdown-Formats inkl. Datumszeile, Schritttrennung und sicherer Webdarstellung.
+- `docs/business/features/` enthält F001–F012.
+- Lücken:
+  - Keine eigene fachliche Feature-Seite für `claude-cli-integration`.
+  - Plugin-Einstellungen/Konfiguration sind fachlich nicht vollständig beschrieben.
+  - Benutzerleitfaden benötigt Ergänzung zur Nutzung/Einrichtung von Claude CLI.
 
 ### README (`README.md`)
-- README ist umfangreich und enthält bereits Struktur zu Features, Architektur, Tests und Changelog.
-- Lücke: Das neu umgesetzte Protokoll-Feature ist im Feature-/Doku-Teil noch nicht ausdrücklich und vollständig beschrieben.
-
-### Einbezogene Referenzartefakte
-- Implementierung:
-  - `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs`
-  - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs`
-- Tests:
-  - `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
-  - `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
+- Struktur ist vorhanden, aber `claude-cli-integration` ist unvollständig bzw. nicht durchgängig eingebunden.
+- Lücken betreffen insbesondere Features, Voraussetzungen, Konfiguration, Projektstruktur, Roadmap und Dokumentationsverweise auf Testartefakte.
 
 ## Phase 1 – Priorisierter Ausführungsplan
 
-### Zu erstellen
-1. `docs/flows/ki-arbeitsprotokoll-rendering-flow.md`
+### Neu zu erstellen
+1. `docs/business/features/F013-claude-cli-integration.md`
+2. `docs/flows/aufgabe-service-status-flow.md`
+3. `docs/flows/auto-shutdown-orchestrator-flow.md`
+4. `docs/flows/plugin-settings-service-flow.md`
 
 ### Zu aktualisieren
-1. `docs/api/README.md`
-2. `docs/api/http-endpoints.md`
-3. `docs/business/features/F005-aufgabenprotokoll.md`
-4. `docs/flows/README.md`
-5. `README.md`
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/plugin-interfaces.md`
+4. `docs/api/http-endpoints.md`
+5. `docs/flows/README.md`
+6. `docs/flows/follow-up-context-steering-flow.md`
+7. `docs/business/features.md`
+8. `docs/user-guide.md`
 
 ### Priorität
-1. **Hoch:** `docs/business/features/F005-aufgabenprotokoll.md`, `docs/flows/ki-arbeitsprotokoll-rendering-flow.md`
-2. **Mittel:** `README.md`, `docs/flows/README.md`
-3. **Mittel:** `docs/api/README.md`, `docs/api/http-endpoints.md`
+1. **Hoch:** README, `F013-claude-cli-integration.md`, `docs/business/features.md`
+2. **Hoch:** KI-/Plugin-Flows inkl. Claude-CLI-Bezug
+3. **Mittel:** API-Docs-Abgleich/Verweise
+4. **Mittel:** User-Guide-Ergänzungen
 
 ### Leitplanken
 - Bestehende Dokumentation nicht löschen, nur ergänzen/aktualisieren.
-- Keine Duplikation von Quellcode; stattdessen strukturierte, wartbare Referenzdoku mit gezielten Dateiverweisen.
-- Konsistente Terminologie: „KI-Arbeitsprotokoll“, „Markdown-Rendering“, „Sanitizing“, „Fallback“.
+- Fokus auf konsistente End-to-End-Dokumentation des Features `claude-cli-integration`.
+- Querverweise zwischen `docs/requirements/`, `docs/architecture/`, `docs/improvements/`, `docs/tests/` herstellen.
 
 ## Ergebnis (Phase 3)
 
-### Erstellt
-1. `docs/flows/ki-arbeitsprotokoll-rendering-flow.md`
+### Neu erstellt
+1. `docs/business/features/F013-claude-cli-integration.md`
+2. `docs/flows/aufgabe-service-status-flow.md`
+3. `docs/flows/auto-shutdown-orchestrator-flow.md`
+4. `docs/flows/plugin-settings-service-flow.md`
 
 ### Aktualisiert
-1. `docs/api/README.md`
-2. `docs/api/http-endpoints.md`
-3. `docs/business/features/F005-aufgabenprotokoll.md`
-4. `docs/flows/README.md`
-5. `README.md`
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/plugin-interfaces.md`
+4. `docs/api/http-endpoints.md`
+5. `docs/flows/README.md`
+6. `docs/flows/follow-up-context-steering-flow.md`
+7. `docs/business/features.md`
+8. `docs/user-guide.md`
 
 ### Validierung
-- Alle geplanten Artefakte existieren und sind nicht leer.
-- Querverweise zwischen API-, Flow-, Business- und README-Dokumentation sind gesetzt.
-- Repository-Validierung ausgeführt:
+- Alle im Plan geforderten Zielartefakte wurden auf Existenz und Nicht-Leerheit geprüft.
+- Build-/Testlauf wurde gestartet:
   - `dotnet build .\Softwareschmiede.slnx --nologo`
   - `dotnet test .\Softwareschmiede.slnx --nologo --verbosity minimal`
-- Ergebnis der technischen Validierung: fehlgeschlagen aufgrund vorbestehender, dokumentationsunabhängiger Compilerfehler im aktuellen Codebestand (u. a. fehlende Typen/Namespaces wie `IGitPlugin`, `IKiPlugin`, `AgentInfo`, `ICliRunner`).
+- Der Lauf blieb in der Umgebung bei `Softwareschmiede.IntegrationTests net10.0 / IncludeTransitiveProjectReferences` ohne Abschluss hängen und wurde nach Wartezeit beendet.
 
 ### Offene Punkte
-- Für das dokumentierte Feature „KI-Arbeitsprotokoll als Markdown“ bestehen in den Zielartefakten keine offenen Dokumentationslücken.
-- Technische Build-Probleme sind separat im Code-Track zu beheben.
+- Inhaltlich sind die geplanten Dokumentationslücken für `claude-cli-integration` geschlossen.
+- Technische Build-/Test-Stabilisierung in der aktuellen Arbeitskopie bleibt separat zu klären.

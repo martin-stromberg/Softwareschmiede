@@ -8,7 +8,7 @@ Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der So
 
 | Dokument | Beschreibung |
 |---|---|
-| [plugin-interfaces.md](./plugin-interfaces.md) | Plugin-Entwickler-Dokumentation: `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType` und `PluginManager` – Schnittstellenreferenz, Discovery/DI und Implementierungsanleitungen |
+| [plugin-interfaces.md](./plugin-interfaces.md) | Plugin-Entwickler-Dokumentation: `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType` und `PluginManager` – Schnittstellenreferenz, Discovery/DI und Implementierungsanleitungen inkl. unterstützter KI-Plugins `GitHubCopilotPlugin` und `ClaudeCliPlugin` |
 | [workdir-configuration.md](./workdir-configuration.md) | Technische Dokumentation des Features „konfigurierbares Arbeitsverzeichnis“ (Settings, Resolver, Fallback, Klonpfadbildung) |
 | [http-endpoints.md](./http-endpoints.md) | Aktueller Stand der HTTP-Schnittstellen (keine öffentlichen REST-Endpoints) inkl. interner technischer Contracts zu KI-Protokollformat und Rendering |
 
@@ -42,13 +42,31 @@ Technische Dokumentation der öffentlichen Schnittstellen und Plugin-APIs der So
 
 ---
 
+## Feature-Hinweis: Claude-CLI-Integration
+
+- **Kein API-Impact auf HTTP-Ebene:** Es wurden keine öffentlichen REST-/Minimal-API-Endpunkte ergänzt oder geändert.
+- **Eindeutig unterstützte KI-Implementierung:** `IKiPlugin` wird produktiv sowohl durch `GitHubCopilotPlugin` als auch durch `ClaudeCliPlugin` umgesetzt.
+- **Contract-Stabilität:** Der Plugin-Vertrag (`IKiPlugin`, insbesondere `StartDevelopmentAsync`) bleibt stabil; provider-spezifische Unterschiede werden in der jeweiligen Plugin-Implementierung gekapselt.
+- **CLI-spezifische Ausführung:** `ClaudeCliPlugin` ruft `claude` mit Agent-/Model-Parametern auf und nutzt `ANTHROPIC_API_KEY` als Umgebungsvariable.
+- Technische Details: [plugin-interfaces.md](./plugin-interfaces.md#3-ikiplugin--schnittstellenreferenz), [http-endpoints.md](./http-endpoints.md#feature-impact-claude-cli-integration)
+
+### Referenzdokumente (Anforderungen/Architektur/Review/Tests)
+
+- Anforderungen: [plugin-klassenbibliotheken-github-und-copilot.md](../requirements/plugin-klassenbibliotheken-github-und-copilot.md)
+- Architektur: [plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md](../architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md)
+- Architecture Review: [plugin-klassenbibliotheken-github-und-copilot-architecture-review.md](../improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md)
+- Testplan: [testplan-claude-cli-integration.md](../tests/testplan-claude-cli-integration.md)
+- Testlücken: [testluecken-claude-cli-integration.md](../tests/testluecken-claude-cli-integration.md)
+
+---
+
 ## Überblick Plugin-System
 
 Die Softwareschmiede verwendet ein Plugin-System mit zwei fachlichen Schnittstellen und einer gemeinsamen Basis:
 
 - **`IPlugin`** – Gemeinsame Metadaten (`PluginName`, `PluginPrefix`, `PluginType`) und konfigurierbare Settings.
 - **`IGitPlugin`** – Kapselt alle Git-Operationen (Issues laden, Repository klonen, Branches verwalten, Pull Requests erstellen, …). Referenzimplementierung: `GitHubPlugin`.
-- **`IKiPlugin`** – Kapselt die KI-Integration (Agenten verwalten, Entwicklung starten, Tests ausführen, …). Referenzimplementierung: `GitHubCopilotPlugin`.
+- **`IKiPlugin`** – Kapselt die KI-Integration (Agenten verwalten, Entwicklung starten, Tests ausführen, …). Unterstützte Implementierungen: `GitHubCopilotPlugin`, `ClaudeCliPlugin`.
 
 `IPluginManager` wird als **Singleton** registriert und lädt Plugins dynamisch aus dem `plugins`-Ordner.  
 `IGitPlugin` und `IKiPlugin` werden als **Scoped** aus dem Default-Plugin des `PluginManager` aufgelöst.

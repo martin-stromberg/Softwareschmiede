@@ -23,6 +23,7 @@
     <ItemGroup>
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\$(TargetFramework)\*.dll" />
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\$(TargetFramework)\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins" />
     <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(OutDir)plugins" SkipUnchangedFiles="true" />
@@ -32,6 +33,7 @@
     <ItemGroup>
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\$(TargetFramework)\*.dll" />
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\$(TargetFramework)\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(PublishDir)plugins" />
     <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(PublishDir)plugins" SkipUnchangedFiles="true" />
