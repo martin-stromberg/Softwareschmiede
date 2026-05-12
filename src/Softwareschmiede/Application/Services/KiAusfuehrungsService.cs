@@ -248,11 +248,7 @@ internal sealed class KiSession : IDisposable
     {
         var now = _nowProvider();
         List<Action<string>> subscribers;
-<<<<<<< task/ed190ee52bfa4a55b8e0a1eb3795d58b-shutdown-bei-abschluss
         List<string> additionalLines = new();
-=======
-        List<string> additionalLines = new List<string>();
->>>>>>> main
         lock (_lock)
         {
             if (_lastLineAt is null || now - _lastLineAt >= BlockPause)
