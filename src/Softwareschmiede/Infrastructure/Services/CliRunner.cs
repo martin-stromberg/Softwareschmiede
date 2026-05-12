@@ -68,9 +68,18 @@ public sealed class CliRunner : ICliRunner
     {
         _logger.LogInformation("Starte CLI-Streaming: {Command}", command);
 
-        var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleWriter = true });
+        var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleWriter = false });
         Process? process = null;
-        var outputCompletionSource = new TaskCompletionSource();
+        var processExitedCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completedOutputStreams = 0;
+
+        void TryCompleteChannel()
+        {
+            if (processExitedCompletionSource.Task.IsCompleted && Volatile.Read(ref completedOutputStreams) == 2)
+            {
+                channel.Writer.TryComplete();
+            }
+        }
 
         try
         {
@@ -79,64 +88,62 @@ public sealed class CliRunner : ICliRunner
 
             process.OutputDataReceived += (_, e) =>
             {
-                if (e.Data is not null)
+                if (e.Data is null)
                 {
-                    channel.Writer.TryWrite(e.Data);
+                    Interlocked.Increment(ref completedOutputStreams);
+                    TryCompleteChannel();
+                    return;
                 }
+
+                channel.Writer.TryWrite(e.Data);
             };
 
             process.ErrorDataReceived += (_, e) =>
             {
-                if (e.Data is not null)
+                if (e.Data is null)
                 {
-                    _logger.LogDebug("CLI-StdErr: {Line}", e.Data);
-                    // stderr ebenfalls an den Aufrufer weiterleiten, damit Fehlermeldungen
-                    // z.B. im Aufgaben-Protokoll erscheinen
-                    channel.Writer.TryWrite($"[Fehler] {e.Data}");
+                    Interlocked.Increment(ref completedOutputStreams);
+                    TryCompleteChannel();
+                    return;
                 }
+
+                _logger.LogDebug("CLI-StdErr: {Line}", e.Data);
+                // stderr ebenfalls an den Aufrufer weiterleiten, damit Fehlermeldungen
+                // z.B. im Aufgaben-Protokoll erscheinen
+                channel.Writer.TryWrite($"[Fehler] {e.Data}");
             };
 
             process.Exited += (_, _) =>
             {
-                // Signalisiere, dass der Prozess beendet ist
-                outputCompletionSource.SetResult();
+                processExitedCompletionSource.TrySetResult();
+                TryCompleteChannel();
             };
 
             process.Start();
-            
+
             // Schließe StandardInput sofort, damit CLI-Tools nicht versuchen, interaktive Eingaben zu lesen
             process.StandardInput.Close();
-            
+
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
-            // Starte das Warten auf den Prozess im Hintergrund
-            var exitTask = process.WaitForExitAsync(ct);
-            var outputTask = outputCompletionSource.Task;
-
-            // Yield alle verfügbaren Zeilen, bis der Prozess beendet ist
             await foreach (var line in channel.Reader.ReadAllAsync(ct))
             {
                 yield return line;
-                
-                // Prüfe, ob der Prozess beendet ist und alle Ausgabe gepuffert wurde
-                if (outputTask.IsCompleted)
-                {
-                    // Gebe dem Output-Reader eine kurze Zeit, um verbleibende Daten zu verarbeiten
-                    await Task.Delay(10, ct);
-                }
             }
 
             if (process.ExitCode != 0)
+            {
                 _logger.LogWarning(
                     "CLI-Streaming-Prozess {Command} beendet mit Exit-Code {ExitCode}",
                     command, process.ExitCode);
+            }
         }
         finally
         {
             // Stelle sicher, dass der Channel geschlossen ist
-            channel.Writer.Complete();
-            
+            channel.Writer.TryComplete();
+
             if (process is not null)
             {
                 try
@@ -152,6 +159,7 @@ public sealed class CliRunner : ICliRunner
                     // Prozess wurde nicht gestartet oder ist bereits beendet
                     _logger.LogDebug(ex, "Prozess konnte nicht beendet werden (wahrscheinlich nicht gestartet).");
                 }
+
                 process.Dispose();
             }
         }

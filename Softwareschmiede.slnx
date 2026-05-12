@@ -1,11 +1,11 @@
 <Solution>
+  <Project Path="plugins/Softwareschmiede.Plugin.ClaudeCli/Softwareschmiede.Plugin.ClaudeCli.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
   <Project Path="plugins/Softwareschmiede.Plugin.GitHub/Softwareschmiede.Plugin.GitHub.csproj">
     <Build Solution="Debug|*" Project="false" />
   </Project>
   <Project Path="plugins/Softwareschmiede.Plugin.GitHubCopilot/Softwareschmiede.Plugin.GitHubCopilot.csproj">
-    <Build Solution="Debug|*" Project="false" />
-  </Project>
-  <Project Path="plugins/Softwareschmiede.Plugin.ClaudeCli/Softwareschmiede.Plugin.ClaudeCli.csproj">
     <Build Solution="Debug|*" Project="false" />
   </Project>
   <Project Path="src/Softwareschmiede.Client/Softwareschmiede.Client.csproj" />
