@@ -70,6 +70,7 @@ public sealed class CliRunner : ICliRunner
 
         var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleWriter = true });
         Process? process = null;
+        var outputCompletionSource = new TaskCompletionSource();
 
         try
         {
@@ -79,7 +80,9 @@ public sealed class CliRunner : ICliRunner
             process.OutputDataReceived += (_, e) =>
             {
                 if (e.Data is not null)
+                {
                     channel.Writer.TryWrite(e.Data);
+                }
             };
 
             process.ErrorDataReceived += (_, e) =>
@@ -95,7 +98,8 @@ public sealed class CliRunner : ICliRunner
 
             process.Exited += (_, _) =>
             {
-                channel.Writer.Complete();
+                // Signalisiere, dass der Prozess beendet ist
+                outputCompletionSource.SetResult();
             };
 
             process.Start();
@@ -106,12 +110,22 @@ public sealed class CliRunner : ICliRunner
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
+            // Starte das Warten auf den Prozess im Hintergrund
+            var exitTask = process.WaitForExitAsync(ct);
+            var outputTask = outputCompletionSource.Task;
+
+            // Yield alle verfügbaren Zeilen, bis der Prozess beendet ist
             await foreach (var line in channel.Reader.ReadAllAsync(ct))
             {
                 yield return line;
+                
+                // Prüfe, ob der Prozess beendet ist und alle Ausgabe gepuffert wurde
+                if (outputTask.IsCompleted)
+                {
+                    // Gebe dem Output-Reader eine kurze Zeit, um verbleibende Daten zu verarbeiten
+                    await Task.Delay(10, ct);
+                }
             }
-
-            await process.WaitForExitAsync(ct);
 
             if (process.ExitCode != 0)
                 _logger.LogWarning(
@@ -120,6 +134,9 @@ public sealed class CliRunner : ICliRunner
         }
         finally
         {
+            // Stelle sicher, dass der Channel geschlossen ist
+            channel.Writer.Complete();
+            
             if (process is not null)
             {
                 try
