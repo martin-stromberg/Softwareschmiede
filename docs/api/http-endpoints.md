@@ -1,86 +1,38 @@
 # HTTP-Endpunkte – Softwareschmiede
 
-## Überblick
+## Übersicht
 
-Die Softwareschmiede stellt im aktuellen Stand **keine öffentlichen REST- oder Minimal-API-Endpunkte** bereit.
+Die Softwareschmiede stellt derzeit **keine öffentlichen HTTP-Endpunkte** bereit.  
+Die Anwendung wird über Razor Components bereitgestellt (`app.MapRazorComponents<App>()` in `src/Softwareschmiede/Program.cs`).
 
-Die Anwendung ist als Blazor-Webanwendung umgesetzt und mappt Razor-Komponenten direkt:
+## Endpoint-Status (einheitlich)
 
-- `app.MapRazorComponents<App>()`
-- `AddInteractiveServerRenderMode()`
-- `AddInteractiveWebAssemblyRenderMode()`
+Da es keine öffentlichen API-Routen gibt, gelten die üblichen Endpoint-Bestandteile aktuell als **nicht anwendbar**:
 
-Referenz: `src/Softwareschmiede/Program.cs`
+1. **HTTP-Methode & Pfad:** nicht vorhanden
+2. **Authentifizierung:** nicht anwendbar (kein öffentlicher HTTP-Zugriffspunkt)
+3. **Request:** keine Header/Parameter/Bodies für öffentliche Endpunkte
+4. **Response:** keine öffentlichen HTTP-Statuscodes für API-Calls
+5. **curl-Beispiel:** entfällt, da kein aufrufbarer Endpoint existiert
 
-## Auswirkungen auf die API-Dokumentation
+## Was stattdessen dokumentiert ist
 
-- Es gibt aktuell kein `src/ReceiptScanner.Api/Endpoints/` und kein alternatives Endpunkt-Verzeichnis in `src/`.
-- Die technische API-Dokumentation fokussiert daher auf:
-  - Plugin-Schnittstellen (`IPlugin`, `IGitPlugin`, `IKiPlugin`)
-  - Infrastruktur-Verträge und Laufzeitverhalten (z. B. Workdir-Resolution)
+- Interne Plugin-Contracts: [plugin-interfaces.md](./plugin-interfaces.md)
+- Interner Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** und **Fallback**: [plugin-default-selection.md](./plugin-default-selection.md)
+- Interner Contract für Workdir-**Fallback**: [workdir-configuration.md](./workdir-configuration.md)
 
-## Feature-Impact: Kontextsteuerung bei Folgeanweisungen
+## Explizites Mapping (Feature F014)
 
-**Ergebnis:** **kein API-Impact** auf öffentliche HTTP-Schnittstellen.
+Das Feature „Standardplugin je Pluginart & KI-Plugin-Auswahl“ ist ein **interner Application-Contract** und **kein HTTP-Contract**.
 
-Das Feature „Kontextsteuerung bei Folgeanweisungen (Kontext mitgeben / ignorieren / neu beginnen)“ wurde in der Blazor-UI und in der internen Orchestrierung umgesetzt (Aufgabe-Detailseite und Application-Service), ohne neue oder geänderte öffentliche HTTP-Endpunkte.
+| Thema | Abbildung |
+|---|---|
+| Standardplugin je Pluginart speichern | `PluginDefaultSettingsService` persistiert `plugins.default.SourceCodeManagement` und `plugins.default.DevelopmentAutomation` |
+| KI-Plugin-Auswahl beim Prompt | `selectedKiPluginPrefix` wird von der Aufgaben-Detailseite an `KiAusfuehrungsService` und `EntwicklungsprozessService` weitergereicht |
+| Auflösung inkl. Fallback | `PluginSelectionService`: explizite Auswahl → gespeicherter Default → Fallback |
 
-### API-relevante Umsetzung (ohne HTTP-Änderung)
+## Verknüpfte Dokumentation
 
-| Bereich | Status | Umsetzung / Referenz |
-|---|---|---|
-| UI-Kontextmodi vorhanden (3 feste Werte) | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (`FolgeanweisungsKontextmodus`: `KontextMitgeben`, `KontextIgnorieren`, `KontextNeuBeginnen`) |
-| Guardrail bei „Kontext neu beginnen“ | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` + `AufgabeDetail.razor.cs` (Bestätigung erforderlich vor Senden) |
-| Modusübergabe in den Laufstart | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`KiMitPromptStartenAsync(..., FolgeanweisungsKontextmodus?)`) |
-| Prompt-Building je Modus inkl. Kontextdatei-Lifecycle | Erfüllt | `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`KiStartenAsync`, `BuildFollowPromptWithContextAsync`) |
-| KI-Plugin-Contract unverändert | Erfüllt | `docs/api/plugin-interfaces.md#startdevelopmentasync` |
-| Testabdeckung erweitert | Erfüllt | `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/KiAusfuehrungsServiceTests.cs` |
-
-### Fachliche und architektonische Referenzen
-
-Zur Vermeidung von Redundanz werden Anforderungen, Architekturentscheidungen und Testdetails in den jeweiligen Fachdokumenten geführt:
-
-- Anforderungen: [`../requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md`](../requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md)
-- Architektur: [`../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md`](../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md)
-- Architektur-Review: [`../improvements/kontextsteuerung-folgeanweisungen-architecture-review.md`](../improvements/kontextsteuerung-folgeanweisungen-architecture-review.md)
-- Testplan: [`../tests/testplan-kontextsteuerung-folgeanweisungen.md`](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
-- Testlücken: [`../tests/testluecken-kontextsteuerung-folgeanweisungen.md`](../tests/testluecken-kontextsteuerung-folgeanweisungen.md)
-
-## Feature-Impact: KI-Arbeitsprotokoll als Markdown und sichere Render-Pipeline
-
-**Ergebnis:** **kein API-Impact** auf öffentliche HTTP-Schnittstellen, aber **interner Contract-Impact** in Persistenz- und Renderlogik des Protokollinhalts.
-
-Das Feature wurde in Application-Service und Blazor-Seite umgesetzt, ohne neue oder geänderte öffentliche HTTP-Endpunkte.
-
-### API-relevante Umsetzung (ohne HTTP-Änderung)
-
-| Bereich | Status | Umsetzung / Referenz |
-|---|---|---|
-| Persistenzformat KI-Antwort als Markdown | Erfüllt | `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`BuildKiArbeitsprotokollMarkdown`) mit Datumszeile `# yyyy-MM-dd`, `RunId` und Schritttrennung `## Schritt n` |
-| Fehlerfall nutzt identisches Protokollschema | Erfüllt | `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`KiStartenAsync` → `BuildKiArbeitsprotokollMarkdown` auch bei Exceptions) |
-| Markdown-Rendering in der Webausgabe | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`RenderProtokollInhalt`, `Markdown.ToHtml`) |
-| Sanitizing der gerenderten HTML-Ausgabe | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`MarkdownPipelineBuilder().DisableHtml()`, `SanitizeMarkdownHtml`) |
-| Fallback für robuste Lesbarkeit | Erfüllt | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`BuildFallbackHtml` mit HTML-encoding in `<pre>`) |
-
-### Interner technischer Contract (Kurzform)
-
-- **Formatvertrag Protokollinhalt:** Jeder KI-Antworteintrag folgt dem Schema `# {Datum}` + `- RunId: ...` + `## Schritt n`.
-- **Rendervertrag UI:** Persistierter Markdown-Inhalt wird in HTML transformiert, danach sanitiziert und nur dann angezeigt; bei Fehlern/leerem Sanitizing greift ein sicherer `<pre>`-Fallback.
-- **HTTP-Vertrag unverändert:** Keine Änderung an `Program.cs`-Routing (`MapRazorComponents`) und keine öffentlichen API-Routen hinzugefügt.
-
-### Verknüpfte Dokumentation
-
-- Fachliche Sicht: [`../business/features/F005-aufgabenprotokoll.md`](../business/features/F005-aufgabenprotokoll.md)
-- Ablaufübersicht: [`../flows/README.md`](../flows/README.md)
-- Technischer Ablauf (KI-Streaming/Protokollierung): [`../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung`](../flows/development-process-flow.md#ablauf-2-ki-streaming-und-protokollierung)
-- Detaillierter Rendering-Flow: [`../flows/ki-arbeitsprotokoll-rendering-flow.md`](../flows/ki-arbeitsprotokoll-rendering-flow.md)
-
-## Nächste Erweiterung
-
-Falls künftig HTTP-Endpunkte eingeführt werden, sollte diese Datei um eine Endpoint-Matrix erweitert werden:
-
-- Route
-- HTTP-Methode
-- Request-/Response-Schema
-- Authentifizierung/Autorisierung
-- Fehlercodes
+- Business: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)
+- Flow: [plugin-default-selection-flow.md](../flows/plugin-default-selection-flow.md)
+- Flow-Index: [docs/flows/README.md](../flows/README.md)

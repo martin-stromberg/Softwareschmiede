@@ -345,11 +345,23 @@ public sealed class KiAusfuehrungsServiceTests
                     It.IsAny<CancellationToken>()))
                 .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => streamFactory());
 
+            var gitPluginMock = new Mock<IGitPlugin>();
+            var pluginManagerMock = new Mock<IPluginManager>();
+            pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+            pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(gitPluginMock.Object);
+            pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPluginMock.Object]);
+            pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPluginMock.Object);
+            var defaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+            var pluginSelectionService = new PluginSelectionService(
+                pluginManagerMock.Object,
+                defaultSettingsService,
+                NullLogger<PluginSelectionService>.Instance);
+
             var entwicklungsprozessService = new EntwicklungsprozessService(
                 aufgabeService,
                 protokollService,
-                new Mock<IGitPlugin>().Object,
-                kiPluginMock.Object,
+                gitPluginMock.Object,
+                pluginSelectionService,
                 new Mock<IAgentPackageService>().Object,
                 new Mock<IArbeitsverzeichnisResolver>().Object,
                 new ConfigurationBuilder().Build(),

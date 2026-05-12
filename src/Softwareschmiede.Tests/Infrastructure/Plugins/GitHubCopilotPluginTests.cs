@@ -104,6 +104,7 @@ public sealed class GitHubCopilotPluginTests : IDisposable
     public void PluginMetadata_ShouldExposeExpectedValues()
     {
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHubCopilot");
+        _sut.ProviderDateiPraefix.Should().Be("copilot");
         _sut.GetSettingGroups().Should().ContainSingle();
         _sut.GetSettingGroups().Single().Fields.Should().ContainSingle(f => f.Key == "Token");
     }
@@ -183,7 +184,7 @@ public sealed class GitHubCopilotPluginTests : IDisposable
 
         // Assert
         lines.Should().Equal("line 1", "line 2");
-        var promptFile = Path.Combine(_testDirectory, ".copilot-task.md");
+        var promptFile = Directory.GetFiles(_testDirectory, "*.copilot-task.md").Single();
         File.Exists(promptFile).Should().BeTrue();
         (await File.ReadAllTextAsync(promptFile)).Should().Be("Prompt-Inhalt");
 
@@ -308,6 +309,23 @@ public sealed class GitHubCopilotPluginTests : IDisposable
 
         // Assert
         result.Should().BeTrue();
+    }
+
+    /// <summary>CheckHealthAsync gibt false zurück wenn gh copilot version fehlschlägt.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ShouldReturnFalse_WhenGhCopilotVersionFails()
+    {
+        // Arrange
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "copilot", It.IsAny<IEnumerable<string>>(), null,
+                It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "error"));
+
+        // Act
+        var result = await _sut.CheckHealthAsync();
+
+        // Assert
+        result.Should().BeFalse();
     }
 
     private static async IAsyncEnumerable<string> ToAsyncEnumerable(params string[] lines)

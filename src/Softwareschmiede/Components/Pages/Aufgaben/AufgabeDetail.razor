@@ -217,6 +217,22 @@ else
                         </select>
                     </div>
                     <div class="form-group">
+                        <label class="form-label">KI-Plugin</label>
+                        <select class="form-control" @bind="_selectedKiPluginPrefix">
+                            @if (_kiPlugins.Count == 0)
+                            {
+                                <option value="">– Kein KI-Plugin verfügbar –</option>
+                            }
+                            else
+                            {
+                                @foreach (var plugin in _kiPlugins)
+                                {
+                                    <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">Prompt *</label>
                         <textarea class="form-control" @bind="_prompt" rows="4" placeholder="Beschreibe was die KI tun soll..."></textarea>
                     </div>
@@ -275,6 +291,22 @@ else
                             @foreach (var a in _agenten)
                             {
                                 <option value="@a.Name">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">KI-Plugin</label>
+                        <select class="form-control" @bind="_selectedKiPluginPrefix">
+                            @if (_kiPlugins.Count == 0)
+                            {
+                                <option value="">– Kein KI-Plugin verfügbar –</option>
+                            }
+                            else
+                            {
+                                @foreach (var plugin in _kiPlugins)
+                                {
+                                    <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
+                                }
                             }
                         </select>
                     </div>

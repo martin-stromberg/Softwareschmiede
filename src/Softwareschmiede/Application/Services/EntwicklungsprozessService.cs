@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -17,7 +18,7 @@ public sealed class EntwicklungsprozessService
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
     private readonly IGitPlugin _gitPlugin;
-    private readonly IKiPlugin _kiPlugin;
+    private readonly PluginSelectionService _pluginSelectionService;
     private readonly IAgentPackageService _agentPackageService;
     private readonly IArbeitsverzeichnisResolver _arbeitsverzeichnisResolver;
     private readonly IConfiguration _configuration;
@@ -30,7 +31,7 @@ public sealed class EntwicklungsprozessService
         AufgabeService aufgabeService,
         ProtokollService protokollService,
         IGitPlugin gitPlugin,
-        IKiPlugin kiPlugin,
+        PluginSelectionService pluginSelectionService,
         IAgentPackageService agentPackageService,
         IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
         IConfiguration configuration,
@@ -39,7 +40,7 @@ public sealed class EntwicklungsprozessService
         _aufgabeService = aufgabeService;
         _protokollService = protokollService;
         _gitPlugin = gitPlugin;
-        _kiPlugin = kiPlugin;
+        _pluginSelectionService = pluginSelectionService;
         _agentPackageService = agentPackageService;
         _arbeitsverzeichnisResolver = arbeitsverzeichnisResolver;
         _configuration = configuration;
@@ -58,6 +59,7 @@ public sealed class EntwicklungsprozessService
     public async Task ProzessStartenAsync(Guid aufgabeId, string repositoryUrl, string? basisBranchName = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Entwicklungsprozess für Aufgabe {AufgabeId} starten.", aufgabeId);
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(null, ct);
 
         var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
@@ -68,11 +70,11 @@ public sealed class EntwicklungsprozessService
             var paketVorCheck = await _agentPackageService.GetPackageAsync(aufgabe.AgentenpaketName, ct);
             if (paketVorCheck is not null)
             {
-                var istKompatibel = await _kiPlugin.IsAgentPackageCompatibleAsync(paketVorCheck.Pfad, ct);
+                var istKompatibel = await kiPlugin.IsAgentPackageCompatibleAsync(paketVorCheck.Pfad, ct);
                 if (!istKompatibel)
                 {
                     throw new InvalidOperationException(
-                        $"Agentenpaket '{aufgabe.AgentenpaketName}' ist nicht kompatibel mit Plugin '{_kiPlugin.PluginName}'. " +
+                        $"Agentenpaket '{aufgabe.AgentenpaketName}' ist nicht kompatibel mit Plugin '{kiPlugin.PluginName}'. " +
                         $"Für GitHub Copilot muss das Paket einen '.github'-Ordner enthalten.");
                 }
             }
@@ -133,7 +135,7 @@ public sealed class EntwicklungsprozessService
             if (paket is not null)
             {
                 _logger.LogInformation("Agentenpaket '{PaketName}' deployen.", aufgabe.AgentenpaketName);
-                await _kiPlugin.DeployAgentPackageAsync(paket.Pfad, lokalerKlonPfad, ct);
+                await kiPlugin.DeployAgentPackageAsync(paket.Pfad, lokalerKlonPfad, ct);
             }
             else
             {
@@ -160,6 +162,7 @@ public sealed class EntwicklungsprozessService
         Guid aufgabeId,
         string prompt,
         AgentInfo agent,
+        string? selectedKiPluginPrefix = null,
         string? model = null,
         FolgeanweisungsKontextmodus? kontextmodus = null,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -174,8 +177,9 @@ public sealed class EntwicklungsprozessService
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad. Bitte zuerst ProzessStartenAsync aufrufen.");
 
         var runId = Guid.NewGuid();
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(selectedKiPluginPrefix, ct);
         var finalPrompt = prompt;
-        var contextFilePath = Path.Combine(aufgabe.LokalerKlonPfad, $"{aufgabeId}.copilot.context.md");
+        var contextFilePath = ResolveContextFilePath(kiPlugin, aufgabe.LokalerKlonPfad, aufgabeId);
 
         if (kontextmodus is not null)
         {
@@ -188,6 +192,7 @@ public sealed class EntwicklungsprozessService
                     aufgabe.LokalerKlonPfad,
                     contextFilePath,
                     runId,
+                    kiPlugin,
                     kontextmodus.Value,
                     model,
                     ct);
@@ -216,7 +221,7 @@ public sealed class EntwicklungsprozessService
         await _protokollService.AddEintragAsync(
             aufgabeId,
             ProtokollTyp.Prompt,
-            $"[RunId:{runId}] {(kontextmodus is null ? "Initialprompt" : $"Kontextmodus={kontextmodus}")}\n{finalPrompt}",
+            $"[RunId:{runId}] {(kontextmodus is null ? "Initialprompt" : $"Kontextmodus={kontextmodus}")}\n- KI-Plugin: {kiPlugin.PluginName} ({kiPlugin.PluginPrefix})\n{finalPrompt}",
             agent.Name,
             ct);
         await _aufgabeService.KiAktiviertAsync(aufgabeId, ct);
@@ -226,7 +231,7 @@ public sealed class EntwicklungsprozessService
 
         // yield return inside a try-catch is not allowed in C#.
         // Workaround: manually advance the enumerator and catch MoveNextAsync separately.
-        var enumerator = _kiPlugin.StartDevelopmentAsync(finalPrompt, agent, aufgabe.LokalerKlonPfad, model, ct)
+        var enumerator = kiPlugin.StartDevelopmentAsync(finalPrompt, agent, aufgabe.LokalerKlonPfad, model, ct)
             .GetAsyncEnumerator(ct);
 
         try
@@ -430,7 +435,8 @@ public sealed class EntwicklungsprozessService
         if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
 
-        var testResult = await _kiPlugin.RunTestsAsync(aufgabe.LokalerKlonPfad, ct);
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(null, ct);
+        var testResult = await kiPlugin.RunTestsAsync(aufgabe.LokalerKlonPfad, ct);
         await _protokollService.AddTestErgebnisseAsync(aufgabeId, testResult, ct);
 
         _logger.LogInformation("Tests für Aufgabe {AufgabeId} abgeschlossen. Bestanden: {Bestanden}.", aufgabeId, testResult.Bestanden);
@@ -499,6 +505,7 @@ public sealed class EntwicklungsprozessService
         string localRepoPath,
         string contextFilePath,
         Guid runId,
+        IKiPlugin kiPlugin,
         FolgeanweisungsKontextmodus kontextmodus,
         string? model,
         CancellationToken ct)
@@ -537,6 +544,7 @@ public sealed class EntwicklungsprozessService
             agent,
             localRepoPath,
             runId,
+            kiPlugin,
             model,
             ct);
 
@@ -555,6 +563,16 @@ public sealed class EntwicklungsprozessService
         return $"{context.TrimEnd()}\n\n---\n\n{userPrompt}";
     }
 
+    private static string ResolveContextFilePath(IKiPlugin kiPlugin, string localRepoPath, Guid aufgabeId)
+    {
+        if (kiPlugin is CliKiPluginBase cliKiPlugin)
+        {
+            return cliKiPlugin.BuildContextFilePath(localRepoPath, aufgabeId);
+        }
+
+        return Path.Combine(localRepoPath, $"{aufgabeId}.copilot.context.md");
+    }
+
     private async Task<string> EnsureContextWithinLimitsAsync(
         Guid aufgabeId,
         string context,
@@ -562,6 +580,7 @@ public sealed class EntwicklungsprozessService
         AgentInfo agent,
         string localRepoPath,
         Guid runId,
+        IKiPlugin kiPlugin,
         string? model,
         CancellationToken ct)
     {
@@ -584,7 +603,7 @@ public sealed class EntwicklungsprozessService
                 agent.Name,
                 ct);
 
-            current = await CompressContextAsync(current, agent, localRepoPath, model, ct);
+            current = await CompressContextAsync(current, agent, localRepoPath, kiPlugin, model, ct);
             await WriteTextAtomicallyWithBackupAsync(contextFilePath, current, ct);
 
             await _protokollService.AddEintragAsync(
@@ -609,6 +628,7 @@ public sealed class EntwicklungsprozessService
         string context,
         AgentInfo agent,
         string localRepoPath,
+        IKiPlugin kiPlugin,
         string? model,
         CancellationToken ct)
     {
@@ -626,7 +646,7 @@ public sealed class EntwicklungsprozessService
             """;
 
         var builder = new StringBuilder();
-        await foreach (var line in _kiPlugin.StartDevelopmentAsync(compressionPrompt, agent, localRepoPath, model, ct))
+        await foreach (var line in kiPlugin.StartDevelopmentAsync(compressionPrompt, agent, localRepoPath, model, ct))
         {
             builder.AppendLine(line);
         }

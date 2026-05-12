@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Components.Pages;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
@@ -25,7 +26,7 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), true, "no-configured-path", null));
 
-        var sut = CreateSut(settingsService, resolverMock.Object);
+        var sut = CreateSut(db, settingsService, resolverMock.Object);
 
         await sut.InvokeOnInitializedAsync();
 
@@ -41,7 +42,7 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
         resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
-        var sut = CreateSut(settingsService, resolverMock.Object);
+        var sut = CreateSut(db, settingsService, resolverMock.Object);
 
         sut.InvokeArbeitsverzeichnisInputChanged("relative\\invalid");
 
@@ -63,7 +64,7 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
         resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
-        var sut = CreateSut(settingsService, resolverMock.Object);
+        var sut = CreateSut(db, settingsService, resolverMock.Object);
         await sut.InvokeOnInitializedAsync();
 
         await sut.InvokeArbeitsverzeichnisZuruecksetzenAsync();
@@ -74,22 +75,118 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.ArbeitsverzeichnisStatusIsError.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task OnInitializedAsync_ShouldLoadStoredDefaultPlugin_WhenPrefixIsValid()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var gitPlugin = CreateGitPlugin("GitHub", "Softwareschmiede.GitHub");
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.SourceCodeManagement, "Softwareschmiede.GitHub");
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            scmPlugins: [gitPlugin],
+            kiPlugins: []);
+
+        await sut.InvokeOnInitializedAsync();
+
+        sut.GetDefaultPluginSelection(PluginType.SourceCodeManagement).Should().Be("Softwareschmiede.GitHub");
+    }
+
+    [Fact]
+    public async Task StandardPluginSpeichernAsync_ShouldPersistValidSelection()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var gitPlugin = CreateGitPlugin("GitHub", "Softwareschmiede.GitHub");
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            scmPlugins: [gitPlugin],
+            kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+        sut.SetDefaultPluginSelection(PluginType.SourceCodeManagement, "Softwareschmiede.GitHub");
+
+        await sut.InvokeStandardPluginSpeichernAsync(PluginType.SourceCodeManagement);
+
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var saved = await defaultSettings.GetDefaultPluginPrefixAsync(PluginType.SourceCodeManagement);
+        saved.Should().Be("Softwareschmiede.GitHub");
+        sut.GetDefaultPluginStatusIsError(PluginType.SourceCodeManagement).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task StandardPluginSpeichernAsync_ShouldSetError_WhenSelectionIsInvalidForType()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var gitPlugin = CreateGitPlugin("GitHub", "Softwareschmiede.GitHub");
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            scmPlugins: [gitPlugin],
+            kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+        sut.SetDefaultPluginSelection(PluginType.SourceCodeManagement, "Softwareschmiede.Unbekannt");
+
+        await sut.InvokeStandardPluginSpeichernAsync(PluginType.SourceCodeManagement);
+
+        sut.GetDefaultPluginStatusIsError(PluginType.SourceCodeManagement).Should().BeTrue();
+        sut.GetDefaultPluginStatusMessage(PluginType.SourceCodeManagement).Should().Contain("Ungültige Plugin-Auswahl");
+    }
+
     private static TestEinstellungenPage CreateSut(
+        SoftwareschmiededDbContext db,
         ArbeitsverzeichnisSettingsService arbeitsverzeichnisSettings,
-        IArbeitsverzeichnisResolver arbeitsverzeichnisResolver)
+        IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
+        IReadOnlyList<IGitPlugin>? scmPlugins = null,
+        IReadOnlyList<IKiPlugin>? kiPlugins = null)
     {
         var credentialStoreMock = new Mock<ICredentialStore>();
         var pluginManagerMock = new Mock<IPluginManager>();
-        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns(Array.Empty<IGitPlugin>());
-        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(Array.Empty<IKiPlugin>());
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns(scmPlugins ?? Array.Empty<IGitPlugin>());
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(kiPlugins ?? Array.Empty<IKiPlugin>());
+        var pluginDefaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var pluginSelection = new PluginSelectionService(
+            pluginManagerMock.Object,
+            pluginDefaultSettings,
+            NullLogger<PluginSelectionService>.Instance);
         var pluginSettings = new PluginSettingsService(credentialStoreMock.Object, NullLogger<PluginSettingsService>.Instance);
         var sut = new TestEinstellungenPage();
         SetInjectedProperty(sut, "PluginManager", pluginManagerMock.Object);
+        SetInjectedProperty(sut, "PluginSelection", pluginSelection);
         SetInjectedProperty(sut, "PluginSettings", pluginSettings);
         SetInjectedProperty(sut, "ArbeitsverzeichnisSettings", arbeitsverzeichnisSettings);
         SetInjectedProperty(sut, "ArbeitsverzeichnisResolver", arbeitsverzeichnisResolver);
         SetInjectedProperty(sut, "Logger", NullLogger<EinstellungenBase>.Instance);
         return sut;
+    }
+
+    private static IGitPlugin CreateGitPlugin(string name, string prefix)
+    {
+        var plugin = new Mock<IGitPlugin>();
+        plugin.SetupGet(p => p.PluginName).Returns(name);
+        plugin.SetupGet(p => p.PluginPrefix).Returns(prefix);
+        plugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        plugin.Setup(p => p.GetSettingGroups()).Returns([]);
+        return plugin.Object;
     }
 
     private static SoftwareschmiededDbContext CreateDb()
@@ -115,10 +212,15 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         public string? ArbeitsverzeichnisStatusMessage => _arbeitsverzeichnisStatusMessage;
         public bool ArbeitsverzeichnisStatusIsError => _arbeitsverzeichnisStatusIsError;
         public string? ArbeitsverzeichnisFallbackHinweis => _arbeitsverzeichnisFallbackHinweis;
+        public string? GetDefaultPluginSelection(PluginType pluginType) => _defaultPluginSelections.GetValueOrDefault(pluginType);
+        public void SetDefaultPluginSelection(PluginType pluginType, string? pluginPrefix) => _defaultPluginSelections[pluginType] = pluginPrefix;
+        public string GetDefaultPluginStatusMessage(PluginType pluginType) => _defaultPluginStatusMessages.GetValueOrDefault(pluginType, string.Empty);
+        public bool GetDefaultPluginStatusIsError(PluginType pluginType) => _defaultPluginStatusIsError.GetValueOrDefault(pluginType);
 
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
         public Task InvokeArbeitsverzeichnisSpeichernAsync() => ArbeitsverzeichnisSpeichernAsync();
         public void InvokeArbeitsverzeichnisInputChanged(string value) => ArbeitsverzeichnisInputChanged(value);
         public Task InvokeArbeitsverzeichnisZuruecksetzenAsync() => ArbeitsverzeichnisZuruecksetzenAsync();
+        public Task InvokeStandardPluginSpeichernAsync(PluginType pluginType) => StandardPluginSpeichernAsync(pluginType);
     }
 }

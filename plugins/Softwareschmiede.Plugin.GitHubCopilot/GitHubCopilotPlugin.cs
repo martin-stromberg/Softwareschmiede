@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -11,23 +12,26 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// Der Prozess läuft im Repository-Verzeichnis, sodass der Agent Dateien direkt anlegen und ändern kann.
 /// Die Agent-Datei wird als Kontext-Präambel an den Prompt angehängt.
 /// </summary>
-public sealed class GitHubCopilotPlugin : IKiPlugin
+public sealed class GitHubCopilotPlugin : CliKiPluginBase
 {
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubCopilotPlugin> _logger;
 
     /// <inheritdoc/>
-    public string PluginName => "GitHub Copilot";
+    public override string PluginName => "GitHub Copilot";
 
     /// <inheritdoc/>
-    public string PluginPrefix => "Softwareschmiede.GitHubCopilot";
+    public override string ProviderDateiPraefix => "copilot";
 
     /// <inheritdoc/>
-    public PluginType PluginType => PluginType.DevelopmentAutomation;
+    public override string PluginPrefix => "Softwareschmiede.GitHubCopilot";
 
     /// <inheritdoc/>
-    public IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
+    public override PluginType PluginType => PluginType.DevelopmentAutomation;
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
     [
         new PluginSettingGroup("Authentifizierung",
         [
@@ -64,7 +68,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     }
 
     /// <inheritdoc/>
-    public Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default)
+    public override Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default)
     {
         _logger.LogInformation("Lese Agenten aus Paket {PackagePath}.", agentPackagePath);
 
@@ -90,7 +94,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     }
 
     /// <inheritdoc/>
-    public Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default)
+    public override Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default)
     {
         _logger.LogInformation("Prufe Kompatibilitat des Agentenpakets {PackagePath}.", agentPackagePath);
 
@@ -114,7 +118,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     }
 
     /// <inheritdoc/>
-    public async Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default)
+    public override async Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Deploye Agentenpaket {PackagePath} nach {RepoPath}.", agentPackagePath, localRepoPath);
 
@@ -144,7 +148,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<string> StartDevelopmentAsync(
+    public override async IAsyncEnumerable<string> StartDevelopmentAsync(
         string prompt,
         AgentInfo agent,
         string localRepoPath,
@@ -153,7 +157,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     {
         _logger.LogInformation("Starte KI-Entwicklung mit Agent {AgentName} in {RepoPath}.", agent.Name, localRepoPath);
 
-        var promptFile = Path.Combine(localRepoPath, $"{Guid.NewGuid()}.copilot-task.md");
+        var promptFile = BuildTaskFilePath(localRepoPath, Guid.NewGuid());
         await File.WriteAllTextAsync(promptFile, prompt, ct);
 
         var args = BuildCopilotArgs(promptFile, agent, model);
@@ -212,7 +216,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     }
 
     /// <inheritdoc/>
-    public async Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default)
+    public override async Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Fuhre Tests in {RepoPath} aus.", localRepoPath);
 
@@ -223,7 +227,10 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
             null,
             ct);
 
-        var ergebnisse = ParseTestOutput(result.StdOut + result.StdErr);
+        var output = string.IsNullOrEmpty(result.StdOut) || string.IsNullOrEmpty(result.StdErr)
+            ? result.StdOut + result.StdErr
+            : $"{result.StdOut}{Environment.NewLine}{result.StdErr}";
+        var ergebnisse = ParseTestOutput(output);
         var bestanden = result.IsSuccess;
 
         _logger.LogInformation(
@@ -256,7 +263,7 @@ public sealed class GitHubCopilotPlugin : IKiPlugin
     }
 
     /// <inheritdoc/>
-    public async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Prufe GitHub-Copilot-Plugin-Health.");
         var result = await _cliRunner.RunAsync("copilot", ["--version"], null, null, ct);

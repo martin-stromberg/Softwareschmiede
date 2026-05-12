@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -31,6 +32,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
         _kiPluginMock = new Mock<IKiPlugin>();
+        _kiPluginMock.SetupGet(p => p.PluginName).Returns("Test KI");
+        _kiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestKi");
+        _kiPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+        _kiPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
         _agentPackageServiceMock = new Mock<IAgentPackageService>();
         _arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
@@ -40,7 +45,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            _kiPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             new ConfigurationBuilder().Build(),
@@ -57,6 +62,18 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     }
 
     public void Dispose() => _db.Dispose();
+
+    private PluginSelectionService CreatePluginSelectionService(params IKiPlugin[] kiPlugins)
+    {
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
+        pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPlugins.First());
+
+        var defaultService = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        return new PluginSelectionService(pluginManagerMock.Object, defaultService, new Mock<ILogger<PluginSelectionService>>().Object);
+    }
 
     /// <summary>ProzessStartenAsync klont das Repository und legt einen Branch an.</summary>
     [Fact]
@@ -106,6 +123,30 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
         // Assert
         _kiPluginMock.Verify(k => k.DeployAgentPackageAsync("/pfad/zum/paket", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>ProzessStartenAsync bricht vor Clone ab, wenn Agentenpaket inkompatibel ist.</summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldThrowAndSkipClone_WhenAgentPackageIsIncompatible()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Inkompatibles Paket", null);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "inkompatibel", null);
+        var paket = new AgentPackageInfo("inkompatibel", "/pfad/zum/paket", [], []);
+
+        _agentPackageServiceMock.Setup(a => a.GetPackageAsync("inkompatibel", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(paket);
+        _kiPluginMock.Setup(k => k.IsAgentPackageCompatibleAsync("/pfad/zum/paket", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _kiPluginMock.SetupGet(k => k.PluginName).Returns("Claude CLI");
+
+        // Act
+        var act = () => _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*nicht kompatibel*");
+        _gitPluginMock.Verify(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>ProzessStartenAsync wirft Exception wenn Aufgabe nicht gefunden.</summary>
@@ -308,7 +349,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
         {
         }
 
@@ -325,6 +366,117 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var content = await File.ReadAllTextAsync(contextPath);
         content.Should().Contain("Neue Folgeanweisung");
         content.Should().Contain("Antwort");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldUseProviderSpecificContextFile_ForCliPluginBase()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-provider-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Provider Kontext", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        var plugin = new TestCliKiPluginBase("claude", StreamSingleLine("Antwort"));
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(plugin),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        {
+        }
+
+        // Assert
+        var claudeContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.claude.context.md");
+        var copilotContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        File.Exists(claudeContextPath).Should().BeTrue();
+        File.Exists(copilotContextPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldReadAndAppendProviderContext_ForKontextMitgeben()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-provider-include-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Provider Kontext Mitgeben", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+
+        var plugin = new TestCliKiPluginBase("claude", StreamSingleLine("Antwort"));
+        var claudeContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.claude.context.md");
+        await File.WriteAllTextAsync(claudeContextPath, "Claude-Kontext");
+
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(plugin),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        {
+        }
+
+        // Assert
+        plugin.LastPrompt.Should().NotBeNull();
+        plugin.LastPrompt.Should().StartWith("Claude-Kontext");
+        plugin.LastPrompt.Should().Contain("\n\n---\n\nNeue Folgeanweisung");
+
+        var copilotContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        File.Exists(claudeContextPath).Should().BeTrue();
+        File.Exists(copilotContextPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldResetOnlyProviderContext_ForKontextNeuBeginnen()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-provider-reset-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Provider Kontext Reset", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+
+        var plugin = new TestCliKiPluginBase("claude", StreamSingleLine("Antwort"));
+        var claudeContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.claude.context.md");
+        var copilotContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        await File.WriteAllTextAsync(claudeContextPath, "Alter Claude-Kontext");
+        await File.WriteAllTextAsync(copilotContextPath, "Unveraenderter Copilot-Kontext");
+
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(plugin),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
+        {
+        }
+
+        // Assert
+        var claudeContent = await File.ReadAllTextAsync(claudeContextPath);
+        var copilotContent = await File.ReadAllTextAsync(copilotContextPath);
+
+        claudeContent.Should().Contain("Reset durch Folgeanweisung");
+        claudeContent.Should().Contain($"# Kontextverlauf Aufgabe {aufgabe.Id}");
+        copilotContent.Should().Be("Unveraenderter Copilot-Kontext");
     }
 
     [Fact]
@@ -348,7 +500,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
         {
         }
 
@@ -380,7 +532,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Nur Prompt", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Nur Prompt", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
         {
         }
 
@@ -414,7 +566,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neu anfangen", agent, null, null, FolgeanweisungsKontextmodus.KontextNeuBeginnen))
         {
         }
 
@@ -448,7 +600,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            _kiPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             config,
@@ -468,7 +620,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Act
         var act = async () =>
         {
-            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
             {
             }
         };
@@ -502,7 +654,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            _kiPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
             _agentPackageServiceMock.Object,
             _arbeitsverzeichnisResolverMock.Object,
             config,
@@ -519,7 +671,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Act
         var act = async () =>
         {
-            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+            await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Neue Folgeanweisung", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
             {
             }
         };
@@ -551,7 +703,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamThrows("plugin boom"));
 
         // Act
-        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Weiter", agent, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Weiter", agent, null, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
         {
         }
 
@@ -766,6 +918,54 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _agentPackageServiceMock.Verify(a => a.GetPackageAsync("missing-package", It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
+    /// <summary>TestsAusfuehrenAsync speichert bei Erfolg Test-Ergebnisprotokolle.</summary>
+    [Fact]
+    public async Task TestsAusfuehrenAsync_ShouldPersistSuccessfulTestSummary()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Tests erfolgreich", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var expected = new TestResult(true, [new TestErgebnisInfo("Passed UnitTest", TestStatus.Bestanden, null, TimeSpan.Zero)]);
+        _kiPluginMock.Setup(k => k.RunTestsAsync("/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        // Act
+        var result = await _sut.TestsAusfuehrenAsync(aufgabe.Id);
+
+        // Assert
+        result.Should().BeEquivalentTo(expected);
+        var protokoll = (await _protokollService.GetByAufgabeAsync(aufgabe.Id)).ToList();
+        var testEintrag = protokoll.Single(p => p.Typ == ProtokollTyp.TestErgebnis);
+        testEintrag.Inhalt.Should().Be("Alle 1 Tests bestanden.");
+        testEintrag.TestErgebnisse.Should().ContainSingle(e => e.TestName == "Passed UnitTest" && e.Status == TestStatus.Bestanden);
+    }
+
+    /// <summary>TestsAusfuehrenAsync speichert bei Fehlern die Fehlerschwelle korrekt.</summary>
+    [Fact]
+    public async Task TestsAusfuehrenAsync_ShouldPersistFailureSummary_WhenTestsFail()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Tests fehlschlagen", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var expected = new TestResult(false,
+        [
+            new TestErgebnisInfo("Passed UnitTest", TestStatus.Bestanden, null, TimeSpan.Zero),
+            new TestErgebnisInfo("Failed UnitTest", TestStatus.Fehlgeschlagen, "boom", TimeSpan.Zero)
+        ]);
+        _kiPluginMock.Setup(k => k.RunTestsAsync("/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        // Act
+        var result = await _sut.TestsAusfuehrenAsync(aufgabe.Id);
+
+        // Assert
+        result.Should().BeEquivalentTo(expected);
+        var protokoll = (await _protokollService.GetByAufgabeAsync(aufgabe.Id)).ToList();
+        var testEintrag = protokoll.Single(p => p.Typ == ProtokollTyp.TestErgebnis);
+        testEintrag.Inhalt.Should().Be("1 von 2 Tests fehlgeschlagen.");
+        testEintrag.TestErgebnisse.Should().HaveCount(2);
+    }
+
     private static async IAsyncEnumerable<string> StreamSingleLine(string line)
     {
         yield return line;
@@ -789,5 +989,33 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 #pragma warning disable CS0162
         yield break;
 #pragma warning restore CS0162
+    }
+
+    private sealed class TestCliKiPluginBase : CliKiPluginBase
+    {
+        private readonly IAsyncEnumerable<string> _stream;
+
+        public TestCliKiPluginBase(string providerDateiPraefix, IAsyncEnumerable<string> stream)
+        {
+            ProviderDateiPraefix = providerDateiPraefix;
+            _stream = stream;
+        }
+
+        public override string ProviderDateiPraefix { get; }
+        public string? LastPrompt { get; private set; }
+        public override string PluginName => "Test";
+        public override string PluginPrefix => "Softwareschmiede.Test";
+        public override PluginType PluginType => PluginType.DevelopmentAutomation;
+        public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
+        public override Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default) => Task.FromResult<IEnumerable<AgentInfo>>([]);
+        public override Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default) => Task.FromResult(true);
+        public override Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default) => Task.CompletedTask;
+        public override IAsyncEnumerable<string> StartDevelopmentAsync(string prompt, AgentInfo agent, string localRepoPath, string? model = null, CancellationToken ct = default)
+        {
+            LastPrompt = prompt;
+            return _stream;
+        }
+        public override Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default) => Task.FromResult(new TestResult(true, []));
+        public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
     }
 }

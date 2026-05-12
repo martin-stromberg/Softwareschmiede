@@ -50,11 +50,26 @@ public sealed class EntwicklungsprozessServiceTests
             aufgabeService,
             protokollService,
             gitMock.Object,
-            kiMock.Object,
+            CreatePluginSelectionService(db, gitMock.Object, kiMock.Object),
             packageMock.Object,
             arbeitsverzeichnisResolver,
             new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
+    }
+
+    private static PluginSelectionService CreatePluginSelectionService(
+        DatabaseFixture db,
+        IGitPlugin gitPlugin,
+        IKiPlugin kiPlugin)
+    {
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([gitPlugin]);
+        pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(gitPlugin);
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPlugin);
+
+        var defaultService = new PluginDefaultSettingsService(db.Context, NullLogger<PluginDefaultSettingsService>.Instance);
+        return new PluginSelectionService(pluginManagerMock.Object, defaultService, NullLogger<PluginSelectionService>.Instance);
     }
 
     /// <summary>

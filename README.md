@@ -6,7 +6,7 @@
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor)](https://blazor.net/)
 [![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/License-zu%20definieren-lightgrey)](#-lizenz)
 
 ---
 
@@ -16,9 +16,9 @@
 2. [Features](#-features)
 3. [Screenshots](#-screenshots)
 4. [Voraussetzungen](#-voraussetzungen)
-5. [Schnellstart](#-schnellstart)
+5. [Installation](#-installation)
 6. [Usage](#-usage)
-7. [Konfiguration & Plugin-Setup](#️-konfiguration--plugin-setup)
+7. [Konfiguration & Plugin-Setup](#-konfiguration--plugin-setup)
 8. [Agentenpakete](#-agentenpakete)
 9. [Projektstruktur](#-projektstruktur)
 10. [Architektur](#-architektur)
@@ -29,6 +29,7 @@
 15. [Dokumentation](#-dokumentation)
 16. [Beitragen](#-beitragen)
 17. [Lizenz](#-lizenz)
+18. [Kontakt](#-kontakt)
 
 ---
 
@@ -73,11 +74,15 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ### 🤖 KI-Steuerung (Plugin-System)
 - **Plugin-Architektur** über `IKiPlugin`-Interface – austauschbar für verschiedene KI-Systeme
-- **GitHub Copilot-Plugin** (erstes Plugin): KI-Integration via `copilot` CLI
+- **GitHub Copilot-Plugin**: KI-Integration via `copilot` CLI
+- **Claude-CLI-Plugin** (`claude-cli-integration`): KI-Integration via `claude` CLI inkl. `ANTHROPIC_API_KEY`-Weitergabe aus dem Windows Credential Store
+- Provider-spezifische Kontext- und Task-Dateien (`*.copilot.context.md`, `*.claude.context.md`, `*.copilot-task.md`, `*.claude-task.md`)
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Sidebar-Footer zeigt live die Anzahl laufender Automatisierungen; optionaler Auto-Shutdown-Toggle erscheint nur bei aktiven Läufen
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
+- Standardplugin je Pluginart in den Einstellungen (SCM und KI) persistierbar
+- Explizite KI-Plugin-Auswahl beim Prompt-Senden, inkl. vorausgewähltem Standardplugin
 - Folgeanweisungen mit eigener Agenten-Auswahl (Initial-Agent als Standardwert, Rücksetzung nach dem Senden)
 - **Kontextsteuerung bei Folgeanweisungen (implementiert):** pro Folgeanweisung wählbar zwischen **Kontext mitgeben**, **Kontext ignorieren** und **Kontext neu beginnen**
 - Erweiterte Testabdeckung für Folgeanweisungen inkl. Kontextmodi in UI- und Service-Tests
@@ -120,9 +125,11 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 | **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen |
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
 | **Copilot CLI** (`copilot`) | aktuell | Für KI-Steuerung im Plugin (`copilot --version`) |
+| **Claude CLI** (`claude`) | aktuell | Für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
 | **GitHub Copilot** | aktives Abo | Wird über die Copilot-CLI genutzt |
+| **Anthropic API Key** | vorhanden | Für Claude-CLI-Läufe (als Credential `Softwareschmiede.ClaudeCli.Token`) |
 
-**GitHub CLI einrichten:**
+**CLI-Tools prüfen/einrichten:**
 
 ```powershell
 # GitHub CLI installieren (z. B. via winget)
@@ -133,11 +140,14 @@ gh auth login
 
 # Copilot-CLI prüfen
 copilot --version
+
+# Claude-CLI prüfen
+claude --version
 ```
 
 ---
 
-## ⚡ Schnellstart
+## 🛠️ Installation
 
 ### 1. Repository klonen
 
@@ -165,11 +175,12 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 
 ### 4. Erste Schritte
 
-1. **GitHub-Token einrichten** – Credential Manager öffnen und Token speichern (siehe [Konfiguration](#️-konfiguration--plugin-setup))
-2. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt mit GitHub-Repository erstellen
-3. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
-4. **Agentenpaket auswählen** – Passendes Agentenpaket aus `agent-packages/` zuweisen
-5. **KI-Lauf starten** – Prompt eingeben, Agenten auswählen und den KI-gestützten Prozess starten
+1. **GitHub-Token einrichten** – Credential Manager öffnen und Token speichern (siehe [Konfiguration](#-konfiguration--plugin-setup))
+2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
+3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt mit GitHub-Repository erstellen
+4. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
+5. **Agentenpaket auswählen** – Passendes Agentenpaket aus `agent-packages/` zuweisen
+6. **KI-Lauf starten** – KI-Plugin (Copilot oder Claude CLI), Prompt und Agent auswählen und den Prozess starten
 
 ---
 
@@ -179,10 +190,19 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
 2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
-3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch).
-4. **KI-Lauf ausführen** (Prompt + Agent aus Agentenpaket wählen).
+3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch, KI-Plugin wird über Default/Fallback aufgelöst).
+4. **KI-Lauf ausführen** (Prompt + Agent + KI-Plugin wählen; Standardplugin ist vorausgewählt).
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 6. **Commits/Push/PR durchführen** und Aufgabe abschließen oder abbrechen.
+
+### KI-Plugin-Auswahl (Copilot oder Claude CLI)
+
+- In den Einstellungen kann je Pluginart (`SourceCodeManagement`, `DevelopmentAutomation`) ein Standardplugin gespeichert werden.
+- Beim Prompt-Senden kann das KI-Plugin explizit ausgewählt werden; in der UI ist das Standardplugin für `DevelopmentAutomation` vorausgewählt.
+- Auflösungskette zur Laufzeit: **explizite Auswahl → gespeichertes Standardplugin → Fallback auf verfügbares Plugin**.
+- Bei installierten Plugins stehen aktuell **GitHub Copilot** und **Claude CLI** zur Verfügung.
+- Claude-Läufe nutzen den Credential-Key `Softwareschmiede.ClaudeCli.Token` und setzen `ANTHROPIC_API_KEY` für den CLI-Prozess.
+- Agentenpakete müssen für Claude einen `.github`-Ordner enthalten, damit sie als kompatibel gelten.
 
 ### Folgeanweisungen mit Agent- und Kontextsteuerung (Aufgabe-Detailseite)
 
@@ -209,6 +229,7 @@ Details zu den einzelnen Schritten:
 - **Host-Referenzen:** `src/Softwareschmiede/Softwareschmiede.csproj` referenziert Plugin-Projekte mit `ReferenceOutputAssembly="false"`
 - **Build/Publish-Kopie:** MSBuild-Targets kopieren Plugin-Artefakte nach `$(OutDir)plugins` bzw. `$(PublishDir)plugins`
 - **Discovery zur Laufzeit:** `PluginManager` lädt alle `*.dll` aus `AppContext.BaseDirectory/plugins` und registriert sie nach `PluginType`
+- **Aktuelle KI-Plugins:** `Softwareschmiede.Plugin.GitHubCopilot` und `Softwareschmiede.Plugin.ClaudeCli`
 
 ### GitHub-Token im Windows Credential Store speichern
 
@@ -240,10 +261,25 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 | Schlüssel | Inhalt |
 |-----------|--------|
 | `Softwareschmiede.GitHub.Token` | GitHub Personal Access Token |
+| `Softwareschmiede.ClaudeCli.Token` | Anthropic API Key für Claude CLI (`ANTHROPIC_API_KEY`) |
 
 ### Weitere Plugin-Konfiguration
 
 Alle weiteren Plugin-Einstellungen (Repository-URL, Organisations-URL) werden direkt in der Oberfläche unter *Projekte → Repository verknüpfen* konfiguriert und sicher in der lokalen SQLite-Datenbank gespeichert.
+
+Für das Claude-CLI-Plugin kann der API-Key alternativ per `cmdkey` gesetzt werden:
+
+```powershell
+cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANTHROPIC_API_KEY>
+```
+
+### Standardplugin je Pluginart konfigurieren
+
+- In **Einstellungen** kann pro Pluginart genau ein Standardplugin gespeichert werden:
+  - `SourceCodeManagement` (z. B. GitHub)
+  - `DevelopmentAutomation` (z. B. GitHub Copilot oder Claude CLI)
+- Die Auswahl wird persistent in den App-Einstellungen gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt.
+- Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin.
 
 ### Arbeitsverzeichnis für lokale Klone
 
@@ -265,7 +301,7 @@ gebildet, z. B.:
 
 ### Was sind Agentenpakete?
 
-Agentenpakete sind **Verzeichnisse mit `.agent.md`-Dateien**, die KI-Agenten und deren Instruktionen definieren. Sie werden beim Start eines KI-Laufs automatisch in das Arbeitsverzeichnis des Branches kopiert und vom KI-Plugin (z. B. GitHub Copilot) ausgewertet.
+Agentenpakete sind **Verzeichnisse mit `.agent.md`-Dateien**, die KI-Agenten und deren Instruktionen definieren. Sie werden beim Start eines KI-Laufs automatisch in das Arbeitsverzeichnis des Branches kopiert und vom KI-Plugin (z. B. GitHub Copilot oder Claude CLI) ausgewertet.
 
 ### Speicherort
 
@@ -293,6 +329,8 @@ agent-packages/
 Eine `.agent.md`-Datei beschreibt einen einzelnen Agenten mit seinen Instruktionen, Werkzeugen und Rollen. Das Format folgt dem Standard für GitHub Copilot Custom Agents.
 
 Wichtig: Der **gesamte Inhalt eines Agentenpaket-Verzeichnisses** muss der Dateistruktur entsprechen, die das jeweils verwendete KI-Plugin erwartet. Diese Strukturvorgaben kommen vom jeweiligen KI-Anbieter und sind in dessen Dokumentation beschrieben (z. B. bei GitHub Copilot in den Vorgaben zu Custom Agents).
+
+Für **Claude CLI** gilt zusätzlich: Der Paketinhalt muss einen `.github`-Ordner enthalten, da dieses Layout zur Kompatibilitätsprüfung verwendet wird.
 
 ### Agentenpakete in der Oberfläche
 
@@ -333,14 +371,18 @@ Softwareschmiede/                            # Solution Root
 │   └── Softwareschmiede.Tests/              # Unit-Tests (xUnit, FluentAssertions, Moq)
 ├── plugins/                                 # Plugin-Projekte (separate Klassenbibliotheken)
 │   ├── Softwareschmiede.Plugin.GitHub/      # Git-Provider Plugin
-│   └── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin
+│   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
+│   └── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
 ├── docs/                                    # Planungsdokumente und Architektur
 │   ├── requirements/
-│   │   └── requirements-analysis.md
+│   │   ├── requirements-analysis.md
+│   │   └── plugin-klassenbibliotheken-github-und-copilot.md
 │   ├── architecture/
 │   │   ├── architecture-blueprint.md
-│   │   └── entity-relationship-model.md
-│   └── improvements/
+│   │   ├── entity-relationship-model.md
+│   │   └── plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md
+│   ├── improvements/
+│   └── tests/
 └── Softwareschmiede.slnx               # Solution-Datei
 ```
 
@@ -377,9 +419,10 @@ flowchart TB
     subgraph Infrastructure["Infrastructure Layer"]
         INL1["EF Core / SQLite"]
         INL2["PluginManager laedt Plugin-DLLs aus dem plugins-Ordner"]
-        INL3["GitHubPlugin / GitHubCopilotPlugin als Plugin-Projekte"]
-        INL4["Windows Credential Store"]
-        INL5["AgentPackage FileSystem Reader"]
+        INL3["GitHubPlugin / GitHubCopilotPlugin / ClaudeCliPlugin"]
+        INL4["CLI-Runner fuer gh, copilot und claude"]
+        INL5["Windows Credential Store"]
+        INL6["AgentPackage FileSystem Reader"]
     end
 
     Presentation -->|ruft auf| Application
@@ -407,7 +450,7 @@ public interface IPlugin
 }
 
 public interface IGitPlugin : IPlugin { /* Git operations */ }
-public interface IKiPlugin : IPlugin { /* AI/Copilot operations */ }
+public interface IKiPlugin : IPlugin { /* AI operations */ }
 ```
 
 `IPluginManager` lädt Plugin-DLLs aus `plugins/` dynamisch und ordnet sie über `PluginType` den Kategorien zu.
@@ -439,9 +482,11 @@ dotnet test --collect:"XPlat Code Coverage"
 - [FluentAssertions](https://fluentassertions.com/) – Lesbare Assertions
 - [Moq](https://github.com/moq/moq4) – Mocking von Plugin-Interfaces und Services
 
-Feature-spezifische Testartefakte zur Kontextsteuerung bei Folgeanweisungen:
+Feature-spezifische Testartefakte:
 - [Testplan: Kontextsteuerung bei Folgeanweisungen](docs/tests/testplan-kontextsteuerung-folgeanweisungen.md)
 - [Testlücken: Kontextsteuerung bei Folgeanweisungen](docs/tests/testluecken-kontextsteuerung-folgeanweisungen.md)
+- [Testplan: Claude-CLI-Integration](docs/tests/testplan-claude-cli-integration.md)
+- [Testlücken: Claude-CLI-Integration](docs/tests/testluecken-claude-cli-integration.md)
 
 ---
 
@@ -453,13 +498,18 @@ Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
 - **Publish:** `dotnet publish src/Softwareschmiede/Softwareschmiede.csproj -c Release`
 - Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
 
-Für die Inbetriebnahme müssen `gh`, `git` und `copilot` auf dem Zielsystem verfügbar sein.
+Für die Inbetriebnahme müssen `gh`, `git`, `copilot` und (für Claude-Läufe) `claude` auf dem Zielsystem verfügbar sein.
 
 ---
 
 ## 📝 Changelog
 
 Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
+
+Zuletzt dokumentiert (README-/Doku-Update):
+- Claude-CLI-Integration als produktiv verfügbares KI-Plugin ergänzt
+- Voraussetzungen, Konfiguration, Usage, Projektstruktur und Roadmap auf aktuellen Stand gebracht
+- Testartefakte für `claude-cli-integration` in der Dokumentationsübersicht verlinkt
 
 ---
 
@@ -470,6 +520,7 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 - [x] Domänenmodell und EF Core Datenbankschema
 - [x] GitHub-Plugin (gh CLI) – vollständige Git-Integration
 - [x] GitHub Copilot-Plugin (copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
+- [x] Claude-CLI-Plugin (claude CLI) – KI-Steuerung inkl. Credential-Integration und Agentenpaket-Kompatibilitätsprüfung
 - [x] Blazor UI: Dashboard, Projekte, Aufgaben, Protokoll, Agentenpakete
 - [x] Folgeanweisungen mit Agent- und Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
 - [x] Windows Credential Store Integration
@@ -477,7 +528,7 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 ### v1.x – Erweiterungen
 - [ ] GitLab-Plugin
 - [ ] Azure DevOps-Plugin
-- [ ] Weiteres KI-Plugin (z. B. OpenAI / Claude)
+- [ ] Weitere KI-Plugins (z. B. OpenAI, Gemini als dedizierte Provider)
 - [ ] Export des Aufgabenprotokolls (PDF / Markdown)
 - [ ] Erweiterte Agentenpaket-Verwaltung (Upload, Bearbeitung in der UI)
 
@@ -487,6 +538,9 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 
 | Dokument | Beschreibung |
 |----------|-------------|
+| [API-Dokumentation (Index)](docs/api/README.md) | Technische Schnittstellen, Plugin-Contracts und Auflösungslogik (inkl. Standardplugin-Mechanik) |
+| [Business-Dokumentation (Index)](docs/business/features.md) | Fachliche Feature-Sicht für Nutzer:innen und Stakeholder (inkl. F014) |
+| [Flow-Dokumentation (Index)](docs/flows/README.md) | Ablaufdiagramme für Services und End-to-End-Prozesse (inkl. Plugin-Default-Flow) |
 | [Anforderungsanalyse](docs/requirements/requirements-analysis.md) | Funktionale und nicht-funktionale Anforderungen, Use Cases, Domänenmodell |
 | [Architektur-Blueprint](docs/architecture/architecture-blueprint.md) | Schichtenarchitektur, Plugin-System, Sequenzdiagramme, Technologieentscheidungen |
 | [Entity-Relationship-Modell](docs/architecture/entity-relationship-model.md) | Datenbankstruktur und Entitäten-Beziehungen |
@@ -495,12 +549,18 @@ Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-His
 | [Feature-Dokumentation](docs/business/features.md) | Fachliche Beschreibung aller Features für nicht-technische Stakeholder |
 | [Feature F005: Aufgabenprotokoll](docs/business/features/F005-aufgabenprotokoll.md) | Fachliche Beschreibung des strukturierten Protokollformats mit Markdown-Darstellung, Sanitizing und Fallback |
 | [Feature F009: Arbeitsverzeichnis konfigurieren](docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md) | Fachliche Beschreibung des konfigurierbaren Arbeitsverzeichnisses inkl. Fallback und Migration |
-| [Feature F010: Plugin-Prinzip für Integrationen](docs/business/features/F010-plugin-prinzip-integrationen.md) | Fachliche Beschreibung der ausgelagerten GitHub-/Copilot-Plugins |
+| [Feature F010: Plugin-Prinzip für Integrationen](docs/business/features/F010-plugin-prinzip-integrationen.md) | Fachliche Beschreibung des ausgelagerten Plugin-Prinzips für Git- und KI-Integrationen |
+| [Dokumentationsplan: claude-cli-integration](docs/documentation-plan.md) | Analyse und Maßnahmenplan zur durchgängigen Doku-Aktualisierung |
+| [Anforderungen: Plugin-Klassenbibliotheken](docs/requirements/plugin-klassenbibliotheken-github-und-copilot.md) | Feature-Anforderungen für Plugin-Architektur und Build-Auslieferung |
+| [Architektur: Plugin-Klassenbibliotheken](docs/architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md) | Technische Architektur für Discovery, Build/Pipeline und Plugin-Design |
+| [Architecture Review: Plugin-Klassenbibliotheken](docs/improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md) | Architekturprüfung mit Findings und Maßnahmen |
 | [Requirements: Kontextsteuerung bei Folgeanweisungen](docs/requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md) | Anforderungsbasis für Kontextmodi bei Folgeanweisungen |
 | [Architektur-Blueprint: Kontextsteuerung bei Folgeanweisungen](docs/architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md) | Technische Umsetzung der Kontextmodi, Persistenz und Prompt-Komposition |
 | [Architecture Review: Kontextsteuerung bei Folgeanweisungen](docs/improvements/kontextsteuerung-folgeanweisungen-architecture-review.md) | Review-Ergebnisse und Auflagen zur Robustheit/UX |
 | [Testplan: Kontextsteuerung bei Folgeanweisungen](docs/tests/testplan-kontextsteuerung-folgeanweisungen.md) | Testabdeckung für Kontextmodi in UI- und Service-Schicht |
 | [Testlücken: Kontextsteuerung bei Folgeanweisungen](docs/tests/testluecken-kontextsteuerung-folgeanweisungen.md) | Nachverfolgung offener Rand- und Fehlerpfade |
+| [Testplan: Claude-CLI-Integration](docs/tests/testplan-claude-cli-integration.md) | Abdeckungsnachweis für Claude-Plugin, Services und Basisklassen |
+| [Testlücken: Claude-CLI-Integration](docs/tests/testluecken-claude-cli-integration.md) | Aktueller Lückenstand (alle identifizierten Punkte geschlossen) |
 | [Plugin-Interfaces](docs/api/plugin-interfaces.md) | Technische Dokumentation der Plugin-Schnittstellen für Plugin-Entwickler |
 | [Workdir-Konfiguration (technisch)](docs/api/workdir-configuration.md) | Technische Umsetzung von Settings, Resolver, Klonpfadbildung und Reason-Codes |
 | [Programmablaufpläne](docs/flows/development-process-flow.md) | Grafische Ablaufpläne und technische Prozessbeschreibungen |
@@ -561,7 +621,15 @@ refactor: KiOrchestrationService in kleinere Methoden aufgeteilt
 
 ## 📄 Lizenz
 
-MIT License *(Platzhalter – wird vor erster Veröffentlichung festgelegt)*
+Die Lizenz ist noch nicht final festgelegt.  
+Vor einem öffentlichen Release wird eine `LICENSE`-Datei ergänzt und diese Sektion aktualisiert.
+
+---
+
+## 📬 Kontakt
+
+- Aktuell kein öffentlicher Maintainer-Kontakt hinterlegt.
+- Für Rückfragen/Feedback bitte Issues im Repository verwenden.
 
 ---
 

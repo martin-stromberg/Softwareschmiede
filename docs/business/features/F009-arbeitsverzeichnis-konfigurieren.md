@@ -78,4 +78,7 @@ Das Speichern wird mit einer verständlichen Fehlermeldung verhindert.
 
 - [F001 – Projektverwaltung](./F001-projektverwaltung.md)
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md)
+- [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md)
+- [F015 – Einstellungen & Persistenz](./F015-einstellungen-und-persistenz.md)
+- [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md)
 - [Zurück zur Übersicht](../features.md)

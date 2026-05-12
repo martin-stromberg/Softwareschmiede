@@ -73,4 +73,5 @@ Ja. Der Ablauf bleibt im Protokoll nachvollziehbar.
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – Folgeanweisungen im Gesamtablauf verstehen
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md) – Antworten und Schritte nachvollziehen
 - [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md) – Passenden Agenten pro Folgeanweisung wählen
+- [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – KI-Plugin-Auswahl beim Prompt
 - [Zurück zur Übersicht](../features.md)

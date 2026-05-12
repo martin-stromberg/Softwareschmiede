@@ -7,10 +7,16 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | Ablauf | Datei | Beschreibung |
 |--------|-------|--------------|
 | [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (inkl. Agent-Auswahl bei Folgeanweisungen) |
-| [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md) | `follow-up-context-steering-flow.md` | Detaillierter Folgeanweisungsfluss für Kontext mitgeben/ignorieren/neu beginnen inkl. Komprimierung, Fehlerpfade und Persistenz |
+| [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md) | `follow-up-context-steering-flow.md` | Folgeanweisungsfluss inkl. Moduslogik, Plugin-Auflösung (Copilot/Claude CLI), Komprimierung und persistenter Kontextdateien |
+| [AufgabeService Statusübergänge](./aufgabe-service-status-flow.md) | `aufgabe-service-status-flow.md` | Statuslebenszyklus einer Aufgabe mit Guard-Checks, Persistenz und Fehlerpfaden |
+| [AutoShutdownOrchestrator](./auto-shutdown-orchestrator-flow.md) | `auto-shutdown-orchestrator-flow.md` | Ereignisgesteuerter Auto-Shutdown beim Übergang laufender Automatisierungen von >0 auf 0 |
+| [PluginSettingsService](./plugin-settings-service-flow.md) | `plugin-settings-service-flow.md` | Lesen/Schreiben von Plugin-Credentials und Laufzeitbezug zur Claude-CLI-Integration |
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 | [KI-Arbeitsprotokoll: Persistierung und Rendering](./ki-arbeitsprotokoll-rendering-flow.md) | `ki-arbeitsprotokoll-rendering-flow.md` | Persistierung des Markdown-Protokolls mit Datumszeile/Schritten sowie sicheres Rendering mit Sanitizing und Fallback |
+| [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
+| [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
+| [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
 
 ---
 
@@ -38,9 +44,30 @@ Beschreibt die Folge-Prompt-Logik mit Agenten-Auswahl, Start-Agent als Standardw
 ---
 
 ### [Ablauf 2c: Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md)
-**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `KiAusfuehrungsService`, `EntwicklungsprozessService`, `IKiPlugin`
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `KiAusfuehrungsService`, `EntwicklungsprozessService`, `PluginManager`, `IKiPlugin`
 
-Beschreibt die Moduslogik **Kontext mitgeben / ignorieren / neu beginnen** inkl. UI-Bestätigung, Soft-/Hard-Limit-Komprimierung, Fehlerpfaden und Persistenz in `{id}.copilot.context.md`.
+Beschreibt die Moduslogik **Kontext mitgeben / ignorieren / neu beginnen** inkl. UI-Bestätigung, Soft-/Hard-Limit-Komprimierung, Fehlerpfaden und pluginabhängiger Persistenz (`{id}.copilot.context.md` / `{id}.claude.context.md`).
+
+---
+
+### [Ablauf 2d: AufgabeService Statusübergänge](./aufgabe-service-status-flow.md)
+**Typ:** `stateDiagram-v2` + `flowchart TD` · **Services:** `AufgabeService`, `SoftwareschmiededDbContext`
+
+Zeigt die vollständigen Statusübergänge von `Offen` bis `Archiviert` inklusive fachlicher Guards (z. B. Archivierung nur aus Endzuständen) und Fehlerbehandlung.
+
+---
+
+### [Ablauf 2e: AutoShutdown-Orchestrierung](./auto-shutdown-orchestrator-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `MainLayout`, `AutoShutdownOrchestrator`, `KiAusfuehrungsService`, `ISystemShutdownService`
+
+Dokumentiert den Toggle-gesteuerten Shutdown-Mechanismus mit Idempotenz pro Zero-Transition und Final-Recheck vor Ausführung des OS-Kommandos.
+
+---
+
+### [Ablauf 2f: Plugin-Settings und Credential-Persistenz](./plugin-settings-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EinstellungenBase`, `PluginSettingsService`, `IPluginManager`, `ICredentialStore`
+
+Beschreibt die Schlüsselbildung `<PluginPrefix>.<FieldKey>`, das Speichern/Löschen von Credentials und die konkrete Nutzung des Claude-Tokens in `ClaudeCliPlugin`.
 
 ---
 
@@ -86,6 +113,27 @@ Beschreibt die Ende-zu-Ende-Pipeline vom Erzeugen des Markdown-Protokolls (`# Da
 
 ---
 
+### [Ablauf 9: Standardplugin-Auflösung und KI-Plugin-Dispatch](./plugin-default-selection-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EinstellungenBase`, `PluginDefaultSettingsService`, `PluginSelectionService`, `AufgabeDetail`, `KiAusfuehrungsService`, `EntwicklungsprozessService`
+
+Beschreibt den End-to-End-Pfad von der Default-Konfiguration in den Einstellungen bis zur tatsächlichen Prompt-Ausführung mit klarer Auflösungskette (**explizit → Default → Fallback**) und KI-Fallback-Präferenz.
+
+---
+
+### [Ablauf 10: ProjektService – Projektverwaltung und Repository-Zuordnung](./projekt-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `ProjektService`, `ProjektListe`, `ProjektDetail`, `AufgabeService`
+
+Beschreibt die Trennung zwischen Übersichtsaktionen (Neu anlegen) und Einzelaktionen auf der Detailseite (Bearbeiten, Archivieren, Löschen, Repository hinzufügen) inklusive Persistenzpfaden.
+
+---
+
+### [Ablauf 11: AgentPackageFileService – Dateisystemoperationen und Pfadsicherheit](./agent-package-file-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `IAgentPackageFileService`, `AgentenpaketeSeite`
+
+Dokumentiert den vollständigen Datei-/Verzeichnis-Flow für Agentenpakete inklusive `ResolveSafePath`-Guard, Namensvalidierung und rekursivem Dateibaum.
+
+---
+
 ## Statusübergänge (Kurzreferenz)
 
 ```
@@ -101,4 +149,5 @@ Vollständiges Zustandsdiagramm: [development-process-flow.md – Zustandsdiagra
 
 - Technische Schnittstellen: [docs/api/plugin-interfaces.md](../api/plugin-interfaces.md)
 - Fachliche Einordnung: [F010 – Plugin-Prinzip für Integrationen](../business/features/F010-plugin-prinzip-integrationen.md)
-- Testabdeckung: [Testplan Plugin-Klassenbibliotheken](../tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md)
+- Testabdeckung Plugin-Architektur: [Testplan Plugin-Klassenbibliotheken](../tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md)
+- Testabdeckung Claude-CLI: [Testplan Claude-CLI-Integration](../tests/testplan-claude-cli-integration.md)

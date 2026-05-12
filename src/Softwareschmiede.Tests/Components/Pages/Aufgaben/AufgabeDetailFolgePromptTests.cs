@@ -44,6 +44,20 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     }
 
     [Fact]
+    public async Task OnInitializedAsync_ShouldPreselectStoredDefaultKiPlugin()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            kiPlugins: [("KI A", "Softwareschmiede.KiA"), ("KI B", "Softwareschmiede.KiB")],
+            storedDefaultKiPluginPrefix: "Softwareschmiede.KiB");
+
+        await sut.InvokeOnInitializedAsync();
+
+        GetPrivateField<string>(sut, "_selectedKiPluginPrefix").Should().Be("Softwareschmiede.KiB");
+    }
+
+    [Fact]
     public async Task FolgePromptAsync_ShouldUseSelectedFollowAgent_AndResetToInitialAgent()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -77,7 +91,40 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.StartedRuns[0].Prompt.Should().Be("Initialer Prompt");
         sut.StartedRuns[0].Agent.Name.Should().Be("agent-alt");
         sut.StartedRuns[0].Kontextmodus.Should().BeNull();
+        sut.StartedRuns[0].KiPluginPrefix.Should().Be("Softwareschmiede.TestKi");
         GetPrivateField<string>(sut, "_prompt").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldForwardSelectedKiPluginPrefix()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            kiPlugins: [("KI A", "Softwareschmiede.KiA"), ("KI B", "Softwareschmiede.KiB")]);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_kiAgentName", "agent-alt");
+        SetPrivateField(sut, "_selectedKiPluginPrefix", "Softwareschmiede.KiB");
+        SetPrivateField(sut, "_prompt", "Initialer Prompt");
+
+        await InvokePrivateAsync(sut, "KiStartenAsync");
+
+        sut.StartedRuns.Should().ContainSingle();
+        sut.StartedRuns[0].KiPluginPrefix.Should().Be("Softwareschmiede.KiB");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"], kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_kiAgentName", "agent-alt");
+        SetPrivateField(sut, "_prompt", "Initialer Prompt");
+
+        await InvokePrivateAsync(sut, "KiStartenAsync");
+
+        sut.StartedRuns.Should().BeEmpty();
+        GetPrivateField<string?>(sut, "_fehler").Should().Contain("Kein KI-Plugin verfügbar");
     }
 
     [Fact]
@@ -283,7 +330,11 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    private async Task<TestAufgabeDetailPage> CreateSutAsync(string initialAgent, IReadOnlyList<string> weitereAgenten)
+    private async Task<TestAufgabeDetailPage> CreateSutAsync(
+        string initialAgent,
+        IReadOnlyList<string> weitereAgenten,
+        IReadOnlyList<(string Name, string Prefix)>? kiPlugins = null,
+        string? storedDefaultKiPluginPrefix = null)
     {
         var projekt = new Projekt
         {
@@ -322,12 +373,37 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
-        var kiPluginMock = new Mock<IKiPlugin>();
+        var kiPluginDefinitions = kiPlugins ?? [("Test KI", "Softwareschmiede.TestKi")];
+        var kiPluginMocks = kiPluginDefinitions.Select(def =>
+        {
+            var mock = new Mock<IKiPlugin>();
+            mock.SetupGet(p => p.PluginName).Returns(def.Name);
+            mock.SetupGet(p => p.PluginPrefix).Returns(def.Prefix);
+            mock.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+            mock.Setup(p => p.GetSettingGroups()).Returns([]);
+            return mock;
+        }).ToList();
         var agentPackageServiceMock = new Mock<IAgentPackageService>();
         var arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
         arbeitsverzeichnisResolverMock
             .Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+        pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(gitPluginMock.Object);
+        var kiPluginObjects = kiPluginMocks.Select(m => m.Object).ToList();
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(kiPluginObjects);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPluginObjects.FirstOrDefault() ?? new Mock<IKiPlugin>().Object);
+        var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        if (!string.IsNullOrWhiteSpace(storedDefaultKiPluginPrefix))
+        {
+            await pluginDefaultSettingsService.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, storedDefaultKiPluginPrefix);
+        }
+        var pluginSelectionService = new PluginSelectionService(
+            pluginManagerMock.Object,
+            pluginDefaultSettingsService,
+            NullLogger<PluginSelectionService>.Instance);
 
         var agentNamen = new List<string> { initialAgent };
         agentNamen.AddRange(weitereAgenten);
@@ -346,7 +422,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             aufgabeService,
             protokollService,
             gitPluginMock.Object,
-            kiPluginMock.Object,
+            pluginSelectionService,
             agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
             new ConfigurationBuilder().Build(),
@@ -360,6 +436,8 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         var sut = new TestAufgabeDetailPage { Id = aufgabe.Id };
         SetInjectedProperty(sut, "ServiceScopeFactory", new Mock<IServiceScopeFactory>().Object);
+        SetInjectedProperty(sut, "PluginManager", pluginManagerMock.Object);
+        SetInjectedProperty(sut, "PluginSelection", pluginSelectionService);
         SetInjectedProperty(sut, "AufgabeService", aufgabeService);
         SetInjectedProperty(sut, "EntwicklungsprozessService", entwicklungsprozessService);
         SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
@@ -453,13 +531,18 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
     private sealed class TestAufgabeDetailPage : AufgabeDetail
     {
-        public List<(string Prompt, AgentInfo Agent, string? Model, FolgeanweisungsKontextmodus? Kontextmodus)> StartedRuns { get; } = [];
+        public List<(string Prompt, AgentInfo Agent, string? Model, FolgeanweisungsKontextmodus? Kontextmodus, string? KiPluginPrefix)> StartedRuns { get; } = [];
 
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
 
-        protected override void StartKiLauf(string prompt, AgentInfo agent, string? model, FolgeanweisungsKontextmodus? kontextmodus)
+        protected override void StartKiLauf(
+            string prompt,
+            AgentInfo agent,
+            string? model,
+            FolgeanweisungsKontextmodus? kontextmodus,
+            string? selectedKiPluginPrefix)
         {
-            StartedRuns.Add((prompt, agent, model, kontextmodus));
+            StartedRuns.Add((prompt, agent, model, kontextmodus, selectedKiPluginPrefix));
         }
 
         protected override void NotifyStateChanged()

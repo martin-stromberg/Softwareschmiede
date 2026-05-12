@@ -15,6 +15,8 @@ public sealed class ProgramDiWiringTests
         source.Should().Contain("builder.Services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());");
         source.Should().Contain("builder.Services.AddSingleton<IAutoShutdownOrchestrator, AutoShutdownOrchestrator>();");
         source.Should().Contain("builder.Services.AddSingleton<ISystemShutdownService, SystemShutdownService>();");
+        source.Should().Contain("builder.Services.AddScoped<PluginDefaultSettingsService>();");
+        source.Should().Contain("builder.Services.AddScoped<PluginSelectionService>();");
     }
 
     private static string FindRepositoryRoot()

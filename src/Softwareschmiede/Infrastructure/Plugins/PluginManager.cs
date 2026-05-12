@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.Extensions.DependencyInjection;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 
@@ -49,9 +50,18 @@ public sealed class PluginManager : IPluginManager
     public IKiPlugin GetDefaultDevelopmentAutomationPlugin()
     {
         EnsureInitialized();
-        return _kiPlugins.FirstOrDefault()
+        return _kiPlugins
+                   .OrderBy(GetKiPluginPriority)
+                   .ThenBy(p => p.PluginName, StringComparer.OrdinalIgnoreCase)
+                   .FirstOrDefault()
                ?? throw new InvalidOperationException("Kein Development-Automation-Plugin verfügbar.");
     }
+
+    private static int GetKiPluginPriority(IKiPlugin plugin)
+        => plugin is CliKiPluginBase cliPlugin
+           && string.Equals(cliPlugin.ProviderDateiPraefix, "copilot", StringComparison.OrdinalIgnoreCase)
+            ? 0
+            : 1;
 
     private void EnsureInitialized()
     {
