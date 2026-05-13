@@ -23,8 +23,8 @@
 | `ResetAsync` | ✅ | Stellt Git-Repository sicher und delegiert auf Git-Basislogik. |
 | `CheckHealthAsync` | ✅ | Liefert immer `true`. |
 | `GetIssuesAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
-| `PushBranchAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
-| `PullAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
+| `PushBranchAsync` | ✅ (nur `SeparateWorkingDirectory`) | Kein klassischer `git push`: **Push-Sync** als Dateisynchronisation `WorkingDirectory -> SourceDirectory` (inkl. **Delete-Sync** über `git status --porcelain`). |
+| `PullAsync` | ✅ (nur `SeparateWorkingDirectory`) | Kein Merge-Workflow: **Pull-Sync** als Dateisynchronisation `SourceDirectory -> WorkingDirectory` (ff-only/rebase-äquivalentes Verhalten ohne Merge-Commit). |
 | `CreatePullRequestAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
 | `GetRemoteBranchesAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
 | `GetDefaultBranchAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
@@ -44,11 +44,33 @@
 - Das Ziel muss:
   - ungleich Quelle sein,
   - leer sein (falls vorhanden).
-- Danach entscheidet das Plugin deterministisch:
+- Danach entscheidet das Plugin deterministisch (Git-Workflow-Fallback):
   1. Quelle ist Git-Repository → `git clone source target`
-  2. Quelle ist kein Git-Repository + `ConfirmGitInitInSourceDirectory=true` → `git init` in Quelle, danach `git clone`
+  2. Quelle ist kein Git-Repository + `ConfirmGitInitInSourceDirectory=true` → **git-init-Fallback**: `git init` in Quelle, danach `git clone`
   3. Quelle ist kein Git-Repository + `ConfirmGitInitInSourceDirectory!=true` → Copy-Fallback (`CopyDirectoryWithGuardrails`), kein Clone
 - Bei Clone-Fehlern wird das Zielverzeichnis aufgeräumt.
+
+## Git-Workflow-Fallback im `SeparateWorkingDirectory`-Modus
+
+### Pull-Sync (`PullAsync`)
+
+- Führt **keinen Merge** aus und erstellt keine Merge-Commits.
+- Verhalten ist als **ff-only/rebase-äquivalente Policy** dokumentiert: Änderungen werden deterministisch aus dem Quellverzeichnis synchronisiert.
+- Vor der Synchronisation muss das Arbeitsverzeichnis sauber sein (`git status --porcelain` leer), sonst Abbruch mit `InvalidOperationException` (z. B. bei lokalen Änderungen/Konfliktlage).
+- Es wird ein Hinweis geloggt, dass kein Merge durchgeführt wird.
+- **Warning:** Bei Konflikt- oder manuellem Eingriffsbedarf muss die Situation außerhalb von `PullAsync` bereinigt werden (z. B. manuelle Auflösung/Commit/Reset), danach Pull erneut starten.
+
+### Push-Sync (`PushBranchAsync`)
+
+- Führt **keinen Remote-Push** aus.
+- Stattdessen werden Dateien vom Arbeitsverzeichnis ins Quellverzeichnis synchronisiert (`WorkingDirectory -> SourceDirectory`, overwrite aktiv).
+- Das entspricht einer lokalen Datei-Synchronisation und nicht einem klassischen `git push origin <branch>`.
+
+### Delete-Sync
+
+- Gelöschte/umbenannte Pfade werden über `git status --porcelain` im Arbeitsverzeichnis erkannt.
+- Status mit `D`, `T` und Rename-Status (`R`, Altpfad aus `old -> new`) werden als Löschkandidaten interpretiert.
+- Die erkannten Pfade werden im Quellverzeichnis entfernt (Datei oder Verzeichnis), sodass Löschungen konsistent synchronisiert sind.
 
 ## Settings und Guardrails (`LocalDirectoryPlugin.<Key>`)
 
@@ -70,9 +92,17 @@
 - Quellverzeichnis muss existieren (`DirectoryNotFoundException` bei fehlendem Pfad).
 - Symlinks/Reparse-Points werden beim Kopieren blockiert (`InvalidOperationException`).
 - Bei Fehler/Abbruch während der Kopie wird das Zielverzeichnis vollständig aufgeräumt.
+- Push in `SeparateWorkingDirectory` nutzt Push-Sync (lokale Dateisynchronisation inkl. Delete-Sync), keinen Remote-Push.
 - Workspace-Auflösung für Folgeoperationen (`CreateBranchAsync`, `CommitAsync`, `ResetAsync`) nutzt:
   1. In-Memory-Mapping des Plugin-Objekts,
   2. Pointer-Datei `.softwareschmiede-local-workspace` (auch nach Plugin-Neuinstanz).
+
+## Grenzen, bekannte Einschränkungen und nächste Schritte
+
+- Kein Remote-Provider-Contract: kein `git push`/`git pull` zu Remotes, keine PR-/Issue-API.
+- Push/Pull im `SeparateWorkingDirectory` sind bewusst lokale Datei-Synchronisationen.
+- Pull läuft nur auf sauberem Workspace; bei `uncommitted changes` wird hart abgebrochen.
+- Bekannter Restpunkt: Ein expliziter UI-Bestätigungsfluss vor Pull ist fachlich vorgesehen, aber nicht Teil der aktuellen automatisierten Testabdeckung.
 
 ## Testabdeckung (relevante Nachweise)
 
@@ -81,6 +111,8 @@
   - Dirty-Workspace-Abbruch
   - Guardrails für `CopyMaxFiles` und `CopyMaxMegabytes`
   - Strategiematrix für `SeparateWorkingDirectory` (`clone`, `init+clone`, `copy`)
+  - Push-Sync und Delete-Sync über `git status --porcelain`
+  - Pull-Sync ohne Merge (nur bei sauberem Workspace)
   - Verzeichnisregeln (Quelle/Ziel verschieden, Ziel leer)
   - Fallback für `SourceDirectory` und Default-Auflösung des Zielpfads via `targetPath`
   - NotSupported-Verhalten für Remote-Methoden

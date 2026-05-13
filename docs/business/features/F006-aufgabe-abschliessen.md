@@ -22,8 +22,8 @@ Sie ist wichtig für alle, die Ergebnisse geordnet an das Team übergeben möcht
 1. Sie öffnen die Aufgabe mit dem Status **In Bearbeitung**.
 2. Sie klicken auf **Commit** und geben eine verständliche Nachricht ein.
 3. Sie öffnen **Push/Pull** und klicken auf **Push**.
-4. Sie klicken auf **Pull Request** und prüfen Titel und Beschreibung.
-5. Sie klicken auf **PR erstellen**.
+4. Falls Ihr SCM-Plugin Pull Requests unterstützt (z. B. GitHub), klicken Sie auf **Pull Request** und prüfen Titel/Beschreibung.
+5. Optional klicken Sie auf **PR erstellen**.
 6. Zum Schluss klicken Sie auf **Abschließen**.
 
 ---
@@ -32,15 +32,19 @@ Sie ist wichtig für alle, die Ergebnisse geordnet an das Team übergeben möcht
 
 Die KI hat ein neues Suchfeld umgesetzt.  
 Sie speichern den Stand über **Commit**.  
-Danach laden Sie ihn mit **Push** hoch.  
-Sie erstellen den Prüfvorschlag mit **PR erstellen** und schließen die Aufgabe ab.
+Danach übertragen Sie ihn mit **Push**:
+- bei Remote-Plugins als klassischer Push zum Remote-Repository,
+- beim **LocalDirectoryPlugin** als Dateisynchronisation vom Arbeitsverzeichnis in den Quellordner (kein `git push`).
+Anschließend erstellen Sie bei Bedarf einen Prüfvorschlag via **PR erstellen** und schließen die Aufgabe ab.
 
 ---
 
 ## Was passiert im Hintergrund?
 
 Beim Commit wird ein fester Zwischenstand Ihrer Änderungen gespeichert.  
-Mit Push wird dieser Stand in die zentrale Ablage übertragen.  
+Mit Push wird dieser Stand pluginabhängig übertragen:
+- **Remote-SCM-Plugins:** Push zum Remote-Repository
+- **LocalDirectoryPlugin:** lokaler Datei-Sync `WorkingDirectory -> SourceDirectory` inkl. Delete-Sync über Git-Status (`git status --porcelain`)  
 Beim Abschließen wird die Aufgabe als erledigt markiert.
 
 ---
@@ -49,6 +53,9 @@ Beim Abschließen wird die Aufgabe als erledigt markiert.
 
 **Kann ich eine Aufgabe ohne PR abschließen?**  
 Ja. Das ist möglich, aber für Teamprüfung meist nicht sinnvoll.
+
+**Ist Push immer ein `git push` zum Remote?**  
+Nein. Beim **LocalDirectoryPlugin** ist Push bewusst eine lokale Dateisynchronisation (kein Remote-`git push`).
 
 **Muss ich immer erst committen?**  
 Für einen sauberen Ablauf ja, sonst fehlen klare Zwischenstände.

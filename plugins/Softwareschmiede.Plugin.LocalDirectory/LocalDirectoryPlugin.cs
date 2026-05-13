@@ -20,6 +20,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     private const int DefaultCopyMaxFiles = 100_000;
     private const long DefaultCopyMaxMegabytes = 10 * 1024;
     private const string WorkspacePointerFileName = ".softwareschmiede-local-workspace";
+    private const string SourcePointerFileName = ".softwareschmiede-local-source";
     private const string CloneStrategyName = "Clone";
     private const string InitThenCloneStrategyName = "InitThenClone";
     private const string CopyFallbackStrategyName = "CopyFallback";
@@ -27,6 +28,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<LocalDirectoryPlugin> _logger;
     private readonly ConcurrentDictionary<string, string> _workspaceMappings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _workspaceSourceMappings = new(StringComparer.OrdinalIgnoreCase);
 
     /// <inheritdoc/>
     public override string PluginName => "Local Directory";
@@ -128,6 +130,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
             await EnsureInitializedInSourceDirectoryAsync(sourcePath, ct);
             WriteWorkspacePointer(targetPath, sourcePath);
             TrackWorkspace(targetPath, sourcePath);
+            TrackSourceDirectory(targetPath, sourcePath, sourcePath);
             return;
         }
 
@@ -140,6 +143,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
             await CloneToWorkingDirectoryAsync(sourcePath, workingPath, ct);
             await ValidateWorkspaceIsCleanAsync(workingPath, ct);
             TrackWorkspace(targetPath, workingPath);
+            TrackSourceDirectory(targetPath, workingPath, sourcePath);
             return;
         }
 
@@ -150,12 +154,15 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
             await CloneToWorkingDirectoryAsync(sourcePath, workingPath, ct);
             await ValidateWorkspaceIsCleanAsync(workingPath, ct);
             TrackWorkspace(targetPath, workingPath);
+            TrackSourceDirectory(targetPath, workingPath, sourcePath);
             return;
         }
 
         LogPreparationStrategy(CopyFallbackStrategyName, "SourceIsNotGitAndGitInitNotConfirmed", sourcePath, workingPath);
         await CopyDirectoryWithGuardrailsAsync(sourcePath, workingPath, ct);
+        await EnsureInitializedInWorkingDirectoryAsync(workingPath, ct);
         TrackWorkspace(targetPath, workingPath);
+        TrackSourceDirectory(targetPath, workingPath, sourcePath);
     }
 
     /// <inheritdoc/>
@@ -167,12 +174,46 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     }
 
     /// <inheritdoc/>
-    public override Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
-        => throw BuildNotSupported(nameof(PushBranchAsync));
+    public override async Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
+    {
+        if (ResolveWorkspaceMode() != WorkspaceMode.SeparateWorkingDirectory)
+        {
+            throw BuildNotSupported(nameof(PushBranchAsync));
+        }
+
+        var workspacePath = ResolveWorkspacePath(localPath);
+        await EnsureGitRepositoryAsync(workspacePath, ct);
+        var sourcePath = await ResolveSourcePathForWorkspaceAsync(workspacePath, ct);
+        EnsureDirectoryExists(sourcePath, "Quellverzeichnis");
+
+        if (string.Equals(workspacePath, sourcePath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Push-Synchronisation erfordert unterschiedliche Pfade für Arbeits- und Quellverzeichnis.");
+        }
+
+        await CopyDirectoryForSyncAsync(workspacePath, sourcePath, overwriteFiles: true, ct);
+        await ApplyDeletedFilesToSourceAsync(workspacePath, sourcePath, ct);
+    }
 
     /// <inheritdoc/>
-    public override Task PullAsync(string localPath, CancellationToken ct = default)
-        => throw BuildNotSupported(nameof(PullAsync));
+    public override async Task PullAsync(string localPath, CancellationToken ct = default)
+    {
+        if (ResolveWorkspaceMode() != WorkspaceMode.SeparateWorkingDirectory)
+        {
+            throw BuildNotSupported(nameof(PullAsync));
+        }
+
+        var workspacePath = ResolveWorkspacePath(localPath);
+        await EnsureGitRepositoryAsync(workspacePath, ct);
+        await ValidateWorkspaceIsCleanAsync(workspacePath, ct);
+        var sourcePath = await ResolveSourcePathForWorkspaceAsync(workspacePath, ct);
+        EnsureDirectoryExists(sourcePath, "Quellverzeichnis");
+
+        _logger.LogInformation(
+            "LocalDirectoryPlugin.PullAsync führt im SeparateWorkingDirectory-Modus keinen Merge aus. Es wird eine Dateisynchronisation von Quelle zu Arbeitsverzeichnis ausgeführt.");
+
+        await CopyDirectoryForSyncAsync(sourcePath, workspacePath, overwriteFiles: true, ct);
+    }
 
     /// <inheritdoc/>
     public override Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default)
@@ -328,7 +369,15 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
             throw new InvalidOperationException($"Workspace-Status konnte nicht geprüft werden: {status.StdErr}");
         }
 
-        if (!string.IsNullOrWhiteSpace(status.StdOut))
+        var relevantChanges = status.StdOut
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.TrimEnd('\r'))
+            .Where(line => line.Length >= 4)
+            .Select(line => NormalizeGitRelativePath(line[3..]))
+            .Where(path => !ShouldSkipRelativePath(path))
+            .ToList();
+
+        if (relevantChanges.Count > 0)
         {
             throw new InvalidOperationException(
                 $"Workspace '{workspacePath}' enthält uncommitted changes. Operation wird aus Sicherheitsgründen abgebrochen.");
@@ -418,6 +467,219 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         }
     }
 
+    private async Task EnsureInitializedInWorkingDirectoryAsync(string workingPath, CancellationToken ct)
+    {
+        if (await IsGitRepositoryAsync(workingPath, ct))
+        {
+            return;
+        }
+
+        var initResult = await RunGitAsync(["init"], workingPath, ct);
+        if (!initResult.IsSuccess)
+        {
+            throw new InvalidOperationException($"git init im Arbeitsverzeichnis fehlgeschlagen: {initResult.StdErr}");
+        }
+    }
+
+    private async Task<string> ResolveSourcePathForWorkspaceAsync(string workspacePath, CancellationToken ct)
+    {
+        var normalizedWorkspace = ResolveAndNormalizePath(workspacePath);
+        if (_workspaceSourceMappings.TryGetValue(normalizedWorkspace, out var mapped))
+        {
+            return mapped;
+        }
+
+        var sourcePointerPath = Path.Combine(normalizedWorkspace, SourcePointerFileName);
+        if (File.Exists(sourcePointerPath))
+        {
+            var pointedSource = ResolveAndNormalizePath(File.ReadAllText(sourcePointerPath));
+            _workspaceSourceMappings[normalizedWorkspace] = pointedSource;
+            return pointedSource;
+        }
+
+        var remoteResult = await RunGitAsync(["config", "--get", "remote.origin.url"], normalizedWorkspace, ct);
+        if (remoteResult.IsSuccess && !string.IsNullOrWhiteSpace(remoteResult.StdOut))
+        {
+            var remotePath = ResolveAndNormalizePath(remoteResult.StdOut.Trim());
+            if (Directory.Exists(remotePath))
+            {
+                _workspaceSourceMappings[normalizedWorkspace] = remotePath;
+                return remotePath;
+            }
+        }
+
+        var configuredSource = _credentialStore.GetCredential($"{PluginPrefix}.{SourceDirectoryKey}");
+        if (!string.IsNullOrWhiteSpace(configuredSource))
+        {
+            var normalizedConfiguredSource = ResolveAndNormalizePath(configuredSource);
+            _workspaceSourceMappings[normalizedWorkspace] = normalizedConfiguredSource;
+            return normalizedConfiguredSource;
+        }
+
+        throw new InvalidOperationException(
+            $"Quellverzeichnis für Workspace '{normalizedWorkspace}' konnte nicht aufgelöst werden.");
+    }
+
+    private async Task CopyDirectoryForSyncAsync(string sourcePath, string destinationPath, bool overwriteFiles, CancellationToken ct)
+    {
+        foreach (var file in EnumerateFilesForSync(sourcePath))
+        {
+            ct.ThrowIfCancellationRequested();
+            var relativePath = Path.GetRelativePath(sourcePath, file);
+            if (ShouldSkipRelativePath(relativePath))
+            {
+                continue;
+            }
+
+            var destinationFile = CombineAndValidatePath(destinationPath, relativePath);
+            var destinationDirectory = Path.GetDirectoryName(destinationFile)
+                ?? throw new InvalidOperationException($"Ungültiger Zielpfad '{destinationFile}'.");
+            Directory.CreateDirectory(destinationDirectory);
+            File.Copy(file, destinationFile, overwrite: overwriteFiles);
+        }
+    }
+
+    private async Task ApplyDeletedFilesToSourceAsync(string workspacePath, string sourcePath, CancellationToken ct)
+    {
+        var deletedPaths = await ResolveDeletedPathsAsync(workspacePath, ct);
+        foreach (var deletedPath in deletedPaths)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (ShouldSkipRelativePath(deletedPath))
+            {
+                continue;
+            }
+
+            var sourceCandidate = CombineAndValidatePath(sourcePath, deletedPath);
+            if (File.Exists(sourceCandidate))
+            {
+                File.Delete(sourceCandidate);
+                continue;
+            }
+
+            if (Directory.Exists(sourceCandidate))
+            {
+                Directory.Delete(sourceCandidate, recursive: true);
+            }
+        }
+    }
+
+    private async Task<IReadOnlyCollection<string>> ResolveDeletedPathsAsync(string workspacePath, CancellationToken ct)
+    {
+        var statusResult = await RunGitAsync(["status", "--porcelain"], workspacePath, ct);
+        if (!statusResult.IsSuccess)
+        {
+            throw new InvalidOperationException($"git status für Delete-Sync fehlgeschlagen: {statusResult.StdErr}");
+        }
+
+        var deletedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var lines = statusResult.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (line.Length < 3)
+            {
+                continue;
+            }
+
+            var status = line[..2];
+            var payload = line[3..];
+
+            if (status.IndexOf('R') >= 0 && payload.Contains(" -> ", StringComparison.Ordinal))
+            {
+                var renameParts = payload.Split(" -> ", 2, StringSplitOptions.None);
+                deletedPaths.Add(NormalizeGitRelativePath(renameParts[0]));
+            }
+
+            if (status.IndexOf('D') >= 0 || status.IndexOf('T') >= 0)
+            {
+                var pathPart = payload.Contains(" -> ", StringComparison.Ordinal)
+                    ? payload.Split(" -> ", 2, StringSplitOptions.None)[0]
+                    : payload;
+                deletedPaths.Add(NormalizeGitRelativePath(pathPart));
+            }
+        }
+
+        return deletedPaths;
+    }
+
+    private static IEnumerable<string> EnumerateFilesForSync(string rootPath)
+    {
+        var directories = new Stack<string>();
+        directories.Push(rootPath);
+
+        while (directories.Count > 0)
+        {
+            var current = directories.Pop();
+            foreach (var directory in Directory.EnumerateDirectories(current))
+            {
+                EnsureNotReparsePoint(directory);
+                var relativeDirectory = Path.GetRelativePath(rootPath, directory);
+                if (ShouldSkipRelativePath(relativeDirectory))
+                {
+                    continue;
+                }
+
+                directories.Push(directory);
+            }
+
+            foreach (var file in Directory.EnumerateFiles(current))
+            {
+                EnsureNotReparsePoint(file);
+                yield return file;
+            }
+        }
+    }
+
+    private static string NormalizeGitRelativePath(string path)
+    {
+        var unquoted = UnquoteGitPath(path.Trim());
+        return unquoted.Replace('/', Path.DirectorySeparatorChar);
+    }
+
+    private static string UnquoteGitPath(string path)
+    {
+        if (path.Length >= 2 && path[0] == '"' && path[^1] == '"')
+        {
+            return path[1..^1]
+                .Replace("\\\"", "\"", StringComparison.Ordinal)
+                .Replace("\\\\", "\\", StringComparison.Ordinal);
+        }
+
+        return path;
+    }
+
+    private static bool ShouldSkipRelativePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath) || relativePath == ".")
+        {
+            return true;
+        }
+
+        var normalized = relativePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        return normalized.Equals(".git", StringComparison.OrdinalIgnoreCase)
+               || normalized.StartsWith($".git{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals(SourcePointerFileName, StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals(WorkspacePointerFileName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CombineAndValidatePath(string rootPath, string relativePath)
+    {
+        var normalizedRoot = ResolveAndNormalizePath(rootPath);
+        var candidate = Path.GetFullPath(Path.Combine(normalizedRoot, relativePath));
+
+        var rootWithSeparator = normalizedRoot.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedRoot
+            : normalizedRoot + Path.DirectorySeparatorChar;
+
+        if (!candidate.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Pfad '{relativePath}' liegt außerhalb des erlaubten Root-Verzeichnisses.");
+        }
+
+        return candidate;
+    }
+
     private static void EnsureNotReparsePoint(string path)
     {
         var attributes = File.GetAttributes(path);
@@ -455,6 +717,20 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         var normalizedResolved = ResolveAndNormalizePath(resolvedPath);
         _workspaceMappings[normalizedRequested] = normalizedResolved;
         _workspaceMappings[normalizedResolved] = normalizedResolved;
+    }
+
+    private void TrackSourceDirectory(string requestedPath, string workspacePath, string sourcePath)
+    {
+        var normalizedRequested = ResolveAndNormalizePath(requestedPath);
+        var normalizedWorkspace = ResolveAndNormalizePath(workspacePath);
+        var normalizedSource = ResolveAndNormalizePath(sourcePath);
+        _workspaceSourceMappings[normalizedRequested] = normalizedSource;
+        _workspaceSourceMappings[normalizedWorkspace] = normalizedSource;
+
+        if (Directory.Exists(normalizedWorkspace))
+        {
+            File.WriteAllText(Path.Combine(normalizedWorkspace, SourcePointerFileName), normalizedSource);
+        }
     }
 
     private void WriteWorkspacePointer(string requestedPath, string resolvedPath)

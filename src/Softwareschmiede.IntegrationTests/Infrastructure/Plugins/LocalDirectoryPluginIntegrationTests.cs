@@ -149,7 +149,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         await sut.CloneRepositoryAsync(sourcePath, targetPath);
 
         File.Exists(Path.Combine(targetPath, "copy-source.txt")).Should().BeTrue();
-        Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeFalse();
+        Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
     }
 
     [Fact]
@@ -170,6 +170,59 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
 
         Directory.Exists(Path.Combine(sourcePath, ".git")).Should().BeTrue();
         Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PushBranchAsync_ShouldSynchronizeFilesAndDeleteTrackedRemovals_InSeparateMode()
+    {
+        var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
+        var sourcePath = CreateTempDirectory();
+        var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-push-sync-{Guid.NewGuid():N}");
+        _tempPaths.Add(targetPath);
+        await InitializeRepositoryAsync(cliRunner, sourcePath);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "delete-me.txt"), "delete");
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "old-name.txt"), "old");
+        await RunGitAsync(cliRunner, sourcePath, "add", ".");
+        await RunGitAsync(cliRunner, sourcePath, "commit", "-m", "add files");
+
+        var credentials = new InMemoryCredentialStore();
+        credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
+        var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(sourcePath, targetPath);
+        await File.WriteAllTextAsync(Path.Combine(targetPath, "readme.txt"), "updated");
+        File.Delete(Path.Combine(targetPath, "delete-me.txt"));
+        await RunGitAsync(cliRunner, targetPath, "mv", "old-name.txt", "new-name.txt");
+
+        await sut.PushBranchAsync(targetPath, "feature/sync");
+
+        (await File.ReadAllTextAsync(Path.Combine(sourcePath, "readme.txt"))).Should().Be("updated");
+        File.Exists(Path.Combine(sourcePath, "delete-me.txt")).Should().BeFalse();
+        File.Exists(Path.Combine(sourcePath, "old-name.txt")).Should().BeFalse();
+        File.Exists(Path.Combine(sourcePath, "new-name.txt")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PullAsync_ShouldRefreshWorkspaceFromSource_WithoutMerge()
+    {
+        var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
+        var sourcePath = CreateTempDirectory();
+        var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-pull-sync-{Guid.NewGuid():N}");
+        _tempPaths.Add(targetPath);
+        await InitializeRepositoryAsync(cliRunner, sourcePath);
+
+        var credentials = new InMemoryCredentialStore();
+        credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
+        var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(sourcePath, targetPath);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "readme.txt"), "source-new");
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "from-source.txt"), "new");
+
+        await sut.PullAsync(targetPath);
+
+        (await File.ReadAllTextAsync(Path.Combine(targetPath, "readme.txt"))).Should().Be("source-new");
+        File.Exists(Path.Combine(targetPath, "from-source.txt")).Should().BeTrue();
     }
 
     [Fact]

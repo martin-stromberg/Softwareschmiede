@@ -1,7 +1,7 @@
 # Ablauf – LocalDirectoryPlugin (WorkspaceMode, Kopierpfad, Guardrails)
 
 **Modul:** `LocalDirectoryPlugin`, `ArbeitsverzeichnisResolver`, `ArbeitsverzeichnisSettingsService`, `EntwicklungsprozessService`, `GitOrchestrationService`  
-**Letzte Aktualisierung:** 2026-05-12
+**Letzte Aktualisierung:** 2026-05-13
 
 ---
 
@@ -54,7 +54,7 @@ sequenceDiagram
             Plugin->>Git: git status --porcelain (target)
         else source ist nicht git-basiert
             Plugin->>Plugin: ConfirmGitInitInSourceDirectory == true?
-            alt bestätigt
+            alt bestätigt (git-init-Fallback)
                 Plugin->>Git: git init (source)
                 Plugin->>Git: git clone source target
                 Plugin->>Git: git status --porcelain (target)
@@ -87,7 +87,7 @@ flowchart TD
     H -- Ja --> N([Workspace bereit])
 
     F -- Nein --> I{ConfirmGitInitInSourceDirectory == true?}
-    I -- Ja --> J[git init source]
+    I -- Ja --> J[git-init-Fallback:\ngit init source]
     J --> K[git clone source destination]
     K --> L[git status --porcelain leer?]
     L -- Nein --> L1[InvalidOperationException\nuncommitted changes]:::error
@@ -126,11 +126,13 @@ flowchart TD
 | Quellverzeichnis existiert nicht | `EnsureDirectoryExists` | `DirectoryNotFoundException` |
 | `InSourceDirectory` ohne `ConfirmGitInitInSourceDirectory=true` und ohne `.git` | `EnsureInitializedInSourceDirectoryAsync` | `InvalidOperationException` |
 | `SeparateWorkingDirectory`: Quelle ist Git-Repository | `CloneToWorkingDirectoryAsync` | `git clone` wird ausgeführt |
-| `SeparateWorkingDirectory`: Quelle ist kein Git + Init bestätigt | `EnsureInitializedInSourceDirectoryAsync` + `CloneToWorkingDirectoryAsync` | `git init` in Quelle, danach `git clone` |
+| `SeparateWorkingDirectory`: Quelle ist kein Git + Init bestätigt | `EnsureInitializedInSourceDirectoryAsync` + `CloneToWorkingDirectoryAsync` | **git-init-Fallback:** `git init` in Quelle, danach `git clone` |
 | `SeparateWorkingDirectory`: Quelle ist kein Git + Init nicht bestätigt | `CopyDirectoryWithGuardrailsAsync` | Copy-Fallback ohne Clone |
 | Dirty Workspace (`git status --porcelain` nicht leer) | `ValidateWorkspaceIsCleanAsync` | `InvalidOperationException` |
 | Copy-Guardrails verletzt (`CopyMaxFiles`, `CopyMaxMegabytes`, Timeout/Cancellation) | `CopyDirectoryWithGuardrailsAsync` | Abbruch + Aufräumen des Zielverzeichnisses |
-| Remote-Operationen (`Push`, `Pull`, `CreatePullRequest`, `GetIssues`, …) | `BuildNotSupported` | `NotSupportedException` |
+| `Push` im `SeparateWorkingDirectory` | `PushBranchAsync` | Dateisynchronisation `WorkingDirectory -> SourceDirectory` (Copy/Overwrite + Delete-Sync via `git status --porcelain`), **kein `git push`** |
+| `Pull` im `SeparateWorkingDirectory` | `PullAsync` | No-Merge-Sync `SourceDirectory -> WorkingDirectory` mit explizitem Hinweislog („kein Merge“) |
+| Nicht unterstützte Remote-Provider-Operationen (`CreatePullRequest`, `GetIssues`, `GetRemoteBranches`, …) | `BuildNotSupported` | `NotSupportedException` |
 
 ---
 
@@ -165,3 +167,11 @@ sequenceDiagram
 - [workdir-resolution-flow.md](./workdir-resolution-flow.md)
 - [development-process-flow.md](./development-process-flow.md)
 - [plugin-settings-service-flow.md](./plugin-settings-service-flow.md)
+
+---
+
+## Bekannte Einschränkungen / nächste Schritte
+
+- Kein Remote-`git push`/`git pull`: Im `SeparateWorkingDirectory` wird ausschließlich Datei-Sync verwendet.
+- Pull führt keinen Merge aus; bei `uncommitted changes` wird vor dem Sync abgebrochen.
+- Offener Restpunkt: UI-seitiger Pull-Bestätigungsdialog in `AufgabeDetail` ist noch nicht automatisiert getestet.

@@ -1,35 +1,30 @@
-# Lifecycle Report: Separates Arbeitsverzeichnis (Git-Init-Fallback)
+# Lifecycle Report: separates-arbeitsverzeichnis-git-init-fallback
 
-## Geplante Ergebnisse
+## Was wurde geplant?
 - Anforderungen: [`docs/requirements/separates-arbeitsverzeichnis-git-init-fallback-requirements-analysis.md`](./requirements/separates-arbeitsverzeichnis-git-init-fallback-requirements-analysis.md)
 - Architektur-Blueprint: [`docs/architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md`](./architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md)
 - ERM: [`docs/architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md`](./architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md)
 - Architecture-Review: [`docs/improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md`](./improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md)
 - Planungsübersicht: [`docs/planning-overview-separates-arbeitsverzeichnis-git-init-fallback.md`](./planning-overview-separates-arbeitsverzeichnis-git-init-fallback.md)
 
-## Umgesetzte Änderungen
-- Der Ablauf für das separate Arbeitsverzeichnis wurde auf eine klare Strategiematrix umgestellt:
-  - Git-Quelle: `git clone`
-  - Nicht-Git + `ConfirmGitInitInSourceDirectory=true`: `git init` in der Quelle, danach `git clone`
-  - Nicht-Git + init nicht aktiviert: Duplikation per Dateikopie (ohne Clone)
-- `LocalDirectoryPlugin.CloneRepositoryAsync` setzt diesen Ablauf um.
-- Strukturierte Logs wurden für die gewählte Strategie und Entscheidungsgründe ergänzt.
-- Fehlerbehandlung beim Clone wurde verbessert (Bereinigung des Zielverzeichnisses bei Fehlschlag).
+## Was wurde implementiert?
+- Git-Fallback für separates Arbeitsverzeichnis in `LocalDirectoryPlugin` (inkl. `git init` bei Bedarf) umgesetzt.
+- `PullAsync` auf Sync Source -> Workspace ohne Merge umgestellt.
+- `PushBranchAsync` auf Datei-Synchronisation Workspace -> Source ohne `git push` umgestellt.
+- Lösch-/Umbenennungs-Synchronisation per `git status --porcelain` ergänzt.
+- Pull-Hinweis „kein Merge“ in den Orchestrierungsservices ergänzt.
 
-## Ergänzte Tests
-- Unit-Tests für alle drei Ausführungspfade (Clone, Init+Clone, Copy-Fallback).
-- Integrationstests für Copy-Fallback sowie Init+Clone-Szenario.
-- Testlücken- und Testplan-Artefakte wurden aktualisiert:
-  - [`docs/tests/testluecken-systemweit.md`](./tests/testluecken-systemweit.md)
-  - [`docs/tests/testplan-systemweit.md`](./tests/testplan-systemweit.md)
+## Welche Tests wurden ergänzt?
+- Erweiterte Unit-Tests in `LocalDirectoryPluginTests` für Guard-, Pull-/Push-Fehlerpfade sowie Delete-Sync.
+- Ergänzter Test in `GitOrchestrationServiceTests` für den Pull-Hinweistext.
+- Testdokumente:
+  - [`docs/tests/testluecken-separates-arbeitsverzeichnis-git-workflow-fallback.md`](./tests/testluecken-separates-arbeitsverzeichnis-git-workflow-fallback.md)
+  - [`docs/tests/testplan-separates-arbeitsverzeichnis-git-workflow-fallback.md`](./tests/testplan-separates-arbeitsverzeichnis-git-workflow-fallback.md)
 
-## Aktualisierte Dokumentation
-- API-, Architektur-, Flow- und Business-Dokumentation wurde auf den neuen Ablauf angepasst.
-- Zusätzlich wurden neue Flows/Fachdokumente ergänzt, u. a.:
-  - [`docs/flows/git-orchestration-service-flow.md`](./flows/git-orchestration-service-flow.md)
-  - [`docs/flows/ki-ausfuehrungs-service-flow.md`](./flows/ki-ausfuehrungs-service-flow.md)
-  - [`docs/business/features/F018-automatisches-herunterfahren.md`](./business/features/F018-automatisches-herunterfahren.md)
+## Was wurde dokumentiert?
+- `README.md` für den geänderten Ablauf aktualisiert.
+- API-, Flow- und Business-Dokumentation für Pull/Push-Verhalten im separaten Workspace aktualisiert.
+- Planungs-, Architektur- und Verbesserungsdokumente auf finalen Stand gebracht.
 
 ## Offene Punkte / Hinweise
-- Kein fachlicher Blocker aus dem Lifecycle-Durchlauf offen.
-- Im Arbeitsbaum existieren weitere parallele Änderungen außerhalb dieses Features; diese sollten vor Merge final abgegrenzt werden.
+- Rest-Risiko: Der UI-Bestätigungsflow vor Pull (`AufgabeDetail`) ist weiterhin nicht automatisiert getestet.

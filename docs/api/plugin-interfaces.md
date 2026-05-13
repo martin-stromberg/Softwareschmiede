@@ -116,11 +116,12 @@ string PluginName { get; }
 
 ### Implementierungshinweis: `LocalDirectoryPlugin`
 
-Für die konkrete `IGitPlugin`-Implementierung `LocalDirectoryPlugin` gelten provider-spezifische Einschränkungen:
+Für die konkrete `IGitPlugin`-Implementierung `LocalDirectoryPlugin` gelten provider-spezifische Abweichungen:
 
-- **Unterstützt:** `CloneRepositoryAsync`, `CreateBranchAsync`, `CommitAsync`, `ResetAsync`, `CheckHealthAsync`
-- **Nicht unterstützt (`NotSupportedException`):** `GetIssuesAsync`, `PushBranchAsync`, `PullAsync`, `CreatePullRequestAsync`, `GetRemoteBranchesAsync`, `GetDefaultBranchAsync`, `CheckoutRemoteBranchAsync`
+- **Unterstützt:** `CloneRepositoryAsync`, `CreateBranchAsync`, `CommitAsync`, `ResetAsync`, `CheckHealthAsync`, `PushBranchAsync` *(nur `SeparateWorkingDirectory`, als Push-Sync)*, `PullAsync` *(nur `SeparateWorkingDirectory`, als Pull-Sync ohne Merge)*
+- **Nicht unterstützt (`NotSupportedException`):** `GetIssuesAsync`, `CreatePullRequestAsync`, `GetRemoteBranchesAsync`, `GetDefaultBranchAsync`, `CheckoutRemoteBranchAsync`
 - **Konfigurations-/Guardrail-Details:** `WorkspaceMode`, `SourceDirectory`, `ConfirmGitInitInSourceDirectory`, `CopyTimeoutSeconds`, `CopyMaxFiles`, `CopyMaxMegabytes`
+- **Git-Workflow-Fallback:** `git-init`-Fallback (`init+clone`) sowie Copy-Fallback bei nicht initialisiertem Quellverzeichnis ohne Opt-in.
 
 Details: [local-directory-plugin.md](./local-directory-plugin.md)
 
@@ -244,6 +245,9 @@ Task PushBranchAsync(string localPath, string branchName, CancellationToken ct =
 
 **Beschreibung:** Pusht einen lokalen Branch in das Remote-Repository (`origin`).
 
+> **Implementierungshinweis `LocalDirectoryPlugin`:**  
+> Im `SeparateWorkingDirectory`-Modus ist dies **kein klassischer Remote-Push**, sondern ein **Push-Sync** (`WorkingDirectory -> SourceDirectory`) inkl. **Delete-Sync** über `git status --porcelain`.
+
 **Parameter:**
 
 | Name | Typ | Pflicht | Beschreibung |
@@ -268,6 +272,10 @@ Task PullAsync(string localPath, CancellationToken ct = default);
 ```
 
 **Beschreibung:** Aktualisiert das lokale Repository durch einen `git pull` vom Remote (`origin`).
+
+> **Implementierungshinweis `LocalDirectoryPlugin`:**  
+> Im `SeparateWorkingDirectory`-Modus ist dies ein **Pull-Sync** (`SourceDirectory -> WorkingDirectory`) **ohne Merge** (ff-only/rebase-äquivalentes Verhalten).  
+> Bei Konflikt- oder manuellem Eingriffsbedarf (z. B. dirty Workspace) bricht der Ablauf ab; die Bereinigung muss manuell erfolgen.
 
 **Parameter:**
 

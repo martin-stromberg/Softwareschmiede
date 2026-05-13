@@ -12,7 +12,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F003 | KI-Entwicklungsprozess | KI starten, Echtzeit-Ausgabe beobachten, Folge-Prompts senden | [F003 – KI-Entwicklungsprozess](./features/F003-ki-entwicklungsprozess.md) |
 | F004 | Agentenpakete | Agentenpakete verstehen, anlegen und für Aufgaben einsetzen | [F004 – Agentenpakete](./features/F004-agentenpakete.md) |
 | F005 | Aufgabenprotokoll | Das Protokoll einer Aufgabe lesen und verstehen | [F005 – Aufgabenprotokoll](./features/F005-aufgabenprotokoll.md) |
-| F006 | Aufgabe abschließen | Änderungen hochladen, Pull Request erstellen, Aufgabe beenden | [F006 – Aufgabe abschließen](./features/F006-aufgabe-abschliessen.md) |
+| F006 | Aufgabe abschließen | Änderungen committen/pushen (pluginabhängig) und Aufgabe sauber beenden | [F006 – Aufgabe abschließen](./features/F006-aufgabe-abschliessen.md) |
 | F007 | Aufgabe abbrechen | Aufgabe abbrechen ohne Änderungen zu speichern | [F007 – Aufgabe abbrechen](./features/F007-aufgabe-abbrechen.md) |
 | F008 | Dashboard | Projektübergreifende Übersicht aller Aufgaben und deren Status | [F008 – Dashboard](./features/F008-dashboard.md) |
 | F009 | Arbeitsverzeichnis konfigurieren | Basis-Arbeitsverzeichnis für lokale Repository-Klone festlegen und Fallback verstehen | [F009 – Arbeitsverzeichnis konfigurieren](./features/F009-arbeitsverzeichnis-konfigurieren.md) |
@@ -23,7 +23,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F014 | Standardplugin & KI-Plugin-Auswahl | Standardplugin je Pluginart festlegen und beim Prompt das konkrete KI-Plugin auswählen | [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./features/F014-standardplugin-ki-plugin-auswahl.md) |
 | F015 | Einstellungen & Persistenz | Welche Einstellungen gespeichert werden und wie sie im Alltag wirken | [F015 – Einstellungen & Persistenz](./features/F015-einstellungen-und-persistenz.md) |
 | F016 | Fehlerbehandlung & Recovery | Wie Sie bei typischen Störungen sicher weiterarbeiten können | [F016 – Fehlerbehandlung & Recovery](./features/F016-fehlerbehandlung-und-recovery.md) |
-| F017 | Lokales Verzeichnis Plugin | Lokale Ordner ohne Remote-Provider als sichere Git-Arbeitsbereiche nutzen | [F017 – Lokales Verzeichnis Plugin](./features/F017-lokales-verzeichnis-plugin.md) |
+| F017 | Lokales Verzeichnis Plugin | Lokale Ordner mit separatem Arbeitsverzeichnis und Git-Workflow-Fallback sicher nutzen | [F017 – Lokales Verzeichnis Plugin](./features/F017-lokales-verzeichnis-plugin.md) |
 | F018 | Automatisches Herunterfahren | Nach dem letzten laufenden KI-Lauf den Rechner automatisch herunterfahren | [F018 – Automatisches Herunterfahren](./features/F018-automatisches-herunterfahren.md) |
 
 ---

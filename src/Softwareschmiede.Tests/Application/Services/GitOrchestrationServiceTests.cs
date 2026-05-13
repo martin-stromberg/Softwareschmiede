@@ -125,6 +125,35 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.PushBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pull", @"C:\repos\task-pull");
+        _gitPluginMock.SetupGet(g => g.PluginPrefix).Returns("LocalDirectoryPlugin");
+
+        await _sut.PullAsync(aufgabe.Id);
+
+        _gitPluginMock.Verify(g => g.PullAsync(@"C:\repos\task-pull", It.IsAny<CancellationToken>()), Times.Once);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
+    }
+
+    [Fact]
+    public async Task PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe Remote", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pull-remote", @"C:\repos\task-pull-remote");
+        _gitPluginMock.SetupGet(g => g.PluginPrefix).Returns("GitHubPlugin");
+
+        await _sut.PullAsync(aufgabe.Id);
+
+        _gitPluginMock.Verify(g => g.PullAsync(@"C:\repos\task-pull-remote", It.IsAny<CancellationToken>()), Times.Once);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Änderungen vom Remote geholt"));
+        protokoll.Should().NotContain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
+    }
+
     /// <summary>PullRequestErstellenAsync nutzt das Repository der Aufgabe und protokolliert den PR.</summary>
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldUseTaskRepositoryAndLog_WhenAufgabeHasLinkedRepository()

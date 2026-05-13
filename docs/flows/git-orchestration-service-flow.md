@@ -4,6 +4,7 @@
 
 Dieser Ablauf dokumentiert die zentrale Git-Orchestrierung in `GitOrchestrationService`.
 Der Service kapselt die UI-nahen Git-Aktionen (Issues laden, Commit/Reset/Push/Pull, Pull Request erstellen) und ergänzt sie um fachliche Guards sowie Protokolleinträge.
+Für `LocalDirectoryPlugin` gelten dabei Fallback-Semantiken: Push als Datei-Synchronisation (`WorkingDirectory -> SourceDirectory`), Pull als No-Merge-Sync mit Hinweis und Delete-Sync über `git status --porcelain`.
 Ein besonderer Fokus liegt auf der Repository-Auflösung für Pull Requests (Aufgaben-Repository vs. Projekt-Repository).
 
 ---
@@ -82,12 +83,12 @@ flowchart TD
 3. **Ausführung der Plugin-Operation**
    - **Code:** `GitOrchestrationService.*` → `IGitPlugin` (`CommitAsync`, `ResetAsync`, `PushBranchAsync`, `PullAsync`, `CreatePullRequestAsync`)
    - **Eingaben:** Lokaler Repository-Pfad, Branch, PR-Metadaten
-   - **Ausgaben/Seiteneffekte:** Git-Kommando läuft im Ziel-Repository; Plugin-Ergebnis wird an den Service zurückgegeben.
+   - **Ausgaben/Seiteneffekte:** Plugin-Aktion läuft im Ziel-Workspace; je Plugin entweder Remote-Git (`git push`/`git pull`) oder Dateisynchronisation (inkl. Delete-Sync via `git status --porcelain`).
 
 4. **Protokollierung jeder Git-Aktion**
    - **Code:** `GitOrchestrationService.*` → `ProtokollService.AddEintragAsync`
    - **Eingaben:** `aufgabeId`, `ProtokollTyp.GitAktion`, formatierter Text
-   - **Ausgaben/Seiteneffekte:** Persistenter Audit-Log in der Aufgabenhistorie.
+   - **Ausgaben/Seiteneffekte:** Persistenter Audit-Log in der Aufgabenhistorie; bei LocalDirectory-Pull expliziter Hinweis „kein Merge, Dateisynchronisation“.
 
 5. **Repository-Auflösung für Pull Requests**
    - **Code:** `GitOrchestrationService.PullRequestErstellenAsync`, `ResolveRepositoryIdAsync`, `ExtractRepositoryIdFromUrl`
@@ -123,6 +124,10 @@ flowchart TD
   - Pfad: `IGitPlugin`-Aufrufe
   - Behandlung: Exception propagiert; Aufrufseite (`AufgabeDetail`/`NeueAufgabe`) setzt UI-Fehlermeldung.
 
+- **Pull im LocalDirectory-Workspace mit Merge-Erwartung**
+  - Pfad: `GitOrchestrationService.PullAsync` + `LocalDirectoryPlugin.PullAsync`
+  - Behandlung: Kein Merge; stattdessen Hinweis-Log und Dateisynchronisation `SourceDirectory -> WorkingDirectory`.
+
 ---
 
 ## Abhängigkeiten
@@ -136,3 +141,11 @@ flowchart TD
 - `src/Softwareschmiede/Domain/Interfaces/IGitPlugin.cs`
 
 > Verwandte Flows: [Entwicklungsprozess-Abläufe](./development-process-flow.md) · [ProjektService](./projekt-service-flow.md) · [KI-Ausführung im Hintergrund](./ki-ausfuehrungs-service-flow.md)
+
+---
+
+## Bekannte Einschränkungen / nächste Schritte
+
+- Für `LocalDirectoryPlugin` sind Push/Pull bewusst lokale Datei-Synchronisationen; Remote-Operationen bleiben ausgeschlossen.
+- Pull im lokalen Workspace führt keinen Merge aus und bricht bei dirty Workspace kontrolliert ab.
+- Als Restpunkt ist ein UI-seitiger Pull-Bestätigungsdialog in `AufgabeDetail` dokumentiert, aber noch nicht automatisiert getestet.

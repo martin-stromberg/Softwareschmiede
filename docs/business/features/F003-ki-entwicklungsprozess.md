@@ -69,9 +69,9 @@ Die KI arbeitet weiter und meldet schließlich den Abschluss.
 ## Was passiert im Hintergrund?
 
 Beim Start der KI bereitet die Softwareschmiede den Code über das gewählte SCM-Plugin als lokale Arbeitsbasis auf.
-Es wird eine separate Arbeitskopie angelegt, damit der ursprüngliche Code unberührt bleibt.
-Das Basis-Arbeitsverzeichnis dieser Arbeitskopie kann in den Einstellungen konfiguriert werden.
-Die KI arbeitet in dieser Kopie. Alle Änderungen bleiben lokal, bis Sie den Abschluss bestätigen.
+Je nach Plugin-Konfiguration wird entweder eine separate Arbeitskopie angelegt (`SeparateWorkingDirectory`) oder direkt im Quellverzeichnis gearbeitet (`InSourceDirectory`).
+Das Basis-Arbeitsverzeichnis für separate Arbeitskopien kann in den Einstellungen konfiguriert werden.
+Die KI arbeitet im jeweils aktiven Workspace. Alle Änderungen bleiben lokal, bis Sie den Abschluss bestätigen.
 Ihre Folge-Anweisungen werden direkt an die KI weitergeleitet – wie eine Unterhaltung.
 
 ---

@@ -120,10 +120,14 @@ public sealed class GitOrchestrationService
 
         await _gitPlugin.PullAsync(aufgabe.LokalerKlonPfad, ct);
 
+        var pullLogText = string.Equals(_gitPlugin.PluginPrefix, "LocalDirectoryPlugin", StringComparison.Ordinal)
+            ? "Pull: Kein Merge durchgeführt. Arbeitsverzeichnis wurde per Dateisynchronisation aktualisiert."
+            : "Pull: Änderungen vom Remote geholt.";
+
         await _protokollService.AddEintragAsync(
             aufgabeId,
             ProtokollTyp.GitAktion,
-            "Pull: Änderungen vom Remote geholt.",
+            pullLogText,
             ct: ct);
 
         _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchgeführt.", aufgabeId);

@@ -1,7 +1,7 @@
 # Ablauf – Arbeitsverzeichnis-Auflösung und Integration mit LocalDirectoryPlugin
 
 **Modul:** `ArbeitsverzeichnisSettingsService`, `ArbeitsverzeichnisResolver`, `EntwicklungsprozessService`, `Einstellungen.razor`  
-**Letzte Aktualisierung:** 2026-05-12
+**Letzte Aktualisierung:** 2026-05-13
 
 ---
 
@@ -14,7 +14,8 @@ Der Prozess bildet daraus immer den angefragten Klonpfad:
 
 `<resolvedBase>/softwareschmiede/<aufgabeId>`
 
-Dieser Pfad wird anschließend an das aktive `IGitPlugin` übergeben (u. a. `LocalDirectoryPlugin`).
+Dieser Pfad wird anschließend an das aktive `IGitPlugin` übergeben (u. a. `LocalDirectoryPlugin`).  
+Im Modus `SeparateWorkingDirectory` entscheidet das Plugin danach zwischen `git clone`, git-init-Fallback (`git init` + `git clone`) oder Copy-Fallback.
 
 ---
 
@@ -60,7 +61,7 @@ sequenceDiagram
 | 3 | Laufzeit-Auflösung beim Prozessstart | `ResolveAsync` prüft den gespeicherten Wert inkl. Schreibprobe |
 | 4 | Fallback bei Laufzeitproblemen | `ResolvedPath = Path.GetTempPath()`, `UsedFallback = true`, `ReasonCode` gesetzt |
 | 5 | Bildung des Klon-Zielpfads | `<ResolvedPath>/softwareschmiede/<aufgabeId>` |
-| 6 | Übergabe an SCM-Plugin | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` |
+| 6 | Übergabe an SCM-Plugin | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)`; bei `LocalDirectoryPlugin` ggf. git-init-Fallback/Copy-Fallback im separaten Arbeitsverzeichnis |
 
 ---
 

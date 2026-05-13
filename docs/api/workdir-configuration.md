@@ -71,6 +71,22 @@ Damit gelten:
 - Beim Start eines Entwicklungsprozesses wird ein Protokolleintrag erzeugt, wenn Fallback aktiv ist.
 - Die Einstellungsseite zeigt bei aktivem Fallback einen Hinweis an.
 
+## Zusammenhang mit „separatem Arbeitsverzeichnis + Git-Workflow-Fallback“
+
+Das hier konfigurierte Basis-Arbeitsverzeichnis steuert den Zielpfad für den Modus `SeparateWorkingDirectory`.
+Darauf bauen die folgenden LocalDirectory-Workflows auf:
+
+- **Git-Fallback im separaten Workspace:** Quelle ist Git → Clone; Quelle ohne Git + Opt-in → `git init` + Clone; sonst Copy-Fallback.
+- **Pull ohne Merge + Nutzerhinweis:** Pull synchronisiert `SourceDirectory -> WorkingDirectory`, erzeugt keinen Merge-Commit.
+- **Push als Datei-Sync statt `git push`:** Push synchronisiert `WorkingDirectory -> SourceDirectory`.
+- **Delete-Sync über Git-Status:** Löschungen/Umbenennungen werden über `git status --porcelain` ermittelt und im Quellverzeichnis gespiegelt.
+
+## Grenzen und bekannte Einschränkungen
+
+- Das Workdir-Setting selbst stellt keine Remote-Git-Funktion bereit (kein PR/Issue/Remote-Branching).
+- Konflikthafte Pull-Situationen mit lokalen Änderungen werden per Guard (`uncommitted changes`) abgebrochen.
+- Ein UI-Bestätigungsdialog für Pull ist als Restpunkt dokumentiert, aber nicht automatisiert getestet.
+
 ## Tests
 
 Relevante Testklassen:
@@ -80,4 +96,3 @@ Relevante Testklassen:
 - `EntwicklungsprozessServiceTests`
 - `EinstellungenBaseArbeitsverzeichnisTests`
 - `WorkdirMigrationTests` (Integration)
-

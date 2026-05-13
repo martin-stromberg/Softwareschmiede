@@ -46,6 +46,12 @@ Beispiele:
 Hinweis: Das **Local Directory**-Plugin besitzt kein separates `WorkingDirectory`-Setting.
 Das in dieser Funktion konfigurierte Basis-Arbeitsverzeichnis steuert daher auch den Zielpfad für `SeparateWorkingDirectory`.
 
+Wenn der Modus `SeparateWorkingDirectory` genutzt wird, greift beim Start eine feste Git-Workflow-Fallback-Logik:
+
+- Git-Quelle vorhanden → Arbeitskopie per Clone
+- Keine Git-Quelle + Init-Bestätigung aktiv → `git init` in der Quelle, danach Clone
+- Keine Git-Quelle + keine Init-Bestätigung → sichere Dateikopie als Fallback
+
 ---
 
 ## Validierung und Fallback
@@ -53,6 +59,15 @@ Das in dieser Funktion konfigurierte Basis-Arbeitsverzeichnis steuert daher auch
 - Nur **absolute und gültige Pfade** werden akzeptiert.
 - Wenn ein gespeicherter Pfad später nicht nutzbar ist (z. B. Laufwerk nicht verfügbar), verwendet die Anwendung automatisch den Fallback.
 - In diesem Fall erscheint ein Hinweis in den Einstellungen, damit Sie den Pfad korrigieren können.
+- Wenn der Zielordner einer Arbeitskopie bereits befüllt ist, wird der Start aus Sicherheitsgründen abgebrochen (kein Überschreiben).
+
+---
+
+## Grenzen und offene Punkte
+
+- Das Arbeitsverzeichnis steuert den Speicherort, ersetzt aber keine Remote-Git-Funktionen.
+- Sehr große Verzeichniskopien können durch Schutzgrenzen (Dateien, Datenmenge, Laufzeit) gestoppt werden.
+- Für konkurrierende gleichzeitige Synchronisationsvorgänge auf identischen Pfaden werden weitere Leitplanken fortlaufend verfeinert.
 
 ---
 

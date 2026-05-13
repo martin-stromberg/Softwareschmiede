@@ -35,6 +35,19 @@ Das ist sinnvoll für interne Codebasen, Offline-Szenarien oder vorbereitete Arb
 - Das Ziel der Arbeitskopie wird aus dem globalen Arbeitsverzeichnis (`repositories.workdir`) und der Aufgaben-ID gebildet.
 - Schutzregeln verhindern riskante Kopien (z. B. zu viele Dateien, zu große Datenmenge, Timeout).
 
+#### Git-Workflow-Fallback im separaten Arbeitsverzeichnis
+
+Beim Vorbereiten der Arbeitskopie nutzt das System eine feste Reihenfolge:
+
+1. **Quelle ist bereits ein Git-Repository**  
+   → Die Arbeitskopie wird per Clone erstellt.
+2. **Quelle ist kein Git-Repository + „git init im Quellverzeichnis bestätigen“ = Ja**  
+   → Die Quelle wird initialisiert, danach wird geklont.
+3. **Quelle ist kein Git-Repository + Bestätigung = Nein**  
+   → Die Dateien werden als sichere Kopie übernommen (Copy-Fallback) und das Arbeitsverzeichnis wird für lokale Commits vorbereitet.
+
+Damit bleibt der Modus `SeparateWorkingDirectory` auch bei gemischten Ausgangslagen nutzbar.
+
 ### InSourceDirectory
 
 - Die Arbeit erfolgt direkt im Quellordner.
@@ -47,8 +60,30 @@ Das ist sinnvoll für interne Codebasen, Offline-Szenarien oder vorbereitete Arb
 
 - Das Plugin arbeitet lokal und unterstützt die Kernschritte **Branch erstellen**, **Commit** und **Reset**.
 - Für die Projektverknüpfung wird plugin-gesteuert das Feld **SourceDirectory** abgefragt.
-- Nicht passende Remote-Funktionen (z. B. Pull Request erstellen, Push/Pull, Issues laden) sind bewusst nicht verfügbar.
+- Nicht passende Remote-Funktionen (z. B. Pull Request erstellen, Remote-Push/Pull, Issues laden) sind bewusst nicht verfügbar.
 - Beim Modus `InSourceDirectory` wird eine Zuordnung zum echten Arbeitsort gespeichert, damit Folgeschritte stabil im richtigen Ordner laufen.
+- Im Modus `SeparateWorkingDirectory` gilt:
+  - **Pull** aktualisiert die Arbeitskopie aus der Quelle als Dateisynchronisation (**ohne Merge**).
+  - **Push** überträgt Änderungen aus der Arbeitskopie zurück in die Quelle als Dateisynchronisation (**kein Remote-`git push`**).
+  - **Delete-Sync** spiegelt Löschungen/Umbenennungen aus dem Workspace über Git-Status (`git status --porcelain`) in den Quellordner.
+
+---
+
+## Grenzen, Limitierungen und offene Punkte
+
+### Aktuelle Grenzen
+
+- Dieses Plugin ist für **lokale Verzeichnisse** gedacht, nicht für Remote-Workflows (kein PR, kein Remote-Push).
+- Bei Synchronisationen werden technische Metadaten wie `.git` nicht zwischen Quelle und Arbeitskopie gespiegelt.
+- Symlinks/Reparse-Points sind aus Sicherheitsgründen ausgeschlossen.
+- Bei sehr großen Datenmengen greifen Schutzgrenzen (Dateianzahl, MB, Timeout), um riskante Kopiervorgänge abzubrechen.
+
+### Offene Punkte (fachlich bekannt)
+
+- Für parallele gleichzeitige Push/Pull-Aktionen auf denselben Pfaden sind noch weitergehende Leitplanken vorgesehen.
+- Der genaue Konfliktpfad für „Pull ohne Merge“ wird weiter präzisiert (insbesondere bei stark divergierenden lokalen Ständen).
+- Audit-Konventionen für automatische Initialisierungen (z. B. einheitliche Metadaten) werden weiter geschärft.
+- Ein UI-Bestätigungsdialog vor Pull in der Aufgabenansicht ist als Restpunkt bekannt und bisher nicht automatisiert getestet.
 
 ---
 
