@@ -31,6 +31,24 @@ Das Feature „Standardplugin je Pluginart & KI-Plugin-Auswahl“ ist ein **inte
 | KI-Plugin-Auswahl beim Prompt | `selectedKiPluginPrefix` wird von der Aufgaben-Detailseite an `KiAusfuehrungsService` und `EntwicklungsprozessService` weitergereicht |
 | Auflösung inkl. Fallback | `PluginSelectionService`: explizite Auswahl → gespeicherter Default → Fallback |
 
+## Feature-Impact: Kontextsteuerung bei Folgeanweisungen
+
+Die Kontextmodi für Folgeanweisungen (`KontextMitgeben`, `KontextIgnorieren`, `KontextNeuBeginnen`) werden in der Application-Schicht umgesetzt und ändern **keine** öffentliche HTTP-Schnittstelle.
+
+- HTTP-Methode & Pfad: nicht anwendbar
+- Authentifizierung: nicht anwendbar
+- Request/Response: nicht anwendbar
+- `curl`-Beispiel: nicht anwendbar
+
+## Feature-Impact: Claude CLI Integration
+
+Die Integration von `ClaudeCliPlugin` erweitert den internen `IKiPlugin`-Betrieb, führt jedoch **keine** neuen öffentlichen HTTP-Endpunkte ein.
+
+- HTTP-Methode & Pfad: nicht anwendbar
+- Authentifizierung: nicht anwendbar
+- Request/Response: nicht anwendbar
+- `curl`-Beispiel: nicht anwendbar
+
 ## Verknüpfte Dokumentation
 
 - Business: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)

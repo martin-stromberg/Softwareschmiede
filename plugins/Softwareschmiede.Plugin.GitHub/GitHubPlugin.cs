@@ -15,6 +15,8 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
 {
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
+    private const string RepositoryUrlKey = "RepositoryUrl";
+    private const string RepositoryNameKey = "RepositoryName";
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubPlugin> _logger;
@@ -41,6 +43,25 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
                 Description: "GitHub Personal Access Token mit den Berechtigungen repo und read:org. Token erstellen: https://github.com/settings/tokens/new",
                 IsRequired: true)
         ])
+    ];
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() =>
+    [
+        new PluginSettingField(
+            Key: RepositoryUrlKey,
+            Label: "Repository-URL",
+            FieldType: PluginSettingFieldType.Url,
+            Placeholder: "https://github.com/owner/repo",
+            Description: "Vollständige URL des GitHub-Repositories.",
+            IsRequired: true),
+        new PluginSettingField(
+            Key: RepositoryNameKey,
+            Label: "Repository-Name",
+            FieldType: PluginSettingFieldType.Text,
+            Placeholder: "owner/repo",
+            Description: "Repository-ID für API-Aufrufe und Pull-Requests.",
+            IsRequired: true)
     ];
 
     /// <summary>Erstellt eine neue Instanz des <see cref="GitHubPlugin"/>.</summary>

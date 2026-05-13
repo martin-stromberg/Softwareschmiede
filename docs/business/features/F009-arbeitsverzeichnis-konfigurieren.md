@@ -43,8 +43,8 @@ Beispiele:
 - Konfiguriert: `D:\Repos` → `D:\Repos\softwareschmiede\<aufgabeId>`
 - Default/Fallback: `<Temp>` → `<Temp>\softwareschmiede\<aufgabeId>`
 
-Hinweis: Wenn im **Local Directory**-Plugin zusätzlich ein eigenes `WorkingDirectory` gesetzt ist,
-hat diese plugin-spezifische Vorgabe für dieses Plugin Vorrang.
+Hinweis: Das **Local Directory**-Plugin besitzt kein separates `WorkingDirectory`-Setting.
+Das in dieser Funktion konfigurierte Basis-Arbeitsverzeichnis steuert daher auch den Zielpfad für `SeparateWorkingDirectory`.
 
 ---
 

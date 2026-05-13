@@ -199,3 +199,125 @@
 
 ### Offene Punkte
 - Keine kritischen offenen Dokumentationslücken für das Feature „Lokales Verzeichnis Plugin“ identifiziert.
+
+---
+
+# Dokumentationsplan – Feature „Übersetzte WorkspaceMode-Werte & dynamische Repository-Felder“ – 2026-05-13
+
+## Kontext
+- Feature bereits implementiert und mit ergänzten Tests abgesichert.
+- Fokus:
+  - Übersetzte `WorkspaceMode`-Enumwerte in den Einstellungen
+  - Kein `WorkingDirectory`-Plugin-Setting mehr
+  - `SourceDirectory` im Projekt-/Repository-Kontext
+  - Plugin-gesteuerte dynamische Repository-Felder inkl. Standardplugin-Vorauswahl
+  - GitHub-Felder `RepositoryUrl` und `RepositoryName`
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `local-directory-plugin.md` enthielt veralteten Eintrag `WorkingDirectory`.
+- `plugin-interfaces.md` beschrieb `GetRepositoryLinkFields` im Interface nicht explizit.
+- `README.md` in `docs/api/` nannte dynamische Repository-Feldschemata noch nicht.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `local-directory-plugin-flow.md` referenzierte noch `WorkingDirectory` im Clone-Pfad.
+- `projekt-service-flow.md` beschrieb Repository-Verknüpfung noch als starre Parameter statt plugin-gesteuertem Feldschema.
+
+### Business-Dokumentation (`docs/business/`)
+- `F009` erwähnte veraltet ein plugin-spezifisches `WorkingDirectory`.
+- `F015` und `F017` deckten neue Aspekte (übersetzte WorkspaceMode-Labels, `SourceDirectory` als Repository-Linkfeld) noch nicht vollständig ab.
+
+### README
+- Enthielt noch `LocalDirectoryPlugin.WorkingDirectory`.
+- Repository-Verknüpfung war nicht klar als plugin-gesteuertes dynamisches Feldschema beschrieben.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Veraltete `WorkingDirectory`-Aussagen in API/Flow/Business/README entfernen.
+2. **Hoch:** Dynamische Repository-Feldlogik (`GetRepositoryLinkFields`, Default-SCM-Vorauswahl) in API/Flow/README dokumentieren.
+3. **Mittel:** Fachliche Texte zu übersetzten WorkspaceMode-Labels und `SourceDirectory`-Nutzung präzisieren.
+
+## Ergebnis (Phase 3)
+
+### Aktualisiert
+1. `docs/api/local-directory-plugin.md`
+2. `docs/api/plugin-interfaces.md`
+3. `docs/api/README.md`
+4. `docs/flows/local-directory-plugin-flow.md`
+5. `docs/flows/projekt-service-flow.md`
+6. `docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md`
+7. `docs/business/features/F015-einstellungen-und-persistenz.md`
+8. `docs/business/features/F017-lokales-verzeichnis-plugin.md`
+9. `README.md`
+10. `docs/documentation-plan.md`
+
+### Validierung
+- Alle aktualisierten Dateien vorhanden und nicht leer.
+- Dokumentationsinhalte auf Implementierung abgeglichen:
+  - `EinstellungenBase` (`WorkspaceModeDisplayLabels`, Enum-Rendering)
+  - `ProjektDetail` (`GetRepositoryLinkFields`, Default-SCM-Auflösung)
+  - `LocalDirectoryPlugin` (kein `WorkingDirectory`-Setting, `SourceDirectory`)
+  - `GitHubPlugin` (`RepositoryUrl`, `RepositoryName`)
+
+### Offene Punkte
+- Keine fachlich kritischen offenen Dokumentationslücken im genannten Feature-Fokus identifiziert.
+
+---
+
+# Dokumentationsplan – Vollständige Orchestrierung (Agentenschwarm + Parallelisierung) – 2026-05-13
+
+## Kontext
+- Ausführung gemäß Agentendefinition `documentation-orchestrator`.
+- Ziel: Vollständige Analyse und Aktualisierung der Projektdokumentation in `docs/api/`, `docs/flows/`, `docs/business/` sowie `README.md`.
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `docs/api/` existiert und enthält bereits Kernartefakte (`README.md`, `http-endpoints.md`, `plugin-interfaces.md`, `local-directory-plugin.md`, `plugin-default-selection.md`, `workdir-configuration.md`).
+- Im Code wurden weiterhin keine öffentlichen HTTP-Endpoints identifiziert (Blazor/Razor Components statt REST-Controller/Minimal-API-Routen).
+- Lücke: explizite, featurebezogene Klarstellung in `http-endpoints.md` zu neueren Features.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `docs/flows/` existiert und enthält viele bestehende Flows.
+- Lücken: keine dedizierten Flows für `GitOrchestrationService` und `KiAusfuehrungsService`; Querverweise aus vorhandenen Flows ausbaufähig.
+
+### Business-Dokumentation (`docs/business/`)
+- `docs/business/features.md` mit bestehendem Feature-Katalog vorhanden.
+- Lücken: einzelne Feature-Seiten waren gegenüber der aktuellen UI/Prozessführung veraltet (u. a. F001, F002, F006, F008); Auto-Shutdown-Funktion fachlich noch nicht als eigenes Feature dokumentiert.
+
+### README (`README.md`)
+- Struktur grundsätzlich vollständig.
+- Lücken: einzelne veraltete/inkonsistente Inhalte, inklusive früherer Bild-/Verweisprobleme und notwendiger Präzisierungen zum Implementierungsstatus.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Konsistenz zwischen realer Implementierung und API-/Business-/Flow-Dokumentation herstellen.
+2. **Hoch:** Fehlende dedizierte Flows für zentrale Services ergänzen.
+3. **Mittel:** README auf aktuellen Stand inkl. validierbarer lokaler Verweise bringen.
+4. **Mittel:** Fachliche Abdeckung von Auto-Shutdown als eigenes Feature ergänzen.
+
+## Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/flows/git-orchestration-service-flow.md`
+2. `docs/flows/ki-ausfuehrungs-service-flow.md`
+3. `docs/business/features/F018-automatisches-herunterfahren.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/http-endpoints.md`
+3. `docs/flows/README.md`
+4. `docs/flows/development-process-flow.md`
+5. `docs/flows/auto-shutdown-orchestrator-flow.md`
+6. `docs/business/features.md`
+7. `docs/business/features/F001-projektverwaltung.md`
+8. `docs/business/features/F002-aufgabenverwaltung.md`
+9. `docs/business/features/F006-aufgabe-abschliessen.md`
+10. `docs/business/features/F008-dashboard.md`
+
+### Validierung
+- Existenz- und Nicht-Leerheitsprüfung für alle in diesem Lauf erzeugten/aktualisierten Hauptartefakte: **erfolgreich**.
+- API-Status geprüft: **keine öffentlichen HTTP-Endpunkte** weiterhin konsistent dokumentiert.
+
+### Offene Punkte
+1. `LICENSE`-Datei im Repository fehlt weiterhin (Lizenztext derzeit nur im README referenziert).
+2. Optional: Dedizierte `CHANGELOG.md` ergänzen (aktuell Changelog-Abschnitt im README).

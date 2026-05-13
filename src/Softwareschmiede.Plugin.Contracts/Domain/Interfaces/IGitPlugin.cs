@@ -5,6 +5,14 @@ namespace Softwareschmiede.Domain.Interfaces;
 /// <summary>Git-Provider Plugin Interface.</summary>
 public interface IGitPlugin : IPlugin
 {
+    /// <summary>
+    /// Liefert die Felder für die projektbezogene Repository-Verknüpfung.
+    /// </summary>
+    /// <remarks>
+    /// Diese Felder steuern die UI für "Repository verknüpfen" (Label, Placeholder, Pflichtfelder).
+    /// </remarks>
+    IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
+
     /// <summary>Ruft Issues aus dem Repository ab.</summary>
     /// <param name="repositoryId">Repository-Identifier (z.B. "owner/repo").</param>
     /// <param name="ct">Cancellation Token.</param>

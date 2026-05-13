@@ -133,6 +133,46 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CloneRepositoryAsync_ShouldUseCopyFallback_WhenSeparateModeSourceIsNotGitAndInitNotConfirmed()
+    {
+        var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
+        var sourcePath = CreateTempDirectory();
+        var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-copy-fallback-{Guid.NewGuid():N}");
+        _tempPaths.Add(targetPath);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "copy-source.txt"), "copy-me");
+
+        var credentials = new InMemoryCredentialStore();
+        credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
+        credentials.SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "false");
+        var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(sourcePath, targetPath);
+
+        File.Exists(Path.Combine(targetPath, "copy-source.txt")).Should().BeTrue();
+        Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldInitSourceAndClone_WhenSeparateModeSourceIsNotGitAndInitConfirmed()
+    {
+        var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
+        var sourcePath = CreateTempDirectory();
+        var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-init-clone-{Guid.NewGuid():N}");
+        _tempPaths.Add(targetPath);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "untracked.txt"), "content");
+
+        var credentials = new InMemoryCredentialStore();
+        credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
+        credentials.SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
+        var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(sourcePath, targetPath);
+
+        Directory.Exists(Path.Combine(sourcePath, ".git")).Should().BeTrue();
+        Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task CreateBranchCommitReset_ShouldWork_AfterPluginRecreation_UsingPointerFile()
     {
         var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);

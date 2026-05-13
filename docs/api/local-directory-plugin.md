@@ -41,11 +41,14 @@
 
 ### `SeparateWorkingDirectory`
 
-- `sourcePath` wird in ein separates Arbeitsverzeichnis kopiert.
 - Das Ziel muss:
   - ungleich Quelle sein,
   - leer sein (falls vorhanden).
-- Nach dem Kopieren wird ein Git-Repository sichergestellt und anschließend auf dirty Workspace geprüft.
+- Danach entscheidet das Plugin deterministisch:
+  1. Quelle ist Git-Repository → `git clone source target`
+  2. Quelle ist kein Git-Repository + `ConfirmGitInitInSourceDirectory=true` → `git init` in Quelle, danach `git clone`
+  3. Quelle ist kein Git-Repository + `ConfirmGitInitInSourceDirectory!=true` → Copy-Fallback (`CopyDirectoryWithGuardrails`), kein Clone
+- Bei Clone-Fehlern wird das Zielverzeichnis aufgeräumt.
 
 ## Settings und Guardrails (`LocalDirectoryPlugin.<Key>`)
 
@@ -53,11 +56,14 @@
 |---|---|---|---|
 | `WorkspaceMode` | Enum | `SeparateWorkingDirectory` | Modusauswahl: exakt `InSourceDirectory` oder `SeparateWorkingDirectory` (case-sensitive Parsing). Ungültige Werte fallen auf `SeparateWorkingDirectory` zurück. |
 | `SourceDirectory` | String | – | Fallback-Quelle, wenn `repositoryUrl` beim Clone leer ist. |
-| `WorkingDirectory` | String | – | Optionales Zielverzeichnis für `SeparateWorkingDirectory`; überschreibt `targetPath`. |
 | `ConfirmGitInitInSourceDirectory` | Bool (`true`/`false`) | `false` | Erforderliche explizite Freigabe für `git init` im Quellverzeichnis, falls dort noch kein Git-Repository existiert. |
 | `CopyTimeoutSeconds` | Integer | `600` | Timeout der Verzeichniskopie. Werte `< 1` oder ungültig fallen auf Default zurück. |
 | `CopyMaxFiles` | Integer | `100000` | Maximale Dateianzahl je Kopiervorgang. Werte `< 1` oder ungültig fallen auf Default zurück. |
 | `CopyMaxMegabytes` | Integer | `10240` | Maximale Datenmenge (MB) je Kopiervorgang. Werte `< 1` oder ungültig fallen auf Default zurück. |
+
+> Hinweis: Ein plugin-spezifisches `WorkingDirectory`-Setting existiert nicht mehr.  
+> Das Zielverzeichnis für `SeparateWorkingDirectory` stammt aus dem vom Prozess übergebenen `targetPath`
+> (auf Basis von `repositories.workdir` + `softwareschmiede/<aufgabeId>`).
 
 ## Weitere Sicherheits-/Stabilitätsregeln
 
@@ -74,10 +80,12 @@
   - Bestätigungspflicht für `git init` in `InSourceDirectory`
   - Dirty-Workspace-Abbruch
   - Guardrails für `CopyMaxFiles` und `CopyMaxMegabytes`
+  - Strategiematrix für `SeparateWorkingDirectory` (`clone`, `init+clone`, `copy`)
   - Verzeichnisregeln (Quelle/Ziel verschieden, Ziel leer)
-  - Fallbacks für `SourceDirectory` und `WorkingDirectory`
+  - Fallback für `SourceDirectory` und Default-Auflösung des Zielpfads via `targetPath`
   - NotSupported-Verhalten für Remote-Methoden
 - Integration: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
   - End-to-End für Clone/Branch/Commit/Reset
   - Verhalten in `InSourceDirectory` und `SeparateWorkingDirectory`
+  - Nicht-Git-Szenarien mit `git-init`-Opt-in und Copy-Fallback
   - Pointer-Datei-Verhalten bei Plugin-Neuinstanz

@@ -158,6 +158,38 @@ public sealed class ProjektServiceTests
     }
 
     /// <summary>
+    /// Testet, dass AddRepositoryAsync im LocalDirectory-Flow SourceDirectory als Pflichtfeld verwendet
+    /// und den Quellpfad korrekt als RepositoryUrl persistiert.
+    /// </summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldPersistSourceDirectory_WhenLocalDirectoryPluginIsUsed()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var projekt = await service.CreateAsync("Projekt mit lokalem Verzeichnis", null);
+        var sourceDirectory = @"C:\repos\integration-local";
+
+        // Act
+        var repo = await service.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            new Dictionary<string, string>
+            {
+                ["SourceDirectory"] = sourceDirectory
+            });
+
+        // Assert
+        await using var db2 = db.CreateNewContext();
+        var loaded = await db2.GitRepositories.FindAsync(repo.Id);
+
+        loaded.Should().NotBeNull();
+        loaded!.RepositoryUrl.Should().Be(sourceDirectory);
+        loaded.RepositoryName.Should().Be("integration-local");
+        loaded.PluginTyp.Should().Be("LocalDirectoryPlugin");
+    }
+
+    /// <summary>
     /// Testet, dass UpdateAsync Name und Beschreibung eines Projekts korrekt persistiert.
     /// </summary>
     [Fact]

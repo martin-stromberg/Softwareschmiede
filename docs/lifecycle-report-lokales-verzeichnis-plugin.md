@@ -1,8 +1,8 @@
 # Lifecycle Report: Lokales Verzeichnis Plugin
 
-## Geplante Artefakte
+## Geplant
 
-Die Planung wurde in folgenden Dokumenten erstellt:
+Planungsdokumente:
 
 - [Requirements Analysis](./requirements/lokales-verzeichnis-plugin-requirements-analysis.md)
 - [Architecture Blueprint](./architecture/lokales-verzeichnis-plugin-architecture-blueprint.md)
@@ -10,35 +10,33 @@ Die Planung wurde in folgenden Dokumenten erstellt:
 - [Architecture Review](./improvements/lokales-verzeichnis-plugin-architecture-review.md)
 - [Planning Overview](./planning-overview-lokales-verzeichnis-plugin.md)
 
-## Implementierung
+## Implementiert
 
-Folgende Kernpunkte wurden umgesetzt:
+- Repository-Verknuepfung im Projekt ist plugin-gesteuert mit **vorausgewaehltem Standardplugin**.
+- `LocalDirectoryPlugin` verwendet kein separates `WorkingDirectory`-Setting mehr; Zielpfad kommt aus dem globalen Arbeitsverzeichnis.
+- Projektbezogenes Pflichtfeld `SourceDirectory` fuer lokale Verzeichnisse.
+- GitHub-Variante mit Pflichtfeldern `RepositoryUrl` und `RepositoryName`.
+- Einstellungen zeigen `WorkspaceMode`-Enumwerte mit lokalisierten Labels.
 
-- Neues `LocalDirectoryPlugin` als Git-Plugin fuer lokale Verzeichnisse.
-- Erweiterungen im Contracts-Bereich mit `WorkspaceMode` und `PluginSettingFieldType.Enum`.
-- Einfuehrung einer wiederverwendbaren, oeffentlichen `GitPluginBase<TPlugin>`.
-- Refactoring des bestehenden `GitHubPlugin` auf die neue Basisklasse.
-- Integration von Einstellungen, Serialisierung und klarer Behandlung nicht unterstuetzter Remote-Funktionen.
+## Tests ergaenzt
 
-## Ergaenzte Tests
-
-Die Testabdeckung wurde gezielt erweitert in:
-
-- `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`
-- `src/Softwareschmiede.Tests/Domain/Abstractions/GitPluginBaseTests.cs`
+- `src/Softwareschmiede.Tests/Application/Services/ProjektServiceTests.cs`
 - `src/Softwareschmiede.Tests/Components/Pages/EinstellungenBaseArbeitsverzeichnisTests.cs`
-- `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
+- `src/Softwareschmiede.Tests/Components/Pages/Projekte/ProjektDetailRepositoryFormTests.cs`
 
-## Dokumentation
+## Dokumentation aktualisiert
 
-Die Dokumentation wurde konsistent erweitert/aktualisiert, u. a.:
-
+- `README.md`
+- `docs/api/README.md`
 - `docs/api/local-directory-plugin.md`
+- `docs/api/plugin-interfaces.md`
 - `docs/flows/local-directory-plugin-flow.md`
+- `docs/flows/projekt-service-flow.md`
+- `docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md`
+- `docs/business/features/F015-einstellungen-und-persistenz.md`
 - `docs/business/features/F017-lokales-verzeichnis-plugin.md`
-- `README.md` sowie mehrere Index- und Feature-Dokumente unter `docs/api`, `docs/flows` und `docs/business`.
+- `docs/documentation-plan.md`
 
-## Offene Punkte und Hinweise
+## Offene Punkte / Hinweise
 
-- Es sind aktuell keine offenen Blocker dokumentiert.
-- Fuer den weiteren Betrieb gelten die in der Planung festgelegten Guardrails (u. a. explizite `git init`-Bestaetigung, Dirty-Workspace-Abbruch, Copy-Limits/Timeouts).
+- Keine offenen Blocker aus dem Lifecycle-Durchlauf.

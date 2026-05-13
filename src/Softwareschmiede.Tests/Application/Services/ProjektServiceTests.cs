@@ -199,6 +199,221 @@ public sealed class ProjektServiceTests : IDisposable
         repo.Aktiv.Should().BeTrue();
     }
 
+    /// <summary>AddRepositoryAsync übernimmt SourceDirectory als RepositoryUrl für LocalDirectoryPlugin.</summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldUseSourceDirectoryForLocalDirectoryPlugin_WhenFieldValuesAreValid()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Lokales Projekt", null);
+        var sourceDirectory = @"C:\repos\local-source";
+
+        // Act
+        var repo = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            new Dictionary<string, string>
+            {
+                ["SourceDirectory"] = sourceDirectory
+            });
+
+        // Assert
+        repo.RepositoryUrl.Should().Be(sourceDirectory);
+        repo.RepositoryName.Should().Be("local-source");
+        repo.PluginTyp.Should().Be("LocalDirectoryPlugin");
+    }
+
+    /// <summary>AddRepositoryAsync validiert SourceDirectory für LocalDirectoryPlugin als Pflichtfeld.</summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldThrow_WhenSourceDirectoryIsMissingForLocalDirectoryPlugin()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Lokales Projekt ohne SourceDirectory", null);
+
+        // Act
+        var act = () => _sut.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            new Dictionary<string, string>());
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*SourceDirectory*Pflichtfeld*");
+    }
+
+    /// <summary>AddRepositoryAsync mappt im String-Overload repositoryUrl auf SourceDirectory für LocalDirectoryPlugin.</summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldMapRepositoryUrlToSourceDirectory_WhenUsingStringOverloadForLocalDirectoryPlugin()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Lokales Projekt per String-Overload", null);
+        var sourceDirectory = @"C:\repos\local-source";
+
+        // Act
+        var repo = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            sourceDirectory,
+            string.Empty);
+
+        // Assert
+        repo.RepositoryUrl.Should().Be(sourceDirectory);
+        repo.RepositoryName.Should().Be("local-source");
+        repo.PluginTyp.Should().Be("LocalDirectoryPlugin");
+    }
+
+    /// <summary>AddRepositoryAsync trimmt SourceDirectory und leitet den Namen trotz Trailing-Separator korrekt ab.</summary>
+    [Theory]
+    [InlineData(@"  C:\repos\team-a  ", "team-a")]
+    [InlineData(@"C:\repos\team-b\", "team-b")]
+    public async Task AddRepositoryAsync_ShouldHandleTrimAndTrailingSeparator_ForLocalDirectorySourceDirectory(
+        string sourceDirectoryInput,
+        string expectedRepositoryName)
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Lokales Projekt mit Randfällen", null);
+
+        // Act
+        var repo = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            new Dictionary<string, string>
+            {
+                ["SourceDirectory"] = sourceDirectoryInput
+            });
+
+        // Assert
+        repo.RepositoryUrl.Should().Be(sourceDirectoryInput.Trim());
+        repo.RepositoryName.Should().Be(expectedRepositoryName);
+    }
+
+    /// <summary>AddRepositoryAsync validiert RepositoryUrl für GitHub-Plugins als Pflichtfeld.</summary>
+    [Theory]
+    [InlineData("GitHub")]
+    [InlineData("Softwareschmiede.GitHub")]
+    public async Task AddRepositoryAsync_ShouldThrow_WhenRepositoryUrlIsMissingForGitHubPlugin(string pluginPrefix)
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("GitHub-Projekt ohne URL", null);
+
+        // Act
+        var act = () => _sut.AddRepositoryAsync(
+            projekt.Id,
+            pluginPrefix,
+            new Dictionary<string, string>
+            {
+                ["RepositoryName"] = "owner/repo"
+            });
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*RepositoryUrl*Pflichtfeld*");
+    }
+
+    /// <summary>AddRepositoryAsync validiert RepositoryName für GitHub-Plugins als Pflichtfeld.</summary>
+    [Theory]
+    [InlineData("GitHub")]
+    [InlineData("Softwareschmiede.GitHub")]
+    public async Task AddRepositoryAsync_ShouldThrow_WhenRepositoryNameIsMissingForGitHubPlugin(string pluginPrefix)
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("GitHub-Projekt ohne Name", null);
+
+        // Act
+        var act = () => _sut.AddRepositoryAsync(
+            projekt.Id,
+            pluginPrefix,
+            new Dictionary<string, string>
+            {
+                ["RepositoryUrl"] = "https://github.com/owner/repo"
+            });
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*RepositoryName*Pflichtfeld*");
+    }
+
+    /// <summary>AddRepositoryAsync leitet für Non-GitHub-Plugins den RepositoryName aus der URL ab, wenn kein Name gesetzt ist.</summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldDeriveRepositoryName_FromRepositoryUrl_WhenNameMissing_ForNonGitHubPlugin()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Custom-SCM ohne Namen", null);
+
+        // Act
+        var repo = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "Softwareschmiede.CustomScm",
+            new Dictionary<string, string>
+            {
+                ["RepositoryUrl"] = "https://github.com/owner/repo"
+            });
+
+        // Assert
+        repo.RepositoryName.Should().Be("repo");
+    }
+
+    /// <summary>AddRepositoryAsync leitet für Non-GitHub-Plugins den RepositoryName aus einem lokalen Pfad ab.</summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldDeriveRepositoryName_FromLocalPath_WhenNameMissing_ForNonGitHubPlugin()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Custom-SCM mit lokalem Pfad", null);
+
+        // Act
+        var repo = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "Softwareschmiede.CustomScm",
+            new Dictionary<string, string>
+            {
+                ["RepositoryUrl"] = @"C:\repos\my-repo\"
+            });
+
+        // Assert
+        repo.RepositoryName.Should().Be("my-repo");
+    }
+
+    /// <summary>AddRepositoryAsync schlägt fehl, wenn aus einer URL kein valider RepositoryName abgeleitet werden kann.</summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldThrow_WhenDerivedRepositoryNameIsEmpty_ForNonGitHubPlugin()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Custom-SCM mit nicht ableitbarem Namen", null);
+
+        // Act
+        var act = () => _sut.AddRepositoryAsync(
+            projekt.Id,
+            "Softwareschmiede.CustomScm",
+            new Dictionary<string, string>
+            {
+                ["RepositoryUrl"] = "https://github.com/"
+            });
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*konnte kein RepositoryName ermittelt werden*");
+    }
+
+    /// <summary>AddRepositoryAsync bevorzugt einen expliziten RepositoryName gegenüber einer Ableitung.</summary>
+    [Fact]
+    public async Task AddRepositoryAsync_ShouldPreferExplicitRepositoryName_OverDerivedName_ForNonGitHubPlugin()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Custom-SCM mit Override-Namen", null);
+
+        // Act
+        var repo = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "Softwareschmiede.CustomScm",
+            new Dictionary<string, string>
+            {
+                ["RepositoryUrl"] = "https://github.com/owner/repo",
+                ["RepositoryName"] = "override-name"
+            });
+
+        // Assert
+        repo.RepositoryName.Should().Be("override-name");
+    }
+
     /// <summary>RemoveRepositoryAsync entfernt ein Repository aus dem Projekt.</summary>
     [Fact]
     public async Task RemoveRepositoryAsync_ShouldRemoveRepository_WhenRepositoryExists()

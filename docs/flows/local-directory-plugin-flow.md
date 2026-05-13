@@ -46,12 +46,22 @@ sequenceDiagram
         Plugin->>Plugin: WriteWorkspacePointer(lokalerKlonPfad -> source) falls verschieden
         Plugin->>Plugin: TrackWorkspace(lokalerKlonPfad, source)
     else WorkspaceMode == SeparateWorkingDirectory
-        Plugin->>Plugin: ResolveWorkingPath(WorkingDirectory || lokalerKlonPfad)
+        Plugin->>Plugin: ResolveWorkingPath(lokalerKlonPfad)
         Plugin->>Plugin: EnsureTargetIsSafeForCopy(target != source, target leer)
-        Plugin->>Plugin: CopyDirectoryWithGuardrails(source -> target)
-        Plugin->>Git: git rev-parse --is-inside-work-tree (target)
-        Plugin->>Git: git init (target, wenn kein Repo)
-        Plugin->>Git: git status --porcelain (target)
+        Plugin->>Git: git rev-parse --is-inside-work-tree (source)
+        alt source ist git-basiert
+            Plugin->>Git: git clone source target
+            Plugin->>Git: git status --porcelain (target)
+        else source ist nicht git-basiert
+            Plugin->>Plugin: ConfirmGitInitInSourceDirectory == true?
+            alt bestätigt
+                Plugin->>Git: git init (source)
+                Plugin->>Git: git clone source target
+                Plugin->>Git: git status --porcelain (target)
+            else nicht bestätigt
+                Plugin->>Plugin: CopyDirectoryWithGuardrails(source -> target)
+            end
+        end
         Plugin->>Plugin: TrackWorkspace(lokalerKlonPfad, target)
     end
 
@@ -69,28 +79,38 @@ flowchart TD
     C -- Ja --> C1[InvalidOperationException\n"anderes Zielverzeichnis erforderlich"]:::error
     C -- Nein --> D{destination existiert und nicht leer?}
     D -- Ja --> D1[InvalidOperationException\n"Zielverzeichnis ist nicht leer"]:::error
-    D -- Nein --> E[Directory.CreateDirectory(destination)]
-    E --> F[Traverse Verzeichnisbaum]
-    F --> G{Reparse Point/Symlink?}
-    G -- Ja --> G1[InvalidOperationException\n"Symlink/Reparse-Point ist nicht erlaubt"]:::error
-    G -- Nein --> H[Datei zählen + Bytes summieren]
-    H --> I{CopyMaxFiles überschritten?}
-    I -- Ja --> I1[InvalidOperationException\nCopy-Guardrail Dateien]:::error
-    I -- Nein --> J{CopyMaxMegabytes überschritten?}
-    J -- Ja --> J1[InvalidOperationException\nCopy-Guardrail MB]:::error
-    J -- Nein --> K[File copy (overwrite:false)]
-    K --> F
-    F --> L[git init falls nötig]
-    L --> M[git status --porcelain leer?]
-    M -- Nein --> M1[InvalidOperationException\nuncommitted changes]:::error
-    M -- Ja --> N([Workspace bereit])
+    D -- Nein --> E[git rev-parse source]
+    E --> F{source ist git?}
+    F -- Ja --> G[git clone source destination]
+    G --> H[git status --porcelain leer?]
+    H -- Nein --> H1[InvalidOperationException\nuncommitted changes]:::error
+    H -- Ja --> N([Workspace bereit])
+
+    F -- Nein --> I{ConfirmGitInitInSourceDirectory == true?}
+    I -- Ja --> J[git init source]
+    J --> K[git clone source destination]
+    K --> L[git status --porcelain leer?]
+    L -- Nein --> L1[InvalidOperationException\nuncommitted changes]:::error
+    L -- Ja --> N
+    I -- Nein --> M[Directory.CreateDirectory(destination)]
+    M --> O[Traverse Verzeichnisbaum]
+    O --> P{Reparse Point/Symlink?}
+    P -- Ja --> P1[InvalidOperationException\n"Symlink/Reparse-Point ist nicht erlaubt"]:::error
+    P -- Nein --> Q[Datei zählen + Bytes summieren]
+    Q --> R{CopyMaxFiles überschritten?}
+    R -- Ja --> R1[InvalidOperationException\nCopy-Guardrail Dateien]:::error
+    R -- Nein --> S{CopyMaxMegabytes überschritten?}
+    S -- Ja --> S1[InvalidOperationException\nCopy-Guardrail MB]:::error
+    S -- Nein --> T[File copy (overwrite:false)]
+    T --> O
 
     C1 --> X[Bei Fehler nach Zielerstellung:\nDirectory.Delete(destination, recursive:true)]
     D1 --> X
-    G1 --> X
-    I1 --> X
-    J1 --> X
-    M1 --> X
+    H1 --> X
+    L1 --> X
+    P1 --> X
+    R1 --> X
+    S1 --> X
 
     classDef error fill:#ffcccc,stroke:#cc0000,color:#333
 ```
@@ -105,6 +125,9 @@ flowchart TD
 | Kein Quellverzeichnis übergeben/konfiguriert | `ResolveSourcePath` | `InvalidOperationException` |
 | Quellverzeichnis existiert nicht | `EnsureDirectoryExists` | `DirectoryNotFoundException` |
 | `InSourceDirectory` ohne `ConfirmGitInitInSourceDirectory=true` und ohne `.git` | `EnsureInitializedInSourceDirectoryAsync` | `InvalidOperationException` |
+| `SeparateWorkingDirectory`: Quelle ist Git-Repository | `CloneToWorkingDirectoryAsync` | `git clone` wird ausgeführt |
+| `SeparateWorkingDirectory`: Quelle ist kein Git + Init bestätigt | `EnsureInitializedInSourceDirectoryAsync` + `CloneToWorkingDirectoryAsync` | `git init` in Quelle, danach `git clone` |
+| `SeparateWorkingDirectory`: Quelle ist kein Git + Init nicht bestätigt | `CopyDirectoryWithGuardrailsAsync` | Copy-Fallback ohne Clone |
 | Dirty Workspace (`git status --porcelain` nicht leer) | `ValidateWorkspaceIsCleanAsync` | `InvalidOperationException` |
 | Copy-Guardrails verletzt (`CopyMaxFiles`, `CopyMaxMegabytes`, Timeout/Cancellation) | `CopyDirectoryWithGuardrailsAsync` | Abbruch + Aufräumen des Zielverzeichnisses |
 | Remote-Operationen (`Push`, `Pull`, `CreatePullRequest`, `GetIssues`, …) | `BuildNotSupported` | `NotSupportedException` |

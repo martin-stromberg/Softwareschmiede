@@ -18,6 +18,8 @@ sequenceDiagram
     actor U as Nutzer
     participant L as ProjektListe
     participant D as ProjektDetail
+    participant Sel as PluginSelectionService
+    participant PM as PluginManager
     participant PS as ProjektService
     participant AS as AufgabeService
     participant DB as SoftwareschmiededDbContext
@@ -50,8 +52,13 @@ sequenceDiagram
         D->>PS: ArchivierenAsync(id)
         PS->>DB: UPDATE Status = Archiviert
     else Detailaktion: Repository hinzufügen
-        D->>PS: AddRepositoryAsync(id, pluginTyp, repositoryUrl, repositoryName)
-        PS->>DB: INSERT GitRepository (Aktiv = true)
+        D->>PM: GetSourceCodeManagementPlugins()
+        D->>Sel: ResolveSourceCodeManagementPluginAsync(selectedPrefix)
+        Sel-->>D: aufgelöstes SCM-Plugin
+        D->>D: Render dynamische Felder aus GetRepositoryLinkFields()
+        Note over D: Beispiele: GitHub -> RepositoryUrl + RepositoryName\nLocalDirectory -> SourceDirectory
+        D->>PS: AddRepositoryAsync(id, pluginPrefix, fieldValues)
+        PS->>DB: INSERT GitRepository (plugin-spezifische Feldwerte normalisiert)
     else Detailaktion: Projekt löschen
         D->>PS: DeleteAsync(id)
         PS->>DB: DELETE Projekt (inkl. verknüpfter Daten via DB-Regeln)
@@ -105,9 +112,11 @@ flowchart TD
    - **Code:** `ProjektDetail.razor.cs` (`UpdateAsync`, `ArchivierenAsync`, `DeleteAsync`, `AddRepositoryAsync`)  
    - **Verhalten:** Alle Einzelaktionen werden über `ProjektService` ausgeführt und danach neu geladen oder umgeleitet.
 
-5. **Repository zuordnen**  
-   - **Code:** `ProjektService.AddRepositoryAsync`  
-   - **Verhalten:** Neues `GitRepository` wird dem Projekt zugeordnet, aktuell mit `pluginTyp` aus UI.
+5. **Repository zuordnen (plugin-gesteuerte Felder)**  
+   - **Code:** `ProjektDetail.razor(.cs)` + `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` + `ProjektService.AddRepositoryAsync`  
+   - **Verhalten:** Das Feldschema wird pro SCM-Plugin über `GetRepositoryLinkFields()` geladen.  
+     Beim Öffnen der Maske wird das gespeicherte SCM-Standardplugin (falls gültig) automatisch vorausgewählt.  
+     Für GitHub sind typischerweise `RepositoryUrl` und `RepositoryName` Pflichtfelder; für LocalDirectory `SourceDirectory`.
 
 ---
 
@@ -131,4 +140,3 @@ flowchart TD
 - `src/Softwareschmiede/Components/Pages/Projekte/ProjektDetail.razor.cs`
 - `src/Softwareschmiede/Application/Services/AufgabeService.cs`
 - `src/Softwareschmiede/Infrastructure/Data/SoftwareschmiededDbContext.cs`
-

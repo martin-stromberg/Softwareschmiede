@@ -1,35 +1,119 @@
-# Testlücken – Systemweite Analyse (Planung + Architektur + Implementierung)
+# Testlücken – Systemweite Coverage-Analyse (aktuell)
 
-## Kontext der Analyse
+## Analysebasis
 
-- Berücksichtigte Planungs-/Architekturdokumente:
-  - `docs/requirements/requirements-analysis.md`
-  - `docs/architecture/architecture-blueprint.md`
-  - `docs/improvements/architecture-review.md`
-- Berücksichtigter Implementierungsstand: `src/**` inkl. Unit- und Integrationstests
-- Coverage-Lauf (dotnet): `dotnet test Softwareschmiede.slnx --collect:"XPlat Code Coverage"` (166/166 Tests erfolgreich)
+- Testlauf: `dotnet test .\Softwareschmiede.slnx --collect:"XPlat Code Coverage"`
+- Tests: 340 erfolgreich, 0 fehlgeschlagen
+- Coverage-Quellen: `TestResults/*/coverage.cobertura.xml`
 
-## Nicht getestete oder unzureichend getestete Funktionalitäten (priorisiert)
+## Nicht getestete Funktionalitäten (priorisiert)
 
-| Priorität | Funktionalität | Ist-Zustand Testabdeckung | Anforderungs-/Architekturbezug | Begründung |
-|---|---|---|---|---|
-| P1 | Git-Orchestrierung im Application-Layer (`GitOrchestrationService`: Push/Pull/PR/Reset/Commit-Flows) | Keine direkte Abdeckung (0%) | FR-2.5, FR-2.6, FR-2.7, FR-3.7; Architektur-Komponente „GitOrchestrationService“ | Kern-Git-Flows sind zentral für den Entwicklungsprozess; Fehler hier blockieren Abschluss und Synchronisation von Aufgaben. |
-| P1 | KI-Orchestrierung inkl. Session-/Streaming-Lifecycle (`KiAusfuehrungsService`) | Keine direkte Abdeckung (0%) | FR-4.2, FR-4.3, FR-4.6, FR-7.3; Architektur-Review (Streaming/Reconnect-Risiken) | Realtime-Streaming und Folgeprompts sind Kernnutzen; kritische Zustands-/Race-Condition-Risiken bleiben unvalidiert. |
-| P1 | CLI-Prozesssteuerung (`CliRunner`) | Keine direkte Abdeckung (0%) | NFR-12; Architektur-Review Abschnitt CLI-Prozesssteuerung (Deadlock/Cleanup) | Kritischer Infrastrukturpunkt für alle Plugin-Aufrufe; Risiken bei Deadlock, Prozessbeendigung und Fehlerausgabe ohne Testschutz. |
-| P1 | Sichere Token-Speicherung (`WindowsCredentialStore`) | Keine direkte Abdeckung (0%) | NFR-4, Sicherheitskonzept Blueprint | Sicherheitsanforderung „kein Klartext“ ist ohne direkte Tests auf Plattformintegration unzureichend abgesichert. |
-| P1 | Zentrale UI-Workflows Aufgaben/Projekte (`AufgabeDetail`, `NeueAufgabe`, `ProjektDetail`, `ProjektListe`, `Home`) | Praktisch keine UI-Komponententests (jeweils 0% in Coverage) | US-1 bis US-5, FR-1/FR-3/FR-4/FR-8 | Akzeptanzkriterien sind überwiegend UI-getrieben; fehlende Tests erhöhen Risiko für Regressionen in Kern-User-Journeys. |
-| P2 | Entwicklungsprozess-Randfälle im Service (`EntwicklungsprozessService`) | Nur teilweise abgedeckt (ca. 50%); mehrere Methodenpfade unzureichend | FR-4.4, FR-4.5; Aufgaben-Lebenszyklus Blueprint | Bestehende Tests decken Start/Statuspfade gut ab, aber nicht alle Git-/Test-/Rollback-Operationen inkl. Fehlerszenarien. |
-| P2 | Plugin-Einstellungsverwaltung (`PluginSettingsService`: Get/Set/Delete/HasValue) | Geringe Abdeckung (ca. 30%) | FR-2, FR-5; NFR-12 | Konfigurationsfehler wirken direkt auf Plugin-Funktion; CRUD-/Validierungsverhalten ist nur teilweise abgesichert. |
-| P2 | Einstellungsseite über Workdir hinaus (`Einstellungen.razor.cs`) | Teilabdeckung (ca. 40%) | FR-2.1, FR-5.1, NFR-4 | Aktuelle Tests fokussieren Arbeitsverzeichnis; Plugin-bezogene Settings-Flows und Fehlerpfade fehlen weitgehend. |
-| P2 | Agentenpaket-Verwaltung in der UI (`AgentenpaketeSeite.razor(.cs)`) | Keine direkte UI-Abdeckung (0%) | FR-6.1 bis FR-6.4 | Feature ist fachlich zentral für Agentenauswahl und Paketvorschau, wird aber nur indirekt über Services abgesichert. |
-| P3 | Startup/DI-/App-Bootstrap (`Program.cs`, `Softwareschmiede.Client/Program.cs`) | Keine direkte Abdeckung (0%) | NFR-1, NFR-3 | Fehlkonfigurationen in DI/Startup werden ohne Smoketests erst spät entdeckt. |
-| P3 | Kleine Domain-/UI-Bausteine (`PluginKonfiguration`, Badge-Komponenten) | Keine oder geringe direkte Abdeckung | NFR-11, Domain-Modell | Geringere Komplexität, aber dennoch ungeschützt gegen unbeabsichtigte Änderungen. |
+### P1 – Kritische Lücken (Kernabläufe, 0% oder sehr hohe Lücke)
 
-## Umsetzungsstand (aktuelle Iteration)
+1. **Agentenpaket-Verwaltung UI (vollständig ungetestet)**
+   - **Komponente:** Paket-/Dateibaum, Datei-Editor, Upload, Rename/Delete-Flows
+   - **Dateien:**
+     - `src/Softwareschmiede/Components/Pages/AgentenpaketeSeite.razor.cs` (386/386 uncovered)
+     - `src/Softwareschmiede/Components/Pages/AgentenpaketeSeite.razor` (164/164 uncovered)
 
-- ✅ Erste P1-Lücke adressiert: neue Unit-Tests für `GitOrchestrationService` ergänzt
-  - abgedeckt: `IssuesAbrufenAsync`, `CommitAsync`, `ResetAsync`, `PushAsync` (Fehlerfall), `PullRequestErstellenAsync` (Erfolg + Fehlerfall)
-- 🔄 Offene P1-Lücken:
-  - `KiAusfuehrungsService`
-  - `CliRunner` und `WindowsCredentialStore`
-  - UI-Kernworkflows (`AufgabeDetail`, `NeueAufgabe`, `ProjektDetail`, `ProjektListe`, `Home`)
+2. **Aufgaben-Detail UI Kernworkflow (weitgehend ungetestet)**
+   - **Komponente:** Prozessstart, KI-Start/Folgeprompt, Commit/Push/Pull/Reset/PR, Abschluss/Abbruch/Archivierung
+   - **Dateien:**
+     - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (164/164 uncovered)
+     - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (278/472 uncovered)
+
+3. **Projekt-UI Kernworkflow (weitgehend ungetestet)**
+   - **Komponente:** Projektdetail, Repository-Plugin-Feldschema, Projektliste-Navigation/Erstellung
+   - **Dateien:**
+     - `src/Softwareschmiede/Components/Pages/Projekte/ProjektDetail.razor` (126/126 uncovered)
+     - `src/Softwareschmiede/Components/Pages/Projekte/ProjektDetail.razor.cs` (69/154 uncovered)
+     - `src/Softwareschmiede/Components/Pages/Projekte/ProjektListe.razor.cs` (36/36 uncovered)
+     - `src/Softwareschmiede/Components/Pages/Projekte/ProjektListe.razor` (24/24 uncovered)
+
+4. **Einstellungs-UI (kritische Teilbereiche ungetestet)**
+   - **Komponente:** Plugin-Defaults speichern/zurücksetzen, Arbeitsverzeichnis-Flows
+   - **Dateien:**
+     - `src/Softwareschmiede/Components/Pages/Einstellungen.razor` (94/94 uncovered)
+     - `src/Softwareschmiede/Components/Pages/Einstellungen.razor.cs` (35/348 uncovered)
+
+5. **Startup/Hosting vollständig ungetestet**
+   - **Komponente:** DI-Wiring, Middleware-Reihenfolge, App-Bootstrap
+   - **Dateien:**
+     - `src/Softwareschmiede/Program.cs` (50/50 uncovered)
+     - `src/Softwareschmiede.Client/Program.cs` (4/4 uncovered)
+
+6. **CLI-Prozesssteuerung (große Lücke)**
+   - **Komponente:** Streaming-Pipeline, Channel-Completion, Prozess-Cleanup, Executable-Resolution
+   - **Datei:**
+     - `src/Softwareschmiede/Infrastructure/Services/CliRunner.cs` (125/185 uncovered)
+
+7. **Credential- und Shutdown-Integration ungetestet**
+   - **Komponente:** Windows Credential API, plattformspezifische Shutdown-Command-Ermittlung
+   - **Dateien:**
+     - `src/Softwareschmiede/Infrastructure/Services/WindowsCredentialStore.cs` (34/34 uncovered)
+     - `src/Softwareschmiede/Infrastructure/Services/SystemShutdownService.cs` (33/33 uncovered)
+
+---
+
+### P2 – Hohe Lücken in zentralen Services
+
+1. **KI-Ausführung/Session-Verwaltung**
+   - **Komponente:** Status-Callbacks, Fehler-/Abbruchpfade, Subscriber-Fehlerisolierung
+   - **Datei:** `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs` (48/187 uncovered)
+
+2. **Git-Orchestrierung**
+   - **Komponente:** Guard-/Fehlerpfade (Branch/Repo), Repository-URL-Extraktion, PR-Randfälle
+   - **Datei:** `src/Softwareschmiede/Application/Services/GitOrchestrationService.cs` (31/129 uncovered)
+
+3. **Entwicklungsprozess-Orchestrierung**
+   - **Komponente:** Kontextmodus/Komprimierung, atomare Context-File-Operationen, Abschluss-/Abbruchpfade
+   - **Datei:** `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (88/553 uncovered)
+
+4. **AgentPackageFileService**
+   - **Komponente:** Rename/Delete/Upload/Path-Security-Fehlerpfade, Tree-Refresh-Randfälle
+   - **Datei:** `src/Softwareschmiede/Infrastructure/Services/AgentPackageFileService.cs` (47/263 uncovered)
+
+5. **Arbeitsverzeichnis-Einstellungen**
+   - **Komponente:** Pfadvalidierung/-normalisierung, Verzeichniserstellung-Fehlerfälle, Legacy-ValidatePathForSave
+   - **Datei:** `src/Softwareschmiede/Application/Services/ArbeitsverzeichnisSettingsService.cs` (14/80 uncovered)
+
+---
+
+### P3 – Mittlere/geringere, aber vorhandene Lücken
+
+1. **Plugin Discovery / Registrierung**
+   - **Datei:** `src/Softwareschmiede/Infrastructure/Plugins/PluginManager.cs` (24/120 uncovered)
+
+2. **UI-Nebenkomponenten vollständig ungetestet**
+   - `src/Softwareschmiede/Components/Pages/Home.razor.cs` (25/25 uncovered)
+   - `src/Softwareschmiede/Components/Pages/Home.razor` (21/21 uncovered)
+   - `src/Softwareschmiede/Components/Pages/Aufgaben/NeueAufgabe.razor.cs` (63/63 uncovered)
+   - `src/Softwareschmiede/Components/Pages/Aufgaben/NeueAufgabe.razor` (16/16 uncovered)
+   - `src/Softwareschmiede/Components/Shared/StatusBadge.razor` (24/24 uncovered)
+   - `src/Softwareschmiede/Components/Shared/ProjektStatusBadge.razor` (2/2 uncovered)
+   - `src/Softwareschmiede/Components/Layout/MainLayout.razor` (5/5 uncovered)
+
+3. **Plugin-Implementierungen mit Restlücken**
+   - `plugins/Softwareschmiede.Plugin.LocalDirectory/LocalDirectoryPlugin.cs` (39/391 uncovered)
+   - `plugins/Softwareschmiede.Plugin.GitHub/GitHubPlugin.cs` (22/485 uncovered)
+   - `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` (7/177 uncovered)
+   - `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs` (5/177 uncovered)
+
+4. **Kleine Domain-/Contract-Lücken**
+   - `src/Softwareschmiede/Domain/Entities/PluginKonfiguration.cs` (7/7 uncovered)
+   - `src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IGitPlugin.cs` (1/1 uncovered)
+   - einzelne ValueObjects mit Teilabdeckung (`PluginSettingGroup`, `PluginSettingField`, `AgentInfo`)
+
+## Coverage-Lücken nach Komponentenbereich
+
+- Startup/Hosting: **54/54 uncovered (100.0%)**
+- UI Projekte-Seiten: **255/340 uncovered (75.0%)**
+- UI Aufgaben-Seiten: **521/715 uncovered (72.9%)**
+- UI sonstige Seiten: **733/1046 uncovered (70.1%)**
+- UI Layout/Shared: **35/54 uncovered (64.8%)**
+- Infrastructure Services: **240/598 uncovered (40.1%)**
+- Infrastructure PluginManager: **24/120 uncovered (20.0%)**
+- Application Services: **206/1625 uncovered (12.7%)**
+- Domain Model: **9/84 uncovered (10.7%)**
+- Plugin Contracts: **8/117 uncovered (6.8%)**
+- Plugin Implementierungen: **73/1230 uncovered (5.9%)**

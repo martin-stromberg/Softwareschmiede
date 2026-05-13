@@ -20,6 +20,7 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin
     public abstract string PluginPrefix { get; }
     public abstract PluginType PluginType { get; }
     public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
+    public virtual IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
     public abstract Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
     public abstract Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default);
     public abstract Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default);

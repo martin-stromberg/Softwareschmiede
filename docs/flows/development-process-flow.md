@@ -92,7 +92,7 @@ sequenceDiagram
 - `IGitPlugin` / `GitHubPlugin` (Git-Operationen via CLI)
 - `IKiPlugin` / `GitHubCopilotPlugin` (Agentenpaket-Deployment)
 
-> **Verwandte Abläufe:** [Ablauf 2: KI-Streaming und Protokollierung](#ablauf-2-ki-streaming-und-protokollierung) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
+> **Verwandte Abläufe:** [Ablauf 2: KI-Streaming und Protokollierung](#ablauf-2-ki-streaming-und-protokollierung) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [KiAusfuehrungsService – Hintergrundläufe](./ki-ausfuehrungs-service-flow.md)
 
 ---
 
@@ -157,7 +157,7 @@ flowchart TD
 - `AufgabeService` (Status: `KiAktiviertAsync`, `KiAbgeschlossenAsync`, `FehlgeschlagenAsync`)
 - `IKiPlugin` / `GitHubCopilotPlugin` (`StartDevelopmentAsync` via `copilot suggest`)
 
-> **Verwandte Abläufe:** [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
+> **Verwandte Abläufe:** [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [KiAusfuehrungsService – Hintergrundläufe](./ki-ausfuehrungs-service-flow.md)
 
 ---
 
@@ -264,7 +264,7 @@ flowchart TD
 - `IGitPlugin` / `GitHubPlugin` (`CommitAsync`, `PushBranchAsync`, `CreatePullRequestAsync`)
 - GitHub CLI (`gh pr create`) mit `GH_TOKEN`-Umgebungsvariable
 
-> **Verwandte Abläufe:** [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten)
+> **Verwandte Abläufe:** [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [GitOrchestrationService – Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md)
 
 ---
 
@@ -317,7 +317,7 @@ flowchart TD
 - `AufgabeService` (`AbbrechenAsync`)
 - .NET `System.IO.Directory` (Verzeichnis-Bereinigung)
 
-> **Verwandte Abläufe:** [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten)
+> **Verwandte Abläufe:** [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [GitOrchestrationService – Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md)
 
 ---
 
@@ -408,4 +408,3 @@ stateDiagram-v2
     Fehlgeschlagen --> InBearbeitung : Manueller Reset (nicht implementiert)
     note right of KiAktiv : TestsLaufen als\nZwischenstatus möglich
 ```
-

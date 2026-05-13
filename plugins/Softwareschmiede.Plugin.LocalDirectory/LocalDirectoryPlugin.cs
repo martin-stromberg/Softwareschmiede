@@ -12,7 +12,6 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
 {
     private const string WorkspaceModeKey = "WorkspaceMode";
     private const string SourceDirectoryKey = "SourceDirectory";
-    private const string WorkingDirectoryKey = "WorkingDirectory";
     private const string ConfirmGitInitKey = "ConfirmGitInitInSourceDirectory";
     private const string CopyTimeoutSecondsKey = "CopyTimeoutSeconds";
     private const string CopyMaxFilesKey = "CopyMaxFiles";
@@ -21,6 +20,9 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     private const int DefaultCopyMaxFiles = 100_000;
     private const long DefaultCopyMaxMegabytes = 10 * 1024;
     private const string WorkspacePointerFileName = ".softwareschmiede-local-workspace";
+    private const string CloneStrategyName = "Clone";
+    private const string InitThenCloneStrategyName = "InitThenClone";
+    private const string CopyFallbackStrategyName = "CopyFallback";
 
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<LocalDirectoryPlugin> _logger;
@@ -54,12 +56,6 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
                 Description: "Optionaler Fallback-Quellpfad, wenn beim Start kein Pfad übergeben wird.",
                 IsRequired: false),
             new PluginSettingField(
-                Key: WorkingDirectoryKey,
-                Label: "WorkingDirectory (optional)",
-                FieldType: PluginSettingFieldType.Text,
-                Description: "Optionales Zielverzeichnis für SeparateWorkingDirectory.",
-                IsRequired: false),
-            new PluginSettingField(
                 Key: ConfirmGitInitKey,
                 Label: "git init im Quellverzeichnis explizit bestätigen",
                 FieldType: PluginSettingFieldType.Boolean,
@@ -84,6 +80,18 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
                 Description: "Maximale Datenmenge je Kopie. Default: 10240 MB.",
                 IsRequired: false)
         ])
+    ];
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() =>
+    [
+        new PluginSettingField(
+            Key: SourceDirectoryKey,
+            Label: "Lokales Verzeichnis",
+            FieldType: PluginSettingFieldType.Text,
+            Placeholder: @"C:\Projekte\MeinRepository",
+            Description: "Lokales Quellverzeichnis des Projekts.",
+            IsRequired: true)
     ];
 
     /// <summary>Erstellt eine neue Instanz von <see cref="LocalDirectoryPlugin"/>.</summary>
@@ -112,7 +120,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
 
         var workingPath = mode == WorkspaceMode.InSourceDirectory
             ? sourcePath
-            : ResolveAndNormalizePath(ResolveWorkingPath(targetPath));
+            : ResolveAndNormalizePath(targetPath);
 
         if (mode == WorkspaceMode.InSourceDirectory)
         {
@@ -124,9 +132,29 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         }
 
         EnsureTargetIsSafeForCopy(workingPath, sourcePath);
+
+        var sourceIsGitRepository = await IsGitRepositoryAsync(sourcePath, ct);
+        if (sourceIsGitRepository)
+        {
+            LogPreparationStrategy(CloneStrategyName, "SourceIsGitRepository", sourcePath, workingPath);
+            await CloneToWorkingDirectoryAsync(sourcePath, workingPath, ct);
+            await ValidateWorkspaceIsCleanAsync(workingPath, ct);
+            TrackWorkspace(targetPath, workingPath);
+            return;
+        }
+
+        if (ResolveConfirmationFlag())
+        {
+            LogPreparationStrategy(InitThenCloneStrategyName, "GitInitConfirmedInSource", sourcePath, workingPath);
+            await EnsureInitializedInSourceDirectoryAsync(sourcePath, ct);
+            await CloneToWorkingDirectoryAsync(sourcePath, workingPath, ct);
+            await ValidateWorkspaceIsCleanAsync(workingPath, ct);
+            TrackWorkspace(targetPath, workingPath);
+            return;
+        }
+
+        LogPreparationStrategy(CopyFallbackStrategyName, "SourceIsNotGitAndGitInitNotConfirmed", sourcePath, workingPath);
         await CopyDirectoryWithGuardrailsAsync(sourcePath, workingPath, ct);
-        await EnsureGitRepositoryAsync(workingPath, ct);
-        await ValidateWorkspaceIsCleanAsync(workingPath, ct);
         TrackWorkspace(targetPath, workingPath);
     }
 
@@ -218,12 +246,6 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         return fallback;
     }
 
-    private string ResolveWorkingPath(string targetPath)
-    {
-        var configured = _credentialStore.GetCredential($"{PluginPrefix}.{WorkingDirectoryKey}");
-        return string.IsNullOrWhiteSpace(configured) ? targetPath : configured.Trim();
-    }
-
     private async Task EnsureInitializedInSourceDirectoryAsync(string sourcePath, CancellationToken ct)
     {
         if (await IsGitRepositoryAsync(sourcePath, ct))
@@ -244,6 +266,33 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         }
     }
 
+    private async Task CloneToWorkingDirectoryAsync(string sourcePath, string targetPath, CancellationToken ct)
+    {
+        var targetParentDirectory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrWhiteSpace(targetParentDirectory))
+        {
+            Directory.CreateDirectory(targetParentDirectory);
+        }
+
+        if (Directory.Exists(targetPath) && !Directory.EnumerateFileSystemEntries(targetPath).Any())
+        {
+            Directory.Delete(targetPath, recursive: true);
+        }
+
+        var cloneResult = await RunGitAsync(["clone", sourcePath, targetPath], null, ct);
+        if (cloneResult.IsSuccess)
+        {
+            return;
+        }
+
+        if (Directory.Exists(targetPath))
+        {
+            Directory.Delete(targetPath, recursive: true);
+        }
+
+        throw new InvalidOperationException($"git clone fehlgeschlagen: {cloneResult.StdErr}");
+    }
+
     private bool ResolveConfirmationFlag()
     {
         var raw = _credentialStore.GetCredential($"{PluginPrefix}.{ConfirmGitInitKey}");
@@ -254,6 +303,16 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     {
         var result = await RunGitAsync(["rev-parse", "--is-inside-work-tree"], path, ct);
         return result.IsSuccess && string.Equals(result.StdOut.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void LogPreparationStrategy(string strategy, string reason, string sourcePath, string targetPath)
+    {
+        _logger.LogInformation(
+            "Using local workspace preparation strategy {Strategy} ({Reason}). Source: {SourcePath}, Target: {TargetPath}",
+            strategy,
+            reason,
+            sourcePath,
+            targetPath);
     }
 
     private async Task ValidateWorkspaceIsCleanAsync(string workspacePath, CancellationToken ct)

@@ -262,7 +262,7 @@ public partial class AufgabeDetail : IDisposable
 
             if (repo is not null)
             {
-                _remoteBranches = (await EntwicklungsprozessService.GetRemoteBranchesAsync(repo.RepositoryUrl, _cts.Token)).ToList();
+                _remoteBranches = (await EntwicklungsprozessService.GetRemoteBranchesAsync(repo.RepositoryUrl, repo.PluginTyp, _cts.Token)).ToList();
             }
         }
         catch (Exception ex)
@@ -305,7 +305,7 @@ public partial class AufgabeDetail : IDisposable
                 return;
             }
 
-            await EntwicklungsprozessService.ProzessStartenAsync(Id, repo.RepositoryUrl, string.IsNullOrEmpty(_selectedBranchName) ? null : _selectedBranchName, _cts.Token);
+            await EntwicklungsprozessService.ProzessStartenAsync(Id, repo.RepositoryUrl, string.IsNullOrEmpty(_selectedBranchName) ? null : _selectedBranchName, repo.PluginTyp, _cts.Token);
             _showStartDialog = false;
             _erfolg = "Entwicklungsumgebung erfolgreich gestartet.";
             await LadeAsync();

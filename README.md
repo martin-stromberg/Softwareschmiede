@@ -13,23 +13,24 @@
 ## Inhaltsverzeichnis
 
 1. [Projektbeschreibung](#-projektbeschreibung)
-2. [Features](#-features)
-3. [Screenshots](#-screenshots)
-4. [Voraussetzungen](#-voraussetzungen)
-5. [Installation](#-installation)
-6. [Usage](#-usage)
-7. [Konfiguration & Plugin-Setup](#-konfiguration--plugin-setup)
-8. [Agentenpakete](#-agentenpakete)
-9. [Projektstruktur](#-projektstruktur)
-10. [Architektur](#-architektur)
-11. [Tests](#-tests)
-12. [Deployment](#-deployment)
-13. [Changelog](#-changelog)
-14. [Roadmap](#-roadmap)
-15. [Dokumentation](#-dokumentation)
-16. [Beitragen](#-beitragen)
-17. [Lizenz](#-lizenz)
-18. [Kontakt](#-kontakt)
+2. [Implementierungsstatus](#-implementierungsstatus)
+3. [Features](#-features)
+4. [UI-Status](#-ui-status)
+5. [Voraussetzungen](#-voraussetzungen)
+6. [Installation](#-installation)
+7. [Usage](#-usage)
+8. [Konfiguration & Plugin-Setup](#-konfiguration--plugin-setup)
+9. [Agentenpakete](#-agentenpakete)
+10. [Projektstruktur](#-projektstruktur)
+11. [Architektur](#-architektur)
+12. [Tests](#-tests)
+13. [Deployment](#-deployment)
+14. [Changelog](#-changelog)
+15. [Roadmap](#-roadmap)
+16. [Dokumentation](#-dokumentation)
+17. [Beitragen](#-beitragen)
+18. [Lizenz](#-lizenz)
+19. [Kontakt](#-kontakt)
 
 ---
 
@@ -51,18 +52,35 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ---
 
+## 📌 Implementierungsstatus
+
+Stand: **2026-05-13**
+
+| Bereich | Status | Hinweise |
+|---|---|---|
+| Projekt-, Aufgaben- und Protokollverwaltung | ✅ Implementiert | Blazor-UI inkl. Dashboard, Detailseiten und Verlauf |
+| SCM-Plugins | ✅ Implementiert | `GitHub` und `LocalDirectoryPlugin` produktiv verfügbar |
+| KI-Plugins | ✅ Implementiert | `GitHub Copilot` und `Claude CLI` produktiv verfügbar |
+| Standardplugin-Mechanik | ✅ Implementiert | Auflösung: explizite Auswahl → gespeichertes Standardplugin → Fallback |
+| Folgeanweisungen mit Kontextsteuerung | ✅ Implementiert | Kontext mitgeben / ignorieren / neu beginnen |
+| Lokale Deploymentfähigkeit | ✅ Implementiert | Windows-zentrierter Betrieb, lokale SQLite + Credential Store |
+| Öffentliche HTTP-API | ⛔ Nicht vorhanden | Schnittstellen aktuell über Plugin-Verträge dokumentiert |
+| CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
+
+---
+
 ## 🚀 Features
 
 ### 📁 Projektmanagement
 - Beliebig viele Softwareprojekte anlegen, bearbeiten, archivieren und löschen
-- Repositories aus dem Git-Provider verknüpfen und Issues automatisch laden
+- Repositories plugin-gesteuert verknüpfen (dynamische Felder je SCM-Plugin) und Issues automatisch laden
 - Projektübersicht mit Status und aktiven Aufgaben
 - Konfigurierbares Basis-Arbeitsverzeichnis für lokale Repository-Klone (persistiert als `repositories.workdir`, inkl. Runtime-Fallback)
 
 ### 🔗 Git-Integration (Plugin-System)
 - **Plugin-Architektur** über `IGitPlugin`-Interface – austauschbar für verschiedene Git-Provider
 - **GitHub-Plugin**: vollständige GitHub-Integration via `gh` CLI (inkl. Push/Pull/Pull Request/Issues)
-- **LocalDirectoryPlugin**: lokales SCM-Plugin ohne Remote-Provider mit `WorkspaceMode` (`SeparateWorkingDirectory` oder `InSourceDirectory`)
+- **LocalDirectoryPlugin**: lokales SCM-Plugin ohne Remote-Provider mit `WorkspaceMode` (`SeparateWorkingDirectory` oder `InSourceDirectory`) und lokalisierten UI-Optionen
 - Lokale Git-Basisoperationen: Klonen/Workspace vorbereiten, Branch anlegen, Committen und Reset
 - Aufgabenspezifische Branches (`task/<aufgaben-id>-<kurzname>`)
 - Commit-Verwaltung inkl. Rollback (soft / mixed / hard)
@@ -109,11 +127,10 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ---
 
-## 📸 Screenshots
+## 📸 UI-Status
 
-![Dashboard](docs/images/dashboard.png)
-
-> *Screenshot-Platzhalter – wird nach erstem Release ergänzt.*
+Aktuell ist kein versionierter Screenshot im Repository abgelegt.  
+Die wichtigsten UI-Abläufe sind im [Benutzerleitfaden](docs/user-guide.md) sowie in der [Flow-Dokumentation](docs/flows/README.md) beschrieben.
 
 ---
 
@@ -178,7 +195,7 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 
 1. **GitHub-Token einrichten** – Credential Manager öffnen und Token speichern (siehe [Konfiguration](#-konfiguration--plugin-setup))
 2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
-3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt mit GitHub-Repository erstellen
+3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt erstellen und ein SCM-Plugin wählen
 4. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
 5. **Agentenpaket auswählen** – Passendes Agentenpaket aus `agent-packages/` zuweisen
 6. **KI-Lauf starten** – KI-Plugin (Copilot oder Claude CLI), Prompt und Agent auswählen und den Prozess starten
@@ -201,6 +218,7 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 - Für lokale Quellordner kann in den Einstellungen als SCM-Plugin **Local Directory** gewählt werden.
 - `WorkspaceMode = SeparateWorkingDirectory` (Standard): Es wird eine getrennte Arbeitskopie erstellt; das Quellverzeichnis bleibt unverändert.
 - `WorkspaceMode = InSourceDirectory`: Es wird direkt im Quellverzeichnis gearbeitet; falls dort noch kein Git-Repository existiert, ist `ConfirmGitInitInSourceDirectory=true` erforderlich.
+- In der UI erscheinen dafür die Optionen **„Mit separatem Arbeitsverzeichnis arbeiten“** und **„Direkt im Quellverzeichnis arbeiten“**.
 - Nicht unterstützte Remote-Operationen (z. B. Push/Pull/Pull Request/Issues) werden im LocalDirectoryPlugin explizit mit `NotSupportedException` abgelehnt.
 
 ### KI-Plugin-Auswahl (Copilot oder Claude CLI)
@@ -273,7 +291,8 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 
 ### Weitere Plugin-Konfiguration
 
-Projektbezogene Verknüpfungen (z. B. Repository-URL, Organisations-URL) werden in der Oberfläche unter *Projekte → Repository verknüpfen* konfiguriert und in der lokalen SQLite-Datenbank gespeichert. Plugin-spezifische Runtime-Settings (z. B. `LocalDirectoryPlugin.*`) werden über den jeweiligen Plugin-Settings-Mechanismus persistiert.
+Projektbezogene Verknüpfungen werden in der Oberfläche unter *Projekte → Repository verknüpfen* plugin-gesteuert konfiguriert und in der lokalen SQLite-Datenbank gespeichert.  
+Beispiel: Beim GitHub-Plugin sind `RepositoryUrl` und `RepositoryName` Pflichtfelder; beim LocalDirectoryPlugin wird `SourceDirectory` abgefragt.
 
 Für das Claude-CLI-Plugin kann der API-Key alternativ per `cmdkey` gesetzt werden:
 
@@ -311,14 +330,13 @@ LocalDirectoryPlugin-spezifische Einstellungen werden ebenfalls über das Plugin
 |-----------|-----------|---------|
 | `LocalDirectoryPlugin.WorkspaceMode` | Arbeitsmodus (`SeparateWorkingDirectory` oder `InSourceDirectory`) | `SeparateWorkingDirectory` |
 | `LocalDirectoryPlugin.SourceDirectory` | Optionaler Fallback-Quellpfad, wenn kein Repository-Pfad übergeben wurde | leer |
-| `LocalDirectoryPlugin.WorkingDirectory` | Optionales Zielverzeichnis für `SeparateWorkingDirectory` | verwendet übergebenen Zielpfad |
 | `LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory` | Explizite Bestätigung für `git init` im Quellverzeichnis | `false` |
 | `LocalDirectoryPlugin.CopyTimeoutSeconds` | Guardrail für Kopierdauer | `600` |
 | `LocalDirectoryPlugin.CopyMaxFiles` | Guardrail für maximale Dateianzahl pro Kopie | `100000` |
 | `LocalDirectoryPlugin.CopyMaxMegabytes` | Guardrail für maximale Datenmenge pro Kopie | `10240` |
 
 Hinweise:
-- Wenn `LocalDirectoryPlugin.WorkingDirectory` gesetzt ist, hat dieser Pfad für das LocalDirectoryPlugin Vorrang vor `repositories.workdir`.
+- Ein plugin-spezifisches `WorkingDirectory`-Setting existiert nicht; der Zielpfad wird aus `repositories.workdir` + `softwareschmiede/<aufgabeId>` gebildet.
 - Bei ungültigem gespeichertem `WorkspaceMode` fällt das Plugin zur Laufzeit auf `SeparateWorkingDirectory` zurück.
 
 ---
@@ -536,13 +554,14 @@ Für die Inbetriebnahme müssen `gh`, `git`, `copilot` und (für Claude-Läufe) 
 
 ## 📝 Changelog
 
-Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
+Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
 - LocalDirectoryPlugin als produktiv verfügbares SCM-Plugin ergänzt (inkl. WorkspaceMode und Guardrails)
 - Konfiguration, Usage, Architektur und Testsektion auf LocalDirectoryPlugin-Stand synchronisiert
 - Claude-CLI-Integration als produktiv verfügbares KI-Plugin ergänzt
 - Testartefakte für `lokales-verzeichnis-plugin` und `claude-cli-integration` in der Dokumentationsübersicht verlinkt
+- WorkspaceMode-Übersetzungen, dynamische Repository-Felder und Standardplugin-Vorauswahl konsistent dokumentiert
 
 ---
 
@@ -671,4 +690,3 @@ Vor einem öffentlichen Release wird eine `LICENSE`-Datei ergänzt und diese Sek
 ---
 
 *Softwareschmiede – KI-gestützter Entwicklungsworkflow, lokal und unter Ihrer Kontrolle.*
-

@@ -19,8 +19,10 @@ Stakeholder nutzen diese Sicht, um Betriebssicherheit und einheitliche Team-Stan
 
 - Arbeitsverzeichnis für lokale Repositories
 - Standardplugin je Pluginart (z. B. KI und SCM)
-- Plugin-spezifische Betriebsmodi (z. B. `WorkspaceMode` im Local Directory Plugin)
+- Plugin-spezifische Betriebsmodi (z. B. `WorkspaceMode` im Local Directory Plugin mit verständlichen UI-Labels)
+- Plugin-spezifische Quellpfade (z. B. `SourceDirectory` im Local Directory Plugin)
 - Zugangsdaten/Schlüssel für angebundene Dienste (sicher abgelegt)
+- Projektbezogene Repository-Angaben je SCM-Plugin (z. B. `RepositoryUrl` und `RepositoryName` beim GitHub-Plugin)
 - Weitere nutzerbezogene Vorgaben für den täglichen Ablauf
 
 ---

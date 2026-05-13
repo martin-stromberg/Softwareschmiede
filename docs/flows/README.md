@@ -18,6 +18,8 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
 | [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Kopier-Guardrails, Fehlerpfaden und Workspace-Mapping |
+| [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull sowie Pull-Request-Erstellung mit Repository-Guards |
+| [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 
 ---
 
@@ -139,6 +141,20 @@ Dokumentiert den vollständigen Datei-/Verzeichnis-Flow für Agentenpakete inklu
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `LocalDirectoryPlugin`, `EntwicklungsprozessService`, `GitOrchestrationService`, `ArbeitsverzeichnisResolver`
 
 Beschreibt den End-to-End-Integrationspfad des lokalen Verzeichnis-Plugins: Einstellungen → Prozessstart → `CloneRepositoryAsync`-Verzweigung nach `WorkspaceMode` → sichere Kopie mit Limits/Symlink-Schutz → Pointer-/Mapping-Auflösung für Folgeoperationen.
+
+---
+
+### [Ablauf 13: GitOrchestrationService – Git-Aktionen und PR-Auflösung](./git-orchestration-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `GitOrchestrationService`, `AufgabeDetail`, `NeueAufgabe`, `IGitPlugin`
+
+Dokumentiert den End-to-End-Pfad für Issue-Import und manuelle Git-Aktionen sowie die Pull-Request-Repository-Auflösung (**Aufgaben-Repository → Projekt-Repository → Fehler bei Mehrdeutigkeit**).
+
+---
+
+### [Ablauf 14: KiAusfuehrungsService – Hintergrundlauf und Sessionpuffer](./ki-ausfuehrungs-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `KiAusfuehrungsService`, `EntwicklungsprozessService`, `AufgabeDetail`, `AutoShutdownOrchestrator`
+
+Beschreibt den Ablauf von `StartKiLauf` bis `onCompleted`, inklusive Session-Wiederaufnahme, Live-Subscriptions und Running-Count-Events für die Auto-Shutdown-Orchestrierung.
 
 ---
 

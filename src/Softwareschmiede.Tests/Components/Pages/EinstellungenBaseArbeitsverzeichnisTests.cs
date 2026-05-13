@@ -471,6 +471,43 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         credentialStoreMock.Verify(c => c.SetCredential(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
+    [Fact]
+    public void GetEnumOptionDisplayLabel_ShouldReturnTranslatedLabel_ForWorkspaceModeOptions()
+    {
+        var field = new PluginSettingField(
+            "WorkspaceMode",
+            "WorkspaceMode",
+            PluginSettingFieldType.Enum,
+            EnumOptions: ["InSourceDirectory", "SeparateWorkingDirectory"]);
+
+        var labelInSource = TestEinstellungenPage.InvokeEnumDisplayLabel(field, "InSourceDirectory");
+        var labelSeparate = TestEinstellungenPage.InvokeEnumDisplayLabel(field, "SeparateWorkingDirectory");
+
+        labelInSource.Should().Be("Direkt im Quellverzeichnis arbeiten");
+        labelSeparate.Should().Be("Mit separatem Arbeitsverzeichnis arbeiten");
+    }
+
+    [Fact]
+    public void EinstellungenMarkup_ShouldUseEnumDisplayLabelHelper_ForWorkspaceModeRendering()
+    {
+        var root = FindRepositoryRoot();
+        var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Einstellungen.razor");
+        var markup = File.ReadAllText(razorPath);
+
+        markup.Should().Contain("@GetEnumOptionDisplayLabel(field, enumOption)");
+    }
+
+    [Fact]
+    public void EinstellungenMarkup_ShouldRenderPluginFieldsDynamically_WithoutHardcodedWorkingDirectoryField()
+    {
+        var root = FindRepositoryRoot();
+        var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Einstellungen.razor");
+        var markup = File.ReadAllText(razorPath);
+
+        markup.Should().Contain("@foreach (var field in group.Fields)");
+        markup.Should().NotContain("LocalDirectoryPlugin.WorkingDirectory");
+    }
+
     private static TestEinstellungenPage CreateSut(
         SoftwareschmiededDbContext db,
         ArbeitsverzeichnisSettingsService arbeitsverzeichnisSettings,
@@ -525,6 +562,22 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         property!.SetValue(target, value);
     }
 
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Softwareschmiede.slnx")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Repository root with Softwareschmiede.slnx not found.");
+    }
+
     private sealed class TestEinstellungenPage : EinstellungenBase
     {
         public string ArbeitsverzeichnisInput => _arbeitsverzeichnisInput;
@@ -547,5 +600,6 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         public Task InvokeStandardPluginSpeichernAsync(PluginType pluginType) => StandardPluginSpeichernAsync(pluginType);
         public Task InvokeSpeichernAsync(IPlugin plugin) => SpeichernAsync(plugin);
         public Task InvokeZuruecksetzenAsync(IPlugin plugin) => ZuruecksetzenAsync(plugin);
+        public static string InvokeEnumDisplayLabel(PluginSettingField field, string enumOption) => GetEnumOptionDisplayLabel(field, enumOption);
     }
 }

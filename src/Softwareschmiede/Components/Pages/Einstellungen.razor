@@ -150,7 +150,7 @@
                                 {
                                     @foreach (var enumOption in field.EnumOptions)
                                     {
-                                        <option value="@enumOption">@enumOption</option>
+                                        <option value="@enumOption">@GetEnumOptionDisplayLabel(field, enumOption)</option>
                                     }
                                 }
                             </select>

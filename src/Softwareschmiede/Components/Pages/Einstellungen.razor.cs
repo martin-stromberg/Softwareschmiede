@@ -10,6 +10,13 @@ namespace Softwareschmiede.Components.Pages;
 /// <summary>Code-Behind für die generische Einstellungsseite.</summary>
 public class EinstellungenBase : ComponentBase
 {
+    private static readonly IReadOnlyDictionary<string, string> WorkspaceModeDisplayLabels =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["InSourceDirectory"] = "Direkt im Quellverzeichnis arbeiten",
+            ["SeparateWorkingDirectory"] = "Mit separatem Arbeitsverzeichnis arbeiten"
+        };
+
     // TODO: Konstanten für Boolean-Werte in Einstellungsfeldern
     protected const string BoolTrue = "true";
     protected const string BoolFalse = "false";
@@ -372,5 +379,16 @@ public class EinstellungenBase : ComponentBase
         }
 
         return field.EnumOptions.Contains(value.Trim(), StringComparer.Ordinal);
+    }
+
+    protected static string GetEnumOptionDisplayLabel(PluginSettingField field, string enumOption)
+    {
+        if (string.Equals(field.Key, "WorkspaceMode", StringComparison.Ordinal)
+            && WorkspaceModeDisplayLabels.TryGetValue(enumOption, out var label))
+        {
+            return label;
+        }
+
+        return enumOption;
     }
 }

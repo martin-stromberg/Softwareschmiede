@@ -79,6 +79,7 @@ Diese Logik ist im Detail dokumentiert unter:
 // src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IGitPlugin.cs
 public interface IGitPlugin : IPlugin
 {
+    IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
     Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
     Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default);
     Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default);
@@ -119,9 +120,33 @@ Für die konkrete `IGitPlugin`-Implementierung `LocalDirectoryPlugin` gelten pro
 
 - **Unterstützt:** `CloneRepositoryAsync`, `CreateBranchAsync`, `CommitAsync`, `ResetAsync`, `CheckHealthAsync`
 - **Nicht unterstützt (`NotSupportedException`):** `GetIssuesAsync`, `PushBranchAsync`, `PullAsync`, `CreatePullRequestAsync`, `GetRemoteBranchesAsync`, `GetDefaultBranchAsync`, `CheckoutRemoteBranchAsync`
-- **Konfigurations-/Guardrail-Details:** `WorkspaceMode`, `SourceDirectory`, `WorkingDirectory`, `ConfirmGitInitInSourceDirectory`, `CopyTimeoutSeconds`, `CopyMaxFiles`, `CopyMaxMegabytes`
+- **Konfigurations-/Guardrail-Details:** `WorkspaceMode`, `SourceDirectory`, `ConfirmGitInitInSourceDirectory`, `CopyTimeoutSeconds`, `CopyMaxFiles`, `CopyMaxMegabytes`
 
 Details: [local-directory-plugin.md](./local-directory-plugin.md)
+
+---
+
+### `GetRepositoryLinkFields`
+
+```csharp
+IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
+```
+
+**Beschreibung:** Liefert das Schema für die projektbezogene Repository-Verknüpfung in der UI (`Projekte -> Repository verknüpfen`).
+
+**Verhalten:**
+
+- Die UI rendert die Eingabefelder dynamisch aus den zurückgegebenen `PluginSettingField`-Definitionen.
+- Bei Pluginwechsel wird das Feldschema neu geladen; nicht mehr gültige Feldwerte werden verworfen.
+- Die initiale Pluginauswahl nutzt die Auflösungskette  
+  **explizite Auswahl -> gespeichertes SCM-Standardplugin -> Fallback**.
+
+**Beispiele aus Referenzimplementierungen:**
+
+- `GitHubPlugin`: `RepositoryUrl` (URL, Pflicht), `RepositoryName` (Text, Pflicht)
+- `LocalDirectoryPlugin`: `SourceDirectory` (Text, Pflicht)
+
+Die konkreten Feldwerte werden als `Dictionary<string, string>` an `ProjektService.AddRepositoryAsync(...)` übergeben.
 
 ---
 

@@ -18,9 +18,9 @@ Das ist sinnvoll für interne Codebasen, Offline-Szenarien oder vorbereitete Arb
 
 1. Öffnen Sie **Einstellungen**.
 2. Stellen Sie als SCM-Plugin **Local Directory** ein (optional als Standard).
-3. Wählen Sie den **Workspace-Modus**:
-   - `SeparateWorkingDirectory` (Standard, empfohlen)
-   - `InSourceDirectory` (direkt im Quellordner)
+3. Wählen Sie den **Workspace-Modus** über die klaren UI-Texte:
+   - **Mit separatem Arbeitsverzeichnis arbeiten** (`SeparateWorkingDirectory`, Standard, empfohlen)
+   - **Direkt im Quellverzeichnis arbeiten** (`InSourceDirectory`)
 4. Starten Sie den KI-Prozess für Ihre Aufgabe.
 5. Die Softwareschmiede bereitet den Workspace entsprechend des Modus vor.
 
@@ -32,6 +32,7 @@ Das ist sinnvoll für interne Codebasen, Offline-Szenarien oder vorbereitete Arb
 
 - Der Quellordner bleibt unverändert.
 - Es wird eine getrennte Arbeitskopie erstellt.
+- Das Ziel der Arbeitskopie wird aus dem globalen Arbeitsverzeichnis (`repositories.workdir`) und der Aufgaben-ID gebildet.
 - Schutzregeln verhindern riskante Kopien (z. B. zu viele Dateien, zu große Datenmenge, Timeout).
 
 ### InSourceDirectory
@@ -45,6 +46,7 @@ Das ist sinnvoll für interne Codebasen, Offline-Szenarien oder vorbereitete Arb
 ## Was passiert im Hintergrund?
 
 - Das Plugin arbeitet lokal und unterstützt die Kernschritte **Branch erstellen**, **Commit** und **Reset**.
+- Für die Projektverknüpfung wird plugin-gesteuert das Feld **SourceDirectory** abgefragt.
 - Nicht passende Remote-Funktionen (z. B. Pull Request erstellen, Push/Pull, Issues laden) sind bewusst nicht verfügbar.
 - Beim Modus `InSourceDirectory` wird eine Zuordnung zum echten Arbeitsort gespeichert, damit Folgeschritte stabil im richtigen Ordner laufen.
 

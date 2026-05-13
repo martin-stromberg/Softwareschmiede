@@ -1,87 +1,42 @@
 # Planungsübersicht – LocalDirectoryPlugin
 
-> **Dokument-Typ:** Planungsübersicht (Orchestrator-Ergebnis)  
-> **Feature:** LocalDirectoryPlugin – Git-Plugin für lokale Verzeichnisse  
-> **Status:** ✅ Planungsphase abgeschlossen (mit priorisierten Follow-ups)  
-> **Datum:** 2026-05-12
+> **Dokument-Typ:** Planungsoverview (planning-orchestrator)  
+> **Status:** ✅ Vollständiger Planungsdurchlauf abgeschlossen  
+> **Datum:** 2026-05-13
 
 ---
 
-## 1. Ergebnis der Orchestrator-Phasen
+## 1. Durchlaufstatus
 
-Der vollständige Planungsablauf wurde in der vorgesehenen Reihenfolge durchgeführt:
-
+Die Orchestrator-Schritte wurden vollständig ausgeführt:
 1. Requirements Analysis
 2. Architecture Blueprint
 3. Entity-Relationship Modeling
 4. Architecture Review
-5. Konsolidierung und Verlinkung
+5. Konsolidierung
 
----
+## 2. Artefakte
 
-## 2. Artefakte (final, verlinkt)
-
-| Phase | Artefakt | Stand |
+| Bereich | Datei | Stand |
 |---|---|---|
-| Anforderungen | [docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md](requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | v1.1.0 |
-| Architektur | [docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md](architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | v1.1.0 |
-| ERM | [docs/architecture/lokales-verzeichnis-plugin-entity-relationship-model.md](architecture/lokales-verzeichnis-plugin-entity-relationship-model.md) | v1.2.0 |
-| Review | [docs/improvements/lokales-verzeichnis-plugin-architecture-review.md](improvements/lokales-verzeichnis-plugin-architecture-review.md) | v1.1.0 |
+| Anforderungen | [docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md](requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | v1.3.0 |
+| Architektur | [docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md](architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | v1.3.0 |
+| ERM | [docs/architecture/lokales-verzeichnis-plugin-entity-relationship-model.md](architecture/lokales-verzeichnis-plugin-entity-relationship-model.md) | v1.4.0 |
+| Review | [docs/improvements/lokales-verzeichnis-plugin-architecture-review.md](improvements/lokales-verzeichnis-plugin-architecture-review.md) | v1.3.0 |
+
+## 3. Konsolidierte Entscheidungen
+
+- Projekt-Repository-Linking ist plugin-gesteuert (kein GitHub-Hardcoding).
+- Standardplugin-Auflösung erfolgt zentral über bestehende Services.
+- Pflichtfelder werden pluginabhängig validiert (`SourceDirectory` bzw. `RepositoryUrl`/`RepositoryName`).
+- WorkspaceMode wird benutzerfreundlich angezeigt, technisch stabil gespeichert.
+- `WorkingDirectory` ist kein LocalDirectory-Pluginsetting mehr.
+
+## 4. Offene Punkte
+
+1. Performance-Nachweis für dynamischen Plugin-/Feldwechsel explizit ergänzen.
+2. Entscheidung zur optionalen Normalisierung dynamischer Feldwerte langfristig festhalten.
 
 ---
 
-## 3. Verbindliche Entscheidungen (Unklarheiten aufgelöst)
-
-| Thema | Entscheidung |
-|---|---|
-| `git init` im Source-Verzeichnis | Nur mit expliziter Nutzerbestätigung |
-| Verzeichniskopie bei großen Projekten | Guardrails mit Timeout/Datei-/Größenlimits |
-| Uncommitted Changes | Harter Fehler (kein stilles Überschreiben) |
-| Persistenz Source-/WorkingDirectory | Bestehendes Plugin-Settings-Schema im Credential Store |
-| `GetIssuesAsync` im LocalDirectoryPlugin | `NotSupportedException` |
-| Sichtbarkeit `GitPluginBase<TPlugin>` | `public` |
-
----
-
-## 4. Konsolidiertes Zielbild
-
-- Neues `LocalDirectoryPlugin` unterstützt lokale Workspaces für:
-  - `CloneRepositoryAsync`
-  - `CreateBranchAsync`
-  - `CommitAsync`
-  - `ResetAsync`
-- `WorkspaceMode` (`InSourceDirectory`, `SeparateWorkingDirectory`) ist als Enum/Select in Settings verfügbar und wird stabil serialisiert.
-- Nicht unterstützte Remote-Funktionen (`Push/Pull/PR/Issues/...`) werden klar und konsistent als `NotSupportedException` behandelt.
-- `GitHubPlugin` wird auf gemeinsame Git-Bausteine via `GitPluginBase<TPlugin>` refaktoriert.
-
----
-
-## 5. Review-Ergebnis und priorisierte Nacharbeiten
-
-**Architektururteil:** Freigabe mit Auflagen.
-
-Priorisierte Maßnahmen:
-
-1. Confirm-Contract (`git init`) als klarer Application-Policy-Contract
-2. Security-Hardening für lokale Pfad-/Copy-Operationen
-3. Capability-getriebene UI-Gates für NotSupported-Funktionen
-4. Verbindliche Testfallmatrix inkl. Guardrail-/Abbruchszenarien
-
-Details: [Architecture Review](improvements/lokales-verzeichnis-plugin-architecture-review.md)
-
----
-
-## 6. Nächste Umsetzungsschritte
-
-1. Contracts erweitern (`WorkspaceMode`, `PluginSettingFieldType.Enum`, `GitPluginBase<TPlugin>`).
-2. `GitHubPlugin` auf Basisklasse refaktorieren (ohne Verhaltensänderung).
-3. `LocalDirectoryPlugin` implementieren (Clone/Branch/Commit/Reset + NotSupported Remote).
-4. Settings-UI + Serialisierung finalisieren.
-5. Unit-/Integrationstests ergänzen und Gates ausführen:
-   - `dotnet build Softwareschmiede.slnx`
-   - `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj`
-   - `dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj`
-
----
-
-*Erstellt durch den planning-orchestrator mit Unteragenten: planning-requirements-analysis · planning-architecture-blueprint · planning-entity-relationship-modeler · review-architecture*
+*Erstellt durch planning-orchestrator (sequenziell: planning-requirements-analysis → planning-architecture-blueprint → planning-entity-relationship-modeler → review-architecture).* 

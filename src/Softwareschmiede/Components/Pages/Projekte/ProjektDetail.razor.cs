@@ -3,12 +3,16 @@ namespace Softwareschmiede.Components.Pages.Projekte;
 using Microsoft.AspNetCore.Components;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 
 public partial class ProjektDetail
 {
     [Parameter] public Guid Id { get; set; }
     [Inject] private ProjektService ProjektService { get; set; } = null!;
     [Inject] private AufgabeService AufgabeService { get; set; } = null!;
+    [Inject] private IPluginManager PluginManager { get; set; } = null!;
+    [Inject] private PluginSelectionService PluginSelectionService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
 
     private bool _loading = true;
@@ -22,8 +26,10 @@ public partial class ProjektDetail
     private string _editName = string.Empty;
     private string? _editBeschreibung;
     private string? _fehler;
-    private string _repoUrl = string.Empty;
-    private string _repoName = string.Empty;
+    private IReadOnlyList<IGitPlugin> _sourceCodePlugins = [];
+    private IReadOnlyList<PluginSettingField> _repositoryLinkFields = [];
+    private readonly Dictionary<string, string> _repositoryFieldValues = new(StringComparer.OrdinalIgnoreCase);
+    private string? _selectedRepositoryPluginPrefix;
     private string? _repoFehler;
 
     protected override async Task OnInitializedAsync()
@@ -41,6 +47,7 @@ public partial class ProjektDetail
             _aufgabenArchiviert = (await AufgabeService.GetArchiviertByProjektAsync(Id)).ToList();
             _editName = _projekt.Name;
             _editBeschreibung = _projekt.Beschreibung;
+            await LadeRepositoryPluginAuswahlAsync();
         }
         _loading = false;
     }
@@ -67,18 +74,136 @@ public partial class ProjektDetail
         NavigationManager.NavigateTo("/projekte");
     }
 
+    private async Task ToggleRepositoryFormAsync()
+    {
+        _showRepoForm = !_showRepoForm;
+        _repoFehler = null;
+
+        if (_showRepoForm)
+        {
+            await LadeRepositoryPluginAuswahlAsync();
+        }
+    }
+
+    private async Task OnRepositoryPluginChangedAsync(ChangeEventArgs eventArgs)
+    {
+        _selectedRepositoryPluginPrefix = eventArgs.Value?.ToString();
+        await LadeRepositoryPluginAuswahlAsync();
+    }
+
     private async Task AddRepositoryAsync()
     {
-        if (string.IsNullOrWhiteSpace(_repoUrl) || string.IsNullOrWhiteSpace(_repoName))
+        var selectedPlugin = ResolveSelectedRepositoryPlugin();
+        if (selectedPlugin is null)
         {
-            _repoFehler = "URL und Name sind Pflichtfelder.";
+            _repoFehler = "Es ist kein SourceCode-Plugin verfügbar.";
             return;
         }
-        await ProjektService.AddRepositoryAsync(Id, "GitHub", _repoUrl.Trim(), _repoName.Trim());
-        _repoUrl = string.Empty;
-        _repoName = string.Empty;
+
+        if (_repositoryLinkFields.Count == 0)
+        {
+            _repoFehler = $"Plugin '{selectedPlugin.PluginName}' liefert keine Eingabefelder für die Repository-Verknüpfung.";
+            return;
+        }
+
+        var normalizedFieldValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var field in _repositoryLinkFields)
+        {
+            var value = GetRepositoryFieldValue(field.Key).Trim();
+            if (field.IsRequired && string.IsNullOrWhiteSpace(value))
+            {
+                _repoFehler = $"{field.Label} ist ein Pflichtfeld.";
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                normalizedFieldValues[field.Key] = value;
+            }
+        }
+
+        await ProjektService.AddRepositoryAsync(Id, selectedPlugin.PluginPrefix, normalizedFieldValues);
+        ResetRepositoryFieldValues();
         _showRepoForm = false;
         await LadeAsync();
+    }
+
+    private async Task LadeRepositoryPluginAuswahlAsync()
+    {
+        _sourceCodePlugins = PluginManager.GetSourceCodeManagementPlugins();
+        if (_sourceCodePlugins.Count == 0)
+        {
+            _selectedRepositoryPluginPrefix = null;
+            _repositoryLinkFields = [];
+            _repositoryFieldValues.Clear();
+            return;
+        }
+
+        var resolvedPlugin = await PluginSelectionService.ResolveSourceCodeManagementPluginAsync(_selectedRepositoryPluginPrefix);
+        _selectedRepositoryPluginPrefix = resolvedPlugin.PluginPrefix;
+        ApplyRepositoryFieldSchema(resolvedPlugin);
+    }
+
+    private IGitPlugin? ResolveSelectedRepositoryPlugin()
+    {
+        if (_sourceCodePlugins.Count == 0)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedRepositoryPluginPrefix))
+        {
+            return _sourceCodePlugins[0];
+        }
+
+        return _sourceCodePlugins.FirstOrDefault(plugin =>
+                   string.Equals(plugin.PluginPrefix, _selectedRepositoryPluginPrefix, StringComparison.OrdinalIgnoreCase))
+               ?? _sourceCodePlugins[0];
+    }
+
+    private void ApplyRepositoryFieldSchema(IGitPlugin plugin)
+    {
+        _repositoryLinkFields = plugin.GetRepositoryLinkFields();
+        var allowedKeys = _repositoryLinkFields
+            .Select(field => field.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in _repositoryFieldValues.Keys.Where(key => !allowedKeys.Contains(key)).ToList())
+        {
+            _repositoryFieldValues.Remove(key);
+        }
+
+        foreach (var field in _repositoryLinkFields)
+        {
+            _repositoryFieldValues.TryAdd(field.Key, string.Empty);
+        }
+    }
+
+    private string GetRepositoryFieldValue(string fieldKey)
+        => _repositoryFieldValues.GetValueOrDefault(fieldKey, string.Empty);
+
+    private void SetRepositoryFieldValue(string fieldKey, string value)
+        => _repositoryFieldValues[fieldKey] = value;
+
+    private static string GetRepositoryInputType(PluginSettingField field)
+        => field.FieldType switch
+        {
+            PluginSettingFieldType.Url => "url",
+            PluginSettingFieldType.Integer => "number",
+            _ => "text"
+        };
+
+    private static bool IsWebUrl(string value)
+        => Uri.TryCreate(value, UriKind.Absolute, out var uri)
+           && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+
+    private void ResetRepositoryFieldValues()
+    {
+        foreach (var field in _repositoryLinkFields)
+        {
+            _repositoryFieldValues[field.Key] = string.Empty;
+        }
     }
 
     private void ZurAufgabe(Guid aufgabeId) => NavigationManager.NavigateTo($"/aufgaben/{aufgabeId}");

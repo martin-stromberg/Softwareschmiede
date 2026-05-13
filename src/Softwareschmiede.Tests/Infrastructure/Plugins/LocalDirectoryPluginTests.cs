@@ -77,6 +77,13 @@ public sealed class LocalDirectoryPluginTests
         await File.WriteAllTextAsync(Path.Combine(sourceDir, "b.txt"), "b");
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                sourceDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "not a git repository"));
         var store = new Mock<ICredentialStore>();
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.CopyMaxFiles")).Returns("1");
@@ -98,6 +105,13 @@ public sealed class LocalDirectoryPluginTests
         await File.WriteAllBytesAsync(Path.Combine(sourceDir, "huge.bin"), new byte[2 * 1024 * 1024]);
 
         var cli = new Mock<ICliRunner>(MockBehavior.Strict);
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                sourceDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "not a git repository"));
         var store = new Mock<ICredentialStore>();
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.CopyMaxMegabytes")).Returns("1");
@@ -155,6 +169,20 @@ public sealed class LocalDirectoryPluginTests
         cli.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                sourceDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "true", string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "clone", sourceDir, targetDir })),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
                 targetDir,
                 null,
                 It.IsAny<CancellationToken>()))
@@ -174,16 +202,13 @@ public sealed class LocalDirectoryPluginTests
 
         await sut.CloneRepositoryAsync(string.Empty, targetDir);
 
-        File.Exists(Path.Combine(targetDir, "readme.txt")).Should().BeTrue();
         cli.VerifyAll();
     }
 
     [Fact]
-    public async Task CloneRepositoryAsync_ShouldUseConfiguredWorkingDirectory_WhenSet()
+    public async Task CloneRepositoryAsync_ShouldUseRequestedTargetDirectory_WhenWorkingDirectorySettingExists()
     {
         var sourceDir = Directory.CreateTempSubdirectory().FullName;
-        var configuredWorkingDir = Directory.CreateTempSubdirectory().FullName;
-        Directory.Delete(configuredWorkingDir, recursive: true);
         var requestedTarget = Directory.CreateTempSubdirectory().FullName;
         await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base");
 
@@ -191,28 +216,72 @@ public sealed class LocalDirectoryPluginTests
         cli.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
-                configuredWorkingDir,
+                sourceDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "true", string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "clone", sourceDir, requestedTarget })),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                requestedTarget,
                 null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, "true", string.Empty));
         cli.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "status", "--porcelain" })),
-                configuredWorkingDir,
+                requestedTarget,
                 null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
         var store = new Mock<ICredentialStore>();
         store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
-        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkingDirectory")).Returns(configuredWorkingDir);
+        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkingDirectory")).Returns(@"C:\configured-should-be-ignored");
         var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
         await sut.CloneRepositoryAsync(sourceDir, requestedTarget);
 
-        File.Exists(Path.Combine(configuredWorkingDir, "readme.txt")).Should().BeTrue();
-        File.Exists(Path.Combine(requestedTarget, "readme.txt")).Should().BeFalse();
         cli.VerifyAll();
+    }
+
+    [Fact]
+    public void GetSettingGroups_ShouldNotExposeWorkingDirectoryField()
+    {
+        var sut = new LocalDirectoryPlugin(
+            new Mock<ICliRunner>().Object,
+            new Mock<ICredentialStore>().Object,
+            NullLogger<LocalDirectoryPlugin>.Instance);
+
+        var allFieldKeys = sut.GetSettingGroups()
+            .SelectMany(group => group.Fields)
+            .Select(field => field.Key)
+            .ToList();
+
+        allFieldKeys.Should().NotContain("WorkingDirectory");
+    }
+
+    [Fact]
+    public void GetRepositoryLinkFields_ShouldRequireSourceDirectory()
+    {
+        var sut = new LocalDirectoryPlugin(
+            new Mock<ICliRunner>().Object,
+            new Mock<ICredentialStore>().Object,
+            NullLogger<LocalDirectoryPlugin>.Instance);
+
+        var fields = sut.GetRepositoryLinkFields();
+
+        fields.Should().ContainSingle(field =>
+            field.Key == "SourceDirectory"
+            && field.IsRequired
+            && field.FieldType == PluginSettingFieldType.Text);
     }
 
     [Fact]
@@ -280,6 +349,89 @@ public sealed class LocalDirectoryPluginTests
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Workspace-Status konnte nicht geprüft werden*");
+    }
+
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldInitAndClone_WhenSeparateModeHasNoGitAndInitIsConfirmed()
+    {
+        var sourceDir = Directory.CreateTempSubdirectory().FullName;
+        var targetDir = Directory.CreateTempSubdirectory().FullName;
+        Directory.Delete(targetDir, recursive: true);
+
+        var cli = new Mock<ICliRunner>(MockBehavior.Strict);
+        cli.SetupSequence(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                sourceDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "not a git repository"))
+            .ReturnsAsync(new CliResult(1, string.Empty, "not a git repository"));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "init" })),
+                sourceDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "Initialized empty Git repository", string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "clone", sourceDir, targetDir })),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "true", string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "status", "--porcelain" })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        var store = new Mock<ICredentialStore>();
+        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
+        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory")).Returns("true");
+        var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(sourceDir, targetDir);
+
+        cli.VerifyAll();
+    }
+
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldCopyWithoutClone_WhenSeparateModeHasNoGitAndInitNotConfirmed()
+    {
+        var sourceDir = Directory.CreateTempSubdirectory().FullName;
+        var targetDir = Directory.CreateTempSubdirectory().FullName;
+        Directory.Delete(targetDir, recursive: true);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "copy.txt"), "copied");
+
+        var cli = new Mock<ICliRunner>(MockBehavior.Strict);
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                sourceDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "not a git repository"));
+
+        var store = new Mock<ICredentialStore>();
+        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
+        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory")).Returns("false");
+        var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(sourceDir, targetDir);
+
+        File.Exists(Path.Combine(targetDir, "copy.txt")).Should().BeTrue();
+        cli.VerifyAll();
     }
 
     [Fact]
