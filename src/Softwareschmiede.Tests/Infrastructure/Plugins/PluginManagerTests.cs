@@ -37,6 +37,7 @@ public sealed class PluginManagerTests : IDisposable
     {
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHub.dll"), overwrite: true);
+        File.Copy(typeof(LocalDirectoryPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.LocalDirectory.dll"), overwrite: true);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
 
@@ -45,7 +46,9 @@ public sealed class PluginManagerTests : IDisposable
         var scmPlugins = sut.GetSourceCodeManagementPlugins();
         var kiPlugins = sut.GetDevelopmentAutomationPlugins();
 
-        scmPlugins.Should().ContainSingle(p => p.PluginName == "GitHub");
+        scmPlugins.Should().HaveCount(2);
+        scmPlugins.Should().Contain(p => p.PluginName == "GitHub");
+        scmPlugins.Should().Contain(p => p.PluginName == "Local Directory");
         kiPlugins.Should().HaveCount(2);
         kiPlugins.Should().Contain(p => p.PluginName == "GitHub Copilot");
         kiPlugins.Should().Contain(p => p.PluginName == "Claude CLI");
@@ -105,6 +108,7 @@ public sealed class PluginManagerTests : IDisposable
     {
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHub.dll"), overwrite: true);
+        File.Copy(typeof(LocalDirectoryPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.LocalDirectory.dll"), overwrite: true);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
 
@@ -115,8 +119,8 @@ public sealed class PluginManagerTests : IDisposable
         var kiFirst = sut.GetDevelopmentAutomationPlugins();
         var kiSecond = sut.GetDevelopmentAutomationPlugins();
 
-        firstCall.Should().HaveCount(1);
-        secondCall.Should().HaveCount(1);
+        firstCall.Should().HaveCount(2);
+        secondCall.Should().HaveCount(2);
         kiFirst.Should().HaveCount(2);
         kiSecond.Should().HaveCount(2);
     }

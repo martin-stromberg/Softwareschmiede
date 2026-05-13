@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" />
   </ItemGroup>
 
 </Project>

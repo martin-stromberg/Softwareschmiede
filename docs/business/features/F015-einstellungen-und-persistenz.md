@@ -19,6 +19,7 @@ Stakeholder nutzen diese Sicht, um Betriebssicherheit und einheitliche Team-Stan
 
 - Arbeitsverzeichnis für lokale Repositories
 - Standardplugin je Pluginart (z. B. KI und SCM)
+- Plugin-spezifische Betriebsmodi (z. B. `WorkspaceMode` im Local Directory Plugin)
 - Zugangsdaten/Schlüssel für angebundene Dienste (sicher abgelegt)
 - Weitere nutzerbezogene Vorgaben für den täglichen Ablauf
 
@@ -62,5 +63,6 @@ Nein. Historische Protokolle und abgeschlossene Abläufe bleiben nachvollziehbar
 - [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Speicherort für Arbeitskopien
 - [F013 – Claude-CLI-Integration](./F013-claude-cli-integration.md) – KI-Zugangsdaten in Einstellungen
 - [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – Standardwerte und Auswahl im Prompt
+- [F017 – Lokales Verzeichnis Plugin](./F017-lokales-verzeichnis-plugin.md) – lokale Plugin-Einstellungen wie WorkspaceMode
 - [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md) – Vorgehen bei ungültigen oder nicht nutzbaren Einstellungen
 - [Zurück zur Übersicht](../features.md)

@@ -61,8 +61,9 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ### 🔗 Git-Integration (Plugin-System)
 - **Plugin-Architektur** über `IGitPlugin`-Interface – austauschbar für verschiedene Git-Provider
-- **GitHub-Plugin** (erstes Plugin): vollständige GitHub-Integration via `gh` CLI
-- Klonen, Branch anlegen, Committen, Pushen, Pullen und Pull Requests erstellen
+- **GitHub-Plugin**: vollständige GitHub-Integration via `gh` CLI (inkl. Push/Pull/Pull Request/Issues)
+- **LocalDirectoryPlugin**: lokales SCM-Plugin ohne Remote-Provider mit `WorkspaceMode` (`SeparateWorkingDirectory` oder `InSourceDirectory`)
+- Lokale Git-Basisoperationen: Klonen/Workspace vorbereiten, Branch anlegen, Committen und Reset
 - Aufgabenspezifische Branches (`task/<aufgaben-id>-<kurzname>`)
 - Commit-Verwaltung inkl. Rollback (soft / mixed / hard)
 
@@ -193,7 +194,14 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch, KI-Plugin wird über Default/Fallback aufgelöst).
 4. **KI-Lauf ausführen** (Prompt + Agent + KI-Plugin wählen; Standardplugin ist vorausgewählt).
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
-6. **Commits/Push/PR durchführen** und Aufgabe abschließen oder abbrechen.
+6. **Commits durchführen**, bei Remote-SCM optional Push/PR, und Aufgabe abschließen oder abbrechen.
+
+### LocalDirectoryPlugin & WorkspaceMode
+
+- Für lokale Quellordner kann in den Einstellungen als SCM-Plugin **Local Directory** gewählt werden.
+- `WorkspaceMode = SeparateWorkingDirectory` (Standard): Es wird eine getrennte Arbeitskopie erstellt; das Quellverzeichnis bleibt unverändert.
+- `WorkspaceMode = InSourceDirectory`: Es wird direkt im Quellverzeichnis gearbeitet; falls dort noch kein Git-Repository existiert, ist `ConfirmGitInitInSourceDirectory=true` erforderlich.
+- Nicht unterstützte Remote-Operationen (z. B. Push/Pull/Pull Request/Issues) werden im LocalDirectoryPlugin explizit mit `NotSupportedException` abgelehnt.
 
 ### KI-Plugin-Auswahl (Copilot oder Claude CLI)
 
@@ -265,7 +273,7 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 
 ### Weitere Plugin-Konfiguration
 
-Alle weiteren Plugin-Einstellungen (Repository-URL, Organisations-URL) werden direkt in der Oberfläche unter *Projekte → Repository verknüpfen* konfiguriert und sicher in der lokalen SQLite-Datenbank gespeichert.
+Projektbezogene Verknüpfungen (z. B. Repository-URL, Organisations-URL) werden in der Oberfläche unter *Projekte → Repository verknüpfen* konfiguriert und in der lokalen SQLite-Datenbank gespeichert. Plugin-spezifische Runtime-Settings (z. B. `LocalDirectoryPlugin.*`) werden über den jeweiligen Plugin-Settings-Mechanismus persistiert.
 
 Für das Claude-CLI-Plugin kann der API-Key alternativ per `cmdkey` gesetzt werden:
 
@@ -294,6 +302,24 @@ gebildet, z. B.:
 
 - Konfiguriert: `D:/Repos` → `D:/Repos/softwareschmiede/<aufgabeId>`
 - Fallback: `Path.GetTempPath()` → `<temp>/softwareschmiede/<aufgabeId>`
+
+### LocalDirectoryPlugin-Konfiguration (Workspace)
+
+LocalDirectoryPlugin-spezifische Einstellungen werden ebenfalls über das Plugin-Settings-Schema `<PluginPrefix>.<Key>` persistiert:
+
+| Schlüssel | Bedeutung | Default |
+|-----------|-----------|---------|
+| `LocalDirectoryPlugin.WorkspaceMode` | Arbeitsmodus (`SeparateWorkingDirectory` oder `InSourceDirectory`) | `SeparateWorkingDirectory` |
+| `LocalDirectoryPlugin.SourceDirectory` | Optionaler Fallback-Quellpfad, wenn kein Repository-Pfad übergeben wurde | leer |
+| `LocalDirectoryPlugin.WorkingDirectory` | Optionales Zielverzeichnis für `SeparateWorkingDirectory` | verwendet übergebenen Zielpfad |
+| `LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory` | Explizite Bestätigung für `git init` im Quellverzeichnis | `false` |
+| `LocalDirectoryPlugin.CopyTimeoutSeconds` | Guardrail für Kopierdauer | `600` |
+| `LocalDirectoryPlugin.CopyMaxFiles` | Guardrail für maximale Dateianzahl pro Kopie | `100000` |
+| `LocalDirectoryPlugin.CopyMaxMegabytes` | Guardrail für maximale Datenmenge pro Kopie | `10240` |
+
+Hinweise:
+- Wenn `LocalDirectoryPlugin.WorkingDirectory` gesetzt ist, hat dieser Pfad für das LocalDirectoryPlugin Vorrang vor `repositories.workdir`.
+- Bei ungültigem gespeichertem `WorkspaceMode` fällt das Plugin zur Laufzeit auf `SeparateWorkingDirectory` zurück.
 
 ---
 
@@ -371,6 +397,7 @@ Softwareschmiede/                            # Solution Root
 │   └── Softwareschmiede.Tests/              # Unit-Tests (xUnit, FluentAssertions, Moq)
 ├── plugins/                                 # Plugin-Projekte (separate Klassenbibliotheken)
 │   ├── Softwareschmiede.Plugin.GitHub/      # Git-Provider Plugin
+│   ├── Softwareschmiede.Plugin.LocalDirectory/ # Lokales SCM-Plugin (WorkspaceMode)
 │   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
 │   └── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
 ├── docs/                                    # Planungsdokumente und Architektur
@@ -419,7 +446,7 @@ flowchart TB
     subgraph Infrastructure["Infrastructure Layer"]
         INL1["EF Core / SQLite"]
         INL2["PluginManager laedt Plugin-DLLs aus dem plugins-Ordner"]
-        INL3["GitHubPlugin / GitHubCopilotPlugin / ClaudeCliPlugin"]
+        INL3["GitHubPlugin / LocalDirectoryPlugin / GitHubCopilotPlugin / ClaudeCliPlugin"]
         INL4["CLI-Runner fuer gh, copilot und claude"]
         INL5["Windows Credential Store"]
         INL6["AgentPackage FileSystem Reader"]
@@ -483,6 +510,11 @@ dotnet test --collect:"XPlat Code Coverage"
 - [Moq](https://github.com/moq/moq4) – Mocking von Plugin-Interfaces und Services
 
 Feature-spezifische Testartefakte:
+- Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`
+- Integrationstests: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
+- UI/Settings-Tests: `src/Softwareschmiede.Tests/Components/Pages/EinstellungenBaseArbeitsverzeichnisTests.cs`
+- [Testplan: Arbeitsverzeichnis](docs/tests/testplan-arbeitsverzeichnis.md)
+- [Testlücken: Arbeitsverzeichnis](docs/tests/testluecken-arbeitsverzeichnis.md)
 - [Testplan: Kontextsteuerung bei Folgeanweisungen](docs/tests/testplan-kontextsteuerung-folgeanweisungen.md)
 - [Testlücken: Kontextsteuerung bei Folgeanweisungen](docs/tests/testluecken-kontextsteuerung-folgeanweisungen.md)
 - [Testplan: Claude-CLI-Integration](docs/tests/testplan-claude-cli-integration.md)
@@ -507,9 +539,10 @@ Für die Inbetriebnahme müssen `gh`, `git`, `copilot` und (für Claude-Läufe) 
 Es gibt aktuell keine separate Changelog-Datei. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- LocalDirectoryPlugin als produktiv verfügbares SCM-Plugin ergänzt (inkl. WorkspaceMode und Guardrails)
+- Konfiguration, Usage, Architektur und Testsektion auf LocalDirectoryPlugin-Stand synchronisiert
 - Claude-CLI-Integration als produktiv verfügbares KI-Plugin ergänzt
-- Voraussetzungen, Konfiguration, Usage, Projektstruktur und Roadmap auf aktuellen Stand gebracht
-- Testartefakte für `claude-cli-integration` in der Dokumentationsübersicht verlinkt
+- Testartefakte für `lokales-verzeichnis-plugin` und `claude-cli-integration` in der Dokumentationsübersicht verlinkt
 
 ---
 
@@ -550,7 +583,11 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F005: Aufgabenprotokoll](docs/business/features/F005-aufgabenprotokoll.md) | Fachliche Beschreibung des strukturierten Protokollformats mit Markdown-Darstellung, Sanitizing und Fallback |
 | [Feature F009: Arbeitsverzeichnis konfigurieren](docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md) | Fachliche Beschreibung des konfigurierbaren Arbeitsverzeichnisses inkl. Fallback und Migration |
 | [Feature F010: Plugin-Prinzip für Integrationen](docs/business/features/F010-plugin-prinzip-integrationen.md) | Fachliche Beschreibung des ausgelagerten Plugin-Prinzips für Git- und KI-Integrationen |
-| [Dokumentationsplan: claude-cli-integration](docs/documentation-plan.md) | Analyse und Maßnahmenplan zur durchgängigen Doku-Aktualisierung |
+| [Feature F017: Lokales Verzeichnis Plugin](docs/business/features/F017-lokales-verzeichnis-plugin.md) | Fachliche Beschreibung von LocalDirectoryPlugin, WorkspaceMode und Grenzen gegenüber Remote-Providern |
+| [Requirements: LocalDirectoryPlugin](docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | Umsetzungsnahe Anforderungen und Akzeptanzkriterien für WorkspaceMode, Guardrails und Fehlerverhalten |
+| [Architektur: LocalDirectoryPlugin](docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | Technische Architektur für LocalDirectoryPlugin, Settings und Integrationspfad |
+| [Flow: LocalDirectoryPlugin](docs/flows/local-directory-plugin-flow.md) | Ablaufdarstellung für Clone-/Workspace-Auflösung, Guardrails und Folgeoperationen |
+| [Dokumentationsplan](docs/documentation-plan.md) | Analyse und Maßnahmenplan zur durchgängigen Doku-Aktualisierung |
 | [Anforderungen: Plugin-Klassenbibliotheken](docs/requirements/plugin-klassenbibliotheken-github-und-copilot.md) | Feature-Anforderungen für Plugin-Architektur und Build-Auslieferung |
 | [Architektur: Plugin-Klassenbibliotheken](docs/architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md) | Technische Architektur für Discovery, Build/Pipeline und Plugin-Design |
 | [Architecture Review: Plugin-Klassenbibliotheken](docs/improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md) | Architekturprüfung mit Findings und Maßnahmen |

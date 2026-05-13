@@ -17,6 +17,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
+| [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Kopier-Guardrails, Fehlerpfaden und Workspace-Mapping |
 
 ---
 
@@ -131,6 +132,13 @@ Beschreibt die Trennung zwischen Übersichtsaktionen (Neu anlegen) und Einzelakt
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `IAgentPackageFileService`, `AgentenpaketeSeite`
 
 Dokumentiert den vollständigen Datei-/Verzeichnis-Flow für Agentenpakete inklusive `ResolveSafePath`-Guard, Namensvalidierung und rekursivem Dateibaum.
+
+---
+
+### [Ablauf 12: LocalDirectoryPlugin – WorkspaceMode, Kopierpfad und Guardrails](./local-directory-plugin-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `LocalDirectoryPlugin`, `EntwicklungsprozessService`, `GitOrchestrationService`, `ArbeitsverzeichnisResolver`
+
+Beschreibt den End-to-End-Integrationspfad des lokalen Verzeichnis-Plugins: Einstellungen → Prozessstart → `CloneRepositoryAsync`-Verzweigung nach `WorkspaceMode` → sichere Kopie mit Limits/Symlink-Schutz → Pointer-/Mapping-Auflösung für Folgeoperationen.
 
 ---
 

@@ -113,6 +113,18 @@ string PluginName { get; }
 
 ---
 
+### Implementierungshinweis: `LocalDirectoryPlugin`
+
+Für die konkrete `IGitPlugin`-Implementierung `LocalDirectoryPlugin` gelten provider-spezifische Einschränkungen:
+
+- **Unterstützt:** `CloneRepositoryAsync`, `CreateBranchAsync`, `CommitAsync`, `ResetAsync`, `CheckHealthAsync`
+- **Nicht unterstützt (`NotSupportedException`):** `GetIssuesAsync`, `PushBranchAsync`, `PullAsync`, `CreatePullRequestAsync`, `GetRemoteBranchesAsync`, `GetDefaultBranchAsync`, `CheckoutRemoteBranchAsync`
+- **Konfigurations-/Guardrail-Details:** `WorkspaceMode`, `SourceDirectory`, `WorkingDirectory`, `ConfirmGitInitInSourceDirectory`, `CopyTimeoutSeconds`, `CopyMaxFiles`, `CopyMaxMegabytes`
+
+Details: [local-directory-plugin.md](./local-directory-plugin.md)
+
+---
+
 ### `GetIssuesAsync`
 
 ```csharp

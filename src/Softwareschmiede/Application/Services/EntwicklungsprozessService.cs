@@ -107,9 +107,12 @@ public sealed class EntwicklungsprozessService
         string branchName;
 
         // Prüfen ob ein vorhandener Remote-Branch genutzt werden soll
-        var defaultBranch = await _gitPlugin.GetDefaultBranchAsync(repositoryUrl, ct);
-        var nutzeExistierendenBranch = !string.IsNullOrEmpty(basisBranchName)
-            && !string.Equals(basisBranchName, defaultBranch, StringComparison.OrdinalIgnoreCase);
+        var nutzeExistierendenBranch = false;
+        if (!string.IsNullOrEmpty(basisBranchName))
+        {
+            var defaultBranch = await _gitPlugin.GetDefaultBranchAsync(repositoryUrl, ct);
+            nutzeExistierendenBranch = !string.Equals(basisBranchName, defaultBranch, StringComparison.OrdinalIgnoreCase);
+        }
 
         if (nutzeExistierendenBranch)
         {

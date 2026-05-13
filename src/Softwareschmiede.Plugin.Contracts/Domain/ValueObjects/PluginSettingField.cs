@@ -10,10 +10,12 @@ namespace Softwareschmiede.Domain.ValueObjects;
 /// <param name="Placeholder">Beispieltext für das Eingabefeld (z.B. "ghp_...").</param>
 /// <param name="Description">Optionale Beschreibung / Hinweistext unterhalb des Feldes.</param>
 /// <param name="IsRequired">Gibt an ob das Feld Pflicht ist.</param>
+/// <param name="EnumOptions">Zulässige Optionen für Enum-Felder.</param>
 public sealed record PluginSettingField(
     string Key,
     string Label,
     PluginSettingFieldType FieldType = PluginSettingFieldType.Text,
     string? Placeholder = null,
     string? Description = null,
-    bool IsRequired = false);
+    bool IsRequired = false,
+    IReadOnlyList<string>? EnumOptions = null);

@@ -68,7 +68,7 @@ Die KI arbeitet weiter und meldet schließlich den Abschluss.
 
 ## Was passiert im Hintergrund?
 
-Beim Start der KI lädt die Softwareschmiede den Code aus Ihrer GitHub-Ablage auf Ihren Rechner.
+Beim Start der KI bereitet die Softwareschmiede den Code über das gewählte SCM-Plugin als lokale Arbeitsbasis auf.
 Es wird eine separate Arbeitskopie angelegt, damit der ursprüngliche Code unberührt bleibt.
 Das Basis-Arbeitsverzeichnis dieser Arbeitskopie kann in den Einstellungen konfiguriert werden.
 Die KI arbeitet in dieser Kopie. Alle Änderungen bleiben lokal, bis Sie den Abschluss bestätigen.
@@ -104,7 +104,8 @@ Klicken Sie auf **Aufgabe abbrechen** und formulieren Sie die Aufgabenbeschreibu
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md) – Ergebnis freigeben
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Vorgang beenden ohne zu speichern
 - [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – Speicherort der lokalen Klone steuern
-- [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Ausgelagerte GitHub- und Copilot-Anbindung verstehen
+- [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Ausgelagerte SCM- und KI-Anbindung verstehen
+- [F017 – Lokales Verzeichnis Plugin](./F017-lokales-verzeichnis-plugin.md) – lokale SCM-Arbeit ohne Remote-Provider
 - [F011 – Agent-Auswahl bei Folgeanweisungen](./F011-agent-auswahl-bei-folgeanweisungen.md) – Agent je Folgeanweisung gezielt wählen
 - [F012 – Kontextsteuerung bei Folgeanweisungen](./F012-kontextsteuerung-folgeanweisungen.md) – Verlauf je Folgeanweisung bewusst mitgeben, ignorieren oder neu beginnen
 - [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – KI-Plugin pro Prompt festlegen

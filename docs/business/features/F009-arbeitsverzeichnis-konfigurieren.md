@@ -43,6 +43,9 @@ Beispiele:
 - Konfiguriert: `D:\Repos` → `D:\Repos\softwareschmiede\<aufgabeId>`
 - Default/Fallback: `<Temp>` → `<Temp>\softwareschmiede\<aufgabeId>`
 
+Hinweis: Wenn im **Local Directory**-Plugin zusätzlich ein eigenes `WorkingDirectory` gesetzt ist,
+hat diese plugin-spezifische Vorgabe für dieses Plugin Vorrang.
+
 ---
 
 ## Validierung und Fallback
@@ -81,4 +84,5 @@ Das Speichern wird mit einer verständlichen Fehlermeldung verhindert.
 - [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md)
 - [F015 – Einstellungen & Persistenz](./F015-einstellungen-und-persistenz.md)
 - [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md)
+- [F017 – Lokales Verzeichnis Plugin](./F017-lokales-verzeichnis-plugin.md)
 - [Zurück zur Übersicht](../features.md)

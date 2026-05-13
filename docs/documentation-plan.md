@@ -101,3 +101,101 @@
 ### Offene Punkte
 1. Fehlende Screenshot-Datei `docs/images/dashboard.png` in `README.md`.
 2. Optional: Einführung eines automatisierten Markdown-/Link-Lints in CI.
+
+---
+
+# Dokumentationsplan – Feature „Lokales Verzeichnis Plugin“ – 2026-05-12
+
+## Kontext
+- Feature wurde bereits geplant, implementiert und getestet.
+- Relevante Planungsdokumente: `docs/requirements/`, `docs/architecture/`, `docs/improvements/`, insbesondere `docs/planning-overview-lokales-verzeichnis-plugin.md`.
+- Ziel dieses Laufs: bestehende Projektdokumentation konsistent zum real implementierten Featurestand aktualisieren.
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `docs/api/` existiert.
+- HTTP-Endpunkte sind weiterhin nicht vorhanden; API-Doku beschreibt primär Plugin-Verträge.
+- Lücken für das Feature:
+  - `LocalDirectoryPlugin` als `IGitPlugin`-Implementierung ist nicht ausreichend dokumentiert.
+  - Einstellungen/Guardrails (`WorkspaceMode`, Pfade, Limits, Timeout) sind in API-Doku unvollständig.
+  - NotSupported-Operationen des Plugins sind nicht klar beschrieben.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `docs/flows/` existiert und enthält zentrale Flows.
+- Feature-relevante Arbeitsverzeichnis-Flows sind vorhanden, aber Abgleich auf Plugin-spezifische Ablaufdarstellung nötig.
+- Für diesen Lauf wird auf konsistente Darstellung des LocalDirectory-Ablaufs und seiner Workspace-Modi fokussiert.
+
+### Business-Dokumentation (`docs/business/`)
+- `docs/business/` existiert mit Feature-Dokumenten F001–F016.
+- Kritische Lücke: kein eigener, klarer Business-Abschnitt für das Feature „Lokales Verzeichnis Plugin“ als nutzbares Produkt-Feature.
+- Verknüpfung zu bereits vorhandenen Planungs-/Anforderungsdokumenten für das Feature muss verbessert werden.
+
+### README (`README.md`)
+- README-Struktur ist vorhanden.
+- Feature-spezifische Lücken:
+  - Featureliste nennt LocalDirectoryPlugin nicht oder nicht ausreichend.
+  - Usage/Konfiguration enthalten keine klaren LocalDirectoryPlugin-Beispiele.
+  - Architektur/Test/Changelog/Doc-Links sind nicht vollständig auf den Featurestand synchronisiert.
+
+## Phase 1 – Priorisierter Ausführungsplan
+
+### Neu zu erstellen (falls nicht vorhanden)
+1. `docs/business/features/F017-lokales-verzeichnis-plugin.md` (fachliche Feature-Dokumentation)
+2. `docs/api/local-directory-plugin.md` (technische API-/Plugin-Doku, sofern Detailtiefe in `plugin-interfaces.md` nicht ausreicht)
+
+### Zu aktualisieren
+1. `README.md`
+2. `docs/api/plugin-interfaces.md`
+3. `docs/api/README.md` (Index/Verweise)
+4. `docs/api/http-endpoints.md` (Klarstellung Endpunktstatus, falls notwendig)
+5. `docs/flows/workdir-resolution-flow.md` (Feature-Konsistenzcheck)
+6. `docs/flows/README.md` (Verweise)
+7. `docs/business/features.md`
+8. `docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md`
+9. `docs/business/features/F010-plugin-prinzip-integrationen.md`
+10. `docs/business/features/F017-lokales-verzeichnis-plugin.md` (nach Erstellung)
+
+### Priorität
+1. **Hoch:** README + API-Verträge zum LocalDirectoryPlugin
+2. **Hoch:** Fachliche Feature-Doku (F017) inkl. klarer Nutzerperspektive
+3. **Mittel:** Flow-/Index-/Verlinkungskonsistenz
+4. **Mittel:** Ergänzende Klarstellungen zu Endpunktstatus
+
+### Leitplanken
+- Nur Dokumentationsänderungen.
+- Keine Löschung bestehender Dokumentation; nur Ergänzen/Präzisieren.
+- Einheitliche Terminologie: *LocalDirectoryPlugin*, *WorkspaceMode*, *InSourceDirectory*, *SeparateWorkingDirectory*.
+- Aussagen ausschließlich auf Basis tatsächlicher Implementierung und vorhandener Tests.
+
+## Ergebnis (Anhang, Phase 3)
+
+### Neu erstellt
+1. `docs/api/local-directory-plugin.md`
+2. `docs/flows/local-directory-plugin-flow.md`
+3. `docs/business/features/F017-lokales-verzeichnis-plugin.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/plugin-interfaces.md`
+4. `docs/flows/README.md`
+5. `docs/flows/workdir-resolution-flow.md`
+6. `docs/business/features.md`
+7. `docs/business/features/F003-ki-entwicklungsprozess.md`
+8. `docs/business/features/F009-arbeitsverzeichnis-konfigurieren.md`
+9. `docs/business/features/F010-plugin-prinzip-integrationen.md`
+10. `docs/business/features/F014-standardplugin-ki-plugin-auswahl.md`
+11. `docs/business/features/F015-einstellungen-und-persistenz.md`
+12. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz- und Nicht-Leerheitsprüfung der erzeugten/aktualisierten Zielartefakte: **erfolgreich**.
+- Fokusabgleich gegen Implementierung und Tests des Features „Lokales Verzeichnis Plugin“: **durchgeführt**.
+- Von den Subagenten gemeldete Testläufe:
+  - `dotnet build .\\Softwareschmiede.slnx` erfolgreich.
+  - `dotnet test .\\Softwareschmiede.slnx` erfolgreich.
+  - `dotnet test --filter "LocalDirectoryPlugin"` erfolgreich.
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken für das Feature „Lokales Verzeichnis Plugin“ identifiziert.

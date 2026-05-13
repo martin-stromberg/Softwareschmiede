@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 using System.Text.Json;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -11,7 +12,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// GitHub Plugin – nutzt gh CLI und git CLI für alle GitHub-Operationen.
 /// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable übergeben, niemals als CLI-Argument.
 /// </summary>
-public sealed class GitHubPlugin : IGitPlugin
+public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
 {
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
     private readonly ICliRunner _cliRunner;
@@ -19,16 +20,16 @@ public sealed class GitHubPlugin : IGitPlugin
     private readonly ILogger<GitHubPlugin> _logger;
 
     /// <inheritdoc/>
-    public string PluginName => "GitHub";
+    public override string PluginName => "GitHub";
 
     /// <inheritdoc/>
-    public string PluginPrefix => "Softwareschmiede.GitHub";
+    public override string PluginPrefix => "Softwareschmiede.GitHub";
 
     /// <inheritdoc/>
-    public PluginType PluginType => PluginType.SourceCodeManagement;
+    public override PluginType PluginType => PluginType.SourceCodeManagement;
 
     /// <inheritdoc/>
-    public IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
+    public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
     [
         new PluginSettingGroup("Authentifizierung",
         [
@@ -44,6 +45,7 @@ public sealed class GitHubPlugin : IGitPlugin
 
     /// <summary>Erstellt eine neue Instanz des <see cref="GitHubPlugin"/>.</summary>
     public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger)
+        : base(cliRunner)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
@@ -290,7 +292,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
+    public override async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
         _logger.LogInformation("Rufe Issues für Repository {RepositoryId} ab.", repositoryId);
 
@@ -334,7 +336,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default)
+    public override async Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Klone Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
 
@@ -377,23 +379,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Lege Branch {BranchName} in {LocalPath} an.", branchName, localPath);
-
-        var result = await _cliRunner.RunAsync(
-            "git",
-            ["checkout", "-b", branchName],
-            localPath,
-            null,
-            ct);
-
-        if (!result.IsSuccess)
-            throw new InvalidOperationException($"git checkout -b fehlgeschlagen: {result.StdErr}");
-    }
-
-    /// <inheritdoc/>
-    public async Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
+    public override async Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
     {
         _logger.LogInformation("Pushe Branch {BranchName} in {LocalPath}.", branchName, localPath);
 
@@ -414,7 +400,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task PullAsync(string localPath, CancellationToken ct = default)
+    public override async Task PullAsync(string localPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Führe git pull in {LocalPath} durch.", localPath);
 
@@ -435,7 +421,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task<PullRequest> CreatePullRequestAsync(
+    public override async Task<PullRequest> CreatePullRequestAsync(
         string repositoryId,
         string branchName,
         string title,
@@ -484,35 +470,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task CommitAsync(string localPath, string message, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Führe Commit in {LocalPath} durch: {Message}", localPath, message);
-
-        var addResult = await _cliRunner.RunAsync("git", ["add", "."], localPath, null, ct);
-        if (!addResult.IsSuccess)
-            throw new InvalidOperationException($"git add fehlgeschlagen: {addResult.StdErr}");
-
-        var commitResult = await _cliRunner.RunAsync("git", ["commit", "-m", message], localPath, null, ct);
-        if (!commitResult.IsSuccess)
-            throw new InvalidOperationException($"git commit fehlgeschlagen: {commitResult.StdErr}");
-    }
-
-    /// <inheritdoc/>
-    public async Task ResetAsync(string localPath, string resetType, string? targetRef, CancellationToken ct = default)
-    {
-        _logger.LogInformation("git reset --{ResetType} {TargetRef} in {LocalPath}.", resetType, targetRef, localPath);
-
-        var args = new List<string> { "reset", $"--{resetType}" };
-        if (!string.IsNullOrEmpty(targetRef))
-            args.Add(targetRef);
-
-        var result = await _cliRunner.RunAsync("git", args, localPath, null, ct);
-        if (!result.IsSuccess)
-            throw new InvalidOperationException($"git reset fehlgeschlagen: {result.StdErr}");
-    }
-
-    /// <inheritdoc/>
-    public async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Prüfe GitHub-Plugin-Health.");
         var result = await _cliRunner.RunAsync("gh", ["auth", "status"], null, GetGhEnvironment(), ct);
@@ -520,7 +478,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default)
+    public override async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default)
     {
         _logger.LogInformation("Rufe Remote-Branches für {RepositoryUrl} ab.", repositoryUrl);
 
@@ -552,7 +510,7 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default)
+    public override async Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default)
     {
         _logger.LogInformation("Ermittle Standard-Branch für {RepositoryUrl}.", repositoryUrl);
 
@@ -581,19 +539,4 @@ password {token}
         return "main";
     }
 
-    /// <inheritdoc/>
-    public async Task CheckoutRemoteBranchAsync(string localPath, string branchName, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Wechsle zu Remote-Branch {BranchName} in {LocalPath}.", branchName, localPath);
-
-        var result = await _cliRunner.RunAsync(
-            "git",
-            ["checkout", "-b", branchName, "--track", $"origin/{branchName}"],
-            localPath,
-            null,
-            ct);
-
-        if (!result.IsSuccess)
-            throw new InvalidOperationException($"git checkout (remote branch) fehlgeschlagen: {result.StdErr}");
-    }
 }

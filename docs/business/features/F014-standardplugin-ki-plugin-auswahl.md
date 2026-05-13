@@ -71,6 +71,7 @@ Die gespeicherte Standardauswahl bleibt erhalten. Eine manuelle Auswahl gilt fü
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – Prompts senden und Ergebnisse verfolgen
 - [F009 – Arbeitsverzeichnis konfigurieren](./F009-arbeitsverzeichnis-konfigurieren.md) – zentrale Laufzeit-Einstellungen verstehen
 - [F010 – Plugin-Prinzip für Integrationen](./F010-plugin-prinzip-integrationen.md) – Plugin-Architektur und Verfügbarkeit
+- [F017 – Lokales Verzeichnis Plugin](./F017-lokales-verzeichnis-plugin.md) – SCM-Alternative ohne Remote-Provider
 - [F013 – Claude-CLI-Integration](./F013-claude-cli-integration.md) – zusätzlichen KI-Anbieter einbinden
 - [F015 – Einstellungen & Persistenz](./F015-einstellungen-und-persistenz.md) – gespeicherte Werte und Gültigkeit
 - [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md) – sicheres Vorgehen bei Störungen

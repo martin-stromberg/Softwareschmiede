@@ -23,6 +23,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F014 | Standardplugin & KI-Plugin-Auswahl | Standardplugin je Pluginart festlegen und beim Prompt das konkrete KI-Plugin auswählen | [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./features/F014-standardplugin-ki-plugin-auswahl.md) |
 | F015 | Einstellungen & Persistenz | Welche Einstellungen gespeichert werden und wie sie im Alltag wirken | [F015 – Einstellungen & Persistenz](./features/F015-einstellungen-und-persistenz.md) |
 | F016 | Fehlerbehandlung & Recovery | Wie Sie bei typischen Störungen sicher weiterarbeiten können | [F016 – Fehlerbehandlung & Recovery](./features/F016-fehlerbehandlung-und-recovery.md) |
+| F017 | Lokales Verzeichnis Plugin | Lokale Ordner ohne Remote-Provider als sichere Git-Arbeitsbereiche nutzen | [F017 – Lokales Verzeichnis Plugin](./features/F017-lokales-verzeichnis-plugin.md) |
 
 ---
 
