@@ -55,10 +55,16 @@ public sealed class EntwicklungsprozessService
     /// wird nach dem Klon zu diesem Branch gewechselt statt einen neuen anzulegen.
     /// Bei Haupt-Branch oder <c>null</c> wird wie gewohnt ein neuer <c>task/</c>-Branch erstellt.
     /// </param>
+    /// <param name="selectedScmPluginPrefix">
+    /// Optionaler Plugin-Prefix des SCM-Plugins (entspricht <see cref="Domain.Abstractions.IPlugin.PluginPrefix"/>).
+    /// Wird gesetzt, wenn das Repository einem bestimmten Plugin zugeordnet ist (z.B. <c>LocalDirectoryPlugin</c>).
+    /// Bei <c>null</c> wird das gespeicherte Standard-SCM-Plugin verwendet.
+    /// </param>
     /// <param name="ct">Cancellation Token.</param>
-    public async Task ProzessStartenAsync(Guid aufgabeId, string repositoryUrl, string? basisBranchName = null, CancellationToken ct = default)
+    public async Task ProzessStartenAsync(Guid aufgabeId, string repositoryUrl, string? basisBranchName = null, string? selectedScmPluginPrefix = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Entwicklungsprozess für Aufgabe {AufgabeId} starten.", aufgabeId);
+        var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(selectedScmPluginPrefix, ct);
         var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(null, ct);
 
         var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
@@ -101,21 +107,24 @@ public sealed class EntwicklungsprozessService
         }
 
         // Repository klonen
-        _logger.LogInformation("Repository '{RepositoryUrl}' nach '{KlonPfad}' klonen.", repositoryUrl, lokalerKlonPfad);
-        await _gitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad, ct);
+        _logger.LogInformation("Repository '{RepositoryUrl}' nach '{KlonPfad}' klonen (Plugin: {PluginPrefix}).", repositoryUrl, lokalerKlonPfad, gitPlugin.PluginPrefix);
+        await gitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad, ct);
 
         string branchName;
 
         // Prüfen ob ein vorhandener Remote-Branch genutzt werden soll
-        var defaultBranch = await _gitPlugin.GetDefaultBranchAsync(repositoryUrl, ct);
-        var nutzeExistierendenBranch = !string.IsNullOrEmpty(basisBranchName)
-            && !string.Equals(basisBranchName, defaultBranch, StringComparison.OrdinalIgnoreCase);
+        var nutzeExistierendenBranch = false;
+        if (!string.IsNullOrEmpty(basisBranchName))
+        {
+            var defaultBranch = await gitPlugin.GetDefaultBranchAsync(repositoryUrl, ct);
+            nutzeExistierendenBranch = !string.Equals(basisBranchName, defaultBranch, StringComparison.OrdinalIgnoreCase);
+        }
 
         if (nutzeExistierendenBranch)
         {
             // Vorhandenen Remote-Branch auschecken
             _logger.LogInformation("Wechsle zu vorhandenem Branch '{BasisBranch}'.", basisBranchName);
-            await _gitPlugin.CheckoutRemoteBranchAsync(lokalerKlonPfad, basisBranchName!, ct);
+            await gitPlugin.CheckoutRemoteBranchAsync(lokalerKlonPfad, basisBranchName!, ct);
             branchName = basisBranchName!;
         }
         else
@@ -125,7 +134,7 @@ public sealed class EntwicklungsprozessService
             branchName = $"task/{aufgabeId:N}-{titelSlug}";
 
             _logger.LogInformation("Branch '{BranchName}' anlegen.", branchName);
-            await _gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, ct);
+            await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, ct);
         }
 
         // Agentenpaket deployen, wenn vorhanden (Kompatibilität wurde bereits vor dem Klonen geprüft)
@@ -387,10 +396,14 @@ public sealed class EntwicklungsprozessService
 
         await _gitPlugin.PullAsync(aufgabe.LokalerKlonPfad, ct);
 
+        var pullLogText = string.Equals(_gitPlugin.PluginPrefix, "LocalDirectoryPlugin", StringComparison.Ordinal)
+            ? "Pull: Kein Merge durchgeführt. Arbeitsverzeichnis wurde per Dateisynchronisation aktualisiert."
+            : "Pull: Änderungen vom Remote geholt.";
+
         await _protokollService.AddEintragAsync(
             aufgabeId,
             ProtokollTyp.GitAktion,
-            "Pull: Änderungen vom Remote geholt.",
+            pullLogText,
             ct: ct);
 
         _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchgeführt.", aufgabeId);
@@ -492,10 +505,17 @@ public sealed class EntwicklungsprozessService
     }
 
     /// <summary>Gibt die Remote-Branches eines Repositories zurück (ohne Klon).</summary>
-    public async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default)
+    /// <param name="repositoryUrl">URL des Repositories.</param>
+    /// <param name="selectedScmPluginPrefix">
+    /// Optionaler Plugin-Prefix des SCM-Plugins. Entspricht dem <see cref="GitRepository.PluginTyp"/> des Repositories.
+    /// Bei <c>null</c> wird das gespeicherte Standard-SCM-Plugin verwendet.
+    /// </param>
+    /// <param name="ct">Cancellation Token.</param>
+    public async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, string? selectedScmPluginPrefix = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Remote-Branches für {RepositoryUrl} abrufen.", repositoryUrl);
-        return await _gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
+        var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(selectedScmPluginPrefix, ct);
+        return await gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
     }
 
     private async Task<string> BuildFollowPromptWithContextAsync(

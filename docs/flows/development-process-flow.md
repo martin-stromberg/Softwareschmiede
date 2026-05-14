@@ -1,7 +1,7 @@
 # Entwicklungsprozess-Ablauf
 
 **Modul:** `EntwicklungsprozessService`, `GitOrchestrationService`, `GitHubPlugin`, `GitHubCopilotPlugin`  
-**Letzte Aktualisierung:** 2026-05-11
+**Letzte Aktualisierung:** 2026-05-13
 
 Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Softwareentwicklung in **Softwareschmiede**. Die Abläufe umfassen den kompletten Lebenszyklus einer Aufgabe: vom Starten des Entwicklungsprozesses über das KI-Streaming bis zum Abschluss oder Abbruch. Querverweise auf verwandte Dokumentation sind am Ende jedes Abschnitts angegeben.
 
@@ -22,7 +22,7 @@ Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Sof
 
 ### Kontext
 
-Dieser Ablauf beschreibt den Einstieg in einen KI-gestützten Entwicklungszyklus. Der Benutzer wählt eine Aufgabe aus, konfiguriert das Agentenpaket und den Prompt, woraufhin `EntwicklungsprozessService` das Repository klont, einen Feature-Branch anlegt und die KI aktiviert. Der Ablauf umfasst zwei Phasen: die Repository-Vorbereitung (`ProzessStartenAsync`) und den KI-Start (`KiStartenAsync`).
+Dieser Ablauf beschreibt den Einstieg in einen KI-gestützten Entwicklungszyklus. Der Benutzer wählt eine Aufgabe aus, konfiguriert das Agentenpaket und den Prompt, woraufhin `EntwicklungsprozessService` den Workspace vorbereitet (Git-Clone oder Fallback-Strategie), einen Feature-Branch anlegt und die KI aktiviert. Der Ablauf umfasst zwei Phasen: die Repository-Vorbereitung (`ProzessStartenAsync`) und den KI-Start (`KiStartenAsync`).
 
 ### Diagramm
 
@@ -68,7 +68,7 @@ sequenceDiagram
 |---|---------|-------------------|-------------------|
 | 1 | Aufgabe aus Datenbank laden | `EntwicklungsprozessService.ProzessStartenAsync` → `AufgabeService.GetByIdAsync(aufgabeId)` | Eingabe: `aufgabeId` (Guid); Ausgabe: `Aufgabe`-Objekt |
 | 2 | Basis-Pfad auflösen und Klon-Pfad bestimmen | `EntwicklungsprozessService.ProzessStartenAsync` + `IArbeitsverzeichnisResolver.ResolveAsync` | Pfad: `<resolvedBase>/softwareschmiede/<aufgabeId>`; bei Fallback: `Path.GetTempPath()/softwareschmiede/<aufgabeId>` |
-| 3 | Repository klonen | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` → `GitHubPlugin`: `git clone {url} {targetPath}` | Eingabe: URL + Zielpfad; Seiteneffekt: lokales Verzeichnis wird erstellt |
+| 3 | Repository/Workspace vorbereiten | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` → je Plugin `git clone` **oder** `git init`-Fallback + Dateikopie | Eingabe: URL/Pfad + Zielpfad; Seiteneffekt: lokales Arbeitsverzeichnis wird erstellt |
 | 4 | Branch-Namen erzeugen | `EntwicklungsprozessService.ProzessStartenAsync` | Format: `task/<aufgabeId-ohne-Bindestriche>-<titel-slug>`, max. 30 Zeichen |
 | 5 | Branch anlegen | `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName)` → `GitHubPlugin`: `git checkout -b {branchName}` | Seiteneffekt: neuer Branch im lokalen Klon |
 | 6 | Agentenpaket deployen (optional) | `IKiPlugin.DeployAgentPackageAsync(paketPfad, lokalerKlonPfad)` → `GitHubCopilotPlugin`: Dateien nach `.github/agents/` kopieren | Nur wenn Paket konfiguriert |
@@ -80,7 +80,7 @@ sequenceDiagram
 | Fehlerfall | Verhalten |
 |-----------|-----------|
 | Aufgabe nicht gefunden (`GetByIdAsync` wirft Exception) | Abbruch; Exception propagiert an BlazorUI |
-| `git clone` schlägt fehl (ungültige URL, fehlende Berechtigungen) | `IGitPlugin` wirft Exception; Klon-Verzeichnis verbleibt ggf. teilweise; Statuswechsel findet **nicht** statt |
+| Workspace-Vorbereitung schlägt fehl (`git init` oder Copy/Bootstrap) | `IGitPlugin` wirft Exception; Zielverzeichnis verbleibt ggf. teilweise; Statuswechsel findet **nicht** statt |
 | Konfigurierter Workdir-Pfad nicht nutzbar | Resolver nutzt Fallback (`Path.GetTempPath()`), schreibt ReasonCode in Logs; Prozess läuft mit Fallback weiter |
 | `git checkout -b` schlägt fehl (Branch existiert bereits) | `IGitPlugin` wirft Exception; Prozess wird nicht als gestartet markiert |
 | `DeployAgentPackageAsync` schlägt fehl | Exception propagiert; Aufgabe bleibt im Status `Offen` |
@@ -92,7 +92,7 @@ sequenceDiagram
 - `IGitPlugin` / `GitHubPlugin` (Git-Operationen via CLI)
 - `IKiPlugin` / `GitHubCopilotPlugin` (Agentenpaket-Deployment)
 
-> **Verwandte Abläufe:** [Ablauf 2: KI-Streaming und Protokollierung](#ablauf-2-ki-streaming-und-protokollierung) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
+> **Verwandte Abläufe:** [Ablauf 2: KI-Streaming und Protokollierung](#ablauf-2-ki-streaming-und-protokollierung) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [KiAusfuehrungsService – Hintergrundläufe](./ki-ausfuehrungs-service-flow.md)
 
 ---
 
@@ -157,7 +157,7 @@ flowchart TD
 - `AufgabeService` (Status: `KiAktiviertAsync`, `KiAbgeschlossenAsync`, `FehlgeschlagenAsync`)
 - `IKiPlugin` / `GitHubCopilotPlugin` (`StartDevelopmentAsync` via `copilot suggest`)
 
-> **Verwandte Abläufe:** [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
+> **Verwandte Abläufe:** [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [KiAusfuehrungsService – Hintergrundläufe](./ki-ausfuehrungs-service-flow.md)
 
 ---
 
@@ -207,7 +207,7 @@ flowchart TD
 
 ### Kontext
 
-Nachdem die KI ihre Arbeit erledigt hat, schließt der Benutzer die Aufgabe ab. Dazu committet er die Änderungen, pusht den Branch, erstellt einen Pull Request und löst anschließend den Abschluss-Vorgang aus, der den lokalen Klon bereinigt. Der Ablauf involviert `GitOrchestrationService` für Git-Operationen und `EntwicklungsprozessService.AbschliessenAsync` für den finalen Statusübergang.
+Nachdem die KI ihre Arbeit erledigt hat, schließt der Benutzer die Aufgabe ab. Dazu committet er die Änderungen, führt einen Push aus (Remote-Git oder Datei-Sync im separaten Arbeitsverzeichnis), erstellt einen Pull Request und löst anschließend den Abschluss-Vorgang aus, der den lokalen Klon bereinigt. Der Ablauf involviert `GitOrchestrationService` für Git-Operationen und `EntwicklungsprozessService.AbschliessenAsync` für den finalen Statusübergang.
 
 ### Diagramm
 
@@ -216,7 +216,7 @@ flowchart TD
     A([Aufgabe bereit zum Abschließen]) --> B[GitOrchestrationService.CommitAsync\ngit add . + git commit -m]
     B --> C{Commit erfolgreich?}
     C -- Nein -.-> CE[Exception protokollieren]:::error
-    C -- Ja --> D[GitOrchestrationService.PushAsync\ngit push --set-upstream origin branchName]
+    C -- Ja --> D[GitOrchestrationService.PushAsync\ngit push ODER Datei-Sync Working -> Source\ninkl. Delete-Sync via git status]
     D --> E{Push erfolgreich?}
     E -- Nein -.-> PE[Exception protokollieren]:::error
     E -- Ja --> F[EntwicklungsprozessService\n.PullRequestErstellenAsync\nBranchName prüfen]
@@ -238,7 +238,7 @@ flowchart TD
 | # | Schritt | Quellcode-Referenz | Eingabe / Ausgabe |
 |---|---------|-------------------|-------------------|
 | 1 | Änderungen committen | `GitOrchestrationService.CommitAsync(aufgabeId, message)` → `IGitPlugin.CommitAsync`: `git add .` + `git commit -m {message}` | Eingabe: Commit-Nachricht; Seiteneffekt: lokaler Commit im Feature-Branch |
-| 2 | Branch pushen | `GitOrchestrationService.PushAsync(aufgabeId)` → `IGitPlugin.PushBranchAsync`: `git push --set-upstream origin {branchName}` | Seiteneffekt: Branch auf Remote-Repository verfügbar |
+| 2 | Branch pushen/synchronisieren | `GitOrchestrationService.PushAsync(aufgabeId)` → `IGitPlugin.PushBranchAsync`: `git push --set-upstream origin {branchName}` **oder** Datei-Sync `WorkingDirectory -> SourceDirectory` | Seiteneffekt: Branch auf Remote oder lokales Quellverzeichnis wird synchronisiert (inkl. Delete-Sync über `git status --porcelain`) |
 | 3 | Pull Request erstellen | `EntwicklungsprozessService.PullRequestErstellenAsync(aufgabeId, repositoryId, title, body)` | BranchName wird aus Aufgabe geladen und geprüft |
 | 4 | gh pr create ausführen | `IGitPlugin.CreatePullRequestAsync(repositoryId, branchName, title, body)` → `GitHubPlugin`: `gh pr create --repo {repositoryId} --head {branchName} --title {title} --body {body} --json number,title,url` | Ausgabe: PR-Nummer, Titel, URL |
 | 5 | PR protokollieren | `EntwicklungsprozessService.PullRequestErstellenAsync` | Protokolleintrag: "Pull Request erstellt: #{nummer} – {titel} ({url})" |
@@ -251,7 +251,7 @@ flowchart TD
 | Fehlerfall | Verhalten |
 |-----------|-----------|
 | Commit schlägt fehl (nichts zu committen, Merge-Konflikt) | Exception propagiert; kein Push, kein PR, Status bleibt `InBearbeitung` |
-| Push schlägt fehl (Authentifizierung, Konflikte) | Exception propagiert; kein PR; Status bleibt `InBearbeitung` |
+| Push/Sync schlägt fehl (Authentifizierung, Konflikte, Dateisync-Fehler) | Exception propagiert; kein PR; Status bleibt `InBearbeitung` |
 | `BranchName` nicht gesetzt | `PullRequestErstellenAsync` wirft Exception vor dem `gh pr create`-Aufruf |
 | `gh pr create` schlägt fehl | Exception propagiert; Klon bleibt vorhanden; Status bleibt `InBearbeitung` |
 | `Directory.Delete` schlägt fehl (gesperrte Dateien) | Exception propagiert; Status wird **nicht** auf `Abgeschlossen` gesetzt |
@@ -261,10 +261,10 @@ flowchart TD
 - `GitOrchestrationService` (`CommitAsync`, `PushAsync`)
 - `EntwicklungsprozessService` (`PullRequestErstellenAsync`, `AbschliessenAsync`)
 - `AufgabeService` (`AbschliessenAsync`)
-- `IGitPlugin` / `GitHubPlugin` (`CommitAsync`, `PushBranchAsync`, `CreatePullRequestAsync`)
+- `IGitPlugin` / `GitHubPlugin` / `LocalDirectoryPlugin` (`CommitAsync`, `PushBranchAsync`, `CreatePullRequestAsync`)
 - GitHub CLI (`gh pr create`) mit `GH_TOKEN`-Umgebungsvariable
 
-> **Verwandte Abläufe:** [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten)
+> **Verwandte Abläufe:** [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [GitOrchestrationService – Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md)
 
 ---
 
@@ -317,7 +317,7 @@ flowchart TD
 - `AufgabeService` (`AbbrechenAsync`)
 - .NET `System.IO.Directory` (Verzeichnis-Bereinigung)
 
-> **Verwandte Abläufe:** [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten)
+> **Verwandte Abläufe:** [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [GitOrchestrationService – Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md)
 
 ---
 
@@ -408,4 +408,3 @@ stateDiagram-v2
     Fehlgeschlagen --> InBearbeitung : Manueller Reset (nicht implementiert)
     note right of KiAktiv : TestsLaufen als\nZwischenstatus möglich
 ```
-

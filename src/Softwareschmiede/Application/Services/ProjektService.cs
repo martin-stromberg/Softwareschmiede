@@ -9,6 +9,13 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service für Projektverwaltung (CRUD + Archivieren).</summary>
 public sealed class ProjektService
 {
+    private const string LocalDirectoryPluginPrefix = "LocalDirectoryPlugin";
+    private const string LegacyGitHubPluginType = "GitHub";
+    private const string GitHubPluginPrefix = "Softwareschmiede.GitHub";
+    private const string SourceDirectoryFieldKey = "SourceDirectory";
+    private const string RepositoryUrlFieldKey = "RepositoryUrl";
+    private const string RepositoryNameFieldKey = "RepositoryName";
+
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<ProjektService> _logger;
 
@@ -122,6 +129,34 @@ public sealed class ProjektService
         string repositoryName,
         CancellationToken ct = default)
     {
+        var fieldValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [RepositoryUrlFieldKey] = repositoryUrl,
+            [RepositoryNameFieldKey] = repositoryName
+        };
+
+        if (IsLocalDirectoryPlugin(pluginTyp))
+        {
+            fieldValues[SourceDirectoryFieldKey] = repositoryUrl;
+        }
+
+        return await AddRepositoryAsync(projektId, pluginTyp, fieldValues, ct);
+    }
+
+    /// <summary>Fügt ein Git-Repository über pluginabhängige Eingabefelder zu einem Projekt hinzu.</summary>
+    public async Task<GitRepository> AddRepositoryAsync(
+        Guid projektId,
+        string pluginTyp,
+        IReadOnlyDictionary<string, string> fieldValues,
+        CancellationToken ct = default)
+    {
+        var normalizedPluginType = NormalizeRequiredValue(pluginTyp, nameof(pluginTyp));
+        var normalizedFieldValues = NormalizeFieldValues(fieldValues);
+
+        ValidateRequiredFields(normalizedPluginType, normalizedFieldValues);
+        var repositoryUrl = ResolveRepositoryUrl(normalizedPluginType, normalizedFieldValues);
+        var repositoryName = ResolveRepositoryName(normalizedPluginType, normalizedFieldValues, repositoryUrl);
+
         _logger.LogInformation("Repository '{RepositoryName}' zu Projekt {ProjektId} hinzufügen.", repositoryName, projektId);
 
         var projekt = await _db.Projekte.FindAsync([projektId], ct)
@@ -131,7 +166,7 @@ public sealed class ProjektService
         {
             Id = Guid.NewGuid(),
             ProjektId = projektId,
-            PluginTyp = pluginTyp,
+            PluginTyp = normalizedPluginType,
             RepositoryUrl = repositoryUrl,
             RepositoryName = repositoryName,
             Aktiv = true
@@ -157,4 +192,113 @@ public sealed class ProjektService
 
         _logger.LogInformation("Repository {RepositoryId} entfernt.", repositoryId);
     }
+
+    private static Dictionary<string, string> NormalizeFieldValues(IReadOnlyDictionary<string, string> fieldValues)
+    {
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in fieldValues)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || string.IsNullOrWhiteSpace(pair.Value))
+            {
+                continue;
+            }
+
+            normalized[pair.Key.Trim()] = pair.Value.Trim();
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeRequiredValue(string value, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"Der Wert '{parameterName}' ist erforderlich.");
+        }
+
+        return value.Trim();
+    }
+
+    private static void ValidateRequiredFields(string pluginType, IReadOnlyDictionary<string, string> fieldValues)
+    {
+        if (IsLocalDirectoryPlugin(pluginType))
+        {
+            if (!fieldValues.TryGetValue(SourceDirectoryFieldKey, out var sourceDirectory)
+                || string.IsNullOrWhiteSpace(sourceDirectory))
+            {
+                throw new InvalidOperationException("Für LocalDirectoryPlugin ist 'SourceDirectory' ein Pflichtfeld.");
+            }
+        }
+
+        if (IsGitHubPlugin(pluginType))
+        {
+            if (!fieldValues.TryGetValue(RepositoryUrlFieldKey, out var repositoryUrl)
+                || string.IsNullOrWhiteSpace(repositoryUrl))
+            {
+                throw new InvalidOperationException("Für GitHub ist 'RepositoryUrl' ein Pflichtfeld.");
+            }
+
+            if (!fieldValues.TryGetValue(RepositoryNameFieldKey, out var repositoryName)
+                || string.IsNullOrWhiteSpace(repositoryName))
+            {
+                throw new InvalidOperationException("Für GitHub ist 'RepositoryName' ein Pflichtfeld.");
+            }
+        }
+    }
+
+    private static string ResolveRepositoryUrl(string pluginType, IReadOnlyDictionary<string, string> fieldValues)
+    {
+        if (IsLocalDirectoryPlugin(pluginType))
+        {
+            return fieldValues[SourceDirectoryFieldKey];
+        }
+
+        if (fieldValues.TryGetValue(RepositoryUrlFieldKey, out var repositoryUrl)
+            && !string.IsNullOrWhiteSpace(repositoryUrl))
+        {
+            return repositoryUrl;
+        }
+
+        throw new InvalidOperationException($"Für Plugin '{pluginType}' wurde kein gültiges RepositoryUrl-Feld übergeben.");
+    }
+
+    private static string ResolveRepositoryName(
+        string pluginType,
+        IReadOnlyDictionary<string, string> fieldValues,
+        string repositoryUrl)
+    {
+        if (fieldValues.TryGetValue(RepositoryNameFieldKey, out var repositoryName)
+            && !string.IsNullOrWhiteSpace(repositoryName))
+        {
+            return repositoryName;
+        }
+
+        var derivedName = DeriveRepositoryName(repositoryUrl);
+        if (!string.IsNullOrWhiteSpace(derivedName))
+        {
+            return derivedName;
+        }
+
+        throw new InvalidOperationException($"Für Plugin '{pluginType}' konnte kein RepositoryName ermittelt werden.");
+    }
+
+    private static string DeriveRepositoryName(string repositoryValue)
+    {
+        var value = repositoryValue.Trim();
+        if (Uri.TryCreate(value, UriKind.Absolute, out var repositoryUri))
+        {
+            var segment = repositoryUri.Segments.LastOrDefault()?.Trim('/').Trim();
+            return string.IsNullOrWhiteSpace(segment) ? string.Empty : segment;
+        }
+
+        var path = Path.TrimEndingDirectorySeparator(value);
+        return Path.GetFileName(path);
+    }
+
+    private static bool IsLocalDirectoryPlugin(string pluginType)
+        => string.Equals(pluginType, LocalDirectoryPluginPrefix, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsGitHubPlugin(string pluginType)
+        => string.Equals(pluginType, LegacyGitHubPluginType, StringComparison.OrdinalIgnoreCase)
+           || string.Equals(pluginType, GitHubPluginPrefix, StringComparison.OrdinalIgnoreCase);
 }

@@ -196,6 +196,177 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     }
 
     [Fact]
+    public void EvaluateGitActionVisibility_ShouldHidePushPullAndPr_WhenLocalCopyFlow()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: true);
+
+        var result = InvokePrivateStatic<(bool ShowPushPullToggle, bool ShowPush, bool ShowPull, bool ShowPullRequest, bool ShowMerge)>(
+            "EvaluateGitActionVisibility",
+            capabilities);
+
+        result.ShowPushPullToggle.Should().BeFalse();
+        result.ShowPush.Should().BeFalse();
+        result.ShowPull.Should().BeFalse();
+        result.ShowPullRequest.Should().BeFalse();
+        result.ShowMerge.Should().BeTrue();
+    }
+
+    [Fact]
+    public void EvaluateGitActionVisibility_ShouldUseFlags_WhenNotInLocalCopyFlow()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: false,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false);
+
+        var result = InvokePrivateStatic<(bool ShowPushPullToggle, bool ShowPush, bool ShowPull, bool ShowPullRequest, bool ShowMerge)>(
+            "EvaluateGitActionVisibility",
+            capabilities);
+
+        result.ShowPushPullToggle.Should().BeTrue();
+        result.ShowPush.Should().BeTrue();
+        result.ShowPull.Should().BeFalse();
+        result.ShowPullRequest.Should().BeTrue();
+        result.ShowMerge.Should().BeFalse();
+    }
+
+    /// <summary>Prüft den Null-Fallback beim Laden der Git-Action-Capabilities.</summary>
+    [Fact]
+    public async Task LadeGitActionCapabilitiesAsync_ShouldApplyFallbackCapabilities_WhenPluginReturnsNull()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            configureGitPlugin: plugin => plugin
+                .Setup(g => g.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult<GitActionCapabilities>(null!)));
+        await sut.InvokeOnInitializedAsync();
+
+        await InvokePrivateAsync(sut, "LadeGitActionCapabilitiesAsync");
+
+        var capabilities = GetPrivateField<GitActionCapabilities>(sut, "_gitActionCapabilities");
+        capabilities.RepositoryKind.Should().Be(RepositoryKind.Unknown);
+        capabilities.CanPush.Should().BeTrue();
+        capabilities.CanPull.Should().BeTrue();
+        capabilities.CanCreatePullRequest.Should().BeTrue();
+        capabilities.CanMergeToSource.Should().BeFalse();
+    }
+
+    /// <summary>Prüft den Exception-Fallback beim Laden der Git-Action-Capabilities.</summary>
+    [Fact]
+    public async Task LadeGitActionCapabilitiesAsync_ShouldApplyFallbackCapabilities_WhenPluginThrows()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            configureGitPlugin: plugin => plugin
+                .Setup(g => g.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("kaputt")));
+        await sut.InvokeOnInitializedAsync();
+
+        await InvokePrivateAsync(sut, "LadeGitActionCapabilitiesAsync");
+
+        var capabilities = GetPrivateField<GitActionCapabilities>(sut, "_gitActionCapabilities");
+        capabilities.RepositoryKind.Should().Be(RepositoryKind.Unknown);
+        capabilities.CanPush.Should().BeTrue();
+        capabilities.CanPull.Should().BeTrue();
+        capabilities.CanCreatePullRequest.Should().BeTrue();
+        capabilities.CanMergeToSource.Should().BeFalse();
+    }
+
+    /// <summary>Verifiziert, dass bei unsichtbaren Aktionen geöffnete Formulare wieder geschlossen werden.</summary>
+    [Fact]
+    public async Task LadeGitActionCapabilitiesAsync_ShouldClosePushPullAndPrForms_WhenActionsAreHidden()
+    {
+        var hiddenCapabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            configureGitPlugin: plugin => plugin
+                .Setup(g => g.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(hiddenCapabilities));
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_showPushPullButtons", true);
+        SetPrivateField(sut, "_showPullRequestForm", true);
+
+        await InvokePrivateAsync(sut, "LadeGitActionCapabilitiesAsync");
+
+        GetPrivateField<bool>(sut, "_showPushPullButtons").Should().BeFalse();
+        GetPrivateField<bool>(sut, "_showPullRequestForm").Should().BeFalse();
+    }
+
+    /// <summary>Verifiziert die Erfolgsmeldung für den Merge-Handler der Detailseite.</summary>
+    [Fact]
+    public async Task MergeToSourceAsync_ShouldSetSuccessMessage_WhenServiceSucceeds()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            configureGitPlugin: plugin =>
+            {
+                plugin.Setup(g => g.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new GitActionCapabilities(
+                        RepositoryKind.LocalDirectory,
+                        IsWorkingDirectoryCopy: true,
+                        CanPush: false,
+                        CanPull: false,
+                        CanCreatePullRequest: false,
+                        CanMergeToSource: true));
+                plugin.Setup(g => g.MergeToSourceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+            });
+        await sut.InvokeOnInitializedAsync();
+
+        await InvokePrivateAsync(sut, "MergeToSourceAsync");
+
+        GetPrivateField<string?>(sut, "_erfolg").Should().Be("Merge ins Quellverzeichnis erfolgreich.");
+        GetPrivateField<string?>(sut, "_fehler").Should().BeNull();
+    }
+
+    /// <summary>Verifiziert den Fehlerpfad für den Merge-Handler der Detailseite.</summary>
+    [Fact]
+    public async Task MergeToSourceAsync_ShouldSetErrorMessage_WhenServiceThrows()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            configureGitPlugin: plugin =>
+            {
+                plugin.Setup(g => g.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new GitActionCapabilities(
+                        RepositoryKind.LocalDirectory,
+                        IsWorkingDirectoryCopy: true,
+                        CanPush: false,
+                        CanPull: false,
+                        CanCreatePullRequest: false,
+                        CanMergeToSource: true));
+                plugin.Setup(g => g.MergeToSourceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new InvalidOperationException("merge failed"));
+            });
+        await sut.InvokeOnInitializedAsync();
+
+        await InvokePrivateAsync(sut, "MergeToSourceAsync");
+
+        GetPrivateField<string?>(sut, "_fehler").Should().Be("merge failed");
+    }
+
+    [Fact]
     public void RenderProtokollInhalt_ShouldRenderMarkdownHeadings()
     {
         var markdown = "# 2026-05-11\n\n## Schritt 1\nAnalyse";
@@ -334,7 +505,8 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         string initialAgent,
         IReadOnlyList<string> weitereAgenten,
         IReadOnlyList<(string Name, string Prefix)>? kiPlugins = null,
-        string? storedDefaultKiPluginPrefix = null)
+        string? storedDefaultKiPluginPrefix = null,
+        Action<Mock<IGitPlugin>>? configureGitPlugin = null)
     {
         var projekt = new Projekt
         {
@@ -373,6 +545,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
+        configureGitPlugin?.Invoke(gitPluginMock);
         var kiPluginDefinitions = kiPlugins ?? [("Test KI", "Softwareschmiede.TestKi")];
         var kiPluginMocks = kiPluginDefinitions.Select(def =>
         {
@@ -432,6 +605,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             projektService,
             protokollService,
             gitPluginMock.Object,
+            pluginSelectionService,
             NullLogger<GitOrchestrationService>.Instance);
 
         var sut = new TestAufgabeDetailPage { Id = aufgabe.Id };

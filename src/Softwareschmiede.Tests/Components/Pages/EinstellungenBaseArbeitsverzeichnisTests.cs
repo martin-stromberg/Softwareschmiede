@@ -152,14 +152,371 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetDefaultPluginStatusMessage(PluginType.SourceCodeManagement).Should().Contain("Ungültige Plugin-Auswahl");
     }
 
+    [Fact]
+    public async Task OnInitializedAsync_ShouldFallbackForInvalidEnumSetting()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        credentialStoreMock
+            .Setup(c => c.GetCredential("LocalDirectoryPlugin.WorkspaceMode"))
+            .Returns("InvalidMode");
+
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: ["InSourceDirectory", "SeparateWorkingDirectory"])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+
+        await sut.InvokeOnInitializedAsync();
+
+        sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().Be("SeparateWorkingDirectory");
+        sut.GetFieldValidationMessage("LocalDirectoryPlugin.WorkspaceMode").Should().Contain("Ungültiger gespeicherter Wert");
+    }
+
+    [Fact]
+    public async Task SpeichernAsync_ShouldPersistEnumValueAsStableString()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: ["InSourceDirectory", "SeparateWorkingDirectory"])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+        sut.SetInputValue("LocalDirectoryPlugin.WorkspaceMode", "InSourceDirectory");
+
+        await sut.InvokeSpeichernAsync(plugin);
+
+        credentialStoreMock.Verify(
+            c => c.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "InSourceDirectory"),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SpeichernAsync_ShouldRejectInvalidEnumSelection_AndNotPersist()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: ["InSourceDirectory", "SeparateWorkingDirectory"])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+        sut.SetInputValue("LocalDirectoryPlugin.WorkspaceMode", "invalid-value");
+
+        await sut.InvokeSpeichernAsync(plugin);
+
+        sut.GetFieldValidationMessage("LocalDirectoryPlugin.WorkspaceMode").Should().Be("Ungültige Auswahl.");
+        credentialStoreMock.Verify(c => c.SetCredential(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ZuruecksetzenAsync_ShouldResetEnumToSeparateWorkingDirectory_WhenAvailable()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: ["InSourceDirectory", "SeparateWorkingDirectory"])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+        sut.SetInputValue("LocalDirectoryPlugin.WorkspaceMode", "InSourceDirectory");
+
+        await sut.InvokeZuruecksetzenAsync(plugin);
+
+        sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().Be("SeparateWorkingDirectory");
+    }
+
+    [Fact]
+    public async Task ZuruecksetzenAsync_ShouldResetEnumToFirstOption_WhenSeparateModeNotPresent()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: ["InSourceDirectory", "PreviewOnly"])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+
+        await sut.InvokeZuruecksetzenAsync(plugin);
+
+        sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().Be("InSourceDirectory");
+    }
+
+    [Fact]
+    public async Task OnInitializedAsync_ShouldTrimStoredEnumValue_WhenValid()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        credentialStoreMock.Setup(c => c.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns(" InSourceDirectory ");
+
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: ["InSourceDirectory", "SeparateWorkingDirectory"])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+
+        await sut.InvokeOnInitializedAsync();
+
+        sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().Be("InSourceDirectory");
+    }
+
+    [Fact]
+    public async Task OnInitializedAsync_ShouldUseEmptyValue_WhenEnumOptionsMissing()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        credentialStoreMock.Setup(c => c.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("InSourceDirectory");
+
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: [])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+
+        await sut.InvokeOnInitializedAsync();
+
+        sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SpeichernAsync_ShouldSetValidationMessage_ForEnumWithoutOptions()
+    {
+        await using var db = CreateDb();
+        var settingsService = new ArbeitsverzeichnisSettingsService(db, NullLogger<ArbeitsverzeichnisSettingsService>.Instance);
+        var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
+        resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
+
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        var plugin = CreateGitPlugin(
+            "Local Directory",
+            "LocalDirectoryPlugin",
+            [
+                new PluginSettingGroup("Workspace",
+                [
+                    new PluginSettingField(
+                        "WorkspaceMode",
+                        "WorkspaceMode",
+                        PluginSettingFieldType.Enum,
+                        EnumOptions: [])
+                ])
+            ]);
+
+        var sut = CreateSut(
+            db,
+            settingsService,
+            resolverMock.Object,
+            credentialStoreMock,
+            scmPlugins: [plugin],
+            kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+        sut.SetInputValue("LocalDirectoryPlugin.WorkspaceMode", "InSourceDirectory");
+
+        await sut.InvokeSpeichernAsync(plugin);
+
+        sut.GetFieldValidationMessage("LocalDirectoryPlugin.WorkspaceMode").Should().Be("Ungültige Auswahl.");
+        credentialStoreMock.Verify(c => c.SetCredential(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public void GetEnumOptionDisplayLabel_ShouldReturnTranslatedLabel_ForWorkspaceModeOptions()
+    {
+        var field = new PluginSettingField(
+            "WorkspaceMode",
+            "WorkspaceMode",
+            PluginSettingFieldType.Enum,
+            EnumOptions: ["InSourceDirectory", "SeparateWorkingDirectory"]);
+
+        var labelInSource = TestEinstellungenPage.InvokeEnumDisplayLabel(field, "InSourceDirectory");
+        var labelSeparate = TestEinstellungenPage.InvokeEnumDisplayLabel(field, "SeparateWorkingDirectory");
+
+        labelInSource.Should().Be("Direkt im Quellverzeichnis arbeiten");
+        labelSeparate.Should().Be("Mit separatem Arbeitsverzeichnis arbeiten");
+    }
+
+    [Fact]
+    public void EinstellungenMarkup_ShouldUseEnumDisplayLabelHelper_ForWorkspaceModeRendering()
+    {
+        var root = FindRepositoryRoot();
+        var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Einstellungen.razor");
+        var markup = File.ReadAllText(razorPath);
+
+        markup.Should().Contain("@GetEnumOptionDisplayLabel(field, enumOption)");
+    }
+
+    [Fact]
+    public void EinstellungenMarkup_ShouldRenderPluginFieldsDynamically_WithoutHardcodedWorkingDirectoryField()
+    {
+        var root = FindRepositoryRoot();
+        var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Einstellungen.razor");
+        var markup = File.ReadAllText(razorPath);
+
+        markup.Should().Contain("@foreach (var field in group.Fields)");
+        markup.Should().NotContain("LocalDirectoryPlugin.WorkingDirectory");
+    }
+
     private static TestEinstellungenPage CreateSut(
         SoftwareschmiededDbContext db,
         ArbeitsverzeichnisSettingsService arbeitsverzeichnisSettings,
         IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
+        Mock<ICredentialStore>? credentialStoreMock = null,
         IReadOnlyList<IGitPlugin>? scmPlugins = null,
         IReadOnlyList<IKiPlugin>? kiPlugins = null)
     {
-        var credentialStoreMock = new Mock<ICredentialStore>();
+        credentialStoreMock ??= new Mock<ICredentialStore>();
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns(scmPlugins ?? Array.Empty<IGitPlugin>());
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(kiPlugins ?? Array.Empty<IKiPlugin>());
@@ -179,13 +536,13 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         return sut;
     }
 
-    private static IGitPlugin CreateGitPlugin(string name, string prefix)
+    private static IGitPlugin CreateGitPlugin(string name, string prefix, IReadOnlyList<PluginSettingGroup>? groups = null)
     {
         var plugin = new Mock<IGitPlugin>();
         plugin.SetupGet(p => p.PluginName).Returns(name);
         plugin.SetupGet(p => p.PluginPrefix).Returns(prefix);
         plugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
-        plugin.Setup(p => p.GetSettingGroups()).Returns([]);
+        plugin.Setup(p => p.GetSettingGroups()).Returns(groups ?? []);
         return plugin.Object;
     }
 
@@ -205,6 +562,22 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         property!.SetValue(target, value);
     }
 
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Softwareschmiede.slnx")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Repository root with Softwareschmiede.slnx not found.");
+    }
+
     private sealed class TestEinstellungenPage : EinstellungenBase
     {
         public string ArbeitsverzeichnisInput => _arbeitsverzeichnisInput;
@@ -216,11 +589,17 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         public void SetDefaultPluginSelection(PluginType pluginType, string? pluginPrefix) => _defaultPluginSelections[pluginType] = pluginPrefix;
         public string GetDefaultPluginStatusMessage(PluginType pluginType) => _defaultPluginStatusMessages.GetValueOrDefault(pluginType, string.Empty);
         public bool GetDefaultPluginStatusIsError(PluginType pluginType) => _defaultPluginStatusIsError.GetValueOrDefault(pluginType);
+        public string GetInputValue(string stateKey) => _inputValues.GetValueOrDefault(stateKey, string.Empty);
+        public string GetFieldValidationMessage(string stateKey) => _fieldValidationMessages.GetValueOrDefault(stateKey, string.Empty);
+        public void SetInputValue(string stateKey, string value) => _inputValues[stateKey] = value;
 
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
         public Task InvokeArbeitsverzeichnisSpeichernAsync() => ArbeitsverzeichnisSpeichernAsync();
         public void InvokeArbeitsverzeichnisInputChanged(string value) => ArbeitsverzeichnisInputChanged(value);
         public Task InvokeArbeitsverzeichnisZuruecksetzenAsync() => ArbeitsverzeichnisZuruecksetzenAsync();
         public Task InvokeStandardPluginSpeichernAsync(PluginType pluginType) => StandardPluginSpeichernAsync(pluginType);
+        public Task InvokeSpeichernAsync(IPlugin plugin) => SpeichernAsync(plugin);
+        public Task InvokeZuruecksetzenAsync(IPlugin plugin) => ZuruecksetzenAsync(plugin);
+        public static string InvokeEnumDisplayLabel(PluginSettingField field, string enumOption) => GetEnumOptionDisplayLabel(field, enumOption);
     }
 }

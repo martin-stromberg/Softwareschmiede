@@ -141,6 +141,20 @@
                                    checked="@(_inputValues.GetValueOrDefault(stateKey) == BoolTrue)"
                                    @onchange="e => _inputValues[stateKey] = ((bool?)e.Value == true) ? BoolTrue : BoolFalse" />
                         }
+                        else if (field.FieldType == PluginSettingFieldType.Enum)
+                        {
+                            <select class="form-control"
+                                    value="@_inputValues.GetValueOrDefault(stateKey, string.Empty)"
+                                    @onchange="e => _inputValues[stateKey] = e.Value?.ToString() ?? string.Empty">
+                                @if (field.EnumOptions is not null)
+                                {
+                                    @foreach (var enumOption in field.EnumOptions)
+                                    {
+                                        <option value="@enumOption">@GetEnumOptionDisplayLabel(field, enumOption)</option>
+                                    }
+                                }
+                            </select>
+                        }
                         else
                         {
                             var inputType = field.FieldType == PluginSettingFieldType.Secret
@@ -176,6 +190,10 @@
                         @if (_hasValues.GetValueOrDefault(stateKey) && string.IsNullOrWhiteSpace(_inputValues.GetValueOrDefault(stateKey)))
                         {
                             <small style="color:#34d399;display:block;margin-top:.25rem">✅ Gespeichert</small>
+                        }
+                        @if (!string.IsNullOrEmpty(_fieldValidationMessages.GetValueOrDefault(stateKey)))
+                        {
+                            <small style="color:#f87171;display:block;margin-top:.25rem">@_fieldValidationMessages[stateKey]</small>
                         }
                     </div>
                 }

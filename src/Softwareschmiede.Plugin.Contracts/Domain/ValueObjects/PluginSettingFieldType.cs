@@ -16,5 +16,8 @@ public enum PluginSettingFieldType
     Integer,
 
     /// <summary>Wahrheitswert (Checkbox).</summary>
-    Boolean
+    Boolean,
+
+    /// <summary>Auswahl über feste Werte (Select).</summary>
+    Enum
 }

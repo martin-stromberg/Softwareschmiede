@@ -28,7 +28,7 @@ else
             <button class="btn btn-warning" @onclick="ArchivierenAsync">📦 Archivieren</button>
         }
         <button class="btn btn-danger" @onclick="() => _showDeleteConfirm = true">🗑️ Löschen</button>
-        <button class="btn btn-ghost" @onclick="() => _showRepoForm = !_showRepoForm">🔗 Repository verknüpfen</button>
+        <button class="btn btn-ghost" @onclick="ToggleRepositoryFormAsync">🔗 Repository verknüpfen</button>
     </div>
     @if (!string.IsNullOrEmpty(_projekt.Beschreibung))
     {
@@ -71,16 +71,49 @@ else
         <div class="card">
             <div class="card-title">Repository verknüpfen</div>
             <div class="form-group">
-                <label class="form-label">Repository-URL *</label>
-                <input class="form-control" @bind="_repoUrl" placeholder="https://github.com/owner/repo" />
+                <label class="form-label">SourceCode-Plugin *</label>
+                <select class="form-control"
+                        value="@_selectedRepositoryPluginPrefix"
+                        @onchange="OnRepositoryPluginChangedAsync">
+                    @foreach (var plugin in _sourceCodePlugins)
+                    {
+                        <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
+                    }
+                </select>
             </div>
-            <div class="form-group">
-                <label class="form-label">Repository-Name *</label>
-                <input class="form-control" @bind="_repoName" placeholder="owner/repo" />
-            </div>
+
+            @if (_repositoryLinkFields.Count == 0)
+            {
+                <div class="alert alert-error">Für das ausgewählte Plugin sind keine Felder definiert.</div>
+            }
+            else
+            {
+                @foreach (var field in _repositoryLinkFields)
+                {
+                    var fieldKey = field.Key;
+                    <div class="form-group">
+                        <label class="form-label">
+                            @field.Label
+                            @if (field.IsRequired)
+                            {
+                                <span style="color:#f87171"> *</span>
+                            }
+                        </label>
+                        <input class="form-control"
+                               type="@GetRepositoryInputType(field)"
+                               value="@GetRepositoryFieldValue(fieldKey)"
+                               placeholder="@field.Placeholder"
+                               @oninput="e => SetRepositoryFieldValue(fieldKey, e.Value?.ToString() ?? string.Empty)" />
+                        @if (!string.IsNullOrWhiteSpace(field.Description))
+                        {
+                            <small style="color:#6b7280;font-size:.75rem">@field.Description</small>
+                        }
+                    </div>
+                }
+            }
             @if (!string.IsNullOrEmpty(_repoFehler)) { <div class="alert alert-error">@_repoFehler</div> }
             <div style="display:flex;gap:.5rem">
-                <button class="btn btn-primary" @onclick="AddRepositoryAsync">🔗 Verknüpfen</button>
+                <button class="btn btn-primary" @onclick="AddRepositoryAsync" disabled="@(_sourceCodePlugins.Count == 0)">🔗 Verknüpfen</button>
                 <button class="btn btn-ghost" @onclick="() => _showRepoForm = false">Abbrechen</button>
             </div>
         </div>
@@ -102,7 +135,16 @@ else
                     {
                         <tr>
                             <td>@repo.RepositoryName</td>
-                            <td><a href="@repo.RepositoryUrl" target="_blank" style="color:#7c3aed">@repo.RepositoryUrl</a></td>
+                            <td>
+                                @if (IsWebUrl(repo.RepositoryUrl))
+                                {
+                                    <a href="@repo.RepositoryUrl" target="_blank" style="color:#7c3aed">@repo.RepositoryUrl</a>
+                                }
+                                else
+                                {
+                                    <code>@repo.RepositoryUrl</code>
+                                }
+                            </td>
                             <td><code>@repo.PluginTyp</code></td>
                         </tr>
                     }

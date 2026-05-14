@@ -5,6 +5,7 @@
 Dieses Dokument beschreibt den internen API-Contract für:
 - Speicherung eines **Standardplugins** je **Pluginart**
 - **KI-Plugin-Auswahl** beim Prompt-Start
+- projektspezifische/aufgabenbezogene Auflösung des `IGitPlugin` in `AufgabeDetail` und `GitOrchestrationService`
 - Auflösung des effektiven Plugins mit robustem **Fallback**
 
 Es handelt sich um einen Application-/Service-Contract, nicht um einen HTTP-Endpoint-Contract.
@@ -58,6 +59,40 @@ Es handelt sich um einen Application-/Service-Contract, nicht um einen HTTP-Endp
 2. Beim Prompt-Senden wird `selectedKiPluginPrefix` an den KI-Lauf übergeben.
 3. `EntwicklungsprozessService.KiStartenAsync(...)` löst darüber das effektive KI-Plugin auf.
 4. Das Protokoll enthält das tatsächlich verwendete KI-Plugin (`PluginName`, `PluginPrefix`).
+
+## SCM-Plugin-Auflösung für `AufgabeDetail`/`GitOrchestrationService`
+
+### Auswahlregel (verbindlich)
+
+1. Aufgaben-Repository (`Aufgabe.GitRepository.PluginTyp`) *(required, falls gesetzt)*.
+2. Projekt-Repository (`Projekt.Repositories`) bei fehlender Aufgaben-Verknüpfung:
+   - genau **ein** aktives Repository mit `PluginTyp` *(required für diese Stufe)*.
+3. Standard-/Fallback-Auflösung über `PluginSelectionService.ResolveSourceCodeManagementPluginAsync(null, ...)`.
+
+Damit gilt: **projekt-/aufgabenbezogene Pluginkonfiguration hat Vorrang vor dem globalen Default**.
+
+### Fallback bei fehlender Repository-Verknüpfung
+
+- Hat eine Aufgabe keine direkte Repository-Verknüpfung, wird das Projekt betrachtet.
+- Gibt es dort genau **ein aktives** Repository, wird dessen `PluginTyp` verwendet.
+- Bei **mehreren** aktiven Repositories wird keine implizite Auswahl getroffen; es erfolgt der Fallback auf das konfigurierte Standardplugin.
+
+### LocalDirectory-/lokales Repository-Verhalten
+
+- Wenn die Auflösung auf `LocalDirectoryPlugin` fällt, laufen Git-Aktionen über den lokalen Contract (kein Remote-Merge bei Pull).
+- Für den lokalen Arbeitskopie-Fall (`RepositoryKind.LocalDirectory` + `IsWorkingDirectoryCopy=true`) steuert die UI die Aktionsmatrix capability-basiert: Push/Pull/PR ausblenden, Merge einblenden.
+- Details: [local-directory-plugin.md](./local-directory-plugin.md)
+
+### Testnachweise
+
+- `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
+  - `CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType`
+  - `PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository`
+  - `CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous`
+- `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
+  - `AufgabeDetail_ShouldUseProjectSelectedGitPlugin_InInjectedGitOrchestrationService`
+  - `AufgabeDetail_ShouldUseLocalDirectoryPlugin_WhenSelectedPluginIsLocalAndDefaultIsGitHub`
+  - `AufgabeDetail_ShouldInvokePullOnProjectSelectedGitPlugin`
 
 ## Fehler- und Kompatibilitätsverhalten
 

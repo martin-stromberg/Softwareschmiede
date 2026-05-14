@@ -17,6 +17,9 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
+| [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
+| [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
+| [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 
 ---
 
@@ -74,7 +77,7 @@ Beschreibt die Schlüsselbildung `<PluginPrefix>.<FieldKey>`, das Speichern/Lös
 ### [Ablauf 3: Aufgabe abschließen](./development-process-flow.md#ablauf-3-aufgabe-abschlie%C3%9Fen)
 **Typ:** `flowchart TD` · **Services:** `GitOrchestrationService`, `EntwicklungsprozessService`, `IGitPlugin`
 
-Beschreibt den Abschluss einer Aufgabe: Commit → Push → Pull Request erstellen → Klon-Bereinigung → Status `Abgeschlossen`.
+Beschreibt den Abschluss einer Aufgabe: Commit → Push (Remote-Git oder Datei-Sync) → Pull Request erstellen → Klon-Bereinigung → Status `Abgeschlossen`.
 
 ---
 
@@ -131,6 +134,27 @@ Beschreibt die Trennung zwischen Übersichtsaktionen (Neu anlegen) und Einzelakt
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `IAgentPackageFileService`, `AgentenpaketeSeite`
 
 Dokumentiert den vollständigen Datei-/Verzeichnis-Flow für Agentenpakete inklusive `ResolveSafePath`-Guard, Namensvalidierung und rekursivem Dateibaum.
+
+---
+
+### [Ablauf 12: LocalDirectoryPlugin – WorkspaceMode, Kopierpfad und Guardrails](./local-directory-plugin-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `LocalDirectoryPlugin`, `EntwicklungsprozessService`, `GitOrchestrationService`, `ArbeitsverzeichnisResolver`
+
+Beschreibt den End-to-End-Integrationspfad des lokalen Verzeichnis-Plugins: Einstellungen → Prozessstart → `CloneRepositoryAsync`-Verzweigung nach `WorkspaceMode` (inkl. Source-Copy-Bootstrap) → sichere Kopie mit Limits/Symlink-Schutz → Pointer-/Mapping-Auflösung für Folgeoperationen sowie Push/Pull als Datei-Sync.
+
+---
+
+### [Ablauf 13: GitOrchestrationService – Git-Aktionen und PR-Auflösung](./git-orchestration-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `GitOrchestrationService`, `AufgabeDetail`, `NeueAufgabe`, `IGitPlugin`
+
+Dokumentiert den End-to-End-Pfad für Issue-Import und manuelle Git-Aktionen inklusive LocalDirectory-Fallbacks (Push als Datei-Sync, Pull ohne Merge mit Hinweis, Delete-Sync via `git status`) sowie die Pull-Request-Repository-Auflösung (**Aufgaben-Repository → Projekt-Repository → Fehler bei Mehrdeutigkeit**).
+
+---
+
+### [Ablauf 14: KiAusfuehrungsService – Hintergrundlauf und Sessionpuffer](./ki-ausfuehrungs-service-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `KiAusfuehrungsService`, `EntwicklungsprozessService`, `AufgabeDetail`, `AutoShutdownOrchestrator`
+
+Beschreibt den Ablauf von `StartKiLauf` bis `onCompleted`, inklusive Session-Wiederaufnahme, Live-Subscriptions und Running-Count-Events für die Auto-Shutdown-Orchestrierung.
 
 ---
 

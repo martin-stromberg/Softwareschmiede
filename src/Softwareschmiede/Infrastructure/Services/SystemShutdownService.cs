@@ -41,7 +41,7 @@ public sealed class SystemShutdownService(ILogger<SystemShutdownService> logger)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            return ("shutdown", "/s /t 0");
+            return ("shutdown", "/s /f /t 0");
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

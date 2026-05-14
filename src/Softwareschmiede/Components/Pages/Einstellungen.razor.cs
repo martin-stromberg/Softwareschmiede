@@ -10,6 +10,13 @@ namespace Softwareschmiede.Components.Pages;
 /// <summary>Code-Behind für die generische Einstellungsseite.</summary>
 public class EinstellungenBase : ComponentBase
 {
+    private static readonly IReadOnlyDictionary<string, string> WorkspaceModeDisplayLabels =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["InSourceDirectory"] = "Direkt im Quellverzeichnis arbeiten",
+            ["SeparateWorkingDirectory"] = "Mit separatem Arbeitsverzeichnis arbeiten"
+        };
+
     // TODO: Konstanten für Boolean-Werte in Einstellungsfeldern
     protected const string BoolTrue = "true";
     protected const string BoolFalse = "false";
@@ -34,6 +41,7 @@ public class EinstellungenBase : ComponentBase
     // Status-Meldungen pro Plugin-Prefix
     protected Dictionary<string, string> _statusMessages = [];
     protected Dictionary<string, bool> _errorFlags = [];
+    protected Dictionary<string, string> _fieldValidationMessages = [];
     protected bool _saving;
     protected IReadOnlyList<IGitPlugin> _sourceCodeManagementPlugins = [];
     protected IReadOnlyList<IKiPlugin> _developmentAutomationPlugins = [];
@@ -72,7 +80,8 @@ public class EinstellungenBase : ComponentBase
                     var key = $"{plugin.PluginPrefix}.{field.Key}";
                     var stored = PluginSettings.GetValue(plugin, field);
                     _hasValues[key] = !string.IsNullOrEmpty(stored);
-                    _inputValues[key] = string.Empty;
+                    _fieldValidationMessages[key] = string.Empty;
+                    _inputValues[key] = BuildInitialInputValue(field, stored, key);
                     _visibleSecrets[key] = false;
                 }
             }
@@ -143,6 +152,13 @@ public class EinstellungenBase : ComponentBase
                 {
                     var key = $"{plugin.PluginPrefix}.{field.Key}";
                     var value = _inputValues.GetValueOrDefault(key, string.Empty);
+                    _fieldValidationMessages[key] = string.Empty;
+
+                    if (field.FieldType == PluginSettingFieldType.Enum && !IsValidEnumOption(field, value))
+                    {
+                        _fieldValidationMessages[key] = "Ungültige Auswahl.";
+                        throw new InvalidOperationException($"Ungültige Enum-Auswahl für '{field.Label}'.");
+                    }
 
                     if (string.IsNullOrWhiteSpace(value))
                     {
@@ -187,7 +203,10 @@ public class EinstellungenBase : ComponentBase
                     var key = $"{plugin.PluginPrefix}.{field.Key}";
                     await Task.Run(() => PluginSettings.DeleteValue(plugin, field));
                     _hasValues[key] = false;
-                    _inputValues[key] = string.Empty;
+                    _fieldValidationMessages[key] = string.Empty;
+                    _inputValues[key] = field.FieldType == PluginSettingFieldType.Enum
+                        ? GetDefaultEnumOption(field)
+                        : string.Empty;
                 }
             }
 
@@ -316,5 +335,60 @@ public class EinstellungenBase : ComponentBase
                 string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase)),
             _ => false
         };
+    }
+
+    private string BuildInitialInputValue(PluginSettingField field, string? stored, string key)
+    {
+        if (field.FieldType != PluginSettingFieldType.Enum)
+        {
+            return string.Empty;
+        }
+
+        var fallback = GetDefaultEnumOption(field);
+        if (string.IsNullOrWhiteSpace(stored))
+        {
+            return fallback;
+        }
+
+        if (IsValidEnumOption(field, stored))
+        {
+            return stored.Trim();
+        }
+
+        _fieldValidationMessages[key] = $"Ungültiger gespeicherter Wert '{stored}'. Fallback auf '{fallback}'.";
+        return fallback;
+    }
+
+    private static string GetDefaultEnumOption(PluginSettingField field)
+    {
+        if (field.EnumOptions is null || field.EnumOptions.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return field.EnumOptions.Contains("SeparateWorkingDirectory", StringComparer.Ordinal)
+            ? "SeparateWorkingDirectory"
+            : field.EnumOptions[0];
+    }
+
+    private static bool IsValidEnumOption(PluginSettingField field, string value)
+    {
+        if (field.EnumOptions is null || field.EnumOptions.Count == 0)
+        {
+            return false;
+        }
+
+        return field.EnumOptions.Contains(value.Trim(), StringComparer.Ordinal);
+    }
+
+    protected static string GetEnumOptionDisplayLabel(PluginSettingField field, string enumOption)
+    {
+        if (string.Equals(field.Key, "WorkspaceMode", StringComparison.Ordinal)
+            && WorkspaceModeDisplayLabels.TryGetValue(enumOption, out var label))
+        {
+            return label;
+        }
+
+        return enumOption;
     }
 }

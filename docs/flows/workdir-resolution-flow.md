@@ -1,20 +1,21 @@
-# Ablauf – Arbeitsverzeichnis-Auflösung für lokale Repository-Klone
+# Ablauf – Arbeitsverzeichnis-Auflösung und Integration mit LocalDirectoryPlugin
 
 **Modul:** `ArbeitsverzeichnisSettingsService`, `ArbeitsverzeichnisResolver`, `EntwicklungsprozessService`, `Einstellungen.razor`  
-**Letzte Aktualisierung:** 2026-05-10
+**Letzte Aktualisierung:** 2026-05-13
 
 ---
 
 ## Kontext
 
-Der Benutzer kann in den Einstellungen ein Basis-Arbeitsverzeichnis für lokale Klone konfigurieren.  
-Beim Start eines Entwicklungsprozesses wird dieses Basisverzeichnis zur Laufzeit validiert und aufgelöst. Ist der Wert ungültig oder nicht nutzbar, wird auf `Path.GetTempPath()` zurückgefallen.
+Das globale Arbeitsverzeichnis (`repositories.workdir`) wird in den Einstellungen gespeichert und beim Prozessstart zur Laufzeit aufgelöst.  
+Der Resolver liefert entweder den konfigurierten, schreibbaren Basis-Pfad oder einen Fallback auf `Path.GetTempPath()` mit `ReasonCode`.
 
-Der finale Klonpfad wird immer unterhalb von:
+Der Prozess bildet daraus immer den angefragten Klonpfad:
 
-`<basis>/softwareschmiede/<aufgabeId>`
+`<resolvedBase>/softwareschmiede/<aufgabeId>`
 
-gebildet.
+Dieser Pfad wird anschließend an das aktive `IGitPlugin` übergeben (u. a. `LocalDirectoryPlugin`).  
+Im Modus `SeparateWorkingDirectory` wird die Quelle per Dateikopie ins Working Directory übertragen, dort `git init` ausgeführt und ein initialer Snapshot-Commit erstellt.
 
 ---
 
@@ -23,31 +24,29 @@ gebildet.
 ```mermaid
 sequenceDiagram
     actor Benutzer
-    participant UI as Einstellungen-UI
+    participant UI as EinstellungenBase
     participant Settings as ArbeitsverzeichnisSettingsService
     participant Resolver as ArbeitsverzeichnisResolver
     participant Prozess as EntwicklungsprozessService
-    participant Git as IGitPlugin
+    participant Git as IGitPlugin (z. B. LocalDirectoryPlugin)
 
     Benutzer->>UI: Arbeitsverzeichnis eingeben/speichern
-    UI->>Settings: SaveArbeitsverzeichnisAsync(path)
-    Settings->>Settings: ValidatePathForSave(path)
-    Settings-->>UI: gespeichert (oder Validierungsfehler)
+    UI->>Settings: ValidatePathForConfiguration(input)
+    UI->>Settings: SaveArbeitsverzeichnisAsync(input)
+    Settings-->>UI: gespeichert / ArgumentException
 
-    Benutzer->>Prozess: ProzessStartenAsync(...)
+    Benutzer->>Prozess: ProzessStartenAsync(aufgabeId, repositoryUrl)
     Prozess->>Resolver: ResolveAsync()
     Resolver->>Settings: GetArbeitsverzeichnisAsync()
 
     alt Konfiguration gültig + schreibbar
         Resolver-->>Prozess: ResolvedPath=configured, UsedFallback=false
-    else Keine Konfiguration / ungültig / nicht schreibbar
+    else Keine Konfiguration / invalid-path / not-writable-or-unavailable
         Resolver-->>Prozess: ResolvedPath=Path.GetTempPath(), UsedFallback=true, ReasonCode=...
+        Prozess->>Prozess: AddEintragAsync("Arbeitsverzeichnis-Fallback aktiv ...")
     end
 
     Prozess->>Prozess: lokalerKlonPfad = Path.Combine(ResolvedPath, "softwareschmiede", aufgabeId)
-    opt UsedFallback == true
-        Prozess->>Prozess: Protokolleintrag "Arbeitsverzeichnis-Fallback aktiv (...)"
-    end
     Prozess->>Git: CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)
 ```
 
@@ -57,12 +56,12 @@ sequenceDiagram
 
 | # | Schritt | Ergebnis |
 |---|---|---|
-| 1 | Benutzer pflegt Wert in Einstellungen | `repositories.workdir` wird in `AppEinstellungen` gespeichert oder auf `null` gesetzt |
-| 2 | Service validiert Eingabe | Nur absolute, gültige und erzeugbare Pfade werden akzeptiert |
-| 3 | Prozessstart ruft Resolver auf | Laufzeit-validierter Basispfad wird ermittelt |
-| 4 | Fallback falls nötig | `Path.GetTempPath()` + ReasonCode |
-| 5 | Finaler Klonpfad wird gebildet | `<ResolvedPath>/softwareschmiede/<aufgabeId>` |
-| 6 | Repository wird geklont | `IGitPlugin.CloneRepositoryAsync(...)` |
+| 1 | UI validiert Eingabe syntaktisch | `ValidatePathForConfiguration` prüft absoluten und gültigen Pfad (ohne Seiteneffekte) |
+| 2 | Speichern der Einstellung | `SaveArbeitsverzeichnisAsync` normalisiert Pfad, erstellt Verzeichnis (wenn gesetzt) und persistiert `repositories.workdir` |
+| 3 | Laufzeit-Auflösung beim Prozessstart | `ResolveAsync` prüft den gespeicherten Wert inkl. Schreibprobe |
+| 4 | Fallback bei Laufzeitproblemen | `ResolvedPath = Path.GetTempPath()`, `UsedFallback = true`, `ReasonCode` gesetzt |
+| 5 | Bildung des Klon-Zielpfads | `<ResolvedPath>/softwareschmiede/<aufgabeId>` |
+| 6 | Übergabe an SCM-Plugin | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonpfad)`; bei `LocalDirectoryPlugin` im separaten Arbeitsverzeichnis Source-Copy + `git init` + initialer Snapshot-Commit |
 
 ---
 
@@ -70,14 +69,15 @@ sequenceDiagram
 
 | Fehlerfall | Verhalten |
 |---|---|
-| Ungültige Eingabe in Einstellungen | `ArgumentException`, Speichern wird verhindert, UI zeigt Validierungsfehler |
-| Konfigurierter Pfad zur Laufzeit nicht nutzbar | Fallback auf Temp-Pfad, Warn-Logs + Protokolleintrag mit `ReasonCode` |
-| `git clone` schlägt fehl | Exception wird propagiert, Aufgabe bleibt nicht gestartet |
+| Ungültige Eingabe beim Speichern | `ArgumentException`, UI zeigt Validierungsfehler, DB-Wert bleibt unverändert |
+| Laufzeitwert nicht nutzbar (z. B. Datei statt Ordner, nicht schreibbar) | Resolver-Fallback auf Temp, Warn-Logs mit `ReasonCode`, Prozess läuft mit Fallback weiter |
+| `IGitPlugin.CloneRepositoryAsync` schlägt fehl | Exception wird propagiert, Aufgabe bleibt nicht gestartet |
 
 ---
 
 ## Verwandte Dokumentation
 
+- [local-directory-plugin-flow.md](./local-directory-plugin-flow.md)
 - [development-process-flow.md](./development-process-flow.md)
 - [API: workdir-configuration.md](../api/workdir-configuration.md)
 - [Business: F009 – Arbeitsverzeichnis konfigurieren](../business/features/F009-arbeitsverzeichnis-konfigurieren.md)

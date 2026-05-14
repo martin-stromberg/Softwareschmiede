@@ -127,3 +127,5 @@ flowchart TD
 
 - **Infrastruktur**
   - `src/Softwareschmiede/Infrastructure/Services/SystemShutdownService.cs`
+
+> Verwandte Flows: [KiAusfuehrungsService – Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) · [Entwicklungsprozess-Abläufe](./development-process-flow.md)

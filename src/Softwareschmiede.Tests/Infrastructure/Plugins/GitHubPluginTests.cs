@@ -296,6 +296,8 @@ public sealed class GitHubPluginTests
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHub");
         _sut.GetSettingGroups().Should().ContainSingle();
         _sut.GetSettingGroups().Single().Fields.Should().ContainSingle(f => f.Key == "Token" && f.IsRequired);
+        _sut.GetRepositoryLinkFields().Should().ContainSingle(f => f.Key == "RepositoryUrl" && f.IsRequired);
+        _sut.GetRepositoryLinkFields().Should().ContainSingle(f => f.Key == "RepositoryName" && f.IsRequired);
     }
 
     [Fact]

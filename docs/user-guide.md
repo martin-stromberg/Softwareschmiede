@@ -33,6 +33,7 @@ Aktive Projekte erscheinen im Dashboard, archivierte verschwinden aus der Ansich
 
 Sie können in den **Einstellungen** festlegen, in welchem Basisordner lokale Arbeitskopien Ihrer Repositories angelegt werden.
 Wenn keine eigene Angabe gespeichert ist oder der Pfad nicht nutzbar ist, verwendet die Softwareschmiede automatisch einen sicheren Default auf Basis des Temp-Verzeichnisses.
+Im Modus `SeparateWorkingDirectory` wird die Quelle nur kopiert und anschließend im Arbeitsverzeichnis als eigenes Git-Repository initialisiert.
 
 👉 Mehr dazu: [F009 – Arbeitsverzeichnis konfigurieren](./business/features/F009-arbeitsverzeichnis-konfigurieren.md)
 
