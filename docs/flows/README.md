@@ -20,6 +20,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
+| [Issue-, Branch- und PR-Verknüpfung](./issue-branch-pr-linking-flow.md) | `issue-branch-pr-linking-flow.md` | End-to-End-Flow von der Issue-Auswahl über issuebezogenen Branch bis zur PR-Closing-Direktive (`Closes #<Issue>`) |
 
 ---
 
@@ -155,6 +156,13 @@ Dokumentiert den End-to-End-Pfad für Issue-Import und manuelle Git-Aktionen ink
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `KiAusfuehrungsService`, `EntwicklungsprozessService`, `AufgabeDetail`, `AutoShutdownOrchestrator`
 
 Beschreibt den Ablauf von `StartKiLauf` bis `onCompleted`, inklusive Session-Wiederaufnahme, Live-Subscriptions und Running-Count-Events für die Auto-Shutdown-Orchestrierung.
+
+---
+
+### [Ablauf 15: Issue-Auswahl, Branch-Verknüpfung und PR Auto-Close](./issue-branch-pr-linking-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `NeueAufgabe`, `AufgabeService`, `EntwicklungsprozessService`, `GitOrchestrationService`, `IGitPlugin`
+
+Dokumentiert die durchgängige Verknüpfung zwischen ausgewählter Issue, task-Branch und PR-Closing-Direktive inkl. Duplikatvermeidung bei bereits vorhandenen Direktiven.
 
 ---
 

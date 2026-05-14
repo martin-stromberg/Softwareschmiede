@@ -43,6 +43,7 @@ Sie klicken auf **Aufgabe anlegen** und starten danach die Umsetzung.
 Die Anwendung speichert Titel, Beschreibung und die Zuordnung zum Projekt.  
 Wenn Sie eine Issue wählen, übernimmt sie die vorhandenen Texte als Startpunkt.  
 Beim Start der Entwicklung wird später ein eigener Arbeitsbereich für diese Aufgabe genutzt.
+Zusätzlich bleibt die Issue-Verknüpfung erhalten, damit Branch und Pull Request automatisch zur richtigen Issue passen.
 
 ---
 
@@ -69,4 +70,5 @@ Nein. Sie starten sie später in der Detailansicht.
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md)
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md)
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md)
+- [F019 – Issue-, Branch- und PR-Verknüpfung](./F019-issue-branch-pr-verknuepfung.md)
 - [Zurück zur Übersicht](../features.md)

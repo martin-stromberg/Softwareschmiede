@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -67,7 +68,7 @@ public sealed class EntwicklungsprozessService
         var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(selectedScmPluginPrefix, ct);
         var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(null, ct);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
+        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
 
         // Kompatibilität des Agentenpakets VOR dem Klonen prüfen
@@ -130,8 +131,7 @@ public sealed class EntwicklungsprozessService
         else
         {
             // Neuen task-Branch anlegen
-            var titelSlug = ErstelleTitelSlug(aufgabe.Titel);
-            branchName = $"task/{aufgabeId:N}-{titelSlug}";
+            branchName = ErstelleTaskBranchName(aufgabe);
 
             _logger.LogInformation("Branch '{BranchName}' anlegen.", branchName);
             await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, ct);
@@ -820,6 +820,17 @@ public sealed class EntwicklungsprozessService
                 File.Delete(tempPath);
             }
         }
+    }
+
+    /// <summary>Erstellt einen URL-freundlichen Slug aus dem Titel (max. 30 Zeichen).</summary>
+    private static string ErstelleTaskBranchName(Aufgabe aufgabe)
+    {
+        var titelSlug = ErstelleTitelSlug(aufgabe.Titel);
+        var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
+
+        return issueNummer is > 0
+            ? $"task/issue-{issueNummer.Value}-{aufgabe.Id:N}-{titelSlug}"
+            : $"task/{aufgabe.Id:N}-{titelSlug}";
     }
 
     /// <summary>Erstellt einen URL-freundlichen Slug aus dem Titel (max. 30 Zeichen).</summary>

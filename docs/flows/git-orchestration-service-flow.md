@@ -96,12 +96,17 @@ flowchart TD
    - **Eingaben:** Aufgabe inkl. optionaler `GitRepository`-Verknüpfung
    - **Ausgaben/Seiteneffekte:** Eindeutige `repositoryId`; bei fehlender oder mehrdeutiger Projektzuordnung wird kontrolliert abgebrochen.
 
-6. **UI-Integration für Commit/Push/Pull/Reset/PR/Merge**
+6. **PR-Body-Aufbau mit Issue-Closing-Direktive**
+   - **Code:** `GitOrchestrationService.BuildPullRequestBody`, `ContainsClosingDirectiveForIssue`
+   - **Eingaben:** bestehender PR-Body + optionale `IssueReferenz.IssueNummer`
+   - **Ausgaben/Seiteneffekte:** Ergänzt `Closes #<IssueNummer>`, wenn für die aktuelle Issue noch keine Closing-Direktive vorhanden ist; bei Whitespace-Body wird nur die Direktive verwendet.
+
+7. **UI-Integration für Commit/Push/Pull/Reset/PR/Merge**
    - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`LadeGitActionCapabilitiesAsync`, `EvaluateGitActionVisibility`, `CommitAsync`, `PushAsync`, `PullAsync`, `MergeToSourceAsync`, `ResetAsync`, `PullRequestErstellenAsync`)
    - **Eingaben:** Formulardaten in der Aufgabenansicht
    - **Ausgaben/Seiteneffekte:** Erfolg-/Fehlermeldungen in der UI, anschließendes Reload via `LadeAsync`; bei `LocalDirectory + IsWorkingDirectoryCopy` werden Push/Pull/PR ausgeblendet und Merge sichtbar.
 
-7. **Projektspezifische Plugin-Auflösung für Aufgabenaktionen**
+8. **Projektspezifische Plugin-Auflösung für Aufgabenaktionen**
    - **Code:** `GitOrchestrationService.ResolveGitPluginAsync`, `ResolveSelectedPluginPrefixAsync`, `PluginSelectionService.ResolveSourceCodeManagementPluginAsync`
    - **Eingaben:** `Aufgabe.GitRepository.PluginTyp`, aktive Projekt-Repositories, gespeichertes Standardplugin
    - **Ausgaben/Seiteneffekte:** Das effektive `IGitPlugin` wird pro Aktion neu aufgelöst. Ohne Aufgaben-Repository wird bei genau einem aktiven Projekt-Repository dessen `PluginTyp` genutzt (inkl. LocalRepository/`LocalDirectoryPlugin`); bei Mehrdeutigkeit greift der definierte Standard-Fallback.

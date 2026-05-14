@@ -435,6 +435,184 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Times.Once);
     }
 
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference()
+    {
+        var projekt = await _projektService.CreateAsync("Projekt mit Issue", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/issue-repo",
+            "test/issue-repo");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Issue", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/issue", @"C:\repos\task-issue");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = 123,
+            Titel = "Issue 123",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/issue-repo",
+                "feature/issue",
+                "Titel",
+                It.Is<string>(body => body == $"Body{Environment.NewLine}{Environment.NewLine}Closes #123"),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(77, "PR", "https://example/pr/77", "feature/issue"));
+
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/issue-repo",
+            "feature/issue",
+            "Titel",
+            It.Is<string>(body => body == $"Body{Environment.NewLine}{Environment.NewLine}Closes #123"),
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Issue #123"));
+    }
+
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective()
+    {
+        var projekt = await _projektService.CreateAsync("Projekt mit bestehender Direktive", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/existing-directive",
+            "test/existing-directive");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Duplikat", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-dup", @"C:\repos\task-no-dup");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = 88,
+            Titel = "Issue 88",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        const string existingBody = "Implementierung abgeschlossen.\nFixes #88";
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/existing-directive",
+                "feature/no-dup",
+                "Titel",
+                existingBody,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(78, "PR", "https://example/pr/78", "feature/no-dup"));
+
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/existing-directive",
+            "feature/no-dup",
+            "Titel",
+            existingBody,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync ersetzt einen reinen Whitespace-Body bei bestehender Issue-Referenz durch die Closing-Direktive.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldUseOnlyClosingDirective_WhenBodyIsWhitespaceAndIssueExists()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt mit Whitespace-Body", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/whitespace-body",
+            "test/whitespace-body");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Whitespace-Body", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/whitespace", @"C:\repos\task-whitespace");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = 501,
+            Titel = "Issue 501",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/whitespace-body",
+                "feature/whitespace",
+                "Titel",
+                "Closes #501",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(79, "PR", "https://example/pr/79", "feature/whitespace"));
+
+        // Act
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "   ");
+
+        // Assert
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/whitespace-body",
+            "feature/whitespace",
+            "Titel",
+            "Closes #501",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync ergänzt die Closing-Direktive der aktuellen Issue, wenn bereits eine Direktive für eine andere Issue vorhanden ist.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveForCurrentIssue_WhenBodyContainsDirectiveForAnotherIssue()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt mit anderer Direktive", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/other-directive",
+            "test/other-directive");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit anderer Direktive", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/other-directive", @"C:\repos\task-other-directive");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = 123,
+            Titel = "Issue 123",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        const string existingBody = "Implementierung abgeschlossen.\nCloses #41";
+        var expectedBody = $"{existingBody.TrimEnd()}{Environment.NewLine}{Environment.NewLine}Closes #123";
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/other-directive",
+                "feature/other-directive",
+                "Titel",
+                expectedBody,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(80, "PR", "https://example/pr/80", "feature/other-directive"));
+
+        // Act
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+
+        // Assert
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/other-directive",
+            "feature/other-directive",
+            "Titel",
+            expectedBody,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     /// <summary>PullRequestErstellenAsync bricht bei mehrdeutiger Repository-Zuordnung kontrolliert ab.</summary>
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenMultipleActiveRepositoriesExist()
@@ -464,6 +642,64 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(
             g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    /// <summary>PullRequestErstellenAsync bricht kontrolliert ab, wenn im Projekt kein aktives Repository vorhanden ist.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldThrowInvalidOperationException_WhenNoActiveRepositoryExists()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt ohne Repository", null);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Repository", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-active-repo", @"C:\repos\task-no-active-repo");
+
+        // Act
+        var act = () => _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*kein aktives Repository*");
+        _gitPluginMock.Verify(
+            g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>PullRequestErstellenAsync löst die Repository-ID korrekt aus einer SSH-Repository-URL auf.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldResolveRepositoryId_FromSshRepositoryUrl()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt mit SSH-Repository", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "git@github.com:owner/repo.git",
+            "owner/repo");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit SSH-URL", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ssh-url", @"C:\repos\task-ssh-url");
+        var expectedPr = new PullRequest(81, "SSH PR", "https://example/pr/81", "feature/ssh-url");
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "owner/repo",
+                "feature/ssh-url",
+                "Titel",
+                "Body",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedPr);
+
+        // Act
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        // Assert
+        result.Should().Be(expectedPr);
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "owner/repo",
+            "feature/ssh-url",
+            "Titel",
+            "Body",
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private GitOrchestrationService CreateSutWithPlugins(Mock<IGitPlugin> defaultPlugin, params Mock<IGitPlugin>[] additionalPlugins)

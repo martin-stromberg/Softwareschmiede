@@ -25,6 +25,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F016 | Fehlerbehandlung & Recovery | Wie Sie bei typischen Störungen sicher weiterarbeiten können | [F016 – Fehlerbehandlung & Recovery](./features/F016-fehlerbehandlung-und-recovery.md) |
 | F017 | Lokales Verzeichnis Plugin | Lokale Ordner mit separatem Arbeitsverzeichnis und Git-Workflow-Fallback sicher nutzen | [F017 – Lokales Verzeichnis Plugin](./features/F017-lokales-verzeichnis-plugin.md) |
 | F018 | Automatisches Herunterfahren | Nach dem letzten laufenden KI-Lauf den Rechner automatisch herunterfahren | [F018 – Automatisches Herunterfahren](./features/F018-automatisches-herunterfahren.md) |
+| F019 | Issue-, Branch- und PR-Verknüpfung | GitHub-Issue durchgängig von Aufgabenanlage bis PR Auto-Close verknüpfen | [F019 – Issue-, Branch- und PR-Verknüpfung](./features/F019-issue-branch-pr-verknuepfung.md) |
 
 ---
 

@@ -235,6 +235,10 @@ Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct
 
 **Rückgabewert:** `Task` – abgeschlossen, wenn Branch erstellt und ausgecheckt wurde.
 
+**Hinweis zur Branch-Namensbildung:**  
+Die eigentliche Branch-Namenskonvention wird in der Application-Schicht (`EntwicklungsprozessService`) erzeugt.  
+Bei Aufgaben mit `IssueReferenz` wird das Muster `task/issue-<IssueNummer>-<AufgabeIdN>-<TitelSlug>` verwendet.
+
 **Fehlerverhalten:**
 - `InvalidOperationException` – Branch existiert bereits oder `localPath` ist kein gültiges Git-Repository.
 - `OperationCanceledException` – Abbruch über `ct`.
@@ -320,6 +324,9 @@ Task<PullRequest> CreatePullRequestAsync(
 | `ct` | `CancellationToken` | optional | Abbruch-Token |
 
 **Rückgabewert:** `Task<PullRequest>` – Daten des erstellten Pull Requests.
+
+**Hinweis zur Closing-Direktive:**  
+Die Ergänzung von `Closes #<IssueNummer>` erfolgt in der Orchestrierung (`GitOrchestrationService.BuildPullRequestBody`), nicht im `IGitPlugin`-Contract selbst.
 
 **Datenmodell [`PullRequest`](#pullrequest):**
 

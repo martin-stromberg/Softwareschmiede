@@ -58,8 +58,18 @@ Die Aktionsmatrix in `AufgabeDetail` (Push/Pull/PR ausblenden, Merge einblenden)
 - Request/Response: nicht anwendbar
 - `curl`-Beispiel: nicht anwendbar
 
+## Feature-Impact: Issue-Auswahl, Branch-Verknüpfung und PR Auto-Close
+
+Das Feature für Issue-Verknüpfung, issuebezogene Branch-Namensbildung und PR-Closing-Direktive wird vollständig in der Domain-/Application-Schicht umgesetzt und erzeugt **keine** öffentlichen HTTP-Endpunkte.
+
+- HTTP-Methode & Pfad: nicht anwendbar
+- Authentifizierung: nicht anwendbar
+- Request/Response: nicht anwendbar
+- `curl`-Beispiel: nicht anwendbar
+
 ## Verknüpfte Dokumentation
 
 - Business: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)
 - Flow: [plugin-default-selection-flow.md](../flows/plugin-default-selection-flow.md)
 - Flow-Index: [docs/flows/README.md](../flows/README.md)
+- API: [issue-branch-pr-linking.md](./issue-branch-pr-linking.md)

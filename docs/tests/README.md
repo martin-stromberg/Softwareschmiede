@@ -13,3 +13,5 @@
 | [testplan-aufgabe-detail-project-selected-git-plugin.md](./testplan-aufgabe-detail-project-selected-git-plugin.md) | Teststrategie für projektspezifische IGitPlugin-Auswahl in AufgabeDetail/GitOrchestrationService (inkl. LocalRepository) |
 | [testluecken-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md](./testluecken-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md) | Testlückenanalyse für Git-Plugin-Capabilities und Copy-Flow-Aktionssteuerung |
 | [testplan-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md](./testplan-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md) | Umsetzungsplan zur Schließung der Testlücken für Git-Plugin-Capabilities und Merge nach Source |
+| [testplan-issue-branch-pr-linking.md](./testplan-issue-branch-pr-linking.md) | Testplan für Issue-Auswahl, issuebezogene Branch-Namensbildung und PR-Auto-Close |
+| [testluecken-issue-branch-pr-linking.md](./testluecken-issue-branch-pr-linking.md) | Testlückenanalyse für den End-to-End-Flow Issue → Branch → Pull Request |
