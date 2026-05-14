@@ -40,6 +40,7 @@ public sealed class PluginManagerTests : IDisposable
         File.Copy(typeof(LocalDirectoryPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.LocalDirectory.dll"), overwrite: true);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
+        File.Copy(typeof(KiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 
@@ -49,9 +50,10 @@ public sealed class PluginManagerTests : IDisposable
         scmPlugins.Should().HaveCount(2);
         scmPlugins.Should().Contain(p => p.PluginName == "GitHub");
         scmPlugins.Should().Contain(p => p.PluginName == "Local Directory");
-        kiPlugins.Should().HaveCount(2);
+        kiPlugins.Should().HaveCount(3);
         kiPlugins.Should().Contain(p => p.PluginName == "GitHub Copilot");
         kiPlugins.Should().Contain(p => p.PluginName == "Claude CLI");
+        kiPlugins.Should().Contain(p => p.PluginName == "KI Simulator");
     }
 
     [Fact]
@@ -111,6 +113,7 @@ public sealed class PluginManagerTests : IDisposable
         File.Copy(typeof(LocalDirectoryPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.LocalDirectory.dll"), overwrite: true);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
+        File.Copy(typeof(KiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 
@@ -121,8 +124,8 @@ public sealed class PluginManagerTests : IDisposable
 
         firstCall.Should().HaveCount(2);
         secondCall.Should().HaveCount(2);
-        kiFirst.Should().HaveCount(2);
-        kiSecond.Should().HaveCount(2);
+        kiFirst.Should().HaveCount(3);
+        kiSecond.Should().HaveCount(3);
     }
 
     public void Dispose()

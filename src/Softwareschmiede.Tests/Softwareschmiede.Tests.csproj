@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.KiSimulator\Softwareschmiede.Plugin.KiSimulator.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
     <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
   </ItemGroup>
