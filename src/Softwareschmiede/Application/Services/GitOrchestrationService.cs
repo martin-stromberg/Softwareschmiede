@@ -3,6 +3,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
+using System.Text.RegularExpressions;
 
 namespace Softwareschmiede.Application.Services;
 
@@ -192,19 +193,56 @@ public sealed class GitOrchestrationService
         var repositoryId = await ResolveRepositoryIdAsync(aufgabe, ct);
 
         var prTitle = title ?? aufgabe.Titel;
-        var prBody = body ?? $"Automatisch erstellt für Aufgabe: {aufgabe.Titel}";
+        var prBody = BuildPullRequestBody(aufgabe, body);
+        var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
 
         var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, prTitle, prBody, ct);
+
+        var issueLogSuffix = issueNummer is > 0
+            ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
+            : string.Empty;
 
         await _protokollService.AddEintragAsync(
             aufgabeId,
             ProtokollTyp.GitAktion,
-            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Titel} ({pullRequest.Url})",
+            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Titel} ({pullRequest.Url}){issueLogSuffix}",
             ct: ct);
 
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellt.", aufgabeId);
 
         return pullRequest;
+    }
+
+    private string BuildPullRequestBody(Aufgabe aufgabe, string? body)
+    {
+        var prBody = body ?? $"Automatisch erstellt für Aufgabe: {aufgabe.Titel}";
+        var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
+
+        if (issueNummer is not > 0)
+        {
+            return prBody;
+        }
+
+        if (ContainsClosingDirectiveForIssue(prBody, issueNummer.Value))
+        {
+            return prBody;
+        }
+
+        var trimmedBody = prBody.TrimEnd();
+        return string.IsNullOrWhiteSpace(trimmedBody)
+            ? $"Closes #{issueNummer.Value}"
+            : $"{trimmedBody}{Environment.NewLine}{Environment.NewLine}Closes #{issueNummer.Value}";
+    }
+
+    private static bool ContainsClosingDirectiveForIssue(string body, int issueNummer)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return false;
+        }
+
+        var pattern = $@"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#{issueNummer}\b";
+        return Regex.IsMatch(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     /// <summary>Ermittelt die Repository-ID aus der Aufgabe oder dem zugehörigen Projekt.</summary>
@@ -292,6 +330,24 @@ public sealed class GitOrchestrationService
         var url = repositoryUrl.EndsWith(".git", StringComparison.OrdinalIgnoreCase)
             ? repositoryUrl[..^4]
             : repositoryUrl;
+
+        // SCP-/SSH-Format behandeln:
+        // git@github.com:owner/repo
+        if (!url.Contains("://", StringComparison.Ordinal))
+        {
+            var colonIndex = url.IndexOf(':');
+            if (colonIndex >= 0 && colonIndex < url.Length - 1)
+            {
+                var repositoryPath = url[(colonIndex + 1)..];
+                var slashIndex = repositoryPath.IndexOf('/');
+                if (slashIndex > 0 && slashIndex < repositoryPath.Length - 1)
+                {
+                    var sshOwner = repositoryPath[..slashIndex];
+                    var sshRepo = repositoryPath[(slashIndex + 1)..];
+                    return $"{sshOwner}/{sshRepo}";
+                }
+            }
+        }
 
         // Owner/Repo aus verschiedenen URL-Formaten extrahieren:
         // https://github.com/owner/repo

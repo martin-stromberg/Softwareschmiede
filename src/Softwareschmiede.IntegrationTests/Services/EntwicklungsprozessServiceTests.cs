@@ -106,6 +106,31 @@ public sealed class EntwicklungsprozessServiceTests
         loaded.LokalerKlonPfad.Should().NotBeNullOrEmpty();
     }
 
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldPersistIssueBasedBranch_WhenAufgabeWasCreatedFromIssue()
+    {
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var projekt = await projektService.CreateAsync("Issue-Branch-Projekt", null);
+        var issue = new Issue(55, "Issue-basierte Aufgabe", "Beschreibung", ["feature"], null, "https://github.com/test/repo/issues/55");
+        var aufgabe = await aufgabeService.CreateFromIssueAsync(projekt.Id, issue);
+
+        var gitMock = new Mock<IGitPlugin>();
+        gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+
+        await service.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        await using var db2 = db.CreateNewContext();
+        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        loaded!.BranchName.Should().StartWith($"task/issue-55-{aufgabe.Id:N}");
+    }
+
     /// <summary>
     /// Testet, dass ProzessStartenAsync einen GitAktion-Protokolleintrag in der DB anlegt.
     /// </summary>

@@ -43,7 +43,7 @@ sequenceDiagram
     EntwicklungsprozessService->>EntwicklungsprozessService: Basis-Pfad via Resolver ermitteln + Klon-Pfad bilden
     EntwicklungsprozessService->>IGitPlugin: CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)
     IGitPlugin-->>EntwicklungsprozessService: Klon erfolgreich
-    EntwicklungsprozessService->>EntwicklungsprozessService: Branch-Name erzeugen (task/<id>-<slug>)
+    EntwicklungsprozessService->>EntwicklungsprozessService: Branch-Name erzeugen (mit Issue: task/issue-<nr>-<id>-<slug>)
     EntwicklungsprozessService->>IGitPlugin: CreateBranchAsync(lokalerKlonPfad, branchName)
     IGitPlugin-->>EntwicklungsprozessService: Branch angelegt
 
@@ -69,7 +69,7 @@ sequenceDiagram
 | 1 | Aufgabe aus Datenbank laden | `EntwicklungsprozessService.ProzessStartenAsync` → `AufgabeService.GetByIdAsync(aufgabeId)` | Eingabe: `aufgabeId` (Guid); Ausgabe: `Aufgabe`-Objekt |
 | 2 | Basis-Pfad auflösen und Klon-Pfad bestimmen | `EntwicklungsprozessService.ProzessStartenAsync` + `IArbeitsverzeichnisResolver.ResolveAsync` | Pfad: `<resolvedBase>/softwareschmiede/<aufgabeId>`; bei Fallback: `Path.GetTempPath()/softwareschmiede/<aufgabeId>` |
 | 3 | Repository/Workspace vorbereiten | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` → je Plugin `git clone` **oder** `git init`-Fallback + Dateikopie | Eingabe: URL/Pfad + Zielpfad; Seiteneffekt: lokales Arbeitsverzeichnis wird erstellt |
-| 4 | Branch-Namen erzeugen | `EntwicklungsprozessService.ProzessStartenAsync` | Format: `task/<aufgabeId-ohne-Bindestriche>-<titel-slug>`, max. 30 Zeichen |
+| 4 | Branch-Namen erzeugen | `EntwicklungsprozessService.ProzessStartenAsync` | Ohne Issue: `task/<aufgabeIdN>-<titel-slug>`; mit Issue: `task/issue-<issueNummer>-<aufgabeIdN>-<titel-slug>` (Slug max. 30 Zeichen) |
 | 5 | Branch anlegen | `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName)` → `GitHubPlugin`: `git checkout -b {branchName}` | Seiteneffekt: neuer Branch im lokalen Klon |
 | 6 | Agentenpaket deployen (optional) | `IKiPlugin.DeployAgentPackageAsync(paketPfad, lokalerKlonPfad)` → `GitHubCopilotPlugin`: Dateien nach `.github/agents/` kopieren | Nur wenn Paket konfiguriert |
 | 7 | Aufgabe als gestartet markieren | `AufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad)` | Statusübergang: `Offen → InBearbeitung`; BranchName + Pfad werden persistiert |

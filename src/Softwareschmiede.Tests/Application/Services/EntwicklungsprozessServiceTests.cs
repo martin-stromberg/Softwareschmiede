@@ -98,6 +98,28 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         updatedAufgabe.BranchName.Should().Contain("login-feature");
     }
 
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference()
+    {
+        var issue = new Issue(321, "Issue Branch", "Body", ["enhancement"], null, "https://github.com/test/repo/issues/321");
+        var aufgabe = await _aufgabeService.CreateFromIssueAsync(_projektId, issue);
+
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        _gitPluginMock.Verify(g => g.CreateBranchAsync(
+            It.IsAny<string>(),
+            It.Is<string>(branch => branch.StartsWith($"task/issue-321-{aufgabe.Id:N}") && branch.Contains("-issue-branch")),
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        var updatedAufgabe = await _aufgabeService.GetDetailAsync(aufgabe.Id);
+        updatedAufgabe!.BranchName.Should().StartWith($"task/issue-321-{aufgabe.Id:N}");
+    }
+
     /// <summary>ProzessStartenAsync deployt Agentenpaket wenn AgentenpaketName gesetzt ist.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldDeployAgentPackage_WhenAgentenpaketNameIsSet()
@@ -864,6 +886,35 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         updatedAufgabe!.BranchName.Should().Be("feature/existing-branch");
     }
 
+    /// <summary>ProzessStartenAsync erstellt einen neuen Task-Branch, wenn Basis- und Default-Branch nur in der Groß-/Kleinschreibung abweichen.</summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldCreateTaskBranch_WhenBasisBranchEqualsDefaultBranch_CaseInsensitive()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Case Insensitive Branch", null);
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("main");
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo", "MAIN");
+
+        // Assert
+        _gitPluginMock.Verify(g => g.GetDefaultBranchAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()), Times.Once);
+        _gitPluginMock.Verify(g => g.CheckoutRemoteBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gitPluginMock.Verify(g => g.CreateBranchAsync(
+            It.IsAny<string>(),
+            It.Is<string>(branch => branch.StartsWith("task/", StringComparison.Ordinal)),
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.BranchName.Should().StartWith("task/");
+        updatedAufgabe.BranchName.Should().NotBe("MAIN");
+    }
+
     [Fact]
     public async Task ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone()
     {
@@ -964,6 +1015,58 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var testEintrag = protokoll.Single(p => p.Typ == ProtokollTyp.TestErgebnis);
         testEintrag.Inhalt.Should().Be("1 von 2 Tests fehlgeschlagen.");
         testEintrag.TestErgebnisse.Should().HaveCount(2);
+    }
+
+    /// <summary>GetRemoteBranchesAsync löst das gewünschte SCM-Plugin über den Prefix auf und liefert dessen Branches zurück.</summary>
+    [Fact]
+    public async Task GetRemoteBranchesAsync_ShouldResolvePluginBySelectedPrefix_AndReturnPluginBranches()
+    {
+        // Arrange
+        var defaultGitPluginMock = new Mock<IGitPlugin>();
+        defaultGitPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Default Git");
+        defaultGitPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("LocalDirectoryPlugin");
+        defaultGitPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.SourceCodeManagement);
+        defaultGitPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        defaultGitPluginMock.Setup(plugin => plugin.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["main"]);
+
+        var selectedGitPluginMock = new Mock<IGitPlugin>();
+        selectedGitPluginMock.SetupGet(plugin => plugin.PluginName).Returns("GitHub");
+        selectedGitPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Softwareschmiede.GitHub");
+        selectedGitPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.SourceCodeManagement);
+        selectedGitPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        selectedGitPluginMock.Setup(plugin => plugin.GetRemoteBranchesAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["develop", "release/1.0"]);
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([defaultGitPluginMock.Object, selectedGitPluginMock.Object]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(defaultGitPluginMock.Object);
+        pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(_kiPluginMock.Object);
+
+        var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginSelectionService = new PluginSelectionService(
+            pluginManagerMock.Object,
+            pluginDefaultSettings,
+            new Mock<ILogger<PluginSelectionService>>().Object);
+
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            defaultGitPluginMock.Object,
+            pluginSelectionService,
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        var result = (await sut.GetRemoteBranchesAsync("https://github.com/test/repo", "  softwaRESchmiede.githUB  ")).ToArray();
+
+        // Assert
+        result.Should().BeEquivalentTo(["develop", "release/1.0"]);
+        selectedGitPluginMock.Verify(plugin => plugin.GetRemoteBranchesAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()), Times.Once);
+        defaultGitPluginMock.Verify(plugin => plugin.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static async IAsyncEnumerable<string> StreamSingleLine(string line)

@@ -12,6 +12,7 @@ Details: [http-endpoints.md](./http-endpoints.md)
 | Dokument | Kurzbeschreibung |
 |---|---|
 | [http-endpoints.md](./http-endpoints.md) | Verbindlicher HTTP-Status: keine öffentlichen Endpunkte, inkl. einheitlicher Dokumentation für Request/Response = *nicht anwendbar*. |
+| [issue-branch-pr-linking.md](./issue-branch-pr-linking.md) | Interner Contract für Issue-Auswahl, issuebezogene Branch-Erzeugung und PR-Closing-Direktive (`Closes #<Issue>`). |
 | [local-directory-plugin.md](./local-directory-plugin.md) | Technischer Contract der `IGitPlugin`-Implementierung `LocalDirectoryPlugin` inkl. Workspace-Modi, `git-init`-Fallback, Pull ohne Merge, Push-/Delete-Sync sowie Capability-Flags für die Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden bei Arbeitskopie). |
 | [plugin-default-selection.md](./plugin-default-selection.md) | Interner API-Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** sowie die projektspezifische/aufgabenbezogene `IGitPlugin`-Auflösung (vor Default) inkl. Fallback bei fehlender Repo-Verknüpfung. |
 | [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType`, Plugin-Discovery sowie dynamische Repository-Feldschemata (`GetRepositoryLinkFields`). |
@@ -28,6 +29,12 @@ Details: [http-endpoints.md](./http-endpoints.md)
 - Technischer Contract: [local-directory-plugin.md](./local-directory-plugin.md)
 - Schnittstellen-Referenz: [plugin-interfaces.md](./plugin-interfaces.md)
 - Ablaufdarstellung: [local-directory-plugin-flow.md](../flows/local-directory-plugin-flow.md)
+
+## Feature-Fokus: Issue-, Branch- und PR-Verknüpfung
+
+- Technischer Contract: [issue-branch-pr-linking.md](./issue-branch-pr-linking.md)
+- Ablaufdarstellung: [issue-branch-pr-linking-flow.md](../flows/issue-branch-pr-linking-flow.md)
+- Fachliche Einordnung: [F019 – Issue-, Branch- und PR-Verknüpfung](../business/features/F019-issue-branch-pr-verknuepfung.md)
 
 ## Verknüpfte Dokumentation
 

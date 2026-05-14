@@ -111,13 +111,13 @@ Dieser Ablauf zeigt, wie eine Aufgabe von Anfang bis Ende bearbeitet wird.
 2. **GitHub-Ablage verknüpfen** – Tragen Sie im Projekt die Adresse Ihrer GitHub-Ablage ein. Die Softwareschmiede lädt den Code automatisch herunter, wenn eine Aufgabe startet.
 3. **Arbeitsverzeichnis prüfen** (optional) – Öffnen Sie **Einstellungen** und setzen Sie bei Bedarf ein eigenes Basis-Arbeitsverzeichnis für lokale Klone.
 4. **Claude einrichten** (optional) – Öffnen Sie **Einstellungen**, tragen Sie bei **Anthropic API Key** Ihren Schlüssel ein und klicken Sie **💾 Speichern**.
-5. **Aufgabe erstellen** – Wählen Sie Ihr Projekt aus und klicken Sie auf **Neue Aufgabe**. Beschreiben Sie, was umgesetzt werden soll.
+5. **Aufgabe erstellen** – Wählen Sie Ihr Projekt aus und klicken Sie auf **Neue Aufgabe**. Optional können Sie eine GitHub-Issue auswählen; Titel und Beschreibung werden übernommen.
 6. **Agentenpaket wählen** – Wählen Sie aus der Liste das passende Agentenpaket für diese Aufgabe aus.
 7. **KI starten** – Klicken Sie auf **KI starten**. Die KI erhält Ihre Aufgabenbeschreibung und beginnt zu arbeiten.
 8. **Echtzeit-Ausgabe beobachten** – Verfolgen Sie auf dem Bildschirm, was die KI gerade tut. Sie sehen Nachrichten, Code-Änderungen und Zwischenergebnisse.
 9. **Folge-Anweisung geben** (optional) – Wenn Sie der KI etwas ergänzen möchten, tippen Sie eine Nachricht in das Eingabefeld und senden Sie sie ab.
 10. **Ergebnis prüfen** – Sobald die KI fertig ist, sehen Sie eine Zusammenfassung. Prüfen Sie, ob das Ergebnis Ihren Vorstellungen entspricht.
-11. **Pull Request erstellen** – Klicken Sie auf **Pull Request erstellen**. Die Änderungen werden als Vorschlag in Ihre GitHub-Ablage hochgeladen.
+11. **Pull Request erstellen** – Klicken Sie auf **Pull Request erstellen**. Die Änderungen werden als Vorschlag in Ihre GitHub-Ablage hochgeladen. Bei verknüpfter Issue ergänzt die Anwendung automatisch eine Closing-Direktive.
 12. **Aufgabe abschließen** – Bestätigen Sie den Abschluss. Die lokale Arbeitskopie wird gelöscht, die Aufgabe gilt als erledigt.
 
 ![Typischer Arbeitsablauf](./images/arbeitsablauf.png)

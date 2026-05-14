@@ -467,3 +467,73 @@
 
 ## Bekannte offene Punkte
 - Bei mehreren aktiven Projekt-Repositories ohne Aufgabenverknüpfung bleibt der Standard-Fallback bewusst aktiv; eine mögliche spätere UX-Verbesserung wäre eine explizite Auswahlaufforderung statt Fallback.
+
+---
+
+# Dokumentationsplan – Feature „Issue-Auswahl, Branch-Verknüpfung und PR Auto-Close“ – 2026-05-14
+
+## Kontext
+- Feature bereits implementiert und mit Tests abgesichert.
+- Scope:
+  - Issue-Auswahl bei Aufgabenanlage
+  - issuebezogene Branch-Namensbildung beim Prozessstart
+  - PR-Closing-Direktive (`Closes #<Issue>`) für Auto-Close beim Merge
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `docs/api/` existiert, aber kein dediziertes Contract-Dokument für den End-to-End-Zusammenhang Issue -> Branch -> PR.
+- `plugin-interfaces.md` dokumentierte `CreateBranchAsync` und `CreatePullRequestAsync`, aber ohne explizite Einordnung der Issue-bezogenen Namensbildung/Closing-Logik in der Orchestrierung.
+- `http-endpoints.md` enthielt noch keinen expliziten Feature-Impact-Hinweis für dieses nicht-HTTP Feature.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `docs/flows/` existiert, aber es fehlte ein dedizierter Ablaufplan für die komplette Featurekette.
+- `development-process-flow.md` nutzte beim Branch-Format noch eine verkürzte Darstellung ohne Issue-Präfix.
+- `git-orchestration-service-flow.md` beschrieb PR-Erstellung, aber nicht explizit die Conditional-Logik für die Closing-Direktive.
+
+### Business-Dokumentation (`docs/business/`)
+- Kein eigenes Fachdokument für das Feature vorhanden.
+- F002/F006 beschrieben Teilaspekte, aber ohne vollständige End-to-End-Sicht für nicht-technische Stakeholder.
+
+### README
+- Feature- und Usage-Abschnitte erwähnten Issue-Import und Branches, aber nicht die vollständige Kette inklusive Auto-Close-Direktive.
+- Dokumentationsindex enthielt noch keine direkten Links zu einem dedizierten API-/Flow-/Business-Dokument für dieses Feature.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Dedizierte API-, Flow- und Business-Dokumente für das Feature erstellen.
+2. **Hoch:** README (Features, Usage, Doku-Index) auf die End-to-End-Kette synchronisieren.
+3. **Mittel:** Bestehende Flow/API-Dokumente mit präzisen Hinweisen zur Branch-/Closing-Logik ergänzen.
+4. **Mittel:** Testdokumentationsindex auf Feature-Testplan/Testlücken-Dokument erweitern.
+
+## Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/api/issue-branch-pr-linking.md`
+2. `docs/flows/issue-branch-pr-linking-flow.md`
+3. `docs/business/features/F019-issue-branch-pr-verknuepfung.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/plugin-interfaces.md`
+4. `docs/api/http-endpoints.md`
+5. `docs/flows/README.md`
+6. `docs/flows/development-process-flow.md`
+7. `docs/flows/git-orchestration-service-flow.md`
+8. `docs/business/features.md`
+9. `docs/business/features/F002-aufgabenverwaltung.md`
+10. `docs/business/features/F006-aufgabe-abschliessen.md`
+11. `docs/user-guide.md`
+12. `docs/tests/README.md`
+13. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz- und Nicht-Leerheitsprüfung aller neu erstellten/aktualisierten Doku-Dateien: durchgeführt.
+- Link-/Inhaltsabgleich gegen implementierten Code und Tests für:
+  - `AufgabeService.CreateFromIssueAsync`
+  - `EntwicklungsprozessService.ErstelleTaskBranchName`
+  - `GitOrchestrationService.BuildPullRequestBody`
+  - relevante Unit-/BUnit-Tests (`NeueAufgabeBunitTests`, `EntwicklungsprozessServiceTests`, `GitOrchestrationServiceTests`)
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken für den Feature-Scope identifiziert.
