@@ -14,6 +14,8 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// <summary>Erzeugt den Dateinamen für die Kontextdatei einer Aufgabe.</summary>
     public string BuildContextFileName(Guid aufgabeId)
         => $"{aufgabeId}.{ProviderDateiPraefix}.context.md";
+    /// <summary>Erzeugt den Dateimaske für die Kontextdatei einer Aufgabe.</summary>
+    protected string BuildContextFileMask() => $"*.{ProviderDateiPraefix}.context.md";
 
     /// <summary>Erzeugt den Pfad für die Kontextdatei einer Aufgabe.</summary>
     public string BuildContextFilePath(string localRepoPath, Guid aufgabeId)
@@ -22,10 +24,72 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// <summary>Erzeugt den Dateinamen für eine Prompt-Taskdatei eines KI-Runs.</summary>
     public string BuildTaskFileName(Guid runId)
         => $"{runId}.{ProviderDateiPraefix}-task.md";
+    /// <summary>Erzeugt den Dateimaske für eine Prompt-Taskdatei eines KI-Runs.</summary>
+    protected string BuildTaskFileMask() => $"*.{ProviderDateiPraefix}-task.md";
 
     /// <summary>Erzeugt den Pfad für eine Prompt-Taskdatei eines KI-Runs.</summary>
     public string BuildTaskFilePath(string localRepoPath, Guid runId)
         => Path.Combine(localRepoPath, BuildTaskFileName(runId));
+    /// <summary>
+    /// Stellt sicher, dass die .gitignore-Datei im angegebenen Verzeichnis
+    /// die erforderlichen Ignore-Muster enthält. Die Datei wird nur geändert,
+    /// wenn das Verzeichnis ein Git-Repository ist (erkennbar am .git-Ordner).
+    /// Bereits vorhandene Einträge werden nicht dupliziert.
+    /// </summary>
+    /// <param name="directoryPath">
+    /// Das Zielverzeichnis, in dem die .gitignore-Datei geprüft bzw. erstellt wird.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// Wird ausgelöst, wenn der Pfad null oder leer ist.
+    /// </exception>
+    protected void EnsureGitignoreEntries(string directoryPath, params string[] requiredPatterns)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+            throw new ArgumentException("Directory path must not be empty.", nameof(directoryPath));
+
+        // Prüfen, ob es ein Git-Repository ist
+        var gitFolder = Path.Combine(directoryPath, ".git");
+        if (!Directory.Exists(gitFolder))
+        {
+            // Kein Git-Repo → keine Änderungen vornehmen
+            return;
+        }
+
+        var gitignorePath = Path.Combine(directoryPath, ".gitignore");
+
+        var existingLines = File.Exists(gitignorePath)
+            ? File.ReadAllLines(gitignorePath).ToList()
+            : new List<string>();
+
+        bool changed = false;
+
+        foreach (var pattern in requiredPatterns)
+        {
+            if (!existingLines.Any(line => line.Trim() == pattern))
+            {
+                existingLines.Add(pattern);
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            File.WriteAllLines(gitignorePath, existingLines);
+        }
+    }
+    /// <summary>
+    /// Stellt sicher, dass die .gitignore-Datei im angegebenen Verzeichnis
+    /// die erforderlichen Ignore-Muster enthält. Die Datei wird nur geändert,
+    /// wenn das Verzeichnis ein Git-Repository ist (erkennbar am .git-Ordner).
+    /// Bereits vorhandene Einträge werden nicht dupliziert.
+    /// </summary>
+    /// <param name="directoryPath">
+    /// Das Zielverzeichnis, in dem die .gitignore-Datei geprüft bzw. erstellt wird.
+    /// </param>
+    protected void EnsureGitignoreEntries(string directoryPath)
+    {
+        EnsureGitignoreEntries(directoryPath, BuildTaskFileMask(), BuildContextFileMask());
+    }
 
     public abstract string PluginName { get; }
     public abstract string PluginPrefix { get; }

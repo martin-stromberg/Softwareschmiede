@@ -140,6 +140,8 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Starte KI-Entwicklung mit Agent {AgentName} in {RepoPath}.", agent.Name, localRepoPath);
 
+        EnsureGitignoreEntries(localRepoPath);
+
         var promptFile = BuildTaskFilePath(localRepoPath, Guid.NewGuid());
         await File.WriteAllTextAsync(promptFile, prompt, ct);
 
