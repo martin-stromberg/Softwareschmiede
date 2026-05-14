@@ -44,7 +44,7 @@ Beim Vorbereiten der Arbeitskopie nutzt das System eine feste Reihenfolge:
 2. **Quelle ist kein Git-Repository + „git init im Quellverzeichnis bestätigen“ = Ja**  
    → Die Quelle wird initialisiert, danach wird geklont.
 3. **Quelle ist kein Git-Repository + Bestätigung = Nein**  
-   → Die Dateien werden als sichere Kopie übernommen (Copy-Fallback) und das Arbeitsverzeichnis wird für lokale Commits vorbereitet.
+   → Die Dateien werden als sichere Kopie übernommen, im Arbeitsverzeichnis wird `git init` ausgeführt und ein initialer Snapshot-Commit angelegt.
 
 Damit bleibt der Modus `SeparateWorkingDirectory` auch bei gemischten Ausgangslagen nutzbar.
 
@@ -66,6 +66,9 @@ Damit bleibt der Modus `SeparateWorkingDirectory` auch bei gemischten Ausgangsla
   - **Pull** aktualisiert die Arbeitskopie aus der Quelle als Dateisynchronisation (**ohne Merge**).
   - **Push** überträgt Änderungen aus der Arbeitskopie zurück in die Quelle als Dateisynchronisation (**kein Remote-`git push`**).
   - **Delete-Sync** spiegelt Löschungen/Umbenennungen aus dem Workspace über Git-Status (`git status --porcelain`) in den Quellordner.
+  - Die Aktionsleiste nutzt Plugin-Capabilities: **Push/Pull/Pull Request werden ausgeblendet, stattdessen wird „Merge“ eingeblendet**.
+  - Der Merge-Button übernimmt Änderungen aus der Arbeitskopie zurück in den Quellordner.
+  - Für alle Aktionen gilt: Das projektspezifisch verknüpfte Repository-Plugin hat Vorrang vor dem globalen Standardplugin.
 
 ---
 

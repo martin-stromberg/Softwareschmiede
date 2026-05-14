@@ -1,185 +1,116 @@
-# Anforderungsanalyse – Separates Arbeitsverzeichnis mit Git-Funktionalität
+# Anforderungsanalyse – Separates Arbeitsverzeichnis mit Copy & Git-Bootstrap
 
-> **Dokument-Typ:** Requirements Analysis  
-> **Status:** 📋 Geplant  
-> **Version:** 2.0.0  
+> **Dokument-Typ:** Requirements Analysis
+> **Status:** ✅ Implementiert
+> **Version:** 3.0.0
 > **Datum:** 2026-05-13
 
 ---
 
-## 1. Überblick und Projektkontext
+## 1. Überblick und Ziel
 
-Das aktuelle Verhalten für lokale Repositories ist inkonsistent:
-- Git-Funktionen funktionieren faktisch nur bei `Arbeitsverzeichnis == Quellverzeichnis`.
-- Im Modus `SeparateWorkingDirectory` fehlen zentrale Git-Funktionen häufig vollständig (insb. kein sinnvoller Pull/Commit-Flow, oft nur Copy-Fallback).
+Die bisherige Planung erlaubte im Modus `SeparateWorkingDirectory` eine konfigurierbare Git-Initialisierung.
+Die neue Anforderung stellt das Verhalten klar:
 
-**Geschäftsziel:** Der Modus `SeparateWorkingDirectory` muss für lokale Quellen vollständig arbeitsfähig sein, inkl. Git-basierter Änderungserkennung und nachvollziehbarer Pull-/Push-Semantik.
+- Das Quellverzeichnis bleibt unverändert.
+- Die Arbeitskopie wird per einfacher Dateikopie aus dem Quellverzeichnis erzeugt.
+- `git init` wird ausschließlich im separaten Arbeitsverzeichnis ausgeführt.
+- In den Einstellungen ist `git init` im separaten Modus nicht mehr konfigurierbar.
 
-**Stakeholder:**
-- Anwender:innen (verlässlicher Workflow in separatem Arbeitsverzeichnis)
-- Entwicklung/QA (implementierbare, testbare Regeln)
-- Support/Betrieb (klare Logs und Fehlerbilder)
-
-**Abgrenzung:**
-- Fokus auf lokale Quellen und Plugin-Verhalten im separaten Arbeitsverzeichnis.
-- Kein echter Remote-Push/Merge im Sinne eines Git-Server-Workflows.
+Ziel ist ein stabiler, nachvollziehbarer Start eines lokalen Repository-Workflows ohne Änderungen am Quellverzeichnis.
 
 ## 2. Funktionale Anforderungen
 
-| Kennung | Beschreibung | Kategorie | Priorität | Status |
-|---------|--------------|-----------|-----------|--------|
-| **FR-1** | **Git-Workflow im separaten Arbeitsverzeichnis:** Bei `WorkspaceMode=SeparateWorkingDirectory` werden Git-Funktionen im Arbeitsverzeichnis bereitgestellt; nach initialer Vorbereitung sind lokale Commits im Arbeitsverzeichnis möglich und nachvollziehbar. → [Architektur-Blueprint](../architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) · [ERM](../architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md) · [Architecture-Review](../improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | Kern-Feature | MUST HAVE | 📋 Geplant |
-| **FR-1.1** | **Repository-Initialisierung im Working Directory:** Ist im Arbeitsverzeichnis kein Git-Repository vorhanden, wird (abhängig von Settings/Policy) `git init` dort ausgeführt und ein definierter Initial-Commit ermöglicht. | Datenverwaltung | MUST HAVE | 📋 Geplant |
-| **FR-2** | **Pull-Semantik ohne Merge:** Ein Pull im separaten Arbeitsverzeichnis führt **keinen Merge** durch. Vor Ausführung wird ein verpflichtender Anwenderhinweis angezeigt: „Kein Merge – Stand wird gemäß definierter Synchronisationslogik aktualisiert“. → [Architektur-Blueprint](../architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) · [Architecture-Review](../improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | Kern-Feature | MUST HAVE | 📋 Geplant |
-| **FR-3** | **Push als Dateisynchronisation statt Git-Push:** Ein Push im separaten Arbeitsverzeichnis führt **keinen `git push`** aus, sondern kopiert Dateien vom Arbeitsverzeichnis ins Quellverzeichnis und überschreibt vorhandene Dateien vollständig. → [Architektur-Blueprint](../architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) · [ERM](../architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md) | Kern-Feature | MUST HAVE | 📋 Geplant |
-| **FR-3.1** | **Delete-Sync über Git-Änderungserkennung:** Gelöschte Dateien werden im Arbeitsverzeichnis über Git-Status erkannt und beim Push im Quellverzeichnis ebenfalls gelöscht; Ergebnis ist eine konsistente Spiegelung der Dateioperationen. | Datenverwaltung | MUST HAVE | 📋 Geplant |
-| **FR-4** | **Kompatibilitätsregel für Quellverzeichnis gleich Arbeitsverzeichnis:** Bestehendes Verhalten für `Arbeitsverzeichnis == Quellverzeichnis` bleibt funktionsfähig und wird nicht regressiv verschlechtert. → [Architecture-Review](../improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | Wartbarkeit | HIGH | 📋 Geplant |
-| **FR-5** | **Entscheidungs- und Ausführungsprotokollierung:** Für Pull/Push/Init/Commit werden gewählter Pfad, Warnhinweise und angewandte Sync-Aktionen strukturiert protokolliert. → [Architektur-Blueprint](../architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) | Reporting & Analyse | HIGH | 📋 Geplant |
+| Kennung | Beschreibung | Priorität |
+|---|---|---|
+| FR-1 | Beim Start einer Aufgabe im Modus `SeparateWorkingDirectory` wird das Quellverzeichnis nur gelesen und per Dateikopie in das Arbeitsverzeichnis übertragen. | MUST HAVE |
+| FR-1.1 | Die Kopie wird ohne Änderung des Quellverzeichnisses erzeugt; Git-Metadaten des Quellverzeichnisses werden nicht als Quelle der Initialisierung verwendet. | MUST HAVE |
+| FR-1.2 | `git init` wird ausschließlich im neu erzeugten Arbeitsverzeichnis ausgeführt. | MUST HAVE |
+| FR-1.3 | Im Modus `SeparateWorkingDirectory` ist `git init` keine konfigurierbare Benutzeroption. | MUST HAVE |
+| FR-2 | Die Arbeitskopie bleibt ein vollständiger lokaler Arbeitsstand, auf dem lokale Commits, Pull- und Push-Workflows weiter aufbauen können. | HIGH |
+| FR-3 | Pull im separaten Arbeitsverzeichnis führt keinen Merge aus und bleibt als expliziter Aktualisierungsfluss mit Hinweis erhalten. | HIGH |
+| FR-4 | Push im separaten Arbeitsverzeichnis spiegelt Änderungen als Dateisynchronisation in das Quellverzeichnis zurück; `git push` bleibt dabei ausgeschlossen. | HIGH |
+| FR-5 | Gelöschte Dateien werden über Git-Änderungserkennung im Arbeitsverzeichnis erkannt und im Quellverzeichnis ebenfalls gelöscht. | HIGH |
+| FR-6 | Der Modus `InSourceDirectory` behält die bisherige Git-Initialisierungslogik und Sicherheitsabfragen bei. | HIGH |
+| FR-7 | Alle relevanten Schritte werden strukturiert protokolliert. | HIGH |
 
 ## 3. Nicht-funktionale Anforderungen
 
-| Kennung | Beschreibung | Kategorie | Priorität | Status |
-|---------|--------------|-----------|-----------|--------|
-| **NFR-1** | **Deterministische Synchronisation:** Gleiche Eingaben (Dateistand, Settings, Befehl) erzeugen denselben Sync-Ausgangszustand; Abweichungsrate in Regressionstests = 0 %. → [Architektur-Blueprint](../architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) | Zuverlässigkeit | MUST HAVE | 📋 Geplant |
-| **NFR-2** | **Transparente UX-Hinweise:** Pull ohne Merge muss vor Ausführung immer mit einem klaren Hinweis erscheinen (100 % der Pull-Aktionen im Modus `SeparateWorkingDirectory`). → [Architecture-Review](../improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | UX / Accessibility | MUST HAVE | 📋 Geplant |
-| **NFR-3** | **Konsistenz bei Fehlern:** Bei Abbruch dürfen weder Quell- noch Arbeitsverzeichnis in einen teil-synchronisierten, undefinierten Zustand geraten; Fehlerpfade sind durch Integrationstests abgedeckt. → [ERM](../architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md) | Zuverlässigkeit | MUST HAVE | 📋 Geplant |
-| **NFR-4** | **Performanz für mittlere Repositories:** Push/Sync für bis zu 10.000 Dateien soll unter 60 Sekunden auf Standard-Entwicklungsumgebung abgeschlossen sein. | Performance | HIGH | 📋 Geplant |
-| **NFR-5** | **Wartbare Fehlerklassifikation:** Fehlerklassen für `Init`, `PullNoMerge`, `PushCopy`, `DeleteSync` sind technisch trennbar und maschinenlesbar protokolliert. | Wartbarkeit | HIGH | 📋 Geplant |
+| Kennung | Beschreibung | Priorität |
+|---|---|---|
+| NFR-1 | Das Quellverzeichnis darf durch die Vorbereitung der Aufgabe nicht mutiert werden. | MUST HAVE |
+| NFR-2 | Der Workflow muss deterministisch sein: gleiche Eingaben erzeugen denselben Vorbereitungszustand. | MUST HAVE |
+| NFR-3 | UI, Einstellungen und Fachlogik müssen die nicht konfigurierbare Git-Initialisierung im separaten Modus konsistent abbilden. | MUST HAVE |
+| NFR-4 | Fehlerzustände dürfen weder Quell- noch Arbeitsverzeichnis in einen undefinierten Teilzustand bringen. | MUST HAVE |
+| NFR-5 | Copy- und Bootstrap-Vorgänge müssen für mittlere lokale Repositories performant und nachvollziehbar bleiben. | HIGH |
 
 ## 4. Akzeptanzkriterien
 
-### User Story US-1 – Pull ohne Merge
-**Als** Anwender:in im separaten Arbeitsverzeichnis  
-**möchte ich** beim Pull klar informiert werden, dass kein Merge stattfindet,  
-**damit** ich die Konsequenzen verstehe.
+### US-1 – Arbeitskopie ohne Source-Mutation
+1. Der Start einer Aufgabe im separaten Modus kopiert das Quellverzeichnis in das Arbeitsverzeichnis.
+2. Das Quellverzeichnis bleibt unverändert.
+3. Das Arbeitsverzeichnis erhält anschließend ein eigenes Git-Repository via `git init`.
 
-**ACs:**
-1. Bei jedem Pull im Modus `SeparateWorkingDirectory` wird vor der Aktion ein Hinweistext angezeigt.
-2. Der Hinweis enthält explizit „kein Merge“ und die verwendete Aktualisierungslogik.
-3. Ohne bestätigten Hinweis startet der Pull nicht.
+### US-2 – Kein konfigurierbares `git init` im separaten Modus
+1. In den Einstellungen wird für `SeparateWorkingDirectory` keine `git init`-Option angeboten.
+2. Eine bestehende Konfiguration kann den Git-Init-Schritt im separaten Modus nicht aktivieren oder deaktivieren.
+3. Die UI zeigt den Git-Bootstrap als festes Systemverhalten, nicht als Benutzerentscheidung.
 
-### User Story US-2 – Push als Copy/Overwrite
-**Als** Anwender:in  
-**möchte ich** Änderungen aus dem Arbeitsverzeichnis ins Quellverzeichnis übertragen,  
-**damit** der Quellstand den Arbeitsstand vollständig widerspiegelt.
+### US-3 – Bestehende Folgeflüsse bleiben nutzbar
+1. Pull arbeitet ohne Merge.
+2. Push arbeitet als Dateisynchronisation.
+3. Delete-Sync bleibt über Git-Status im Arbeitsverzeichnis nachvollziehbar.
 
-**ACs:**
-1. Ein Push führt keinen `git push` gegen ein Remote aus.
-2. Alle geänderten/neu erstellten Dateien im Arbeitsverzeichnis werden ins Quellverzeichnis kopiert und dort überschrieben.
-3. Nach erfolgreichem Push sind Dateiinhalte für alle betroffenen Pfade in Quelle und Arbeitsverzeichnis identisch.
+## 5. Scope und Abgrenzung
 
-### User Story US-3 – Delete-Sync
-**Als** Anwender:in  
-**möchte ich** gelöschte Dateien korrekt synchronisieren,  
-**damit** Quelle und Arbeitsverzeichnis konsistent bleiben.
+### In Scope
+- Initiale Arbeitskopie per Dateikopie
+- Git-Initialisierung im Arbeitsverzeichnis
+- Unterdrückung der Git-Init-Konfiguration im separaten Modus
+- Weiterführung der bestehenden Pull-/Push-/Delete-Sync-Logik
 
-**ACs:**
-1. Gelöschte Dateien werden im Arbeitsverzeichnis über Git-Änderungserkennung identifiziert.
-2. Beim Push werden identifizierte Löschungen im Quellverzeichnis ebenfalls ausgeführt.
-3. Integrationstest: Löschung von mindestens 3 Dateien in unterschiedlichen Verzeichnisebenen wird korrekt gespiegelt.
+### Out of Scope
+- Remote-Git-Workflows
+- Branch-Merge-Strategien auf Hosting-Plattformen
+- Automatische Migration bestehender Quellen in Git-Repositorys
 
-### User Story US-4 – Git-Funktionalität trotz separatem Verzeichnis
-**Als** Anwender:in  
-**möchte ich** auch im separaten Arbeitsverzeichnis committen können,  
-**damit** ich meine Änderungen strukturiert versionieren kann.
-
-**ACs:**
-1. Falls kein Git-Repository vorhanden ist, wird ein initialisierbarer Pfad (`git init`) angeboten/ausgeführt.
-2. Danach ist mindestens ein lokaler Commit im Arbeitsverzeichnis möglich.
-3. Der Commit-Verlauf bleibt im Arbeitsverzeichnis verfügbar und wird durch Push nicht als Remote-Git-Push interpretiert.
-
-## 5. Annahmen und Abhängigkeiten
-
-| Typ | Eintrag | Auswirkung |
-|-----|---------|------------|
-| Annahme | Git-CLI ist auf dem Ausführungssystem verfügbar. | Ohne Git-CLI sind Delete-Sync und Commit-Flow nicht erfüllbar. |
-| Annahme | Schreib-/Löschrechte in Quell- und Arbeitsverzeichnis sind vorhanden. | Push/Overwrite/Delete-Sync kann sonst nicht vollständig ausgeführt werden. |
-| Abhängigkeit | `LocalDirectoryPlugin` kapselt Pull/Push/Init-Regeln. | Änderungen sind primär in Plugin- und Orchestrierungslogik umzusetzen. |
-| Abhängigkeit | Logging-/Telemetry-Infrastruktur unterstützt strukturierte Events. | Nachvollziehbarkeit und Support-Diagnose werden technisch sicherstellbar. |
-| Risiko | Fehlbedienung wegen „Push != git push“. | Muss durch verpflichtenden Hinweistext und klare Begriffe minimiert werden. |
-| Risiko | Falsche Delete-Erkennung bei untracked Dateien. | Regeln für tracked/untracked Dateien müssen explizit getestet werden. |
-
-## 6. Scope und Out-of-Scope
-
-### In-Scope ✅
-- Pull-/Push-Semantik für lokale Quellen im Modus `SeparateWorkingDirectory`.
-- Hinweislogik „Pull ohne Merge“.
-- Push als Copy/Overwrite ins Quellverzeichnis.
-- Delete-Sync auf Basis von Git-Änderungserkennung im Arbeitsverzeichnis.
-- Git-Initialisierung und lokale Commits im Arbeitsverzeichnis.
-
-### Out-of-Scope ❌
-- Remote-Repository-Management (`git push` zu Servern, PR-Erstellung).
-- Branch-/Merge-Strategien für Hosting-Plattformen.
-- Vollständiges Redesign der Benutzeroberfläche.
-- Änderung fachfremder Plugins außerhalb des lokalen Verzeichnis-Workflows.
-
-## 7. Domänenmodell und Glossar
+## 6. Domänenmodell (grob)
 
 ```mermaid
 flowchart LR
-    SRC[Quellverzeichnis] <-- Copy/Overwrite/DeleteSync --> WRK[Arbeitsverzeichnis]
-    WRK --> GST[Git-Status im Working Directory]
-    GST --> DEL[Delete-Sync-Entscheidung]
-    WRK --> PULL[Pull ohne Merge + Hinweis]
-    WRK --> PUSH[Push als Dateisynchronisation]
+    SRC[Quellverzeichnis] --> COPY[Source Copy]
+    COPY --> WRK[Arbeitsverzeichnis]
+    WRK --> INIT[git init im Working Directory]
+    WRK --> FLOW[Pull / Push / Delete-Sync]
+    SETTINGS[Einstellungen] -. keine Git-Init-Option .-> WRK
 ```
 
-**Glossar:**
-- **Quellverzeichnis:** Ursprungsverzeichnis der lokalen Codebasis.
-- **Arbeitsverzeichnis:** Separates, aufgabenbezogenes Verzeichnis für Bearbeitung.
-- **Pull ohne Merge:** Aktualisierungsvorgang im separaten Arbeitsverzeichnis ohne Git-Merge-Operation.
-- **Push als Dateisynchronisation:** Übertragung vom Arbeits- ins Quellverzeichnis per Dateikopie/Überschreiben, nicht per `git push`.
-- **Delete-Sync:** Spiegelung von Löschoperationen aus dem Arbeits- ins Quellverzeichnis anhand Git-Änderungserkennung.
+## 7. Annahmen und Abhängigkeiten
 
-## 8. Nutzungsfälle (Use Cases)
+- Das Quellverzeichnis ist lesbar.
+- Das Arbeitsverzeichnis kann neu angelegt oder geleert werden.
+- Git ist auf dem System verfügbar.
+- Der separate Modus bleibt lokal und ohne Remote-Pflichten.
 
-### UC-1: Pull im separaten Arbeitsverzeichnis
-- **Akteur:** Anwender:in
-- **Vorbedingungen:** `WorkspaceMode=SeparateWorkingDirectory`
-- **Hauptablauf:**
-  1. Anwender startet Pull.
-  2. System zeigt verpflichtenden Hinweis „kein Merge“.
-  3. Nach Bestätigung wird Aktualisierungslogik ohne Merge ausgeführt.
-- **Ergebnis:** Arbeitsverzeichnis ist aktualisiert, Merge wurde nicht ausgeführt, Aktion ist geloggt.
+## 8. Offene Punkte
 
-### UC-2: Push als Copy/Overwrite
-- **Akteur:** Anwender:in
-- **Vorbedingungen:** Änderungen im Arbeitsverzeichnis vorhanden
-- **Hauptablauf:**
-  1. Anwender startet Push.
-  2. System sammelt geänderte/neu erstellte Dateien + gelöschte Dateien.
-  3. System kopiert geänderte Dateien ins Quellverzeichnis und überschreibt bestehende.
-  4. System löscht im Quellverzeichnis alle per Delete-Sync erkannten Dateien.
-- **Ergebnis:** Quellverzeichnis entspricht dem gewollten Arbeitsstand.
+1. Soll die Dateikopie Git-Metadaten wie `.git` ausdrücklich ausschließen?
+   **Empfehlung:** Ja, damit `git init` im Arbeitsverzeichnis eindeutig wirkt.
+2. Wie wird mit nicht leeren Zielverzeichnissen umgegangen?
+   **Empfehlung:** Fail-Fast mit klarer Fehlermeldung.
+3. Welche Pfade werden im Copy-Schritt explizit ausgeschlossen?
+   **Empfehlung:** `.git`, Lock-Dateien und temporäre Artefakte.
 
-### UC-3: Initiale Git-Befähigung im Arbeitsverzeichnis
-- **Akteur:** Anwender:in / System
-- **Vorbedingungen:** Arbeitsverzeichnis enthält noch kein `.git`
-- **Hauptablauf:**
-  1. System prüft Git-Status.
-  2. System führt `git init` gemäß Policy aus.
-  3. Anwender kann lokale Commits im Arbeitsverzeichnis erstellen.
-- **Ergebnis:** Git-basierter lokaler Arbeitsfluss ist verfügbar.
+## 9. Verlinkung
 
-## 9. Nächste Schritte
+- Architektur-Blueprint: [../architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md](../architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md)
+- ERM: [../architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md](../architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md)
+- Architecture-Review: [../improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md](../improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md)
 
-1. Technische Feinspezifikation der Pull-/Push-Semantik im `LocalDirectoryPlugin`.
-2. Implementierung der verpflichtenden Pull-Hinweislogik.
-3. Implementierung von Push-Copy/Overwrite inkl. Delete-Sync-Regeln (tracked/untracked).
-4. Testpaket: Unit-, Integrations- und Regressionsfälle gemäß Akzeptanzkriterien.
-5. Architektur-/Review-Dokumente auf Version 2.0.0 synchronisieren.
-
-## 10. Approval & Versionierung
-
-### Freigabe
-- **Product Owner:** Zur fachlichen Freigabe vor Implementierungsstart
-- **Engineering Lead:** Zur technischen Freigabe vor Merge
-- **QA Lead:** Zur Freigabe der Abnahmetests vor Release
-
-### Versionierung
+## 10. Versionierung
 
 | Version | Datum | Autor | Änderung |
-|---------|-------|-------|----------|
-| 1.0.0 | 2026-05-13 | Planning-Agent | Erstfassung mit Init/Clone/Copy-Fallback |
-| 2.0.0 | 2026-05-13 | Planning-Requirements-Analysis Agent | Überarbeitung auf separaten Git-Workflow inkl. Pull-ohne-Merge, Push-Copy-Semantik und Delete-Sync |
+|---|---|---|---|
+| 2.0.0 | 2026-05-13 | Planning-Agent | Vorherige Variante mit optionalem Git-Init-Fallback |
+| 3.0.0 | 2026-05-13 | Planning-Orchestrator | Source bleibt unberührt, `git init` nur im Working Directory, Git-Init-Konfiguration im separaten Modus entfernt |
+| 3.1.0 | 2026-05-13 | Implementation-Orchestrator | Source-Copy-Bootstrap umgesetzt und Settings-Hiding für `ConfirmGitInitInSourceDirectory` ergänzt |

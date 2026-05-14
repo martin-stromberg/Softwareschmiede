@@ -29,6 +29,16 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin
     public abstract Task<bool> CheckHealthAsync(CancellationToken ct = default);
     public abstract Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default);
     public abstract Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default);
+    public virtual Task<GitActionCapabilities> GetGitActionCapabilitiesAsync(string? localPath = null, CancellationToken ct = default)
+        => Task.FromResult(new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false));
+    public virtual Task MergeToSourceAsync(string localPath, CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(MergeToSourceAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 
     /// <inheritdoc/>
     public virtual async Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default)

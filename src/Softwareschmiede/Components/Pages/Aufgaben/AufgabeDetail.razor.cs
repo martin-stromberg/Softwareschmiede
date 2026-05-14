@@ -68,6 +68,14 @@ public partial class AufgabeDetail : IDisposable
     private string? _prBody;
     private string? _fehler;
     private string? _erfolg;
+    private GitActionCapabilities _gitActionCapabilities = new(
+        RepositoryKind.Unknown,
+        IsWorkingDirectoryCopy: false,
+        CanPush: true,
+        CanPull: true,
+        CanCreatePullRequest: true,
+        CanMergeToSource: false);
+    private (bool ShowPushPullToggle, bool ShowPush, bool ShowPull, bool ShowPullRequest, bool ShowMerge) _gitActionVisibility;
 
     // TODO: Liste kann bei Bedarf aus der Plugin-Konfiguration dynamisch befüllt werden
     private static readonly IReadOnlyList<(string Value, string Label)> _verfuegbareModelle =
@@ -118,6 +126,7 @@ public partial class AufgabeDetail : IDisposable
         if (_aufgabe is not null)
         {
             _protokoll = (await ProtokollService.GetByAufgabeAsync(Id)).ToList();
+            await LadeGitActionCapabilitiesAsync();
             _prTitel = _aufgabe.Titel;
             // Agenten laden wenn Paket gesetzt
             if (!string.IsNullOrEmpty(_aufgabe.AgentenpaketName))
@@ -163,6 +172,7 @@ public partial class AufgabeDetail : IDisposable
             if (_aufgabe is not null)
             {
                 _protokoll = (await protokollService.GetByAufgabeAsync(Id)).ToList();
+                await LadeGitActionCapabilitiesAsync();
                 _prTitel = _aufgabe.Titel;
                 // Agenten laden wenn Paket gesetzt
                 if (!string.IsNullOrEmpty(_aufgabe.AgentenpaketName))
@@ -450,6 +460,72 @@ public partial class AufgabeDetail : IDisposable
         _selectedKiPluginPrefix = resolved.PluginPrefix;
     }
 
+    private async Task LadeGitActionCapabilitiesAsync()
+    {
+        if (_aufgabe is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var capabilities = await GitService.GetGitActionCapabilitiesAsync(Id, _cts.Token);
+            _gitActionCapabilities = capabilities ?? new GitActionCapabilities(
+                RepositoryKind.Unknown,
+                IsWorkingDirectoryCopy: false,
+                CanPush: true,
+                CanPull: true,
+                CanCreatePullRequest: true,
+                CanMergeToSource: false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GitActionCapabilities konnten nicht geladen werden. Fallback auf Standard-Sichtbarkeit.");
+            _gitActionCapabilities = new GitActionCapabilities(
+                RepositoryKind.Unknown,
+                IsWorkingDirectoryCopy: false,
+                CanPush: true,
+                CanPull: true,
+                CanCreatePullRequest: true,
+                CanMergeToSource: false);
+        }
+
+        _gitActionVisibility = EvaluateGitActionVisibility(_gitActionCapabilities);
+
+        if (!_gitActionVisibility.ShowPushPullToggle)
+        {
+            _showPushPullButtons = false;
+        }
+
+        if (!_gitActionVisibility.ShowPullRequest)
+        {
+            _showPullRequestForm = false;
+        }
+    }
+
+    private static (bool ShowPushPullToggle, bool ShowPush, bool ShowPull, bool ShowPullRequest, bool ShowMerge) EvaluateGitActionVisibility(GitActionCapabilities capabilities)
+    {
+        var isLocalCopy = capabilities.RepositoryKind == RepositoryKind.LocalDirectory && capabilities.IsWorkingDirectoryCopy;
+        if (isLocalCopy)
+        {
+            return (
+                ShowPushPullToggle: false,
+                ShowPush: false,
+                ShowPull: false,
+                ShowPullRequest: false,
+                ShowMerge: capabilities.CanMergeToSource);
+        }
+
+        var showPush = capabilities.CanPush;
+        var showPull = capabilities.CanPull;
+        return (
+            ShowPushPullToggle: showPush || showPull,
+            ShowPush: showPush,
+            ShowPull: showPull,
+            ShowPullRequest: capabilities.CanCreatePullRequest,
+            ShowMerge: capabilities.CanMergeToSource);
+    }
+
     private async Task CommitAsync()
     {
         if (string.IsNullOrWhiteSpace(_commitMessage)) { _fehler = "Commit-Nachricht ist Pflichtfeld."; return; }
@@ -486,6 +562,19 @@ public partial class AufgabeDetail : IDisposable
         {
             await GitService.PullAsync(Id, _cts.Token);
             _erfolg = "Pull erfolgreich.";
+            await LadeAsync();
+        }
+        catch (Exception ex) { _fehler = ex.Message; }
+        finally { _processing = false; }
+    }
+
+    private async Task MergeToSourceAsync()
+    {
+        _processing = true;
+        try
+        {
+            await GitService.MergeToSourceAsync(Id, _cts.Token);
+            _erfolg = "Merge ins Quellverzeichnis erfolgreich.";
             await LadeAsync();
         }
         catch (Exception ex) { _fehler = ex.Message; }

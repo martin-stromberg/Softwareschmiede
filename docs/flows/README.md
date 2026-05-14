@@ -17,7 +17,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
-| [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. git-init-Fallback, Kopier-Guardrails, Dateisynchronisation und Workspace-Mapping |
+| [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 
@@ -140,7 +140,7 @@ Dokumentiert den vollständigen Datei-/Verzeichnis-Flow für Agentenpakete inklu
 ### [Ablauf 12: LocalDirectoryPlugin – WorkspaceMode, Kopierpfad und Guardrails](./local-directory-plugin-flow.md)
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `LocalDirectoryPlugin`, `EntwicklungsprozessService`, `GitOrchestrationService`, `ArbeitsverzeichnisResolver`
 
-Beschreibt den End-to-End-Integrationspfad des lokalen Verzeichnis-Plugins: Einstellungen → Prozessstart → `CloneRepositoryAsync`-Verzweigung nach `WorkspaceMode` (inkl. git-init-Fallback) → sichere Kopie mit Limits/Symlink-Schutz → Pointer-/Mapping-Auflösung für Folgeoperationen sowie Push/Pull als Datei-Sync.
+Beschreibt den End-to-End-Integrationspfad des lokalen Verzeichnis-Plugins: Einstellungen → Prozessstart → `CloneRepositoryAsync`-Verzweigung nach `WorkspaceMode` (inkl. Source-Copy-Bootstrap) → sichere Kopie mit Limits/Symlink-Schutz → Pointer-/Mapping-Auflösung für Folgeoperationen sowie Push/Pull als Datei-Sync.
 
 ---
 

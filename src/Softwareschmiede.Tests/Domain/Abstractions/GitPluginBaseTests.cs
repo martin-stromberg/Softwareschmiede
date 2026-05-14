@@ -172,6 +172,34 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git reset fehlgeschlagen*");
     }
 
+    /// <summary>Prüft die Default-Capabilities der Basisklasse für Remote-Git-Plugins.</summary>
+    [Fact]
+    public async Task GetGitActionCapabilitiesAsync_ShouldReturnRemoteDefaults_ByDefault()
+    {
+        var sut = new TestGitPlugin(new Mock<ICliRunner>().Object);
+
+        var capabilities = await sut.GetGitActionCapabilitiesAsync();
+
+        capabilities.RepositoryKind.Should().Be(RepositoryKind.RemoteGit);
+        capabilities.IsWorkingDirectoryCopy.Should().BeFalse();
+        capabilities.CanPush.Should().BeTrue();
+        capabilities.CanPull.Should().BeTrue();
+        capabilities.CanCreatePullRequest.Should().BeTrue();
+        capabilities.CanMergeToSource.Should().BeFalse();
+    }
+
+    /// <summary>Prüft, dass MergeToSource standardmäßig als nicht unterstützt markiert ist.</summary>
+    [Fact]
+    public async Task MergeToSourceAsync_ShouldThrowNotSupportedException_ByDefault()
+    {
+        var sut = new TestGitPlugin(new Mock<ICliRunner>().Object);
+
+        var act = () => sut.MergeToSourceAsync("/repo");
+
+        await act.Should().ThrowAsync<NotSupportedException>()
+            .WithMessage("*MergeToSourceAsync*");
+    }
+
     private sealed class TestGitPlugin(ICliRunner cliRunner) : GitPluginBase<TestGitPlugin>(cliRunner)
     {
         public override string PluginName => "Test";

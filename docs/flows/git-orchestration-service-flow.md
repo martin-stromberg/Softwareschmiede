@@ -3,9 +3,10 @@
 ## Titel & Kontext
 
 Dieser Ablauf dokumentiert die zentrale Git-Orchestrierung in `GitOrchestrationService`.
-Der Service kapselt die UI-nahen Git-Aktionen (Issues laden, Commit/Reset/Push/Pull, Pull Request erstellen) und ergänzt sie um fachliche Guards sowie Protokolleinträge.
+Der Service kapselt die UI-nahen Git-Aktionen (Issues laden, Commit/Reset/Push/Pull, Pull Request erstellen, Merge ins Quellverzeichnis) und ergänzt sie um fachliche Guards sowie Protokolleinträge.
 Für `LocalDirectoryPlugin` gelten dabei Fallback-Semantiken: Push als Datei-Synchronisation (`WorkingDirectory -> SourceDirectory`), Pull als No-Merge-Sync mit Hinweis und Delete-Sync über `git status --porcelain`.
 Ein besonderer Fokus liegt auf der Repository-Auflösung für Pull Requests (Aufgaben-Repository vs. Projekt-Repository).
+Zusätzlich liefert der Service Capability-Flags für die Aktionsmatrix in `AufgabeDetail` (`GetGitActionCapabilitiesAsync`).
 
 ---
 
@@ -95,10 +96,16 @@ flowchart TD
    - **Eingaben:** Aufgabe inkl. optionaler `GitRepository`-Verknüpfung
    - **Ausgaben/Seiteneffekte:** Eindeutige `repositoryId`; bei fehlender oder mehrdeutiger Projektzuordnung wird kontrolliert abgebrochen.
 
-6. **UI-Integration für Commit/Push/Pull/Reset/PR**
-   - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`CommitAsync`, `PushAsync`, `PullAsync`, `ResetAsync`, `PullRequestErstellenAsync`)
+6. **UI-Integration für Commit/Push/Pull/Reset/PR/Merge**
+   - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`LadeGitActionCapabilitiesAsync`, `EvaluateGitActionVisibility`, `CommitAsync`, `PushAsync`, `PullAsync`, `MergeToSourceAsync`, `ResetAsync`, `PullRequestErstellenAsync`)
    - **Eingaben:** Formulardaten in der Aufgabenansicht
-   - **Ausgaben/Seiteneffekte:** Erfolg-/Fehlermeldungen in der UI, anschließendes Reload via `LadeAsync`.
+   - **Ausgaben/Seiteneffekte:** Erfolg-/Fehlermeldungen in der UI, anschließendes Reload via `LadeAsync`; bei `LocalDirectory + IsWorkingDirectoryCopy` werden Push/Pull/PR ausgeblendet und Merge sichtbar.
+
+7. **Projektspezifische Plugin-Auflösung für Aufgabenaktionen**
+   - **Code:** `GitOrchestrationService.ResolveGitPluginAsync`, `ResolveSelectedPluginPrefixAsync`, `PluginSelectionService.ResolveSourceCodeManagementPluginAsync`
+   - **Eingaben:** `Aufgabe.GitRepository.PluginTyp`, aktive Projekt-Repositories, gespeichertes Standardplugin
+   - **Ausgaben/Seiteneffekte:** Das effektive `IGitPlugin` wird pro Aktion neu aufgelöst. Ohne Aufgaben-Repository wird bei genau einem aktiven Projekt-Repository dessen `PluginTyp` genutzt (inkl. LocalRepository/`LocalDirectoryPlugin`); bei Mehrdeutigkeit greift der definierte Standard-Fallback.
+   - **Tests:** `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs` und `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`.
 
 ---
 
@@ -139,6 +146,8 @@ flowchart TD
 - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs`
 - `src/Softwareschmiede/Components/Pages/Aufgaben/NeueAufgabe.razor.cs`
 - `src/Softwareschmiede/Domain/Interfaces/IGitPlugin.cs`
+- `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
+- `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
 
 > Verwandte Flows: [Entwicklungsprozess-Abläufe](./development-process-flow.md) · [ProjektService](./projekt-service-flow.md) · [KI-Ausführung im Hintergrund](./ki-ausfuehrungs-service-flow.md)
 
@@ -149,3 +158,4 @@ flowchart TD
 - Für `LocalDirectoryPlugin` sind Push/Pull bewusst lokale Datei-Synchronisationen; Remote-Operationen bleiben ausgeschlossen.
 - Pull im lokalen Workspace führt keinen Merge aus und bricht bei dirty Workspace kontrolliert ab.
 - Als Restpunkt ist ein UI-seitiger Pull-Bestätigungsdialog in `AufgabeDetail` dokumentiert, aber noch nicht automatisiert getestet.
+- Bei mehreren aktiven Projekt-Repositories ohne Aufgabenverknüpfung nutzt die Plugin-Auflösung bewusst den Standard-Fallback statt einer impliziten Auswahl.

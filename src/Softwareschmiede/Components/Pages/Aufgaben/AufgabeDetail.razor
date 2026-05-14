@@ -32,8 +32,18 @@ else
         @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
         {
             <button class="btn btn-success" @onclick="() => _showCommitForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">📝 Commit</button>
-            <button class="btn btn-secondary" @onclick="() => _showPushPullButtons = !_showPushPullButtons">🔄 Push/Pull</button>
-            <button class="btn btn-warning" @onclick="() => _showPullRequestForm = true">🔀 Pull Request</button>
+            @if (_gitActionVisibility.ShowPushPullToggle)
+            {
+                <button class="btn btn-secondary" @onclick="() => _showPushPullButtons = !_showPushPullButtons">🔄 Push/Pull</button>
+            }
+            @if (_gitActionVisibility.ShowPullRequest)
+            {
+                <button class="btn btn-warning" @onclick="() => _showPullRequestForm = true">🔀 Pull Request</button>
+            }
+            @if (_gitActionVisibility.ShowMerge)
+            {
+                <button class="btn btn-info" @onclick="MergeToSourceAsync" disabled="@_processing">🔀 Merge</button>
+            }
             <button class="btn btn-secondary" @onclick="() => _showResetForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">↩️ Reset</button>
         }
         @if (_aufgabe.Status == AufgabeStatus.InBearbeitung)
@@ -145,13 +155,19 @@ else
                 </div>
             }
 
-            @if (_showPushPullButtons)
+            @if (_showPushPullButtons && _gitActionVisibility.ShowPushPullToggle)
             {
                 <div class="card">
                     <div class="card-title">🔄 Push / Pull</div>
                     <div style="display:flex;gap:.5rem">
-                        <button class="btn btn-primary" @onclick="PushAsync" disabled="@_processing">⬆️ Push</button>
-                        <button class="btn btn-secondary" @onclick="PullAsync" disabled="@_processing">⬇️ Pull</button>
+                        @if (_gitActionVisibility.ShowPush)
+                        {
+                            <button class="btn btn-primary" @onclick="PushAsync" disabled="@_processing">⬆️ Push</button>
+                        }
+                        @if (_gitActionVisibility.ShowPull)
+                        {
+                            <button class="btn btn-secondary" @onclick="PullAsync" disabled="@_processing">⬇️ Pull</button>
+                        }
                     </div>
                 </div>
             }
@@ -179,7 +195,7 @@ else
                 </div>
             }
 
-            @if (_showPullRequestForm)
+            @if (_showPullRequestForm && _gitActionVisibility.ShowPullRequest)
             {
                 <div class="card">
                     <div class="card-title">🔀 Pull Request erstellen</div>

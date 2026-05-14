@@ -92,6 +92,8 @@ public interface IGitPlugin : IPlugin
     Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default);
     Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default);
     Task CheckoutRemoteBranchAsync(string localPath, string branchName, CancellationToken ct = default);
+    Task<GitActionCapabilities> GetGitActionCapabilitiesAsync(string? localPath = null, CancellationToken ct = default);
+    Task MergeToSourceAsync(string localPath, CancellationToken ct = default);
 }
 ```
 
@@ -120,8 +122,10 @@ Für die konkrete `IGitPlugin`-Implementierung `LocalDirectoryPlugin` gelten pro
 
 - **Unterstützt:** `CloneRepositoryAsync`, `CreateBranchAsync`, `CommitAsync`, `ResetAsync`, `CheckHealthAsync`, `PushBranchAsync` *(nur `SeparateWorkingDirectory`, als Push-Sync)*, `PullAsync` *(nur `SeparateWorkingDirectory`, als Pull-Sync ohne Merge)*
 - **Nicht unterstützt (`NotSupportedException`):** `GetIssuesAsync`, `CreatePullRequestAsync`, `GetRemoteBranchesAsync`, `GetDefaultBranchAsync`, `CheckoutRemoteBranchAsync`
+- **Capabilities für UI-Aktionsmatrix:** `GetGitActionCapabilitiesAsync` liefert `RepositoryKind.LocalDirectory` + Modus-Flags; bei `SeparateWorkingDirectory` wird `CanMergeToSource=true` für die sichtbare **Merge**-Aktion gesetzt.
+- **Merge statt Push/Pull/PR in Arbeitskopie:** `MergeToSourceAsync` übernimmt Änderungen `WorkingDirectory -> SourceDirectory`; die Aufgabenansicht blendet Push/Pull/PR für lokale Arbeitskopien aus.
 - **Konfigurations-/Guardrail-Details:** `WorkspaceMode`, `SourceDirectory`, `ConfirmGitInitInSourceDirectory`, `CopyTimeoutSeconds`, `CopyMaxFiles`, `CopyMaxMegabytes`
-- **Git-Workflow-Fallback:** `git-init`-Fallback (`init+clone`) sowie Copy-Fallback bei nicht initialisiertem Quellverzeichnis ohne Opt-in.
+- **Git-Bootstrap:** Im separaten Workspace wird die Quelle kopiert, im Working Directory `git init` ausgeführt und ein initialer Snapshot-Commit angelegt.
 
 Details: [local-directory-plugin.md](./local-directory-plugin.md)
 
@@ -406,6 +410,49 @@ Task<bool> CheckHealthAsync(CancellationToken ct = default);
 **Referenzimplementierung (GitHubPlugin):** Führt `gh auth status` aus und wertet den Exit-Code aus.
 
 **Fehlerverhalten:** Soll keine Exception werfen – Fehler werden als `false` zurückgegeben und intern geloggt.
+
+---
+
+### `GetGitActionCapabilitiesAsync`
+
+```csharp
+Task<GitActionCapabilities> GetGitActionCapabilitiesAsync(string? localPath = null, CancellationToken ct = default);
+```
+
+**Beschreibung:** Liefert capability-basierte Flags für die Aufgaben-Aktionsleiste (`Push`, `Pull`, `Pull Request`, `Merge`).
+
+**Rückgabewert (`GitActionCapabilities`):**
+
+```csharp
+public sealed record GitActionCapabilities(
+    RepositoryKind RepositoryKind,
+    bool IsWorkingDirectoryCopy,
+    bool CanPush,
+    bool CanPull,
+    bool CanCreatePullRequest,
+    bool CanMergeToSource);
+```
+
+**Wichtiger LocalDirectory-Fall (`SeparateWorkingDirectory`):**
+- `RepositoryKind = LocalDirectory`
+- `IsWorkingDirectoryCopy = true`
+- `CanMergeToSource = true`
+- Push/Pull/PR werden in der UI ausgeblendet; stattdessen wird **Merge** angeboten.
+
+---
+
+### `MergeToSourceAsync`
+
+```csharp
+Task MergeToSourceAsync(string localPath, CancellationToken ct = default);
+```
+
+**Beschreibung:** Übernimmt Änderungen aus dem lokalen Arbeitsverzeichnis in das Quellverzeichnis.
+
+**LocalDirectory-Semantik:**
+- Nur im `SeparateWorkingDirectory`-Modus unterstützt.
+- Führt Dateisynchronisation `WorkingDirectory -> SourceDirectory` aus.
+- Spiegelung von Löschungen/Umbenennungen via Git-Status (`git status --porcelain`).
 
 ---
 

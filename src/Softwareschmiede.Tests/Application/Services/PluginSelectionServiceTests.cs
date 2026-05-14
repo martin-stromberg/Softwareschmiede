@@ -94,6 +94,48 @@ public sealed class PluginSelectionServiceTests
         resolved.PluginPrefix.Should().Be("Softwareschmiede.Default");
     }
 
+    /// <summary>Verwendet explizit ausgewähltes SCM-Plugin mit höchster Priorität.</summary>
+    [Fact]
+    public async Task ResolveSourceCodeManagementPluginAsync_ShouldUseExplicitSelection_WhenProvided()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.SourceCodeManagement, "Softwareschmiede.StoredGit");
+
+        var explicitPlugin = CreateGitPlugin("Explicit Git", "Softwareschmiede.ExplicitGit");
+        var storedPlugin = CreateGitPlugin("Stored Git", "Softwareschmiede.StoredGit");
+        var pluginManager = CreatePluginManager([], [explicitPlugin, storedPlugin]);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolved = await sut.ResolveSourceCodeManagementPluginAsync("Softwareschmiede.ExplicitGit");
+
+        // Assert
+        resolved.PluginPrefix.Should().Be("Softwareschmiede.ExplicitGit");
+    }
+
+    /// <summary>Fällt für SCM auf gespeicherten Standard zurück, wenn keine explizite Auswahl vorliegt.</summary>
+    [Fact]
+    public async Task ResolveSourceCodeManagementPluginAsync_ShouldUseStoredDefault_WhenNoExplicitSelection()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await defaultSettings.SaveDefaultPluginPrefixAsync(PluginType.SourceCodeManagement, "Softwareschmiede.StoredGit");
+
+        var firstPlugin = CreateGitPlugin("First Git", "Softwareschmiede.FirstGit");
+        var storedPlugin = CreateGitPlugin("Stored Git", "Softwareschmiede.StoredGit");
+        var pluginManager = CreatePluginManager([], [firstPlugin, storedPlugin]);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolved = await sut.ResolveSourceCodeManagementPluginAsync(null);
+
+        // Assert
+        resolved.PluginPrefix.Should().Be("Softwareschmiede.StoredGit");
+    }
+
     private static Mock<IPluginManager> CreatePluginManager(
         IReadOnlyList<IKiPlugin> kiPlugins,
         IReadOnlyList<IGitPlugin>? gitPlugins = null)

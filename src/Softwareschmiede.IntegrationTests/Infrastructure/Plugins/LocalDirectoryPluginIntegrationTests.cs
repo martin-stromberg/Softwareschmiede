@@ -143,27 +143,26 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
 
         var credentials = new InMemoryCredentialStore();
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
-        credentials.SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "false");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
         await sut.CloneRepositoryAsync(sourcePath, targetPath);
 
         File.Exists(Path.Combine(targetPath, "copy-source.txt")).Should().BeTrue();
         Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
+        Directory.Exists(Path.Combine(sourcePath, ".git")).Should().BeFalse();
     }
 
     [Fact]
-    public async Task CloneRepositoryAsync_ShouldInitSourceAndClone_WhenSeparateModeSourceIsNotGitAndInitConfirmed()
+    public async Task CloneRepositoryAsync_ShouldCopySourceWithoutMutatingIt_WhenSeparateModeUsesCopyBootstrap()
     {
         var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
         var sourcePath = CreateTempDirectory();
         var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-init-clone-{Guid.NewGuid():N}");
         _tempPaths.Add(targetPath);
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "untracked.txt"), "content");
+        await InitializeRepositoryAsync(cliRunner, sourcePath);
 
         var credentials = new InMemoryCredentialStore();
         credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
-        credentials.SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
         var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
 
         await sut.CloneRepositoryAsync(sourcePath, targetPath);
@@ -223,6 +222,33 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
 
         (await File.ReadAllTextAsync(Path.Combine(targetPath, "readme.txt"))).Should().Be("source-new");
         File.Exists(Path.Combine(targetPath, "from-source.txt")).Should().BeTrue();
+    }
+
+    /// <summary>Prüft den direkten Merge vom Arbeitsverzeichnis zurück ins Quellverzeichnis.</summary>
+    [Fact]
+    public async Task MergeToSourceAsync_ShouldSynchronizeWorkspaceToSource_EndToEnd()
+    {
+        var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
+        var sourcePath = CreateTempDirectory();
+        var targetPath = Path.Combine(Path.GetTempPath(), $"local-plugin-merge-sync-{Guid.NewGuid():N}");
+        _tempPaths.Add(targetPath);
+        await InitializeRepositoryAsync(cliRunner, sourcePath);
+        await File.WriteAllTextAsync(Path.Combine(sourcePath, "remove-me.txt"), "remove");
+        await RunGitAsync(cliRunner, sourcePath, "add", ".");
+        await RunGitAsync(cliRunner, sourcePath, "commit", "-m", "add removable");
+
+        var credentials = new InMemoryCredentialStore();
+        credentials.SetCredential("LocalDirectoryPlugin.WorkspaceMode", "SeparateWorkingDirectory");
+        var sut = new LocalDirectoryPlugin(cliRunner, credentials, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(sourcePath, targetPath);
+        await File.WriteAllTextAsync(Path.Combine(targetPath, "readme.txt"), "merged-content");
+        File.Delete(Path.Combine(targetPath, "remove-me.txt"));
+
+        await sut.MergeToSourceAsync(targetPath);
+
+        (await File.ReadAllTextAsync(Path.Combine(sourcePath, "readme.txt"))).Should().Be("merged-content");
+        File.Exists(Path.Combine(sourcePath, "remove-me.txt")).Should().BeFalse();
     }
 
     [Fact]

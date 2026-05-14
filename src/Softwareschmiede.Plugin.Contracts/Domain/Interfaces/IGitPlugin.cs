@@ -1,3 +1,4 @@
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Interfaces;
@@ -83,4 +84,22 @@ public interface IGitPlugin : IPlugin
     /// <param name="branchName">Name des Remote-Branches (ohne "origin/"-Präfix).</param>
     /// <param name="ct">Cancellation Token.</param>
     Task CheckoutRemoteBranchAsync(string localPath, string branchName, CancellationToken ct = default);
+
+    /// <summary>Liefert die verfügbaren Git-Aktionen für die UI.</summary>
+    /// <param name="localPath">Optionaler lokaler Arbeitsverzeichnispfad der Aufgabe.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<GitActionCapabilities> GetGitActionCapabilitiesAsync(string? localPath = null, CancellationToken ct = default)
+        => Task.FromResult(new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false));
+
+    /// <summary>Übernimmt lokale Änderungen vom Arbeitsverzeichnis ins Quellverzeichnis.</summary>
+    /// <param name="localPath">Lokaler Pfad des Arbeitsverzeichnisses.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task MergeToSourceAsync(string localPath, CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(MergeToSourceAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 }

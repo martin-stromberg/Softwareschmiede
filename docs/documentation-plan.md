@@ -321,3 +321,149 @@
 ### Offene Punkte
 1. `LICENSE`-Datei im Repository fehlt weiterhin (Lizenztext derzeit nur im README referenziert).
 2. Optional: Dedizierte `CHANGELOG.md` ergänzen (aktuell Changelog-Abschnitt im README).
+
+---
+
+# Dokumentationsplan – Vollständige Orchestrierung (Aktueller Lauf) – 2026-05-13
+
+## Kontext
+- Ausführung gemäß Agentendefinition `documentation-orchestrator`.
+- Ziel: Prüfen, ob die vorhandene Dokumentation aktuell und vollständig ist, und festgestellte Abweichungen schließen.
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `docs/api/` existiert und deckt die technischen Contracts sowie den expliziten Status „keine öffentlichen HTTP-Endpunkte“ ab.
+- Keine fehlenden API-Seiten identifiziert.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `docs/flows/` existiert und enthält die zentralen Service- und Prozessabläufe.
+- Keine fehlenden Kernflows identifiziert.
+
+### Business-Dokumentation (`docs/business/`)
+- `docs/business/features.md` listet alle Features F001–F018.
+- Keine fehlenden fachlichen Feature-Seiten identifiziert.
+
+### README (`README.md`)
+- Inhaltlich weitgehend vollständig.
+- Auffälligkeit: veraltete Architektur-Bezeichnungen (`KiOrchestrationService`, `AgentPackageService`) und fehlender Link auf F018.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. README-Begriffe an die aktuelle Implementierung anpassen.
+2. F018 im Dokumentationsindex sichtbar verlinken.
+
+## Phase 3 – Ergebnis
+
+### Aktualisiert
+1. `README.md`
+2. `docs/documentation-plan.md`
+
+### Neu erstellt
+- Keine neuen Dokumentationsdateien erforderlich.
+
+### Offene Punkte
+- Keine offenen Dokumentationslücken im Scope dieses Laufs identifiziert.
+
+---
+
+# Dokumentationsplan – Lokales Verzeichnis + Arbeitskopie-Aktionsmatrix (Aktueller Lauf) – 2026-05-14
+
+## Kontext
+- Feature-Fokus: `LocalDirectory + SeparateWorkingDirectory` soll in der UI **Push/Pull/PR ausblenden** und **Merge einblenden**.
+- Technische Basis: Plugin liefert Capability-/Flag-Informationen (`GitActionCapabilities`) über den `IGitPlugin`-Contract.
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `plugin-interfaces.md` enthielt den erweiterten Contract (`GetGitActionCapabilitiesAsync`, `MergeToSourceAsync`) noch nicht vollständig.
+- `local-directory-plugin.md` beschrieb Push/Pull-Sync bereits, aber die Capability-gesteuerte Aktionsmatrix fehlte.
+- `http-endpoints.md` enthielt noch keinen expliziten Feature-Impact zu Capabilities/Flags.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `local-directory-plugin-flow.md` hatte noch keine eigene Sequenz für Capabilities -> UI-Sichtbarkeit.
+- `git-orchestration-service-flow.md` erwähnte die neue Capability-Abfrage und Merge-UI nur teilweise.
+
+### Business-Dokumentation (`docs/business/`)
+- `F017-lokales-verzeichnis-plugin.md` beschrieb Pull/Push-Sync, aber nicht die konkrete Button-Matrix in der Aufgabenansicht.
+
+### README (`README.md`)
+- Feature war technisch beschrieben, der explizite Hinweis auf die capability-gesteuerte Aktionsmatrix fehlte.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** API-Contract-Dokumentation um Capabilities/Flags und Merge-Methode erweitern.
+2. **Hoch:** Flow-Dokumentation um die UI-Sichtbarkeitslogik ergänzen.
+3. **Mittel:** Business- und README-Texte um die konkrete Aktionsmatrix ergänzen.
+4. **Mittel:** HTTP-Statusdokument um Nicht-HTTP-Charakter des Features ergänzen.
+
+## Phase 3 – Ergebnis
+
+### Aktualisiert
+1. `docs/api/README.md`
+2. `docs/api/plugin-interfaces.md`
+3. `docs/api/local-directory-plugin.md`
+4. `docs/api/http-endpoints.md`
+5. `docs/flows/local-directory-plugin-flow.md`
+6. `docs/flows/git-orchestration-service-flow.md`
+7. `docs/business/features/F017-lokales-verzeichnis-plugin.md`
+8. `README.md`
+9. `docs/documentation-plan.md`
+
+### Neu erstellt
+- Keine neuen Dokumentationsdateien erforderlich.
+
+### Validierung
+- Alle aktualisierten Dateien vorhanden und nicht leer.
+- Inhaltlicher Abgleich durchgeführt gegen:
+  - `IGitPlugin` Contract (`GetGitActionCapabilitiesAsync`, `MergeToSourceAsync`)
+  - `GitActionCapabilities` / `RepositoryKind`
+  - `LocalDirectoryPlugin.GetGitActionCapabilitiesAsync`
+  - `AufgabeDetail.EvaluateGitActionVisibility`
+
+### Offene Punkte
+- Keine kritischen Dokumentationslücken für den Feature-Fokus identifiziert.
+
+---
+
+# Dokumentationsplan – AufgabeDetail/GitOrchestrationService: projektspezifische IGitPlugin-Auswahl (Aktueller Lauf) – 2026-05-14
+
+## Kontext
+- Korrigierte/ergänzte Tests für `AufgabeDetail` und `GitOrchestrationService`.
+- Fokus: korrekte projektspezifische `IGitPlugin`-Auswahl inklusive LocalRepository-/`LocalDirectoryPlugin`-Fall.
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `docs/api/plugin-default-selection.md` beschreibt nun explizit die Auflösungskette für Aufgabenaktionen:
+  1. Aufgaben-Repository
+  2. einzelnes aktives Projekt-Repository
+  3. Standard-/Fallback-Plugin
+- LocalRepository-/`LocalDirectoryPlugin`-Semantik ist im Auswahlkontext konkretisiert.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `docs/flows/git-orchestration-service-flow.md` musste um die projektspezifische Plugin-Auflösung und den Mehrdeutigkeits-Fallback ergänzt werden.
+
+### Business-Dokumentation (`docs/business/`)
+- `docs/business/features/F017-lokales-verzeichnis-plugin.md` wurde um den Vorrang der projektspezifischen Plugin-Zuordnung vor dem globalen Standard ergänzt.
+
+### Testdokumentation (`docs/tests/`)
+- Für den konkreten Change-Fokus fehlte ein dedizierter Testplan mit Pflichtfällen für Service + UI.
+
+## Phase 2 – Umsetzung
+
+### Aktualisiert
+1. `docs/flows/git-orchestration-service-flow.md`
+2. `docs/business/features/F017-lokales-verzeichnis-plugin.md`
+3. `docs/tests/README.md`
+4. `docs/documentation-plan.md`
+
+### Neu erstellt
+1. `docs/tests/testplan-aufgabe-detail-project-selected-git-plugin.md`
+
+## Phase 3 – Ergebnis / Validierung
+- Existenz-/Nicht-Leerheitsprüfung der geänderten/neuen Dateien: durchgeführt.
+- Build/Test-Validierung:
+  - `dotnet build .\Softwareschmiede.slnx` erfolgreich
+  - `dotnet test .\Softwareschmiede.slnx --no-build` erfolgreich
+
+## Bekannte offene Punkte
+- Bei mehreren aktiven Projekt-Repositories ohne Aufgabenverknüpfung bleibt der Standard-Fallback bewusst aktiv; eine mögliche spätere UX-Verbesserung wäre eine explizite Auswahlaufforderung statt Fallback.

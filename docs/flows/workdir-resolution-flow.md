@@ -15,7 +15,7 @@ Der Prozess bildet daraus immer den angefragten Klonpfad:
 `<resolvedBase>/softwareschmiede/<aufgabeId>`
 
 Dieser Pfad wird anschließend an das aktive `IGitPlugin` übergeben (u. a. `LocalDirectoryPlugin`).  
-Im Modus `SeparateWorkingDirectory` entscheidet das Plugin danach zwischen `git clone`, git-init-Fallback (`git init` + `git clone`) oder Copy-Fallback.
+Im Modus `SeparateWorkingDirectory` wird die Quelle per Dateikopie ins Working Directory übertragen, dort `git init` ausgeführt und ein initialer Snapshot-Commit erstellt.
 
 ---
 
@@ -61,7 +61,7 @@ sequenceDiagram
 | 3 | Laufzeit-Auflösung beim Prozessstart | `ResolveAsync` prüft den gespeicherten Wert inkl. Schreibprobe |
 | 4 | Fallback bei Laufzeitproblemen | `ResolvedPath = Path.GetTempPath()`, `UsedFallback = true`, `ReasonCode` gesetzt |
 | 5 | Bildung des Klon-Zielpfads | `<ResolvedPath>/softwareschmiede/<aufgabeId>` |
-| 6 | Übergabe an SCM-Plugin | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)`; bei `LocalDirectoryPlugin` ggf. git-init-Fallback/Copy-Fallback im separaten Arbeitsverzeichnis |
+| 6 | Übergabe an SCM-Plugin | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonpfad)`; bei `LocalDirectoryPlugin` im separaten Arbeitsverzeichnis Source-Copy + `git init` + initialer Snapshot-Commit |
 
 ---
 

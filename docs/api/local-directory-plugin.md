@@ -17,7 +17,7 @@
 
 | IGitPlugin-Methode | Support | Verhalten |
 |---|---|---|
-| `CloneRepositoryAsync` | ✅ | Arbeitet je nach `WorkspaceMode` im Quellverzeichnis oder in einer kopierten Arbeitskopie. |
+| `CloneRepositoryAsync` | ✅ | Arbeitet je nach `WorkspaceMode` im Quellverzeichnis oder in einer kopierten Arbeitskopie. In `SeparateWorkingDirectory` wird die Quelle nur kopiert, im Working Directory `git init` ausgeführt und ein initialer Snapshot-Commit erzeugt. |
 | `CreateBranchAsync` | ✅ | Stellt Git-Repository sicher und delegiert auf Git-Basislogik. |
 | `CommitAsync` | ✅ | Stellt Git-Repository sicher und delegiert auf Git-Basislogik. |
 | `ResetAsync` | ✅ | Stellt Git-Repository sicher und delegiert auf Git-Basislogik. |
@@ -29,6 +29,21 @@
 | `GetRemoteBranchesAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
 | `GetDefaultBranchAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
 | `CheckoutRemoteBranchAsync` | ❌ | `NotSupportedException` (keine Remote-Provider-Funktionen). |
+| `GetGitActionCapabilitiesAsync` | ✅ | Liefert Flags für die Aufgaben-UI. Bei lokaler Arbeitskopie (`SeparateWorkingDirectory`) werden Push/Pull/PR ausgeblendet und `Merge` eingeblendet. |
+| `MergeToSourceAsync` | ✅ (nur `SeparateWorkingDirectory`) | Übernimmt Änderungen aus der Arbeitskopie in das Quellverzeichnis (`WorkingDirectory -> SourceDirectory`) inklusive Delete-Sync. |
+
+## Capability-Flags für die Aufgaben-Aktionsmatrix
+
+`LocalDirectoryPlugin.GetGitActionCapabilitiesAsync(...)` steuert die Sichtbarkeit der Git-Aktionen in `AufgabeDetail`.
+
+| Modus | RepositoryKind | IsWorkingDirectoryCopy | CanPush | CanPull | CanCreatePullRequest | CanMergeToSource | UI-Effekt |
+|---|---|---:|---:|---:|---:|---:|---|
+| `SeparateWorkingDirectory` | `LocalDirectory` | `true` | `false` | `false` | `false` | `true` | Push/Pull/PR ausblenden, **Merge** anzeigen |
+| `InSourceDirectory` | `LocalDirectory` | `false` | `true` | `true` | `true` | `false` | Kein lokaler Arbeitskopie-Fall; UI verwendet die gelieferten Flags unverändert |
+
+Die UI enthält zusätzlich eine Schutzregel:
+
+- Wenn `RepositoryKind = LocalDirectory` **und** `IsWorkingDirectoryCopy = true`, werden Push/Pull/PR unabhängig von einzelnen Flag-Werten versteckt und nur Merge angeboten.
 
 ## WorkspaceMode und Ablauf von `CloneRepositoryAsync`
 
@@ -44,13 +59,12 @@
 - Das Ziel muss:
   - ungleich Quelle sein,
   - leer sein (falls vorhanden).
-- Danach entscheidet das Plugin deterministisch (Git-Workflow-Fallback):
-  1. Quelle ist Git-Repository → `git clone source target`
-  2. Quelle ist kein Git-Repository + `ConfirmGitInitInSourceDirectory=true` → **git-init-Fallback**: `git init` in Quelle, danach `git clone`
-  3. Quelle ist kein Git-Repository + `ConfirmGitInitInSourceDirectory!=true` → Copy-Fallback (`CopyDirectoryWithGuardrails`), kein Clone
-- Bei Clone-Fehlern wird das Zielverzeichnis aufgeräumt.
+- Danach wird die Quelle per Dateikopie in das Working Directory übertragen.
+- `.git`, lokale Pointer-Dateien und Reparse-Points werden dabei nicht übernommen.
+- Anschließend wird im Working Directory `git init` ausgeführt, die lokale Commit-Identität gesetzt und ein initialer Snapshot-Commit erzeugt.
+- Bei Fehlern wird das Zielverzeichnis aufgeräumt.
 
-## Git-Workflow-Fallback im `SeparateWorkingDirectory`-Modus
+## Git-Bootstrap im `SeparateWorkingDirectory`-Modus
 
 ### Pull-Sync (`PullAsync`)
 
@@ -78,7 +92,7 @@
 |---|---|---|---|
 | `WorkspaceMode` | Enum | `SeparateWorkingDirectory` | Modusauswahl: exakt `InSourceDirectory` oder `SeparateWorkingDirectory` (case-sensitive Parsing). Ungültige Werte fallen auf `SeparateWorkingDirectory` zurück. |
 | `SourceDirectory` | String | – | Fallback-Quelle, wenn `repositoryUrl` beim Clone leer ist. |
-| `ConfirmGitInitInSourceDirectory` | Bool (`true`/`false`) | `false` | Erforderliche explizite Freigabe für `git init` im Quellverzeichnis, falls dort noch kein Git-Repository existiert. |
+| `ConfirmGitInitInSourceDirectory` | Bool (`true`/`false`) | `false` | Erforderliche explizite Freigabe für `git init` im Quellverzeichnis, falls dort noch kein Git-Repository existiert. In `SeparateWorkingDirectory` wird dieses Setting in der UI ausgeblendet. |
 | `CopyTimeoutSeconds` | Integer | `600` | Timeout der Verzeichniskopie. Werte `< 1` oder ungültig fallen auf Default zurück. |
 | `CopyMaxFiles` | Integer | `100000` | Maximale Dateianzahl je Kopiervorgang. Werte `< 1` oder ungültig fallen auf Default zurück. |
 | `CopyMaxMegabytes` | Integer | `10240` | Maximale Datenmenge (MB) je Kopiervorgang. Werte `< 1` oder ungültig fallen auf Default zurück. |
@@ -110,7 +124,7 @@
   - Bestätigungspflicht für `git init` in `InSourceDirectory`
   - Dirty-Workspace-Abbruch
   - Guardrails für `CopyMaxFiles` und `CopyMaxMegabytes`
-  - Strategiematrix für `SeparateWorkingDirectory` (`clone`, `init+clone`, `copy`)
+  - Strategiematrix für `SeparateWorkingDirectory` (`source-copy + init + initial commit`)
   - Push-Sync und Delete-Sync über `git status --porcelain`
   - Pull-Sync ohne Merge (nur bei sauberem Workspace)
   - Verzeichnisregeln (Quelle/Ziel verschieden, Ziel leer)
@@ -119,5 +133,5 @@
 - Integration: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
   - End-to-End für Clone/Branch/Commit/Reset
   - Verhalten in `InSourceDirectory` und `SeparateWorkingDirectory`
-  - Nicht-Git-Szenarien mit `git-init`-Opt-in und Copy-Fallback
+  - Nicht-Git-Szenarien mit Copy-Bootstrap im separaten Arbeitsverzeichnis
   - Pointer-Datei-Verhalten bei Plugin-Neuinstanz

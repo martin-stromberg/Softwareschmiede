@@ -80,7 +80,7 @@ sequenceDiagram
 | Fehlerfall | Verhalten |
 |-----------|-----------|
 | Aufgabe nicht gefunden (`GetByIdAsync` wirft Exception) | Abbruch; Exception propagiert an BlazorUI |
-| Workspace-Vorbereitung schlägt fehl (`git clone`, `git init` oder Copy-Fallback) | `IGitPlugin` wirft Exception; Zielverzeichnis verbleibt ggf. teilweise; Statuswechsel findet **nicht** statt |
+| Workspace-Vorbereitung schlägt fehl (`git init` oder Copy/Bootstrap) | `IGitPlugin` wirft Exception; Zielverzeichnis verbleibt ggf. teilweise; Statuswechsel findet **nicht** statt |
 | Konfigurierter Workdir-Pfad nicht nutzbar | Resolver nutzt Fallback (`Path.GetTempPath()`), schreibt ReasonCode in Logs; Prozess läuft mit Fallback weiter |
 | `git checkout -b` schlägt fehl (Branch existiert bereits) | `IGitPlugin` wirft Exception; Prozess wird nicht als gestartet markiert |
 | `DeployAgentPackageAsync` schlägt fehl | Exception propagiert; Aufgabe bleibt im Status `Offen` |

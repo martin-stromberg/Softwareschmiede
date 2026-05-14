@@ -50,13 +50,13 @@ sequenceDiagram
         Plugin->>Plugin: EnsureTargetIsSafeForCopy(target != source, target leer)
         Plugin->>Git: git rev-parse --is-inside-work-tree (source)
         alt source ist git-basiert
-            Plugin->>Git: git clone source target
+            Plugin->>Git: copy source -> target
             Plugin->>Git: git status --porcelain (target)
         else source ist nicht git-basiert
             Plugin->>Plugin: ConfirmGitInitInSourceDirectory == true?
-            alt bestätigt (git-init-Fallback)
+            alt Source-Copy-Bootstrap
                 Plugin->>Git: git init (source)
-                Plugin->>Git: git clone source target
+                Plugin->>Git: copy source -> target
                 Plugin->>Git: git status --porcelain (target)
             else nicht bestätigt
                 Plugin->>Plugin: CopyDirectoryWithGuardrails(source -> target)
@@ -87,7 +87,7 @@ flowchart TD
     H -- Ja --> N([Workspace bereit])
 
     F -- Nein --> I{ConfirmGitInitInSourceDirectory == true?}
-    I -- Ja --> J[git-init-Fallback:\ngit init source]
+    I -- Ja --> J[Source-Copy-Bootstrap:\ngit init target]
     J --> K[git clone source destination]
     K --> L[git status --porcelain leer?]
     L -- Nein --> L1[InvalidOperationException\nuncommitted changes]:::error
@@ -126,8 +126,7 @@ flowchart TD
 | Quellverzeichnis existiert nicht | `EnsureDirectoryExists` | `DirectoryNotFoundException` |
 | `InSourceDirectory` ohne `ConfirmGitInitInSourceDirectory=true` und ohne `.git` | `EnsureInitializedInSourceDirectoryAsync` | `InvalidOperationException` |
 | `SeparateWorkingDirectory`: Quelle ist Git-Repository | `CloneToWorkingDirectoryAsync` | `git clone` wird ausgeführt |
-| `SeparateWorkingDirectory`: Quelle ist kein Git + Init bestätigt | `EnsureInitializedInSourceDirectoryAsync` + `CloneToWorkingDirectoryAsync` | **git-init-Fallback:** `git init` in Quelle, danach `git clone` |
-| `SeparateWorkingDirectory`: Quelle ist kein Git + Init nicht bestätigt | `CopyDirectoryWithGuardrailsAsync` | Copy-Fallback ohne Clone |
+| `SeparateWorkingDirectory`: Source-Copy-Bootstrap | `CopyDirectoryWithGuardrailsAsync` + `EnsureInitializedInWorkingDirectoryAsync` + `CreateInitialWorkspaceCommitAsync` | Source bleibt unverändert, Working Directory erhält eigenes Git-Repository |
 | Dirty Workspace (`git status --porcelain` nicht leer) | `ValidateWorkspaceIsCleanAsync` | `InvalidOperationException` |
 | Copy-Guardrails verletzt (`CopyMaxFiles`, `CopyMaxMegabytes`, Timeout/Cancellation) | `CopyDirectoryWithGuardrailsAsync` | Abbruch + Aufräumen des Zielverzeichnisses |
 | `Push` im `SeparateWorkingDirectory` | `PushBranchAsync` | Dateisynchronisation `WorkingDirectory -> SourceDirectory` (Copy/Overwrite + Delete-Sync via `git status --porcelain`), **kein `git push`** |
@@ -159,6 +158,40 @@ sequenceDiagram
     Plugin->>Plugin: EnsureGitRepositoryAsync(...)
     Plugin-->>GitSvc: Operation ausgeführt / Exception
 ```
+
+---
+
+## Ablauf 4: Capability-Flags und Aktionssichtbarkeit in `AufgabeDetail`
+
+```mermaid
+sequenceDiagram
+    participant UI as AufgabeDetail
+    participant GitSvc as GitOrchestrationService
+    participant Plugin as IGitPlugin (LocalDirectoryPlugin)
+
+    UI->>GitSvc: GetGitActionCapabilitiesAsync(aufgabeId)
+    GitSvc->>Plugin: GetGitActionCapabilitiesAsync(localPath)
+    Plugin-->>GitSvc: GitActionCapabilities
+    GitSvc-->>UI: GitActionCapabilities
+    UI->>UI: EvaluateGitActionVisibility(capabilities)
+
+    alt RepositoryKind=LocalDirectory && IsWorkingDirectoryCopy=true
+        UI->>UI: Push/Pull/PR ausblenden
+        UI->>UI: Merge anzeigen
+    else anderer Fall
+        UI->>UI: Sichtbarkeit direkt aus Flags ableiten
+    end
+```
+
+Für den Modus `SeparateWorkingDirectory` liefert `LocalDirectoryPlugin` die Kombination:
+
+- `RepositoryKind = LocalDirectory`
+- `IsWorkingDirectoryCopy = true`
+- `CanPush = false`, `CanPull = false`, `CanCreatePullRequest = false`
+- `CanMergeToSource = true`
+
+Damit wird der gewünschte Workflow in der Aufgabenansicht erzwungen:
+**Push/Pull/PR ausblenden, Merge einblenden**.
 
 ---
 

@@ -1,80 +1,65 @@
-# Planungsübersicht – Separates Arbeitsverzeichnis mit Git-Workflow (v2.0.0)
+# Planungsübersicht – Separates Arbeitsverzeichnis mit Source-Copy und Git-Bootstrap (v3.0.0)
 
-> **Dokument-Typ:** Planungsoverview (planning-orchestrator)  
-> **Status:** ✅ Vollständiger Planungsdurchlauf abgeschlossen / konsolidiert  
-> **Version:** 2.0.0  
+> **Dokument-Typ:** Planungsoverview (planning-orchestrator)
+> **Status:** ✅ Vollständiger Planungsdurchlauf abgeschlossen / konsolidiert
+> **Version:** 3.0.0
 > **Datum:** 2026-05-13
 
 ---
 
 ## 1. Durchlaufstatus
 
-Der sequenzielle Planungsablauf wurde vollständig abgeschlossen:
+Der sequenzielle Planungsablauf wurde abgeschlossen:
+
 1. Requirements Analysis
 2. Architecture Blueprint
 3. Entity-Relationship Modeling
 4. Architecture Review
-5. Orchestrator-Konsolidierung (dieses Dokument)
+5. Orchestrator-Konsolidierung
 
-## 2. Kernartefakte (konsolidiert auf v2.0.0)
+## 2. Kernartefakte
 
 | Bereich | Datei | Stand |
 |---|---|---|
-| Anforderungen | [requirements/separates-arbeitsverzeichnis-git-init-fallback-requirements-analysis.md](requirements/separates-arbeitsverzeichnis-git-init-fallback-requirements-analysis.md) | v2.0.0 |
-| Architektur | [architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md](architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) | v2.0.0 |
-| ERM | [architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md](architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md) | v2.0.0 |
-| Review | [improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md](improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | v2.0.0 |
+| Anforderungen | [requirements/separates-arbeitsverzeichnis-git-init-fallback-requirements-analysis.md](requirements/separates-arbeitsverzeichnis-git-init-fallback-requirements-analysis.md) | v3.0.0 |
+| Architektur | [architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md](architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) | v3.0.0 |
+| ERM | [architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md](architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md) | v3.0.0 |
+| Review | [improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md](improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | v3.0.0 |
 
-## 3. Konsolidierte Entscheidungen (2.0.0)
+## 3. Konsolidierte Entscheidungen
 
-1. **Pull ohne Merge:**  
-   Im Modus `SeparateWorkingDirectory` ist Pull ein eigener No-Merge-Flow mit verpflichtender Bestätigung.
-2. **Push als Dateisynchronisation:**  
-   Push führt **kein `git push`** aus, sondern `WorkingDirectory -> SourceDirectory` als Copy/Overwrite-Sync.
-3. **Delete-Sync via Git-Änderungserkennung:**  
-   Löschungen werden über Git-Status im Working Directory ermittelt und im Source Directory gespiegelt.
-4. **Git im separaten Working Directory:**  
-   Fehlt `.git`, wird abhängig von Policy `git init` im Working Directory ausgeführt; lokaler Commit-Flow wird ermöglicht.
-5. **Legacy-Schutz:**  
-   Bei `WorkingDirectory == SourceDirectory` bleibt der Legacy-Workflow unverändert (regressionsfrei).
+1. **Source bleibt unberührt**
+   Das Quellverzeichnis wird nicht initialisiert und nicht fachlich verändert.
+2. **Copy vor Git-Bootstrap**
+   Die Arbeitskopie wird per Dateikopie erzeugt; danach folgt `git init` im Arbeitsverzeichnis.
+3. **Keine Git-Init-Option im separaten Modus**
+   Die Einstellung ist dort nicht benutzbar, sondern ein festes Systemverhalten.
+4. **Legacy-Modus bleibt getrennt**
+   `InSourceDirectory` wird weiterhin separat behandelt.
 
-## 4. Konsolidierte Risiken aus dem Review
+## 4. Risiken aus dem Review
 
-### Blocker (vor Implementierungsfreigabe zu schließen)
-1. Fehlender atomarer/fail-safe Konsistenzvertrag für Push (Copy + Delete) bei Teilfehlern.
-2. Unklarer Sync-Scope (`.git`, Symlinks, Hidden Files, Rechte, Locks) und fehlende Guardrails.
-3. Unvollständige Delete-Sync-Regeln für Git-Statusvarianten (u. a. rename/typechange/staged vs. unstaged).
+### Blocker
+1. Copy-Scope muss verbindlich begrenzt werden.
+2. Zielverzeichniszustand vor Copy/Init muss fail-fast geprüft werden.
+3. Git-Init darf in keiner separaten UI-Ansicht konfigurierbar bleiben.
 
 ### Major
-4. Nicht spezifiziertes Parallelitäts-/Race-Verhalten bei konkurrierenden Push/Pull.
-5. Pull-ohne-Merge fachlich definiert, technisch noch unpräzise (Quelle/Konfliktbehandlung).
-6. Legacy-Regressionsziel ohne vollständige Kompatibilitätsmatrix.
+4. Verhalten bei bereits existierendem Git-Repository im Source-Baum muss eindeutig definiert sein.
+5. Fehlerklassen für Copy und Bootstrap müssen normiert werden.
 
-### Minor
-7. Telemetrie ohne verbindliche KPI-/SLO-Schwellen.
-8. `git init`-/Initial-Commit-Policy (Autor/Commit-Message/Audit) noch nicht final.
+## 5. Umsetzbare Reihenfolge
 
-## 5. Umsetzbare Reihenfolge (aus Review + Blueprint)
-
-### P0 – vor Implementierungsstart
-1. Push-Konsistenzmodell verbindlich festlegen (atomar oder expliziter fail-safe Zustand).
-2. Sync-Scope-/Security-Regeln als Normtabelle spezifizieren.
-3. Delete-Sync-Status-Mapping inkl. Testorakel finalisieren.
-
-### P1 – während Implementierung
-4. Locking-Strategie für konkurrierende Operationen definieren und umsetzen.
-5. Pull-No-Merge technisch präzisieren (Datenquelle, Divergenzen, Fehlercodes).
-6. Legacy-Kompatibilitätsmatrix aufbauen und in Regressionstests überführen.
-
-### P2 – vor Release
-7. KPI/SLO und Alerting-Grenzen für Observability finalisieren.
-8. Auditierbare `git init`-/Commit-Metadaten standardisieren und testen.
+1. Copy-/Exclude-Regeln festziehen.
+2. Zielverzeichnis-Guardrails spezifizieren.
+3. UI-Settings-Projection für das separate Arbeitsverzeichnis konsolidieren.
+4. Danach Implementierung und Tests auf Basis der Blueprint-/ERM-Vorgaben starten.
 
 ## 6. Freigabeempfehlung
 
-- **Planungsstand 2.0.0 ist konsistent**, aber **noch nicht implementierungsreif ohne P0-Abschluss**.  
-- Nach Abschluss der P0-Punkte kann Umsetzung mit den in Blueprint/ERM definierten Services und Invarianten starten.
+- **Planungsstand 3.0.0 ist konsistent.**
+- Implementierungsfreigabe erst nach Klärung der Blocker aus dem Review.
 
 ---
 
-*Konsolidiert durch planning-orchestrator (sequenziell: planning-requirements-analysis → planning-architecture-blueprint → planning-entity-relationship-modeler → review-architecture).*
+*Konsolidiert durch planning-orchestrator (Requirements → Architecture → ERM → Review).*

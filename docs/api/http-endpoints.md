@@ -49,6 +49,15 @@ Die Integration von `ClaudeCliPlugin` erweitert den internen `IKiPlugin`-Betrieb
 - Request/Response: nicht anwendbar
 - `curl`-Beispiel: nicht anwendbar
 
+## Feature-Impact: LocalDirectory-Arbeitskopie Aktionsmatrix (Capabilities/Flags)
+
+Die Aktionsmatrix in `AufgabeDetail` (Push/Pull/PR ausblenden, Merge einblenden) wird über den internen Plugin-Contract `IGitPlugin.GetGitActionCapabilitiesAsync` gesteuert und ist **kein HTTP-Contract**.
+
+- HTTP-Methode & Pfad: nicht anwendbar
+- Authentifizierung: nicht anwendbar
+- Request/Response: nicht anwendbar
+- `curl`-Beispiel: nicht anwendbar
+
 ## Verknüpfte Dokumentation
 
 - Business: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)

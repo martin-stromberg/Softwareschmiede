@@ -28,11 +28,26 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
         _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
+        _gitPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Mock Git");
+        _gitPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Mock.Git");
+        _gitPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.SourceCodeManagement);
+        _gitPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
+        pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginSelectionService = new PluginSelectionService(
+            pluginManagerMock.Object,
+            pluginDefaultSettings,
+            new Mock<ILogger<PluginSelectionService>>().Object);
         _sut = new GitOrchestrationService(
             _aufgabeService,
             _projektService,
             _protokollService,
             _gitPluginMock.Object,
+            pluginSelectionService,
             new Mock<ILogger<GitOrchestrationService>>().Object);
 
         _db.Projekte.Add(new Projekt
@@ -87,6 +102,36 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CommitAsync(@"C:\repos\task-1", "feat: add tests", It.IsAny<CancellationToken>()), Times.Once);
         var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Commit: feat: add tests"));
+    }
+
+    [Fact]
+    public async Task CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType()
+    {
+        var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
+        var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
+        var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
+
+        var projekt = await _projektService.CreateAsync("Projekt mit explizitem Plugin", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            @"C:\repos\source",
+            "source");
+        var repositoryEntity = await _db.GitRepositories.FindAsync(repository.Id);
+        repositoryEntity!.PluginTyp = "  localdirectoryplugin  ";
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit mit Pluginauswahl", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/selection", @"C:\repos\task-selection");
+
+        await sut.CommitAsync(aufgabe.Id, "feat: selected plugin");
+
+        selectedPluginMock.Verify(
+            plugin => plugin.CommitAsync(@"C:\repos\task-selection", "feat: selected plugin", It.IsAny<CancellationToken>()),
+            Times.Once);
+        defaultPluginMock.Verify(
+            plugin => plugin.CommitAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     /// <summary>ResetAsync protokolliert HEAD als Ziel, wenn keine Target-Ref angegeben wird.</summary>
@@ -152,6 +197,177 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Änderungen vom Remote geholt"));
         protokoll.Should().NotContain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
+    }
+
+    [Fact]
+    public async Task PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository()
+    {
+        var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
+        var localPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
+        var sut = CreateSutWithPlugins(defaultPluginMock, localPluginMock);
+
+        var projekt = await _projektService.CreateAsync("Projekt mit lokalem Repository", null);
+        await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            @"C:\repos\project-source",
+            "source");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Pull ohne Repo-Verknüpfung", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/local-pull", @"C:\repos\task-local-pull");
+
+        await sut.PullAsync(aufgabe.Id);
+
+        localPluginMock.Verify(
+            plugin => plugin.PullAsync(@"C:\repos\task-local-pull", It.IsAny<CancellationToken>()),
+            Times.Once);
+        defaultPluginMock.Verify(
+            plugin => plugin.PullAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
+    }
+
+    [Fact]
+    public async Task CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved()
+    {
+        var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
+        var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
+        var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
+
+        var projekt = await _projektService.CreateAsync("Projekt mit ungültigem Plugin", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "Unknown.Plugin",
+            "https://example.com/repo.git",
+            "repo");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit mit ungültigem Plugin", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fallback", @"C:\repos\task-fallback");
+
+        await sut.CommitAsync(aufgabe.Id, "feat: fallback default");
+
+        defaultPluginMock.Verify(
+            plugin => plugin.CommitAsync(@"C:\repos\task-fallback", "feat: fallback default", It.IsAny<CancellationToken>()),
+            Times.Once);
+        selectedPluginMock.Verify(
+            plugin => plugin.CommitAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous()
+    {
+        var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
+        var selectedPluginMock = CreateGitPluginMock("Local Directory", "LocalDirectoryPlugin");
+        var sut = CreateSutWithPlugins(defaultPluginMock, selectedPluginMock);
+
+        var projekt = await _projektService.CreateAsync("Projekt mit mehreren Repositories", null);
+        await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "LocalDirectoryPlugin",
+            @"C:\repos\source-a",
+            "source-a");
+        await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "Softwareschmiede.GitHub",
+            "https://github.com/example/repo-b",
+            "repo-b");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Commit ohne Repo-Verknüpfung", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ambiguous-selection", @"C:\repos\task-ambiguous");
+
+        await sut.CommitAsync(aufgabe.Id, "feat: default because ambiguous");
+
+        defaultPluginMock.Verify(
+            plugin => plugin.CommitAsync(@"C:\repos\task-ambiguous", "feat: default because ambiguous", It.IsAny<CancellationToken>()),
+            Times.Once);
+        selectedPluginMock.Verify(
+            plugin => plugin.CommitAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/merge", @"C:\repos\task-merge");
+
+        await _sut.MergeToSourceAsync(aufgabe.Id);
+
+        _gitPluginMock.Verify(g => g.MergeToSourceAsync(@"C:\repos\task-merge", It.IsAny<CancellationToken>()), Times.Once);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("ins Quellverzeichnis übernommen"));
+    }
+
+    /// <summary>MergeToSourceAsync bricht ab, wenn kein lokaler Klonpfad gesetzt ist.</summary>
+    [Fact]
+    public async Task MergeToSourceAsync_ShouldThrowInvalidOperationException_WhenLocalPathIsMissing()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge ohne Pfad", null);
+
+        var act = () => _sut.MergeToSourceAsync(aufgabe.Id);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*keinen lokalen Klonpfad*");
+        _gitPluginMock.Verify(g => g.MergeToSourceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/caps", @"C:\repos\task-caps");
+        var expected = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        _gitPluginMock
+            .Setup(g => g.GetGitActionCapabilitiesAsync(@"C:\repos\task-caps", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        var result = await _sut.GetGitActionCapabilitiesAsync(aufgabe.Id);
+
+        result.Should().Be(expected);
+        _gitPluginMock.Verify(g => g.GetGitActionCapabilitiesAsync(@"C:\repos\task-caps", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetGitActionCapabilitiesAsync bricht kontrolliert ab, wenn die Aufgabe nicht existiert.</summary>
+    [Fact]
+    public async Task GetGitActionCapabilitiesAsync_ShouldThrowInvalidOperationException_WhenTaskIsMissing()
+    {
+        var act = () => _sut.GetGitActionCapabilitiesAsync(Guid.NewGuid());
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*nicht gefunden*");
+        _gitPluginMock.Verify(g => g.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>GetGitActionCapabilitiesAsync gibt einen fehlenden lokalen Pfad unverändert an das Plugin weiter.</summary>
+    [Fact]
+    public async Task GetGitActionCapabilitiesAsync_ShouldForwardNullLocalPath_WhenTaskHasNoLocalPath()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities ohne Pfad", null);
+        var expected = new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false);
+
+        _gitPluginMock
+            .Setup(g => g.GetGitActionCapabilitiesAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        var result = await _sut.GetGitActionCapabilitiesAsync(aufgabe.Id);
+
+        result.Should().Be(expected);
+        _gitPluginMock.Verify(g => g.GetGitActionCapabilitiesAsync(null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>PullRequestErstellenAsync nutzt das Repository der Aufgabe und protokolliert den PR.</summary>
@@ -248,5 +464,68 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(
             g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    private GitOrchestrationService CreateSutWithPlugins(Mock<IGitPlugin> defaultPlugin, params Mock<IGitPlugin>[] additionalPlugins)
+    {
+        var plugins = new List<IGitPlugin> { defaultPlugin.Object };
+        plugins.AddRange(additionalPlugins.Select(plugin => plugin.Object));
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns(plugins);
+        pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(defaultPlugin.Object);
+        pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+
+        var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginSelectionService = new PluginSelectionService(
+            pluginManagerMock.Object,
+            pluginDefaultSettings,
+            new Mock<ILogger<PluginSelectionService>>().Object);
+
+        return new GitOrchestrationService(
+            _aufgabeService,
+            _projektService,
+            _protokollService,
+            defaultPlugin.Object,
+            pluginSelectionService,
+            new Mock<ILogger<GitOrchestrationService>>().Object);
+    }
+
+    private static Mock<IGitPlugin> CreateGitPluginMock(string pluginName, string pluginPrefix)
+    {
+        var pluginMock = new Mock<IGitPlugin>();
+        pluginMock.SetupGet(plugin => plugin.PluginName).Returns(pluginName);
+        pluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns(pluginPrefix);
+        pluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.SourceCodeManagement);
+        pluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        pluginMock.Setup(plugin => plugin.CommitAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        pluginMock.Setup(plugin => plugin.PullAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        pluginMock.Setup(plugin => plugin.ResetAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        pluginMock.Setup(plugin => plugin.PushBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        pluginMock.Setup(plugin => plugin.MergeToSourceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        pluginMock.Setup(plugin => plugin.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        pluginMock.Setup(plugin => plugin.CreatePullRequestAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(1, "PR", "https://example/pr/1", "feature/test"));
+        pluginMock.Setup(plugin => plugin.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitActionCapabilities(
+                RepositoryKind.RemoteGit,
+                IsWorkingDirectoryCopy: false,
+                CanPush: true,
+                CanPull: true,
+                CanCreatePullRequest: true,
+                CanMergeToSource: false));
+        return pluginMock;
     }
 }

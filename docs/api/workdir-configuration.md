@@ -76,7 +76,7 @@ Damit gelten:
 Das hier konfigurierte Basis-Arbeitsverzeichnis steuert den Zielpfad für den Modus `SeparateWorkingDirectory`.
 Darauf bauen die folgenden LocalDirectory-Workflows auf:
 
-- **Git-Fallback im separaten Workspace:** Quelle ist Git → Clone; Quelle ohne Git + Opt-in → `git init` + Clone; sonst Copy-Fallback.
+- **Git-Bootstrap im separaten Workspace:** Quelle wird per Dateikopie übernommen, im Working Directory `git init` ausgeführt und ein initialer Snapshot-Commit erstellt.
 - **Pull ohne Merge + Nutzerhinweis:** Pull synchronisiert `SourceDirectory -> WorkingDirectory`, erzeugt keinen Merge-Commit.
 - **Push als Datei-Sync statt `git push`:** Push synchronisiert `WorkingDirectory -> SourceDirectory`.
 - **Delete-Sync über Git-Status:** Löschungen/Umbenennungen werden über `git status --porcelain` ermittelt und im Quellverzeichnis gespiegelt.
