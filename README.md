@@ -54,7 +54,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-05-13**
+Stand: **2026-05-14**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -65,6 +65,7 @@ Stand: **2026-05-13**
 | Standardplugin-Mechanik | ✅ Implementiert | Auflösung: explizite Auswahl → gespeichertes Standardplugin → Fallback |
 | Folgeanweisungen mit Kontextsteuerung | ✅ Implementiert | Kontext mitgeben / ignorieren / neu beginnen |
 | Lokale Deploymentfähigkeit | ✅ Implementiert | Windows-zentrierter Betrieb, lokale SQLite + Credential Store |
+| Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Öffentliche HTTP-API | ⛔ Nicht vorhanden | Schnittstellen aktuell über Plugin-Verträge dokumentiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -75,6 +76,7 @@ Stand: **2026-05-13**
 ### 📁 Projektmanagement
 - Beliebig viele Softwareprojekte anlegen, bearbeiten, archivieren und löschen
 - Repositories plugin-gesteuert verknüpfen (dynamische Felder je SCM-Plugin) und Issues automatisch laden
+- Repositorybezogene Startskript-Konfiguration mit Portmodus (`Auto` / `Fest` / `ScriptGesteuert`) pro verknüpftem Repository
 - Projektübersicht mit Status und aktiven Aufgaben
 - Konfigurierbares Basis-Arbeitsverzeichnis für lokale Repository-Klone (persistiert als `repositories.workdir`, inkl. Runtime-Fallback)
 
@@ -105,6 +107,7 @@ Stand: **2026-05-13**
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Sidebar-Footer zeigt live die Anzahl laufender Automatisierungen; optionaler Auto-Shutdown-Toggle erscheint nur bei aktiven Läufen
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
+- Optionaler Startskript-Lauf beim Prozessstart mit reserviertem Port (`SOFTWARESCHMIEDE_FREE_PORT`) für branchspezifische lokale Run-Konfiguration
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
 - Standardplugin je Pluginart in den Einstellungen (SCM und KI) persistierbar
 - Explizite KI-Plugin-Auswahl beim Prompt-Senden, inkl. vorausgewähltem Standardplugin
@@ -214,10 +217,18 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
 2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
-3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; bei Issue mit issuebezogenem Branchnamen; KI-Plugin wird über Default/Fallback aufgelöst).
+3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 4. **KI-Lauf ausführen** (Prompt + Agent + KI-Plugin wählen; Standardplugin ist vorausgewählt).
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 6. **Commits durchführen**, bei Remote-SCM optional Push/PR (bei Issue inkl. `Closes #<Issue>`), und Aufgabe abschließen oder abbrechen.
+
+### `start.ps1` für Visual-Studio-Debug (freier HTTP-Port)
+
+- Skript: `.\start.ps1` im Repository-Root ausführen, danach F5 in Visual Studio starten.
+- Optionale Übergabe: `.\start.ps1 -Port 53123`.
+- Portpriorität: `-Port` → `SOFTWARESCHMIEDE_FREE_PORT` → `SOFTWARESCHMIEDE_RESERVED_PORT` → automatische freie Portsuche.
+- Exit-Codes: `0` (Erfolg), `10` (launchSettings fehlt), `11` (JSON/Profil ungültig), `12` (Port ungültig/belegt), `13` (Write-Fehler), `99` (unerwartet).
+- Detailvertrag: [docs/api/start-ps1-visual-studio-freier-http-port.md](docs/api/start-ps1-visual-studio-freier-http-port.md)
 
 ### LocalDirectoryPlugin & WorkspaceMode
 
@@ -554,7 +565,9 @@ dotnet test --collect:"XPlat Code Coverage"
 
 Feature-spezifische Testartefakte:
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
+- Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
 - UI-bUnit-Tests (Git-Aktionsleiste/Pluginauswahl): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
+- UI-Tests (Projektdetail Startkonfiguration): `src/Softwareschmiede.Tests/Components/Pages/Projekte/ProjektDetailRepositoryFormTests.cs`
 - Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`
 - Integrationstests: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
 - UI/Settings-Tests: `src/Softwareschmiede.Tests/Components/Pages/EinstellungenBaseArbeitsverzeichnisTests.cs`
@@ -570,6 +583,8 @@ Feature-spezifische Testartefakte:
 - [Testlücken: Kontextsteuerung bei Folgeanweisungen](docs/tests/testluecken-kontextsteuerung-folgeanweisungen.md)
 - [Testplan: Claude-CLI-Integration](docs/tests/testplan-claude-cli-integration.md)
 - [Testlücken: Claude-CLI-Integration](docs/tests/testluecken-claude-cli-integration.md)
+- [Testplan: Repository-Startskript mit freier Portzuweisung](docs/tests/testplan-repository-startskript-freier-port.md)
+- [Testlücken: Repository-Startskript mit freier Portzuweisung](docs/tests/testluecken-repository-startskript-freier-port.md)
 
 ---
 
@@ -599,6 +614,9 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - WorkspaceMode-Übersetzungen, dynamische Repository-Felder und Standardplugin-Vorauswahl konsistent dokumentiert
 - Projektspezifische `IGitPlugin`-Auflösung in `GitOrchestrationService`/`AufgabeDetail` präzisiert (inkl. LocalDirectory-/LocalRepository-Szenarien und Fallback-Verhalten)
 - Testabsicherung für diese Auflösung ergänzt (Service: `GitOrchestrationServiceTests`, UI: `AufgabeDetailGitActionsBunitTests`)
+- Repository-Startskript mit freier Portzuweisung dokumentiert (Business/API/Flow) inkl. Persistenzmodell `RepositoryStartKonfiguration`
+- Testsektion und Dokumentationsindex um neue Startskript-/Port-Tests und Planungsartefakte erweitert
+- `start.ps1`-Skriptvertrag für Visual-Studio-Debug ergänzt (Aufruf, Parameter/Env-Priorität, Exit-Codes, F5-Workflow)
 
 ---
 
@@ -642,10 +660,19 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F017: Lokales Verzeichnis Plugin](docs/business/features/F017-lokales-verzeichnis-plugin.md) | Fachliche Beschreibung von LocalDirectoryPlugin, WorkspaceMode und Grenzen gegenüber Remote-Providern |
 | [Feature F018: Automatisches Herunterfahren](docs/business/features/F018-automatisches-herunterfahren.md) | Fachliche Beschreibung des automatischen Herunterfahrens nach dem letzten laufenden KI-Lauf |
 | [Feature F019: Issue-, Branch- und PR-Verknüpfung](docs/business/features/F019-issue-branch-pr-verknuepfung.md) | Fachliche Beschreibung der durchgängigen Verbindung von Issue-Auswahl, Branch-Namensbildung und PR-Auto-Close |
+| [Feature F020: Repository-Startskript mit freier Portzuweisung](docs/business/features/F020-repository-startskript-freier-port.md) | Fachliche Beschreibung der repositorybezogenen Startskript-Konfiguration mit Portreservierung beim Prozessstart |
 | [Requirements: LocalDirectoryPlugin](docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | Umsetzungsnahe Anforderungen und Akzeptanzkriterien für WorkspaceMode, Guardrails und Fehlerverhalten |
 | [Architektur: LocalDirectoryPlugin](docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | Technische Architektur für LocalDirectoryPlugin, Settings und Integrationspfad |
 | [Flow: LocalDirectoryPlugin](docs/flows/local-directory-plugin-flow.md) | Ablaufdarstellung für Clone-/Workspace-Auflösung, Guardrails und Folgeoperationen |
 | [Flow: Issue-, Branch- und PR-Verknüpfung](docs/flows/issue-branch-pr-linking-flow.md) | End-to-End-Ablauf von der Issue-Auswahl über den issuebezogenen Branch bis zur PR-Closing-Direktive |
+| [Flow: Repository-Startskript mit freier Portzuweisung](docs/flows/repository-startskript-freier-port-flow.md) | Ablauf für Startkonfiguration, Portreservierung und Skriptausführung beim Aufgabenstart |
+| [API: Repository-Startskript mit freier Portzuweisung](docs/api/repository-startskript-freier-port.md) | Technischer Contract für Persistenz, Validierung, Portmodus und Skript-Execution |
+| [API: `start.ps1` für Visual-Studio-Debug](docs/api/start-ps1-visual-studio-freier-http-port.md) | Technischer Skriptvertrag für Aufruf, Portquellen-Priorität, Exit-Codes und Debug-Workflow |
+| [Flow: `start.ps1` für Visual-Studio-Debug](docs/flows/start-ps1-visual-studio-freier-http-port-flow.md) | Ablauf von Portauflösung über `launchSettings`-Update bis zur Rückgabe der Exit-Codes |
+| [Requirements: Repository-Startskript mit freier Portzuweisung](docs/requirements/repository-startskript-freier-port-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für Startskript-Auswahl und konfliktfreie Portzuweisung |
+| [Architektur: Repository-Startskript mit freier Portzuweisung](docs/architecture/repository-startskript-freier-port-architecture-blueprint.md) | Architekturpfad für Portreservierung, Skriptaufruf und Integration in den Prozessstart |
+| [ERM: Repository-Startskript mit freier Portzuweisung](docs/architecture/repository-startskript-freier-port-entity-relationship-model.md) | Datenmodell der `RepositoryStartKonfiguration` und Beziehung zu GitRepository |
+| [Architecture Review: Repository-Startskript mit freier Portzuweisung](docs/improvements/repository-startskript-freier-port-architecture-review.md) | Review-Findings und Auflagen zur Absicherung von Port-/Skriptpfaden |
 | [Requirements: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/requirements/separates-arbeitsverzeichnis-git-init-fallback-requirements-analysis.md) | Anforderungen für `git init`-Fallback, Pull ohne Merge, Push-Sync und Delete-Sync |
 | [Architektur: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) | Architekturentscheidungen und Sequenzen für den separaten Workspace-Workflow |
 | [Architecture Review: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | Review-Findings und Qualitätsauflagen für Pull-/Push-/Delete-Sync-Regeln |

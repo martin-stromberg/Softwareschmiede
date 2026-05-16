@@ -59,6 +59,7 @@ public sealed class AufgabeService
             .AsNoTracking()
             .Include(a => a.IssueReferenz)
             .Include(a => a.GitRepository)
+                .ThenInclude(r => r.StartKonfiguration)
             .Include(a => a.Protokolleintraege)
                 .ThenInclude(p => p.TestErgebnisse)
             .FirstOrDefaultAsync(a => a.Id == id, ct);

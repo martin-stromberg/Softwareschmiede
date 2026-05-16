@@ -429,4 +429,154 @@ public sealed class ProjektServiceTests : IDisposable
         var detail = await _sut.GetDetailAsync(projekt.Id);
         detail!.Repositories.Should().BeEmpty();
     }
+
+    /// <summary>SaveRepositoryStartKonfigurationAsync erstellt und persistiert eine neue Startkonfiguration.</summary>
+    [Fact]
+    public async Task SaveRepositoryStartKonfigurationAsync_ShouldCreateConfiguration_WhenRepositoryExists()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit Startkonfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/start",
+            "test/start");
+
+        // Act
+        var saved = await _sut.SaveRepositoryStartKonfigurationAsync(
+            repository.Id,
+            " scripts/start.ps1 ",
+            " --flag value ",
+            RepositoryStartPortModus.Fest,
+            5050,
+            5050,
+            true);
+
+        // Assert
+        saved.GitRepositoryId.Should().Be(repository.Id);
+        saved.StartScriptRelativePath.Should().Be("scripts/start.ps1");
+        saved.StartScriptArgumentsTemplate.Should().Be("--flag value");
+        saved.PortModus.Should().Be(RepositoryStartPortModus.Fest);
+        saved.PortBereichVon.Should().Be(5050);
+        saved.PortBereichBis.Should().Be(5050);
+        saved.Aktiv.Should().BeTrue();
+
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        persisted.Should().NotBeNull();
+        persisted!.StartScriptRelativePath.Should().Be("scripts/start.ps1");
+    }
+
+    /// <summary>SaveRepositoryStartKonfigurationAsync aktualisiert eine bestehende Startkonfiguration statt eine neue anzulegen.</summary>
+    [Fact]
+    public async Task SaveRepositoryStartKonfigurationAsync_ShouldUpdateExistingConfiguration_WhenAlreadyPresent()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit bestehender Konfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/start-existing",
+            "test/start-existing");
+
+        var first = await _sut.SaveRepositoryStartKonfigurationAsync(
+            repository.Id,
+            "scripts/start.ps1",
+            null,
+            RepositoryStartPortModus.Auto,
+            null,
+            null,
+            true);
+
+        // Act
+        var updated = await _sut.SaveRepositoryStartKonfigurationAsync(
+            repository.Id,
+            "scripts/updated.ps1",
+            "--foo bar",
+            RepositoryStartPortModus.ScriptGesteuert,
+            6000,
+            6010,
+            false);
+
+        // Assert
+        updated.Id.Should().Be(first.Id);
+        updated.StartScriptRelativePath.Should().Be("scripts/updated.ps1");
+        updated.PortModus.Should().Be(RepositoryStartPortModus.ScriptGesteuert);
+        updated.PortBereichVon.Should().Be(6000);
+        updated.PortBereichBis.Should().Be(6010);
+        updated.Aktiv.Should().BeFalse();
+    }
+
+    /// <summary>GetRepositoryStartKonfigurationAsync gibt null zurück, wenn keine Konfiguration existiert.</summary>
+    [Fact]
+    public async Task GetRepositoryStartKonfigurationAsync_ShouldReturnNull_WhenNoConfigurationExists()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt ohne Konfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/no-config",
+            "test/no-config");
+
+        // Act
+        var result = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    /// <summary>SaveRepositoryStartKonfigurationAsync validiert absoluten Skriptpfad.</summary>
+    [Fact]
+    public async Task SaveRepositoryStartKonfigurationAsync_ShouldThrow_WhenScriptPathIsAbsolute()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit invalider Konfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/invalid",
+            "test/invalid");
+        var absolutePath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "start.ps1");
+
+        // Act
+        var act = () => _sut.SaveRepositoryStartKonfigurationAsync(
+            repository.Id,
+            absolutePath,
+            null,
+            RepositoryStartPortModus.Auto,
+            null,
+            null,
+            true);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*relativ*");
+    }
+
+    /// <summary>SaveRepositoryStartKonfigurationAsync validiert festen Portmodus ohne Port.</summary>
+    [Fact]
+    public async Task SaveRepositoryStartKonfigurationAsync_ShouldThrow_WhenFestModeHasNoPort()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit fehlendem Port", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/missing-port",
+            "test/missing-port");
+
+        // Act
+        var act = () => _sut.SaveRepositoryStartKonfigurationAsync(
+            repository.Id,
+            "scripts/start.ps1",
+            null,
+            RepositoryStartPortModus.Fest,
+            null,
+            null,
+            true);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Port erforderlich*");
+    }
 }

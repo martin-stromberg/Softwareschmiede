@@ -21,6 +21,9 @@ public sealed class GitRepository
     /// <summary>Gibt an, ob das Repository aktiv ist.</summary>
     public bool Aktiv { get; set; } = true;
 
+    /// <summary>Optionale Startkonfiguration für Repository-Startskripte.</summary>
+    public RepositoryStartKonfiguration? StartKonfiguration { get; set; }
+
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
 }

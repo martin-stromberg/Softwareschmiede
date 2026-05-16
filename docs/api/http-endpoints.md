@@ -67,6 +67,15 @@ Das Feature für Issue-Verknüpfung, issuebezogene Branch-Namensbildung und PR-C
 - Request/Response: nicht anwendbar
 - `curl`-Beispiel: nicht anwendbar
 
+## Feature-Impact: Repository-Startskript mit freier Portzuweisung
+
+Die repositorybezogene Startkonfiguration (`RepositoryStartKonfiguration`), Portreservierung (`PortReservationService`) und Skriptausführung (`RepositoryStartskriptService`) laufen vollständig innerhalb der Application-/Infrastructure-Schicht und erzeugen **keine** öffentlichen HTTP-Endpunkte.
+
+- HTTP-Methode & Pfad: nicht anwendbar
+- Authentifizierung: nicht anwendbar
+- Request/Response: nicht anwendbar
+- `curl`-Beispiel: nicht anwendbar
+
 ## Verknüpfte Dokumentation
 
 - Business: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)

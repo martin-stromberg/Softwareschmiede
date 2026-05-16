@@ -52,6 +52,7 @@ public sealed class ProjektService
         return await _db.Projekte
             .AsNoTracking()
             .Include(p => p.Repositories)
+                .ThenInclude(r => r.StartKonfiguration)
             .Include(p => p.Aufgaben)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
     }
@@ -193,6 +194,62 @@ public sealed class ProjektService
         _logger.LogInformation("Repository {RepositoryId} entfernt.", repositoryId);
     }
 
+    /// <summary>Speichert die Startkonfiguration für ein Repository.</summary>
+    public async Task<RepositoryStartKonfiguration> SaveRepositoryStartKonfigurationAsync(
+        Guid repositoryId,
+        string startScriptRelativePath,
+        string? startScriptArgumentsTemplate,
+        RepositoryStartPortModus portModus,
+        int? portBereichVon,
+        int? portBereichBis,
+        bool aktiv,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation("Startkonfiguration für Repository {RepositoryId} speichern.", repositoryId);
+
+        ValidateStartConfiguration(startScriptRelativePath, portModus, portBereichVon, portBereichBis);
+
+        var repository = await _db.GitRepositories
+            .Include(r => r.StartKonfiguration)
+            .FirstOrDefaultAsync(r => r.Id == repositoryId, ct)
+            ?? throw new InvalidOperationException($"Repository {repositoryId} nicht gefunden.");
+
+        var configuration = repository.StartKonfiguration ?? new RepositoryStartKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            GitRepositoryId = repositoryId
+        };
+
+        configuration.StartScriptRelativePath = NormalizeRequiredValue(startScriptRelativePath, nameof(startScriptRelativePath));
+        configuration.StartScriptArgumentsTemplate = string.IsNullOrWhiteSpace(startScriptArgumentsTemplate)
+            ? null
+            : startScriptArgumentsTemplate.Trim();
+        configuration.PortModus = portModus;
+        configuration.PortBereichVon = portBereichVon;
+        configuration.PortBereichBis = portBereichBis;
+        configuration.Aktiv = aktiv;
+
+        if (repository.StartKonfiguration is null)
+        {
+            _db.Add(configuration);
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Startkonfiguration für Repository {RepositoryId} gespeichert.", repositoryId);
+        return configuration;
+    }
+
+    /// <summary>Liefert die Startkonfiguration eines Repositories.</summary>
+    public async Task<RepositoryStartKonfiguration?> GetRepositoryStartKonfigurationAsync(Guid repositoryId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Startkonfiguration für Repository {RepositoryId} abrufen.", repositoryId);
+
+        return await _db.Set<RepositoryStartKonfiguration>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(config => config.GitRepositoryId == repositoryId, ct);
+    }
+
     private static Dictionary<string, string> NormalizeFieldValues(IReadOnlyDictionary<string, string> fieldValues)
     {
         var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -280,6 +337,40 @@ public sealed class ProjektService
         }
 
         throw new InvalidOperationException($"Für Plugin '{pluginType}' konnte kein RepositoryName ermittelt werden.");
+    }
+
+    private static void ValidateStartConfiguration(
+        string startScriptRelativePath,
+        RepositoryStartPortModus portModus,
+        int? portBereichVon,
+        int? portBereichBis)
+    {
+        if (string.IsNullOrWhiteSpace(startScriptRelativePath))
+        {
+            throw new InvalidOperationException("Der relative Pfad zum Startskript ist erforderlich.");
+        }
+
+        if (Path.IsPathRooted(startScriptRelativePath))
+        {
+            throw new InvalidOperationException("Das Startskript muss relativ zum Repository angegeben werden.");
+        }
+
+        if (portModus == RepositoryStartPortModus.Fest)
+        {
+            if (!portBereichVon.HasValue)
+            {
+                throw new InvalidOperationException("Für den festen Portmodus ist ein Port erforderlich.");
+            }
+
+            if (portBereichBis.HasValue && portBereichBis.Value != portBereichVon.Value)
+            {
+                throw new InvalidOperationException("Für den festen Portmodus darf kein Portbereich angegeben werden.");
+            }
+        }
+        else if (portBereichVon.HasValue ^ portBereichBis.HasValue)
+        {
+            throw new InvalidOperationException("Ein Portbereich muss beide Grenzen enthalten.");
+        }
     }
 
     private static string DeriveRepositoryName(string repositoryValue)
