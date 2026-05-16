@@ -374,3 +374,4 @@ FodyWeavers.xsd
 *.copilot-task.md
 *.copilot.context.md
 *launchSettings.json
+/.softwareschmiede/copilot-runtime

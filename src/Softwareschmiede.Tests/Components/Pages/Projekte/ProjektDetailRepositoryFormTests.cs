@@ -139,10 +139,6 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 StartScriptRelativePath = "scripts/start.ps1",
-                StartScriptArgumentsTemplate = "--mode dev",
-                PortModus = RepositoryStartPortModus.Fest,
-                PortBereichVon = 5050,
-                PortBereichBis = 5050,
                 Aktiv = false
             }
         };
@@ -154,10 +150,6 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
 
         GetPrivateField<Guid?>(sut, "_selectedStartKonfigurationRepositoryId").Should().Be(repository.Id);
         GetPrivateField<string>(sut, "_startScriptRelativePath").Should().Be("scripts/start.ps1");
-        GetPrivateField<string?>(sut, "_startScriptArgumentsTemplate").Should().Be("--mode dev");
-        GetPrivateField<RepositoryStartPortModus>(sut, "_startPortModus").Should().Be(RepositoryStartPortModus.Fest);
-        GetPrivateField<int?>(sut, "_startPortBereichVon").Should().Be(5050);
-        GetPrivateField<int?>(sut, "_startPortBereichBis").Should().Be(5050);
         GetPrivateField<bool>(sut, "_startKonfigurationAktiv").Should().BeFalse();
         GetPrivateField<bool>(sut, "_showStartKonfigurationForm").Should().BeTrue();
     }
@@ -181,10 +173,6 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
 
         SetPrivateField(sut, "_selectedStartKonfigurationRepositoryId", repository.Id);
         SetPrivateField(sut, "_startScriptRelativePath", "scripts/start.ps1");
-        SetPrivateField(sut, "_startScriptArgumentsTemplate", "--demo yes");
-        SetPrivateField(sut, "_startPortModus", RepositoryStartPortModus.Fest);
-        SetPrivateField(sut, "_startPortBereichVon", 4242);
-        SetPrivateField(sut, "_startPortBereichBis", 4242);
         SetPrivateField(sut, "_startKonfigurationAktiv", true);
         SetPrivateField(sut, "_showStartKonfigurationForm", true);
 
@@ -193,10 +181,6 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         var persisted = await _db.RepositoryStartKonfigurationen
             .SingleAsync(config => config.GitRepositoryId == repository.Id);
         persisted.StartScriptRelativePath.Should().Be("scripts/start.ps1");
-        persisted.StartScriptArgumentsTemplate.Should().Be("--demo yes");
-        persisted.PortModus.Should().Be(RepositoryStartPortModus.Fest);
-        persisted.PortBereichVon.Should().Be(4242);
-        persisted.PortBereichBis.Should().Be(4242);
         persisted.Aktiv.Should().BeTrue();
         GetPrivateField<bool>(sut, "_showStartKonfigurationForm").Should().BeFalse();
         GetPrivateField<string?>(sut, "_startKonfigurationFehler").Should().BeNull();

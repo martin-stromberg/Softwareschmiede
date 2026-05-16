@@ -35,6 +35,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
 
         var buttonTexts = cut.FindAll("button").Select(button => button.TextContent.Trim()).ToArray();
+        buttonTexts.Should().Contain("▶️ Startskript ausführen");
         buttonTexts.Should().NotContain("🔄 Push/Pull");
         buttonTexts.Should().NotContain("🔀 Pull Request");
         buttonTexts.Should().Contain("🔀 Merge");
@@ -58,6 +59,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
 
         var buttonTexts = cut.FindAll("button").Select(button => button.TextContent.Trim()).ToArray();
+        buttonTexts.Should().Contain("▶️ Startskript ausführen");
         buttonTexts.Should().Contain("🔄 Push/Pull");
         buttonTexts.Should().Contain("🔀 Pull Request");
         buttonTexts.Should().NotContain("🔀 Merge");

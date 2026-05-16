@@ -8,7 +8,7 @@ $ExitCodeInvalidOrUnavailablePort = 12
 $ExitCodeWriteFailed = 13
 $ExitCodeUnexpectedError = 99
 
-$ProfileName = 'http'
+$PreferredProfileName = 'http'
 $IgnoredDirectoryNames = @('.git', 'bin', 'obj', 'TestResults', 'node_modules')
 $RunId = [Guid]::NewGuid().ToString('N')
 $AtomicWriteRetryCount = 3
@@ -45,11 +45,20 @@ function Write-Diagnostic {
 }
 
 function Resolve-RepositoryRootPath {
-    if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
-        return [System.IO.Path]::GetFullPath((Get-Location).Path)
+    if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        return [System.IO.Path]::GetFullPath($PSScriptRoot)
     }
 
-    return [System.IO.Path]::GetFullPath($PSScriptRoot)
+    if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+        return [System.IO.Path]::GetFullPath((Split-Path -Parent $PSCommandPath))
+    }
+
+    $invocationPath = if ($null -eq $MyInvocation) { $null } else { $MyInvocation.MyCommand.Path }
+    if (-not [string]::IsNullOrWhiteSpace($invocationPath)) {
+        return [System.IO.Path]::GetFullPath((Split-Path -Parent $invocationPath))
+    }
+
+    return [System.IO.Path]::GetFullPath((Get-Location).Path)
 }
 
 function Test-IsJsonObject {
@@ -256,6 +265,57 @@ function Find-LaunchSettingsTargets {
         Sort-Object FullName)
 }
 
+function Resolve-TargetHttpProfile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Profiles
+    )
+
+    $entries = @()
+    if ($Profiles -is [System.Collections.IDictionary]) {
+        foreach ($key in $Profiles.Keys) {
+            $entries += @{
+                Name = [string]$key
+                Value = $Profiles[$key]
+            }
+        }
+    }
+    else {
+        foreach ($property in $Profiles.PSObject.Properties) {
+            $entries += @{
+                Name = $property.Name
+                Value = $property.Value
+            }
+        }
+    }
+
+    if ($entries.Count -eq 0) {
+        return $null
+    }
+
+    $preferred = $entries |
+        Where-Object {
+            $_.Name.Equals($PreferredProfileName, [System.StringComparison]::OrdinalIgnoreCase) -and
+            (Test-IsJsonObject -Value $_.Value)
+        } |
+        Select-Object -First 1
+    if ($null -ne $preferred) {
+        return $preferred
+    }
+
+    $projectProfile = $entries |
+        Where-Object {
+            (Test-IsJsonObject -Value $_.Value) -and
+            ([string](Get-JsonPropertyValue -InputObject $_.Value -PropertyName 'commandName')).Equals('Project', [System.StringComparison]::OrdinalIgnoreCase)
+        } |
+        Select-Object -First 1
+    if ($null -ne $projectProfile) {
+        return $projectProfile
+    }
+
+    return $entries | Where-Object { Test-IsJsonObject -Value $_.Value } | Select-Object -First 1
+}
+
 function Process-LaunchSettingsFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -315,23 +375,25 @@ function Process-LaunchSettingsFile {
         }
     }
 
-    $httpProfile = Get-JsonPropertyValue -InputObject $profiles -PropertyName $ProfileName
-    if ($null -eq $httpProfile) {
+    $selectedProfile = Resolve-TargetHttpProfile -Profiles $profiles
+    if ($null -eq $selectedProfile) {
         return @{
             ExitCode = $ExitCodeInvalidLaunchSettings
             ProjectPath = $projectPath
             LaunchSettingsPath = $LaunchSettingsFile.FullName
-            Message = "Profile '$ProfileName' is missing in launchSettings.json."
+            Message = "No usable profile was found in launchSettings.json."
             Port = $null
         }
     }
 
+    $selectedProfileName = [string]$selectedProfile.Name
+    $httpProfile = $selectedProfile.Value
     if (-not (Test-IsJsonObject -Value $httpProfile)) {
         return @{
             ExitCode = $ExitCodeInvalidLaunchSettings
             ProjectPath = $projectPath
             LaunchSettingsPath = $LaunchSettingsFile.FullName
-            Message = "Profile '$ProfileName' in launchSettings.json must be an object."
+            Message = "Profile '$selectedProfileName' in launchSettings.json must be an object."
             Port = $null
         }
     }
@@ -415,7 +477,7 @@ function Process-LaunchSettingsFile {
         ExitCode = $ExitCodeSuccess
         ProjectPath = $projectPath
         LaunchSettingsPath = $LaunchSettingsFile.FullName
-        Message = "Updated '$ProfileName' profile to '$newUrl'."
+        Message = "Updated '$selectedProfileName' profile to '$newUrl'."
         Port = $resolvedPort
     }
 }

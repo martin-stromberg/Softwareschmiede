@@ -74,12 +74,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<RepositoryStartKonfiguration>(e =>
         {
             e.HasKey(c => c.Id);
-            e.Property(c => c.PortModus).HasConversion<string>();
             e.Property(c => c.StartScriptRelativePath)
                 .IsRequired()
                 .HasMaxLength(512);
-            e.Property(c => c.StartScriptArgumentsTemplate)
-                .HasMaxLength(2000);
             e.HasIndex(c => c.GitRepositoryId).IsUnique();
         });
 

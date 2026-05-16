@@ -446,19 +446,11 @@ public sealed class ProjektServiceTests : IDisposable
         var saved = await _sut.SaveRepositoryStartKonfigurationAsync(
             repository.Id,
             " scripts/start.ps1 ",
-            " --flag value ",
-            RepositoryStartPortModus.Fest,
-            5050,
-            5050,
             true);
 
         // Assert
         saved.GitRepositoryId.Should().Be(repository.Id);
         saved.StartScriptRelativePath.Should().Be("scripts/start.ps1");
-        saved.StartScriptArgumentsTemplate.Should().Be("--flag value");
-        saved.PortModus.Should().Be(RepositoryStartPortModus.Fest);
-        saved.PortBereichVon.Should().Be(5050);
-        saved.PortBereichBis.Should().Be(5050);
         saved.Aktiv.Should().BeTrue();
 
         var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
@@ -481,28 +473,17 @@ public sealed class ProjektServiceTests : IDisposable
         var first = await _sut.SaveRepositoryStartKonfigurationAsync(
             repository.Id,
             "scripts/start.ps1",
-            null,
-            RepositoryStartPortModus.Auto,
-            null,
-            null,
             true);
 
         // Act
         var updated = await _sut.SaveRepositoryStartKonfigurationAsync(
             repository.Id,
             "scripts/updated.ps1",
-            "--foo bar",
-            RepositoryStartPortModus.ScriptGesteuert,
-            6000,
-            6010,
             false);
 
         // Assert
         updated.Id.Should().Be(first.Id);
         updated.StartScriptRelativePath.Should().Be("scripts/updated.ps1");
-        updated.PortModus.Should().Be(RepositoryStartPortModus.ScriptGesteuert);
-        updated.PortBereichVon.Should().Be(6000);
-        updated.PortBereichBis.Should().Be(6010);
         updated.Aktiv.Should().BeFalse();
     }
 
@@ -542,10 +523,6 @@ public sealed class ProjektServiceTests : IDisposable
         var act = () => _sut.SaveRepositoryStartKonfigurationAsync(
             repository.Id,
             absolutePath,
-            null,
-            RepositoryStartPortModus.Auto,
-            null,
-            null,
             true);
 
         // Assert
@@ -553,30 +530,4 @@ public sealed class ProjektServiceTests : IDisposable
             .WithMessage("*relativ*");
     }
 
-    /// <summary>SaveRepositoryStartKonfigurationAsync validiert festen Portmodus ohne Port.</summary>
-    [Fact]
-    public async Task SaveRepositoryStartKonfigurationAsync_ShouldThrow_WhenFestModeHasNoPort()
-    {
-        // Arrange
-        var projekt = await _sut.CreateAsync("Projekt mit fehlendem Port", null);
-        var repository = await _sut.AddRepositoryAsync(
-            projekt.Id,
-            "GitHub",
-            "https://github.com/test/missing-port",
-            "test/missing-port");
-
-        // Act
-        var act = () => _sut.SaveRepositoryStartKonfigurationAsync(
-            repository.Id,
-            "scripts/start.ps1",
-            null,
-            RepositoryStartPortModus.Fest,
-            null,
-            null,
-            true);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Port erforderlich*");
-    }
 }
