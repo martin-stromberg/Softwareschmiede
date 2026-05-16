@@ -16,6 +16,8 @@ Details: [http-endpoints.md](./http-endpoints.md)
 | [local-directory-plugin.md](./local-directory-plugin.md) | Technischer Contract der `IGitPlugin`-Implementierung `LocalDirectoryPlugin` inkl. Workspace-Modi, `git-init`-Fallback, Pull ohne Merge, Push-/Delete-Sync sowie Capability-Flags für die Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden bei Arbeitskopie). |
 | [plugin-default-selection.md](./plugin-default-selection.md) | Interner API-Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** sowie die projektspezifische/aufgabenbezogene `IGitPlugin`-Auflösung (vor Default) inkl. Fallback bei fehlender Repo-Verknüpfung. |
 | [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType`, Plugin-Discovery sowie dynamische Repository-Feldschemata (`GetRepositoryLinkFields`). |
+| [repository-startskript-freier-port.md](./repository-startskript-freier-port.md) | Interner Contract für repositorybezogene Startskripte mit freier Portreservierung, Persistenz (`RepositoryStartKonfiguration`) und Ausführung beim Prozessstart. |
+| [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
 | [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
 
 ## Feature-Fokus: Standardplugin je Pluginart & KI-Plugin-Auswahl
@@ -35,6 +37,13 @@ Details: [http-endpoints.md](./http-endpoints.md)
 - Technischer Contract: [issue-branch-pr-linking.md](./issue-branch-pr-linking.md)
 - Ablaufdarstellung: [issue-branch-pr-linking-flow.md](../flows/issue-branch-pr-linking-flow.md)
 - Fachliche Einordnung: [F019 – Issue-, Branch- und PR-Verknüpfung](../business/features/F019-issue-branch-pr-verknuepfung.md)
+
+## Feature-Fokus: Repository-Startskript mit freier Portzuweisung
+
+- Technischer Contract: [repository-startskript-freier-port.md](./repository-startskript-freier-port.md)
+- Skriptvertrag für VS-Debug: [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md)
+- Ablaufdarstellung: [repository-startskript-freier-port-flow.md](../flows/repository-startskript-freier-port-flow.md)
+- Fachliche Einordnung: [F020 – Repository-Startskript mit freier Portzuweisung](../business/features/F020-repository-startskript-freier-port.md)
 
 ## Verknüpfte Dokumentation
 

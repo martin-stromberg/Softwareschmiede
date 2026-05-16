@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="..\..\start.ps1" Link="start.ps1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede.Client\Softwareschmiede.Client.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" />

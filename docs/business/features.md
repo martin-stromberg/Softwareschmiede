@@ -26,6 +26,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F017 | Lokales Verzeichnis Plugin | Lokale Ordner mit separatem Arbeitsverzeichnis und Git-Workflow-Fallback sicher nutzen | [F017 – Lokales Verzeichnis Plugin](./features/F017-lokales-verzeichnis-plugin.md) |
 | F018 | Automatisches Herunterfahren | Nach dem letzten laufenden KI-Lauf den Rechner automatisch herunterfahren | [F018 – Automatisches Herunterfahren](./features/F018-automatisches-herunterfahren.md) |
 | F019 | Issue-, Branch- und PR-Verknüpfung | GitHub-Issue durchgängig von Aufgabenanlage bis PR Auto-Close verknüpfen | [F019 – Issue-, Branch- und PR-Verknüpfung](./features/F019-issue-branch-pr-verknuepfung.md) |
+| F020 | Repository-Startskript mit freier Portzuweisung | Repositorys mit Startskript und branchspezifischem freiem Port beim Prozessstart ausführen | [F020 – Repository-Startskript mit freier Portzuweisung](./features/F020-repository-startskript-freier-port.md) |
 
 ---
 
