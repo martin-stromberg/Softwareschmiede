@@ -371,3 +371,6 @@ FodyWeavers.xsd
 /.github/agents
 /.github/tools
 /.github/workflows
+*.copilot-task.md
+*.copilot.context.md
+*launchSettings.json

@@ -18,10 +18,12 @@ public sealed class EntwicklungsprozessService
 {
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
+    private readonly ProjektService? _projektService;
     private readonly IGitPlugin _gitPlugin;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly IAgentPackageService _agentPackageService;
     private readonly IArbeitsverzeichnisResolver _arbeitsverzeichnisResolver;
+    private readonly RepositoryStartskriptService? _repositoryStartskriptService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EntwicklungsprozessService> _logger;
     private const int DefaultContextCompressionSoftLimit = 12_000;
@@ -37,13 +39,41 @@ public sealed class EntwicklungsprozessService
         IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
         IConfiguration configuration,
         ILogger<EntwicklungsprozessService> logger)
+        : this(
+            aufgabeService,
+            protokollService,
+            null,
+            gitPlugin,
+            pluginSelectionService,
+            agentPackageService,
+            arbeitsverzeichnisResolver,
+            null,
+            configuration,
+            logger)
+    {
+    }
+
+    /// <inheritdoc cref="EntwicklungsprozessService"/>
+    public EntwicklungsprozessService(
+        AufgabeService aufgabeService,
+        ProtokollService protokollService,
+        ProjektService? projektService,
+        IGitPlugin gitPlugin,
+        PluginSelectionService pluginSelectionService,
+        IAgentPackageService agentPackageService,
+        IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
+        RepositoryStartskriptService? repositoryStartskriptService,
+        IConfiguration configuration,
+        ILogger<EntwicklungsprozessService> logger)
     {
         _aufgabeService = aufgabeService;
         _protokollService = protokollService;
+        _projektService = projektService;
         _gitPlugin = gitPlugin;
         _pluginSelectionService = pluginSelectionService;
         _agentPackageService = agentPackageService;
         _arbeitsverzeichnisResolver = arbeitsverzeichnisResolver;
+        _repositoryStartskriptService = repositoryStartskriptService;
         _configuration = configuration;
         _logger = logger;
     }
@@ -65,11 +95,15 @@ public sealed class EntwicklungsprozessService
     public async Task ProzessStartenAsync(Guid aufgabeId, string repositoryUrl, string? basisBranchName = null, string? selectedScmPluginPrefix = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Entwicklungsprozess für Aufgabe {AufgabeId} starten.", aufgabeId);
-        var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(selectedScmPluginPrefix, ct);
-        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(null, ct);
 
         var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var repository = await ResolveRepositoryAsync(aufgabe, repositoryUrl, ct);
+        var resolvedPluginPrefix = !string.IsNullOrWhiteSpace(repository.PluginTyp)
+            ? repository.PluginTyp
+            : selectedScmPluginPrefix;
+        var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(resolvedPluginPrefix, ct);
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(null, ct);
 
         // Kompatibilität des Agentenpakets VOR dem Klonen prüfen
         if (!string.IsNullOrEmpty(aufgabe.AgentenpaketName))
@@ -108,8 +142,8 @@ public sealed class EntwicklungsprozessService
         }
 
         // Repository klonen
-        _logger.LogInformation("Repository '{RepositoryUrl}' nach '{KlonPfad}' klonen (Plugin: {PluginPrefix}).", repositoryUrl, lokalerKlonPfad, gitPlugin.PluginPrefix);
-        await gitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad, ct);
+        _logger.LogInformation("Repository '{RepositoryUrl}' nach '{KlonPfad}' klonen (Plugin: {PluginPrefix}).", repository.RepositoryUrl, lokalerKlonPfad, gitPlugin.PluginPrefix);
+        await gitPlugin.CloneRepositoryAsync(repository.RepositoryUrl, lokalerKlonPfad, ct);
 
         string branchName;
 
@@ -117,7 +151,7 @@ public sealed class EntwicklungsprozessService
         var nutzeExistierendenBranch = false;
         if (!string.IsNullOrEmpty(basisBranchName))
         {
-            var defaultBranch = await gitPlugin.GetDefaultBranchAsync(repositoryUrl, ct);
+            var defaultBranch = await gitPlugin.GetDefaultBranchAsync(repository.RepositoryUrl, ct);
             nutzeExistierendenBranch = !string.Equals(basisBranchName, defaultBranch, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -135,6 +169,23 @@ public sealed class EntwicklungsprozessService
 
             _logger.LogInformation("Branch '{BranchName}' anlegen.", branchName);
             await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, ct);
+        }
+
+        if (repository.StartKonfiguration is not null && _repositoryStartskriptService is not null)
+        {
+            try
+            {
+                await _repositoryStartskriptService.RunAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
+            }
+            catch
+            {
+                if (Directory.Exists(lokalerKlonPfad))
+                {
+                    DeleteDirectoryForce(lokalerKlonPfad);
+                }
+
+                throw;
+            }
         }
 
         // Agentenpaket deployen, wenn vorhanden (Kompatibilität wurde bereits vor dem Klonen geprüft)
@@ -516,6 +567,52 @@ public sealed class EntwicklungsprozessService
         _logger.LogInformation("Remote-Branches für {RepositoryUrl} abrufen.", repositoryUrl);
         var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(selectedScmPluginPrefix, ct);
         return await gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
+    }
+
+    private async Task<GitRepository> ResolveRepositoryAsync(Aufgabe aufgabe, string repositoryUrl, CancellationToken ct)
+    {
+        if (aufgabe.GitRepository is not null)
+        {
+            return aufgabe.GitRepository;
+        }
+
+        if (_projektService is null)
+        {
+            return new GitRepository
+            {
+                Id = Guid.Empty,
+                ProjektId = aufgabe.ProjektId,
+                PluginTyp = string.Empty,
+                RepositoryUrl = repositoryUrl,
+                RepositoryName = repositoryUrl,
+                Aktiv = true
+            };
+        }
+
+        var projekt = await _projektService.GetDetailAsync(aufgabe.ProjektId, ct)
+            ?? throw new InvalidOperationException($"Projekt {aufgabe.ProjektId} nicht gefunden.");
+
+        var repositories = projekt.Repositories
+            .Where(repository => repository.Aktiv)
+            .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(repository => repository.Id)
+            .ToList();
+
+        var matchingRepository = repositories.FirstOrDefault(repository =>
+            string.Equals(repository.RepositoryUrl, repositoryUrl, StringComparison.OrdinalIgnoreCase));
+
+        if (matchingRepository is not null)
+        {
+            return matchingRepository;
+        }
+
+        if (repositories.Count == 1)
+        {
+            return repositories[0];
+        }
+
+        throw new InvalidOperationException(
+            $"Aufgabe {aufgabe.Id} kann nicht gestartet werden, weil kein eindeutiges Repository für den Startkontext ermittelt werden konnte.");
     }
 
     private async Task<string> BuildFollowPromptWithContextAsync(

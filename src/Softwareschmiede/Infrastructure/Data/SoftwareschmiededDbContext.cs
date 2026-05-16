@@ -15,6 +15,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Git-Repositories.</summary>
     public DbSet<GitRepository> GitRepositories => Set<GitRepository>();
 
+    /// <summary>Repository-Startkonfigurationen.</summary>
+    public DbSet<RepositoryStartKonfiguration> RepositoryStartKonfigurationen => Set<RepositoryStartKonfiguration>();
+
     /// <summary>Aufgaben.</summary>
     public DbSet<Aufgabe> Aufgaben => Set<Aufgabe>();
 
@@ -61,6 +64,23 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<GitRepository>(e =>
         {
             e.HasKey(r => r.Id);
+            e.HasOne(r => r.StartKonfiguration)
+                .WithOne(c => c.GitRepository)
+                .HasForeignKey<RepositoryStartKonfiguration>(c => c.GitRepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // RepositoryStartKonfiguration
+        modelBuilder.Entity<RepositoryStartKonfiguration>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.PortModus).HasConversion<string>();
+            e.Property(c => c.StartScriptRelativePath)
+                .IsRequired()
+                .HasMaxLength(512);
+            e.Property(c => c.StartScriptArgumentsTemplate)
+                .HasMaxLength(2000);
+            e.HasIndex(c => c.GitRepositoryId).IsUnique();
         });
 
         // Aufgabe

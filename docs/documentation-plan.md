@@ -537,3 +537,118 @@
 
 ### Offene Punkte
 - Keine kritischen offenen Dokumentationslücken für den Feature-Scope identifiziert.
+
+---
+
+# Dokumentationsplan – `start.ps1` für Visual-Studio-Debug mit freiem HTTP-Port – 2026-05-14
+
+## Kontext
+- Feature-Stand: Planung, Implementierung und Testabdeckung bereits abgeschlossen.
+- Scope dieser Orchestrierung: technische + fachliche Dokumentation auf den finalen Featurestand bringen.
+- Kernfokus: Nutzung von `start.ps1`, Portquellen-Priorität, Exit-Codes und Visual-Studio-Debug-Workflow.
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `docs/api/repository-startskript-freier-port.md` beschreibt den Gesamtvertrag für Startskripte im Prozessstart.
+- Lücke: dedizierter Skriptvertrag für den direkten lokalen `start.ps1`-Aufruf (inkl. Priorität/Exit-Codes) fehlte.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `repository-startskript-freier-port-flow.md` deckt primär den orchestrierten Aufgabenprozess ab.
+- Lücke: kein separater Ablaufplan für den direkten `start.ps1`-Pfad bis zum Visual-Studio-F5-Start.
+
+### Business-Dokumentation (`docs/business/`)
+- `F020` ist vorhanden und beschreibt den Funktionsbereich.
+- Lücke: konkrete Kurz-Anleitung für lokalen VS-Debug über `start.ps1` fehlte.
+
+### README (`README.md`)
+- Feature war grundsätzlich erwähnt.
+- Lücke: kein klarer, kompakter Skriptvertrag in der Usage-Sektion (Aufruf, Priorität, Exit-Codes, Workflow).
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Dedizierten API-Vertrag für `start.ps1` erstellen.
+2. **Hoch:** Dedizierten Flow für `start.ps1`-Ablauf erstellen.
+3. **Hoch:** README-Usage um klare Bedien- und Diagnoseinformationen ergänzen.
+4. **Mittel:** F020 und Dokumentationsindizes um direkte Querverweise ergänzen.
+
+## Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/api/start-ps1-visual-studio-freier-http-port.md`
+2. `docs/flows/start-ps1-visual-studio-freier-http-port-flow.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/repository-startskript-freier-port.md`
+4. `docs/flows/README.md`
+5. `docs/business/features/F020-repository-startskript-freier-port.md`
+6. `docs/documentation-plan.md`
+
+### Validierung
+- Alle neu erstellten/aktualisierten Zielartefakte vorhanden und nicht leer.
+- Konsistenzabgleich gegen Implementierung durchgeführt (`start.ps1`, `Softwareschmiede.csproj` linked item).
+- Build/Test-Baselines im Repository erneut geprüft (`dotnet build`, `dotnet test` erfolgreich; `dotnet format --verify-no-changes` mit bestehendem, nicht-featurebezogenem Whitespace-Fehler in `plugins/Softwareschmiede.Plugin.GitHub/GitHubPlugin.cs`).
+
+### Offene Punkte
+- Keine offenen Dokumentationslücken im Scope dieses Features identifiziert.
+
+---
+
+# Dokumentationsplan – Feature „Repository-Startskript mit freier Portzuweisung“ (Aktueller Lauf) – 2026-05-14
+
+## Kontext
+- Fortsetzung des Lifecycle-Prozesses nach Implementierung und erweiterter Testabdeckung.
+- Feature-Fokus: `repository-startskript-freier-port`.
+- Vorhandene Planungs-/Review-/Testartefakte wurden als Kontext einbezogen:
+  - `docs/requirements/repository-startskript-freier-port-requirements-analysis.md`
+  - `docs/architecture/repository-startskript-freier-port-architecture-blueprint.md`
+  - `docs/architecture/repository-startskript-freier-port-entity-relationship-model.md`
+  - `docs/improvements/repository-startskript-freier-port-architecture-review.md`
+  - `docs/tests/testplan-repository-startskript-freier-port.md`
+  - `docs/tests/testluecken-repository-startskript-freier-port.md`
+
+## Phase 1 – Analyse
+
+### API-Dokumentation (`docs/api/`)
+- `docs/api/` existiert; für das neue Feature fehlte ein dedizierter technischer Contract.
+- `http-endpoints.md` benötigte einen expliziten Nicht-HTTP-Feature-Impact-Eintrag.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `docs/flows/` existiert; für Startkonfiguration -> Portreservierung -> Skriptausführung fehlte ein eigener Ablaufplan.
+
+### Business-Dokumentation (`docs/business/`)
+- Feature-Katalog endete bei `F019`; eine fachliche Seite für das neue Feature fehlte.
+
+### README (`README.md`)
+- Feature war im zentralen Projektüberblick, Tests und Dokumentationsindex noch nicht vollständig verlinkt.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** API-/Flow-/Business-Artefakte für das Feature neu erstellen.
+2. **Hoch:** Indizes (`docs/api`, `docs/flows`, `docs/business`, `docs/tests`) ergänzen.
+3. **Mittel:** README auf aktuellen Feature- und Teststand synchronisieren.
+4. **Mittel:** `docs/documentation-plan.md` mit Ergebnisanhang aktualisieren.
+
+## Phase 3 – Ergebnis
+
+### Neu erstellt
+1. `docs/api/repository-startskript-freier-port.md`
+2. `docs/flows/repository-startskript-freier-port-flow.md`
+3. `docs/business/features/F020-repository-startskript-freier-port.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/http-endpoints.md`
+4. `docs/flows/README.md`
+5. `docs/business/features.md`
+6. `docs/tests/README.md`
+7. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz und Nicht-Leerheit aller neu erstellten/aktualisierten Dokumentationsdateien geprüft.
+- Inhaltsabgleich gegen implementierten Code-Stand durchgeführt (u. a. `PortReservationService`, `RepositoryStartskriptService`, `ProjektService`, `ProjektDetail`, `EntwicklungsprozessService`, Migration `RepositoryStartKonfiguration`).
+- Testartefakte für das Feature in den Dokumentationsindizes verknüpft.
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken für den Feature-Scope identifiziert.

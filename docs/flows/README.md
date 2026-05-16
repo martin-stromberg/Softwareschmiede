@@ -21,6 +21,8 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 | [Issue-, Branch- und PR-Verknüpfung](./issue-branch-pr-linking-flow.md) | `issue-branch-pr-linking-flow.md` | End-to-End-Flow von der Issue-Auswahl über issuebezogenen Branch bis zur PR-Closing-Direktive (`Closes #<Issue>`) |
+| [Repository-Startskript mit freier Portzuweisung](./repository-startskript-freier-port-flow.md) | `repository-startskript-freier-port-flow.md` | Konfigurations- und Laufzeitablauf für repositorybezogene Startskripte inkl. Portreservierung und PowerShell-Ausführung beim Prozessstart |
+| [`start.ps1` für VS-Debug mit freiem HTTP-Port](./start-ps1-visual-studio-freier-http-port-flow.md) | `start-ps1-visual-studio-freier-http-port-flow.md` | Ablauf für Portauflösung (Parameter/Env/Auto), `launchSettings.json`-Update und Exit-Code-Pfade des lokalen Startskripts |
 
 ---
 
@@ -163,6 +165,20 @@ Beschreibt den Ablauf von `StartKiLauf` bis `onCompleted`, inklusive Session-Wie
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `NeueAufgabe`, `AufgabeService`, `EntwicklungsprozessService`, `GitOrchestrationService`, `IGitPlugin`
 
 Dokumentiert die durchgängige Verknüpfung zwischen ausgewählter Issue, task-Branch und PR-Closing-Direktive inkl. Duplikatvermeidung bei bereits vorhandenen Direktiven.
+
+---
+
+### [Ablauf 16: Repository-Startskript mit freier Portzuweisung](./repository-startskript-freier-port-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `ProjektService`, `EntwicklungsprozessService`, `RepositoryStartskriptService`, `PortReservationService`, `ICliRunner`
+
+Dokumentiert die repositorybezogene Startkonfiguration und die Ausführung eines Startskripts mit reserviertem Port beim Prozessstart inklusive Validierung, Sicherheitsgrenzen und Cleanup-Pfaden.
+
+---
+
+### [Ablauf 17: `start.ps1` für Visual-Studio-Debug](./start-ps1-visual-studio-freier-http-port-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Artefakte:** `start.ps1`, `launchSettings.json`, Visual-Studio-`http`-Profil
+
+Dokumentiert den lokalen Skriptablauf von der Portquellen-Auflösung (**Parameter → Env → Auto**) über das gezielte `launchSettings`-Update bis zur Exit-Code-Rückgabe.
 
 ---
 

@@ -3,6 +3,7 @@ namespace Softwareschmiede.Components.Pages.Projekte;
 using Microsoft.AspNetCore.Components;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
@@ -31,6 +32,15 @@ public partial class ProjektDetail
     private readonly Dictionary<string, string> _repositoryFieldValues = new(StringComparer.OrdinalIgnoreCase);
     private string? _selectedRepositoryPluginPrefix;
     private string? _repoFehler;
+    private bool _showStartKonfigurationForm;
+    private Guid? _selectedStartKonfigurationRepositoryId;
+    private string _startScriptRelativePath = string.Empty;
+    private string? _startScriptArgumentsTemplate;
+    private RepositoryStartPortModus _startPortModus = RepositoryStartPortModus.Auto;
+    private int? _startPortBereichVon;
+    private int? _startPortBereichBis;
+    private bool _startKonfigurationAktiv = true;
+    private string? _startKonfigurationFehler;
 
     protected override async Task OnInitializedAsync()
     {
@@ -126,6 +136,54 @@ public partial class ProjektDetail
         ResetRepositoryFieldValues();
         _showRepoForm = false;
         await LadeAsync();
+    }
+
+    private void StartKonfigurationBearbeiten(Guid repositoryId)
+    {
+        var repository = _projekt?.Repositories.FirstOrDefault(r => r.Id == repositoryId);
+        if (repository is null)
+        {
+            return;
+        }
+
+        _selectedStartKonfigurationRepositoryId = repositoryId;
+        _startScriptRelativePath = repository.StartKonfiguration?.StartScriptRelativePath ?? string.Empty;
+        _startScriptArgumentsTemplate = repository.StartKonfiguration?.StartScriptArgumentsTemplate;
+        _startPortModus = repository.StartKonfiguration?.PortModus ?? RepositoryStartPortModus.Auto;
+        _startPortBereichVon = repository.StartKonfiguration?.PortBereichVon;
+        _startPortBereichBis = repository.StartKonfiguration?.PortBereichBis;
+        _startKonfigurationAktiv = repository.StartKonfiguration?.Aktiv ?? true;
+        _startKonfigurationFehler = null;
+        _showRepoForm = false;
+        _showStartKonfigurationForm = true;
+    }
+
+    private async Task SpeichereStartKonfigurationAsync()
+    {
+        if (_selectedStartKonfigurationRepositoryId is null)
+        {
+            _startKonfigurationFehler = "Kein Repository ausgewählt.";
+            return;
+        }
+
+        try
+        {
+            await ProjektService.SaveRepositoryStartKonfigurationAsync(
+                _selectedStartKonfigurationRepositoryId.Value,
+                _startScriptRelativePath,
+                _startScriptArgumentsTemplate,
+                _startPortModus,
+                _startPortBereichVon,
+                _startPortBereichBis,
+                _startKonfigurationAktiv);
+
+            _showStartKonfigurationForm = false;
+            await LadeAsync();
+        }
+        catch (Exception ex)
+        {
+            _startKonfigurationFehler = ex.Message;
+        }
     }
 
     private async Task LadeRepositoryPluginAuswahlAsync()
