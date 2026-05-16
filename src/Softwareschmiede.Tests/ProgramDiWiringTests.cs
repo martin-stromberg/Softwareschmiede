@@ -17,7 +17,6 @@ public sealed class ProgramDiWiringTests
         source.Should().Contain("builder.Services.AddSingleton<ISystemShutdownService, SystemShutdownService>();");
         source.Should().Contain("builder.Services.AddScoped<PluginDefaultSettingsService>();");
         source.Should().Contain("builder.Services.AddScoped<PluginSelectionService>();");
-        source.Should().Contain("builder.Services.AddSingleton<PortReservationService>();");
         source.Should().Contain("builder.Services.AddScoped<RepositoryStartskriptService>();");
     }
 

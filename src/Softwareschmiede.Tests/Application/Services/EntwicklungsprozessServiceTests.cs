@@ -98,6 +98,149 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         updatedAufgabe.BranchName.Should().Contain("login-feature");
     }
 
+    /// <summary>ProzessStartenAsync blockiert den Start nicht, wenn das Repository-Startskript fehlschlägt.</summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldContinue_WhenRepositoryStartScriptFails()
+    {
+        // Arrange
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "https://github.com/test/repo-start-script",
+            RepositoryName = "repo-start-script",
+            Aktiv = true
+        };
+        repository.StartKonfiguration = new RepositoryStartKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            StartScriptRelativePath = "scripts/start.ps1",
+            Aktiv = true,
+            GitRepository = repository
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Startskript robust starten", null, repository.Id);
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var cliRunnerMock = new Mock<ICliRunner>();
+        cliRunnerMock.Setup(runner => runner.RunAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "script failed"));
+        var repositoryStartskriptService = new RepositoryStartskriptService(
+            cliRunnerMock.Object,
+            new Mock<ILogger<RepositoryStartskriptService>>().Object);
+        var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            projektService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            repositoryStartskriptService,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        await sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+
+        // Assert
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe.Should().NotBeNull();
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(entry =>
+            entry.Typ == ProtokollTyp.GitAktion
+            && entry.Inhalt.Contains("Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden", StringComparison.Ordinal));
+    }
+
+    /// <summary>RepositoryStartskriptAusfuehrenAsync liefert einen Hinweis statt Exception bei Skriptfehler.</summary>
+    [Fact]
+    public async Task RepositoryStartskriptAusfuehrenAsync_ShouldReturnHint_WhenScriptExecutionFails()
+    {
+        // Arrange
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "https://github.com/test/repo-manual-start",
+            RepositoryName = "repo-manual-start",
+            Aktiv = true
+        };
+        repository.StartKonfiguration = new RepositoryStartKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            StartScriptRelativePath = "scripts/start.ps1",
+            Aktiv = true,
+            GitRepository = repository
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Manuelles Startskript", null, repository.Id);
+        var lokalerPfad = Path.Combine(Path.GetTempPath(), $"manual-start-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(lokalerPfad, "scripts"));
+        await File.WriteAllTextAsync(Path.Combine(lokalerPfad, "scripts", "start.ps1"), "Write-Host 'test'");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "task/manual", lokalerPfad);
+
+        var cliRunnerMock = new Mock<ICliRunner>();
+        cliRunnerMock.Setup(runner => runner.RunAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "script failed"));
+        var repositoryStartskriptService = new RepositoryStartskriptService(
+            cliRunnerMock.Object,
+            new Mock<ILogger<RepositoryStartskriptService>>().Object);
+        var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            projektService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            repositoryStartskriptService,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        try
+        {
+            // Act
+            var result = await sut.RepositoryStartskriptAusfuehrenAsync(aufgabe.Id);
+
+            // Assert
+            result.Success.Should().BeFalse();
+            result.Message.Should().Contain("Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden");
+            var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+            protokoll.Should().Contain(entry =>
+                entry.Typ == ProtokollTyp.GitAktion
+                && entry.Inhalt.Contains("Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(lokalerPfad))
+            {
+                Directory.Delete(lokalerPfad, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference()
     {

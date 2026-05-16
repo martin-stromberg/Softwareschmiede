@@ -581,6 +581,27 @@ public partial class AufgabeDetail : IDisposable
         finally { _processing = false; }
     }
 
+    private async Task RepositoryStartskriptAusfuehrenAsync()
+    {
+        _processing = true;
+        _fehler = null;
+        _erfolg = null;
+        try
+        {
+            var ergebnis = await EntwicklungsprozessService.RepositoryStartskriptAusfuehrenAsync(Id, _cts.Token);
+            _erfolg = ergebnis.Message;
+            await LadeAsync();
+        }
+        catch (Exception ex)
+        {
+            _fehler = ex.Message;
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
     private async Task ResetAsync()
     {
         _processing = true;

@@ -31,6 +31,7 @@ else
         }
         @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
         {
+            <button class="btn btn-secondary" @onclick="RepositoryStartskriptAusfuehrenAsync" disabled="@_processing">▶️ Startskript ausführen</button>
             <button class="btn btn-success" @onclick="() => _showCommitForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">📝 Commit</button>
             @if (_gitActionVisibility.ShowPushPullToggle)
             {

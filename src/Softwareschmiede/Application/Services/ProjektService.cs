@@ -198,16 +198,12 @@ public sealed class ProjektService
     public async Task<RepositoryStartKonfiguration> SaveRepositoryStartKonfigurationAsync(
         Guid repositoryId,
         string startScriptRelativePath,
-        string? startScriptArgumentsTemplate,
-        RepositoryStartPortModus portModus,
-        int? portBereichVon,
-        int? portBereichBis,
         bool aktiv,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Startkonfiguration für Repository {RepositoryId} speichern.", repositoryId);
 
-        ValidateStartConfiguration(startScriptRelativePath, portModus, portBereichVon, portBereichBis);
+        ValidateStartConfiguration(startScriptRelativePath);
 
         var repository = await _db.GitRepositories
             .Include(r => r.StartKonfiguration)
@@ -221,12 +217,6 @@ public sealed class ProjektService
         };
 
         configuration.StartScriptRelativePath = NormalizeRequiredValue(startScriptRelativePath, nameof(startScriptRelativePath));
-        configuration.StartScriptArgumentsTemplate = string.IsNullOrWhiteSpace(startScriptArgumentsTemplate)
-            ? null
-            : startScriptArgumentsTemplate.Trim();
-        configuration.PortModus = portModus;
-        configuration.PortBereichVon = portBereichVon;
-        configuration.PortBereichBis = portBereichBis;
         configuration.Aktiv = aktiv;
 
         if (repository.StartKonfiguration is null)
@@ -339,11 +329,7 @@ public sealed class ProjektService
         throw new InvalidOperationException($"Für Plugin '{pluginType}' konnte kein RepositoryName ermittelt werden.");
     }
 
-    private static void ValidateStartConfiguration(
-        string startScriptRelativePath,
-        RepositoryStartPortModus portModus,
-        int? portBereichVon,
-        int? portBereichBis)
+    private static void ValidateStartConfiguration(string startScriptRelativePath)
     {
         if (string.IsNullOrWhiteSpace(startScriptRelativePath))
         {
@@ -353,23 +339,6 @@ public sealed class ProjektService
         if (Path.IsPathRooted(startScriptRelativePath))
         {
             throw new InvalidOperationException("Das Startskript muss relativ zum Repository angegeben werden.");
-        }
-
-        if (portModus == RepositoryStartPortModus.Fest)
-        {
-            if (!portBereichVon.HasValue)
-            {
-                throw new InvalidOperationException("Für den festen Portmodus ist ein Port erforderlich.");
-            }
-
-            if (portBereichBis.HasValue && portBereichBis.Value != portBereichVon.Value)
-            {
-                throw new InvalidOperationException("Für den festen Portmodus darf kein Portbereich angegeben werden.");
-            }
-        }
-        else if (portBereichVon.HasValue ^ portBereichBis.HasValue)
-        {
-            throw new InvalidOperationException("Ein Portbereich muss beide Grenzen enthalten.");
         }
     }
 

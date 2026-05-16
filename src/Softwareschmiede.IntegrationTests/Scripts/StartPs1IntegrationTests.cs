@@ -101,10 +101,10 @@ public sealed class StartPs1IntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// Validates clear error handling when the http profile is missing.
+    /// Validates fallback to a project profile when no http profile exists.
     /// </summary>
     [Fact]
-    public async Task StartScript_ShouldFailWithExit11_WhenHttpProfileIsMissing()
+    public async Task StartScript_ShouldUseProjectProfile_WhenHttpProfileIsMissing()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -130,8 +130,17 @@ public sealed class StartPs1IntegrationTests : IDisposable
         var result = await RunStartScriptAsync(tempRepositoryRoot);
 
         // Assert
-        result.ExitCode.Should().Be(11);
-        result.StandardOutput.Should().Contain("[CODE:11]").And.Contain("Profile 'http' is missing");
+        result.ExitCode.Should().Be(0);
+        result.StandardOutput.Should().Contain("Updated 'https' profile");
+
+        using var jsonDocument = JsonDocument.Parse(File.ReadAllText(launchSettingsPath));
+        var profileUrl = jsonDocument.RootElement
+            .GetProperty("profiles")
+            .GetProperty("https")
+            .GetProperty("applicationUrl")
+            .GetString();
+        profileUrl.Should().NotBeNullOrWhiteSpace();
+        profileUrl.Should().MatchRegex("^http://localhost:[0-9]+$");
     }
 
     /// <summary>
@@ -229,7 +238,7 @@ public sealed class StartPs1IntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// Validates malformed profiles.http (non-object) is handled per target with exit 11.
+    /// Validates malformed profiles.http (non-object) still fails with exit 11 if no usable profile exists.
     /// </summary>
     [Fact]
     public async Task StartScript_ShouldReturnExit11_PerTarget_WhenHttpProfileIsNotObject()
@@ -257,9 +266,53 @@ public sealed class StartPs1IntegrationTests : IDisposable
 
         // Assert
         result.ExitCode.Should().Be(11);
-        result.StandardOutput.Should().Contain("[CODE:11]").And.Contain("must be an object");
+        result.StandardOutput.Should().Contain("[CODE:11]").And.Contain("No usable profile was found");
         result.StandardOutput.Should().NotContain("[CODE:99]");
         ReadHttpApplicationUrl(validLaunchSettingsPath).Should().MatchRegex("^http://localhost:[0-9]+$");
+    }
+
+    /// <summary>
+    /// Validates malformed profiles.http (non-object) falls back to a usable project profile.
+    /// </summary>
+    [Fact]
+    public async Task StartScript_ShouldUseProjectProfile_WhenHttpProfileIsInvalidButProjectProfileExists()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // Arrange
+        var tempRepositoryRoot = CreateTemporaryRepository();
+        var launchSettingsPath = Path.Combine(tempRepositoryRoot, "src", "AppOne", "Properties", "launchSettings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(launchSettingsPath)!);
+        File.WriteAllText(launchSettingsPath, """
+{
+  "profiles": {
+    "http": "not-an-object",
+    "https": {
+      "commandName": "Project",
+      "applicationUrl": "https://localhost:7001"
+    }
+  }
+}
+""");
+
+        // Act
+        var result = await RunStartScriptAsync(tempRepositoryRoot);
+
+        // Assert
+        result.ExitCode.Should().Be(0);
+        result.StandardOutput.Should().Contain("Updated 'https' profile");
+
+        using var jsonDocument = JsonDocument.Parse(File.ReadAllText(launchSettingsPath));
+        var profileUrl = jsonDocument.RootElement
+            .GetProperty("profiles")
+            .GetProperty("https")
+            .GetProperty("applicationUrl")
+            .GetString();
+        profileUrl.Should().NotBeNullOrWhiteSpace();
+        profileUrl.Should().MatchRegex("^http://localhost:[0-9]+$");
     }
 
     /// <inheritdoc />

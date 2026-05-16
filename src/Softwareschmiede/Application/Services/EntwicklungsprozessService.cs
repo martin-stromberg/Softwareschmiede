@@ -171,20 +171,22 @@ public sealed class EntwicklungsprozessService
             await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, ct);
         }
 
+        string? startskriptHinweis = null;
         if (repository.StartKonfiguration is not null && _repositoryStartskriptService is not null)
         {
             try
             {
                 await _repositoryStartskriptService.RunAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
             }
-            catch
+            catch (OperationCanceledException)
             {
-                if (Directory.Exists(lokalerKlonPfad))
-                {
-                    DeleteDirectoryForce(lokalerKlonPfad);
-                }
-
                 throw;
+            }
+            catch (Exception ex)
+            {
+                startskriptHinweis =
+                    $"Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden ({ex.Message}). Die Aufgabe wurde dennoch gestartet.";
+                _logger.LogWarning(ex, "Repository-Startskript für Aufgabe {AufgabeId} ist fehlgeschlagen.", aufgabeId);
             }
         }
 
@@ -210,10 +212,66 @@ public sealed class EntwicklungsprozessService
         var protokollNachricht = nutzeExistierendenBranch
             ? $"Klon angelegt, vorhandener Branch ausgecheckt: {branchName} in {lokalerKlonPfad}"
             : $"Klon und Branch angelegt: {branchName} in {lokalerKlonPfad}";
+        if (!string.IsNullOrWhiteSpace(startskriptHinweis))
+        {
+            protokollNachricht = $"{protokollNachricht}{Environment.NewLine}{startskriptHinweis}";
+        }
 
         await _protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.GitAktion, protokollNachricht, ct: ct);
 
         _logger.LogInformation("Entwicklungsprozess für Aufgabe {AufgabeId} erfolgreich gestartet.", aufgabeId);
+    }
+
+    /// <summary>Führt das konfigurierte Repository-Startskript einer laufenden Aufgabe manuell aus.</summary>
+    public async Task<(bool Success, string Message)> RepositoryStartskriptAusfuehrenAsync(Guid aufgabeId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Repository-Startskript für Aufgabe {AufgabeId} manuell ausführen.", aufgabeId);
+
+        if (_repositoryStartskriptService is null)
+        {
+            throw new InvalidOperationException("Repository-Startskript-Service ist nicht verfügbar.");
+        }
+
+        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        if (aufgabe.Status is not (AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv))
+        {
+            throw new InvalidOperationException("Das Repository-Startskript kann nur für laufende Aufgaben ausgeführt werden.");
+        }
+
+        if (string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
+        {
+            throw new InvalidOperationException("Die Aufgabe hat keinen lokalen Klonpfad.");
+        }
+
+        if (!Directory.Exists(aufgabe.LokalerKlonPfad))
+        {
+            throw new InvalidOperationException("Das lokale Arbeitsverzeichnis der Aufgabe ist nicht mehr vorhanden.");
+        }
+
+        var repositoryUrl = aufgabe.GitRepository?.RepositoryUrl ?? string.Empty;
+        var repository = await ResolveRepositoryAsync(aufgabe, repositoryUrl, ct);
+        var startKonfiguration = repository.StartKonfiguration
+            ?? throw new InvalidOperationException("Für das Repository ist kein Startskript konfiguriert.");
+
+        try
+        {
+            await _repositoryStartskriptService.RunAsync(aufgabe.LokalerKlonPfad, startKonfiguration, ct);
+            const string successMessage = "Repository-Startskript wurde ausgeführt.";
+            await _protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.GitAktion, successMessage, ct: ct);
+            return (true, successMessage);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var hintMessage = $"Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden ({ex.Message}).";
+            _logger.LogWarning(ex, "Manuelle Startskript-Ausführung für Aufgabe {AufgabeId} ist fehlgeschlagen.", aufgabeId);
+            await _protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.GitAktion, hintMessage, ct: ct);
+            return (false, hintMessage);
+        }
     }
 
     /// <summary>Startet einen KI-Lauf und streamt die Ausgabe.</summary>

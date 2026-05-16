@@ -1,7 +1,6 @@
 @page "/projekte/{Id:guid}"
 @rendermode InteractiveServer
 @using Softwareschmiede.Domain.Entities
-@using Softwareschmiede.Domain.Enums
 
 <PageTitle>@(_projekt?.Name ?? "Projekt") – Softwareschmiede</PageTitle>
 
@@ -129,7 +128,7 @@ else
         else
         {
             <table>
-                <thead><tr><th>Name</th><th>URL</th><th>Plugin</th><th>Startskript</th><th>Portmodus</th><th></th></tr></thead>
+                <thead><tr><th>Name</th><th>URL</th><th>Plugin</th><th>Startskript</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var repo in _projekt.Repositories.Where(r => r.Aktiv))
                     {
@@ -147,7 +146,6 @@ else
                             </td>
                             <td><code>@repo.PluginTyp</code></td>
                             <td><code>@(repo.StartKonfiguration?.StartScriptRelativePath ?? "–")</code></td>
-                            <td>@(repo.StartKonfiguration?.PortModus.ToString() ?? "–")</td>
                             <td>
                                 <button class="btn btn-secondary" @onclick="() => StartKonfigurationBearbeiten(repo.Id)">⚙️ Startskript</button>
                             </td>
@@ -165,26 +163,6 @@ else
             <div class="form-group">
                 <label class="form-label">Skriptpfad (relativ zum Repository) *</label>
                 <input class="form-control" @bind="_startScriptRelativePath" placeholder="scripts/start.ps1" />
-            </div>
-            <div class="form-group">
-                <label class="form-label">Skript-Argumente (optional)</label>
-                <input class="form-control" @bind="_startScriptArgumentsTemplate" placeholder="-Environment Dev" />
-            </div>
-            <div class="form-group">
-                <label class="form-label">Portmodus</label>
-                <select class="form-control" @bind="_startPortModus">
-                    <option value="@Softwareschmiede.Domain.Enums.RepositoryStartPortModus.Auto">Auto</option>
-                    <option value="@Softwareschmiede.Domain.Enums.RepositoryStartPortModus.Fest">Fest</option>
-                    <option value="@Softwareschmiede.Domain.Enums.RepositoryStartPortModus.ScriptGesteuert">Script-gesteuert</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Port von</label>
-                <input class="form-control" type="number" @bind="_startPortBereichVon" />
-            </div>
-            <div class="form-group">
-                <label class="form-label">Port bis</label>
-                <input class="form-control" type="number" @bind="_startPortBereichBis" />
             </div>
             <div class="form-group">
                 <label class="form-label">

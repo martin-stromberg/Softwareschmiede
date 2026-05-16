@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
-using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
@@ -132,7 +131,6 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             Id = Guid.NewGuid(),
             GitRepositoryId = Guid.NewGuid(),
             Aktiv = true,
-            PortModus = RepositoryStartPortModus.Auto,
             StartScriptRelativePath = "start.ps1"
         };
 
