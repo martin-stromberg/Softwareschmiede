@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
@@ -14,6 +15,8 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// </summary>
 public sealed class GitHubCopilotPlugin : CliKiPluginBase
 {
+    private const string ExecutablePathSettingKey = "ExecutablePath";
+
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubCopilotPlugin> _logger;
@@ -42,6 +45,16 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
                 Placeholder: "ghp_...",
                 Description: "GitHub Personal Access Token. Wird als GH_TOKEN-Umgebungsvariable an das copilot-CLI übergeben.",
                 IsRequired: false)
+        ]),
+        new PluginSettingGroup("Ausführung",
+        [
+            new PluginSettingField(
+                Key: ExecutablePathSettingKey,
+                Label: "Copilot CLI Pfad",
+                FieldType: PluginSettingFieldType.Text,
+                Placeholder: "C:\\Program Files\\GitHub Copilot\\copilot.exe",
+                Description: "Optionaler absoluter Pfad zur copilot-Executable. Erforderlich für IIS, wenn der Application-Pool die PATH-Variable nicht enthält.",
+                IsRequired: false)
         ])
     ];
 
@@ -56,15 +69,49 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         _logger = logger;
     }
 
-    private IDictionary<string, string> GetGhEnvironment()
+    private IDictionary<string, string> GetGhEnvironment(string localRepoPath)
     {
         var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
-        var env = new Dictionary<string, string>();
+
+        var runtimeRoot = Path.Combine(localRepoPath, ".softwareschmiede", "copilot-runtime");
+        var userProfile = Path.Combine(runtimeRoot, "userprofile");
+        var localAppData = Path.Combine(runtimeRoot, "localappdata");
+        var appData = Path.Combine(runtimeRoot, "appdata");
+        var temp = Path.Combine(runtimeRoot, "temp");
+
+        Directory.CreateDirectory(runtimeRoot);
+        Directory.CreateDirectory(userProfile);
+        Directory.CreateDirectory(localAppData);
+        Directory.CreateDirectory(appData);
+        Directory.CreateDirectory(temp);
+
+        var env = new Dictionary<string, string>
+        {
+            ["USERPROFILE"] = userProfile,
+            ["HOME"] = userProfile,
+            ["LOCALAPPDATA"] = localAppData,
+            ["APPDATA"] = appData,
+            ["TEMP"] = temp,
+            ["TMP"] = temp,
+        };
+
         if (!string.IsNullOrEmpty(token))
         {
             env["GH_TOKEN"] = token;
         }
+
         return env;
+    }
+
+    private string GetCopilotCommand()
+    {
+        var configuredPath = _credentialStore.GetCredential($"{PluginPrefix}.{ExecutablePathSettingKey}");
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return configuredPath.Trim().Trim('"');
+        }
+
+        return "copilot";
     }
 
     /// <inheritdoc/>
@@ -163,13 +210,34 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         await File.WriteAllTextAsync(promptFile, prompt, ct);
 
         var args = BuildCopilotArgs(promptFile, agent, model);
-        var env = GetGhEnvironment();
+        var env = GetGhEnvironment(localRepoPath);
+        var copilotCommand = GetCopilotCommand();
 
         _logger.LogInformation("Rufe copilot CLI mit Agent {AgentName} auf.", agent.Name);
 
-        await foreach (var line in _cliRunner.StreamAsync("copilot", args, localRepoPath, env, ct))
+        var stream = _cliRunner.StreamAsync(copilotCommand, args, localRepoPath, env, ct);
+        await using var enumerator = stream.GetAsyncEnumerator(ct);
+
+        while (true)
         {
-            yield return line;
+            bool hasNext;
+            try
+            {
+                hasNext = await enumerator.MoveNextAsync();
+            }
+            catch (Win32Exception ex)
+            {
+                throw new InvalidOperationException(
+                    "Copilot CLI wurde nicht gefunden. Bitte in den Plugin-Einstellungen 'Copilot CLI Pfad' als absoluten Pfad setzen (z.B. C:\\Program Files\\GitHub Copilot\\copilot.exe).",
+                    ex);
+            }
+
+            if (!hasNext)
+            {
+                break;
+            }
+
+            yield return enumerator.Current;
         }
     }
 
@@ -268,8 +336,15 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Prufe GitHub-Copilot-Plugin-Health.");
-        var result = await _cliRunner.RunAsync("copilot", ["--version"], null, null, ct);
-        return result.IsSuccess;
+        try
+        {
+            var result = await _cliRunner.RunAsync(GetCopilotCommand(), ["--version"], null, null, ct);
+            return result.IsSuccess;
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
     }
 
     private static string? ReadAgentDescription(string agentFilePath)
