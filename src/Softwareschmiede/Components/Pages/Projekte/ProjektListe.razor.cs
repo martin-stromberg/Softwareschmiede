@@ -57,5 +57,5 @@ public partial class ProjektListe
 
     private void FormAbbrechen() { _showForm = false; _fehler = null; }
 
-    private void ZurDetail(Guid id) => NavigationManager.NavigateTo($"/projekte/{id}");
+    private void ZurDetail(Guid id) => NavigationManager.NavigateTo($"projekte/{id}");
 }

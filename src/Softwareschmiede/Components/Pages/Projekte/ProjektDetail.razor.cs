@@ -52,7 +52,7 @@ public partial class ProjektDetail
         _loading = false;
     }
 
-    private void NeuAufgabe() => NavigationManager.NavigateTo($"/projekte/{Id}/aufgaben/neu");
+    private void NeuAufgabe() => NavigationManager.NavigateTo($"projekte/{Id}/aufgaben/neu");
 
     private async Task ArchivierenAsync()
     {
@@ -71,7 +71,7 @@ public partial class ProjektDetail
     private async Task DeleteAsync()
     {
         await ProjektService.DeleteAsync(Id);
-        NavigationManager.NavigateTo("/projekte");
+        NavigationManager.NavigateTo("projekte");
     }
 
     private async Task ToggleRepositoryFormAsync()
@@ -206,5 +206,5 @@ public partial class ProjektDetail
         }
     }
 
-    private void ZurAufgabe(Guid aufgabeId) => NavigationManager.NavigateTo($"/aufgaben/{aufgabeId}");
+    private void ZurAufgabe(Guid aufgabeId) => NavigationManager.NavigateTo($"aufgaben/{aufgabeId}");
 }

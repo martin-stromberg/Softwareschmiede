@@ -655,7 +655,7 @@ public partial class AufgabeDetail : IDisposable
         {
             await AufgabeService.DeleteAsync(Id, _cts.Token);
             if (_aufgabe is not null)
-                NavigationManager.NavigateTo($"/projekte/{_aufgabe.ProjektId}");
+                NavigationManager.NavigateTo($"projekte/{_aufgabe.ProjektId}");
         }
         catch (Exception ex) { _fehler = ex.Message; _processing = false; }
     }
@@ -677,9 +677,9 @@ public partial class AufgabeDetail : IDisposable
     private void Zurueck()
     {
         if (_aufgabe is not null)
-            NavigationManager.NavigateTo($"/projekte/{_aufgabe.ProjektId}");
+            NavigationManager.NavigateTo($"projekte/{_aufgabe.ProjektId}");
         else
-            NavigationManager.NavigateTo("/projekte");
+            NavigationManager.NavigateTo("projekte");
     }
 
     private static string GetProtokollCssClass(ProtokollTyp typ) => typ switch

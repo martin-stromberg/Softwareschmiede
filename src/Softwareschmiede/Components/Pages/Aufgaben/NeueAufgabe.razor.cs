@@ -81,9 +81,9 @@ public partial class NeueAufgabe
             Aufgabe aufgabe;
             if (_selectedIssue is not null)
                 aufgabe = await AufgabeService.CreateFromIssueAsync(ProjektId, _selectedIssue, _repositoryId);
-            else
-                aufgabe = await AufgabeService.CreateAsync(ProjektId, _titel.Trim(), _beschreibung?.Trim(), _repositoryId);
-            NavigationManager.NavigateTo($"/aufgaben/{aufgabe.Id}");
+                else
+                    aufgabe = await AufgabeService.CreateAsync(ProjektId, _titel.Trim(), _beschreibung?.Trim(), _repositoryId);
+                NavigationManager.NavigateTo($"aufgaben/{aufgabe.Id}");
         }
         catch (Exception ex)
         {
@@ -92,5 +92,5 @@ public partial class NeueAufgabe
         }
     }
 
-    private void Zurueck() => NavigationManager.NavigateTo($"/projekte/{ProjektId}");
+    private void Zurueck() => NavigationManager.NavigateTo($"projekte/{ProjektId}");
 }

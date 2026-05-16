@@ -44,5 +44,5 @@ public partial class Home
         _projekte.FirstOrDefault(p => p.Id == projektId)?.Name ?? "–";
 
     private void NavigateToAufgabe(Guid id) =>
-        NavigationManager.NavigateTo($"/aufgaben/{id}");
+        NavigationManager.NavigateTo($"aufgaben/{id}");
 }

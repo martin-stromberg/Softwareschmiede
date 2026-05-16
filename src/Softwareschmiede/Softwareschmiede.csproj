@@ -10,6 +10,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede.Client\Softwareschmiede.Client.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.KiSimulator\Softwareschmiede.Plugin.KiSimulator.csproj" />
     <PackageReference Include="Markdig" Version="0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.*" />
@@ -31,7 +36,7 @@
     <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(OutDir)plugins" SkipUnchangedFiles="true" />
   </Target>
 
-  <Target Name="CopyPluginsToPublishOutput" AfterTargets="Publish">
+  <Target Name="CopyPluginsToPublishOutput" BeforeTargets="Publish">
     <ItemGroup>
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\$(TargetFramework)\*.dll" />
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\$(TargetFramework)\*.dll" />
