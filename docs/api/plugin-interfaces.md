@@ -45,10 +45,10 @@ Das System definiert zwei Plugin-Schnittstellen:
 
 ### Unterstützte KI-Plugin-Implementierungen (Stand: claude-cli-integration)
 
-| Implementierung | PluginName | CLI-Binary | Env-Variable für Token | Quellcode |
-|---|---|---|---|---|
-| `GitHubCopilotPlugin` | `GitHub Copilot` | `copilot` | `GH_TOKEN` | `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs` |
-| `ClaudeCliPlugin` | `Claude CLI` | `claude` | `ANTHROPIC_API_KEY` | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` |
+| Implementierung | PluginName | CLI-Binary | Env-Variable für Token | CLI-Pfad-Konfiguration | Quellcode |
+|---|---|---|---|---|---|
+| `GitHubCopilotPlugin` | `GitHub Copilot` | `copilot` | `GH_TOKEN` | optional: `Softwareschmiede.GitHubCopilot.ExecutablePath` | `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs` |
+| `ClaudeCliPlugin` | `Claude CLI` | `claude` | `ANTHROPIC_API_KEY` | nicht vorgesehen | `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` |
 
 **Hinweis:** Beide Implementierungen erfüllen denselben `IKiPlugin`-Contract. Provider-spezifische Unterschiede (CLI-Parameter, Token-Variable, Health-Check) sind ausschließlich Implementierungsdetails.
 
@@ -674,6 +674,18 @@ Task<bool> CheckHealthAsync(CancellationToken ct = default);
 **Rückgabewert:** `Task<bool>` – `true`, wenn das Plugin einsatzbereit ist; `false` bei Konfigurationsproblemen.
 
 **Fehlerverhalten:** Soll keine Exception werfen – Fehler werden als `false` zurückgegeben und intern geloggt.
+
+---
+
+### Implementierungshinweis: GitHubCopilotPlugin
+
+Das `GitHubCopilotPlugin` erweitert die Standard-`IKiPlugin`-Funktionalität um eine optionale Ausführungskonfiguration:
+
+- **Authentifizierung:** `Softwareschmiede.GitHubCopilot.Token` wird als `GH_TOKEN` an den CLI-Prozess übergeben.
+- **Ausführung:** `Softwareschmiede.GitHubCopilot.ExecutablePath` kann einen absoluten Pfad zur `copilot`-Executable enthalten.
+- Ist der Pfad nicht konfiguriert, wird weiterhin der Kommando-Name `copilot` verwendet.
+- Kann der Prozess nicht gestartet werden, wird der Fehler als `InvalidOperationException` mit einem Hinweis auf den optionalen absoluten Pfad gemappt.
+- Die Einstellung ist besonders für IIS-/Service-Umgebungen relevant, wenn `copilot` nicht über die PATH-Variable auflösbar ist.
 
 ---
 
