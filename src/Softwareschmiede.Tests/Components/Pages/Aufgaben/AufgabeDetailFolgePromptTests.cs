@@ -19,28 +19,33 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
 
     [Fact]
-    public void FolgePromptMarkup_ShouldContainAgentSelectionBinding_AndExactContextModes()
+    public void KiPanelMarkup_ShouldContainUnifiedPanel_AndConditionalContextMode()
     {
         var root = FindRepositoryRoot();
         var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Aufgaben", "AufgabeDetail.razor");
         var markup = File.ReadAllText(razorPath);
 
-        markup.Should().Contain("@if (_aufgabe.Status == AufgabeStatus.InBearbeitung && _protokoll.Any(p => p.Typ == ProtokollTyp.KiAntwort))");
-        markup.Should().Contain("@bind=\"_folgeAgentName\"");
+        markup.Should().Contain("@if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)");
+        markup.Should().Contain("<div class=\"card-title\">💬 KI-Anfrage</div>");
+        markup.Should().Contain("@bind=\"_kiAgentName\"");
+        markup.Should().Contain("@if (_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))");
         markup.Should().Contain("Kontext mitgeben");
         markup.Should().Contain("Kontext ignorieren");
         markup.Should().Contain("Kontext neu beginnen");
+        markup.Should().Contain("@onclick=\"KiStartenAsync\"");
+        markup.Should().Contain("disabled=\"@_processing\"");
+        markup.Should().NotContain("Folge-Prompt");
         markup.Should().NotContain("Kontext automatisch");
     }
 
     [Fact]
-    public async Task OnInitializedAsync_ShouldDefaultFolgeAgentToInitialAgent()
+    public async Task OnInitializedAsync_ShouldDefaultSelectedAgentToInitialAgent()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
 
         await sut.InvokeOnInitializedAsync();
 
-        GetPrivateField<string>(sut, "_folgeAgentName").Should().Be("agent-initial");
+        GetPrivateField<string>(sut, "_kiAgentName").Should().Be("agent-initial");
     }
 
     [Fact]
@@ -58,27 +63,26 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     }
 
     [Fact]
-    public async Task FolgePromptAsync_ShouldUseSelectedFollowAgent_AndResetToInitialAgent()
+    public async Task KiStartenAsync_ShouldUseSelectedAgent_AndKeepSelection()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
         await sut.InvokeOnInitializedAsync();
-        SetPrivateField(sut, "_folgePrompt", "Bitte passe die Tests an.");
-        SetPrivateField(sut, "_folgeAgentName", "agent-alt");
+        SetPrivateField(sut, "_prompt", "Bitte passe die Tests an.");
+        SetPrivateField(sut, "_kiAgentName", "agent-alt");
         SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextIgnorieren);
 
-        await InvokePrivateAsync(sut, "FolgePromptAsync");
+        await InvokePrivateAsync(sut, "KiStartenAsync");
 
         sut.StartedRuns.Should().ContainSingle();
         sut.StartedRuns[0].Prompt.Should().Be("Bitte passe die Tests an.");
         sut.StartedRuns[0].Agent.Name.Should().Be("agent-alt");
         sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextIgnorieren);
-        GetPrivateField<string>(sut, "_folgePrompt").Should().BeEmpty();
-        GetPrivateField<string>(sut, "_folgeAgentName").Should().Be("agent-initial");
-        GetPrivateField<FolgeanweisungsKontextmodus>(sut, "_folgeKontextmodus").Should().Be(FolgeanweisungsKontextmodus.KontextMitgeben);
+        GetPrivateField<string>(sut, "_prompt").Should().BeEmpty();
+        GetPrivateField<string>(sut, "_kiAgentName").Should().Be("agent-alt");
     }
 
     [Fact]
-    public async Task KiStartenAsync_ShouldKeepInitialPromptBehavior()
+    public async Task KiStartenAsync_ShouldUseDefaultKontextmodus_WhenKiAntwortExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
         await sut.InvokeOnInitializedAsync();
@@ -90,7 +94,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.StartedRuns.Should().ContainSingle();
         sut.StartedRuns[0].Prompt.Should().Be("Initialer Prompt");
         sut.StartedRuns[0].Agent.Name.Should().Be("agent-alt");
-        sut.StartedRuns[0].Kontextmodus.Should().BeNull();
+        sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextMitgeben);
         sut.StartedRuns[0].KiPluginPrefix.Should().Be("Softwareschmiede.TestKi");
         GetPrivateField<string>(sut, "_prompt").Should().BeEmpty();
     }
@@ -128,18 +132,37 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     }
 
     [Fact]
-    public async Task FolgePromptAsync_ShouldNotStart_WhenNeuBeginnenNotConfirmed()
+    public async Task KiStartenAsync_ShouldNotStart_WhenNeuBeginnenNotConfirmedAndKiAntwortExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
         await sut.InvokeOnInitializedAsync();
-        SetPrivateField(sut, "_folgePrompt", "Neuer Start");
+        SetPrivateField(sut, "_prompt", "Neuer Start");
         SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextNeuBeginnen);
         SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", false);
 
-        await InvokePrivateAsync(sut, "FolgePromptAsync");
+        await InvokePrivateAsync(sut, "KiStartenAsync");
 
         sut.StartedRuns.Should().BeEmpty();
         GetPrivateField<string?>(sut, "_fehler").Should().Contain("bestätigen");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldIgnoreKontextmodus_WhenNoKiAntwortExists()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            includeKiAntwort: false);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_prompt", "Neuer Start ohne Antwort");
+        SetPrivateField(sut, "_kiAgentName", "agent-alt");
+        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextNeuBeginnen);
+        SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", false);
+
+        await InvokePrivateAsync(sut, "KiStartenAsync");
+
+        sut.StartedRuns.Should().ContainSingle();
+        sut.StartedRuns[0].Kontextmodus.Should().BeNull();
     }
 
     [Fact]
@@ -181,15 +204,15 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     }
 
     [Fact]
-    public async Task FolgePromptAsync_ShouldStart_WhenNeuBeginnenConfirmed()
+    public async Task KiStartenAsync_ShouldStart_WhenNeuBeginnenConfirmedAndKiAntwortExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
         await sut.InvokeOnInitializedAsync();
-        SetPrivateField(sut, "_folgePrompt", "Bitte starte neu.");
+        SetPrivateField(sut, "_prompt", "Bitte starte neu.");
         SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextNeuBeginnen);
         SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", true);
 
-        await InvokePrivateAsync(sut, "FolgePromptAsync");
+        await InvokePrivateAsync(sut, "KiStartenAsync");
 
         sut.StartedRuns.Should().ContainSingle();
         sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextNeuBeginnen);
@@ -506,6 +529,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         IReadOnlyList<string> weitereAgenten,
         IReadOnlyList<(string Name, string Prefix)>? kiPlugins = null,
         string? storedDefaultKiPluginPrefix = null,
+        bool includeKiAntwort = true,
         Action<Mock<IGitPlugin>>? configureGitPlugin = null)
     {
         var projekt = new Projekt
@@ -530,14 +554,17 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         _db.Projekte.Add(projekt);
         _db.Aufgaben.Add(aufgabe);
-        _db.Protokolleintraege.Add(new Protokolleintrag
+        if (includeKiAntwort)
         {
-            Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            Typ = ProtokollTyp.KiAntwort,
-            Inhalt = "Antwort",
-            Zeitstempel = DateTimeOffset.UtcNow
-        });
+            _db.Protokolleintraege.Add(new Protokolleintrag
+            {
+                Id = Guid.NewGuid(),
+                AufgabeId = aufgabe.Id,
+                Typ = ProtokollTyp.KiAntwort,
+                Inhalt = "Antwort",
+                Zeitstempel = DateTimeOffset.UtcNow
+            });
+        }
         await _db.SaveChangesAsync();
 
         var aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);

@@ -56,11 +56,9 @@ public partial class AufgabeDetail : IDisposable
     private string _selectedAgentName = string.Empty;
     private string _kiAgentName = string.Empty;
     private string _selectedKiPluginPrefix = string.Empty;
-    private string _folgeAgentName = string.Empty;
     private FolgeanweisungsKontextmodus _folgeKontextmodus = FolgeanweisungsKontextmodus.KontextMitgeben;
     private bool _folgeKontextNeuBeginnenBestaetigt;
     private string _prompt = string.Empty;
-    private string _folgePrompt = string.Empty;
     private string _commitMessage = string.Empty;
     private string _resetType = "mixed";
     private string? _resetRef;
@@ -142,11 +140,6 @@ public partial class AufgabeDetail : IDisposable
                 _selectedAgentName = _aufgabe.AgentenName;
             }
 
-            if (string.IsNullOrWhiteSpace(_folgeAgentName))
-            {
-                _folgeAgentName = _aufgabe.AgentenName ?? string.Empty;
-            }
-
             // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
             if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
                 && string.IsNullOrWhiteSpace(_prompt)
@@ -186,11 +179,6 @@ public partial class AufgabeDetail : IDisposable
                 {
                     _kiAgentName = _aufgabe.AgentenName;
                     _selectedAgentName = _aufgabe.AgentenName;
-                }
-
-                if (string.IsNullOrWhiteSpace(_folgeAgentName))
-                {
-                    _folgeAgentName = _aufgabe.AgentenName ?? string.Empty;
                 }
 
                 // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
@@ -327,23 +315,18 @@ public partial class AufgabeDetail : IDisposable
 
     private async Task KiStartenAsync()
     {
-        await KiMitPromptStartenAsync(_prompt, _kiAgentName, null);
-        _prompt = string.Empty;
-    }
-
-    private async Task FolgePromptAsync()
-    {
-        if (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen && !_folgeKontextNeuBeginnenBestaetigt)
+        var hasKiAntwort = _protokoll.Any(p => p.Typ == ProtokollTyp.KiAntwort);
+        if (hasKiAntwort
+            && _folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen
+            && !_folgeKontextNeuBeginnenBestaetigt)
         {
             _fehler = "Bitte bestätigen Sie zuerst, dass der bisherige Kontext zurückgesetzt werden soll.";
             return;
         }
 
-        var initialAgent = _aufgabe?.AgentenName ?? string.Empty;
-        await KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName, _folgeKontextmodus);
-        _folgePrompt = string.Empty;
-        _folgeAgentName = initialAgent;
-        _folgeKontextmodus = FolgeanweisungsKontextmodus.KontextMitgeben;
+        FolgeanweisungsKontextmodus? kontextmodus = hasKiAntwort ? _folgeKontextmodus : null;
+        await KiMitPromptStartenAsync(_prompt, _kiAgentName, kontextmodus);
+        _prompt = string.Empty;
         _folgeKontextNeuBeginnenBestaetigt = false;
     }
 

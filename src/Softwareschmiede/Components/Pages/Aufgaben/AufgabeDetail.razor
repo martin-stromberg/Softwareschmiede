@@ -218,11 +218,11 @@ else
 
         <!-- Rechte Spalte: KI-Prompt + Protokoll -->
         <div>
-            <!-- KI-Prompt nur wenn InBearbeitung -->
-            @if (_aufgabe.Status == AufgabeStatus.InBearbeitung)
+            <!-- KI-Anfrage nach Start bis zum Abschluss sichtbar -->
+            @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
             {
                 <div class="card">
-                    <div class="card-title">💬 KI-Prompt</div>
+                    <div class="card-title">💬 KI-Anfrage</div>
                     <div class="form-group">
                         <label class="form-label">Agent auswählen</label>
                         <select class="form-control" @bind="_kiAgentName">
@@ -249,12 +249,35 @@ else
                             }
                         </select>
                     </div>
+                    @if (_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Kontextmodus</label>
+                            <select class="form-control" value="@_folgeKontextmodus" @onchange="FolgeKontextmodusGeaendert">
+                                <option value="@FolgeanweisungsKontextmodus.KontextMitgeben">Kontext mitgeben</option>
+                                <option value="@FolgeanweisungsKontextmodus.KontextIgnorieren">Kontext ignorieren</option>
+                                <option value="@FolgeanweisungsKontextmodus.KontextNeuBeginnen">Kontext neu beginnen</option>
+                            </select>
+                        </div>
+                        @if (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen)
+                        {
+                            <div class="alert alert-warning" style="margin-bottom:.75rem">
+                                <strong>Achtung:</strong> Der bisherige Kontextverlauf dieser Aufgabe wird beim Senden zurückgesetzt.
+                                <div style="margin-top:.5rem">
+                                    <label style="display:flex;gap:.5rem;align-items:center;cursor:pointer">
+                                        <input type="checkbox" @bind="_folgeKontextNeuBeginnenBestaetigt" />
+                                        Ich habe verstanden, dass der bisherige Kontext verworfen wird.
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    }
                     <div class="form-group">
                         <label class="form-label">Prompt *</label>
                         <textarea class="form-control" @bind="_prompt" rows="4" placeholder="Beschreibe was die KI tun soll..."></textarea>
                     </div>
-                    <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@(_processing || string.IsNullOrWhiteSpace(_prompt))">
-                        🤖 KI starten
+                    <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@_processing">
+                        ▶️ Senden
                     </button>
                 </div>
             }
@@ -296,65 +319,6 @@ else
                 }
             </div>
 
-            <!-- Folge-Prompt (nach einem KI-Lauf) -->
-            @if (_aufgabe.Status == AufgabeStatus.InBearbeitung && _protokoll.Any(p => p.Typ == ProtokollTyp.KiAntwort))
-            {
-                <div class="card">
-                    <div class="card-title">🔄 Folge-Prompt</div>
-                    <div class="form-group">
-                        <label class="form-label">Agent auswählen</label>
-                        <select class="form-control" @bind="_folgeAgentName">
-                            <option value="">– Agent wählen –</option>
-                            @foreach (var a in _agenten)
-                            {
-                                <option value="@a.Name">@a.Name</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">KI-Plugin</label>
-                        <select class="form-control" @bind="_selectedKiPluginPrefix">
-                            @if (_kiPlugins.Count == 0)
-                            {
-                                <option value="">– Kein KI-Plugin verfügbar –</option>
-                            }
-                            else
-                            {
-                                @foreach (var plugin in _kiPlugins)
-                                {
-                                    <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
-                                }
-                            }
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Kontextmodus</label>
-                        <select class="form-control" value="@_folgeKontextmodus" @onchange="FolgeKontextmodusGeaendert">
-                            <option value="@FolgeanweisungsKontextmodus.KontextMitgeben">Kontext mitgeben</option>
-                            <option value="@FolgeanweisungsKontextmodus.KontextIgnorieren">Kontext ignorieren</option>
-                            <option value="@FolgeanweisungsKontextmodus.KontextNeuBeginnen">Kontext neu beginnen</option>
-                        </select>
-                    </div>
-                    @if (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen)
-                    {
-                        <div class="alert alert-warning" style="margin-bottom:.75rem">
-                            <strong>Achtung:</strong> Der bisherige Kontextverlauf dieser Aufgabe wird beim Senden zurückgesetzt.
-                            <div style="margin-top:.5rem">
-                                <label style="display:flex;gap:.5rem;align-items:center;cursor:pointer">
-                                    <input type="checkbox" @bind="_folgeKontextNeuBeginnenBestaetigt" />
-                                    Ich habe verstanden, dass der bisherige Kontext verworfen wird.
-                                </label>
-                            </div>
-                        </div>
-                    }
-                    <div class="form-group">
-                        <textarea class="form-control" @bind="_folgePrompt" rows="3" placeholder="Weiteren Prompt eingeben..."></textarea>
-                    </div>
-                    <button class="btn btn-primary" @onclick="FolgePromptAsync" disabled="@(_processing || string.IsNullOrWhiteSpace(_folgePrompt) || (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen && !_folgeKontextNeuBeginnenBestaetigt))">
-                        ▶️ Senden
-                    </button>
-                </div>
-            }
         </div>
     </div>
 }
