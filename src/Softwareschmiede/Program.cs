@@ -42,6 +42,7 @@ namespace Softwareschmiede
             builder.Services.AddScoped<ProtokollService>();
             builder.Services.AddScoped<EntwicklungsprozessService>();
             builder.Services.AddScoped<GitOrchestrationService>();
+            builder.Services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();
             builder.Services.AddScoped<RepositoryStartskriptService>();
             builder.Services.AddScoped<PluginSettingsService>();
             builder.Services.AddScoped<PluginDefaultSettingsService>();

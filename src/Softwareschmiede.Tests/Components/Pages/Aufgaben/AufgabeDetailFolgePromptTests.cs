@@ -62,6 +62,37 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_selectedKiPluginPrefix").Should().Be("Softwareschmiede.KiB");
     }
 
+    /// <summary>Prüft, dass der Query-Parameter die Explorer-Ansicht aktiviert.</summary>
+    [Fact]
+    public async Task OnParametersSetAsync_ShouldEnableExplorer_WhenViewQueryIsTree()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+
+        sut.View = "tree";
+        await sut.InvokeOnParametersSetAsync();
+
+        GetPrivateField<bool>(sut, "_showExplorer").Should().BeTrue();
+    }
+
+    /// <summary>Prüft, dass nur die Explorer-Ansicht den Tree-Modus aktiviert.</summary>
+    [Fact]
+    public async Task OnParametersSetAsync_ShouldDisableExplorer_WhenViewQueryIsTaskOrMissing()
+    {
+        var taskSut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        taskSut.View = "task";
+
+        await taskSut.InvokeOnParametersSetAsync();
+
+        GetPrivateField<bool>(taskSut, "_showExplorer").Should().BeFalse();
+
+        var defaultSut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        defaultSut.View = null;
+
+        await defaultSut.InvokeOnParametersSetAsync();
+
+        GetPrivateField<bool>(defaultSut, "_showExplorer").Should().BeFalse();
+    }
+
     [Fact]
     public async Task KiStartenAsync_ShouldUseSelectedAgent_AndKeepSelection()
     {
@@ -216,6 +247,92 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         sut.StartedRuns.Should().ContainSingle();
         sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextNeuBeginnen);
+    }
+
+    /// <summary>Prüft, dass die Explorer-Ansicht zwischen Baum- und Listenlayout umschaltet.</summary>
+    [Fact]
+    public async Task VisibleWorkspaceNodes_ShouldSwitchBetweenTreeAndListLayouts()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        var sourceFile = new WorkspaceFileNode
+        {
+            Name = "Child.cs",
+            RelativePath = Path.Combine("src", "Child.cs"),
+            IsDirectory = false,
+            Status = new WorkspaceFileStatus('M', ' '),
+        };
+        var directory = new WorkspaceFileNode
+        {
+            Name = "src",
+            RelativePath = "src",
+            IsDirectory = true,
+            IsExpanded = false,
+            ChildrenLoaded = true,
+            ChangedFileCount = 1,
+            Children = [sourceFile],
+        };
+        var rootFile = new WorkspaceFileNode
+        {
+            Name = "README.md",
+            RelativePath = "README.md",
+            IsDirectory = false,
+            Status = new WorkspaceFileStatus(' ', 'M'),
+        };
+
+        SetPrivateField(sut, "_workspaceSnapshot", new WorkspaceSnapshot
+        {
+            RepositoryPath = Path.GetTempPath(),
+            CommitCount = 1,
+            ChangedFileCount = 2,
+            RootNodes = [directory, rootFile],
+            FlatFiles = [sourceFile, rootFile],
+        });
+        SetPrivateField(sut, "_useTreeLayout", true);
+
+        var treeRows = GetPrivateProperty<ICollection<WorkspaceNodeRow>>(sut, "VisibleWorkspaceNodes");
+        treeRows.Should().HaveCount(2);
+        treeRows.ElementAt(0).Node.Should().Be(directory);
+        treeRows.ElementAt(0).Depth.Should().Be(0);
+        treeRows.ElementAt(1).Node.Should().Be(rootFile);
+        treeRows.ElementAt(1).Depth.Should().Be(0);
+
+        directory.IsExpanded = true;
+
+        treeRows = GetPrivateProperty<ICollection<WorkspaceNodeRow>>(sut, "VisibleWorkspaceNodes");
+        treeRows.Should().HaveCount(3);
+        treeRows.ElementAt(0).Node.Should().Be(directory);
+        treeRows.ElementAt(1).Node.Should().Be(sourceFile);
+        treeRows.ElementAt(1).Depth.Should().Be(1);
+        treeRows.ElementAt(2).Node.Should().Be(rootFile);
+
+        SetPrivateField(sut, "_useTreeLayout", false);
+
+        var listRows = GetPrivateProperty<ICollection<WorkspaceNodeRow>>(sut, "VisibleWorkspaceNodes");
+        listRows.Should().HaveCount(2);
+        listRows.Should().OnlyContain(row => row.Depth == 0);
+        listRows.ElementAt(0).Node.Should().Be(sourceFile);
+        listRows.ElementAt(1).Node.Should().Be(rootFile);
+    }
+
+    /// <summary>Prüft die Verzeichnisauswahl im Explorer.</summary>
+    [Fact]
+    public async Task WorkspaceNodeClickedAsync_ShouldToggleDirectoryExpansion()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        var directory = new WorkspaceFileNode
+        {
+            Name = "src",
+            RelativePath = "src",
+            IsDirectory = true,
+            IsExpanded = false,
+        };
+
+        await InvokePrivateAsync(sut, "WorkspaceNodeClickedAsync", directory);
+
+        directory.IsExpanded.Should().BeTrue();
+        GetPrivateField<WorkspaceFileNode?>(sut, "_selectedWorkspaceNode").Should().Be(directory);
+        GetPrivateField<FilePreview?>(sut, "_selectedWorkspacePreview").Should().BeNull();
+        GetPrivateField<string?>(sut, "_selectedWorkspacePath").Should().Be("src");
     }
 
     [Fact]
@@ -635,6 +752,19 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             pluginSelectionService,
             NullLogger<GitOrchestrationService>.Instance);
 
+        var workspaceBrowserServiceMock = new Mock<IGitWorkspaceBrowserService>();
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WorkspaceSnapshot
+            {
+                RepositoryPath = Path.GetTempPath(),
+                CommitCount = 0,
+                ChangedFileCount = 0,
+            });
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadPreviewAsync(It.IsAny<string>(), It.IsAny<WorkspaceFileNode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FilePreview(string.Empty, null, false, false, false, null, null, null));
+
         var sut = new TestAufgabeDetailPage { Id = aufgabe.Id };
         SetInjectedProperty(sut, "ServiceScopeFactory", new Mock<IServiceScopeFactory>().Object);
         SetInjectedProperty(sut, "PluginManager", pluginManagerMock.Object);
@@ -643,6 +773,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         SetInjectedProperty(sut, "EntwicklungsprozessService", entwicklungsprozessService);
         SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
         SetInjectedProperty(sut, "GitService", gitService);
+        SetInjectedProperty(sut, "GitWorkspaceBrowserService", workspaceBrowserServiceMock.Object);
         SetInjectedProperty(sut, "ProtokollService", protokollService);
         SetInjectedProperty(sut, "ProjektService", projektService);
         SetInjectedProperty(sut, "AgentPackageService", agentPackageServiceMock.Object);
@@ -707,6 +838,13 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         return (T)field!.GetValue(target)!;
     }
 
+    private static T GetPrivateProperty<T>(object target, string propertyName)
+    {
+        var property = typeof(AufgabeDetail).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic);
+        property.Should().NotBeNull($"Property {propertyName} should exist.");
+        return (T)property!.GetValue(target)!;
+    }
+
     private static void SetInjectedProperty(object target, string propertyName, object value)
     {
         var property = typeof(AufgabeDetail).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -735,6 +873,8 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         public List<(string Prompt, AgentInfo Agent, string? Model, FolgeanweisungsKontextmodus? Kontextmodus, string? KiPluginPrefix)> StartedRuns { get; } = [];
 
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
+
+        public Task InvokeOnParametersSetAsync() => OnParametersSetAsync();
 
         protected override void StartKiLauf(
             string prompt,

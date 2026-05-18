@@ -18,6 +18,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
 | [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
+| [Live Project Browser mit Git-Status](./live-project-browser-git-status-flow.md) | `live-project-browser-git-status-flow.md` | Ablauf für Snapshot-Laden, Tree-/Listenansicht, Datei-Vorschau, Refresh und Rückkehr zur Aufgabenansicht |
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 | [Issue-, Branch- und PR-Verknüpfung](./issue-branch-pr-linking-flow.md) | `issue-branch-pr-linking-flow.md` | End-to-End-Flow von der Issue-Auswahl über issuebezogenen Branch bis zur PR-Closing-Direktive (`Closes #<Issue>`) |
@@ -179,6 +180,13 @@ Dokumentiert die repositorybezogene Startkonfiguration und die Ausführung eines
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Artefakte:** `start.ps1`, `launchSettings.json`, Visual-Studio-`http`-Profil
 
 Dokumentiert den lokalen Skriptablauf von der Portquellen-Auflösung (**Parameter → Env → Auto**) über das gezielte `launchSettings`-Update bis zur Exit-Code-Rückgabe.
+
+---
+
+### [Ablauf 18: Live Project Browser mit Git-Status](./live-project-browser-git-status-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `GitWorkspaceBrowserService`
+
+Beschreibt den kompletten UI-Pfad von der Aufgabenansicht über die Query-Parameter-gesteuerte Tree-/Listenansicht bis zur Dateivorschau und zum Refresh.
 
 ---
 

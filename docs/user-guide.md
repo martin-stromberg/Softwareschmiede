@@ -103,6 +103,16 @@ Sie können das Protokoll jederzeit aufrufen – auch Tage oder Wochen später.
 
 ---
 
+### Projektverzeichnis auf der Aufgabenseite
+
+Auf der Detailseite einer Aufgabe können Sie das verknüpfte lokale Repository direkt ansehen.
+Sie sehen dort die Anzahl der Commits, die lokalen Änderungen und das Projektverzeichnis mit Git-Status.
+Mit einem Klick auf eine Datei erhalten Sie Inhalt, Hinweis oder Vergleichsansicht.
+
+👉 Mehr dazu: [F021 – Live Project Browser mit Git-Status](./business/features/F021-live-project-browser-git-status.md)
+
+---
+
 ## Typischer Arbeitsablauf
 
 Dieser Ablauf zeigt, wie eine Aufgabe von Anfang bis Ende bearbeitet wird.
@@ -239,4 +249,5 @@ Sie können eine laufende oder offene Aufgabe jederzeit abbrechen.
 - [F009 – Arbeitsverzeichnis konfigurieren](./business/features/F009-arbeitsverzeichnis-konfigurieren.md)
 - [F010 – Plugin-Prinzip für Integrationen](./business/features/F010-plugin-prinzip-integrationen.md)
 - [F013 – Claude-CLI-Integration](./business/features/F013-claude-cli-integration.md)
+- [F021 – Live Project Browser mit Git-Status](./business/features/F021-live-project-browser-git-status.md)
 - [Feature-Übersicht](./business/features.md)
