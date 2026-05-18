@@ -47,6 +47,15 @@ else
             }
             <button class="btn btn-secondary" @onclick="() => _showResetForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">↩️ Reset</button>
         }
+        @if (_showExplorer)
+        {
+            <button class="btn btn-ghost" @onclick="SwitchToTaskViewAsync">← Zur Aufgabe</button>
+        }
+        else
+        {
+            <button class="btn btn-ghost" @onclick="SwitchToExplorerViewAsync">🗂️ Projektverzeichnis</button>
+        }
+        <button class="btn btn-ghost" @onclick="ExplorerRefreshAsync" disabled="@_loadingWorkspace">↻ Aktualisieren</button>
         @if (_aufgabe.Status == AufgabeStatus.InBearbeitung)
         {
             <button class="btn btn-success" @onclick="AbschliessenAsync">✅ Abschließen</button>
@@ -62,6 +71,131 @@ else
         }
     </div>
 
+    <div class="grid-3" style="margin-bottom:1rem">
+        <div class="stat-card">
+            <div class="stat-value">@(_workspaceSnapshot?.CommitCount ?? 0)</div>
+            <div class="stat-label">Commits</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@(_workspaceSnapshot?.ChangedFileCount ?? 0)</div>
+            <div class="stat-label">Geänderte Dateien</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@(_showExplorer ? "Tree" : "Task")</div>
+            <div class="stat-label">Ansicht</div>
+        </div>
+    </div>
+
+    @if (_showExplorer)
+    {
+        <div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                <span>🗂️ Repository-Explorer</span>
+                <div style="display:flex;gap:.5rem;align-items:center">
+                    <button class="btn btn-ghost" @onclick="() => _useTreeLayout = true" disabled="@_useTreeLayout">Baum</button>
+                    <button class="btn btn-ghost" @onclick="() => _useTreeLayout = false" disabled="@(!_useTreeLayout)">Liste</button>
+                </div>
+            </div>
+
+            @if (_loadingWorkspace)
+            {
+                <div class="loading"><div class="spinner"></div> Repository wird geladen...</div>
+            }
+            else if (_workspaceSnapshot?.HasError == true)
+            {
+                <div class="alert alert-warning">@_workspaceSnapshot.ErrorMessage</div>
+            }
+            else if (_workspaceSnapshot is null)
+            {
+                <div class="alert alert-warning">Kein Repository-Browser verfügbar.</div>
+            }
+            else if (_workspaceSnapshot.ChangedFileCount == 0)
+            {
+                <div class="alert alert-info">Keine geänderten Dateien vorhanden.</div>
+            }
+            else
+            {
+                <div class="grid-2">
+                    <div class="tree-panel">
+                        <div class="tree-header">
+                            <span class="tree-header-title">Änderungen</span>
+                            <span class="tree-header-title">@(_useTreeLayout ? "Baum" : "Liste")</span>
+                        </div>
+                        <Virtualize TItem="WorkspaceNodeRow" Items="@VisibleWorkspaceNodes" Context="entry" ItemSize="32">
+                            <div class="tree-item @(IsWorkspaceNodeSelected(entry.Node) ? "tree-item-selected" : "")"
+                                 style="padding-left:@(entry.Depth * 16 + 8)px"
+                                 @onclick="() => WorkspaceNodeClickedAsync(entry.Node)">
+                                @if (entry.Node.IsDirectory)
+                                {
+                                    <svg class="tree-expand-btn" @onclick:stopPropagation @onclick="() => WorkspaceNodeClickedAsync(entry.Node)">
+                                        @if (entry.Node.IsExpanded)
+                                        {
+                                            <use href="/sprite.svg#icon-chevron-down" />
+                                        }
+                                        else
+                                        {
+                                            <use href="/sprite.svg#icon-chevron-right" />
+                                        }
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <span style="width:16px;display:inline-block"></span>
+                                }
+
+                                <svg class="tree-item-icon">
+                                    <use href="/sprite.svg#@(entry.Node.IsDirectory ? "icon-folder" : "icon-file")" />
+                                </svg>
+
+                                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@entry.Node.Name</span>
+
+                                @if (entry.Node.IsDirectory)
+                                {
+                                    <span class="badge badge-offen">@entry.Node.ChangedFileCount</span>
+                                }
+                                else if (entry.Node.Status is not null)
+                                {
+                                    <span class="badge @entry.Node.Status.CssClass" title="@entry.Node.Status.Description">@entry.Node.Status.BadgeText</span>
+                                }
+                            </div>
+                        </Virtualize>
+                    </div>
+
+                    <div class="card" style="margin-bottom:0">
+                        <div class="card-title">Dateivorschau</div>
+                        @if (_selectedWorkspacePreview is null)
+                        {
+                            <p style="color:#94a3b8">Wählen Sie links eine Datei aus.</p>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(_selectedWorkspacePreview.Hint))
+                        {
+                            <div class="alert alert-warning">@_selectedWorkspacePreview.Hint</div>
+                            @if (_selectedWorkspacePreview.CurrentContent is not null)
+                            {
+                                <pre class="workspace-preview">@_selectedWorkspacePreview.CurrentContent</pre>
+                            }
+                        }
+                        else
+                        {
+                            <div class="comparison-grid">
+                                <div class="comparison-pane">
+                                    <div class="comparison-pane-title">Original</div>
+                                    <pre class="workspace-preview">@(_selectedWorkspacePreview.OriginalContent ?? "–")</pre>
+                                </div>
+                                <div class="comparison-pane">
+                                    <div class="comparison-pane-title">Aktuell</div>
+                                    <pre class="workspace-preview">@(_selectedWorkspacePreview.CurrentContent ?? (_selectedWorkspacePreview.IsDeleted ? "Datei gelöscht" : "–"))</pre>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!_showExplorer)
+    {
     @if (!string.IsNullOrEmpty(_fehler))
     {
         <div class="alert alert-error">@_fehler <button @onclick="() => _fehler = null" style="float:right;background:none;border:none;color:inherit;cursor:pointer">✕</button></div>
@@ -391,4 +525,5 @@ else
             <button class="btn btn-ghost" @onclick="StartDialogSchliessen" disabled="@_processing">Abbrechen</button>
         </div>
     </div>
+}
 }

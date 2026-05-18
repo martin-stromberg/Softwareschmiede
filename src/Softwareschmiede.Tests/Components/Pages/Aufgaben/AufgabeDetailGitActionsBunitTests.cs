@@ -259,6 +259,19 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             .Setup(service => service.GetPackageAsync("paket-a", It.IsAny<CancellationToken>()))
             .ReturnsAsync(packageInfo);
 
+        var workspaceBrowserServiceMock = new Mock<IGitWorkspaceBrowserService>();
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WorkspaceSnapshot
+            {
+                RepositoryPath = Path.GetTempPath(),
+                CommitCount = 0,
+                ChangedFileCount = 0,
+            });
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadPreviewAsync(It.IsAny<string>(), It.IsAny<WorkspaceFileNode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FilePreview(string.Empty, null, false, false, false, null, null, null));
+
         var arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
         arbeitsverzeichnisResolverMock
             .Setup(resolver => resolver.ResolveAsync(It.IsAny<CancellationToken>()))
@@ -292,6 +305,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);
         Services.AddSingleton(agentPackageServiceMock.Object);
+        Services.AddSingleton(workspaceBrowserServiceMock.Object);
         Services.AddSingleton<ILogger<AufgabeDetail>>(NullLogger<AufgabeDetail>.Instance);
 
         return new TestHarness(db, aufgabe.Id, defaultGitPlugin: gitPluginMock, selectedGitPlugin: gitPluginMock);
@@ -399,6 +413,19 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             .Setup(service => service.GetPackageAsync("paket-a", It.IsAny<CancellationToken>()))
             .ReturnsAsync(packageInfo);
 
+        var workspaceBrowserServiceMock = new Mock<IGitWorkspaceBrowserService>();
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WorkspaceSnapshot
+            {
+                RepositoryPath = Path.GetTempPath(),
+                CommitCount = 0,
+                ChangedFileCount = 0,
+            });
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadPreviewAsync(It.IsAny<string>(), It.IsAny<WorkspaceFileNode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FilePreview(string.Empty, null, false, false, false, null, null, null));
+
         var arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
         arbeitsverzeichnisResolverMock
             .Setup(resolver => resolver.ResolveAsync(It.IsAny<CancellationToken>()))
@@ -432,6 +459,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);
         Services.AddSingleton(agentPackageServiceMock.Object);
+        Services.AddSingleton(workspaceBrowserServiceMock.Object);
         Services.AddSingleton<ILogger<AufgabeDetail>>(NullLogger<AufgabeDetail>.Instance);
 
         return new TestHarness(db, aufgabe.Id, defaultGitPluginMock, selectedGitPluginMock);

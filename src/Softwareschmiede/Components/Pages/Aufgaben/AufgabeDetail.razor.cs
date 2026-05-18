@@ -20,11 +20,14 @@ public partial class AufgabeDetail : IDisposable
     [Inject] private EntwicklungsprozessService EntwicklungsprozessService { get; set; } = null!;
     [Inject] private KiAusfuehrungsService KiAusfuehrungsService { get; set; } = null!;
     [Inject] private GitOrchestrationService GitService { get; set; } = null!;
+    [Inject] private IGitWorkspaceBrowserService GitWorkspaceBrowserService { get; set; } = null!;
     [Inject] private ProtokollService ProtokollService { get; set; } = null!;
     [Inject] private ProjektService ProjektService { get; set; } = null!;
     [Inject] private IAgentPackageService AgentPackageService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
     [Inject] private ILogger<AufgabeDetail> _logger { get; set; } = null!;
+    [SupplyParameterFromQuery(Name = "view")]
+    public string? View { get; set; }
 
     private bool _loading = true;
     private bool _processing;
@@ -34,6 +37,13 @@ public partial class AufgabeDetail : IDisposable
     private List<AgentInfo> _agenten = [];
     private IReadOnlyList<IKiPlugin> _kiPlugins = [];
     private List<string> _streamingLines = [];
+    private WorkspaceSnapshot? _workspaceSnapshot;
+    private WorkspaceFileNode? _selectedWorkspaceNode;
+    private FilePreview? _selectedWorkspacePreview;
+    private string? _selectedWorkspacePath;
+    private bool _showExplorer;
+    private bool _useTreeLayout = true;
+    private bool _loadingWorkspace;
 
     // Subscription auf laufende KI-Session (wird beim Dispose freigegeben)
     private IDisposable? _kiSubscription;
@@ -103,6 +113,7 @@ public partial class AufgabeDetail : IDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        ApplyViewFromQuery();
         await LadeKiPluginsAsync();
         await LadeAsync();
         _agentenpakete = (await AgentPackageService.GetPackagesAsync()).ToList();
@@ -117,6 +128,12 @@ public partial class AufgabeDetail : IDisposable
         }
     }
 
+    protected override Task OnParametersSetAsync()
+    {
+        ApplyViewFromQuery();
+        return Task.CompletedTask;
+    }
+
     private async Task LadeAsync()
     {
         _loading = true;
@@ -125,6 +142,7 @@ public partial class AufgabeDetail : IDisposable
         {
             _protokoll = (await ProtokollService.GetByAufgabeAsync(Id)).ToList();
             await LadeGitActionCapabilitiesAsync();
+            await LadeWorkspaceAsync();
             _prTitel = _aufgabe.Titel;
             // Agenten laden wenn Paket gesetzt
             if (!string.IsNullOrEmpty(_aufgabe.AgentenpaketName))
@@ -166,6 +184,7 @@ public partial class AufgabeDetail : IDisposable
             {
                 _protokoll = (await protokollService.GetByAufgabeAsync(Id)).ToList();
                 await LadeGitActionCapabilitiesAsync();
+                await LadeWorkspaceAsync();
                 _prTitel = _aufgabe.Titel;
                 // Agenten laden wenn Paket gesetzt
                 if (!string.IsNullOrEmpty(_aufgabe.AgentenpaketName))
@@ -484,6 +503,200 @@ public partial class AufgabeDetail : IDisposable
         {
             _showPullRequestForm = false;
         }
+    }
+
+    private void ApplyViewFromQuery()
+    {
+        _showExplorer = string.Equals(View, "tree", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task SwitchViewAsync(string view)
+    {
+        if (string.Equals(View, view, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        NavigationManager.NavigateTo($"?view={view}", replace: true);
+        await Task.CompletedTask;
+    }
+
+    private Task SwitchToTaskViewAsync() => SwitchViewAsync("task");
+
+    private Task SwitchToExplorerViewAsync() => SwitchViewAsync("tree");
+
+    private async Task LadeWorkspaceAsync()
+    {
+        if (_aufgabe?.LokalerKlonPfad is null or "")
+        {
+            _workspaceSnapshot = WorkspaceSnapshot.FromError("Kein lokaler Klonpfad vorhanden.");
+            _selectedWorkspaceNode = null;
+            _selectedWorkspacePreview = null;
+            return;
+        }
+
+        _loadingWorkspace = true;
+        try
+        {
+            _workspaceSnapshot = await GitWorkspaceBrowserService.LoadSnapshotAsync(_aufgabe.LokalerKlonPfad, _cts.Token);
+            if (_selectedWorkspacePath is not null)
+            {
+                ExpandPath(_workspaceSnapshot.RootNodes, _selectedWorkspacePath);
+            }
+
+            _selectedWorkspaceNode = _selectedWorkspacePath is null
+                ? null
+                : FindNode(_workspaceSnapshot.RootNodes, _selectedWorkspacePath);
+
+            if (_selectedWorkspaceNode?.IsDirectory == true)
+            {
+                _selectedWorkspaceNode.IsExpanded = true;
+            }
+
+            if (_selectedWorkspaceNode is not null && !_selectedWorkspaceNode.IsDirectory)
+            {
+                await LadeWorkspacePreviewAsync(_selectedWorkspaceNode);
+            }
+            else
+            {
+                _selectedWorkspacePreview = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Workspace snapshot konnte nicht geladen werden.");
+            _workspaceSnapshot = WorkspaceSnapshot.FromError(ex.Message);
+            _selectedWorkspaceNode = null;
+            _selectedWorkspacePreview = null;
+        }
+        finally
+        {
+            _loadingWorkspace = false;
+        }
+    }
+
+    private async Task LadeWorkspacePreviewAsync(WorkspaceFileNode node)
+    {
+        if (_aufgabe?.LokalerKlonPfad is null or "")
+        {
+            return;
+        }
+
+        try
+        {
+            _selectedWorkspacePath = node.RelativePath;
+            _selectedWorkspaceNode = node;
+            _selectedWorkspacePreview = await GitWorkspaceBrowserService.LoadPreviewAsync(_aufgabe.LokalerKlonPfad, node, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Workspace preview konnte nicht geladen werden.");
+            _selectedWorkspacePreview = new FilePreview(node.RelativePath, node.SourceRelativePath, node.IsDeleted, false, false, null, null, ex.Message);
+        }
+    }
+
+    private static WorkspaceFileNode? FindNode(IEnumerable<WorkspaceFileNode> nodes, string relativePath)
+    {
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.RelativePath, relativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return node;
+            }
+
+            var child = FindNode(node.Children, relativePath);
+            if (child is not null)
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private static void ExpandPath(IEnumerable<WorkspaceFileNode> nodes, string relativePath)
+    {
+        var segments = relativePath.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+        {
+            return;
+        }
+
+        var currentNodes = nodes.ToList();
+        var currentPath = string.Empty;
+        for (var index = 0; index < Math.Max(0, segments.Length - 1); index++)
+        {
+            currentPath = string.IsNullOrEmpty(currentPath)
+                ? segments[index]
+                : Path.Combine(currentPath, segments[index]);
+
+            var directory = currentNodes.FirstOrDefault(node => node.IsDirectory && string.Equals(node.RelativePath, currentPath, StringComparison.OrdinalIgnoreCase));
+            if (directory is null)
+            {
+                return;
+            }
+
+            directory.IsExpanded = true;
+            currentNodes = directory.Children;
+        }
+    }
+
+    private bool IsWorkspaceNodeSelected(WorkspaceFileNode node)
+        => string.Equals(_selectedWorkspacePath, node.RelativePath, StringComparison.OrdinalIgnoreCase);
+
+    private ICollection<WorkspaceNodeRow> VisibleWorkspaceNodes
+    {
+        get
+        {
+            if (_workspaceSnapshot is null)
+            {
+                return [];
+            }
+
+            if (_useTreeLayout)
+            {
+                return _workspaceSnapshot.RootNodes
+                    .SelectMany(node => FlattenWorkspaceNode(node, 0))
+                    .ToList();
+            }
+
+            return _workspaceSnapshot.FlatFiles.Select(node => new WorkspaceNodeRow(node, 0)).ToList();
+        }
+    }
+
+    private static IEnumerable<WorkspaceNodeRow> FlattenWorkspaceNode(WorkspaceFileNode node, int depth)
+    {
+        yield return new WorkspaceNodeRow(node, depth);
+
+        if (node.IsDirectory && node.IsExpanded)
+        {
+            foreach (var child in node.Children)
+            {
+                foreach (var item in FlattenWorkspaceNode(child, depth + 1))
+                {
+                    yield return item;
+                }
+            }
+        }
+    }
+
+    private async Task WorkspaceNodeClickedAsync(WorkspaceFileNode node)
+    {
+        if (node.IsDirectory)
+        {
+            node.IsExpanded = !node.IsExpanded;
+            _selectedWorkspaceNode = node;
+            _selectedWorkspacePreview = null;
+            _selectedWorkspacePath = node.RelativePath;
+            return;
+        }
+
+        await LadeWorkspacePreviewAsync(node);
+    }
+
+    private async Task ExplorerRefreshAsync()
+    {
+        await LadeWorkspaceAsync();
     }
 
     private static (bool ShowPushPullToggle, bool ShowPush, bool ShowPull, bool ShowPullRequest, bool ShowMerge) EvaluateGitActionVisibility(GitActionCapabilities capabilities)
