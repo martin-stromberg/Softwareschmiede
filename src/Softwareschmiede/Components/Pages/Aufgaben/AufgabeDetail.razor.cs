@@ -517,7 +517,7 @@ public partial class AufgabeDetail : IDisposable
             return;
         }
 
-        NavigationManager.NavigateTo($"?view={view}", replace: true);
+        NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameter("view", view), replace: true);
         await Task.CompletedTask;
     }
 
