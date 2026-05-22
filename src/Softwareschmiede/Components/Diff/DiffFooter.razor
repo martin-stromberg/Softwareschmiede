@@ -1,0 +1,135 @@
+@using Softwareschmiede.Domain.Entities
+
+<footer class="diff-footer" role="contentinfo" aria-label="Diff summary and statistics">
+    <div class="diff-footer__content">
+        <div class="diff-footer__stats" role="status" aria-live="polite">
+            <span class="diff-footer__stat" aria-label="Total lines displayed">
+                <strong>Total Lines:</strong> @TotalLines
+            </span>
+            
+            <span class="diff-footer__stat" aria-label="Selected lines count">
+                <strong>Selected:</strong> @SelectedLineCount
+            </span>
+            
+            <span class="diff-footer__stat" aria-label="Added lines count">
+                <strong>Added:</strong> @DiffResult.AddedLines
+            </span>
+            
+            <span class="diff-footer__stat" aria-label="Removed lines count">
+                <strong>Removed:</strong> @DiffResult.RemovedLines
+            </span>
+            
+            <span class="diff-footer__stat" aria-label="Modified lines count">
+                <strong>Modified:</strong> @DiffResult.ModifiedLines
+            </span>
+        </div>
+
+        <div class="diff-footer__metadata" role="status">
+            <small class="text-muted">
+                Diff Status: <span class="badge" style="@GetStatusColor(DiffResult.Status)">
+                    @GetStatusText(DiffResult.Status)
+                </span>
+            </small>
+            
+            @if (DiffResult.ExpiresAt.HasValue)
+            {
+                <small class="text-muted ms-3">
+                    Cache expires: <time datetime="@DiffResult.ExpiresAt.Value.ToString("O")">
+                        @DiffResult.ExpiresAt.Value.ToString("g")
+                    </time>
+                </small>
+            }
+        </div>
+
+        <div class="diff-footer__actions">
+            <button type="button" 
+                    class="btn btn-sm btn-outline-secondary"
+                    @onclick="ScrollToTop"
+                    title="Scroll to top"
+                    aria-label="Scroll to beginning of diff">
+                ⬆ Top
+            </button>
+            
+            <button type="button" 
+                    class="btn btn-sm btn-outline-secondary"
+                    @onclick="ScrollToBottom"
+                    title="Scroll to bottom"
+                    aria-label="Scroll to end of diff">
+                ⬇ Bottom
+            </button>
+        </div>
+    </div>
+</footer>
+
+@code {
+    [Parameter]
+    public required DiffResult DiffResult { get; set; }
+
+    [Parameter]
+    public int TotalLines { get; set; }
+
+    [Parameter]
+    public int SelectedLineCount { get; set; }
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; } = null!;
+
+    [Inject]
+    private ILogger<DiffFooter> Logger { get; set; } = null!;
+
+    /// <summary>
+    /// Gets the status text for display.
+    /// </summary>
+    private static string GetStatusText(Domain.Enums.DiffResultStatus status) => status switch
+    {
+        Domain.Enums.DiffResultStatus.Pending => "Pending",
+        Domain.Enums.DiffResultStatus.Generated => "Generated",
+        Domain.Enums.DiffResultStatus.Cached => "Cached",
+        Domain.Enums.DiffResultStatus.Error => "Error",
+        _ => "Unknown"
+    };
+
+    /// <summary>
+    /// Gets the status badge color (inline style).
+    /// </summary>
+    private static string GetStatusColor(Domain.Enums.DiffResultStatus status) => status switch
+    {
+        Domain.Enums.DiffResultStatus.Pending => "background-color: #ffc107; color: #000;",
+        Domain.Enums.DiffResultStatus.Generated => "background-color: #28a745; color: #fff;",
+        Domain.Enums.DiffResultStatus.Cached => "background-color: #17a2b8; color: #fff;",
+        Domain.Enums.DiffResultStatus.Error => "background-color: #dc3545; color: #fff;",
+        _ => "background-color: #6c757d; color: #fff;"
+    };
+
+    /// <summary>
+    /// Scrolls to the top of the diff viewer.
+    /// </summary>
+    private async Task ScrollToTop()
+    {
+        try
+        {
+            Logger.LogInformation("Scrolling to top");
+            await JsRuntime.InvokeVoidAsync("window.scrollTo", 0, 0);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error scrolling to top");
+        }
+    }
+
+    /// <summary>
+    /// Scrolls to the bottom of the diff viewer.
+    /// </summary>
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            Logger.LogInformation("Scrolling to bottom");
+            await JsRuntime.InvokeVoidAsync("window.scrollTo", 0, JsRuntime.InvokeAsync<double>("eval", "document.body.scrollHeight"));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error scrolling to bottom");
+        }
+    }
+}

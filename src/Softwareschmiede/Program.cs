@@ -18,10 +18,14 @@ namespace Softwareschmiede
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents()
                 .AddInteractiveWebAssemblyComponents();
+            builder.Services.AddControllers();
 
             // DbContext
             builder.Services.AddDbContext<SoftwareschmiededDbContext>(options =>
                 options.UseSqlite($"Data Source={Path.Combine(builder.Environment.ContentRootPath, "softwareschmiede.db")}"));
+
+            // Caching
+            builder.Services.AddMemoryCache();
 
             // Infrastructure Services
 
@@ -53,6 +57,11 @@ namespace Softwareschmiede
             builder.Services.AddSingleton<IAutoShutdownOrchestrator, AutoShutdownOrchestrator>();
             builder.Services.AddSingleton<ISystemShutdownService, SystemShutdownService>();
 
+            // Diff Services
+            builder.Services.AddTransient<DiffAlgorithmService>();
+            builder.Services.AddTransient<DiffCachingService>();
+            builder.Services.AddTransient<DiffService>();
+
             var app = builder.Build();
 
             // Auto-Migration beim Start
@@ -76,6 +85,7 @@ namespace Softwareschmiede
             app.UseAntiforgery();
 
             app.MapStaticAssets();
+            app.MapControllers(); // API Endpoints aktivieren
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode()
                 .AddInteractiveWebAssemblyRenderMode()

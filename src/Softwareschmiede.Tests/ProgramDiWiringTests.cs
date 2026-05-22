@@ -18,6 +18,9 @@ public sealed class ProgramDiWiringTests
         source.Should().Contain("builder.Services.AddScoped<PluginDefaultSettingsService>();");
         source.Should().Contain("builder.Services.AddScoped<PluginSelectionService>();");
         source.Should().Contain("builder.Services.AddScoped<RepositoryStartskriptService>();");
+        source.Should().Contain("builder.Services.AddTransient<DiffAlgorithmService>();");
+        source.Should().Contain("builder.Services.AddTransient<DiffCachingService>();");
+        source.Should().Contain("builder.Services.AddTransient<DiffService>();");
     }
 
     private static string FindRepositoryRoot()

@@ -26,4 +26,7 @@ public sealed class GitRepository
 
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
+
+    /// <summary>Diff-Ergebnisse für dieses Repository (optionale Zuordnung für Kontext).</summary>
+    public List<DiffResult> DiffResults { get; set; } = [];
 }

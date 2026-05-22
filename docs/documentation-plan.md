@@ -1,3 +1,75 @@
+# Dokumentationsplan – Diff-Funktionalität & ergänzte Tests – 2026-05-22
+
+## Kontext
+- Ursprüngliche Anforderung: `ae13a240-9557-470e-994b-8c550d843312.copilot-task.md`
+- Planung, Implementierung und Testabdeckung wurden bereits umgesetzt.
+- Ziel dieses Laufs: Vollständiger Dokumentationsabgleich mit dem implementierten Diff-Feature inkl. ergänzter Tests.
+
+## Phase 1 – Analyse (Agentenschwarm)
+
+### API (`docs/api/`)
+- Bestand vorhanden: `README.md`, `http-endpoints.md`, `diff.md`, weitere API-Dokumente.
+- Endpunkte in `DiffController` vollständig in `docs/api/http-endpoints.md` und `docs/api/diff.md` dokumentiert.
+- **Lücke:** keine kritische API-Lücke identifiziert; Konsistenz-/Aktualitätsabgleich erforderlich.
+
+### Flows (`docs/flows/`)
+- Bestand mit zahlreichen Flows vorhanden.
+- **Lücke (hoch):** kein dedizierter Ablaufplan für die Diff-Pipeline (`DiffController` + `DiffService` + `DiffAlgorithmService` + `DiffCachingService`) und keinen expliziten Test-/Validierungsfluss.
+
+### Business (`docs/business/`)
+- Feature-Dokumentation bis F021 vorhanden.
+- **Lücke (hoch):** Diff-Funktionalität ist implementiert, aber noch nicht als eigenes Business-Feature dokumentiert.
+
+### README
+- Struktur vollständig vorhanden.
+- **Lücken (hoch):** Diff-Funktionalität und zugehörige Testartefakte sind in Features/Usage/Tests nicht ausreichend abgebildet.
+- **Bekannte Nebenpunkte (niedrig):** Lizenz weiterhin „zu definieren“, Changelog nur im README.
+
+## Phase 1 – Priorisierter Ausführungsplan
+
+### Neu zu erstellen
+1. `docs/flows/diff-service-flow.md`
+2. `docs/business/features/F022-diff-vergleichskomponente.md`
+
+### Zu aktualisieren
+1. `README.md` (Diff-Feature, Nutzung, Testabdeckung)
+2. `docs/flows/README.md` (Verlinkung neuer Diff-Flow)
+3. `docs/business/features.md` (Eintrag F022)
+4. `docs/api/diff.md` / `docs/api/http-endpoints.md` (nur falls beim Abgleich Abweichungen auffallen)
+
+### Priorität
+1. **Hoch:** Business- und Flow-Dokumentation der Diff-Funktionalität
+2. **Hoch:** README-Abgleich mit Diff und Tests
+3. **Mittel:** API-Konsistenzprüfung und Querverweise
+
+## Phase 2 – Ausführung
+- Paralleler Lauf von `documentation-api`, `documentation-flow`, `documentation-business`, `documentation-readme-writer` mit diesem Plan als Kontext.
+
+## Ergebnis
+
+### Neu erstellt
+1. `docs/flows/diff-service-flow.md`
+2. `docs/business/features/F022-diff-vergleichskomponente.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/flows/README.md`
+3. `docs/business/features.md`
+4. `docs/api/diff.md`
+5. `docs/api/http-endpoints.md`
+6. `docs/api/README.md`
+
+### Validierung
+- Existenz- und Nicht-Leerheitsprüfung aller Zielartefakte erfolgreich.
+- Flow-/Business-/README-Inhalte auf implementierte Diff-Funktionalität und vorhandene Testartefakte abgeglichen.
+
+### Offene Punkte
+1. Lizenz ist weiterhin nicht final festgelegt (`README.md`, Abschnitt Lizenz).
+2. Es gibt weiterhin keine separate `CHANGELOG.md` (Changelog derzeit im README).
+3. Fachlich/technisch optional: Fehlerklassifikation der Diff-API kann künftig präzisiert werden (z. B. „Aufgabe nicht gefunden“ aktuell als 500 aus Service-Exception).
+
+---
+
 # Dokumentationsplan – Vollständige Aktualisierung (Standardplugin & KI-Plugin-Auswahl) – 2026-05-12
 
 ## Kontext

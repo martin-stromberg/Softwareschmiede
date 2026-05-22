@@ -2,83 +2,34 @@
 
 ## Übersicht
 
-Die Softwareschmiede stellt derzeit **keine öffentlichen HTTP-Endpunkte** bereit.  
-Die Anwendung wird über Razor Components bereitgestellt (`app.MapRazorComponents<App>()` in `src/Softwareschmiede/Program.cs`).
+Die Anwendung stellt über `app.MapControllers()` öffentliche REST-Endpunkte für Diff-Funktionen bereit.  
+Die detaillierte Endpunktbeschreibung mit vollständigen Request-/Response-Beispielen liegt in [diff.md](./diff.md).
 
-## Endpoint-Status (einheitlich)
+## Öffentliche REST-Endpunkte
 
-Da es keine öffentlichen API-Routen gibt, gelten die üblichen Endpoint-Bestandteile aktuell als **nicht anwendbar**:
+| Methode | Pfad | Zweck |
+|---|---|---|
+| `POST` | `/api/diff/generate` | Erzeugt ein neues Diff-Ergebnis aus Source-/Target-Content. |
+| `GET` | `/api/diff/{id}` | Lädt ein einzelnes Diff-Ergebnis inkl. Blöcken/Zeilen. |
+| `GET` | `/api/diff` | Listet Diff-Ergebnisse einer Aufgabe paginiert. |
+| `GET` | `/api/diff/statistics` | Liefert aggregierte Diff-Statistiken pro Aufgabe. |
+| `DELETE` | `/api/diff/{id}` | Löscht ein Diff-Ergebnis inkl. Cache-Invalidierung. |
+| `POST` | `/api/diff/{id}/invalidate-cache` | Invalidiert den Cache eines bestehenden Diff-Ergebnisses. |
 
-1. **HTTP-Methode & Pfad:** nicht vorhanden
-2. **Authentifizierung:** nicht anwendbar (kein öffentlicher HTTP-Zugriffspunkt)
-3. **Request:** keine Header/Parameter/Bodies für öffentliche Endpunkte
-4. **Response:** keine öffentlichen HTTP-Statuscodes für API-Calls
-5. **curl-Beispiel:** entfällt, da kein aufrufbarer Endpoint existiert
+## Authentifizierung
 
-## Was stattdessen dokumentiert ist
+Aktuell ist für diese Endpunkte keine Authentifizierung erzwungen.  
+Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftreten (Beispiel-Payloads in [diff.md](./diff.md)).
 
-- Interne Plugin-Contracts: [plugin-interfaces.md](./plugin-interfaces.md)
-- Interner Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** und **Fallback**: [plugin-default-selection.md](./plugin-default-selection.md)
-- Interner Contract für Workdir-**Fallback**: [workdir-configuration.md](./workdir-configuration.md)
+## Request-/Response-Konventionen
 
-## Explizites Mapping (Feature F014)
-
-Das Feature „Standardplugin je Pluginart & KI-Plugin-Auswahl“ ist ein **interner Application-Contract** und **kein HTTP-Contract**.
-
-| Thema | Abbildung |
-|---|---|
-| Standardplugin je Pluginart speichern | `PluginDefaultSettingsService` persistiert `plugins.default.SourceCodeManagement` und `plugins.default.DevelopmentAutomation` |
-| KI-Plugin-Auswahl beim Prompt | `selectedKiPluginPrefix` wird von der Aufgaben-Detailseite an `KiAusfuehrungsService` und `EntwicklungsprozessService` weitergereicht |
-| Auflösung inkl. Fallback | `PluginSelectionService`: explizite Auswahl → gespeicherter Default → Fallback |
-
-## Feature-Impact: Kontextsteuerung bei Folgeanweisungen
-
-Die Kontextmodi für Folgeanweisungen (`KontextMitgeben`, `KontextIgnorieren`, `KontextNeuBeginnen`) werden in der Application-Schicht umgesetzt und ändern **keine** öffentliche HTTP-Schnittstelle.
-
-- HTTP-Methode & Pfad: nicht anwendbar
-- Authentifizierung: nicht anwendbar
-- Request/Response: nicht anwendbar
-- `curl`-Beispiel: nicht anwendbar
-
-## Feature-Impact: Claude CLI Integration
-
-Die Integration von `ClaudeCliPlugin` erweitert den internen `IKiPlugin`-Betrieb, führt jedoch **keine** neuen öffentlichen HTTP-Endpunkte ein.
-
-- HTTP-Methode & Pfad: nicht anwendbar
-- Authentifizierung: nicht anwendbar
-- Request/Response: nicht anwendbar
-- `curl`-Beispiel: nicht anwendbar
-
-## Feature-Impact: LocalDirectory-Arbeitskopie Aktionsmatrix (Capabilities/Flags)
-
-Die Aktionsmatrix in `AufgabeDetail` (Push/Pull/PR ausblenden, Merge einblenden) wird über den internen Plugin-Contract `IGitPlugin.GetGitActionCapabilitiesAsync` gesteuert und ist **kein HTTP-Contract**.
-
-- HTTP-Methode & Pfad: nicht anwendbar
-- Authentifizierung: nicht anwendbar
-- Request/Response: nicht anwendbar
-- `curl`-Beispiel: nicht anwendbar
-
-## Feature-Impact: Issue-Auswahl, Branch-Verknüpfung und PR Auto-Close
-
-Das Feature für Issue-Verknüpfung, issuebezogene Branch-Namensbildung und PR-Closing-Direktive wird vollständig in der Domain-/Application-Schicht umgesetzt und erzeugt **keine** öffentlichen HTTP-Endpunkte.
-
-- HTTP-Methode & Pfad: nicht anwendbar
-- Authentifizierung: nicht anwendbar
-- Request/Response: nicht anwendbar
-- `curl`-Beispiel: nicht anwendbar
-
-## Feature-Impact: Repository-Startskript mit freier Portzuweisung
-
-Die repositorybezogene Startkonfiguration (`RepositoryStartKonfiguration`), Portreservierung (`PortReservationService`) und Skriptausführung (`RepositoryStartskriptService`) laufen vollständig innerhalb der Application-/Infrastructure-Schicht und erzeugen **keine** öffentlichen HTTP-Endpunkte.
-
-- HTTP-Methode & Pfad: nicht anwendbar
-- Authentifizierung: nicht anwendbar
-- Request/Response: nicht anwendbar
-- `curl`-Beispiel: nicht anwendbar
+- Content-Type für JSON-Requests: `application/json`
+- Responses: `application/json`
+- Fehlerformat: `ProblemDetails` (ASP.NET Core Standard)
+- Enum-Serialisierung: numerisch (Ausnahme: `statusBreakdown` in Statistiken nutzt Enum-Namen als JSON-Keys)
+- Aktuell testabgeglichen: Zeilenänderungen werden primär als `Added`/`Removed` ausgewiesen; `modifiedLines` ist im aktuellen Algorithmus typischerweise `0` (Details in [diff.md](./diff.md#datenmodelle-enums-und-serviceverträge))
 
 ## Verknüpfte Dokumentation
 
-- Business: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)
-- Flow: [plugin-default-selection-flow.md](../flows/plugin-default-selection-flow.md)
-- Flow-Index: [docs/flows/README.md](../flows/README.md)
-- API: [issue-branch-pr-linking.md](./issue-branch-pr-linking.md)
+- Detaillierte Diff-API: [diff.md](./diff.md)
+- API-Index: [README.md](./README.md)

@@ -28,6 +28,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F019 | Issue-, Branch- und PR-Verknüpfung | GitHub-Issue durchgängig von Aufgabenanlage bis PR Auto-Close verknüpfen | [F019 – Issue-, Branch- und PR-Verknüpfung](./features/F019-issue-branch-pr-verknuepfung.md) |
 | F020 | Repository-Startskript mit freier Portzuweisung | Repositorys mit Startskript und branchspezifischem freiem Port beim Prozessstart ausführen | [F020 – Repository-Startskript mit freier Portzuweisung](./features/F020-repository-startskript-freier-port.md) |
 | F021 | Live Project Browser mit Git-Status | Git-Status, Baum-/Listenansicht und Dateivorschau direkt auf der Aufgabenseite anzeigen | [F021 – Live Project Browser mit Git-Status](./features/F021-live-project-browser-git-status.md) |
+| F022 | Diff-Vergleichskomponente | Zwei Dateiversionen vergleichen, Änderungen nachvollziehen und abgesicherte Vergleichsergebnisse nutzen | [F022 – Diff-Vergleichskomponente](./features/F022-diff-vergleichskomponente.md) |
 
 ---
 
