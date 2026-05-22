@@ -36,6 +36,18 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Globale App-Einstellungen.</summary>
     public DbSet<AppEinstellung> AppEinstellungen => Set<AppEinstellung>();
 
+    /// <summary>Diff-Ergebnisse (Vergleiche zwischen Dateiversionen).</summary>
+    public DbSet<DiffResult> DiffResults => Set<DiffResult>();
+
+    /// <summary>Diff-Blöcke (gruppierte Änderungen).</summary>
+    public DbSet<DiffBlock> DiffBlocks => Set<DiffBlock>();
+
+    /// <summary>Diff-Zeilen (einzelne Zeilen mit Änderungsstatus).</summary>
+    public DbSet<DiffLine> DiffLines => Set<DiffLine>();
+
+    /// <summary>Diff-Cache-Einträge (für TTL-basierte Invalidierung).</summary>
+    public DbSet<DiffCache> DiffCaches => Set<DiffCache>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -105,6 +117,10 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(p => p.Aufgabe)
                 .HasForeignKey(p => p.AufgabeId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(a => a.DiffResults)
+                .WithOne(dr => dr.Aufgabe)
+                .HasForeignKey(dr => dr.AufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // IssueReferenz
@@ -159,6 +175,114 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.AktualisiertAm).HasConversion(
                 v => v.ToUnixTimeMilliseconds(),
                 v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+        });
+
+        // DiffResult
+        modelBuilder.Entity<DiffResult>(e =>
+        {
+            e.HasKey(dr => dr.Id);
+            e.Property(dr => dr.FilePath)
+                .IsRequired()
+                .HasMaxLength(500);
+            e.Property(dr => dr.SourceVersion)
+                .IsRequired()
+                .HasMaxLength(100);
+            e.Property(dr => dr.TargetVersion)
+                .IsRequired()
+                .HasMaxLength(100);
+            e.Property(dr => dr.DiffType).HasConversion<string>();
+            e.Property(dr => dr.Status).HasConversion<string>();
+            e.Property(dr => dr.GeneratedBy)
+                .IsRequired()
+                .HasMaxLength(200);
+            e.Property(dr => dr.GeneratedAt).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(dr => dr.ExpiresAt).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+
+            // Foreign keys
+            e.HasOne(dr => dr.Aufgabe)
+                .WithMany(a => a.DiffResults)
+                .HasForeignKey(dr => dr.AufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(dr => dr.GitRepository)
+                .WithMany(gr => gr.DiffResults)
+                .HasForeignKey(dr => dr.GitRepositoryId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(dr => dr.ProtokollEintrag)
+                .WithOne(pe => pe.DiffResult)
+                .HasForeignKey<DiffResult>(dr => dr.ProtokollEintragId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasMany(dr => dr.DiffBlocks)
+                .WithOne(db => db.DiffResult)
+                .HasForeignKey(db => db.DiffResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(dr => dr.DiffCache)
+                .WithOne(dc => dc.DiffResult)
+                .HasForeignKey<DiffCache>(dc => dc.DiffResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indizes
+            e.HasIndex(dr => dr.AufgabeId);
+            e.HasIndex(dr => dr.GitRepositoryId);
+            e.HasIndex(dr => new { dr.AufgabeId, dr.FilePath });
+            e.HasIndex(dr => dr.Status);
+            e.HasIndex(dr => dr.ExpiresAt);
+        });
+
+        // DiffBlock
+        modelBuilder.Entity<DiffBlock>(e =>
+        {
+            e.HasKey(db => db.Id);
+            e.Property(db => db.BlockType).HasConversion<string>();
+            e.HasMany(db => db.DiffLines)
+                .WithOne(dl => dl.DiffBlock)
+                .HasForeignKey(dl => dl.DiffBlockId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Indizes
+            e.HasIndex(db => db.DiffResultId);
+            e.HasIndex(db => new { db.DiffResultId, db.BlockSequence });
+        });
+
+        // DiffLine
+        modelBuilder.Entity<DiffLine>(e =>
+        {
+            e.HasKey(dl => dl.Id);
+            e.Property(dl => dl.LineStatus).HasConversion<string>();
+            e.Property(dl => dl.Content)
+                .IsRequired();
+
+            // Indizes
+            e.HasIndex(dl => dl.DiffBlockId);
+            e.HasIndex(dl => new { dl.DiffBlockId, dl.LineSequence });
+        });
+
+        // DiffCache
+        modelBuilder.Entity<DiffCache>(e =>
+        {
+            e.HasKey(dc => dc.Id);
+            e.Property(dc => dc.CacheKey)
+                .IsRequired()
+                .HasMaxLength(300);
+            e.Property(dc => dc.CachedData)
+                .IsRequired();
+            e.Property(dc => dc.CachingStrategy).HasConversion<string>();
+            e.Property(dc => dc.CachedAt).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(dc => dc.ExpiresAt).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+
+            // Indizes
+            e.HasIndex(dc => dc.CacheKey).IsUnique();
+            e.HasIndex(dc => dc.DiffResultId).IsUnique();
+            e.HasIndex(dc => dc.ExpiresAt);
         });
     }
 }

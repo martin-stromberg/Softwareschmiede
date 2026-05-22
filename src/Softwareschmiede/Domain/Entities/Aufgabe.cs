@@ -52,4 +52,7 @@ public sealed class Aufgabe
 
     /// <summary>Protokolleinträge des KI-Prozesses für diese Aufgabe.</summary>
     public List<Protokolleintrag> Protokolleintraege { get; set; } = [];
+
+    /// <summary>Diff-Ergebnisse für diese Aufgabe (z.B. für verschiedene Dateien oder Vergleiche).</summary>
+    public List<DiffResult> DiffResults { get; set; } = [];
 }

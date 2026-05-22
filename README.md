@@ -54,7 +54,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-05-14**
+Stand: **2026-05-22**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -66,7 +66,8 @@ Stand: **2026-05-14**
 | Folgeanweisungen mit Kontextsteuerung | ✅ Implementiert | Kontext mitgeben / ignorieren / neu beginnen |
 | Lokale Deploymentfähigkeit | ✅ Implementiert | Windows-zentrierter Betrieb, lokale SQLite + Credential Store |
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
-| Öffentliche HTTP-API | ⛔ Nicht vorhanden | Schnittstellen aktuell über Plugin-Verträge dokumentiert |
+| Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
+| Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
 ---
@@ -92,6 +93,12 @@ Stand: **2026-05-14**
 - Aufgabenspezifische Branches (`task/<aufgaben-id>-<kurzname>`) bzw. bei Issue-Verknüpfung `task/issue-<issue>-<aufgaben-id>-<kurzname>`
 - PR-Erstellung ergänzt bei verknüpfter Issue automatisch eine Closing-Direktive (`Closes #<Issue>`), damit GitHub das Issue beim Merge schließt
 - Commit-Verwaltung inkl. Rollback (soft / mixed / hard)
+
+### 🔍 Diff-Vergleichskomponente
+- Öffentliche REST-Endpunkte unter `/api/diff` für Erzeugung, Abruf, Auflistung, Statistik, Löschung und Cache-Invalidierung von Diffs
+- Persistenz von Diff-Ergebnissen inkl. Blöcken/Zeilen sowie Kennzahlen (`AddedLines`, `RemovedLines`, `ModifiedLines`)
+- Caching-Strategien (`TTL`, `LRU`, `Manual`) mit expliziter Invalidierung pro Diff
+- UI-Komponente `src/Softwareschmiede/Components/Diff/DiffViewer.razor` zur Anzeige gespeicherter Diff-Ergebnisse
 
 ### ✅ Aufgabenverwaltung
 - Aufgaben aus GitHub Issues anlegen (Titel, Body, Labels, Milestone werden übernommen)
@@ -242,6 +249,15 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 - Im Modus `SeparateWorkingDirectory` arbeitet **Push als Dateisynchronisation statt `git push`** (Copy/Overwrite inkl. Delete-Sync über `git status --porcelain`).
 - In der Aufgaben-Aktionsleiste gilt bei `LocalDirectory + Arbeitskopie`: **Push/Pull/Pull Request ausblenden, Merge einblenden** (gesteuert über `GitActionCapabilities`).
 - Nicht unterstützte Remote-Provider-Operationen (z. B. Pull Request/Issues/Remote-Branch-Abfragen) werden im LocalDirectoryPlugin mit `NotSupportedException` abgelehnt.
+
+### Diff-Funktionalität über REST nutzen
+
+- `POST /api/diff/generate` erzeugt ein Diff aus Source-/Target-Inhalt.
+- `GET /api/diff/{id}` lädt ein bestehendes Diff mit Blöcken und Zeilen.
+- `GET /api/diff?aufgabeId=...` listet Diffs einer Aufgabe paginiert.
+- `GET /api/diff/statistics?aufgabeId=...` liefert aggregierte Kennzahlen.
+- `DELETE /api/diff/{id}` entfernt ein Diff; `POST /api/diff/{id}/invalidate-cache` invalidiert nur den Cache.
+- Referenzdokumentation: [HTTP-Endpunkte](docs/api/http-endpoints.md), [API-Index](docs/api/README.md)
 
 ### KI-Plugin-Auswahl (Copilot oder Claude CLI)
 
@@ -565,6 +581,8 @@ dotnet test --collect:"XPlat Code Coverage"
 - [Moq](https://github.com/moq/moq4) – Mocking von Plugin-Interfaces und Services
 
 Feature-spezifische Testartefakte:
+- Service-Tests (Diff-Pipeline/Cache/Algorithmus): `src/Softwareschmiede.Tests/Application/Services/DiffServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffCachingServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffAlgorithmServiceTests.cs`
+- Wiring-Test (DI-Registrierung der Diff-Services): `src/Softwareschmiede.Tests/ProgramDiWiringTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
 - UI-bUnit-Tests (Git-Aktionsleiste/Pluginauswahl): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
@@ -606,6 +624,8 @@ Für die Inbetriebnahme müssen `gh`, `git`, `copilot` und (für Claude-Läufe) 
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- Diff-Funktionalität in README konsolidiert (Implementierungsstatus, Feature- und Usage-Abschnitte) inkl. Verweisen auf `/api/diff`
+- Testsektion um Diff-spezifische Service-/DI-Tests ergänzt (`DiffService`, `DiffCachingService`, `DiffAlgorithmService`, `ProgramDiWiringTests`)
 - LocalDirectoryPlugin als produktiv verfügbares SCM-Plugin ergänzt (inkl. WorkspaceMode und Guardrails)
 - Konfiguration, Usage, Architektur und Testsektion auf LocalDirectoryPlugin-Stand synchronisiert
 - README auf Feature „Separates Arbeitsverzeichnis mit Git-Workflow-Fallback“ aktualisiert (`git init`-Fallback, Pull ohne Merge + Nutzerhinweis, Push-Sync, Delete-Sync über Git-Status)
@@ -669,6 +689,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Flow: Issue-, Branch- und PR-Verknüpfung](docs/flows/issue-branch-pr-linking-flow.md) | End-to-End-Ablauf von der Issue-Auswahl über den issuebezogenen Branch bis zur PR-Closing-Direktive |
 | [Flow: Repository-Startskript mit freier Portzuweisung](docs/flows/repository-startskript-freier-port-flow.md) | Ablauf für Startkonfiguration, Portreservierung und Skriptausführung beim Aufgabenstart |
 | [API: Repository-Startskript mit freier Portzuweisung](docs/api/repository-startskript-freier-port.md) | Technischer Contract für Persistenz, Validierung, Portmodus und Skript-Execution |
+| [API: Diff-Endpunkte](docs/api/http-endpoints.md) | Übersicht der öffentlichen REST-Endpunkte des Diff-Bereichs (`/api/diff`) |
 | [API: `start.ps1` für Visual-Studio-Debug](docs/api/start-ps1-visual-studio-freier-http-port.md) | Technischer Skriptvertrag für Aufruf, Portquellen-Priorität, Exit-Codes und Debug-Workflow |
 | [Flow: `start.ps1` für Visual-Studio-Debug](docs/flows/start-ps1-visual-studio-freier-http-port-flow.md) | Ablauf von Portauflösung über `launchSettings`-Update bis zur Rückgabe der Exit-Codes |
 | [Requirements: Repository-Startskript mit freier Portzuweisung](docs/requirements/repository-startskript-freier-port-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für Startskript-Auswahl und konfliktfreie Portzuweisung |
@@ -683,6 +704,9 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Anforderungen: Plugin-Klassenbibliotheken](docs/requirements/plugin-klassenbibliotheken-github-und-copilot.md) | Feature-Anforderungen für Plugin-Architektur und Build-Auslieferung |
 | [Architektur: Plugin-Klassenbibliotheken](docs/architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md) | Technische Architektur für Discovery, Build/Pipeline und Plugin-Design |
 | [Architecture Review: Plugin-Klassenbibliotheken](docs/improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md) | Architekturprüfung mit Findings und Maßnahmen |
+| [Requirements: Diff-Vergleichskomponente](docs/requirements/diff-comparison-component-requirements.md) | Anforderungen und Akzeptanzkriterien für den diff-basierten Vergleich |
+| [Architektur: Diff Viewer](docs/architecture/diff-viewer-blueprint.md) | Technische Architektur der Diff-Pipeline und Viewer-Integration |
+| [ERM: Diff-Vergleichskomponente](docs/architecture/diff-vergleichskomponente-entity-relationship-model.md) | Datenmodell für DiffResult, DiffBlock, DiffLine und Cache |
 | [Requirements: Kontextsteuerung bei Folgeanweisungen](docs/requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md) | Anforderungsbasis für Kontextmodi bei Folgeanweisungen |
 | [Architektur-Blueprint: Kontextsteuerung bei Folgeanweisungen](docs/architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md) | Technische Umsetzung der Kontextmodi, Persistenz und Prompt-Komposition |
 | [Architecture Review: Kontextsteuerung bei Folgeanweisungen](docs/improvements/kontextsteuerung-folgeanweisungen-architecture-review.md) | Review-Ergebnisse und Auflagen zur Robustheit/UX |

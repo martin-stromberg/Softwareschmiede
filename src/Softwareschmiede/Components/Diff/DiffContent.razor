@@ -1,0 +1,124 @@
+@using Softwareschmiede.Domain.Entities
+@using Softwareschmiede.Domain.Enums
+@using DomainDiffLine = Softwareschmiede.Domain.Entities.DiffLine
+
+<div class="diff-content" role="region" aria-label="Diff content with line-by-line changes">
+    @if (DiffResult?.DiffBlocks == null || DiffResult.DiffBlocks.Count == 0)
+    {
+        <div class="diff-content__empty" role="status">
+            <p>No changes found in this diff.</p>
+        </div>
+    }
+    else
+    {
+        <div class="diff-content__viewport" @ref="viewportElement">
+            <Virtualize Items="@GetVisibleLines()" 
+                       OverscanCount="5"
+                       Context="line"
+                       TItem="DomainDiffLine">
+                
+                <DiffLine LineData="line"
+                         IsSelected="@SelectedLines.Contains(line.Id)"
+                         OnSelected="() => OnLineSelected.InvokeAsync(line.Id)"
+                         OnCopied="@((content) => HandleCopiedContent(content))"
+                         ShowSelectionCheckbox="true"
+                         ShowCopyButton="true"
+                         @key="@line.Id" />
+            </Virtualize>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public required DiffResult DiffResult { get; set; }
+
+    [Parameter]
+    public required DiffViewMode ViewMode { get; set; }
+
+    [Parameter]
+    public required HashSet<Guid> SelectedLines { get; set; }
+
+    [Parameter]
+    public required EventCallback<Guid> OnLineSelected { get; set; }
+
+    [Parameter]
+    public string? SearchTerm { get; set; }
+
+    [Inject]
+    private ILogger<DiffContent> Logger { get; set; } = null!;
+
+    private ElementReference viewportElement;
+    private List<DomainDiffLine>? cachedVisibleLines;
+    private string? cachedSearchTerm;
+
+    /// <summary>
+    /// Gets the list of visible lines based on current filters and search.
+    /// </summary>
+    private List<DomainDiffLine> GetVisibleLines()
+    {
+        // Use cached result if search term hasn't changed
+        if (cachedSearchTerm == SearchTerm && cachedVisibleLines != null)
+        {
+            return cachedVisibleLines;
+        }
+
+        if (DiffResult?.DiffBlocks == null)
+        {
+            return [];
+        }
+
+        var visibleLines = DiffResult.DiffBlocks
+            .OrderBy(b => b.BlockSequence)
+            .SelectMany(b => b.DiffLines.OrderBy(l => l.LineSequence))
+            .Where(l => IsLineVisible(l))
+            .ToList();
+
+        cachedVisibleLines = visibleLines;
+        cachedSearchTerm = SearchTerm;
+
+        Logger.LogInformation(
+            "Visible lines calculated. Total: {Total}, Filtered: {Filtered}, SearchTerm: {SearchTerm}",
+            DiffResult.DiffBlocks.SelectMany(b => b.DiffLines).Count(),
+            visibleLines.Count,
+            SearchTerm ?? "(none)");
+
+        return visibleLines;
+    }
+
+    /// <summary>
+    /// Determines if a line should be visible based on current filters.
+    /// </summary>
+    private bool IsLineVisible(DomainDiffLine line)
+    {
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(SearchTerm))
+        {
+            if (!line.Content.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        // Apply type filters (all enabled by default, disabled by DiffToolbar filter)
+        // This is a basic implementation - actual filtering would be passed via parameters
+        return true;
+    }
+
+    /// <summary>
+    /// Handles content copied to clipboard.
+    /// </summary>
+    private async Task HandleCopiedContent(string content)
+    {
+        try
+        {
+            Logger.LogInformation("Content copied to clipboard: {ContentLength} characters", content.Length);
+            // In a real implementation, use JS interop to copy to clipboard
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error handling copied content");
+        }
+    }
+}

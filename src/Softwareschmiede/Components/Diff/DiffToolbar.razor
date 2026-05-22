@@ -1,0 +1,310 @@
+@using Softwareschmiede.Domain.Entities
+@using Softwareschmiede.Components.Diff
+
+<nav class="diff-toolbar" role="toolbar" aria-label="Diff viewer controls">
+    <div class="diff-toolbar__group diff-toolbar__group--view-mode">
+        <div class="btn-group" role="group" aria-label="View mode selection">
+            <button type="button"
+                    class="btn btn-sm @(CurrentViewMode == DiffViewMode.SideBySide ? "btn-primary" : "btn-outline-primary")"
+                    aria-pressed="@(CurrentViewMode == DiffViewMode.SideBySide)"
+                    @onclick="() => HandleViewModeClick(DiffViewMode.SideBySide)"
+                    title="Side-by-Side view">
+                👬 Side-by-Side
+            </button>
+            <button type="button"
+                    class="btn btn-sm @(CurrentViewMode == DiffViewMode.Split ? "btn-primary" : "btn-outline-primary")"
+                    aria-pressed="@(CurrentViewMode == DiffViewMode.Split)"
+                    @onclick="() => HandleViewModeClick(DiffViewMode.Split)"
+                    title="Split view">
+                ⬌ Split
+            </button>
+            <button type="button"
+                    class="btn btn-sm @(CurrentViewMode == DiffViewMode.Unified ? "btn-primary" : "btn-outline-primary")"
+                    aria-pressed="@(CurrentViewMode == DiffViewMode.Unified)"
+                    @onclick="() => HandleViewModeClick(DiffViewMode.Unified)"
+                    title="Unified view">
+                📄 Unified
+            </button>
+        </div>
+    </div>
+
+    <div class="diff-toolbar__group diff-toolbar__group--search">
+        <div class="input-group input-group-sm">
+            <span class="input-group-text">🔍</span>
+            <input type="text"
+                   class="form-control"
+                   placeholder="Search lines (Ctrl+F)"
+                   aria-label="Search diff content"
+                   value="@searchInput"
+                   @onchange="HandleSearchInput"
+                   @onkeydown="HandleSearchKeydown"
+                   @key="@("search-input")" />
+            @if (!string.IsNullOrWhiteSpace(searchInput))
+            {
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        aria-label="Clear search"
+                        @onclick="HandleClearSearch"
+                        title="Clear search">
+                    ✕
+                </button>
+            }
+            @if (!string.IsNullOrWhiteSpace(searchInput) && searchResultCount > 0)
+            {
+                <span class="input-group-text" role="status" aria-live="polite">
+                    @currentSearchIndex / @searchResultCount
+                </span>
+            }
+        </div>
+    </div>
+
+    <div class="diff-toolbar__group diff-toolbar__group--navigation">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Navigation">
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    title="Previous change (P)"
+                    aria-label="Go to previous change"
+                    @onclick="() => HandleNavigateClick(NavigationDirection.Previous)">
+                ⬆ Prev
+            </button>
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    title="Next change (N)"
+                    aria-label="Go to next change"
+                    @onclick="() => HandleNavigateClick(NavigationDirection.Next)">
+                Next ⬇
+            </button>
+        </div>
+    </div>
+
+    <div class="diff-toolbar__group diff-toolbar__group--filters">
+        <details class="dropdown">
+            <summary class="btn btn-sm btn-outline-secondary" title="Filter lines by type">
+                ⚙ Filter
+            </summary>
+            <ul class="dropdown-menu" role="menu">
+                <li>
+                    <label class="dropdown-item">
+                        <input type="checkbox" 
+                               @onchange='@(e => HandleFilterToggle("added", (bool)e.Value!))'
+                               checked="@filterSettings.ShowAdded" />
+                        Added Lines
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item">
+                        <input type="checkbox"
+                               @onchange='@(e => HandleFilterToggle("removed", (bool)e.Value!))'
+                               checked="@filterSettings.ShowRemoved" />
+                        Removed Lines
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item">
+                        <input type="checkbox"
+                               @onchange='@(e => HandleFilterToggle("modified", (bool)e.Value!))'
+                               checked="@filterSettings.ShowModified" />
+                        Modified Lines
+                    </label>
+                </li>
+                <li>
+                    <label class="dropdown-item">
+                        <input type="checkbox"
+                               @onchange='@(e => HandleFilterToggle("context", (bool)e.Value!))'
+                               checked="@filterSettings.ShowContext" />
+                        Context Lines
+                    </label>
+                </li>
+            </ul>
+        </details>
+    </div>
+
+    <div class="diff-toolbar__group diff-toolbar__group--actions">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Actions">
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    title="Copy selected lines"
+                    aria-label="Copy selected lines to clipboard"
+                    @onclick="() => HandleExportClick(ExportFormat.Text)">
+                📋 Copy
+            </button>
+            <details class="dropdown">
+                <summary class="btn btn-sm btn-outline-secondary" title="Export options">
+                    💾 Export
+                </summary>
+                <ul class="dropdown-menu dropdown-menu-end" role="menu">
+                    <li>
+                        <button class="dropdown-item" @onclick="() => HandleExportClick(ExportFormat.Html)">
+                            📄 Export as HTML
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item" @onclick="() => HandleExportClick(ExportFormat.Pdf)">
+                            📑 Export as PDF
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item" @onclick="() => HandleExportClick(ExportFormat.Text)">
+                            📝 Export as Text
+                        </button>
+                    </li>
+                </ul>
+            </details>
+        </div>
+    </div>
+</nav>
+
+@code {
+    [Parameter]
+    public required DiffResult DiffResult { get; set; }
+
+    [Parameter]
+    public required DiffViewMode CurrentViewMode { get; set; }
+
+    [Parameter]
+    public required EventCallback<DiffViewMode> OnViewModeChanged { get; set; }
+
+    [Parameter]
+    public required EventCallback<string?> OnSearch { get; set; }
+
+    [Parameter]
+    public required EventCallback<NavigationDirection> OnNavigate { get; set; }
+
+    [Parameter]
+    public required EventCallback<ExportFormat> OnExport { get; set; }
+
+    [Inject]
+    private ILogger<DiffToolbar> Logger { get; set; } = null!;
+
+    private string searchInput = string.Empty;
+    private int searchResultCount = 0;
+    private int currentSearchIndex = 0;
+    private FilterSettings filterSettings = new();
+
+    /// <summary>
+    /// Handles view mode button clicks.
+    /// </summary>
+    private async Task HandleViewModeClick(DiffViewMode newMode)
+    {
+        Logger.LogInformation("View mode clicked: {ViewMode}", newMode);
+        await OnViewModeChanged.InvokeAsync(newMode);
+    }
+
+    /// <summary>
+    /// Handles search input changes.
+    /// </summary>
+    private async Task HandleSearchInput(ChangeEventArgs e)
+    {
+        searchInput = e.Value?.ToString() ?? string.Empty;
+        currentSearchIndex = 0;
+        searchResultCount = CalculateSearchResultCount();
+        
+        Logger.LogInformation("Search input changed: {SearchTerm}, Results: {Count}", searchInput, searchResultCount);
+        await OnSearch.InvokeAsync(string.IsNullOrWhiteSpace(searchInput) ? null : searchInput);
+    }
+
+    /// <summary>
+    /// Handles keyboard shortcuts in search box.
+    /// </summary>
+    private async Task HandleSearchKeydown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            if (e.ShiftKey)
+            {
+                // Previous result
+                currentSearchIndex = Math.Max(0, currentSearchIndex - 1);
+                await OnNavigate.InvokeAsync(NavigationDirection.Previous);
+            }
+            else
+            {
+                // Next result
+                currentSearchIndex = Math.Min(searchResultCount - 1, currentSearchIndex + 1);
+                await OnNavigate.InvokeAsync(NavigationDirection.Next);
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            await HandleClearSearch();
+        }
+    }
+
+    /// <summary>
+    /// Clears the search input.
+    /// </summary>
+    private async Task HandleClearSearch()
+    {
+        searchInput = string.Empty;
+        searchResultCount = 0;
+        currentSearchIndex = 0;
+        Logger.LogInformation("Search cleared");
+        await OnSearch.InvokeAsync(null);
+    }
+
+    /// <summary>
+    /// Handles navigation button clicks.
+    /// </summary>
+    private async Task HandleNavigateClick(NavigationDirection direction)
+    {
+        Logger.LogInformation("Navigate clicked: {Direction}", direction);
+        await OnNavigate.InvokeAsync(direction);
+    }
+
+    /// <summary>
+    /// Handles filter toggle changes.
+    /// </summary>
+    private Task HandleFilterToggle(string filterType, bool isChecked)
+    {
+        switch (filterType)
+        {
+            case "added":
+                filterSettings.ShowAdded = isChecked;
+                break;
+            case "removed":
+                filterSettings.ShowRemoved = isChecked;
+                break;
+            case "modified":
+                filterSettings.ShowModified = isChecked;
+                break;
+            case "context":
+                filterSettings.ShowContext = isChecked;
+                break;
+        }
+
+        Logger.LogInformation("Filter toggled: {FilterType}, IsChecked: {IsChecked}", filterType, isChecked);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Handles export format selection.
+    /// </summary>
+    private async Task HandleExportClick(ExportFormat format)
+    {
+        Logger.LogInformation("Export clicked: {Format}", format);
+        await OnExport.InvokeAsync(format);
+    }
+
+    /// <summary>
+    /// Calculates the number of search results.
+    /// </summary>
+    private int CalculateSearchResultCount()
+    {
+        if (string.IsNullOrWhiteSpace(searchInput) || DiffResult?.DiffBlocks == null)
+            return 0;
+
+        return DiffResult.DiffBlocks
+            .SelectMany(b => b.DiffLines)
+            .Count(l => l.Content.Contains(searchInput, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Filter settings for display control.
+    /// </summary>
+    private class FilterSettings
+    {
+        public bool ShowAdded { get; set; } = true;
+        public bool ShowRemoved { get; set; } = true;
+        public bool ShowModified { get; set; } = true;
+        public bool ShowContext { get; set; } = true;
+    }
+}

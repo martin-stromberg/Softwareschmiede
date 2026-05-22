@@ -22,6 +22,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 | [Issue-, Branch- und PR-Verknüpfung](./issue-branch-pr-linking-flow.md) | `issue-branch-pr-linking-flow.md` | End-to-End-Flow von der Issue-Auswahl über issuebezogenen Branch bis zur PR-Closing-Direktive (`Closes #<Issue>`) |
+| [Diff-Pipeline (Controller, Service, Algorithmus, Cache)](./diff-service-flow.md) | `diff-service-flow.md` | End-to-End-Ablauf für Diff-Generierung, 2-Tier-Caching, Persistierung sowie Validierungs- und Fehlerpfade |
 | [Repository-Startskript mit freier Portzuweisung](./repository-startskript-freier-port-flow.md) | `repository-startskript-freier-port-flow.md` | Konfigurations- und Laufzeitablauf für repositorybezogene Startskripte inkl. Portreservierung und PowerShell-Ausführung beim Prozessstart |
 | [`start.ps1` für VS-Debug mit freiem HTTP-Port](./start-ps1-visual-studio-freier-http-port-flow.md) | `start-ps1-visual-studio-freier-http-port-flow.md` | Ablauf für Portauflösung (Parameter/Env/Auto), `launchSettings.json`-Update und Exit-Code-Pfade des lokalen Startskripts |
 
@@ -187,6 +188,13 @@ Dokumentiert den lokalen Skriptablauf von der Portquellen-Auflösung (**Paramete
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `GitWorkspaceBrowserService`
 
 Beschreibt den kompletten UI-Pfad von der Aufgabenansicht über die Query-Parameter-gesteuerte Tree-/Listenansicht bis zur Dateivorschau und zum Refresh.
+
+---
+
+### [Ablauf 19: Diff-Pipeline mit Caching und Fehlerpfaden](./diff-service-flow.md)
+**Typ:** `flowchart TD` · **Services:** `DiffController`, `DiffService`, `DiffAlgorithmService`, `DiffCachingService`
+
+Dokumentiert den Ablauf von `POST /api/diff/generate` über Service-Orchestrierung, 2-Tier-Cache und Persistierung bis zu den relevanten Validierungs- und Fehlerpfaden sowie der zugehörigen Testabdeckung.
 
 ---
 

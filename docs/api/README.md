@@ -4,14 +4,15 @@ Technische Dokumentation der öffentlichen Schnittstellen und internen API-Contr
 
 ## API-Status (HTTP)
 
-Die Softwareschmiede stellt aktuell **keine öffentlichen HTTP-Endpunkte** bereit (keine REST- und keine Minimal-API-Routen).  
-Details: [http-endpoints.md](./http-endpoints.md)
+Die Softwareschmiede stellt öffentliche HTTP-Endpunkte für den Diff-Bereich bereit.  
+Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 
 ## Dokumentierte API-Bereiche
 
 | Dokument | Kurzbeschreibung |
 |---|---|
-| [http-endpoints.md](./http-endpoints.md) | Verbindlicher HTTP-Status: keine öffentlichen Endpunkte, inkl. einheitlicher Dokumentation für Request/Response = *nicht anwendbar*. |
+| [http-endpoints.md](./http-endpoints.md) | Übersicht aller aktuell verfügbaren öffentlichen HTTP-Endpunkte inkl. Auth- und Content-Type-Konventionen. |
+| [diff.md](./diff.md) | Vollständige REST-Dokumentation für `DiffController` (`/api/diff`) mit Request-/Response-Beispielen, Servicevertrags-Referenzen und testabgeglichenen Verhaltensdetails. |
 | [issue-branch-pr-linking.md](./issue-branch-pr-linking.md) | Interner Contract für Issue-Auswahl, issuebezogene Branch-Erzeugung und PR-Closing-Direktive (`Closes #<Issue>`). |
 | [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Dateivorschau und defensiver Git-Status-Auswertung. |
 | [local-directory-plugin.md](./local-directory-plugin.md) | Technischer Contract der `IGitPlugin`-Implementierung `LocalDirectoryPlugin` inkl. Workspace-Modi, `git-init`-Fallback, Pull ohne Merge, Push-/Delete-Sync sowie Capability-Flags für die Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden bei Arbeitskopie). |

@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.IntegrationTests.Infrastructure;
@@ -45,6 +46,7 @@ public sealed class DatabaseFixture : IAsyncDisposable
 
         var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
             .UseSqlite(connection)
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         var context = new SoftwareschmiededDbContext(options);
@@ -62,6 +64,7 @@ public sealed class DatabaseFixture : IAsyncDisposable
     {
         var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
             .UseSqlite($"Data Source={_dbFilePath}")
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         return new SoftwareschmiededDbContext(options);

@@ -28,4 +28,7 @@ public sealed class Protokolleintrag
 
     /// <summary>Zugehörige Testergebnisse (bei Typ TestErgebnis).</summary>
     public List<TestErgebnis> TestErgebnisse { get; set; } = [];
+
+    /// <summary>Optionales Diff-Ergebnis, das auf diesen Protokolleintrag referenziert.</summary>
+    public DiffResult? DiffResult { get; set; }
 }
