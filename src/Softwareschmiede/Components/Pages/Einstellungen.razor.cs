@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -25,6 +27,9 @@ public class EinstellungenBase : ComponentBase
     [Inject] private PluginSettingsService PluginSettings { get; set; } = default!;
     [Inject] private ArbeitsverzeichnisSettingsService ArbeitsverzeichnisSettings { get; set; } = default!;
     [Inject] private IArbeitsverzeichnisResolver ArbeitsverzeichnisResolver { get; set; } = default!;
+    [Inject] private BenachrichtigungsEinstellungenService BenachrichtigungsEinstellungen { get; set; } = default!;
+    [Inject] private IBenutzerkontextService Benutzerkontext { get; set; } = default!;
+    [Inject] private IJSRuntime JsRuntime { get; set; } = default!;
     [Inject] private ILogger<EinstellungenBase> Logger { get; set; } = default!;
 
     // TODO: Jedes Plugin wird als PluginViewModel verwaltet
@@ -57,6 +62,12 @@ public class EinstellungenBase : ComponentBase
     protected string? _arbeitsverzeichnisStatusMessage;
     protected bool _arbeitsverzeichnisStatusIsError;
     protected string? _arbeitsverzeichnisFallbackHinweis;
+    protected BenachrichtigungsModus _toastModus = BenachrichtigungsModus.Global;
+    protected BenachrichtigungsModus _tonModus = BenachrichtigungsModus.NurAufgabenseite;
+    protected string? _benachrichtigungStatus;
+    protected bool _benachrichtigungStatusIsError;
+    protected string? _audioDateiInfo;
+    protected IReadOnlyList<BenachrichtigungsModus> _benachrichtigungsModi = Enum.GetValues<BenachrichtigungsModus>();
 
     /// <inheritdoc/>
     protected override async Task OnInitializedAsync()
@@ -97,6 +108,8 @@ public class EinstellungenBase : ComponentBase
                 $"Aktuell wird Fallback verwendet ({resolution.ReasonCode}): {Path.Combine(Path.GetTempPath(), "softwareschmiede")}. " +
                 "Bitte Pfad prüfen und neu speichern.";
         }
+
+        await LadeBenachrichtigungenAsync();
     }
 
     /// <summary>Speichert das Standardplugin für den angegebenen Plugin-Typ.</summary>
@@ -390,5 +403,138 @@ public class EinstellungenBase : ComponentBase
         }
 
         return enumOption;
+    }
+
+    protected static string GetBenachrichtigungsModusLabel(BenachrichtigungsModus modus)
+    {
+        return modus switch
+        {
+            BenachrichtigungsModus.Deaktiviert => "Deaktiviert",
+            BenachrichtigungsModus.NurAufgabenseite => "Nur auf Aufgabenseite",
+            BenachrichtigungsModus.Global => "Global",
+            _ => modus.ToString()
+        };
+    }
+
+    protected async Task BenachrichtigungsEinstellungenSpeichernAsync()
+    {
+        _saving = true;
+        _benachrichtigungStatus = null;
+        _benachrichtigungStatusIsError = false;
+        try
+        {
+            var benutzerId = Benutzerkontext.GetBenutzerId();
+            await BenachrichtigungsEinstellungen.SaveAsync(
+                benutzerId,
+                new BenachrichtigungsEinstellungenDto(_toastModus, _tonModus));
+            _benachrichtigungStatus = "Benachrichtigungseinstellungen gespeichert.";
+        }
+        catch (Exception ex)
+        {
+            _benachrichtigungStatus = $"Fehler beim Speichern: {ex.Message}";
+            _benachrichtigungStatusIsError = true;
+            Logger.LogError(ex, "Fehler beim Speichern der Benachrichtigungseinstellungen.");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    protected async Task BenachrichtigungsAudioDateiAusgewaehltAsync(InputFileChangeEventArgs args)
+    {
+        if (args.FileCount == 0)
+        {
+            return;
+        }
+
+        _saving = true;
+        _benachrichtigungStatus = null;
+        _benachrichtigungStatusIsError = false;
+        try
+        {
+            var file = args.File;
+            await using var stream = file.OpenReadStream(BenachrichtigungsEinstellungenService.MaxAudioDateigroesseBytes);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var benutzerId = Benutzerkontext.GetBenutzerId();
+            await BenachrichtigungsEinstellungen.UploadAudioAsync(
+                benutzerId,
+                file.Name,
+                file.ContentType,
+                memory.ToArray());
+
+            _benachrichtigungStatus = "Audio-Datei gespeichert.";
+            await LadeBenachrichtigungenAsync();
+        }
+        catch (Exception ex)
+        {
+            _benachrichtigungStatus = $"Upload fehlgeschlagen: {ex.Message}";
+            _benachrichtigungStatusIsError = true;
+            Logger.LogWarning(ex, "Audio-Upload fehlgeschlagen.");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    protected async Task BenachrichtigungsAudioEntfernenAsync()
+    {
+        _saving = true;
+        _benachrichtigungStatus = null;
+        _benachrichtigungStatusIsError = false;
+        try
+        {
+            await BenachrichtigungsEinstellungen.RemoveAudioAsync(Benutzerkontext.GetBenutzerId());
+            _benachrichtigungStatus = "Benutzerdefinierter Ton entfernt. Standardton ist aktiv.";
+            await LadeBenachrichtigungenAsync();
+        }
+        catch (Exception ex)
+        {
+            _benachrichtigungStatus = $"Fehler beim Entfernen: {ex.Message}";
+            _benachrichtigungStatusIsError = true;
+            Logger.LogWarning(ex, "Audio-Datei konnte nicht entfernt werden.");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    protected async Task TesttonAbspielenAsync()
+    {
+        try
+        {
+            var audio = await BenachrichtigungsEinstellungen.GetAudioPayloadAsync(Benutzerkontext.GetBenutzerId());
+            var result = await JsRuntime.InvokeAsync<string>(
+                "softwareschmiedeNotifications.playAlert",
+                audio?.Base64Inhalt,
+                audio?.MimeType);
+
+            _benachrichtigungStatus = string.Equals(result, "deferred", StringComparison.OrdinalIgnoreCase)
+                ? "Browser hat den Ton blockiert. Nach der nächsten Interaktion wird automatisch erneut versucht."
+                : "Testton abgespielt.";
+            _benachrichtigungStatusIsError = string.Equals(result, "failed", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            _benachrichtigungStatus = $"Testton konnte nicht abgespielt werden: {ex.Message}";
+            _benachrichtigungStatusIsError = true;
+            Logger.LogWarning(ex, "Testton fehlgeschlagen.");
+        }
+    }
+
+    private async Task LadeBenachrichtigungenAsync()
+    {
+        var benutzerId = Benutzerkontext.GetBenutzerId();
+        var settings = await BenachrichtigungsEinstellungen.GetAsync(benutzerId);
+        _toastModus = settings.ToastModus;
+        _tonModus = settings.TonModus;
+
+        var audioInfo = await BenachrichtigungsEinstellungen.GetAudioInfoAsync(benutzerId);
+        _audioDateiInfo = audioInfo.HatBenutzerdefinierteDatei
+            ? $"Aktive Datei: {audioInfo.Dateiname} ({audioInfo.GroesseBytes} Bytes)"
+            : "Kein eigener Ton hinterlegt – Standardton aktiv.";
     }
 }

@@ -4,14 +4,15 @@ Technische Dokumentation der öffentlichen Schnittstellen und internen API-Contr
 
 ## API-Status (HTTP)
 
-Die Softwareschmiede stellt öffentliche HTTP-Endpunkte für den Diff-Bereich bereit.  
+Die Softwareschmiede stellt öffentliche HTTP-Endpunkte für den Diff-Bereich bereit.
+Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“** wurden **keine neuen öffentlichen REST-Endpunkte** eingeführt.
 Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 
 ## Dokumentierte API-Bereiche
 
 | Dokument | Kurzbeschreibung |
 |---|---|
-| [http-endpoints.md](./http-endpoints.md) | Übersicht aller aktuell verfügbaren öffentlichen HTTP-Endpunkte inkl. Auth- und Content-Type-Konventionen. |
+| [http-endpoints.md](./http-endpoints.md) | Übersicht aller aktuell verfügbaren öffentlichen HTTP-Endpunkte inkl. Auth- und Content-Type-Konventionen sowie Feature-Hinweis zum Benachrichtigungssystem (keine neuen REST-Endpunkte, interne Service-/UI-Integration). |
 | [diff.md](./diff.md) | Vollständige REST-Dokumentation für `DiffController` (`/api/diff`) mit Request-/Response-Beispielen, Servicevertrags-Referenzen und testabgeglichenen Verhaltensdetails. |
 | [aufgabe-recovery.md](./aufgabe-recovery.md) | Interner Service-/UI-Contract für die manuelle Wiederherstellung festhängender Aufgaben (Eligibility, Statuswechsel, Audit, Concurrency-Schutz). |
 | [issue-branch-pr-linking.md](./issue-branch-pr-linking.md) | Interner Contract für Issue-Auswahl, issuebezogene Branch-Erzeugung und PR-Closing-Direktive (`Closes #<Issue>`). |
@@ -22,6 +23,12 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 | [repository-startskript-freier-port.md](./repository-startskript-freier-port.md) | Interner Contract für repositorybezogene Startskripte mit freier Portreservierung, Persistenz (`RepositoryStartKonfiguration`) und Ausführung beim Prozessstart. |
 | [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
 | [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
+
+## Feature-Fokus: Benachrichtigungssystem für abgeschlossene KI-Aufgaben
+
+- Keine neuen öffentlichen REST-Endpunkte.
+- Interne Service-/UI-Integration über Abschlussereignisse, Hub-Verteilung und UI-Verarbeitung.
+- Terminologie für dieses Feature: **BenachrichtigungsModus**, **Toast**, **Hinweiston**, **Audit**.
 
 ## Feature-Fokus: Standardplugin je Pluginart & KI-Plugin-Auswahl
 

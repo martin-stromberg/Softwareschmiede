@@ -2,8 +2,14 @@
 
 ## Übersicht
 
-Die Anwendung stellt über `app.MapControllers()` öffentliche REST-Endpunkte für Diff-Funktionen bereit.  
+Die Anwendung stellt über `app.MapControllers()` öffentliche REST-Endpunkte für Diff-Funktionen bereit.
 Die detaillierte Endpunktbeschreibung mit vollständigen Request-/Response-Beispielen liegt in [diff.md](./diff.md).
+
+## Feature-Hinweis: Benachrichtigungssystem für abgeschlossene KI-Aufgaben
+
+Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“** wurden **keine neuen öffentlichen REST-Endpunkte** eingeführt.
+Die Integration erfolgt intern über Service-/UI-Komponenten (Abschlussereignis, Hub-Verteilung, UI-Verarbeitung).
+Im UI-Kontext steuert der **BenachrichtigungsModus** die Ausgabe via **Toast** und optionalem **Hinweiston**; relevante Vorgänge werden im **Audit** erfasst.
 
 ## Öffentliche REST-Endpunkte
 
@@ -18,7 +24,7 @@ Die detaillierte Endpunktbeschreibung mit vollständigen Request-/Response-Beisp
 
 ## Authentifizierung
 
-Aktuell ist für diese Endpunkte keine Authentifizierung erzwungen.  
+Aktuell ist für diese Endpunkte keine Authentifizierung erzwungen.
 Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftreten (Beispiel-Payloads in [diff.md](./diff.md)).
 
 ## Request-/Response-Konventionen

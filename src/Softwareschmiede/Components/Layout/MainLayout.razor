@@ -41,6 +41,20 @@
     </main>
 </div>
 
+@if (_toasts.Count > 0)
+{
+    <div class="toast-stack" aria-live="polite" aria-atomic="false">
+        @foreach (var toast in _toasts)
+        {
+            <div class="toast-item @toast.CssClass">
+                <div class="toast-title">@toast.Titel</div>
+                <div class="toast-message">@toast.Nachricht</div>
+                <button class="toast-close" @onclick="() => EntferneToast(toast.Id)">✕</button>
+            </div>
+        }
+    </div>
+}
+
 <div id="blazor-error-ui" data-nosnippet>
     Ein unbehandelter Fehler ist aufgetreten.
     <a href="." class="reload">Neu laden</a>

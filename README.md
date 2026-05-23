@@ -114,6 +114,8 @@ Stand: **2026-05-22**
 - Provider-spezifische Kontext- und Task-Dateien (`*.copilot.context.md`, `*.claude.context.md`, `*.copilot-task.md`, `*.claude-task.md`)
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Sidebar-Footer zeigt live die Anzahl laufender Automatisierungen; optionaler Auto-Shutdown-Toggle erscheint nur bei aktiven Läufen
+- **Benachrichtigungssystem für abgeschlossene KI-Aufgaben:** Abschlussereignisse aus `KiStartenAsync` werden über den `KiAufgabenBenachrichtigungsHub` verteilt und im `MainLayout` als Toast/Hinweiston verarbeitet (Modi: `Deaktiviert`, `NurAufgabenseite`, `Global`)
+- In den Einstellungen sind je Kanal (`Toast`, `Hinweiston`) eigene Modi sowie ein optionaler benutzerdefinierter Audio-Upload (`.mp3/.wav/.ogg`, max. 10 MB) verfügbar
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Optionaler Startskript-Lauf beim Prozessstart mit reserviertem Port (`SOFTWARESCHMIEDE_FREE_PORT`) für branchspezifische lokale Run-Konfiguration
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
@@ -267,6 +269,13 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 - Bei installierten Plugins stehen aktuell **GitHub Copilot** und **Claude CLI** zur Verfügung.
 - Claude-Läufe nutzen den Credential-Key `Softwareschmiede.ClaudeCli.Token` und setzen `ANTHROPIC_API_KEY` für den CLI-Prozess.
 - Agentenpakete müssen für Claude einen `.github`-Ordner enthalten, damit sie als kompatibel gelten.
+
+### Benachrichtigungssystem für abgeschlossene KI-Aufgaben
+
+1. In **Einstellungen → KI-Aufgaben-Benachrichtigungen** Toast- und Hinweiston-Modus je Kanal konfigurieren.
+2. Optional einen benutzerdefinierten Hinweiston hochladen (`.mp3`, `.wav`, `.ogg`, max. 10 MB) und über **Testton** prüfen.
+3. Nach Abschluss oder Fehler eines KI-Laufs erscheint abhängig vom Modus ein Toast und/oder ein Hinweiston.
+4. Bei Browser-Autoplay-Blockierung wird der Ton nach der nächsten Nutzerinteraktion automatisch erneut versucht.
 
 ### Folgeanweisungen mit Agent- und Kontextsteuerung (Aufgabe-Detailseite)
 
@@ -590,6 +599,10 @@ Feature-spezifische Testartefakte:
 - Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`
 - Integrationstests: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
 - UI/Settings-Tests: `src/Softwareschmiede.Tests/Components/Pages/EinstellungenBaseArbeitsverzeichnisTests.cs`
+- Benachrichtigungssystem für abgeschlossene KI-Aufgaben:
+  - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
+  - UI-/Dispatch-Logik (Modusmatrix, Dedupe, Audio-/Toast-Verhalten, Audit): `src/Softwareschmiede.Tests/Components/Layout/MainLayoutTests.cs`
+  - Einstellungs- und Audio-Validierung/Persistenz: `src/Softwareschmiede.Tests/Application/Services/BenachrichtigungsEinstellungenServiceTests.cs`
 - [Testplan: Arbeitsverzeichnis](docs/tests/testplan-arbeitsverzeichnis.md)
 - [Testlücken: Arbeitsverzeichnis](docs/tests/testluecken-arbeitsverzeichnis.md)
 - [Testplan: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/tests/testplan-separates-arbeitsverzeichnis-git-workflow-fallback.md)
@@ -700,7 +713,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Architektur: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) | Architekturentscheidungen und Sequenzen für den separaten Workspace-Workflow |
 | [Architecture Review: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | Review-Findings und Qualitätsauflagen für Pull-/Push-/Delete-Sync-Regeln |
 | [ERM: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md) | Domänenmodell für Sync-Delta, Delete-Kandidaten und Workflow-Zustände |
-| [Dokumentationsplan](docs/documentation-plan.md) | Analyse und Maßnahmenplan zur durchgängigen Doku-Aktualisierung |
+| [Dokumentationsplan](docs/documentation-plan.md) | Analyse und Maßnahmenplan zur Doku-Aktualisierung (inkl. Feature „Benachrichtigungssystem für abgeschlossene KI-Aufgaben“) |
 | [Anforderungen: Plugin-Klassenbibliotheken](docs/requirements/plugin-klassenbibliotheken-github-und-copilot.md) | Feature-Anforderungen für Plugin-Architektur und Build-Auslieferung |
 | [Architektur: Plugin-Klassenbibliotheken](docs/architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md) | Technische Architektur für Discovery, Build/Pipeline und Plugin-Design |
 | [Architecture Review: Plugin-Klassenbibliotheken](docs/improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md) | Architekturprüfung mit Findings und Maßnahmen |
@@ -718,6 +731,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Issue-/Branch-/PR-Linking (technisch)](docs/api/issue-branch-pr-linking.md) | Technischer Contract für IssueReferenz, Branch-Namensmuster und PR-Closing-Direktive |
 | [Workdir-Konfiguration (technisch)](docs/api/workdir-configuration.md) | Technische Umsetzung von Settings, Resolver, Klonpfadbildung und Reason-Codes |
 | [Programmablaufpläne](docs/flows/development-process-flow.md) | Grafische Ablaufpläne und technische Prozessbeschreibungen |
+| [Tests-Dokumentationsindex](docs/tests/README.md) | Index der Testdokumente inkl. Verweis auf bestehende Testabdeckung für das Benachrichtigungssystem |
 | [Flow: Arbeitsverzeichnis-Auflösung](docs/flows/workdir-resolution-flow.md) | Sequenzablauf für Konfiguration, Laufzeit-Auflösung und Fallback-Verhalten |
 | [Flow: Plugin-Discovery und Laden](docs/flows/plugin-discovery-load-flow.md) | Ablauf der dynamischen Plugin-Erkennung und robusten Registrierung |
 | [Testplan: Issue-/Branch-/PR-Linking](docs/tests/testplan-issue-branch-pr-linking.md) | Verifikation der Featurekette von Issue-Auswahl bis PR Auto-Close |

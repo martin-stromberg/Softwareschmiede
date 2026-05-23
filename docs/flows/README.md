@@ -26,6 +26,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Diff-Pipeline (Controller, Service, Algorithmus, Cache)](./diff-service-flow.md) | `diff-service-flow.md` | End-to-End-Ablauf für Diff-Generierung, 2-Tier-Caching, Persistierung sowie Validierungs- und Fehlerpfade |
 | [Repository-Startskript mit freier Portzuweisung](./repository-startskript-freier-port-flow.md) | `repository-startskript-freier-port-flow.md` | Konfigurations- und Laufzeitablauf für repositorybezogene Startskripte inkl. Portreservierung und PowerShell-Ausführung beim Prozessstart |
 | [`start.ps1` für VS-Debug mit freiem HTTP-Port](./start-ps1-visual-studio-freier-http-port-flow.md) | `start-ps1-visual-studio-freier-http-port-flow.md` | Ablauf für Portauflösung (Parameter/Env/Auto), `launchSettings.json`-Update und Exit-Code-Pfade des lokalen Startskripts |
+| [Benachrichtigungssystem für abgeschlossene KI-Aufgaben](./benachrichtigungssystem-flow.md) | `benachrichtigungssystem-flow.md` | End-to-End-Flow von `KiAufgabenAbschlussEreignis` über Hub-Dispatch bis zu Toast/Ton, Modusmatrix, Audit und Einstellungsverwaltung |
 
 ---
 
@@ -203,6 +204,13 @@ Dokumentiert den Ablauf von `POST /api/diff/generate` über Service-Orchestrieru
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `AufgabeRecoveryService`, `IRunningAutomationStatusSource`
 
 Beschreibt die Wiederherstellung von `KiAktiv`/`TestsLaufen` nach `InBearbeitung` mit Bestätigung, Laufzeitprüfung, konkurrierender Schutzlogik und Audit-Eintrag.
+
+---
+
+### [Ablauf 21: Benachrichtigungssystem für abgeschlossene KI-Aufgaben](./benachrichtigungssystem-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EntwicklungsprozessService`, `KiAufgabenBenachrichtigungsHub`, `MainLayout`, `BenachrichtigungsEinstellungenService`, `BenachrichtigungsAuditService`
+
+Dokumentiert den End-to-End-Flow von der Event-Publikation über kanalabhängige Toast-/Ton-Dispatch-Entscheidungen (inkl. Modusmatrix und Dedupe) bis zur Audit-Persistierung sowie den Einstellungsablauf für Modus, Audio-Upload und Testton.
 
 ---
 
