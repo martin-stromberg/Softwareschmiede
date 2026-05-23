@@ -109,6 +109,57 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             .Should().Be(1);
     }
 
+    [Fact]
+    public async Task AufgabeDetail_ShouldShowStatusResetButton_ForKiAktiv_WhenAutomationIsNotRunning()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.KiAktiv, isRunning: false);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var statusResetButton = cut.FindAll("button").Single(button => button.TextContent.Contains("Status zurücksetzen"));
+        statusResetButton.HasAttribute("disabled").Should().BeFalse();
+
+        statusResetButton.Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Status zurücksetzen?"));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Ja, Status zurücksetzen")).Click();
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Status wurde zurückgesetzt. Eine neue Anfrage kann jetzt gesendet werden."));
+
+        var loaded = await harness.Db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == harness.AufgabeId);
+        loaded.Status.Should().Be(AufgabeStatus.InBearbeitung);
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldDisableStatusResetButtonAndShowReason_WhenAutomationIsRunning()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.KiAktiv, isRunning: true);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var statusResetButton = cut.FindAll("button").Single(button => button.TextContent.Contains("Status zurücksetzen"));
+        statusResetButton.HasAttribute("disabled").Should().BeTrue();
+        cut.Markup.Should().Contain("Status kann nicht zurückgesetzt werden, solange die Verarbeitung läuft.");
+    }
+
     /// <summary>Prüft, dass Push/Pull und Pull-Request bei lokalem Repo mit separatem Arbeitsverzeichnis ausgeblendet sind.</summary>
     [Fact]
     public async Task AufgabeDetail_ShouldHidePushPullAndPullRequestButtons_WhenRepositoryIsLocalWorkingDirectoryCopy()

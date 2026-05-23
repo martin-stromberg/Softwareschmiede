@@ -3,7 +3,7 @@
 ## Einleitung
 
 Diese Funktion beschreibt, wie Sie bei Störungen sicher weiterarbeiten – insbesondere bei festhängenden Aufgaben in der Detailansicht.
-Neu ist die **manuelle Recovery-Aktion „Aufgabe wiederherstellen“**.
+Neu ist die **manuelle Recovery-Aktion „Aufgabe wiederherstellen“**. Sie ist von der regulären Aktion **„Status zurücksetzen“** getrennt: Diese wird für Aufgaben im Status `KI Aktiv` verwendet, wenn keine Ausführung mehr läuft.
 
 ---
 
