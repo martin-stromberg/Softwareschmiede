@@ -237,6 +237,20 @@ Sie können eine laufende oder offene Aufgabe jederzeit abbrechen.
 
 ---
 
+## Status zurücksetzen bei KI aktiv
+
+Wenn eine Aufgabe im Status **KI aktiv** steht, aber keine Verarbeitung mehr läuft, können Sie sie in der Detailseite wieder in einen bearbeitbaren Zustand setzen.
+
+1. Öffnen Sie die Aufgabe.
+2. Klicken Sie auf **↩️ Status zurücksetzen**.
+3. Bestätigen Sie mit **Ja, Status zurücksetzen**.
+
+Die Aktion ist nur verfügbar, wenn keine aktive Verarbeitung mehr läuft. Sie ist nicht mit **🩹 Aufgabe wiederherstellen** zu verwechseln.
+
+👉 Mehr dazu: [F023 – Status zurücksetzen bei KI aktiv](./business/features/F023-status-zuruecksetzen-ki-aktiv.md)
+
+---
+
 ## Festhängende Aufgabe wiederherstellen
 
 Wenn eine Aufgabe auf **KI aktiv** oder **Tests laufen** stehen bleibt, obwohl nichts mehr arbeitet, können Sie sie in der Detailseite manuell wiederherstellen.

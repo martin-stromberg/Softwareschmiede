@@ -46,6 +46,15 @@ else
                 <button class="btn btn-info" @onclick="MergeToSourceAsync" disabled="@_processing">🔀 Merge</button>
             }
             <button class="btn btn-secondary" @onclick="() => _showResetForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">↩️ Reset</button>
+            @if (_aufgabe.Status == AufgabeStatus.KiAktiv)
+            {
+                <button class="btn btn-warning"
+                        @onclick="() => _showStatusResetConfirm = true"
+                        disabled="@(_processing || !_statusResetAllowed)"
+                        title="@(_statusResetDisabledReason ?? "Setzt die Aufgabe auf 'In Bearbeitung' zurück, damit eine neue Anfrage möglich ist.")">
+                    ↩️ Status zurücksetzen
+                </button>
+            }
         }
         @if (IsRecoveryStatus)
         {
@@ -98,6 +107,11 @@ else
     @if (IsRecoveryStatus && !_recoveryAllowed && !string.IsNullOrWhiteSpace(_recoveryDisabledReason))
     {
         <div class="alert alert-info">@_recoveryDisabledReason</div>
+    }
+
+    @if (_aufgabe.Status == AufgabeStatus.KiAktiv && !_statusResetAllowed && !string.IsNullOrWhiteSpace(_statusResetDisabledReason))
+    {
+        <div class="alert alert-info">@_statusResetDisabledReason</div>
     }
 
     @if (_showExplorer)
@@ -237,6 +251,17 @@ else
             <div style="display:flex;gap:.5rem;margin-top:.75rem">
                 <button class="btn btn-warning" @onclick="WiederherstellenAsync" disabled="@_processing">Ja, wiederherstellen</button>
                 <button class="btn btn-ghost" @onclick="() => _showRecoveryConfirm = false">Zurück</button>
+            </div>
+        </div>
+    }
+
+    @if (_showStatusResetConfirm)
+    {
+        <div class="alert alert-warning">
+            <strong>Status zurücksetzen?</strong> Die Aufgabe wird auf „In Bearbeitung“ gesetzt. Danach kann eine neue Anfrage gesendet werden.
+            <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                <button class="btn btn-warning" @onclick="StatusZuruecksetzenAsync" disabled="@_processing">Ja, Status zurücksetzen</button>
+                <button class="btn btn-ghost" @onclick="() => _showStatusResetConfirm = false">Zurück</button>
             </div>
         </div>
     }

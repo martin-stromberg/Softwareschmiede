@@ -57,6 +57,7 @@ public partial class AufgabeDetail : IDisposable
     private bool _showPullRequestForm;
     private bool _showAbbrechenConfirm;
     private bool _showRecoveryConfirm;
+    private bool _showStatusResetConfirm;
     private bool _showArchivierenConfirm;
     private bool _showDeleteConfirm;
     private bool _showStartDialog;
@@ -81,6 +82,8 @@ public partial class AufgabeDetail : IDisposable
     private string? _erfolg;
     private bool _recoveryAllowed;
     private string? _recoveryDisabledReason;
+    private bool _statusResetAllowed;
+    private string? _statusResetDisabledReason;
     private GitActionCapabilities _gitActionCapabilities = new(
         RepositoryKind.Unknown,
         IsWorkingDirectoryCopy: false,
@@ -172,6 +175,7 @@ public partial class AufgabeDetail : IDisposable
             }
         }
         AktualisiereRecoveryZustand();
+        AktualisiereStatusResetZustand();
         _loading = false;
     }
 
@@ -215,6 +219,7 @@ public partial class AufgabeDetail : IDisposable
                 }
             }
             AktualisiereRecoveryZustand();
+            AktualisiereStatusResetZustand();
             _loading = false;
         }
         catch (Exception ex)
@@ -249,6 +254,32 @@ public partial class AufgabeDetail : IDisposable
         {
             _recoveryAllowed = false;
             _recoveryDisabledReason = "Prüfung der Laufzeit war nicht möglich.";
+        }
+    }
+
+    private void AktualisiereStatusResetZustand()
+    {
+        _statusResetAllowed = false;
+        _statusResetDisabledReason = null;
+
+        if (_aufgabe is null || _aufgabe.Status != AufgabeStatus.KiAktiv)
+        {
+            return;
+        }
+
+        try
+        {
+            var isRunning = RunningAutomationStatusSource.IsRunning(_aufgabe.Id);
+            _statusResetAllowed = !isRunning;
+            if (isRunning)
+            {
+                _statusResetDisabledReason = "Status kann nicht zurückgesetzt werden, solange die Verarbeitung läuft.";
+            }
+        }
+        catch
+        {
+            _statusResetAllowed = false;
+            _statusResetDisabledReason = "Prüfung der Laufzeit war nicht möglich.";
         }
     }
 
@@ -848,6 +879,40 @@ public partial class AufgabeDetail : IDisposable
         }
         catch (Exception ex) { _fehler = ex.Message; }
         finally { _processing = false; }
+    }
+
+    private async Task StatusZuruecksetzenAsync()
+    {
+        _processing = true;
+        _showStatusResetConfirm = false;
+        _fehler = null;
+
+        try
+        {
+            if (_aufgabe is null || _aufgabe.Status != AufgabeStatus.KiAktiv)
+            {
+                throw new InvalidOperationException("Status zurücksetzen ist nur für Aufgaben im Status 'KI Aktiv' verfügbar.");
+            }
+
+            var isRunning = RunningAutomationStatusSource.IsRunning(_aufgabe.Id);
+            if (isRunning)
+            {
+                throw new InvalidOperationException("Status kann nicht zurückgesetzt werden, solange die Verarbeitung läuft.");
+            }
+
+            await AufgabeService.KiAbgeschlossenAsync(Id, _cts.Token);
+            _erfolg = "Status wurde zurückgesetzt. Eine neue Anfrage kann jetzt gesendet werden.";
+            await LadeAsync();
+        }
+        catch (Exception ex)
+        {
+            _fehler = ex.Message;
+            await LadeAsync();
+        }
+        finally
+        {
+            _processing = false;
+        }
     }
 
     private async Task PullRequestErstellenAsync()
