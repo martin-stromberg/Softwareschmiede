@@ -60,6 +60,7 @@ public partial class AufgabeDetail : IDisposable
     private bool _showStatusResetConfirm;
     private bool _showArchivierenConfirm;
     private bool _showDeleteConfirm;
+    private bool _showVerwerfenConfirm;
     private bool _showStartDialog;
     private bool _editAnforderung;
     private bool _loadingBranches;
@@ -965,6 +966,26 @@ public partial class AufgabeDetail : IDisposable
         }
         catch (Exception ex) { _fehler = ex.Message; }
         finally { _processing = false; }
+    }
+
+    private async Task VerwerfenAsync(VerwerfenAktion aktion)
+    {
+        _processing = true;
+        _showVerwerfenConfirm = false;
+        _fehler = null;
+        try
+        {
+            await AufgabeService.VerwerfenAsync(Id, aktion, _cts.Token);
+            if (_aufgabe is not null)
+            {
+                NavigationManager.NavigateTo($"projekte/{_aufgabe.ProjektId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _fehler = ex.Message;
+            _processing = false;
+        }
     }
 
     private async Task AufgabeLoeschenAsync()

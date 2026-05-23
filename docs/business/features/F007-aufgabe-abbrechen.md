@@ -31,12 +31,13 @@ Das Abbrechen ist immer sicher – es gelangt nichts in die GitHub-Ablage, was n
 6. Die lokale Arbeitskopie wird vollständig gelöscht.
 7. Die Aufgabe wechselt in den Status **Abgebrochen**.
 
-### Offene Aufgabe (noch nicht gestartet) löschen
+### Offene Aufgabe verwerfen
 
 1. Sie öffnen die Aufgabe mit dem Status **Offen**.
-2. Sie klicken auf **Aufgabe löschen**.
-3. Sie bestätigen die Nachfrage.
-4. Die Aufgabe wird entfernt. Es gibt keine Arbeitskopie, die gelöscht werden müsste.
+2. Sie klicken auf **Verwerfen**.
+3. Sie wählen anschließend **Archivieren** oder **Dauerhaft löschen**.
+4. Die Aufgabe wird entsprechend archiviert oder entfernt.
+5. Es gibt keine Arbeitskopie, die gelöscht werden müsste.
 
 ### Abgebrochene Aufgabe neu starten
 
@@ -80,6 +81,9 @@ Der Bestätigungsdialog schützt Sie vor versehentlichem Abbrechen. Erst nach Ih
 
 **Kann ich eine Aufgabe abbrechen, die gerade im Status „In Bearbeitung" ist, aber die KI noch nicht gestartet wurde?**
 Ja. Sie können in jedem aktiven Status abbrechen. Wenn die KI noch nicht gestartet wurde, entfällt lediglich das Löschen der Arbeitskopie.
+
+**Kann ich eine offene Aufgabe direkt archivieren oder löschen?**
+Ja. Dafür nutzen Sie **Verwerfen** auf der Detailseite und wählen danach den gewünschten Pfad.
 
 **Wird die GitHub-Ablage durch das Abbrechen verändert?**
 Nein. Das Abbrechen hat keinerlei Auswirkungen auf Ihre GitHub-Ablage.

@@ -105,6 +105,7 @@ Stand: **2026-05-22**
 - Freie Aufgaben ohne Issue-Referenz anlegen
 - Durchgängige Issue-Verknüpfung von Aufgabenanlage über Branch bis Pull Request
 - Statusmodell: `Offen` → `In Bearbeitung` → `KI aktiv` / `Tests laufen` → `Abgeschlossen` / `Fehlgeschlagen`
+- Offene Aufgaben direkt verwerfen (Archivieren oder dauerhaft löschen), ohne sie vorher zu starten
 - Automatisches Aufräumen (Branch & Klon löschen) nach Abschluss oder Abbruch
 
 ### 🤖 KI-Steuerung (Plugin-System)

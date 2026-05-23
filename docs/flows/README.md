@@ -63,7 +63,7 @@ Beschreibt die Moduslogik **Kontext mitgeben / ignorieren / neu beginnen** inkl.
 ### [Ablauf 2d: AufgabeService Statusübergänge](./aufgabe-service-status-flow.md)
 **Typ:** `stateDiagram-v2` + `flowchart TD` · **Services:** `AufgabeService`, `SoftwareschmiededDbContext`
 
-Zeigt die vollständigen Statusübergänge von `Offen` bis `Archiviert` inklusive fachlicher Guards (z. B. Archivierung nur aus Endzuständen) und Fehlerbehandlung.
+Zeigt die vollständigen Statusübergänge von `Offen` bis `Archiviert` inklusive fachlicher Guards, Verwerfen offener Aufgaben und Fehlerbehandlung.
 
 ---
 
@@ -92,6 +92,13 @@ Beschreibt den Abschluss einer Aufgabe: Commit → Push (Remote-Git oder Datei-S
 **Typ:** `flowchart TD` · **Services:** `EntwicklungsprozessService`, `AufgabeService`
 
 Geordneter Abbruch einer laufenden Aufgabe: lokaler Klon wird gelöscht (ohne Push), Aufgabe kehrt in den Status `Offen` zurück.
+
+---
+
+### [Ablauf 4b: Offene Aufgabe verwerfen](./development-process-flow.md#ablauf-4b-offene-aufgabe-verwerfen)
+**Typ:** `flowchart TD` · **Services:** `AufgabeService`, `AufgabeDetail`
+
+Direktes Verwerfen einer noch nicht gestarteten Aufgabe: je nach Auswahl wird sie archiviert oder dauerhaft gelöscht; ein lokaler Klon existiert dabei noch nicht.
 
 ---
 

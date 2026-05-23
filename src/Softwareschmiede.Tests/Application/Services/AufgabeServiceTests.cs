@@ -222,6 +222,52 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().BeNull();
     }
 
+    /// <summary>VerwerfenAsync archiviert eine offene Aufgabe.</summary>
+    [Fact]
+    public async Task VerwerfenAsync_ShouldSetStatusArchiviert_WhenOffeneAufgabeArchiviertWird()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null);
+
+        // Act
+        await _sut.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Archivieren);
+
+        // Assert
+        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        result!.Status.Should().Be(AufgabeStatus.Archiviert);
+    }
+
+    /// <summary>VerwerfenAsync löscht eine offene Aufgabe dauerhaft.</summary>
+    [Fact]
+    public async Task VerwerfenAsync_ShouldRemoveAufgabe_WhenOffeneAufgabeGeloeschtWird()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null);
+
+        // Act
+        await _sut.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Loeschen);
+
+        // Assert
+        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        result.Should().BeNull();
+    }
+
+    /// <summary>VerwerfenAsync wirft eine Ausnahme, wenn die Aufgabe nicht offen ist.</summary>
+    [Fact]
+    public async Task VerwerfenAsync_ShouldThrowInvalidOperationException_WhenAufgabeIsNotOffen()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Bereits gestartete Aufgabe", null);
+        await _sut.StartenAsync(aufgabe.Id, "feature/test", @"C:\klon");
+
+        // Act
+        var act = () => _sut.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Archivieren);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Nur offene Aufgaben können verworfen werden.");
+    }
+
     /// <summary>StartenAsync wirft InvalidOperationException wenn Aufgabe nicht gefunden.</summary>
     [Fact]
     public async Task StartenAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist()

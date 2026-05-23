@@ -28,6 +28,7 @@ else
         @if (_aufgabe.Status == AufgabeStatus.Offen)
         {
             <button class="btn btn-primary" @onclick="StartDialogOeffnen" disabled="@_processing">🚀 Entwicklung starten</button>
+            <button class="btn btn-warning" @onclick="() => _showVerwerfenConfirm = true" disabled="@_processing">🗑️ Verwerfen</button>
         }
         @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
         {
@@ -284,6 +285,18 @@ else
             <div style="display:flex;gap:.5rem;margin-top:.75rem">
                 <button class="btn btn-danger" @onclick="AufgabeLoeschenAsync">🗑️ Ja, löschen</button>
                 <button class="btn btn-ghost" @onclick="() => _showDeleteConfirm = false">Zurück</button>
+            </div>
+        </div>
+    }
+
+    @if (_showVerwerfenConfirm)
+    {
+        <div class="alert alert-warning">
+            <strong>Aufgabe verwerfen?</strong> Diese Aufgabe wurde noch nie gestartet. Sie können sie archivieren oder dauerhaft löschen.
+            <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                <button class="btn btn-warning" @onclick="() => VerwerfenAsync(VerwerfenAktion.Archivieren)" disabled="@_processing">📦 Archivieren</button>
+                <button class="btn btn-danger" @onclick="() => VerwerfenAsync(VerwerfenAktion.Loeschen)" disabled="@_processing">🗑️ Dauerhaft löschen</button>
+                <button class="btn btn-ghost" @onclick="() => _showVerwerfenConfirm = false">Zurück</button>
             </div>
         </div>
     }

@@ -19,6 +19,8 @@ Er bildet die Grundlage für Orchestrierungsabläufe in `EntwicklungsprozessServ
 stateDiagram-v2
     [*] --> Offen : CreateAsync / CreateFromIssueAsync
     Offen --> InBearbeitung : StartenAsync
+    Offen --> Archiviert : VerwerfenAsync / Archivieren
+    Offen --> [*] : VerwerfenAsync / Loeschen
     InBearbeitung --> KiAktiv : KiAktiviertAsync
     KiAktiv --> InBearbeitung : KiAbgeschlossenAsync
     KiAktiv --> Fehlgeschlagen : FehlgeschlagenAsync
@@ -38,13 +40,18 @@ flowchart TD
     A([Statusoperation auf AufgabeService]) --> B[Aufgabe per FindAsync laden]
     B --> C{Aufgabe gefunden?}
     C -- Nein -.-> C1[InvalidOperationException]
-    C -- Ja --> D{Operation = Archivieren?}
-    D -- Nein --> E[Status/Felder setzen]
-    D -- Ja --> F{Status = Abgeschlossen<br/>oder Fehlgeschlagen?}
+    C -- Ja --> D{Operation}
+    D -- Archivieren --> F{Status = Abgeschlossen<br/>oder Fehlgeschlagen?}
+    D -- Verwerfen --> V{Status = Offen?}
     F -- Nein -.-> F1[InvalidOperationException]
-    F -- Ja --> E
+    F -- Ja --> E[Status = Archiviert]
+    V -- Nein -.-> V1[InvalidOperationException]
+    V -- Ja --> W{Aktion = Archivieren?}
+    W -- Ja --> E
+    W -- Nein --> R[Aufgabe entfernen]
     E --> G[SaveChangesAsync]
-    G --> H([Status persistiert])
+    R --> G
+    G --> H([Status persistiert bzw. Aufgabe entfernt])
 ```
 
 ---
@@ -86,6 +93,11 @@ flowchart TD
    - **Eingaben:** `id`  
    - **Ausgabe/Seiteneffekt:** Setzt `Status = Archiviert`, aber nur für `Abgeschlossen` oder `Fehlgeschlagen`.
 
+8. **Verwerfen offener Aufgaben**
+   - **Code:** `src/Softwareschmiede/Application/Services/AufgabeService.cs` (`VerwerfenAsync`)
+   - **Eingaben:** `id`, `VerwerfenAktion`
+   - **Ausgabe/Seiteneffekt:** Nur für `Offen`; entweder `Status = Archiviert` oder Aufgabe wird vollständig entfernt.
+
 ---
 
 ## Fehlerbehandlung
@@ -97,6 +109,10 @@ flowchart TD
 - **Ungültige Archivierung aus Zwischenzuständen**  
   - **Pfad:** `ArchivierenAsync`  
   - **Behandlung:** `InvalidOperationException("Nur abgeschlossene oder fehlgeschlagene Aufgaben können archiviert werden.")`.
+
+- **Ungültiges Verwerfen aus Nicht-Startzuständen**
+  - **Pfad:** `VerwerfenAsync`
+  - **Behandlung:** `InvalidOperationException("Nur offene Aufgaben können verworfen werden.")`.
 
 - **Datenbankfehler bei Persistenz**  
   - **Pfad:** Alle Methoden mit `SaveChangesAsync`  

@@ -62,10 +62,12 @@
   - Ausgewähltes Agentenpaket
   - Ausgewählter Agent (aus dem Agentenpaket)
 - Jede Aufgabe erhält beim Start des Entwicklungsprozesses einen **eigenen Repository-Klon** und einen **eigenen Branch**.
+- Offene Aufgaben können vor dem ersten Start direkt **verworfen** werden; je nach Auswahl werden sie dabei **archiviert** oder **dauerhaft gelöscht**.
 
 #### Aufgaben-Lebenszyklus
 - **Abschließen:** Der Anwender veranlasst manuell einen Pull Request (über das Git-Plugin). Nach dem PR kann er die Aufgabe als abgeschlossen markieren → lokaler Branch und Klon werden automatisch gelöscht.
-- **Abbrechen:** Der Anwender kann eine Aufgabe jederzeit abbrechen → lokaler Branch und Klon werden gelöscht; keine Änderungen werden gepusht.
+- **Abbrechen:** Der Anwender kann eine laufende Aufgabe abbrechen → lokaler Branch und Klon werden gelöscht; keine Änderungen werden gepusht.
+- **Verwerfen:** Der Anwender kann eine offene Aufgabe direkt verwerfen → ohne vorherigen Start wird sie archiviert oder gelöscht.
 - Der Anwender kann den Branch jederzeit **pushen** (Remote-Branch anlegen / aktualisieren) und **pullen** (Änderungen vom Remote holen).
 
 #### Repository-Klon & Branch pro Aufgabe
@@ -218,7 +220,7 @@ Agentenpaket
 | Branch-Namenskonvention | `task/<aufgaben-id>-<kurzname>` |
 | Agentenpaket-Verzeichnis | Fest: `<Programmverzeichnis>/agent-packages/`; nicht konfigurierbar; wird beim App-Start automatisch angelegt falls nicht vorhanden |
 | Agentenpaket-Verwaltung | Rein manuell: Pakete werden als Ordner im konfigurierten Verzeichnis abgelegt; kein Download aus Onlinequellen |
-| Lokaler Klon / Branch nach Aufgabenende | Anwender entscheidet explizit: **Aufgabe abschließen** (nach PR) → Branch & Klon werden gelöscht; **Aufgabe abbrechen** → Branch & Klon werden ebenfalls gelöscht |
+| Lokaler Klon / Branch nach Aufgabenende | Anwender entscheidet explizit: **Aufgabe abschließen** (nach PR) → Branch & Klon werden gelöscht; **Aufgabe abbrechen** → Branch & Klon werden ebenfalls gelöscht; **offene Aufgabe verwerfen** → kein Klon vorhanden, Aufgabe wird archiviert oder gelöscht |
 | Pull Request | Wird durch den Anwender manuell veranlasst, wenn er die Aufgabe als erledigt betrachtet; Voraussetzung zum Abschluss der Aufgabe |
 | Test-Ergebnisse im Protokoll | Strukturiert: Testname, Status (bestanden/fehlgeschlagen/übersprungen), Fehlermeldung, Dauer; tabellarisch oder als Baumstruktur je nach Testframework-Ausgabe |
 | Push / Pull / Pull Request | Alle drei sind Teil des ersten Umfangs; werden über das Git-Plugin bereitgestellt |
@@ -232,4 +234,3 @@ Agentenpaket
 ---
 
 *Erstellt: 2026-05-06 | Status: Entwurf – wird fortlaufend ergänzt*
-

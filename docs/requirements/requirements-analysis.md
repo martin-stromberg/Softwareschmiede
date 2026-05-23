@@ -79,10 +79,11 @@
 | **FR-3.1** | **Aufgabe aus Issue anlegen:** Anwender wählt ein Issue aus dem geladenen Issue-Feed; Titel, Body, Labels und Milestone werden übernommen. | Kern-Feature | MUST HAVE | 📋 Geplant |
 | **FR-3.2** | **Aufgabe frei anlegen:** Anwender erfasst Titel und freie Anforderungsbeschreibung ohne Issue-Referenz. | Kern-Feature | MUST HAVE | 📋 Geplant |
 | **FR-3.3** | **Aufgaben-Attribute:** Pflichtfelder: Titel, Anforderungsbeschreibung/Issue-Referenz. Optionale Felder: Agentenpaket-Auswahl, Agent-Auswahl. Systemfelder: Status, verknüpftes KI-Protokoll. | Kern-Feature | MUST HAVE | 📋 Geplant |
-| **FR-3.4** | **Aufgaben-Status-Modell:** Status-Werte: `Offen` → `In Bearbeitung` → `KI aktiv` / `Tests laufen` → `Abgeschlossen` / `Fehlgeschlagen`. Übergänge sind im Protokoll dokumentiert. | Kern-Feature | MUST HAVE | 📋 Geplant |
+| **FR-3.4** | **Aufgaben-Status-Modell:** Status-Werte: `Offen` → `In Bearbeitung` → `KI aktiv` / `Tests laufen` → `Abgeschlossen` / `Fehlgeschlagen`. Übergänge sind im Protokoll dokumentiert; offene Aufgaben können vor dem Start direkt verworfen werden. | Kern-Feature | MUST HAVE | 📋 Geplant |
 | **FR-3.5** | **Aufgabe abschließen:** Anwender veranlasst manuell einen Pull Request; nach erfolgreichem PR kann er die Aufgabe als abgeschlossen markieren → lokaler Branch und Klon werden automatisch gelöscht. | Kern-Feature | MUST HAVE | 📋 Geplant |
-| **FR-3.6** | **Aufgabe abbrechen:** Anwender bricht Aufgabe jederzeit ab → lokaler Branch und Klon werden gelöscht; keine Änderungen werden gepusht. | Kern-Feature | MUST HAVE | 📋 Geplant |
+| **FR-3.6** | **Aufgabe abbrechen:** Anwender bricht eine laufende Aufgabe jederzeit ab → lokaler Branch und Klon werden gelöscht; keine Änderungen werden gepusht. | Kern-Feature | MUST HAVE | 📋 Geplant |
 | **FR-3.7** | **Commit-Verwaltung:** Anwender kann manuell Commits auf dem Branch durchführen. Anwender kann Commits zurücksetzen (soft / mixed / hard). KI kann selbstständig Commits durchführen (abhängig vom KI-Plugin). | Git-Integration | MUST HAVE | 📋 Geplant |
+| **FR-3.8** | **Offene Aufgabe verwerfen:** Anwender kann eine Aufgabe im Status `Offen` direkt archivieren oder dauerhaft löschen, ohne sie zuvor zu starten. | Kern-Feature | MUST HAVE | 📋 Geplant |
 | **FR-4** | **Entwicklungsprozess (KI-gestützt):** Für jede Aufgabe kann der Anwender den KI-gestützten Entwicklungsprozess starten. Die Anwendung klont das Repository, legt einen Branch an, steuert das KI-Plugin und zeigt die Ausgabe in Echtzeit. → [Architektur-Blueprint](../architecture/architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.1** | **Prozess starten:** Anwender wählt Agentenpaket und Agenten aus, gibt Anforderungsprompt ein und startet den KI-Lauf. Das KI-Plugin erhält Prompt und Agenten-Kontext. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.2** | **Echtzeit-Ausgabe:** Ausgabe des KI-Plugins wird per Streaming in Echtzeit im Aufgabenprotokoll angezeigt (< 500 ms Latenz pro Stream-Chunk). | KI-Integration | MUST HAVE | 📋 Geplant |
@@ -193,7 +194,7 @@
 ### US-5: Aufgabe abschließen oder abbrechen
 
 **Als** Anwender  
-**möchte ich** eine Aufgabe regulär abschließen (nach PR) oder jederzeit abbrechen,  
+**möchte ich** eine laufende Aufgabe regulär abschließen (nach PR) oder jederzeit abbrechen,
 **damit** lokale Klone und Branches ordentlich aufgeräumt werden.
 
 | # | Akzeptanzkriterium | Messung |
@@ -520,6 +521,21 @@ classDiagram
 
 ---
 
+### UC-6a: Offene Aufgabe verwerfen
+
+| Feld | Inhalt |
+|------|--------|
+| **ID** | UC-6a |
+| **Name** | Offene Aufgabe verwerfen |
+| **Akteur** | Anwender |
+| **Vorbedingung** | Aufgabe existiert und hat den Status „Offen". |
+| **Auslöser** | Anwender klickt auf „Verwerfen" und wählt „Archivieren" oder „Dauerhaft löschen". |
+| **Hauptszenario** | 1. Anwender öffnet die offene Aufgabe. 2. Anwender startet keine Bearbeitung. 3. Anwender wählt „Verwerfen". 4. Das System bietet Archivieren oder dauerhafte Löschung an. 5. Je nach Auswahl wird die Aufgabe archiviert oder entfernt. |
+| **Nachbedingung** | Offene Aufgabe wurde verworfen; es existierte kein lokaler Klon. |
+| **Anforderungen** | FR-3.8 |
+
+---
+
 ### UC-7: Agentenpaket auswählen und Vorschau anzeigen
 
 | Feld | Inhalt |
@@ -570,4 +586,3 @@ classDiagram
 ---
 
 *Dokument-Pfad: `docs/requirements/requirements-analysis.md` · Projekt: Softwareschmiede · Sprache: Deutsch*
-
