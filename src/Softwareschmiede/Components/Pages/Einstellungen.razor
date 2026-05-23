@@ -56,6 +56,64 @@
 </div>
 
 <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-title">🔔 KI-Aufgaben-Benachrichtigungen</div>
+
+    @if (!string.IsNullOrEmpty(_benachrichtigungStatus))
+    {
+        <div class="alert @(_benachrichtigungStatusIsError ? "alert-error" : "alert-success")" style="margin-bottom:1rem">
+            @_benachrichtigungStatus
+        </div>
+    }
+
+    <div class="form-group">
+        <label class="form-label">Toast-Modus</label>
+        <select class="form-control" @bind="_toastModus">
+            @foreach (var modus in _benachrichtigungsModi)
+            {
+                <option value="@modus">@GetBenachrichtigungsModusLabel(modus)</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Hinweiston-Modus</label>
+        <select class="form-control" @bind="_tonModus">
+            @foreach (var modus in _benachrichtigungsModi)
+            {
+                <option value="@modus">@GetBenachrichtigungsModusLabel(modus)</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Benutzerdefinierter Hinweiston (.mp3, .wav, .ogg, max. 10 MB)</label>
+        <InputFile OnChange="BenachrichtigungsAudioDateiAusgewaehltAsync" accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/ogg" />
+        @if (!string.IsNullOrEmpty(_audioDateiInfo))
+        {
+            <small style="display:block;margin-top:.25rem;color:#94a3b8">@_audioDateiInfo</small>
+        }
+    </div>
+
+    <div class="action-bar">
+        <button class="btn btn-primary"
+                @onclick="BenachrichtigungsEinstellungenSpeichernAsync"
+                disabled="@_saving">
+            💾 Benachrichtigungen speichern
+        </button>
+        <button class="btn btn-ghost"
+                @onclick="BenachrichtigungsAudioEntfernenAsync"
+                disabled="@_saving">
+            🗑️ Benutzerdefinierten Ton entfernen
+        </button>
+        <button class="btn btn-secondary"
+                @onclick="TesttonAbspielenAsync"
+                disabled="@_saving">
+            🔊 Testton
+        </button>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem">
     <div class="card-title">⭐ Standard-Plugins</div>
 
     <div class="form-group">

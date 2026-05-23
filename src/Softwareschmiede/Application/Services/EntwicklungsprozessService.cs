@@ -24,6 +24,7 @@ public sealed class EntwicklungsprozessService
     private readonly IAgentPackageService _agentPackageService;
     private readonly IArbeitsverzeichnisResolver _arbeitsverzeichnisResolver;
     private readonly RepositoryStartskriptService? _repositoryStartskriptService;
+    private readonly KiAufgabenBenachrichtigungsHub? _benachrichtigungsHub;
     private readonly IConfiguration _configuration;
     private readonly ILogger<EntwicklungsprozessService> _logger;
     private const int DefaultContextCompressionSoftLimit = 12_000;
@@ -48,6 +49,33 @@ public sealed class EntwicklungsprozessService
             agentPackageService,
             arbeitsverzeichnisResolver,
             null,
+            null,
+            configuration,
+            logger)
+    {
+    }
+
+    /// <inheritdoc cref="EntwicklungsprozessService"/>
+    public EntwicklungsprozessService(
+        AufgabeService aufgabeService,
+        ProtokollService protokollService,
+        IGitPlugin gitPlugin,
+        PluginSelectionService pluginSelectionService,
+        IAgentPackageService agentPackageService,
+        IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
+        KiAufgabenBenachrichtigungsHub benachrichtigungsHub,
+        IConfiguration configuration,
+        ILogger<EntwicklungsprozessService> logger)
+        : this(
+            aufgabeService,
+            protokollService,
+            null,
+            gitPlugin,
+            pluginSelectionService,
+            agentPackageService,
+            arbeitsverzeichnisResolver,
+            benachrichtigungsHub,
+            null,
             configuration,
             logger)
     {
@@ -65,6 +93,34 @@ public sealed class EntwicklungsprozessService
         RepositoryStartskriptService? repositoryStartskriptService,
         IConfiguration configuration,
         ILogger<EntwicklungsprozessService> logger)
+        : this(
+            aufgabeService,
+            protokollService,
+            projektService,
+            gitPlugin,
+            pluginSelectionService,
+            agentPackageService,
+            arbeitsverzeichnisResolver,
+            null,
+            repositoryStartskriptService,
+            configuration,
+            logger)
+    {
+    }
+
+    /// <inheritdoc cref="EntwicklungsprozessService"/>
+    public EntwicklungsprozessService(
+        AufgabeService aufgabeService,
+        ProtokollService protokollService,
+        ProjektService? projektService,
+        IGitPlugin gitPlugin,
+        PluginSelectionService pluginSelectionService,
+        IAgentPackageService agentPackageService,
+        IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
+        KiAufgabenBenachrichtigungsHub? benachrichtigungsHub,
+        RepositoryStartskriptService? repositoryStartskriptService,
+        IConfiguration configuration,
+        ILogger<EntwicklungsprozessService> logger)
     {
         _aufgabeService = aufgabeService;
         _protokollService = protokollService;
@@ -73,6 +129,7 @@ public sealed class EntwicklungsprozessService
         _pluginSelectionService = pluginSelectionService;
         _agentPackageService = agentPackageService;
         _arbeitsverzeichnisResolver = arbeitsverzeichnisResolver;
+        _benachrichtigungsHub = benachrichtigungsHub;
         _repositoryStartskriptService = repositoryStartskriptService;
         _configuration = configuration;
         _logger = logger;
@@ -408,6 +465,18 @@ public sealed class EntwicklungsprozessService
                     agent.Name,
                     CancellationToken.None);
                 await _aufgabeService.KiAbgeschlossenAsync(aufgabeId, CancellationToken.None);
+            }
+
+            var abschlusstatus = fehler is null ? AufgabeStatus.InBearbeitung : AufgabeStatus.Fehlgeschlagen;
+            if (_benachrichtigungsHub is not null)
+            {
+                await _benachrichtigungsHub.PublishAsync(
+                    new KiAufgabenAbschlussEreignis(
+                        Guid.NewGuid(),
+                        aufgabeId,
+                        aufgabe.Titel,
+                        abschlusstatus,
+                        DateTimeOffset.UtcNow));
             }
 
             if (kontextmodus is not null)

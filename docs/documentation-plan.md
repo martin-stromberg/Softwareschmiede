@@ -70,6 +70,90 @@
 
 ---
 
+# Dokumentationsplan – Feature „Benachrichtigungssystem für abgeschlossene KI-Aufgaben“ – 2026-05-23
+
+## Kontext
+- Feature-Status laut Auftrag: geplant, implementiert und testseitig ergänzt.
+- Fokus dieses Laufs: ausschließlich dokumentationsrelevante Artefakte für das Benachrichtigungssystem.
+
+## Phase 1 – Analyse (Agentenschwarm + Codeabgleich)
+
+### API (`docs/api/`)
+- `docs/api/` existiert; öffentliche HTTP-Endpunkte betreffen weiterhin nur `/api/diff`.
+- Für das Benachrichtigungssystem wurden **keine neuen öffentlichen REST-Endpunkte** gefunden.
+- Feature-relevanter API-Bedarf: technische Einordnung als interne App-/Service-Schnittstelle statt HTTP-API.
+
+### Flows (`docs/flows/`)
+- `docs/flows/` existiert, jedoch kein dedizierter Ablauf für:
+  - Abschlussereignis-Publikation aus `EntwicklungsprozessService`
+  - Hub-Verteilung (`KiAufgabenBenachrichtigungsHub`)
+  - UI-Verarbeitung in `MainLayout` (Toast/Ton, Modusmatrix, Audit)
+  - Einstellungen/Audio-Upload in `Einstellungen`
+- **Lücke (hoch):** fehlender End-to-End-Flow für das Benachrichtigungssystem.
+
+### Business (`docs/business/`)
+- Feature-Katalog bis `F023` vorhanden.
+- **Lücke (hoch):** kein fachlicher Feature-Eintrag für Benachrichtigungen bei abgeschlossenen KI-Aufgaben.
+
+### README (`README.md`)
+- Struktur vollständig; Featureliste enthält das Benachrichtigungssystem noch nicht.
+- **Lücke (hoch):** fehlende Sichtbarkeit des Features in Features/Usage/Tests/Dokumentationslinks.
+
+## Phase 1 – Priorisierter Ausführungsplan
+
+### Neu zu erstellen
+1. `docs/flows/benachrichtigungssystem-flow.md`
+2. `docs/business/features/F024-benachrichtigungssystem-fuer-abgeschlossene-ki-aufgaben.md`
+
+### Zu aktualisieren
+1. `docs/flows/README.md` (Index + Kurzbeschreibung des neuen Flows)
+2. `docs/business/features.md` (Eintrag F024)
+3. `README.md` (Feature, Nutzung, Testhinweise, Dokumentationsverweise)
+4. `docs/api/README.md` und/oder `docs/api/http-endpoints.md` (Klarstellung: keine neuen REST-Endpunkte für F024)
+5. `docs/tests/README.md` (Referenz auf feature-relevante Testabdeckung)
+
+### Priorität
+1. **Hoch:** Business- und Flow-Doku (fachlich + technisch vollständig)
+2. **Hoch:** README-Abgleich für Nutzer- und Projektübersicht
+3. **Mittel:** API-/Testindex-Konsistenz für korrekte Erwartungshaltung
+
+## Phase 2 – Ausführung
+- Parallele Delegation an:
+  - `documentation-api`
+  - `documentation-flow`
+  - `documentation-business`
+  - `documentation-readme-writer`
+- Kontext für alle Agenten: dieser Plan und die implementierten Code-/Testartefakte des Features.
+
+## Ergebnis
+- Parallele Ausführung der vier Dokumentationsagenten abgeschlossen.
+
+### Neu erstellt
+1. `docs/flows/benachrichtigungssystem-flow.md`
+2. `docs/business/features/F024-benachrichtigungssystem-fuer-abgeschlossene-ki-aufgaben.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/http-endpoints.md`
+4. `docs/flows/README.md`
+5. `docs/business/features.md`
+6. `docs/tests/README.md`
+7. `docs/documentation-plan.md`
+
+### Validierung
+- Alle genannten Artefakte existieren und sind nicht leer.
+- Feature-relevante Aussagen wurden gegen implementierte Komponenten abgeglichen:
+  - Event-Publikation: `EntwicklungsprozessService` -> `KiAufgabenBenachrichtigungsHub`
+  - UI-Verarbeitung: `MainLayout` (Toast/Ton, Modusmatrix, Dedupe, Audit)
+  - Einstellungs-/Audiofluss: `Einstellungen` + `BenachrichtigungsEinstellungenService` + `notifications.js`
+  - Testabdeckung: `EntwicklungsprozessServiceTests`, `MainLayoutTests`, `BenachrichtigungsEinstellungenServiceTests`
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken im Feature-Scope identifiziert.
+
+---
+
 # Dokumentationsplan – Vollständige Aktualisierung (Standardplugin & KI-Plugin-Auswahl) – 2026-05-12
 
 ## Kontext

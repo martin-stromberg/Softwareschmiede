@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Components.Pages;
@@ -526,12 +527,19 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
             pluginDefaultSettings,
             NullLogger<PluginSelectionService>.Instance);
         var pluginSettings = new PluginSettingsService(credentialStoreMock.Object, NullLogger<PluginSettingsService>.Instance);
+        var benachrichtigungen = new BenachrichtigungsEinstellungenService(db);
+        var benutzerkontextMock = new Mock<IBenutzerkontextService>();
+        benutzerkontextMock.Setup(x => x.GetBenutzerId()).Returns("test-user");
+        var jsRuntimeMock = new Mock<IJSRuntime>();
         var sut = new TestEinstellungenPage();
         SetInjectedProperty(sut, "PluginManager", pluginManagerMock.Object);
         SetInjectedProperty(sut, "PluginSelection", pluginSelection);
         SetInjectedProperty(sut, "PluginSettings", pluginSettings);
         SetInjectedProperty(sut, "ArbeitsverzeichnisSettings", arbeitsverzeichnisSettings);
         SetInjectedProperty(sut, "ArbeitsverzeichnisResolver", arbeitsverzeichnisResolver);
+        SetInjectedProperty(sut, "BenachrichtigungsEinstellungen", benachrichtigungen);
+        SetInjectedProperty(sut, "Benutzerkontext", benutzerkontextMock.Object);
+        SetInjectedProperty(sut, "JsRuntime", jsRuntimeMock.Object);
         SetInjectedProperty(sut, "Logger", NullLogger<EinstellungenBase>.Instance);
         return sut;
     }

@@ -36,6 +36,15 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Globale App-Einstellungen.</summary>
     public DbSet<AppEinstellung> AppEinstellungen => Set<AppEinstellung>();
 
+    /// <summary>Benutzerbezogene Benachrichtigungseinstellungen.</summary>
+    public DbSet<BenachrichtigungsEinstellung> BenachrichtigungsEinstellungen => Set<BenachrichtigungsEinstellung>();
+
+    /// <summary>Benutzerdefinierte Benachrichtigungstöne.</summary>
+    public DbSet<BenachrichtigungsAudioDatei> BenachrichtigungsAudioDateien => Set<BenachrichtigungsAudioDatei>();
+
+    /// <summary>Auditlog für Benachrichtigungsentscheidungen.</summary>
+    public DbSet<BenachrichtigungsDispatchLog> BenachrichtigungsDispatchLogs => Set<BenachrichtigungsDispatchLog>();
+
     /// <summary>Diff-Ergebnisse (Vergleiche zwischen Dateiversionen).</summary>
     public DbSet<DiffResult> DiffResults => Set<DiffResult>();
 
@@ -181,6 +190,63 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.AktualisiertAm).HasConversion(
                 v => v.ToUnixTimeMilliseconds(),
                 v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+        });
+
+        // BenachrichtigungsEinstellung
+        modelBuilder.Entity<BenachrichtigungsEinstellung>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.BenutzerId)
+                .IsRequired()
+                .HasMaxLength(200);
+            e.HasIndex(b => b.BenutzerId).IsUnique();
+            e.Property(b => b.ToastModus).HasConversion<string>();
+            e.Property(b => b.TonModus).HasConversion<string>();
+            e.Property(b => b.AktualisiertAm).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+        });
+
+        // BenachrichtigungsAudioDatei
+        modelBuilder.Entity<BenachrichtigungsAudioDatei>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.BenutzerId)
+                .IsRequired()
+                .HasMaxLength(200);
+            e.HasIndex(b => b.BenutzerId).IsUnique();
+            e.Property(b => b.OriginalDateiname)
+                .IsRequired()
+                .HasMaxLength(260);
+            e.Property(b => b.MimeType)
+                .IsRequired()
+                .HasMaxLength(100);
+            e.Property(b => b.Inhalt)
+                .IsRequired();
+            e.Property(b => b.HochgeladenAm).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+        });
+
+        // BenachrichtigungsDispatchLog
+        modelBuilder.Entity<BenachrichtigungsDispatchLog>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.BenutzerId)
+                .IsRequired()
+                .HasMaxLength(200);
+            e.Property(b => b.Kanal).HasConversion<string>();
+            e.Property(b => b.Modus).HasConversion<string>();
+            e.Property(b => b.Entscheidung).HasConversion<string>();
+            e.Property(b => b.Grund)
+                .IsRequired()
+                .HasMaxLength(200);
+            e.Property(b => b.ErstelltAm).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.HasIndex(b => new { b.EreignisId, b.BenutzerId, b.Kanal }).IsUnique();
+            e.HasIndex(b => b.AufgabeId);
+            e.HasIndex(b => b.ErstelltAm);
         });
 
         // DiffResult

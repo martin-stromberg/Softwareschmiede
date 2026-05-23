@@ -34,6 +34,7 @@ namespace Softwareschmiede
             builder.Services.AddScoped<IAgentPackageService, AgentPackageReader>();
             builder.Services.AddScoped<IAgentPackageFileService, AgentPackageFileService>();
             builder.Services.AddScoped<IArbeitsverzeichnisResolver, ArbeitsverzeichnisResolver>();
+            builder.Services.AddScoped<IBenutzerkontextService, BenutzerkontextService>();
 
             // Plugins
             builder.Services.AddSingleton<IPluginManager, PluginManager>();
@@ -53,6 +54,9 @@ namespace Softwareschmiede
             builder.Services.AddScoped<PluginDefaultSettingsService>();
             builder.Services.AddScoped<PluginSelectionService>();
             builder.Services.AddScoped<ArbeitsverzeichnisSettingsService>();
+            builder.Services.AddScoped<BenachrichtigungsEinstellungenService>();
+            builder.Services.AddScoped<BenachrichtigungsAuditService>();
+            builder.Services.AddSingleton<KiAufgabenBenachrichtigungsHub>();
             builder.Services.AddSingleton<KiAusfuehrungsService>();
             builder.Services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
             builder.Services.AddSingleton<IAutoShutdownOrchestrator, AutoShutdownOrchestrator>();

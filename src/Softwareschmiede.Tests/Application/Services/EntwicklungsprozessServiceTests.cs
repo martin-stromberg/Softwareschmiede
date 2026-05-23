@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Abstractions;
@@ -885,6 +886,93 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         kiAntwort.Should().MatchRegex(@"- RunId: `[0-9a-fA-F-]{36}`");
         kiAntwort.Should().Contain("## Schritt 1");
         kiAntwort.Should().Contain("Fehler: plugin boom");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldPublishCompletionEvent_WhenRunSucceeds()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Benachrichtigung Erfolg", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("ok"));
+        var hub = new KiAufgabenBenachrichtigungsHub(NullLogger<KiAufgabenBenachrichtigungsHub>.Instance);
+        var events = new List<KiAufgabenAbschlussEreignis>();
+        using var _ = hub.Subscribe(e =>
+        {
+            events.Add(e);
+            return Task.CompletedTask;
+        });
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            hub,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        await foreach (var _line in sut.KiStartenAsync(aufgabe.Id, "prompt", agent))
+        {
+        }
+
+        // Assert
+        events.Should().ContainSingle();
+        events[0].AufgabeId.Should().Be(aufgabe.Id);
+        events[0].Aufgabentitel.Should().Be(aufgabe.Titel);
+        events[0].AbschlussStatus.Should().Be(AufgabeStatus.InBearbeitung);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldPublishCompletionEvent_WhenRunFails()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Benachrichtigung Fehler", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamThrows("boom"));
+        var hub = new KiAufgabenBenachrichtigungsHub(NullLogger<KiAufgabenBenachrichtigungsHub>.Instance);
+        var events = new List<KiAufgabenAbschlussEreignis>();
+        using var _ = hub.Subscribe(e =>
+        {
+            events.Add(e);
+            return Task.CompletedTask;
+        });
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            hub,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        await foreach (var _line in sut.KiStartenAsync(aufgabe.Id, "prompt", agent))
+        {
+        }
+
+        // Assert
+        events.Should().ContainSingle();
+        events[0].AufgabeId.Should().Be(aufgabe.Id);
+        events[0].AbschlussStatus.Should().Be(AufgabeStatus.Fehlgeschlagen);
     }
 
     /// <summary>AbschliessenAsync setzt Status auf Abgeschlossen und erstellt Protokolleintrag.</summary>
