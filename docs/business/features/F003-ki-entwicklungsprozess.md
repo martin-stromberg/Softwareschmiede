@@ -92,7 +92,8 @@ Je nach Einstellung kann der bisherige Verlauf genutzt, ignoriert oder neu begon
 Das hängt von der Komplexität der Aufgabe ab. Einfache Änderungen dauern oft wenige Minuten, komplexe Vorhaben können länger dauern.
 
 **Was tun, wenn die KI keine sinnvolle Ausgabe liefert?**
-Klicken Sie auf **Aufgabe abbrechen** und formulieren Sie die Aufgabenbeschreibung genauer. Dann starten Sie eine neue Aufgabe.
+Wenn die Verarbeitung noch läuft, nutzen Sie **Aufgabe abbrechen**.  
+Wenn die Aufgabe festhängt, obwohl nichts mehr läuft, nutzen Sie **🩹 Aufgabe wiederherstellen** in der Detailseite und setzen Sie danach mit einer Folge-Anweisung fort.
 
 ---
 

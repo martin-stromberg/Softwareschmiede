@@ -13,6 +13,7 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 |---|---|
 | [http-endpoints.md](./http-endpoints.md) | Übersicht aller aktuell verfügbaren öffentlichen HTTP-Endpunkte inkl. Auth- und Content-Type-Konventionen. |
 | [diff.md](./diff.md) | Vollständige REST-Dokumentation für `DiffController` (`/api/diff`) mit Request-/Response-Beispielen, Servicevertrags-Referenzen und testabgeglichenen Verhaltensdetails. |
+| [aufgabe-recovery.md](./aufgabe-recovery.md) | Interner Service-/UI-Contract für die manuelle Wiederherstellung festhängender Aufgaben (Eligibility, Statuswechsel, Audit, Concurrency-Schutz). |
 | [issue-branch-pr-linking.md](./issue-branch-pr-linking.md) | Interner Contract für Issue-Auswahl, issuebezogene Branch-Erzeugung und PR-Closing-Direktive (`Closes #<Issue>`). |
 | [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Dateivorschau und defensiver Git-Status-Auswertung. |
 | [local-directory-plugin.md](./local-directory-plugin.md) | Technischer Contract der `IGitPlugin`-Implementierung `LocalDirectoryPlugin` inkl. Workspace-Modi, `git-init`-Fallback, Pull ohne Merge, Push-/Delete-Sync sowie Capability-Flags für die Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden bei Arbeitskopie). |
@@ -39,6 +40,12 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - Technischer Contract: [live-project-browser-git-status.md](./live-project-browser-git-status.md)
 - Ablaufdarstellung: [live-project-browser-git-status-flow.md](../flows/live-project-browser-git-status-flow.md)
 - Fachliche Einordnung: [F021 – Live Project Browser mit Git-Status](../business/features/F021-live-project-browser-git-status.md)
+
+## Feature-Fokus: Manuelle Aufgaben-Recovery
+
+- Technischer Contract: [aufgabe-recovery.md](./aufgabe-recovery.md)
+- Ablaufdarstellung: [aufgabe-recovery-flow.md](../flows/aufgabe-recovery-flow.md)
+- Fachliche Einordnung: [F016 – Fehlerbehandlung & Recovery](../business/features/F016-fehlerbehandlung-und-recovery.md)
 
 ## Feature-Fokus: Issue-, Branch- und PR-Verknüpfung
 

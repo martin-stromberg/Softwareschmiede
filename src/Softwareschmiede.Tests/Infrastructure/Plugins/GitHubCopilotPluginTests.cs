@@ -105,8 +105,16 @@ public sealed class GitHubCopilotPluginTests : IDisposable
     {
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHubCopilot");
         _sut.ProviderDateiPraefix.Should().Be("copilot");
-        _sut.GetSettingGroups().Should().ContainSingle();
-        _sut.GetSettingGroups().Single().Fields.Should().ContainSingle(f => f.Key == "Token");
+
+        var settingGroups = _sut.GetSettingGroups().ToList();
+        settingGroups.Should().HaveCount(2);
+        settingGroups.Select(g => g.GroupName).Should().Contain(["Authentifizierung", "Ausführung"]);
+
+        settingGroups
+            .SelectMany(g => g.Fields)
+            .Should()
+            .Contain(f => f.Key == "Token")
+            .And.Contain(f => f.Key == "ExecutablePath");
     }
 
     [Fact]
@@ -298,7 +306,8 @@ public sealed class GitHubCopilotPluginTests : IDisposable
     public async Task CheckHealthAsync_ShouldReturnTrue_WhenGhCopilotVersionSucceeds()
     {
         // Arrange
-        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.ExecutablePath")).Returns((string?)null);
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "copilot", It.IsAny<IEnumerable<string>>(), null,
                 It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))

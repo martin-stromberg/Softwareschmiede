@@ -17,8 +17,10 @@ public partial class AufgabeDetail : IDisposable
     [Inject] private IPluginManager PluginManager { get; set; } = null!;
     [Inject] private PluginSelectionService PluginSelection { get; set; } = null!;
     [Inject] private AufgabeService AufgabeService { get; set; } = null!;
+    [Inject] private AufgabeRecoveryService RecoveryService { get; set; } = null!;
     [Inject] private EntwicklungsprozessService EntwicklungsprozessService { get; set; } = null!;
     [Inject] private KiAusfuehrungsService KiAusfuehrungsService { get; set; } = null!;
+    [Inject] private IRunningAutomationStatusSource RunningAutomationStatusSource { get; set; } = null!;
     [Inject] private GitOrchestrationService GitService { get; set; } = null!;
     [Inject] private IGitWorkspaceBrowserService GitWorkspaceBrowserService { get; set; } = null!;
     [Inject] private ProtokollService ProtokollService { get; set; } = null!;
@@ -54,6 +56,7 @@ public partial class AufgabeDetail : IDisposable
     private bool _showResetForm;
     private bool _showPullRequestForm;
     private bool _showAbbrechenConfirm;
+    private bool _showRecoveryConfirm;
     private bool _showArchivierenConfirm;
     private bool _showDeleteConfirm;
     private bool _showStartDialog;
@@ -76,6 +79,8 @@ public partial class AufgabeDetail : IDisposable
     private string? _prBody;
     private string? _fehler;
     private string? _erfolg;
+    private bool _recoveryAllowed;
+    private string? _recoveryDisabledReason;
     private GitActionCapabilities _gitActionCapabilities = new(
         RepositoryKind.Unknown,
         IsWorkingDirectoryCopy: false,
@@ -166,6 +171,7 @@ public partial class AufgabeDetail : IDisposable
                 _prompt = _aufgabe.AnforderungsBeschreibung;
             }
         }
+        AktualisiereRecoveryZustand();
         _loading = false;
     }
 
@@ -208,14 +214,46 @@ public partial class AufgabeDetail : IDisposable
                     _prompt = _aufgabe.AnforderungsBeschreibung;
                 }
             }
+            AktualisiereRecoveryZustand();
             _loading = false;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Aufgabendaten");
+            _recoveryAllowed = false;
+            _recoveryDisabledReason = null;
             _loading = false;
         }
     }
+
+    private void AktualisiereRecoveryZustand()
+    {
+        _recoveryAllowed = false;
+        _recoveryDisabledReason = null;
+
+        if (_aufgabe is null || !AufgabeRecoveryService.IstRecoveryStatus(_aufgabe.Status))
+        {
+            return;
+        }
+
+        try
+        {
+            var isRunning = RunningAutomationStatusSource.IsRunning(_aufgabe.Id);
+            _recoveryAllowed = !isRunning;
+            if (isRunning)
+            {
+                _recoveryDisabledReason = "Wiederherstellung nicht möglich, Verarbeitung läuft noch.";
+            }
+        }
+        catch
+        {
+            _recoveryAllowed = false;
+            _recoveryDisabledReason = "Prüfung der Laufzeit war nicht möglich.";
+        }
+    }
+
+    private bool IsRecoveryStatus
+        => _aufgabe is not null && AufgabeRecoveryService.IstRecoveryStatus(_aufgabe.Status);
 
     private async Task AgentenLadenAsync()
     {
@@ -889,6 +927,28 @@ public partial class AufgabeDetail : IDisposable
         }
         catch (Exception ex) { _fehler = ex.Message; }
         finally { _processing = false; }
+    }
+
+    private async Task WiederherstellenAsync()
+    {
+        _processing = true;
+        _showRecoveryConfirm = false;
+        _fehler = null;
+        try
+        {
+            await RecoveryService.RecoverManuellAsync(Id, _cts.Token);
+            _erfolg = "Aufgabe wurde erfolgreich wiederhergestellt.";
+            await LadeAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _fehler = ex.Message;
+            await LadeAsync();
+        }
+        finally
+        {
+            _processing = false;
+        }
     }
 
     private void Zurueck()

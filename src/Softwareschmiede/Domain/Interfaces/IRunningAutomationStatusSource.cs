@@ -13,4 +13,7 @@ public interface IRunningAutomationStatusSource
 
     /// <summary>Gibt die Anzahl laufender Automatisierungen zurück.</summary>
     int GetRunningCount();
+
+    /// <summary>Gibt an, ob für eine konkrete Aufgabe aktuell eine Automatisierung läuft.</summary>
+    bool IsRunning(Guid aufgabeId);
 }

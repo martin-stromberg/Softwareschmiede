@@ -237,6 +237,20 @@ Sie können eine laufende oder offene Aufgabe jederzeit abbrechen.
 
 ---
 
+## Festhängende Aufgabe wiederherstellen
+
+Wenn eine Aufgabe auf **KI aktiv** oder **Tests laufen** stehen bleibt, obwohl nichts mehr arbeitet, können Sie sie in der Detailseite manuell wiederherstellen.
+
+1. Öffnen Sie die Aufgabe.
+2. Klicken Sie auf **🩹 Aufgabe wiederherstellen**.
+3. Bestätigen Sie mit **Ja, wiederherstellen**.
+
+Die Funktion ist nur verfügbar, wenn keine aktive Verarbeitung mehr läuft. Bei laufender Verarbeitung bleibt die Aktion deaktiviert und zeigt den Grund an.
+
+👉 Mehr dazu: [F016 – Fehlerbehandlung & Recovery](./business/features/F016-fehlerbehandlung-und-recovery.md)
+
+---
+
 ## Weiterführende Dokumentation
 
 - [F001 – Projektverwaltung](./business/features/F001-projektverwaltung.md)

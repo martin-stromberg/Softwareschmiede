@@ -41,6 +41,15 @@ public sealed class Aufgabe
     /// <summary>Abschlussdatum der Aufgabe (null wenn noch nicht abgeschlossen).</summary>
     public DateTimeOffset? AbschlussDatum { get; set; }
 
+    /// <summary>Optional: Aktive Lauf-ID einer KI-Ausführung.</summary>
+    public string? AktiveRunId { get; set; }
+
+    /// <summary>Optional: Zeitstempel des letzten Heartbeats einer Ausführung.</summary>
+    public DateTimeOffset? LastHeartbeatUtc { get; set; }
+
+    /// <summary>Concurrency-Token für Recovery-relevante Statusänderungen.</summary>
+    public int RecoveryVersion { get; set; }
+
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
 

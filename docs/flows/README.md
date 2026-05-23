@@ -19,6 +19,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
 | [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
 | [Live Project Browser mit Git-Status](./live-project-browser-git-status-flow.md) | `live-project-browser-git-status-flow.md` | Ablauf für Snapshot-Laden, Tree-/Listenansicht, Datei-Vorschau, Refresh und Rückkehr zur Aufgabenansicht |
+| [Manuelle Aufgaben-Recovery](./aufgabe-recovery-flow.md) | `aufgabe-recovery-flow.md` | UI- und Serviceablauf zur Wiederherstellung festhängender Aufgaben mit Laufzeit-Guard, Audit-Log und Concurrency-Schutz |
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 | [Issue-, Branch- und PR-Verknüpfung](./issue-branch-pr-linking-flow.md) | `issue-branch-pr-linking-flow.md` | End-to-End-Flow von der Issue-Auswahl über issuebezogenen Branch bis zur PR-Closing-Direktive (`Closes #<Issue>`) |
@@ -198,11 +199,19 @@ Dokumentiert den Ablauf von `POST /api/diff/generate` über Service-Orchestrieru
 
 ---
 
+### [Ablauf 20: Manuelle Aufgaben-Recovery](./aufgabe-recovery-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `AufgabeRecoveryService`, `IRunningAutomationStatusSource`
+
+Beschreibt die Wiederherstellung von `KiAktiv`/`TestsLaufen` nach `InBearbeitung` mit Bestätigung, Laufzeitprüfung, konkurrierender Schutzlogik und Audit-Eintrag.
+
+---
+
 ## Statusübergänge (Kurzreferenz)
 
 ```
-Offen → InBearbeitung → KiAktiv → InBearbeitung (nach KI-Abschluss)
-                                 ↘ Fehlgeschlagen
+Offen → InBearbeitung → KiAktiv → TestsLaufen → InBearbeitung
+                         ↘ (Recovery) InBearbeitung
+                         ↘ Fehlgeschlagen
          InBearbeitung → Abgeschlossen
          InBearbeitung → Offen (nach Abbrechen)
 ```

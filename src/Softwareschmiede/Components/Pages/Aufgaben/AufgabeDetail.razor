@@ -47,6 +47,15 @@ else
             }
             <button class="btn btn-secondary" @onclick="() => _showResetForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">↩️ Reset</button>
         }
+        @if (IsRecoveryStatus)
+        {
+            <button class="btn btn-warning"
+                    @onclick="() => _showRecoveryConfirm = true"
+                    disabled="@(_processing || !_recoveryAllowed)"
+                    title="@(_recoveryDisabledReason ?? "Setzt festhängende Aufgabe wieder auf 'In Bearbeitung'.")">
+                🩹 Aufgabe wiederherstellen
+            </button>
+        }
         @if (_showExplorer)
         {
             <button class="btn btn-ghost" @onclick="SwitchToTaskViewAsync">← Zur Aufgabe</button>
@@ -85,6 +94,11 @@ else
             <div class="stat-label">Ansicht</div>
         </div>
     </div>
+
+    @if (IsRecoveryStatus && !_recoveryAllowed && !string.IsNullOrWhiteSpace(_recoveryDisabledReason))
+    {
+        <div class="alert alert-info">@_recoveryDisabledReason</div>
+    }
 
     @if (_showExplorer)
     {
@@ -212,6 +226,17 @@ else
             <div style="display:flex;gap:.5rem;margin-top:.75rem">
                 <button class="btn btn-danger" @onclick="AbbrechenAsync">Ja, abbrechen</button>
                 <button class="btn btn-ghost" @onclick="() => _showAbbrechenConfirm = false">Zurück</button>
+            </div>
+        </div>
+    }
+
+    @if (_showRecoveryConfirm)
+    {
+        <div class="alert alert-warning">
+            <strong>Aufgabe wiederherstellen?</strong> Der Status wird auf „In Bearbeitung“ gesetzt, wenn keine Verarbeitung mehr läuft.
+            <div style="display:flex;gap:.5rem;margin-top:.75rem">
+                <button class="btn btn-warning" @onclick="WiederherstellenAsync" disabled="@_processing">Ja, wiederherstellen</button>
+                <button class="btn btn-ghost" @onclick="() => _showRecoveryConfirm = false">Zurück</button>
             </div>
         </div>
     }
