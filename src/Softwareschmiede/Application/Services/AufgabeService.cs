@@ -65,6 +65,19 @@ public sealed class AufgabeService
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
+    /// <summary>Gibt die ID des zuletzt generierten Diff-Ergebnisses einer Aufgabe zurück.</summary>
+    public async Task<Guid?> GetLatestDiffResultIdAsync(Guid aufgabeId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Letzte DiffResult-ID für Aufgabe {AufgabeId} abrufen.", aufgabeId);
+
+        return await _db.DiffResults
+            .AsNoTracking()
+            .Where(dr => dr.AufgabeId == aufgabeId)
+            .OrderByDescending(dr => dr.GeneratedAt)
+            .Select(dr => (Guid?)dr.Id)
+            .FirstOrDefaultAsync(ct);
+    }
+
     /// <summary>Erstellt eine neue Aufgabe.</summary>
     public async Task<Aufgabe> CreateAsync(
         Guid projektId,

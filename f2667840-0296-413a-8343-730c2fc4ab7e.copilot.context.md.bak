@@ -1,0 +1,67 @@
+﻿## Verlaufseintrag
+- RunId: f280fb82-56b5-41b9-96ea-e6ba18906b20
+- ContextEventId: b4680aa3-8aa2-4d0d-9064-f9e4d7e3b11f
+- Modus: KontextMitgeben
+- Zeit: 2026-05-23T14:29:19.0472547+00:00
+- Status: Erfolgreich
+
+### Nutzeranweisung
+Das war nicht das, was ich wollte.
+
+Die technischen Abläufe im DiffViewer sind zweitrangig.
+
+Erkläre, wie der Anwender beginnend von der Startseite der Anwendung durch eben diese Anwendung navigieren muss, damit er den DiffViewer zu sehen bekommt.
+
+Erkläre dann für den Anwender, was der DiffViewer macht und welchen funktionalen Zweck er dient.
+
+### KI-Rückmeldung
+Ich gleiche die vorhandene API-Doku mit dem aktuellen Controller ab und aktualisiere dann nur die betroffenen Docs.
+
+Ich prüfe jetzt die DiffViewer-Doku und den Navigationspfad aus der App, damit ich die Nutzerperspektive sauber beschreiben kann.
+
+Ich suche jetzt die konkrete UI-Stelle, an der der Nutzer vom Dashboard zur Diff-Ansicht gelangt, damit die Navigation in der Doku exakt stimmt.
+
+Ich schreibe die DiffViewer-Doku jetzt auf den Anwenderfluss um und lasse nur die nötigen technischen Details stehen.
+
+Ich gleiche den API-Index noch kurz an, damit die neue Nutzerperspektive dort korrekt einsortiert ist.
+
+Die Inhalte sind angepasst; ich prüfe jetzt noch die endgültige Fassung der beiden betroffenen Markdown-Dateien.
+
+Ich prüfe noch kurz den Diff auf einfache Markdown-/Whitespace-Probleme und den betroffenen Datei-Umfang.
+
+Die Statusausgabe ist auffällig; ich prüfe jetzt, ob die neue Datei nur untracked ist oder ob noch eine Nebenänderung entstanden ist.
+
+Ich markiere den Plan noch als abgeschlossen, damit der Arbeitsstand im Session-Artefakt sauber ist.
+
+Die DiffViewer-Doku ist jetzt anwenderorientiert: `docs/api/diff-viewer.md` beschreibt den Weg von der Startseite über die Aufgabenansicht zur Diff-Detailroute und erklärt klar den fachlichen Zweck des Viewers.
+
+Zusätzlich habe ich den API-Index in `docs/api/README.md` und den Diff-API-Querverweis in `docs/api/diff.md` passend ergänzt.
+
+## Verlaufseintrag
+- RunId: 26d23c95-a609-4c20-b855-9dcbe1a00e85
+- ContextEventId: e950f002-8515-4229-9e69-fd9ba3431007
+- Modus: KontextMitgeben
+- Zeit: 2026-05-23T14:33:48.2363484+00:00
+- Status: Erfolgreich
+
+### Nutzeranweisung
+Du schreibst:
+
+## 1. Nutzerweg von der Startseite
+
+1. Der Anwender startet auf der Startseite (`/`) und sieht das Dashboard mit den aktiven Aufgaben.
+2. Er öffnet die gewünschte Aufgabe über den Eintrag in der Aufgabenliste.
+3. In der Aufgabenansicht öffnet er das erzeugte Diff-Ergebnis.
+4. Die Anwendung navigiert dann zur Detailroute `/diff/{DiffResultId:guid}`.
+
+Welcher Button ruft das erzeugte Diff-Ergebnis in der Aufgabenansicht auf?
+
+### KI-Rückmeldung
+Verstanden — ich lese zuerst die Aufgabenbeschreibung und verschaffe mir parallel einen Überblick über vorhandene API-Dokumentation und Endpunkte, dann erstelle/aktualisiere ich die Dateien unter `docs/api/`.
+
+Ich habe den UI-Code geprüft: Es gibt aktuell keinen Button, der in der Aufgabenansicht zur `/diff/{id}`-Route navigiert. Ich passe die Diff-Viewer-Doku jetzt so an, dass der Nutzerfluss technisch korrekt ist und den Einstieg eindeutig beschreibt.
+
+Es gibt aktuell **keinen Button** in der Aufgabenansicht, der das erzeugte Diff-Ergebnis öffnet.  
+Im Code existiert nur die Route `@page "/diff/{DiffResultId:guid}"` (`src\Softwareschmiede\Components\Diff\DiffViewer.razor`), aber kein `NavigateTo("/diff/...")` oder entsprechender Link in den Aufgaben-Komponenten.
+
+Ich habe die Doku entsprechend präzisiert in `docs\api\diff-viewer.md` (Nutzerweg, Schritt 3/4): Dort steht jetzt explizit, dass der Aufruf derzeit nur über die direkte Route mit bekannter Diff-ID erfolgt.
