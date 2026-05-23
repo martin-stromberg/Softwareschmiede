@@ -74,6 +74,10 @@ else
         {
             <button class="btn btn-ghost" @onclick="SwitchToExplorerViewAsync">🗂️ Projektverzeichnis</button>
         }
+        @if (_latestDiffResultId.HasValue)
+        {
+            <button class="btn btn-ghost" @onclick="DiffAnzeigen">🔎 Diff anzeigen</button>
+        }
         <button class="btn btn-ghost" @onclick="ExplorerRefreshAsync" disabled="@_loadingWorkspace">↻ Aktualisieren</button>
         @if (_aufgabe.Status == AufgabeStatus.InBearbeitung)
         {

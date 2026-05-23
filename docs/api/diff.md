@@ -2,6 +2,8 @@
 
 Technische Dokumentation der öffentlichen Diff-Schnittstellen aus [`DiffController`](../../src/Softwareschmiede/Controllers/DiffController.cs).
 
+Verwandte UI-Dokumentation: [`diff-viewer.md`](./diff-viewer.md) für die Blazor-Route `/diff/{DiffResultId:guid}`.
+
 ## Datenmodelle, Enums und Serviceverträge
 
 - Request-/Response-DTOs: [`DiffController.cs`](../../src/Softwareschmiede/Controllers/DiffController.cs)

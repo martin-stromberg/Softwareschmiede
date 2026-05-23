@@ -46,6 +46,7 @@ public partial class AufgabeDetail : IDisposable
     private bool _showExplorer;
     private bool _useTreeLayout = true;
     private bool _loadingWorkspace;
+    private Guid? _latestDiffResultId;
 
     // Subscription auf laufende KI-Session (wird beim Dispose freigegeben)
     private IDisposable? _kiSubscription;
@@ -147,6 +148,7 @@ public partial class AufgabeDetail : IDisposable
     {
         _loading = true;
         _aufgabe = await AufgabeService.GetDetailAsync(Id);
+        _latestDiffResultId = await AufgabeService.GetLatestDiffResultIdAsync(Id);
         if (_aufgabe is not null)
         {
             _protokoll = (await ProtokollService.GetByAufgabeAsync(Id)).ToList();
@@ -191,6 +193,7 @@ public partial class AufgabeDetail : IDisposable
 
             _loading = true;
             _aufgabe = await aufgabeService.GetDetailAsync(Id);
+            _latestDiffResultId = await aufgabeService.GetLatestDiffResultIdAsync(Id);
             if (_aufgabe is not null)
             {
                 _protokoll = (await protokollService.GetByAufgabeAsync(Id)).ToList();
@@ -226,6 +229,7 @@ public partial class AufgabeDetail : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Aufgabendaten");
+            _latestDiffResultId = null;
             _recoveryAllowed = false;
             _recoveryDisabledReason = null;
             _loading = false;
@@ -1043,6 +1047,14 @@ public partial class AufgabeDetail : IDisposable
             NavigationManager.NavigateTo($"projekte/{_aufgabe.ProjektId}");
         else
             NavigationManager.NavigateTo("projekte");
+    }
+
+    private void DiffAnzeigen()
+    {
+        if (_latestDiffResultId is Guid diffResultId)
+        {
+            NavigationManager.NavigateTo($"/diff/{diffResultId}");
+        }
     }
 
     private static string GetProtokollCssClass(ProtokollTyp typ) => typ switch
