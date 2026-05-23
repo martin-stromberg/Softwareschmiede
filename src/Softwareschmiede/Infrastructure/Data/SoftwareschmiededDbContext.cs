@@ -104,6 +104,12 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.AbschlussDatum).HasConversion(
                 v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
                 v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(a => a.LastHeartbeatUtc).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(a => a.RecoveryVersion)
+                .HasDefaultValue(0)
+                .IsConcurrencyToken();
             e.HasOne(a => a.GitRepository)
                 .WithMany()
                 .HasForeignKey(a => a.GitRepositoryId)

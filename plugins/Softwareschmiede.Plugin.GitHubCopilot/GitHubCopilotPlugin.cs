@@ -339,6 +339,12 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         try
         {
             var result = await _cliRunner.RunAsync(GetCopilotCommand(), ["--version"], null, null, ct);
+            if (result is null)
+            {
+                _logger.LogWarning("Copilot-Healthcheck lieferte kein Ergebnis vom CLI-Runner.");
+                return false;
+            }
+
             return result.IsSuccess;
         }
         catch (Win32Exception)

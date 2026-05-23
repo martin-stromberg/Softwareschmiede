@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Softwareschmiede.Infrastructure.Data;
 
@@ -10,9 +11,11 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Migrations
 {
     [DbContext(typeof(SoftwareschmiededDbContext))]
-    partial class SoftwareschmiededDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260523052722_202605230001_AddTaskRecoveryIndicators")]
+    partial class _202605230001_AddTaskRecoveryIndicators
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.16");

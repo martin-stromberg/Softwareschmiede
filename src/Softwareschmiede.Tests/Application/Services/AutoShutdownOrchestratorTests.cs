@@ -138,6 +138,7 @@ public sealed class AutoShutdownOrchestratorTests
         public int SubscriberCount => RunningCountChanged?.GetInvocationList().Length ?? 0;
 
         public int GetRunningCount() => _runningCount;
+        public bool IsRunning(Guid aufgabeId) => _runningCount > 0;
 
         public void Raise(int previous, int current, int observedCurrentCount)
         {

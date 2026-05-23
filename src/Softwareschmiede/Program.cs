@@ -43,6 +43,7 @@ namespace Softwareschmiede
             // Application Services
             builder.Services.AddScoped<ProjektService>();
             builder.Services.AddScoped<AufgabeService>();
+            builder.Services.AddScoped<AufgabeRecoveryService>();
             builder.Services.AddScoped<ProtokollService>();
             builder.Services.AddScoped<EntwicklungsprozessService>();
             builder.Services.AddScoped<GitOrchestrationService>();

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Components.Pages.Aufgaben;
@@ -17,6 +18,97 @@ namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
 public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 {
+    [Theory]
+    [InlineData(AufgabeStatus.KiAktiv)]
+    [InlineData(AufgabeStatus.TestsLaufen)]
+    public async Task AufgabeDetail_ShouldShowRecoveryButton_ForRecoverableStates(AufgabeStatus status)
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, status, isRunning: false);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var recoveryButton = cut.FindAll("button").Single(button => button.TextContent.Contains("Aufgabe wiederherstellen"));
+        recoveryButton.HasAttribute("disabled").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldDisableRecoveryButtonAndShowReason_WhenAutomationIsRunning()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.KiAktiv, isRunning: true);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var recoveryButton = cut.FindAll("button").Single(button => button.TextContent.Contains("Aufgabe wiederherstellen"));
+        recoveryButton.HasAttribute("disabled").Should().BeTrue();
+        cut.Markup.Should().Contain("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldNotShowRecoveryButton_ForInvalidStates()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.InBearbeitung, isRunning: false);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.FindAll("button").Any(button => button.TextContent.Contains("Aufgabe wiederherstellen")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldRecoverTaskAndShowSuccess_WhenRecoveryIsTriggered()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.TestsLaufen, isRunning: false);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Aufgabe wiederherstellen")).Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Aufgabe wiederherstellen?"));
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Ja, wiederherstellen")).Click();
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Aufgabe wurde erfolgreich wiederhergestellt."));
+
+        var loaded = await harness.Db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == harness.AufgabeId);
+        loaded.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        harness.Db.Protokolleintraege
+            .Count(e => e.AufgabeId == harness.AufgabeId && e.Typ == ProtokollTyp.StatusUebergang && e.Inhalt.Contains("Manuelle Wiederherstellung"))
+            .Should().Be(1);
+    }
+
     /// <summary>Prüft, dass Push/Pull und Pull-Request bei lokalem Repo mit separatem Arbeitsverzeichnis ausgeblendet sind.</summary>
     [Fact]
     public async Task AufgabeDetail_ShouldHidePushPullAndPullRequestButtons_WhenRepositoryIsLocalWorkingDirectoryCopy()
@@ -187,7 +279,10 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             Times.Never);
     }
 
-    private async Task<TestHarness> ConfigureComponentServicesAsync(GitActionCapabilities capabilities)
+    private async Task<TestHarness> ConfigureComponentServicesAsync(
+        GitActionCapabilities capabilities,
+        AufgabeStatus status = AufgabeStatus.InBearbeitung,
+        bool isRunning = false)
     {
         var db = TestDbContextFactory.Create();
 
@@ -204,7 +299,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             Id = Guid.NewGuid(),
             ProjektId = projekt.Id,
             Titel = "BUnit-Test-Aufgabe",
-            Status = AufgabeStatus.InBearbeitung,
+            Status = status,
             AgentenpaketName = "paket-a",
             AgentenName = "agent-a",
             LokalerKlonPfad = Path.GetTempPath(),
@@ -295,10 +390,15 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             pluginSelection,
             NullLogger<GitOrchestrationService>.Instance);
 
+        var runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
+        runningStatusSourceMock.Setup(source => source.GetRunningCount()).Returns(0);
+        runningStatusSourceMock.Setup(source => source.IsRunning(It.IsAny<Guid>())).Returns(isRunning);
         Services.AddSingleton(new Mock<IServiceScopeFactory>().Object);
         Services.AddSingleton(pluginManagerMock.Object);
         Services.AddSingleton(pluginSelection);
         Services.AddSingleton(aufgabeService);
+        Services.AddSingleton(runningStatusSourceMock.Object);
+        Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
         Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
         Services.AddSingleton(gitService);
@@ -449,10 +549,15 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             pluginSelection,
             NullLogger<GitOrchestrationService>.Instance);
 
+        var runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
+        runningStatusSourceMock.Setup(source => source.GetRunningCount()).Returns(0);
+        runningStatusSourceMock.Setup(source => source.IsRunning(It.IsAny<Guid>())).Returns(false);
         Services.AddSingleton(new Mock<IServiceScopeFactory>().Object);
         Services.AddSingleton(pluginManagerMock.Object);
         Services.AddSingleton(pluginSelection);
         Services.AddSingleton(aufgabeService);
+        Services.AddSingleton(runningStatusSourceMock.Object);
+        Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
         Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
         Services.AddSingleton(gitService);
@@ -471,6 +576,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Mock<IGitPlugin> defaultGitPlugin,
         Mock<IGitPlugin> selectedGitPlugin) : IAsyncDisposable
     {
+        public Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext Db { get; } = db;
         public Guid AufgabeId { get; } = aufgabeId;
         public Mock<IGitPlugin> DefaultGitPlugin { get; } = defaultGitPlugin;
         public Mock<IGitPlugin> SelectedGitPlugin { get; } = selectedGitPlugin;

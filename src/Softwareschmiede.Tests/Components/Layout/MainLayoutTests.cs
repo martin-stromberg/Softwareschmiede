@@ -152,6 +152,8 @@ public sealed class MainLayoutTests
         public int SubscriberCount => RunningCountChanged?.GetInvocationList().Length ?? 0;
 
         public int GetRunningCount() => RunningCount;
+
+        public bool IsRunning(Guid aufgabeId) => RunningCount > 0;
     }
 
     private sealed class FakeAutoShutdownOrchestrator : IAutoShutdownOrchestrator
