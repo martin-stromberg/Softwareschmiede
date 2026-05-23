@@ -1,7 +1,7 @@
 # Entwicklungsprozess-Ablauf
 
 **Modul:** `EntwicklungsprozessService`, `GitOrchestrationService`, `GitHubPlugin`, `GitHubCopilotPlugin`  
-**Letzte Aktualisierung:** 2026-05-13
+**Letzte Aktualisierung:** 2026-05-23
 
 Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Softwareentwicklung in **Softwareschmiede**. Die Abläufe umfassen den kompletten Lebenszyklus einer Aufgabe: vom Starten des Entwicklungsprozesses über das KI-Streaming bis zum Abschluss oder Abbruch. Querverweise auf verwandte Dokumentation sind am Ende jedes Abschnitts angegeben.
 
@@ -14,7 +14,8 @@ Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Sof
 3. [Ablauf 2b: Agent-Auswahl bei Folgeanweisungen](#ablauf-2b-agent-auswahl-bei-folgeanweisungen)
 4. [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
 5. [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen)
-6. [Ablauf 5: Issue aus GitHub importieren und als Aufgabe anlegen](#ablauf-5-issue-aus-github-importieren-und-als-aufgabe-anlegen)
+6. [Ablauf 4b: Offene Aufgabe verwerfen](#ablauf-4b-offene-aufgabe-verwerfen)
+7. [Ablauf 5: Issue aus GitHub importieren und als Aufgabe anlegen](#ablauf-5-issue-aus-github-importieren-und-als-aufgabe-anlegen)
 
 ---
 
@@ -318,6 +319,55 @@ flowchart TD
 - .NET `System.IO.Directory` (Verzeichnis-Bereinigung)
 
 > **Verwandte Abläufe:** [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [GitOrchestrationService – Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md)
+
+---
+
+## Ablauf 4b: Offene Aufgabe verwerfen
+
+### Kontext
+
+Offene Aufgaben können auf der Detailseite direkt verworfen werden, ohne sie vorher zu starten. Je nach Auswahl wird die Aufgabe archiviert oder dauerhaft gelöscht. Da noch kein lokaler Klon existiert, entfällt jede Klon-Bereinigung.
+
+### Diagramm
+
+```mermaid
+flowchart TD
+    A([Offene Aufgabe verwerfen]) --> B[AufgabeService.VerwerfenAsync\naufgabeId, aktion]
+    B --> C{Aufgabe gefunden?}
+    C -- Nein --> C1[InvalidOperationException]
+    C -- Ja --> D{Status = Offen?}
+    D -- Nein --> D1[InvalidOperationException]
+    D -- Ja --> E{Aktion = Archivieren?}
+    E -- Ja --> F[Status = Archiviert]
+    E -- Nein --> G[Aufgabe löschen]
+    F --> H[SaveChangesAsync]
+    G --> H
+    H --> I([Verwerfen abgeschlossen])
+```
+
+### Schrittbeschreibung
+
+| # | Schritt | Quellcode-Referenz | Eingabe / Ausgabe |
+|---|---------|-------------------|-------------------|
+| 1 | Aufgabe verwerfen | `AufgabeService.VerwerfenAsync(aufgabeId, aktion)` | Eingabe: `aufgabeId`, `VerwerfenAktion` |
+| 2 | Status prüfen | `AufgabeService.VerwerfenAsync` | Nur `Offen` ist zulässig; andere Status führen zu `InvalidOperationException` |
+| 3 | Auswahl ausführen | `VerwerfenAktion.Archivieren` / `VerwerfenAktion.Loeschen` | Ausgabe: Status `Archiviert` oder vollständige Entfernung der Aufgabe |
+| 4 | Verwerfen speichern | `SaveChangesAsync` bzw. `DeleteAsync` | Persistenz der gewählten Verwerfungsaktion |
+
+### Fehlerbehandlung
+
+| Fehlerfall | Verhalten |
+|-----------|-----------|
+| Aufgabe nicht gefunden | Exception propagiert; keine Änderung |
+| Aufgabe ist nicht `Offen` | Exception propagiert; Verwerfen wird abgebrochen |
+
+### Abhängigkeiten
+
+- `AufgabeService.VerwerfenAsync`
+- `VerwerfenAktion`
+- Blazor-Detailseite `AufgabeDetail`
+
+> **Verwandte Abläufe:** [Ablauf 4: Aufgabe abbrechen](#ablauf-4-aufgabe-abbrechen) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen)
 
 ---
 

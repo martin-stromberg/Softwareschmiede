@@ -160,6 +160,84 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.Markup.Should().Contain("Status kann nicht zurückgesetzt werden, solange die Verarbeitung läuft.");
     }
 
+    /// <summary>Prüft, dass offene Aufgaben die neue Verwerfen-Aktion anzeigen.</summary>
+    [Fact]
+    public async Task AufgabeDetail_ShouldShowVerwerfenButton_ForOffeneAufgabe()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Offen, isRunning: false);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var buttonTexts = cut.FindAll("button").Select(button => button.TextContent.Trim()).ToArray();
+        buttonTexts.Should().Contain("🗑️ Verwerfen");
+        buttonTexts.Should().Contain("🚀 Entwicklung starten");
+        buttonTexts.Should().NotContain("📦 Archivieren");
+        buttonTexts.Should().NotContain("🗑️ Löschen");
+    }
+
+    /// <summary>Prüft, dass offene Aufgaben direkt archiviert werden können.</summary>
+    [Fact]
+    public async Task AufgabeDetail_ShouldArchiveOffeneAufgabe_WhenVerwerfenArchivierenSelected()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Offen, isRunning: false);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Verwerfen")).Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Aufgabe verwerfen?"));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Archivieren")).Click();
+
+        var loaded = await harness.Db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == harness.AufgabeId);
+
+        loaded.Status.Should().Be(AufgabeStatus.Archiviert);
+    }
+
+    /// <summary>Prüft, dass offene Aufgaben direkt gelöscht werden können.</summary>
+    [Fact]
+    public async Task AufgabeDetail_ShouldDeleteOffeneAufgabe_WhenVerwerfenLoeschenSelected()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Offen, isRunning: false);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Verwerfen")).Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Aufgabe verwerfen?"));
+
+        cut.FindAll("button").Single(button => button.TextContent.Contains("Dauerhaft löschen")).Click();
+
+        var loaded = await harness.Db.Aufgaben.AsNoTracking().SingleOrDefaultAsync(a => a.Id == harness.AufgabeId);
+
+        loaded.Should().BeNull();
+    }
+
     /// <summary>Prüft, dass Push/Pull und Pull-Request bei lokalem Repo mit separatem Arbeitsverzeichnis ausgeblendet sind.</summary>
     [Fact]
     public async Task AufgabeDetail_ShouldHidePushPullAndPullRequestButtons_WhenRepositoryIsLocalWorkingDirectoryCopy()

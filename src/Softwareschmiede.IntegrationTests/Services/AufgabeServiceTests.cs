@@ -162,6 +162,78 @@ public sealed class AufgabeServiceTests
     }
 
     /// <summary>
+    /// Testet, dass VerwerfenAsync eine offene Aufgabe archiviert und die Änderung persistiert.
+    /// </summary>
+    [Fact]
+    public async Task VerwerfenAsync_ShouldPersistArchivedStatus_WhenOffeneAufgabeArchiviertWird()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektId = await CreateTestProjektAsync(db);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabe = await service.CreateAsync(projektId, "Offene Aufgabe", null);
+
+        // Act
+        await service.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Archivieren);
+
+        // Assert
+        await using var db2 = db.CreateNewContext();
+        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+
+        loaded!.Status.Should().Be(AufgabeStatus.Archiviert);
+    }
+
+    /// <summary>
+    /// Testet, dass VerwerfenAsync eine offene Aufgabe dauerhaft löscht und kaskadierend entfernt.
+    /// </summary>
+    [Fact]
+    public async Task VerwerfenAsync_ShouldCascadeDeleteProtokolleintraege_WhenOffeneAufgabeGeloeschtWird()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektId = await CreateTestProjektAsync(db);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
+
+        var aufgabe = await aufgabeService.CreateAsync(projektId, "Offene Aufgabe", null);
+        await protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Ein Prompt");
+
+        // Act
+        await aufgabeService.VerwerfenAsync(aufgabe.Id, VerwerfenAktion.Loeschen);
+
+        // Assert
+        await using var db2 = db.CreateNewContext();
+        var geladen = await db2.Aufgaben.FindAsync(aufgabe.Id);
+        var protokolle = db2.Protokolleintraege.Where(p => p.AufgabeId == aufgabe.Id).ToList();
+
+        geladen.Should().BeNull();
+        protokolle.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Testet, dass VerwerfenAsync eine bereits gestartete Aufgabe für beide Verwerfungsaktionen ablehnt.
+    /// </summary>
+    [Theory]
+    [InlineData(VerwerfenAktion.Archivieren)]
+    [InlineData(VerwerfenAktion.Loeschen)]
+    public async Task VerwerfenAsync_ShouldThrowWhenAufgabeIsNotOffen(VerwerfenAktion aktion)
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektId = await CreateTestProjektAsync(db);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabe = await service.CreateAsync(projektId, "Gestartete Aufgabe", null);
+        await service.StartenAsync(aufgabe.Id, "task/test", @"C:\klone\test");
+
+        // Act
+        var act = () => service.VerwerfenAsync(aufgabe.Id, aktion);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Nur offene Aufgaben können verworfen werden.");
+    }
+
+    /// <summary>
     /// Testet, dass CreateFromIssueAsync eine Aufgabe mit IssueReferenz anlegt.
     /// </summary>
     [Fact]

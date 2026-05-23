@@ -216,7 +216,8 @@ Sie können im Protokoll scrollen und nach bestimmten Begriffen suchen.
 
 ## Aufgabe abbrechen
 
-Sie können eine laufende oder offene Aufgabe jederzeit abbrechen.
+Sie können eine laufende Aufgabe jederzeit abbrechen.
+Offene Aufgaben verwerfen Sie direkt, ohne sie vorher zu starten.
 
 **Was passiert beim Abbrechen?**
 
@@ -232,6 +233,20 @@ Sie können eine laufende oder offene Aufgabe jederzeit abbrechen.
 3. Bestätigen Sie die Nachfrage mit **Ja, abbrechen**.
 
 > ⚠️ **Hinweis:** Das Abbrechen kann nicht rückgängig gemacht werden. Lokale Änderungen der KI gehen verloren.
+
+👉 Mehr dazu: [F007 – Aufgabe abbrechen](./business/features/F007-aufgabe-abbrechen.md)
+
+---
+
+## Offene Aufgabe verwerfen
+
+Wenn eine Aufgabe noch den Status **Offen** hat, können Sie sie direkt verwerfen:
+
+1. Öffnen Sie die Aufgabe in der Detailansicht.
+2. Klicken Sie auf **Verwerfen**.
+3. Wählen Sie **Archivieren** oder **Dauerhaft löschen**.
+
+Dabei wird keine Arbeitskopie angelegt oder gelöscht, weil die Aufgabe noch nicht gestartet wurde.
 
 👉 Mehr dazu: [F007 – Aufgabe abbrechen](./business/features/F007-aufgabe-abbrechen.md)
 

@@ -171,6 +171,31 @@ public sealed class AufgabeService
         _logger.LogInformation("Aufgabe {AufgabeId} gelöscht.", id);
     }
 
+    /// <summary>Verwirft eine offene Aufgabe durch Archivieren oder Löschen.</summary>
+    public async Task VerwerfenAsync(Guid id, VerwerfenAktion aktion, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Aufgabe {AufgabeId} verwerfen (Aktion: {Aktion}).", id, aktion);
+
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        if (aufgabe.Status != AufgabeStatus.Offen)
+        {
+            throw new InvalidOperationException("Nur offene Aufgaben können verworfen werden.");
+        }
+
+        if (aktion == VerwerfenAktion.Archivieren)
+        {
+            aufgabe.Status = AufgabeStatus.Archiviert;
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Aufgabe {AufgabeId} verworfen und archiviert.", id);
+            return;
+        }
+
+        await DeleteAsync(id, ct);
+        _logger.LogInformation("Aufgabe {AufgabeId} verworfen und dauerhaft gelöscht.", id);
+    }
+
     /// <summary>Archiviert eine Aufgabe. Nur für abgeschlossene oder fehlgeschlagene Aufgaben möglich.</summary>
     public async Task ArchivierenAsync(Guid id, CancellationToken ct = default)
     {

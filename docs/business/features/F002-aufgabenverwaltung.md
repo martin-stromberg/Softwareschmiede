@@ -26,6 +26,7 @@ Neue Mitarbeitende nutzen sie, um strukturiert in bestehende Projekte einzusteig
 4. Sie klicken auf **Aufgabe anlegen**.
 5. Die Aufgabe öffnet sich direkt in der Detailansicht.
 6. Dort starten Sie später über **Entwicklung starten** den Lauf.
+7. Wenn Sie die Aufgabe nie starten möchten, verwenden Sie auf der Detailseite direkt **Verwerfen** und wählen anschließend **Archivieren** oder **Dauerhaft löschen**.
 
 ---
 
@@ -60,6 +61,9 @@ Ja, solange die Aufgabe noch nicht gestartet wurde.
 
 **Wird eine neue Aufgabe sofort ausgeführt?**  
 Nein. Sie starten sie später in der Detailansicht.
+
+**Kann ich eine offene Aufgabe direkt archivieren oder löschen?**
+Ja. Dafür gibt es auf der Detailseite die Aktion **Verwerfen** mit den Pfaden **Archivieren** oder **Dauerhaft löschen**.
 
 ---
 
