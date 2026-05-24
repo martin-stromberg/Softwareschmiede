@@ -93,7 +93,7 @@ public sealed class AufgabeService
             .AsNoTracking()
             .Where(dr => dr.AufgabeId == aufgabeId
                 && dr.FilePath != null
-                && dr.FilePath.Replace('\\', '/').ToLower() == normalizedLookupPath)
+                && dr.FilePath.Replace("\\", "/").ToLower() == normalizedLookupPath)
             .OrderByDescending(dr => dr.GeneratedAt)
             .Select(dr => (Guid?)dr.Id)
             .FirstOrDefaultAsync(ct);
