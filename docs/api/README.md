@@ -6,6 +6,7 @@ Technische Dokumentation der öffentlichen Schnittstellen und internen API-Contr
 
 Die Softwareschmiede stellt öffentliche HTTP-Endpunkte für den Diff-Bereich bereit.
 Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“** wurden **keine neuen öffentlichen REST-Endpunkte** eingeführt.
+Auch für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 
 ## Dokumentierte API-Bereiche
@@ -24,6 +25,7 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 | [repository-startskript-freier-port.md](./repository-startskript-freier-port.md) | Interner Contract für repositorybezogene Startskripte mit freier Portreservierung, Persistenz (`RepositoryStartKonfiguration`) und Ausführung beim Prozessstart. |
 | [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
 | [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
+| [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md) | App-level Contract für die SVG-Favicon-Integration (`icon`/`shortcut icon`/`mask-icon`) inkl. Static-Asset-Auswirkung und Bestätigung „keine neuen HTTP-Endpunkte“. |
 
 ## Feature-Fokus: DiffViewer-Integration (2026-05-23)
 
@@ -39,6 +41,12 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - Neue Service-Query: `GetLatestDiffResultIdForFileAsync(aufgabeId, relativePath)` mit Pfadnormalisierung (`\`/`/`, `./`, Case-Insensitivity).
 - Fallbackpfad: Wenn für `RelativePath` kein Diff gefunden wird, erfolgt ein zweiter Lookup über `SourceRelativePath` (falls sinnvoll).
 - Die Route `/diff/{DiffResultId:guid}` bleibt unverändert und verwendet weiterhin die zuletzt bekannte Diff-ID für den Standalone-Deep-Link.
+
+## Feature-Fokus: App-Favicon `favicon-hammer-pick.svg`
+
+- Technischer Contract: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
+- App.razor referenziert das Favicon bewusst als `icon`, `shortcut icon` und `mask-icon`.
+- Die Änderung betrifft statische Assets (`wwwroot`) und Head-Markup; öffentliche HTTP-Endpunkte bleiben unverändert.
 
 ## Feature-Fokus: Benachrichtigungssystem für abgeschlossene KI-Aufgaben
 

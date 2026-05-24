@@ -11,6 +11,12 @@ Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“
 Die Integration erfolgt intern über Service-/UI-Komponenten (Abschlussereignis, Hub-Verteilung, UI-Verarbeitung).
 Im UI-Kontext steuert der **BenachrichtigungsModus** die Ausgabe via **Toast** und optionalem **Hinweiston**; relevante Vorgänge werden im **Audit** erfasst.
 
+## Feature-Hinweis: App-Favicon `favicon-hammer-pick-svg`
+
+Für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Die Umsetzung erfolgt auf App-Ebene über zusätzliche `<link>`-Einträge in `App.razor` und ein neues statisches Asset in `wwwroot`.
+Details: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
+
 ## Öffentliche REST-Endpunkte
 
 | Methode | Pfad | Zweck |
@@ -38,4 +44,5 @@ Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftret
 ## Verknüpfte Dokumentation
 
 - Detaillierte Diff-API: [diff.md](./diff.md)
+- App-Favicon-Contract: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
 - API-Index: [README.md](./README.md)

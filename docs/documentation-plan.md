@@ -1,3 +1,73 @@
+# Dokumentationsplan – Feature „favicon-hammer-pick-svg“ – 2026-05-24
+
+## Kontext
+- Feature-Slug: **`favicon-hammer-pick-svg`**
+- Implementierungsstand laut Scope:
+  - `src/Softwareschmiede/Components/App.razor` angepasst (SVG-Favicon-Links)
+  - `src/Softwareschmiede/wwwroot/favicon-hammer-pick.svg` hinzugefügt
+  - Tests ergänzt:
+    - `src/Softwareschmiede.Tests/Components/AppTests.cs`
+    - `src/Softwareschmiede.Tests/Infrastructure/StaticAssets/FaviconHammerPickSvgTests.cs`
+- Hinweis zur Orchestrierung: Der in der Agent-Datei vorgesehene Analyse-Schwarm (`explore`, Haiku) war initial durch Rate-Limit blockiert; Phase 1 wurde daher manuell im identischen Prüfschema durchgeführt. Phase 2 wurde danach mit den vier Dokumentationsagenten ausgeführt.
+
+## Phase 1 – Analyse
+
+### 1) API-Docs-Analyse
+- `docs/api/` existiert.
+- Relevante bestehende API-Dokumente vorhanden (`README.md`, `http-endpoints.md`, `diff.md`, ...).
+- Pfad `src/ReceiptScanner.Api/Endpoints/` existiert im aktuellen Repository nicht; öffentliche HTTP-API bleibt unverändert.
+- Lücke identifiziert: Es fehlte eine explizite technische Dokumentation des App-/Static-Asset-Contracts für das neue SVG-Favicon.
+
+### 2) Flow-Docs-Analyse
+- `docs/flows/` existiert mit umfangreichem Flow-Katalog.
+- Lücke identifiziert: Kein dedizierter Ablauf für Favicon-Auslieferung (Head-Linkdefinition → Static Assets → Browser-Selektion/Fallback).
+
+### 3) Business-Docs-Analyse
+- `docs/business/` existiert; Feature-Katalog bis F024 war dokumentiert.
+- Lücke identifiziert: Fachliche Beschreibung des neuen Branding-Favicons für Anwender:innen fehlte.
+
+### 4) README-Analyse
+- README-Struktur vollständig (Projektname, Features, Installation, Usage, Konfiguration, Architektur, Tests, Deployment, Lizenz, Changelog).
+- Lücke identifiziert: Feature `favicon-hammer-pick-svg` und dessen Testabdeckung waren noch nicht enthalten.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Neue API-/Flow-/Business-Dokumente für das Favicon-Feature erstellen.
+2. **Hoch:** README auf Feature, Tests und Dokumentationsverweise aktualisieren.
+3. **Mittel:** API-Index klarstellen, dass keine neuen HTTP-Endpunkte entstanden sind.
+
+## Phase 2 – Parallele Dokumentationserstellung
+- `documentation-api`: ausgeführt
+- `documentation-flow`: ausgeführt
+- `documentation-business`: ausgeführt
+- `documentation-readme-writer`: ausgeführt
+
+## Anhang: Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/api/favicon-hammer-pick-svg.md`
+2. `docs/flows/favicon-delivery-flow.md`
+3. `docs/business/features/F025-favicon-hammer-pick-svg.md`
+
+### Aktualisiert
+1. `docs/api/README.md`
+2. `docs/api/http-endpoints.md`
+3. `docs/flows/README.md`
+4. `docs/business/features.md`
+5. `README.md`
+
+### Validierung (Existenz + nicht leer)
+- Erfolgreich für alle oben genannten neu erstellten/aktualisierten Dokumentdateien.
+
+### Offene Punkte
+- Die im Kontext genannten Planungsdokumente unter
+  - `docs/requirements/favicon-hammer-pick-svg-requirements.md`
+  - `docs/architecture/favicon-hammer-pick-svg-architecture-blueprint.md`
+  - `docs/architecture/favicon-hammer-pick-svg-entity-relationship-model.md`
+  - `docs/improvements/favicon-hammer-pick-svg-architecture-review.md`
+  sind im aktuellen Stand nicht vorhanden und wurden in diesem Lauf nicht neu erstellt, da der Scope auf Dokumentationsorchestrierung der Zielbereiche `docs/api`, `docs/flows`, `docs/business` und `README.md` lag.
+
+---
+
 # Dokumentationsplan – Korrekte Diff-Anzeige im DiffViewer für geänderte Dateien – 2026-05-24
 
 ## Kontext
