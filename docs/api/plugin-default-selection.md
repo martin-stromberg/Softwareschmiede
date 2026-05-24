@@ -35,17 +35,19 @@ Es handelt sich um einen Application-/Service-Contract, nicht um einen HTTP-Endp
 ### Reihenfolge (verbindlich)
 
 1. Explizite Auswahl (z. B. `selectedKiPluginPrefix`)
-2. Gespeichertes Standardplugin der Pluginart
-3. Fallback
+2. Gespeicherter Aufgabenwert (`Aufgabe.KiPluginPrefix`)
+3. Gespeichertes Standardplugin der Pluginart
+4. Fallback
 
 ### Entscheidungsmatrix
 
-| Explizite Auswahl | Gespeicherter Standard | Verfügbare Plugins | Ergebnis |
-|---|---|---|---|
-| gültig und vorhanden | beliebig | mindestens 1 | explizite Auswahl |
-| leer/ungültig | gültig und vorhanden | mindestens 1 | gespeichertes Standardplugin |
-| leer/ungültig | leer/ungültig/nicht mehr vorhanden | mindestens 1 | Fallback aus verfügbarer Liste |
-| beliebig | beliebig | 0 | `PluginManager`-DefaultResolver |
+| Explizite Auswahl | Aufgaben-Prefix | Gespeicherter Standard | Verfügbare Plugins | Ergebnis |
+|---|---|---|---|---|
+| gültig und vorhanden | beliebig | beliebig | mindestens 1 | explizite Auswahl |
+| leer/ungültig | gültig und vorhanden | beliebig | mindestens 1 | Aufgaben-Prefix |
+| leer/ungültig | leer/ungültig | gültig und vorhanden | mindestens 1 | gespeichertes Standardplugin |
+| leer/ungültig | leer/ungültig | leer/ungültig/nicht mehr vorhanden | mindestens 1 | Fallback aus verfügbarer Liste |
+| beliebig | beliebig | beliebig | 0 | `PluginManager`-DefaultResolver |
 
 ### Fallback-Verhalten (KI-Plugins)
 
@@ -55,9 +57,9 @@ Es handelt sich um einen Application-/Service-Contract, nicht um einen HTTP-Endp
 
 ## KI-Plugin-Auswahl beim Prompt
 
-1. Aufgaben-Detailseite lädt verfügbare KI-Plugins und setzt die Vorauswahl auf das aktuell aufgelöste Standardplugin.
+1. Aufgaben-Detailseite lädt verfügbare KI-Plugins und setzt die Vorauswahl auf das aktuell aufgelöste Plugin (explizit/Task/Default/Fallback).
 2. Beim Prompt-Senden wird `selectedKiPluginPrefix` an den KI-Lauf übergeben.
-3. `EntwicklungsprozessService.KiStartenAsync(...)` löst darüber das effektive KI-Plugin auf.
+3. `EntwicklungsprozessService.KiStartenAsync(...)` löst darüber das effektive KI-Plugin auf; ohne expliziten Wert wird `Aufgabe.KiPluginPrefix` berücksichtigt.
 4. Das Protokoll enthält das tatsächlich verwendete KI-Plugin (`PluginName`, `PluginPrefix`).
 
 ## SCM-Plugin-Auflösung für `AufgabeDetail`/`GitOrchestrationService`

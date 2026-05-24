@@ -42,11 +42,12 @@ Beim nächsten Prompt ist wieder der Standard vorausgewählt.
 Die Softwareschmiede nutzt eine feste Reihenfolge:
 
 1. **Explizite Auswahl im Prompt**
-2. **Gespeichertes Standardplugin**
-3. **Automatischer Fallback auf ein verfügbares Plugin**
+2. **Gespeicherte Plugin-Auswahl der Aufgabe (`KiPluginPrefix`)**
+3. **Gespeichertes Standardplugin**
+4. **Automatischer Fallback auf ein verfügbares Plugin**
 
 Gespeichert wird die technische Plugin-Kennung.
-Wenn ein gespeichertes Standardplugin nicht verfügbar ist, bleibt der Ablauf trotzdem arbeitsfähig und nutzt den Fallback.
+Wenn ein gespeicherter Aufgabenwert oder das gespeicherte Standardplugin nicht verfügbar ist, bleibt der Ablauf trotzdem arbeitsfähig und nutzt den Fallback.
 
 ---
 
@@ -75,6 +76,7 @@ Die gespeicherte Standardauswahl bleibt erhalten. Eine manuelle Auswahl gilt fü
 - [F013 – Claude-CLI-Integration](./F013-claude-cli-integration.md) – zusätzlichen KI-Anbieter einbinden
 - [F015 – Einstellungen & Persistenz](./F015-einstellungen-und-persistenz.md) – gespeicherte Werte und Gültigkeit
 - [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md) – sicheres Vorgehen bei Störungen
+- [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](./F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) – durchgängiger Auswahlfluss in Aufgabe/Prompt
 - [Flow: Plugin-Default-Auswahl](../../flows/plugin-default-selection-flow.md) – fachlicher Ablauf der Auflösung
 - [API/Technik: Plugin-Default-Auswahl](../../api/plugin-default-selection.md) – technische Vertragsdetails
 - [Zurück zur Übersicht](../features.md)

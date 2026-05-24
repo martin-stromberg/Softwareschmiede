@@ -44,6 +44,7 @@ Nach dem Versand steht wieder „agent-initial“ als Vorgabe im Auswahlfeld.
 ## Was passiert im Hintergrund?
 
 Die Anwendung zeigt die Agentenliste nur bei verfügbaren Folgeanweisungen.
+Die Liste ist dabei vom gewählten KI-Plugin und dem kompatiblen Agentenpaket abhängig.
 Beim ersten Laden übernimmt sie den Start-Agenten als Vorgabe.
 Beim Senden nutzt sie genau den aktuell ausgewählten Agenten.
 Danach setzt sie die Auswahl wieder auf den Start-Agenten.
@@ -77,6 +78,7 @@ Nein. Das Verhalten des ersten Prompts bleibt unverändert.
 3. Die Agentenauswahl kann vor dem Senden frei geändert werden.
 4. Die Folgeanweisung geht an den aktuell ausgewählten Agenten.
 5. Das Verhalten des Start-Prompts bleibt unverändert.
+6. Die Auswahl bleibt innerhalb der gültigen Plugin- und Paketkombination.
 
 ---
 
@@ -86,4 +88,5 @@ Nein. Das Verhalten des ersten Prompts bleibt unverändert.
 - [F004 – Agentenpakete](./F004-agentenpakete.md) – Agenten verstehen und bereitstellen
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md) – Verlauf und Antworten prüfen
 - [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – Standardauswahl für KI-Prompts verstehen
+- [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](./F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) – durchgängige Reihenfolge Plugin → Paket → Agent
 - [Zurück zur Übersicht](../features.md)

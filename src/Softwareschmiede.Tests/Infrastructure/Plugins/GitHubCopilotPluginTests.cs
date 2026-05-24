@@ -47,20 +47,21 @@ public sealed class GitHubCopilotPluginTests : IDisposable
         result.Should().BeEmpty();
     }
 
-    /// <summary>GetAvailableAgentsAsync erkennt .agent.md Dateien als Agenten.</summary>
+    /// <summary>GetAvailableAgentsAsync erkennt Agenten nur in .github/agents.</summary>
     [Fact]
     public async Task GetAvailableAgentsAsync_ShouldReturnAgents_WhenAgentMdFilesExist()
     {
         // Arrange
-        Directory.CreateDirectory(_testDirectory);
+        var agentsDir = Path.Combine(_testDirectory, ".github", "agents");
+        Directory.CreateDirectory(agentsDir);
         var agentContent = """
             ---
             name: my-agent
             description: Ein Test-Agent
             ---
             """;
-        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "my-agent.agent.md"), agentContent);
-        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "other-agent.agent.md"), "description: Anderer Agent");
+        await File.WriteAllTextAsync(Path.Combine(agentsDir, "my-agent.agent.md"), agentContent);
+        await File.WriteAllTextAsync(Path.Combine(agentsDir, "other-agent.agent.md"), "description: Anderer Agent");
 
         // Act
         var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).ToList();
@@ -71,19 +72,38 @@ public sealed class GitHubCopilotPluginTests : IDisposable
         result.Should().Contain(a => a.Name == "other-agent");
     }
 
+    /// <summary>GetAvailableAgentsAsync ignoriert Agenten außerhalb von .github/agents.</summary>
+    [Fact]
+    public async Task GetAvailableAgentsAsync_ShouldIgnoreAgentsOutsideGithubAgentsFolder()
+    {
+        // Arrange
+        var agentsDir = Path.Combine(_testDirectory, ".github", "agents");
+        Directory.CreateDirectory(agentsDir);
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "root.agent.md"), "description: root");
+        await File.WriteAllTextAsync(Path.Combine(agentsDir, "inside.agent.md"), "description: inside");
+
+        // Act
+        var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).ToList();
+
+        // Assert
+        result.Should().ContainSingle(a => a.Name == "inside");
+        result.Should().NotContain(a => a.Name == "root");
+    }
+
     /// <summary>GetAvailableAgentsAsync liest Beschreibung aus der description-Zeile.</summary>
     [Fact]
     public async Task GetAvailableAgentsAsync_ShouldReadDescriptionFromFrontmatter_WhenDescriptionLineExists()
     {
         // Arrange
-        Directory.CreateDirectory(_testDirectory);
+        var agentsDir = Path.Combine(_testDirectory, ".github", "agents");
+        Directory.CreateDirectory(agentsDir);
         const string content = """
             ---
             name: test
             description: Meine Agenten-Beschreibung
             ---
             """;
-        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "test.agent.md"), content);
+        await File.WriteAllTextAsync(Path.Combine(agentsDir, "test.agent.md"), content);
 
         // Act
         var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).ToList();
@@ -131,7 +151,7 @@ public sealed class GitHubCopilotPluginTests : IDisposable
     [Fact]
     public async Task IsAgentPackageCompatibleAsync_ShouldReturnTrue_WhenGithubFolderExists()
     {
-        Directory.CreateDirectory(Path.Combine(_testDirectory, ".github"));
+        Directory.CreateDirectory(Path.Combine(_testDirectory, ".github", "agents"));
 
         var result = await _sut.IsAgentPackageCompatibleAsync(_testDirectory);
 
@@ -430,14 +450,15 @@ public sealed class GitHubCopilotPluginTests : IDisposable
     public async Task GetAvailableAgentsAsync_ShouldUseFallbackDescription_WhenFrontmatterHasNoDescription()
     {
         // Arrange
-        Directory.CreateDirectory(_testDirectory);
+        var agentsDir = Path.Combine(_testDirectory, ".github", "agents");
+        Directory.CreateDirectory(agentsDir);
         const string content = """
             ---
             name: fallback-agent
             ---
             Erste Inhaltszeile
             """;
-        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "fallback-agent.agent.md"), content);
+        await File.WriteAllTextAsync(Path.Combine(agentsDir, "fallback-agent.agent.md"), content);
 
         // Act
         var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).Single();

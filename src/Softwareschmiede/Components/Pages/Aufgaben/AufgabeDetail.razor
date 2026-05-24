@@ -403,18 +403,8 @@ else
                 <div class="card">
                     <div class="card-title">💬 KI-Anfrage</div>
                     <div class="form-group">
-                        <label class="form-label">Agent auswählen</label>
-                        <select class="form-control" @bind="_kiAgentName">
-                            <option value="">– Agent wählen –</option>
-                            @foreach (var a in _agenten)
-                            {
-                                <option value="@a.Name">@a.Name</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="form-group">
                         <label class="form-label">KI-Plugin</label>
-                        <select class="form-control" @bind="_selectedKiPluginPrefix">
+                        <select class="form-control" @bind="_selectedKiPluginPrefix" @bind:after="KiPluginGeaendertAsync">
                             @if (_kiPlugins.Count == 0)
                             {
                                 <option value="">– Kein KI-Plugin verfügbar –</option>
@@ -428,6 +418,30 @@ else
                             }
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Agentenpaket</label>
+                        <select class="form-control" @bind="_selectedPaketName" @bind:after="PaketGeaendertAsync">
+                            <option value="">– Paket wählen –</option>
+                            @foreach (var paket in _agentenpakete)
+                            {
+                                <option value="@paket.Name">@paket.Name (@paket.Agenten.Count Agenten)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Agent auswählen</label>
+                        <select class="form-control" @bind="_kiAgentName">
+                            <option value="">– Agent wählen –</option>
+                            @foreach (var a in _agenten)
+                            {
+                                <option value="@a.Name">@a.Name</option>
+                            }
+                        </select>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(AgentenauswahlHinweis))
+                    {
+                        <div class="alert alert-warning" style="margin-bottom:.75rem">@AgentenauswahlHinweis</div>
+                    }
                     @if (_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
                     {
                         <div class="form-group">
@@ -455,7 +469,7 @@ else
                         <label class="form-label">Prompt *</label>
                         <textarea class="form-control" @bind="_prompt" rows="4" placeholder="Beschreibe was die KI tun soll..."></textarea>
                     </div>
-                    <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@_processing">
+                    <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@(_processing || !IsAgentenauswahlGueltig)">
                         ▶️ Senden
                     </button>
                 </div>
@@ -497,7 +511,6 @@ else
                     </div>
                 }
             </div>
-
         </div>
     </div>
 }
@@ -513,27 +526,44 @@ else
         </div>
         <div class="modal-body">
             <div class="form-group">
+                <label class="form-label">KI-Plugin</label>
+                <select class="form-control" @bind="_selectedKiPluginPrefix" @bind:after="KiPluginGeaendertAsync">
+                    @if (_kiPlugins.Count == 0)
+                    {
+                        <option value="">– Kein KI-Plugin verfügbar –</option>
+                    }
+                    else
+                    {
+                        @foreach (var plugin in _kiPlugins)
+                        {
+                            <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="form-group">
                 <label class="form-label">Agentenpaket</label>
-                <select class="form-control" @bind="_selectedPaketName" @bind:after="AgentenLadenAsync">
-                    <option value="">– Kein Paket –</option>
+                <select class="form-control" @bind="_selectedPaketName" @bind:after="PaketGeaendertAsync">
+                    <option value="">– Paket wählen –</option>
                     @foreach (var p in _agentenpakete)
                     {
                         <option value="@p.Name">@p.Name (@p.Agenten.Count Agenten)</option>
                     }
                 </select>
             </div>
-            @if (_agenten.Count > 0)
+            <div class="form-group">
+                <label class="form-label">Agent</label>
+                <select class="form-control" @bind="_selectedAgentName">
+                    <option value="">– Agenten wählen –</option>
+                    @foreach (var a in _agenten)
+                    {
+                        <option value="@a.Name">@a.Name @(a.Beschreibung is not null ? $"– {a.Beschreibung}" : "")</option>
+                    }
+                </select>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(AgentenauswahlHinweis))
             {
-                <div class="form-group">
-                    <label class="form-label">Agent</label>
-                    <select class="form-control" @bind="_selectedAgentName">
-                        <option value="">– Agenten wählen –</option>
-                        @foreach (var a in _agenten)
-                        {
-                            <option value="@a.Name">@a.Name @(a.Beschreibung is not null ? $"– {a.Beschreibung}" : "")</option>
-                        }
-                    </select>
-                </div>
+                <div class="alert alert-warning" style="margin-top:.5rem">@AgentenauswahlHinweis</div>
             }
             <div class="form-group">
                 <label class="form-label">Basis-Branch</label>
@@ -564,7 +594,7 @@ else
             }
         </div>
         <div class="modal-footer">
-            <button class="btn btn-primary" @onclick="ProzessStartenAsync" disabled="@_processing">
+            <button class="btn btn-primary" @onclick="ProzessStartenAsync" disabled="@(_processing || !IsAgentenauswahlGueltig)">
                 @(_processing ? "Wird gestartet..." : "🚀 Starten")
             </button>
             <button class="btn btn-ghost" @onclick="StartDialogSchliessen" disabled="@_processing">Abbrechen</button>

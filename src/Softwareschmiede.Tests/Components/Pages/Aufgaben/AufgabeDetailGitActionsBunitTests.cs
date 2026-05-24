@@ -538,6 +538,15 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         var agentPackageServiceMock = new Mock<IAgentPackageService>();
         var agentInfo = new AgentInfo("agent-a", "Agent A", "agent-a.md");
         var packageInfo = new AgentPackageInfo("paket-a", "/paket-a", [agentInfo], []);
+        kiPluginMock
+            .Setup(plugin => plugin.GetAvailableAgentsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([agentInfo]);
+        kiPluginMock
+            .Setup(plugin => plugin.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        kiPluginMock
+            .Setup(plugin => plugin.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         agentPackageServiceMock
             .Setup(service => service.GetPackagesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([packageInfo]);
@@ -697,6 +706,15 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         var agentPackageServiceMock = new Mock<IAgentPackageService>();
         var agentInfo = new AgentInfo("agent-a", "Agent A", "agent-a.md");
         var packageInfo = new AgentPackageInfo("paket-a", "/paket-a", [agentInfo], []);
+        kiPluginMock
+            .Setup(plugin => plugin.GetAvailableAgentsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([agentInfo]);
+        kiPluginMock
+            .Setup(plugin => plugin.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        kiPluginMock
+            .Setup(plugin => plugin.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         agentPackageServiceMock
             .Setup(service => service.GetPackagesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([packageInfo]);

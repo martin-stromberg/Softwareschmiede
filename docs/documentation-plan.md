@@ -1,3 +1,76 @@
+# Dokumentationsplan – Issue 58 „KI-Plugin-spezifische Agenten-Discovery/Auswahl“ – 2026-05-24
+
+## Kontext
+- Ziel: Vollständige technische und fachliche Dokumentationssynchronisation für **Issue 58**.
+- Relevante Planungsdokumente:
+  - `docs/requirements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-requirements-analysis.md`
+  - `docs/architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md`
+  - `docs/architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-entity-relationship-model.md`
+  - `docs/improvements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-review.md`
+- Hinweis Agentendefinition: `~/.copilot/agents/documentation-orchestrator.agent.md` war in der Laufzeitumgebung nicht vorhanden.
+- Hinweis Subagentenlauf: Vorgesehene parallele Analyse-Subagenten waren durch API-Rate-Limit (429) nicht nutzbar; der Ablauf wurde im gleichen Phasenschema manuell ausgeführt.
+
+## Phase 1 – Analyse
+
+### API-Docs
+- `docs/api/` vorhanden.
+- Keine neuen öffentlichen HTTP-Endpunkte für Issue 58.
+- Lücken identifiziert:
+  1. Kein dedizierter technischer Contract für plugin-spezifische Agenten-Discovery/Auswahl.
+  2. Auflösungskette in bestehenden Doku-Artefakten teilweise ohne `Aufgabe.KiPluginPrefix`.
+
+### Flow-Docs
+- `docs/flows/` vorhanden.
+- Lücke identifiziert: Kein eigener Ablauf für Issue 58 (Reihenfolge Plugin → Paket → Agent inkl. Persistenz/Reset-Regeln).
+
+### Business-Docs
+- `docs/business/features/` vorhanden.
+- Lücken identifiziert:
+  1. Kein eigenständiges Feature-Dokument für Issue 58.
+  2. Querverweise in F011/F014 auf den Issue-58-Kontext fehlten.
+
+### README
+- Struktur vollständig.
+- Lücken identifiziert:
+  1. Kein expliziter Issue-58-Feature-Fokus in Features/Usage.
+  2. Testsektion ohne gebündelten Issue-58-Nachweis.
+  3. Doku-Übersicht ohne explizite Links auf neue API-/Flow-/Business-Artefakte.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Neue dedizierte Dokumente für API, Flow und Business zu Issue 58 erstellen.
+2. **Hoch:** Bestehende Querschnittsdokumente (`README`, API-/Flow-/Business-Indizes) konsistent aktualisieren.
+3. **Mittel:** Bestehende Default-Selection-Doku (`plugin-default-selection`) an reale Auflösung mit `KiPluginPrefix` angleichen.
+
+## Anhang: Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md`
+2. `docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md`
+3. `docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md`
+
+### Aktualisiert
+1. `docs/api/README.md`
+2. `docs/api/http-endpoints.md`
+3. `docs/api/plugin-default-selection.md`
+4. `docs/flows/README.md`
+5. `docs/flows/plugin-default-selection-flow.md`
+6. `docs/business/features.md`
+7. `docs/business/features/F011-agent-auswahl-bei-folgeanweisungen.md`
+8. `docs/business/features/F014-standardplugin-ki-plugin-auswahl.md`
+9. `README.md`
+10. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz-/Nicht-Leerheitsprüfung der Zieldateien: **erfolgreich**.
+- Relevante Tests ausgeführt:  
+  `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~PluginSelectionServiceTests|FullyQualifiedName~EntwicklungsprozessServiceTests|FullyQualifiedName~AufgabeDetailFolgePromptTests|FullyQualifiedName~AufgabeServiceTests"`  
+  Ergebnis: **113 bestanden, 0 fehlgeschlagen**.
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationspunkte im Scope von Issue 58 identifiziert.
+
+---
+
 # Dokumentationsplan – Feature „Changed Artifact Detection & Agentendefinitions-Compliance“ – 2026-05-24
 
 ## Kontext

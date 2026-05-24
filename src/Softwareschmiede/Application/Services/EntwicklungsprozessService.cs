@@ -149,7 +149,13 @@ public sealed class EntwicklungsprozessService
     /// Bei <c>null</c> wird das gespeicherte Standard-SCM-Plugin verwendet.
     /// </param>
     /// <param name="ct">Cancellation Token.</param>
-    public async Task ProzessStartenAsync(Guid aufgabeId, string repositoryUrl, string? basisBranchName = null, string? selectedScmPluginPrefix = null, CancellationToken ct = default)
+    public async Task ProzessStartenAsync(
+        Guid aufgabeId,
+        string repositoryUrl,
+        string? basisBranchName = null,
+        string? selectedScmPluginPrefix = null,
+        string? selectedKiPluginPrefix = null,
+        CancellationToken ct = default)
     {
         _logger.LogInformation("Entwicklungsprozess für Aufgabe {AufgabeId} starten.", aufgabeId);
 
@@ -160,7 +166,9 @@ public sealed class EntwicklungsprozessService
             ? repository.PluginTyp
             : selectedScmPluginPrefix;
         var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(resolvedPluginPrefix, ct);
-        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(null, ct);
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(
+            string.IsNullOrWhiteSpace(selectedKiPluginPrefix) ? aufgabe.KiPluginPrefix : selectedKiPluginPrefix,
+            ct);
 
         // Kompatibilität des Agentenpakets VOR dem Klonen prüfen
         if (!string.IsNullOrEmpty(aufgabe.AgentenpaketName))
@@ -352,7 +360,9 @@ public sealed class EntwicklungsprozessService
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad. Bitte zuerst ProzessStartenAsync aufrufen.");
 
         var runId = Guid.NewGuid();
-        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(selectedKiPluginPrefix, ct);
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(
+            string.IsNullOrWhiteSpace(selectedKiPluginPrefix) ? aufgabe.KiPluginPrefix : selectedKiPluginPrefix,
+            ct);
         var finalPrompt = prompt;
         var contextFilePath = ResolveContextFilePath(kiPlugin, aufgabe.LokalerKlonPfad, aufgabeId);
 

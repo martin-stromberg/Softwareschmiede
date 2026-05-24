@@ -15,6 +15,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 | [KI-Arbeitsprotokoll: Persistierung und Rendering](./ki-arbeitsprotokoll-rendering-flow.md) | `ki-arbeitsprotokoll-rendering-flow.md` | Persistierung des Markdown-Protokolls mit Datumszeile/Schritten sowie sicheres Rendering mit Sanitizing und Fallback |
 | [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
+| [KI-Plugin-spezifische Agenten-Discovery/Auswahl (Issue 58)](./ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | `ki-plugin-spezifische-agenten-discovery-auswahl-flow.md` | Verbindlicher Auswahlfluss `KI-Plugin → Agentenpaket → Agent` inkl. Persistenz `KiPluginPrefix`, plugin-spezifischer Discovery und einheitlicher Auflösung in Start/Folgeprompt |
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung, rekursivem Dateibaum und robusten I/O-Fehlerpfaden |
 | [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
@@ -136,6 +137,13 @@ Beschreibt die Ende-zu-Ende-Pipeline vom Erzeugen des Markdown-Protokolls (`# Da
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EinstellungenBase`, `PluginDefaultSettingsService`, `PluginSelectionService`, `AufgabeDetail`, `KiAusfuehrungsService`, `EntwicklungsprozessService`
 
 Beschreibt den End-to-End-Pfad von der Default-Konfiguration in den Einstellungen bis zur tatsächlichen Prompt-Ausführung mit klarer Auflösungskette (**explizit → Default → Fallback**) und KI-Fallback-Präferenz.
+
+---
+
+### [Ablauf 9b: KI-Plugin-spezifische Agenten-Discovery/Auswahl (Issue 58)](./ki-plugin-spezifische-agenten-discovery-auswahl-flow.md)
+**Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `PluginSelectionService`, `EntwicklungsprozessService`, `KiAusfuehrungsService`, `IAgentPackageService`, `IKiPlugin`, `AufgabeService`
+
+Dokumentiert die verbindliche UI-Reihenfolge **KI-Plugin → Agentenpaket → Agent**, die plugin-spezifische Discovery pro Paket, die Persistenz von `KiPluginPrefix` sowie die konsistente Prefix-Auflösung in Start- und Folgeprompt-Pfaden.
 
 ---
 

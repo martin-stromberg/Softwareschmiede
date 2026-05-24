@@ -3,7 +3,7 @@
 ## Titel & Kontext
 
 Dieser Ablauf beschreibt die konsistente Auflösung des effektiven Plugins beim Prompt-Dispatch in der Reihenfolge
-**Explizite Auswahl → gespeicherter Default → Fallback**.
+**Explizite Auswahl → gespeicherter Aufgabenwert (`KiPluginPrefix`) → gespeicherter Default → Fallback**.
 Damit ist die technische Umsetzung deckungsgleich zu den Fachregeln in **F014** und zur API-Dokumentation.
 
 > Verwandte Artefakte:  
@@ -59,7 +59,11 @@ flowchart TD
     B -- Ja --> C{selectedPluginPrefix gesetzt<br/>und in Liste vorhanden?}
     C -- Ja --> C1[Explizites Plugin verwenden]
     C1 --> Z
-    C -- Nein --> D[Gespeicherten Default laden]
+    C -- Nein --> C2[Gespeicherten Aufgabenwert laden]
+    C2 --> C3{Aufgabenwert vorhanden<br/>und verfügbar?}
+    C3 -- Ja --> C4[Aufgabenwert verwenden]
+    C4 --> Z
+    C3 -- Nein --> D[Gespeicherten Default laden]
     D --> E{Default vorhanden<br/>und verfügbar?}
     E -- Ja --> E1[Gespeichertes Default-Plugin verwenden]
     E1 --> Z

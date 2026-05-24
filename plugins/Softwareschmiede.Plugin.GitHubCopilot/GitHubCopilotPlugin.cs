@@ -119,22 +119,7 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Lese Agenten aus Paket {PackagePath}.", agentPackagePath);
 
-        if (!Directory.Exists(agentPackagePath))
-        {
-            _logger.LogWarning("Agentenpaket-Verzeichnis {Path} nicht gefunden.", agentPackagePath);
-            return Task.FromResult<IEnumerable<AgentInfo>>([]);
-        }
-
-        var githubDir = Path.Combine(agentPackagePath, ".github");
-        var searchRoot = Directory.Exists(githubDir) ? githubDir : agentPackagePath;
-
-        var agents = Directory.GetFiles(searchRoot, "*.agent.md", SearchOption.AllDirectories)
-            .Select(f => new AgentInfo(
-                Name: Path.GetFileNameWithoutExtension(f).Replace(".agent", string.Empty, StringComparison.OrdinalIgnoreCase),
-                Beschreibung: ReadAgentDescription(f),
-                DateiPfad: f
-            ))
-            .ToList();
+        var agents = DiscoverAgents(agentPackagePath, Path.Combine(".github", "agents"));
 
         _logger.LogInformation("{Count} Agenten im Paket gefunden.", agents.Count);
         return Task.FromResult<IEnumerable<AgentInfo>>(agents);
@@ -151,13 +136,12 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
             return Task.FromResult(false);
         }
 
-        var githubDir = Path.Combine(agentPackagePath, ".github");
-        var compatible = Directory.Exists(githubDir);
+        var compatible = Directory.Exists(Path.Combine(agentPackagePath, ".github", "agents"));
 
         if (!compatible)
         {
             _logger.LogWarning(
-                "Agentenpaket {PackagePath} ist nicht kompatibel mit GitHub Copilot: Kein '.github'-Ordner gefunden.",
+                "Agentenpaket {PackagePath} ist nicht kompatibel mit GitHub Copilot: Kein '.github/agents'-Ordner gefunden.",
                 agentPackagePath);
         }
 
@@ -351,20 +335,5 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         {
             return false;
         }
-    }
-
-    private static string? ReadAgentDescription(string agentFilePath)
-    {
-        try
-        {
-            var lines = File.ReadLines(agentFilePath).Take(10).ToList();
-            var descLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("description:", StringComparison.OrdinalIgnoreCase));
-            if (descLine is not null)
-            {
-                return descLine.Split(':', 2).ElementAtOrDefault(1)?.Trim().Trim('"');
-            }
-            return lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith("---", StringComparison.Ordinal));
-        }
-        catch { return null; }
     }
 }

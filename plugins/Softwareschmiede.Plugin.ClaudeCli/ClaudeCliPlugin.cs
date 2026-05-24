@@ -58,22 +58,7 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Lese Agenten aus Paket {PackagePath}.", agentPackagePath);
 
-        if (!Directory.Exists(agentPackagePath))
-        {
-            _logger.LogWarning("Agentenpaket-Verzeichnis {Path} nicht gefunden.", agentPackagePath);
-            return Task.FromResult<IEnumerable<AgentInfo>>([]);
-        }
-
-        var githubDir = Path.Combine(agentPackagePath, ".github");
-        var searchRoot = Directory.Exists(githubDir) ? githubDir : agentPackagePath;
-
-        var agents = Directory.GetFiles(searchRoot, "*.agent.md", SearchOption.AllDirectories)
-            .Select(f => new AgentInfo(
-                Name: Path.GetFileNameWithoutExtension(f).Replace(".agent", string.Empty, StringComparison.OrdinalIgnoreCase),
-                Beschreibung: ReadAgentDescription(f),
-                DateiPfad: f
-            ))
-            .ToList();
+        var agents = DiscoverAgents(agentPackagePath, Path.Combine(".claude", "commands"));
 
         _logger.LogInformation("{Count} Agenten im Paket gefunden.", agents.Count);
         return Task.FromResult<IEnumerable<AgentInfo>>(agents);
@@ -89,13 +74,12 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
             return Task.FromResult(false);
         }
 
-        var githubDir = Path.Combine(agentPackagePath, ".github");
-        var compatible = Directory.Exists(githubDir);
+        var compatible = Directory.Exists(Path.Combine(agentPackagePath, ".claude", "commands"));
 
         if (!compatible)
         {
             _logger.LogWarning(
-                "Agentenpaket {PackagePath} ist nicht kompatibel mit Claude CLI: Kein '.github'-Ordner gefunden.",
+                "Agentenpaket {PackagePath} ist nicht kompatibel mit Claude CLI: Kein '.claude/commands'-Ordner gefunden.",
                 agentPackagePath);
         }
 
@@ -106,29 +90,29 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Deploye Agentenpaket {PackagePath} nach {RepoPath}.", agentPackagePath, localRepoPath);
 
-        var githubSourceDir = Path.Combine(agentPackagePath, ".github");
-        if (!Directory.Exists(githubSourceDir))
+        var claudeSourceDir = Path.Combine(agentPackagePath, ".claude");
+        if (!Directory.Exists(claudeSourceDir))
         {
             _logger.LogWarning(
-                "Kein '.github'-Ordner im Agentenpaket {PackagePath} gefunden. Deploy wird ubersprungen.",
+                "Kein '.claude'-Ordner im Agentenpaket {PackagePath} gefunden. Deploy wird ubersprungen.",
                 agentPackagePath);
             return;
         }
 
-        var githubTargetDir = Path.Combine(localRepoPath, ".github");
+        var claudeTargetDir = Path.Combine(localRepoPath, ".claude");
 
         await Task.Run(() =>
         {
-            foreach (var sourceFile in Directory.GetFiles(githubSourceDir, "*", SearchOption.AllDirectories))
+            foreach (var sourceFile in Directory.GetFiles(claudeSourceDir, "*", SearchOption.AllDirectories))
             {
-                var relativePath = Path.GetRelativePath(githubSourceDir, sourceFile);
-                var targetFile = Path.Combine(githubTargetDir, relativePath);
+                var relativePath = Path.GetRelativePath(claudeSourceDir, sourceFile);
+                var targetFile = Path.Combine(claudeTargetDir, relativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(targetFile)!);
                 File.Copy(sourceFile, targetFile, overwrite: true);
             }
         }, ct);
 
-        _logger.LogInformation("Agentenpaket '.github'-Ordner erfolgreich nach {TargetDir} deployed.", githubTargetDir);
+        _logger.LogInformation("Agentenpaket '.claude'-Ordner erfolgreich nach {TargetDir} deployed.", claudeTargetDir);
     }
 
     public override async IAsyncEnumerable<string> StartDevelopmentAsync(
@@ -237,18 +221,4 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
         return result.IsSuccess;
     }
 
-    private static string? ReadAgentDescription(string agentFilePath)
-    {
-        try
-        {
-            var lines = File.ReadLines(agentFilePath).Take(10).ToList();
-            var descLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("description:", StringComparison.OrdinalIgnoreCase));
-            if (descLine is not null)
-            {
-                return descLine.Split(':', 2).ElementAtOrDefault(1)?.Trim().Trim('"');
-            }
-            return lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith("---", StringComparison.Ordinal));
-        }
-        catch { return null; }
-    }
 }

@@ -133,9 +133,11 @@ Stand: **2026-05-24**
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Optionaler Startskript-Lauf beim Prozessstart mit reserviertem Port (`SOFTWARESCHMIEDE_FREE_PORT`) für branchspezifische lokale Run-Konfiguration
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
+- **Issue 58: KI-Plugin-spezifische Agenten-Discovery/Auswahl** mit verbindlicher Reihenfolge **KI-Plugin → Agentenpaket → Agent**
 - Standardplugin je Pluginart in den Einstellungen (SCM und KI) persistierbar
 - Explizite KI-Plugin-Auswahl beim Prompt-Senden, inkl. vorausgewähltem Standardplugin
 - Folgeanweisungen mit eigener Agenten-Auswahl (Initial-Agent als Standardwert, Rücksetzung nach dem Senden)
+- Persistenz der KI-Plugin-Auswahl pro Aufgabe über `KiPluginPrefix` (inkl. Fallback-Auflösung explizit → Aufgabe → Default → Fallback)
 - **Kontextsteuerung bei Folgeanweisungen (implementiert):** pro Folgeanweisung wählbar zwischen **Kontext mitgeben**, **Kontext ignorieren** und **Kontext neu beginnen**
 - Erweiterte Testabdeckung für Folgeanweisungen inkl. Kontextmodi in UI- und Service-Tests
 - Test-Ausführung und strukturierte Auswertung der Ergebnisse
@@ -289,6 +291,14 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 - Bei installierten Plugins stehen aktuell **GitHub Copilot** und **Claude CLI** zur Verfügung.
 - Claude-Läufe nutzen den Credential-Key `Softwareschmiede.ClaudeCli.Token` und setzen `ANTHROPIC_API_KEY` für den CLI-Prozess.
 - Agentenpakete müssen für Claude einen `.github`-Ordner enthalten, damit sie als kompatibel gelten.
+
+### Issue 58: Plugin-spezifische Agenten-Discovery/Auswahl
+
+1. In der Aufgabe zuerst das **KI-Plugin** wählen.
+2. Danach ein kompatibles **Agentenpaket** wählen.
+3. Danach einen verfügbaren **Agenten** wählen.
+4. Bei Pluginwechsel werden Paket und Agent zurückgesetzt, bei Paketwechsel der Agent.
+5. Die Auswahl wird pro Aufgabe als `KiPluginPrefix` gespeichert und in Start-/Folgeprompt konsistent genutzt.
 
 ### Benachrichtigungssystem für abgeschlossene KI-Aufgaben
 
@@ -625,6 +635,8 @@ Feature-spezifische Testartefakte:
 - Service-Tests (Changed Artifact Detection: `CodeFiles` + `PlanningDocuments`, Fallback-Pfade): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
 - Service-Tests (dateispezifische Diff-Auflösung): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
+- Service-Tests (Issue 58 Pluginauswahl/Persistenz): `src/Softwareschmiede.Tests/Application/Services/PluginSelectionServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
+- UI-bUnit-Tests (Issue 58 Reihenfolge/Weitergabe): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
 - UI-bUnit-Tests (Git-Aktionsleiste/Pluginauswahl): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
 - UI-Tests (Projektdetail Startkonfiguration): `src/Softwareschmiede.Tests/Components/Pages/Projekte/ProjektDetailRepositoryFormTests.cs`
@@ -697,6 +709,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - DiffViewer-Korrektur dokumentiert: dateispezifische Diff-Auflösung für geänderte Dateien in `AufgabeDetail` inkl. Pfadnormalisierung/Fallback und ergänzter Testabdeckung
 - SVG-Favicon `favicon-hammer-pick.svg` dokumentiert (Features/Usage) inkl. ergänzter Testabdeckung für Head-Markup und statische Asset-Validierung
 - Feature-Dokumentation für „Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“ konsolidiert (API/Flow/Business/Tests): getrennte Workspace-Klassifikation (`CodeFiles`/`PlanningDocuments`), Fallback-Erkennung und Compliance-Regeln für Agentenpakete
+- Feature-Dokumentation für **Issue 58** ergänzt (API/Flow/Business/README): plugin-spezifische Agenten-Discovery/Auswahl, `KiPluginPrefix`-Persistenz und konsistente Auflösung in Start-/Folgeprompt
 
 ---
 
@@ -751,6 +764,13 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Testlücken: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md) | Dokumentation der abgedeckten und verbleibenden Randpfade |
 | [Feature F022: Diff-Vergleichskomponente](docs/business/features/F022-diff-vergleichskomponente.md) | Fachliche Beschreibung des Diff-Viewers inkl. eingebetteter Nutzung und Standalone-Route |
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
+| [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der verbindlichen Auswahlreihenfolge (Plugin → Paket → Agent) inkl. Persistenz je Aufgabe |
+| [API: Issue 58 Agenten-Discovery/Auswahl](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für plugin-spezifische Discovery, Prefix-Auflösung und Persistenz (`KiPluginPrefix`) |
+| [Flow: Issue 58 Agenten-Discovery/Auswahl](docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | Ablaufdiagramm für UI-Reihenfolge, Kompatibilitätsprüfung und Start-/Folgeprompt-Dispatch |
+| [Requirements: Issue 58](docs/requirements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für plugin-spezifische Discovery/Auswahl |
+| [Architektur: Issue 58](docs/architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md) | Architekturentscheidungen und Komponenten für Reihenfolge, Zustände und Auflösung |
+| [ERM: Issue 58](docs/architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-entity-relationship-model.md) | Persistenzsicht auf `Aufgabe.KiPluginPrefix` und Auflösungsregeln |
+| [Architecture Review: Issue 58](docs/improvements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-review.md) | Review-Findings und Auflagen zur robusten Umsetzung |
 | [Requirements: LocalDirectoryPlugin](docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | Umsetzungsnahe Anforderungen und Akzeptanzkriterien für WorkspaceMode, Guardrails und Fehlerverhalten |
 | [Architektur: LocalDirectoryPlugin](docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | Technische Architektur für LocalDirectoryPlugin, Settings und Integrationspfad |
 | [Flow: LocalDirectoryPlugin](docs/flows/local-directory-plugin-flow.md) | Ablaufdarstellung für Clone-/Workspace-Auflösung, Guardrails und Folgeoperationen |

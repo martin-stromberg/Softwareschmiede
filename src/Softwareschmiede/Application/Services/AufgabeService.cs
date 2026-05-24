@@ -186,6 +186,7 @@ public sealed class AufgabeService
         string? anforderungsBeschreibung,
         string? agentenpaketName,
         string? agentenName,
+        string? kiPluginPrefix = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisieren.", id);
@@ -197,6 +198,7 @@ public sealed class AufgabeService
         aufgabe.AnforderungsBeschreibung = anforderungsBeschreibung;
         aufgabe.AgentenpaketName = agentenpaketName;
         aufgabe.AgentenName = agentenName;
+        aufgabe.KiPluginPrefix = kiPluginPrefix;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisiert.", id);

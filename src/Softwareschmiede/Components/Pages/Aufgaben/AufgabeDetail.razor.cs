@@ -35,7 +35,7 @@ public partial class AufgabeDetail : IDisposable
     private bool _processing;
     private Aufgabe? _aufgabe;
     private List<Protokolleintrag> _protokoll = [];
-    private List<AgentPackageInfo> _agentenpakete = [];
+    private IReadOnlyList<AgentPackageInfo> _agentenpakete = [];
     private List<AgentInfo> _agenten = [];
     private IReadOnlyList<IKiPlugin> _kiPlugins = [];
     private List<string> _streamingLines = [];
@@ -127,9 +127,7 @@ public partial class AufgabeDetail : IDisposable
     protected override async Task OnInitializedAsync()
     {
         ApplyViewFromQuery();
-        await LadeKiPluginsAsync();
         await LadeAsync();
-        _agentenpakete = (await AgentPackageService.GetPackagesAsync()).ToList();
 
         // Wenn beim Seitenaufruf ein KI-Lauf im Hintergrund läuft: pufferlosen Stand wiederherstellen
         // und auf neue Zeilen subscriben, damit die Ausgabe live weiterläuft.
@@ -164,7 +162,6 @@ public partial class AufgabeDetail : IDisposable
             if (!string.IsNullOrEmpty(_aufgabe.AgentenpaketName))
             {
                 _selectedPaketName = _aufgabe.AgentenpaketName;
-                await AgentenLadenAsync();
             }
 
             // Ausgewählten Agenten wiederherstellen
@@ -173,6 +170,9 @@ public partial class AufgabeDetail : IDisposable
                 _kiAgentName = _aufgabe.AgentenName;
                 _selectedAgentName = _aufgabe.AgentenName;
             }
+
+            _selectedKiPluginPrefix = _aufgabe.KiPluginPrefix ?? string.Empty;
+            await LadeKiPluginsAsync();
 
             // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
             if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
@@ -210,7 +210,6 @@ public partial class AufgabeDetail : IDisposable
                 if (!string.IsNullOrEmpty(_aufgabe.AgentenpaketName))
                 {
                     _selectedPaketName = _aufgabe.AgentenpaketName;
-                    await AgentenLadenAsync();
                 }
 
                 // Ausgewählten Agenten wiederherstellen
@@ -219,6 +218,9 @@ public partial class AufgabeDetail : IDisposable
                     _kiAgentName = _aufgabe.AgentenName;
                     _selectedAgentName = _aufgabe.AgentenName;
                 }
+
+                _selectedKiPluginPrefix = _aufgabe.KiPluginPrefix ?? string.Empty;
+                await LadeKiPluginsAsync();
 
                 // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
                 if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
@@ -298,11 +300,153 @@ public partial class AufgabeDetail : IDisposable
     private bool IsRecoveryStatus
         => _aufgabe is not null && AufgabeRecoveryService.IstRecoveryStatus(_aufgabe.Status);
 
-    private async Task AgentenLadenAsync()
+    private bool IsAgentenauswahlGueltig
+        => _kiPlugins.Count > 0
+           && _agentenpakete.Count > 0
+           && _agenten.Count > 0
+           && !string.IsNullOrWhiteSpace(_selectedPaketName)
+           && !string.IsNullOrWhiteSpace(_selectedAgentName);
+
+    private string? AgentenauswahlHinweis
     {
-        if (string.IsNullOrEmpty(_selectedPaketName)) { _agenten = []; return; }
-        var paket = await AgentPackageService.GetPackageAsync(_selectedPaketName);
-        _agenten = paket?.Agenten.ToList() ?? [];
+        get
+        {
+            if (_kiPlugins.Count == 0)
+            {
+                return "Kein KI-Plugin verfügbar.";
+            }
+
+            if (_agentenpakete.Count == 0)
+            {
+                return "Für das gewählte KI-Plugin sind keine kompatiblen Agentenpakete verfügbar.";
+            }
+
+            if (_agenten.Count == 0)
+            {
+                return "Für das gewählte Agentenpaket sind keine kompatiblen Agenten verfügbar.";
+            }
+
+            return null;
+        }
+    }
+
+    private Task AgentenLadenAsync()
+    {
+        if (_agentenpakete.Count == 0 || string.IsNullOrWhiteSpace(_selectedPaketName))
+        {
+            _agenten = [];
+            _selectedAgentName = string.Empty;
+            _kiAgentName = string.Empty;
+            return Task.CompletedTask;
+        }
+
+        var paket = _agentenpakete.FirstOrDefault(p => p.Name == _selectedPaketName);
+        if (paket is null)
+        {
+            _selectedPaketName = _agentenpakete[0].Name;
+            paket = _agentenpakete[0];
+        }
+
+        _agenten = paket.Agenten.ToList();
+        if (_agenten.Count == 0)
+        {
+            _selectedAgentName = string.Empty;
+            _kiAgentName = string.Empty;
+            return Task.CompletedTask;
+        }
+
+        if (!_agenten.Any(agent => agent.Name == _selectedAgentName))
+        {
+            _selectedAgentName = _agenten[0].Name;
+        }
+
+        if (!_agenten.Any(agent => agent.Name == _kiAgentName))
+        {
+            _kiAgentName = _selectedAgentName;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task LadeKiPluginsAsync()
+    {
+        _kiPlugins = PluginManager.GetDevelopmentAutomationPlugins();
+        if (_kiPlugins.Count == 0)
+        {
+            _agentenpakete = [];
+            _agenten = [];
+            _selectedKiPluginPrefix = string.Empty;
+            _selectedPaketName = string.Empty;
+            _selectedAgentName = string.Empty;
+            return;
+        }
+
+        var resolved = await PluginSelection.ResolveDevelopmentAutomationPluginAsync(
+            string.IsNullOrWhiteSpace(_selectedKiPluginPrefix) ? _aufgabe?.KiPluginPrefix : _selectedKiPluginPrefix,
+            _cts.Token);
+        _selectedKiPluginPrefix = resolved.PluginPrefix;
+
+        await LadeAgentenpaketeAsync(resolved);
+    }
+
+    private async Task LadeAgentenpaketeAsync(IKiPlugin? kiPlugin = null)
+    {
+        if (_kiPlugins.Count == 0)
+        {
+            _agentenpakete = [];
+            _agenten = [];
+            _selectedPaketName = string.Empty;
+            _selectedAgentName = string.Empty;
+            return;
+        }
+
+        var resolvedPlugin = kiPlugin ?? await PluginSelection.ResolveDevelopmentAutomationPluginAsync(_selectedKiPluginPrefix, _cts.Token);
+        var packages = await AgentPackageService.GetPackagesAsync(_cts.Token);
+        var compatiblePackages = new List<AgentPackageInfo>();
+
+        foreach (var package in packages.OrderBy(package => package.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            var agents = (await resolvedPlugin.GetAvailableAgentsAsync(package.Pfad, _cts.Token)).ToList();
+            if (agents.Count == 0)
+            {
+                continue;
+            }
+
+            compatiblePackages.Add(package with { Agenten = agents });
+        }
+
+        _agentenpakete = compatiblePackages;
+        if (_agentenpakete.Count == 0)
+        {
+            _agenten = [];
+            _selectedPaketName = string.Empty;
+            _selectedAgentName = string.Empty;
+            return;
+        }
+
+        if (_agentenpakete.All(paket => paket.Name != _selectedPaketName))
+        {
+            _selectedPaketName = _agentenpakete[0].Name;
+        }
+
+        await AgentenLadenAsync();
+    }
+
+    private async Task KiPluginGeaendertAsync()
+    {
+        _selectedPaketName = string.Empty;
+        _selectedAgentName = string.Empty;
+        _kiAgentName = string.Empty;
+        await LadeAgentenpaketeAsync();
+        StateHasChanged();
+    }
+
+    private async Task PaketGeaendertAsync()
+    {
+        _selectedAgentName = string.Empty;
+        _kiAgentName = string.Empty;
+        await AgentenLadenAsync();
+        StateHasChanged();
     }
 
     private void AnforderungBearbeitenStarten()
@@ -325,7 +469,13 @@ public partial class AufgabeDetail : IDisposable
         _fehler = null;
         try
         {
-            await AufgabeService.UpdateAsync(Id, _aufgabe.Titel, _anforderungInput, _aufgabe.AgentenpaketName, _aufgabe.AgentenName);
+            await AufgabeService.UpdateAsync(
+                Id,
+                _aufgabe.Titel,
+                _anforderungInput,
+                _aufgabe.AgentenpaketName,
+                _aufgabe.AgentenName,
+                _aufgabe.KiPluginPrefix);
             _editAnforderung = false;
             _erfolg = "Anforderungsbeschreibung gespeichert.";
             await LadeAsync();
@@ -383,13 +533,24 @@ public partial class AufgabeDetail : IDisposable
 
     private async Task ProzessStartenAsync()
     {
+        if (!IsAgentenauswahlGueltig)
+        {
+            _fehler = AgentenauswahlHinweis ?? "Bitte wählen Sie ein kompatibles KI-Plugin, Agentenpaket und einen Agenten aus.";
+            return;
+        }
+
         _processing = true;
         _fehler = null;
         try
         {
-            // Agentenpaket + Agent speichern
-            if (!string.IsNullOrEmpty(_selectedPaketName))
-                await AufgabeService.UpdateAsync(Id, _aufgabe!.Titel, _aufgabe.AnforderungsBeschreibung, _selectedPaketName, _selectedAgentName);
+            // Agentenpaket, Agent und KI-Plugin speichern
+            await AufgabeService.UpdateAsync(
+                Id,
+                _aufgabe!.Titel,
+                _aufgabe.AnforderungsBeschreibung,
+                string.IsNullOrWhiteSpace(_selectedPaketName) ? null : _selectedPaketName,
+                string.IsNullOrWhiteSpace(_selectedAgentName) ? null : _selectedAgentName,
+                string.IsNullOrWhiteSpace(_selectedKiPluginPrefix) ? null : _selectedKiPluginPrefix);
 
             // Repository-URL ermitteln: erst verknüpftes Repo, dann erstes aktives des Projekts
             var projekt = await ProjektService.GetDetailAsync(_aufgabe!.ProjektId);
@@ -403,7 +564,13 @@ public partial class AufgabeDetail : IDisposable
                 return;
             }
 
-            await EntwicklungsprozessService.ProzessStartenAsync(Id, repo.RepositoryUrl, string.IsNullOrEmpty(_selectedBranchName) ? null : _selectedBranchName, repo.PluginTyp, _cts.Token);
+            await EntwicklungsprozessService.ProzessStartenAsync(
+                Id,
+                repo.RepositoryUrl,
+                string.IsNullOrEmpty(_selectedBranchName) ? null : _selectedBranchName,
+                repo.PluginTyp,
+                string.IsNullOrWhiteSpace(_selectedKiPluginPrefix) ? null : _selectedKiPluginPrefix,
+                _cts.Token);
             _showStartDialog = false;
             _erfolg = "Entwicklungsumgebung erfolgreich gestartet.";
             await LadeAsync();
@@ -415,6 +582,12 @@ public partial class AufgabeDetail : IDisposable
 
     private async Task KiStartenAsync()
     {
+        if (!IsAgentenauswahlGueltig)
+        {
+            _fehler = AgentenauswahlHinweis ?? "Bitte wählen Sie ein kompatibles KI-Plugin, Agentenpaket und einen Agenten aus.";
+            return;
+        }
+
         var hasKiAntwort = _protokoll.Any(p => p.Typ == ProtokollTyp.KiAntwort);
         if (hasKiAntwort
             && _folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen
@@ -529,19 +702,6 @@ public partial class AufgabeDetail : IDisposable
     }
 
     protected virtual void NotifyStateChanged() => StateHasChanged();
-
-    private async Task LadeKiPluginsAsync()
-    {
-        _kiPlugins = PluginManager.GetDevelopmentAutomationPlugins();
-        if (_kiPlugins.Count == 0)
-        {
-            _selectedKiPluginPrefix = string.Empty;
-            return;
-        }
-
-        var resolved = await PluginSelection.ResolveDevelopmentAutomationPluginAsync(null);
-        _selectedKiPluginPrefix = resolved.PluginPrefix;
-    }
 
     private async Task LadeGitActionCapabilitiesAsync()
     {

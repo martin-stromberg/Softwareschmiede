@@ -32,6 +32,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F023 | Status zurücksetzen bei KI aktiv | Eine Aufgabe im Status KI aktiv ohne laufende Verarbeitung wieder in Bearbeitung setzen | [F023 – Status zurücksetzen bei KI Aktiv](./features/F023-status-zuruecksetzen-ki-aktiv.md) |
 | F024 | Benachrichtigungssystem für abgeschlossene KI-Aufgaben | Abschluss von KI-Aufgaben mit Toast und Hinweiston melden, inklusive Modi, Audio-Upload und Auditierung | [F024 – Benachrichtigungssystem für abgeschlossene KI-Aufgaben](./features/F024-benachrichtigungssystem-fuer-abgeschlossene-ki-aufgaben.md) |
 | F025 | Gebrandetes Favicon (Hammer & Spitzhacke) | Browser-Tab und Lesezeichen zeigen das Softwareschmiede-Symbol als einheitliches Markenkennzeichen | [F025 – Gebrandetes Favicon (Hammer & Spitzhacke)](./features/F025-favicon-hammer-pick-svg.md) |
+| F026 | KI-Plugin-spezifische Agenten-Discovery und -Auswahl | Verbindliche Reihenfolge KI-Plugin → Agentenpaket → Agent mit kompatibilitätsbasierter Anzeige und Persistenz pro Aufgabe | [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](./features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) |
 
 ---
 

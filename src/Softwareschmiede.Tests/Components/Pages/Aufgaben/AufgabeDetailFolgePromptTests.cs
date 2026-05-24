@@ -33,9 +33,35 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         markup.Should().Contain("Kontext ignorieren");
         markup.Should().Contain("Kontext neu beginnen");
         markup.Should().Contain("@onclick=\"KiStartenAsync\"");
-        markup.Should().Contain("disabled=\"@_processing\"");
+        markup.Should().Contain("disabled=\"@(_processing || !IsAgentenauswahlGueltig)\"");
         markup.Should().NotContain("Folge-Prompt");
         markup.Should().NotContain("Kontext automatisch");
+    }
+
+    [Fact]
+    public void KiPanelMarkup_ShouldKeepPluginPackageAgentOrder_InPromptAndStartDialog()
+    {
+        var root = FindRepositoryRoot();
+        var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Aufgaben", "AufgabeDetail.razor");
+        var markup = File.ReadAllText(razorPath);
+
+        var promptPluginIndex = markup.IndexOf("<label class=\"form-label\">KI-Plugin</label>", StringComparison.Ordinal);
+        var promptPackageIndex = markup.IndexOf("<label class=\"form-label\">Agentenpaket</label>", StringComparison.Ordinal);
+        var promptAgentIndex = markup.IndexOf("<label class=\"form-label\">Agent auswählen</label>", StringComparison.Ordinal);
+        promptPluginIndex.Should().BeGreaterThan(-1);
+        promptPackageIndex.Should().BeGreaterThan(promptPluginIndex);
+        promptAgentIndex.Should().BeGreaterThan(promptPackageIndex);
+
+        var startDialogMarker = markup.IndexOf("<!-- Modal: Agentenpaket & Agent wählen beim Starten -->", StringComparison.Ordinal);
+        startDialogMarker.Should().BeGreaterThan(-1);
+        var startDialogMarkup = markup[startDialogMarker..];
+
+        var startPluginIndex = startDialogMarkup.IndexOf("<label class=\"form-label\">KI-Plugin</label>", StringComparison.Ordinal);
+        var startPackageIndex = startDialogMarkup.IndexOf("<label class=\"form-label\">Agentenpaket</label>", StringComparison.Ordinal);
+        var startAgentIndex = startDialogMarkup.IndexOf("<label class=\"form-label\">Agent</label>", StringComparison.Ordinal);
+        startPluginIndex.Should().BeGreaterThan(-1);
+        startPackageIndex.Should().BeGreaterThan(startPluginIndex);
+        startAgentIndex.Should().BeGreaterThan(startPackageIndex);
     }
 
     [Fact]
@@ -56,6 +82,21 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             weitereAgenten: ["agent-alt"],
             kiPlugins: [("KI A", "Softwareschmiede.KiA"), ("KI B", "Softwareschmiede.KiB")],
             storedDefaultKiPluginPrefix: "Softwareschmiede.KiB");
+
+        await sut.InvokeOnInitializedAsync();
+
+        GetPrivateField<string>(sut, "_selectedKiPluginPrefix").Should().Be("Softwareschmiede.KiB");
+    }
+
+    [Fact]
+    public async Task OnInitializedAsync_ShouldPreselectTaskKiPlugin_WhenTaskStoresOne()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            kiPlugins: [("KI A", "Softwareschmiede.KiA"), ("KI B", "Softwareschmiede.KiB")],
+            storedTaskKiPluginPrefix: "Softwareschmiede.KiB",
+            storedDefaultKiPluginPrefix: "Softwareschmiede.KiA");
 
         await sut.InvokeOnInitializedAsync();
 
@@ -160,6 +201,50 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         sut.StartedRuns.Should().BeEmpty();
         GetPrivateField<string?>(sut, "_fehler").Should().Contain("Kein KI-Plugin verfügbar");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldShowError_WhenNoCompatibleAgentPackagesExist()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            includeCompatibleAgents: false);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_kiAgentName", "agent-alt");
+        SetPrivateField(sut, "_prompt", "Initialer Prompt");
+
+        await InvokePrivateAsync(sut, "KiStartenAsync");
+
+        sut.StartedRuns.Should().BeEmpty();
+        GetPrivateField<string?>(sut, "_fehler").Should().Contain("keine kompatiblen Agentenpakete");
+    }
+
+    [Fact]
+    public async Task LadeAgentenpaketeAsync_ShouldResetDependentSelections_WhenSelectedPluginHasNoCompatiblePackages()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            kiPlugins: [("KI A", "Softwareschmiede.KiA"), ("KI B", "Softwareschmiede.KiB")],
+            availableAgentsByPluginPrefix: prefix => prefix.Equals("Softwareschmiede.KiA", StringComparison.Ordinal)
+                ? [new AgentInfo("agent-initial", "Beschreibung agent-initial", "agent-initial.agent.md")]
+                : []);
+        await sut.InvokeOnInitializedAsync();
+
+        SetPrivateField(sut, "_selectedKiPluginPrefix", "Softwareschmiede.KiB");
+        SetPrivateField(sut, "_selectedPaketName", "paket-a");
+        SetPrivateField(sut, "_selectedAgentName", "agent-initial");
+        SetPrivateField(sut, "_kiAgentName", "agent-initial");
+
+        await InvokePrivateAsync(sut, "LadeAgentenpaketeAsync", (IKiPlugin?)null);
+
+        GetPrivateField<string>(sut, "_selectedPaketName").Should().BeEmpty();
+        GetPrivateField<string>(sut, "_selectedAgentName").Should().BeEmpty();
+        GetPrivateField<IReadOnlyList<AgentPackageInfo>>(sut, "_agentenpakete").Should().BeEmpty();
+        GetPrivateField<List<AgentInfo>>(sut, "_agenten").Should().BeEmpty();
+        GetPrivateProperty<string?>(sut, "AgentenauswahlHinweis")
+            .Should().Contain("keine kompatiblen Agentenpakete");
     }
 
     [Fact]
@@ -645,8 +730,11 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         string initialAgent,
         IReadOnlyList<string> weitereAgenten,
         IReadOnlyList<(string Name, string Prefix)>? kiPlugins = null,
+        string? storedTaskKiPluginPrefix = null,
         string? storedDefaultKiPluginPrefix = null,
+        bool includeCompatibleAgents = true,
         bool includeKiAntwort = true,
+        Func<string, IEnumerable<AgentInfo>>? availableAgentsByPluginPrefix = null,
         Action<Mock<IGitPlugin>>? configureGitPlugin = null)
     {
         var projekt = new Projekt
@@ -665,6 +753,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             Status = AufgabeStatus.InBearbeitung,
             AgentenpaketName = "paket-a",
             AgentenName = initialAgent,
+            KiPluginPrefix = storedTaskKiPluginPrefix,
             LokalerKlonPfad = Path.GetTempPath(),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
@@ -728,6 +817,23 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             .Select(name => new AgentInfo(name, $"Beschreibung {name}", $"{name}.agent.md"))
             .ToList();
         var paket = new AgentPackageInfo("paket-a", "/paket", agenten, []);
+        foreach (var kiPluginMock in kiPluginMocks)
+        {
+            var pluginPrefix = kiPluginMock.Object.PluginPrefix;
+            kiPluginMock
+                .Setup(plugin => plugin.GetAvailableAgentsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(availableAgentsByPluginPrefix is not null
+                    ? availableAgentsByPluginPrefix(pluginPrefix)
+                    : includeCompatibleAgents
+                        ? agenten.AsEnumerable()
+                        : Array.Empty<AgentInfo>());
+            kiPluginMock
+                .Setup(plugin => plugin.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            kiPluginMock
+                .Setup(plugin => plugin.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+        }
         agentPackageServiceMock
             .Setup(s => s.GetPackagesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([paket]);

@@ -22,6 +22,7 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 | [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Dateivorschau, getrennter Klassifikation von Code-/Planungsänderungen, Testbezug und Workflow-Auswirkung in `AufgabeDetail`. |
 | [local-directory-plugin.md](./local-directory-plugin.md) | Technischer Contract der `IGitPlugin`-Implementierung `LocalDirectoryPlugin` inkl. Workspace-Modi, `git-init`-Fallback, Pull ohne Merge, Push-/Delete-Sync sowie Capability-Flags für die Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden bei Arbeitskopie). |
 | [plugin-default-selection.md](./plugin-default-selection.md) | Interner API-Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** sowie die projektspezifische/aufgabenbezogene `IGitPlugin`-Auflösung (vor Default) inkl. Fallback bei fehlender Repo-Verknüpfung. |
+| [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für Issue 58: plugin-spezifische Agenten-Discovery/Auswahl, Persistenz von `KiPluginPrefix` und konsistente Auflösung in Start- und Folgeprompt-Flow. |
 | [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, Plugin-Discovery und Agentenpaket-Compliance (`.github`-Regel, robuste Fehlerpfade, Deploy-Verhalten, Health-Checks) inkl. Workflow-Einordnung. |
 | [repository-startskript-freier-port.md](./repository-startskript-freier-port.md) | Interner Contract für repositorybezogene Startskripte mit freier Portreservierung, Persistenz (`RepositoryStartKonfiguration`) und Ausführung beim Prozessstart. |
 | [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
@@ -60,6 +61,17 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - Technischer Contract: [plugin-default-selection.md](./plugin-default-selection.md)
 - Fachliche Einordnung: [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)
 - Ablaufdarstellung: [plugin-default-selection-flow.md](../flows/plugin-default-selection-flow.md)
+
+## Feature-Fokus: Issue 58 – KI-Plugin-spezifische Agenten-Discovery/Auswahl
+
+- Technischer Contract: [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md)
+- Ablaufdarstellung: [ki-plugin-spezifische-agenten-discovery-auswahl-flow.md](../flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md)
+- Fachliche Einordnung: [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](../business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md)
+- Planungsartefakte:
+  - [Requirements](../requirements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-requirements-analysis.md)
+  - [Architektur-Blueprint](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md)
+  - [ERM](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-entity-relationship-model.md)
+  - [Architecture-Review](../improvements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-review.md)
 
 ## Feature-Fokus: Lokales Verzeichnis Plugin
 

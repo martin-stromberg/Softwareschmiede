@@ -400,6 +400,148 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task KiStartenAsync_ShouldUseStoredTaskKiPluginPrefix_WhenNoSelectedPrefixProvided()
+    {
+        // Arrange
+        var defaultPluginMock = new Mock<IKiPlugin>();
+        defaultPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Default KI");
+        defaultPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Softwareschmiede.KiA");
+        defaultPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.DevelopmentAutomation);
+        defaultPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        defaultPluginMock.Setup(plugin => plugin.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("default"));
+
+        var storedPluginMock = new Mock<IKiPlugin>();
+        storedPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Stored KI");
+        storedPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Softwareschmiede.KiB");
+        storedPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.DevelopmentAutomation);
+        storedPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        storedPluginMock.Setup(plugin => plugin.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("stored"));
+
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(defaultPluginMock.Object, storedPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Stored KI Prefix", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        await _aufgabeService.UpdateAsync(
+            aufgabe.Id,
+            aufgabe.Titel,
+            aufgabe.AnforderungsBeschreibung,
+            null,
+            null,
+            "Softwareschmiede.KiB");
+        var agent = new AgentInfo("agent", "Beschreibung", "/pfad/agent.md");
+
+        // Act
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Prompt", agent))
+        {
+        }
+
+        // Assert
+        storedPluginMock.Verify(plugin => plugin.StartDevelopmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<AgentInfo>(),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+        defaultPluginMock.Verify(plugin => plugin.StartDevelopmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<AgentInfo>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldPreferExplicitSelectedKiPluginPrefix_OverStoredTaskPrefix()
+    {
+        // Arrange
+        var selectedPluginMock = new Mock<IKiPlugin>();
+        selectedPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Selected KI");
+        selectedPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Softwareschmiede.KiA");
+        selectedPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.DevelopmentAutomation);
+        selectedPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        selectedPluginMock.Setup(plugin => plugin.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("selected"));
+
+        var storedPluginMock = new Mock<IKiPlugin>();
+        storedPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Stored KI");
+        storedPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Softwareschmiede.KiB");
+        storedPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.DevelopmentAutomation);
+        storedPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        storedPluginMock.Setup(plugin => plugin.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("stored"));
+
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(selectedPluginMock.Object, storedPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Explicit KI Prefix", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        await _aufgabeService.UpdateAsync(
+            aufgabe.Id,
+            aufgabe.Titel,
+            aufgabe.AnforderungsBeschreibung,
+            null,
+            null,
+            "Softwareschmiede.KiB");
+        var agent = new AgentInfo("agent", "Beschreibung", "/pfad/agent.md");
+
+        // Act
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Prompt", agent, "Softwareschmiede.KiA"))
+        {
+        }
+
+        // Assert
+        selectedPluginMock.Verify(plugin => plugin.StartDevelopmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<AgentInfo>(),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+        storedPluginMock.Verify(plugin => plugin.StartDevelopmentAsync(
+            It.IsAny<string>(),
+            It.IsAny<AgentInfo>(),
+            It.IsAny<string>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task KiStartenAsync_ShouldPersistMarkdownArbeitsprotokoll_WithDateHeadingAndSeparatedSteps()
     {
         // Arrange

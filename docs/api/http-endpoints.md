@@ -28,6 +28,17 @@ Die Umsetzung betrifft bestehende Service-/Plugin-Komponenten (`GitWorkspaceBrow
 - **Testbezug:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`.
 - **Workflow-Auswirkung:** Der Aufgaben-Workflow bleibt auch bei reinen Planungsdokument-Änderungen aktiv, und Agentenbereitstellung wird reproduzierbarer.
 
+## Feature-Hinweis: Issue 58 – KI-Plugin-spezifische Agenten-Discovery/Auswahl
+
+Für das Feature **„Agenten-Discovery und Agenten-Auswahl KI-Plugin-spezifisch“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Die Umsetzung betrifft UI-/Service-Vertragslogik (`AufgabeDetail`, `PluginSelectionService`, `EntwicklungsprozessService`, `KiAusfuehrungsService`, `AufgabeService`) inklusive Persistenz von `KiPluginPrefix`.
+
+- **Ziel:** Konsistente, plugin-spezifische Auswahlkette `KI-Plugin → Agentenpaket → Agent`.
+- **Verhalten:** Start und Folgeprompt nutzen dieselbe Prefix-Auflösung (explizit → Aufgabe → Default → Fallback).
+- **Persistenz:** `Aufgabe.KiPluginPrefix` ist nullable und über Migration eingeführt.
+- **Testbezug:** `PluginSelectionServiceTests`, `EntwicklungsprozessServiceTests`, `AufgabeDetailFolgePromptTests`, `AufgabeServiceTests`.
+- **Details:** [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md)
+
 ## Öffentliche REST-Endpunkte
 
 | Methode | Pfad | Zweck |
@@ -57,5 +68,6 @@ Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftret
 - Detaillierte Diff-API: [diff.md](./diff.md)
 - App-Favicon-Contract: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
 - Live Project Browser Contract: [live-project-browser-git-status.md](./live-project-browser-git-status.md)
+- Issue-58 Contract: [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md)
 - Plugin- und Agentenpaket-Contracts: [plugin-interfaces.md](./plugin-interfaces.md)
 - API-Index: [README.md](./README.md)
