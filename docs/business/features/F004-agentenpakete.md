@@ -76,6 +76,11 @@ Wenn Sie ein Agentenpaket auswählen, werden die darin enthaltenen Anweisungsdat
 Die KI liest diese Anweisungen und richtet ihr Verhalten danach aus.
 Ohne ein Agentenpaket arbeitet die KI nach ihren Standardvorgaben.
 
+Zusätzlich wird die **Agentendefinitions-Compliance** geprüft:
+- Paketpfade müssen erreichbar sein; fehlende Pfade führen robust zu „nicht kompatibel“ bzw. leeren Agentenlisten.
+- Für die produktiven KI-Plugins gilt eine Strukturregel mit `.github`-Ordner als Kompatibilitätskriterium.
+- Nicht lesbare `.agent.md`-Dateien erzeugen keine harten Laufzeitabbrüche; Beschreibungen fallen kontrolliert auf `null` oder die erste Inhaltszeile zurück.
+
 ---
 
 ## Häufige Fragen (FAQ)

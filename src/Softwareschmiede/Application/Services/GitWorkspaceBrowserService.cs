@@ -10,6 +10,14 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
 {
     private const long MaxInlineBytes = 1_048_576;
     private const int BinaryProbeBytes = 8_192;
+    private static readonly HashSet<string> CodeExtensions =
+    [
+        ".cs", ".cshtml", ".razor",
+        ".ts", ".tsx", ".js", ".jsx",
+        ".json", ".yml", ".yaml",
+        ".sql", ".ps1", ".sh",
+        ".xml", ".xaml", ".css", ".scss", ".html"
+    ];
 
     private readonly ICliRunner _cliRunner;
     private readonly ILogger<GitWorkspaceBrowserService> _logger;
@@ -193,13 +201,29 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
 
         SortNodes(rootNodes);
 
+        var orderedFlatFiles = fileNodes.OrderBy(node => node.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+        var planningDocuments = orderedFlatFiles
+            .Where(IsPlanningDocumentNode)
+            .ToList();
+        if (planningDocuments.Count == 0)
+        {
+            planningDocuments = orderedFlatFiles
+                .Where(node => IsPlanningDocumentPathFallback(node.RelativePath) || IsPlanningDocumentPathFallback(node.SourceRelativePath))
+                .ToList();
+        }
+        var codeFiles = orderedFlatFiles
+            .Where(node => !IsPlanningDocumentNode(node) && IsCodeFileNode(node))
+            .ToList();
+
         return new WorkspaceSnapshot
         {
             RepositoryPath = repositoryPath,
             CommitCount = commitCount,
             ChangedFileCount = fileNodes.Count,
             RootNodes = rootNodes,
-            FlatFiles = fileNodes.OrderBy(node => node.RelativePath, StringComparer.OrdinalIgnoreCase).ToList(),
+            FlatFiles = orderedFlatFiles,
+            CodeFiles = codeFiles,
+            PlanningDocuments = planningDocuments,
         };
     }
 
@@ -326,6 +350,63 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
     private static string NormalizeRelativePath(string relativePath)
     {
         return relativePath.Trim().Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+    }
+
+    private static bool IsCodeFilePath(string relativePath)
+    {
+        var extension = Path.GetExtension(relativePath);
+        return !string.IsNullOrWhiteSpace(extension) && CodeExtensions.Contains(extension);
+    }
+
+    private static bool IsCodeFileNode(WorkspaceFileNode node)
+    {
+        return IsCodeFilePath(node.RelativePath) || (!string.IsNullOrWhiteSpace(node.SourceRelativePath) && IsCodeFilePath(node.SourceRelativePath));
+    }
+
+    private static bool IsPlanningDocumentNode(WorkspaceFileNode node)
+    {
+        return IsPlanningDocumentPath(node.RelativePath) || IsPlanningDocumentPath(node.SourceRelativePath);
+    }
+
+    private static bool IsPlanningDocumentPath(string? relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return false;
+        }
+
+        var normalizedPath = NormalizeRelativePath(relativePath);
+        if (normalizedPath.StartsWith($".{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            normalizedPath = normalizedPath[2..];
+        }
+
+        if (!normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return normalizedPath.StartsWith(Path.Combine("docs", "requirements"), StringComparison.OrdinalIgnoreCase)
+               || normalizedPath.StartsWith(Path.Combine("docs", "architecture"), StringComparison.OrdinalIgnoreCase)
+               || normalizedPath.StartsWith(Path.Combine("docs", "improvements"), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPlanningDocumentPathFallback(string? relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return false;
+        }
+
+        var normalizedPath = relativePath.Trim().Replace('\\', '/').TrimStart('.', '/');
+        if (!normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return normalizedPath.StartsWith("docs/requirements/", StringComparison.OrdinalIgnoreCase)
+               || normalizedPath.StartsWith("docs/architecture/", StringComparison.OrdinalIgnoreCase)
+               || normalizedPath.StartsWith("docs/improvements/", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string CombinePath(string rootPath, string relativePath)

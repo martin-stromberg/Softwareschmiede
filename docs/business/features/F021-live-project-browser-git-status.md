@@ -24,6 +24,7 @@ Sie können zwischen Aufgabenansicht und Projektverzeichnis wechseln, Dateien au
 5. Klicken Sie auf eine Datei, um Inhalt, Hinweis oder Vergleich anzuzeigen.
 6. Nutzen Sie **↻ Aktualisieren**, um den aktuellen Git-Stand neu zu laden.
 7. Wechseln Sie mit **← Zur Aufgabe** zurück.
+8. Geänderte Planungsdokumente aus `docs/requirements`, `docs/architecture` und `docs/improvements` werden im gleichen Flow sichtbar verarbeitet – auch dann, wenn keine Codedatei geändert wurde.
 
 ---
 
@@ -36,6 +37,8 @@ Sie können zwischen Aufgabenansicht und Projektverzeichnis wechseln, Dateien au
 - Verzeichnisse werden rekursiv als Baum dargestellt; zusätzlich gibt es eine flache Listenansicht.
 - Beim Klick auf eine Datei wird der Arbeitsstand gelesen oder die Originalversion aus `HEAD` geladen.
 - Große Dateien und Binärdateien werden defensiv mit Hinweis behandelt.
+- Änderungen werden intern in **Codedateien** und **Planungsdokumente** getrennt klassifiziert.
+- Für Planungsdokumente gibt es eine zusätzliche Fallback-Erkennung (Slash-/Dot-Varianten), damit relevante Dokumentänderungen nicht verloren gehen.
 
 ---
 
@@ -44,6 +47,15 @@ Sie können zwischen Aufgabenansicht und Projektverzeichnis wechseln, Dateien au
 - Die Ansicht ist schreibgeschützt.
 - Commit-, Push- und Pull-Aktionen bleiben auf der regulären Aufgabenansicht.
 - Sehr große Repositories mit vielen untracked Dateien bleiben ein dokumentierter Performance-Trade-off.
+- Die Planungsdokument-Erkennung ist bewusst auf `docs/requirements`, `docs/architecture`, `docs/improvements` begrenzt.
+
+---
+
+## Compliance-Hinweis
+
+Das Feature ist mit den Agentendefinitions-Compliance-Regeln abgestimmt:
+- Agentenpakete müssen plugin-kompatibel strukturiert sein (u. a. `.github`-Ordner).
+- Fehlerpfade bei Health-Checks und Agenten-Dateilesen werden robust behandelt, damit Folgeabläufe stabil bleiben.
 
 ---
 
@@ -69,4 +81,6 @@ Die Originalversion aus `HEAD` wird angezeigt.
 - [Requirements Analysis](../../requirements/live-project-browser-git-status-requirements-analysis.md)
 - [Architecture Blueprint](../../architecture/live-project-browser-git-status-architecture-blueprint.md)
 - [Flow-Dokumentation](../../flows/live-project-browser-git-status-flow.md)
+- [Planning Overview – Changed Artifact Detection](../../planning-overview-changed-artifact-detection.md)
+- [Testplan – Changed Artifact Detection & Agentendefinitions-Compliance](../../tests/testplan-changed-artifact-detection-agent-compliance.md)
 - [Zurück zur Übersicht](../features.md)

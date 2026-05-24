@@ -114,4 +114,27 @@ public sealed class AgentPackageReaderTests : IDisposable
         // Assert
         result!.Dateien.Should().HaveCount(2);
     }
+
+    /// <summary>GetPackageAsync setzt Agenten-Beschreibung auf null wenn die Agent-Datei nicht lesbar ist.</summary>
+    [Fact]
+    public async Task GetPackageAsync_ShouldSetAgentDescriptionNull_WhenAgentFileReadThrows()
+    {
+        // Arrange
+        var packagesPath = Path.Combine(_baseDir, "agent-packages");
+        var paketPath = Path.Combine(packagesPath, "io-error-paket");
+        Directory.CreateDirectory(paketPath);
+        var agentFilePath = Path.Combine(paketPath, "broken.agent.md");
+        await File.WriteAllTextAsync(agentFilePath, "description: Nicht lesbar");
+
+        await using var lockStream = new FileStream(agentFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        // Act
+        var result = await _sut.GetPackageAsync("io-error-paket");
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Agenten.Should().ContainSingle();
+        result.Agenten[0].Name.Should().Be("broken");
+        result.Agenten[0].Beschreibung.Should().BeNull();
+    }
 }

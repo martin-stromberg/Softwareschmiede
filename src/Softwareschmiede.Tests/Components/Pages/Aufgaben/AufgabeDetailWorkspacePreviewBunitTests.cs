@@ -96,10 +96,57 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         });
     }
 
+    /// <summary>
+    /// Verifiziert, dass ausschließlich geänderte Planungsdokumente als Einträge angezeigt werden.
+    /// </summary>
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderPlanningDocumentEntries_WhenSnapshotContainsPlanningDocumentsOnly()
+    {
+        await using var harness = await ConfigureComponentServicesAsync(
+            snapshot: CreateWorkspaceSnapshotWithPlanningOnly());
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        var uri = navigationManager.GetUriWithQueryParameter("view", "tree");
+        navigationManager.NavigateTo(uri);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters
+            .Add(page => page.Id, harness.AufgabeId));
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("feature-goals.md");
+            cut.Markup.Should().Contain("target-state.md");
+            cut.Markup.Should().NotContain("Keine geänderten Dateien vorhanden.");
+        });
+    }
+
+    /// <summary>
+    /// Verifiziert, dass gemischte Code- und Planungsänderungen gleichzeitig im Explorer sichtbar sind.
+    /// </summary>
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderCodeAndPlanningEntries_WhenBothArtifactTypesChanged()
+    {
+        await using var harness = await ConfigureComponentServicesAsync(
+            snapshot: CreateWorkspaceSnapshotWithCodeAndPlanning());
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        var uri = navigationManager.GetUriWithQueryParameter("view", "tree");
+        navigationManager.NavigateTo(uri);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters
+            .Add(page => page.Id, harness.AufgabeId));
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("service.cs");
+            cut.Markup.Should().Contain("improvement-plan.md");
+            cut.Markup.Should().NotContain("Keine geänderten Dateien vorhanden.");
+        });
+    }
+
     private async Task<TestHarness> ConfigureComponentServicesAsync(
         bool loadPreviewShouldThrow = false,
         bool includeDiffPreviewData = false,
-        bool includePreviewHints = true)
+        bool includePreviewHints = true,
+        WorkspaceSnapshot? snapshot = null)
     {
         var db = TestDbContextFactory.Create();
         var memoryCache = new MemoryCache(new MemoryCacheOptions());
@@ -179,7 +226,7 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         var workspaceBrowserServiceMock = new Mock<IGitWorkspaceBrowserService>();
         workspaceBrowserServiceMock
             .Setup(service => service.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateWorkspaceSnapshot());
+            .ReturnsAsync(snapshot ?? CreateWorkspaceSnapshot());
         workspaceBrowserServiceMock
             .Setup(service => service.LoadPreviewAsync(It.IsAny<string>(), It.IsAny<WorkspaceFileNode>(), It.IsAny<CancellationToken>()))
             .Returns<string, WorkspaceFileNode, CancellationToken>(async (_, node, ct) =>
@@ -292,6 +339,66 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
             ChangedFileCount = 2,
             RootNodes = [alpha, beta],
             FlatFiles = [alpha, beta],
+        };
+    }
+
+    private static WorkspaceSnapshot CreateWorkspaceSnapshotWithPlanningOnly()
+    {
+        var requirements = new WorkspaceFileNode
+        {
+            Name = "feature-goals.md",
+            RelativePath = "feature-goals.md",
+            IsDirectory = false,
+            Status = new WorkspaceFileStatus('M', ' '),
+        };
+
+        var architecture = new WorkspaceFileNode
+        {
+            Name = "target-state.md",
+            RelativePath = "target-state.md",
+            IsDirectory = false,
+            Status = new WorkspaceFileStatus('M', ' '),
+        };
+
+        return new WorkspaceSnapshot
+        {
+            RepositoryPath = Path.GetTempPath(),
+            CommitCount = 1,
+            ChangedFileCount = 2,
+            RootNodes = [requirements, architecture],
+            FlatFiles = [requirements, architecture],
+            CodeFiles = [],
+            PlanningDocuments = [requirements, architecture],
+        };
+    }
+
+    private static WorkspaceSnapshot CreateWorkspaceSnapshotWithCodeAndPlanning()
+    {
+        var code = new WorkspaceFileNode
+        {
+            Name = "service.cs",
+            RelativePath = "service.cs",
+            IsDirectory = false,
+            Status = new WorkspaceFileStatus('M', ' '),
+        };
+
+        var planning = new WorkspaceFileNode
+        {
+            Name = "improvement-plan.md",
+            RelativePath = "improvement-plan.md",
+            IsDirectory = false,
+            Status = new WorkspaceFileStatus('M', ' '),
+        };
+
+        return new WorkspaceSnapshot
+        {
+            RepositoryPath = Path.GetTempPath(),
+            CommitCount = 3,
+            ChangedFileCount = 2,
+            RootNodes = [code, planning],
+            FlatFiles = [code, planning],
+            CodeFiles = [code],
+            PlanningDocuments = [planning],
         };
     }
 

@@ -8,6 +8,7 @@
 
 1. [Einleitung](#1-einleitung)
    - [1.1 Standardplugin, Pluginart, KI-Plugin-Auswahl und Fallback](#11-standardplugin-pluginart-ki-plugin-auswahl-und-fallback)
+   - [1.2 Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance](#12-feature-fokus-changed-artifact-detection--agentendefinitions-compliance)
 2. [IGitPlugin – Schnittstellenreferenz](#2-igitplugin--schnittstellenreferenz)
 3. [IKiPlugin – Schnittstellenreferenz](#3-ikiplugin--schnittstellenreferenz)
 4. [Neues Git-Plugin implementieren](#4-neues-git-plugin-implementieren)
@@ -70,6 +71,20 @@ Diese Logik ist im Detail dokumentiert unter:
 - [plugin-default-selection.md](./plugin-default-selection.md)
 - [plugin-default-selection-flow.md](../flows/plugin-default-selection-flow.md)
 - [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](../business/features/F014-standardplugin-ki-plugin-auswahl.md)
+
+### 1.2 Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance
+
+- **Ziel:** Agentenpakete und Workspace-Artefakte so zu verarbeiten, dass Planungs-/Code-Änderungen und Agentenkompatibilität stabil in einem gemeinsamen Workflow funktionieren.
+- **Verhalten:** `IKiPlugin`-Contracts bleiben unverändert; die produktiven Implementierungen (`GitHubCopilotPlugin`, `ClaudeCliPlugin`) setzen zusätzliche Validierungs- und Fallback-Regeln um.
+- **Betroffene Komponenten:** `IKiPlugin`, `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`, `EntwicklungsprozessService`.
+- **Compliance-Regeln:**
+  - `.github` ist das verbindliche Kompatibilitätskriterium für produktive KI-Plugins (`IsAgentPackageCompatibleAsync`).
+  - `GetAvailableAgentsAsync` durchsucht bevorzugt `.github`, fällt sonst auf Paket-Root zurück.
+  - Fehlender Paketpfad führt zu leerer Agentenliste statt Ausnahme.
+  - `DeployAgentPackageAsync` kopiert den paketinternen `.github`-Inhalt nach `{localRepoPath}/.github`; fehlt `.github`, wird robust übersprungen.
+  - `CheckHealthAsync` signalisiert Betriebsbereitschaft per `bool` (statt workflowbrechender Ausnahme).
+- **Testbezug:** `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`, `CliKiPluginBaseTests`.
+- **Workflow-Auswirkung:** Agentenauswahl, Paketprüfung, Deploy und KI-Start verhalten sich auch bei unvollständigen Paketen vorhersehbar; dadurch sinken Fehlabbrüche im Entwicklungsablauf.
 
 ---
 
@@ -508,7 +523,7 @@ Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
     CancellationToken ct = default);
 ```
 
-**Beschreibung:** Liest alle verfügbaren Agenten aus einem Agentenpaket-Verzeichnis. Ein Agent wird durch eine `*.agent.md`-Datei repräsentiert.
+**Beschreibung:** Liest alle verfügbaren Agenten aus einem Agentenpaket-Verzeichnis. Ein Agent wird durch eine `*.agent.md`-Datei repräsentiert. Implementierungen durchsuchen bevorzugt den `.github`-Unterordner (falls vorhanden), sonst das Paket-Root.
 
 **Parameter:**
 
@@ -530,12 +545,12 @@ public sealed record AgentInfo(
 ```
 
 **Erkennungslogik:**
-- Es werden alle Dateien mit dem Muster `*.agent.md` im angegebenen Verzeichnis gesucht.
+- Es werden alle Dateien mit dem Muster `*.agent.md` im effektiven Suchpfad gesucht (`.github` bevorzugt, sonst Paket-Root).
 - Der Agent-Name ergibt sich aus dem Dateinamen **ohne** das Suffix `.agent.md`.
-- Die Beschreibung wird aus dem YAML-Frontmatter-Feld `description:` gelesen (optional).
+- Die Beschreibung wird aus dem YAML-Frontmatter-Feld `description:` gelesen (optional); bei fehlendem Frontmatter/Lesefehlern greift ein robuster Fallback (erste Inhaltszeile bzw. `null`).
 
 **Fehlerverhalten:**
-- `DirectoryNotFoundException` – `agentPackagePath` existiert nicht.
+- Existiert `agentPackagePath` nicht, liefern die produktiven Plugins eine leere Liste statt Ausnahme.
 - `OperationCanceledException` – Abbruch über `ct`.
 
 ---
@@ -549,7 +564,7 @@ Task DeployAgentPackageAsync(
     CancellationToken ct = default);
 ```
 
-**Beschreibung:** Kopiert alle Agenten-Dateien eines Pakets in das `.github/agents/`-Verzeichnis des geklonten Repositories. Erstellt das Zielverzeichnis, falls es nicht existiert.
+**Beschreibung:** Kopiert den paketinternen `.github`-Inhalt in das `.github`-Verzeichnis des geklonten Repositories. Ist kein `.github`-Ordner im Paket vorhanden, wird der Deploy robust übersprungen (mit Log-Warnung).
 
 **Parameter:**
 
@@ -561,11 +576,11 @@ Task DeployAgentPackageAsync(
 
 **Rückgabewert:** `Task` – abgeschlossen, wenn alle Dateien kopiert wurden.
 
-**Deployment-Ziel:** `{localRepoPath}/.github/agents/`
+**Deployment-Ziel:** `{localRepoPath}/.github/`
 
 **Fehlerverhalten:**
-- `DirectoryNotFoundException` – Quell- oder Zielpfad nicht erreichbar.
-- `UnauthorizedAccessException` – Fehlende Schreibrechte.
+- Fehlt der paketseitige `.github`-Ordner, erfolgt kein harter Fehler, sondern ein kontrollierter Skip.
+- Bei I/O-/Rechteproblemen können Dateisystem-Ausnahmen auftreten.
 - `OperationCanceledException` – Abbruch über `ct`.
 
 ---
@@ -924,7 +939,7 @@ public sealed class ClaudeCliPlugin : IKiPlugin
 
 ### Schritt 2: `GetAvailableAgentsAsync` implementieren
 
-Liest `.agent.md`-Dateien aus dem Verzeichnis und parst das YAML-Frontmatter:
+Liest `*.agent.md`-Dateien robust aus dem Agentenpaket. Der Suchpfad bevorzugt `.github`; bei fehlendem Paketpfad wird eine leere Liste zurückgegeben (kein Hard-Fail):
 
 ```csharp
 public async Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
@@ -932,9 +947,11 @@ public async Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
     CancellationToken ct = default)
 {
     if (!Directory.Exists(agentPackagePath))
-        throw new DirectoryNotFoundException($"Agentenpaket nicht gefunden: {agentPackagePath}");
+        return [];
 
-    var agentFiles = Directory.GetFiles(agentPackagePath, "*.agent.md");
+    var githubDir = Path.Combine(agentPackagePath, ".github");
+    var searchRoot = Directory.Exists(githubDir) ? githubDir : agentPackagePath;
+    var agentFiles = Directory.GetFiles(searchRoot, "*.agent.md", SearchOption.AllDirectories);
     var agents = new List<AgentInfo>();
 
     foreach (var filePath in agentFiles)
@@ -944,38 +961,19 @@ public async Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
         // Agent-Name: Dateiname ohne ".agent.md"
         var name = Path.GetFileName(filePath).Replace(".agent.md", string.Empty);
 
-        // Beschreibung aus YAML-Frontmatter lesen
-        var description = await ReadDescriptionFromFrontmatterAsync(filePath, ct);
+        // Beschreibung aus Frontmatter/Fallback lesen
+        var description = ReadAgentDescription(filePath);
 
         agents.Add(new AgentInfo(name, description, filePath));
     }
 
     return agents;
 }
-
-private static async Task<string?> ReadDescriptionFromFrontmatterAsync(
-    string filePath,
-    CancellationToken ct)
-{
-    var lines = await File.ReadAllLinesAsync(filePath, ct);
-
-    // YAML-Frontmatter erwartet: erste Zeile "---", endet bei nächstem "---"
-    if (lines.Length < 2 || lines[0].Trim() != "---")
-        return null;
-
-    foreach (var line in lines.Skip(1).TakeWhile(l => l.Trim() != "---"))
-    {
-        if (line.StartsWith("description:", StringComparison.OrdinalIgnoreCase))
-            return line["description:".Length..].Trim();
-    }
-
-    return null;
-}
 ```
 
 ### Schritt 3: `DeployAgentPackageAsync` implementieren
 
-Kopiert alle Dateien des Pakets ins `.github/agents/`-Verzeichnis des Repositories:
+Kopiert den paketinternen `.github`-Inhalt rekursiv in das Repository-Ziel `.github/`. Fehlt `.github`, wird der Deploy kontrolliert übersprungen:
 
 ```csharp
 public async Task DeployAgentPackageAsync(
@@ -983,24 +981,22 @@ public async Task DeployAgentPackageAsync(
     string localRepoPath,
     CancellationToken ct = default)
 {
-    var targetDir = Path.Combine(localRepoPath, ".github", "agents");
-    Directory.CreateDirectory(targetDir);
-
-    var files = Directory.GetFiles(agentPackagePath);
-
-    foreach (var file in files)
+    var githubSourceDir = Path.Combine(agentPackagePath, ".github");
+    if (!Directory.Exists(githubSourceDir))
     {
-        ct.ThrowIfCancellationRequested();
-        var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
-        File.Copy(file, targetFile, overwrite: true);
-        _logger.LogDebug("Deployed {File} → {Target}", file, targetFile);
+        _logger.LogWarning("Kein '.github'-Ordner im Agentenpaket gefunden. Deploy wird übersprungen.");
+        return;
     }
 
-    _logger.LogInformation(
-        "{Count} Dateien nach {Target} deployed",
-        files.Length, targetDir);
-
-    await Task.CompletedTask; // Für zukünftige async-Operationen
+    var githubTargetDir = Path.Combine(localRepoPath, ".github");
+    foreach (var sourceFile in Directory.GetFiles(githubSourceDir, "*", SearchOption.AllDirectories))
+    {
+        ct.ThrowIfCancellationRequested();
+        var relativePath = Path.GetRelativePath(githubSourceDir, sourceFile);
+        var targetFile = Path.Combine(githubTargetDir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(targetFile)!);
+        File.Copy(sourceFile, targetFile, overwrite: true);
+    }
 }
 ```
 
@@ -1092,20 +1088,23 @@ Analog zum Git-Plugin wird das KI-Plugin als eigenes Projekt unter `plugins/` an
 
 ### Verzeichnisstruktur
 
-Agentenpakete werden unter `<AppVerzeichnis>/agent-packages/` abgelegt:
+Agentenpakete werden unter `<AppVerzeichnis>/agent-packages/` abgelegt. Für die produktiven KI-Plugins gilt: ein `.github`-Ordner ist das maßgebliche Kompatibilitätskriterium.
 
 ```
 agent-packages/
 └── mein-paket/
-    ├── planner.agent.md       ← Agent "planner"
-    ├── implementer.agent.md   ← Agent "implementer"
-    ├── reviewer.agent.md      ← Agent "reviewer"
+    ├── .github/
+    │   ├── planner.agent.md       ← Agent "planner"
+    │   ├── implementer.agent.md   ← Agent "implementer"
+    │   └── reviewer.agent.md      ← Agent "reviewer"
     └── README.md              ← Optionale Paketbeschreibung
 ```
 
 ### Datei-Erkennung
 
-Das Plugin sucht nach dem Glob-Muster `*.agent.md` im angegebenen Verzeichnis. Nur Dateien mit dieser Endung werden als Agenten erkannt. Die `README.md` und andere Dateien werden beim Lesen der Agenten ignoriert, aber beim **Deployment** ebenfalls kopiert.
+Das Plugin sucht nach dem Glob-Muster `*.agent.md` im effektiven Suchpfad. Existiert `.github`, wird dort gesucht; sonst im Paket-Root. Nur Dateien mit dieser Endung werden als Agenten erkannt.
+
+> **Compliance-Hinweis:** Für produktive Plugins (`GitHubCopilotPlugin`, `ClaudeCliPlugin`) ist ein fehlender `.github`-Ordner weiterhin **nicht kompatibel** (`IsAgentPackageCompatibleAsync = false`), auch wenn die reine Agentenauflistung technisch auf Paket-Root zurückfallen kann.
 
 ### Namenskonvention
 
@@ -1119,7 +1118,7 @@ Das Plugin sucht nach dem Glob-Muster `*.agent.md` im angegebenen Verzeichnis. N
 
 ### YAML-Frontmatter-Format
 
-Jede `.agent.md`-Datei **muss** ein YAML-Frontmatter-Abschnitt am Dateianfang enthalten:
+Eine `.agent.md`-Datei **sollte** einen YAML-Frontmatter-Abschnitt am Dateianfang enthalten:
 
 ```yaml
 ---
@@ -1133,7 +1132,7 @@ description: Analysiert Anforderungen und erstellt einen strukturierten Entwickl
 | `name` | empfohlen | Interner Name des Agenten |
 | `description` | empfohlen | Kurzbeschreibung, wird in der UI angezeigt |
 
-Das Frontmatter wird durch zwei `---`-Trennlinien begrenzt. Alles unterhalb des schließenden `---` ist der eigentliche Agenteninhalt (Anweisungen, Prompts, etc.).
+Das Frontmatter wird durch zwei `---`-Trennlinien begrenzt. Alles unterhalb des schließenden `---` ist der eigentliche Agenteninhalt (Anweisungen, Prompts, etc.). Fehlt `description`, wird pluginseitig auf erste Inhaltszeile bzw. `null` zurückgefallen.
 
 ### Vollständiges Beispiel einer `.agent.md`-Datei
 
@@ -1169,11 +1168,13 @@ Erstelle einen strukturierten Plan im Markdown-Format mit:
 <AppVerzeichnis>/
 └── agent-packages/
     ├── basis-agenten/
-    │   ├── planner.agent.md
-    │   └── implementer.agent.md
+    │   └── .github/
+    │       ├── planner.agent.md
+    │       └── implementer.agent.md
     └── spezialisiert/
-        ├── api-designer.agent.md
-        └── test-writer.agent.md
+        └── .github/
+            ├── api-designer.agent.md
+            └── test-writer.agent.md
 ```
 
 > **Hinweis:** `<AppVerzeichnis>` entspricht dem Verzeichnis, aus dem die Softwareschmiede-Anwendung gestartet wird (z. B. das Ausgabeverzeichnis von `dotnet publish`).
@@ -1185,13 +1186,12 @@ Nach dem Aufruf von [`DeployAgentPackageAsync`](#deployagentpackageasync) werden
 ```
 {localRepoPath}/
 └── .github/
-    └── agents/
-        ├── planner.agent.md
-        ├── implementer.agent.md
-        └── README.md
+    ├── planner.agent.md
+    ├── implementer.agent.md
+    └── ...
 ```
 
-Das Verzeichnis `.github/agents/` wird automatisch erstellt, falls es nicht existiert. Vorhandene Dateien werden **überschrieben**.
+Das Verzeichnis `.github/` wird automatisch erstellt, falls es nicht existiert. Vorhandene Dateien können überschrieben werden.
 
 ---
 

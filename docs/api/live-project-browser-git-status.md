@@ -32,6 +32,29 @@ Er liest ausschließlich aus dem lokalen Klon und speichert keinen eigenen Brows
 - Untracked-Dateien (`??`) werden als eigener Status modelliert.
 - Rename/Copy-Einträge werden aus dem `old -> new`-Pfad aufgelöst.
 - Der Service erzeugt sowohl `RootNodes` als auch `FlatFiles`.
+- Geänderte Planungsdokumente werden zusätzlich zu Codedateien explizit klassifiziert:
+  - `PlanningDocuments`: Markdown-Dateien unter `docs/requirements/`, `docs/architecture/`, `docs/improvements/`
+  - `CodeFiles`: bekannte Quellcode-/Konfigurationsdateitypen aus dem Workspace
+- Wenn initial keine `PlanningDocuments` erkannt werden, greift eine robuste Fallback-Prüfung auf normalisierte Slash-/Dot-Varianten der drei docs-Pfade.
+
+## Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance
+
+- **Ziel:** Keine „blinden Flecken“ bei geänderten Planungsdokumenten im Live Project Browser.
+- **Verhalten:** Auch bei ausschließlich geänderten Planungsdokumenten bleibt die Workspace-Ansicht konsistent nutzbar (kein irreführender „Keine Änderungen“-Pfad).
+- **Betroffene Komponenten:**
+  - `GitWorkspaceBrowserService` (Klassifikation + Fallback)
+  - `WorkspaceSnapshot` (`CodeFiles`, `PlanningDocuments`)
+  - `AufgabeDetail` (UI-Weiterverarbeitung der getrennten Artefaktlisten)
+- **Compliance-Regeln (angrenzend):**
+  - Planungsdokumente sind ausschließlich `*.md` unter `docs/requirements/`, `docs/architecture/`, `docs/improvements/`.
+  - Fallback-Prüfung normalisiert Slash-/Dot-Varianten (`/docs/...`, `./docs/...`) nur für diese drei freigegebenen Pfade.
+  - Agentenpakete werden pluginseitig auf kompatible Struktur geprüft (`.github`-Ordner, robuste Fehlerpfade bei nicht lesbaren/nicht vorhandenen Paketdateien), damit Orchestrierungsabläufe reproduzierbar bleiben.
+- **Testbezug:**
+  - `GitWorkspaceBrowserServiceTests` (Klassifikation, Fallback, SourceRelativePath bei Rename/Copy)
+  - `AufgabeDetailWorkspacePreviewBunitTests` (Darstellung von Planning-only und gemischten Änderungen im UI-Workflow)
+- **Workflow-Auswirkung:**
+  - Die Aufgabenansicht zeigt geänderte Planungsdokumente als normale Artefakte im Workspace-Explorer.
+  - Folgeaktionen wie Dateiselektion/Vorschau bleiben verfügbar, auch wenn keine klassischen Codedateien geändert wurden.
 
 ## Vorschau-Regeln
 

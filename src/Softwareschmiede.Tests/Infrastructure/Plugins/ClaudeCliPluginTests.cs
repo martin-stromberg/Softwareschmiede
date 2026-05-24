@@ -51,6 +51,17 @@ public sealed class ClaudeCliPluginTests : IDisposable
         result.Should().NotContain(a => a.Name == "root");
     }
 
+    /// <summary>Returns an empty agent list when package path does not exist.</summary>
+    [Fact]
+    public async Task GetAvailableAgentsAsync_ShouldReturnEmpty_WhenPackagePathDoesNotExist()
+    {
+        var nonExistentPath = Path.Combine(_testDirectory, "missing-package");
+
+        var result = await _sut.GetAvailableAgentsAsync(nonExistentPath);
+
+        result.Should().BeEmpty();
+    }
+
     /// <summary>Uses a content fallback if no explicit description exists.</summary>
     [Fact]
     public async Task GetAvailableAgentsAsync_ShouldUseFallbackDescription_WhenFrontmatterHasNoDescription()
@@ -159,6 +170,17 @@ public sealed class ClaudeCliPluginTests : IDisposable
         Directory.CreateDirectory(_testDirectory);
 
         var result = await _sut.IsAgentPackageCompatibleAsync(_testDirectory);
+
+        result.Should().BeFalse();
+    }
+
+    /// <summary>Returns false when package path does not exist.</summary>
+    [Fact]
+    public async Task IsAgentPackageCompatibleAsync_ShouldReturnFalse_WhenPackagePathDoesNotExist()
+    {
+        var nonExistentPath = Path.Combine(_testDirectory, "missing-package");
+
+        var result = await _sut.IsAgentPackageCompatibleAsync(nonExistentPath);
 
         result.Should().BeFalse();
     }

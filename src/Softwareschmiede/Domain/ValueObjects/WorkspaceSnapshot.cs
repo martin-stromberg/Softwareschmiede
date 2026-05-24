@@ -18,6 +18,12 @@ public sealed class WorkspaceSnapshot
     /// <summary>Flache Liste aller geänderten Dateien.</summary>
     public List<WorkspaceFileNode> FlatFiles { get; init; } = [];
 
+    /// <summary>Teilmenge der geänderten Codedateien.</summary>
+    public List<WorkspaceFileNode> CodeFiles { get; init; } = [];
+
+    /// <summary>Teilmenge der geänderten Planungsdokumente.</summary>
+    public List<WorkspaceFileNode> PlanningDocuments { get; init; } = [];
+
     /// <summary>Optionaler Fehlertext, wenn das Repository nicht geladen werden konnte.</summary>
     public string? ErrorMessage { get; init; }
 
