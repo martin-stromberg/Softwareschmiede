@@ -75,9 +75,9 @@ flowchart TD
    - **Ausgaben/Seiteneffekte:** Lädt `_aufgabe`, `_latestDiffResultId` und Workspace-Daten; initialisiert damit den Datenkontext für Vorschau und Diff-Button.
 
 2. **State Ownership im Parent `AufgabeDetail`**
-   - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (`DiffPreviewPanel`-Einbindung) und `AufgabeDetail.razor.cs` (Felder `_selectedWorkspaceNode`, `_selectedWorkspacePreview`, `_latestDiffResultId`)
-   - **Eingaben:** Dateiauswahl und zuletzt bekannte Diff-ID.
-   - **Ausgaben/Seiteneffekte:** Parent hält ausschließlich Selektions-/Preview-/Diff-ID-Zustand und reicht ihn als Parameter an das Panel weiter.
+   - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (`DiffPreviewPanel`-Einbindung) und `AufgabeDetail.razor.cs` (u. a. `_selectedWorkspaceNode`, `_selectedWorkspacePreview`, `_selectedWorkspaceDiffResultId`, `_latestDiffResultId`)
+   - **Eingaben:** Dateiauswahl, Previewdaten und zuletzt bekannte globale Diff-ID.
+   - **Ausgaben/Seiteneffekte:** Parent hält den Selektions-/Preview-Zustand sowie eine dateispezifische Diff-ID für die eingebettete Vorschau.
 
 3. **Dateiauswahl startet versionierten Preview-Ladevorgang**
    - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`WorkspaceNodeClickedAsync`, `LadeWorkspacePreviewAsync`)
@@ -89,42 +89,47 @@ flowchart TD
    - **Eingaben:** `requestVersion`, `_selectedWorkspacePath`.
    - **Ausgaben/Seiteneffekte:** Verwirft veraltete Antworten bei `requestVersion != _previewLoadVersion` oder Pfadwechsel, damit keine stale Preview im UI landet.
 
-5. **FR-4 Entscheidung 1: Keine Datei gewählt**
+5. **Dateispezifische Diff-Auflösung pro ausgewählter Datei**
+   - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`ResolveSelectedWorkspaceDiffResultIdAsync`) + `src/Softwareschmiede/Application/Services/AufgabeService.cs` (`GetLatestDiffResultIdForFileAsync`)
+   - **Eingaben:** `FilePreview.RelativePath`, optional `FilePreview.SourceRelativePath`.
+   - **Ausgaben/Seiteneffekte:** Ermittelt `_selectedWorkspaceDiffResultId` dateibezogen mit Pfadnormalisierung; wenn für `RelativePath` kein Treffer existiert, optionaler Fallback auf `SourceRelativePath`.
+
+6. **FR-4 Entscheidung 1: Keine Datei gewählt**
    - **Code:** `src/Softwareschmiede/Components/Diff/DiffPreviewPanel.razor` (`if (!HasSelectedFile)`)
    - **Eingaben:** `HasSelectedFile = false`.
    - **Ausgaben/Seiteneffekte:** Zeigt den Hinweis *„Wählen Sie links eine Datei aus.“*.
 
-6. **FR-4 Entscheidung 2: Preview lädt**
+7. **FR-4 Entscheidung 2: Preview lädt**
    - **Code:** `src/Softwareschmiede/Components/Diff/DiffPreviewPanel.razor` (`else if (Preview is null)`)
    - **Eingaben:** `Preview = null` bei laufender Ladeoperation.
    - **Ausgaben/Seiteneffekte:** Zeigt den Loading-Hinweis *„Dateivorschau wird geladen…“*.
 
-7. **FR-4 Entscheidung 3: Fachlicher Hinweis (`Hint`)**
+8. **FR-4 Entscheidung 3: Fachlicher Hinweis (`Hint`)**
    - **Code:** `src/Softwareschmiede/Components/Diff/DiffPreviewPanel.razor` (`else if (!string.IsNullOrWhiteSpace(Preview.Hint))`)
    - **Eingaben:** `Preview.Hint`, optional `Preview.CurrentContent`.
    - **Ausgaben/Seiteneffekte:** Rendert Warnung und optional Rohinhalt als `<pre>` statt DiffViewer.
 
-8. **FR-4 Entscheidung 4/5: Diff vorhanden vs. Deleted/kein Diff**
+9. **FR-4 Entscheidung 4/5: Diff vorhanden vs. Deleted/kein Diff**
    - **Code:** `src/Softwareschmiede/Components/Diff/DiffPreviewPanel.razor` (`else if (DiffResultId.HasValue)`, `else if (Preview.IsDeleted)`, `else`)
    - **Eingaben:** `DiffResultId`, `Preview.IsDeleted`.
    - **Ausgaben/Seiteneffekte:** Rendert Embedded-`DiffViewer` oder fallbackt auf Warnung „Datei gelöscht …“ bzw. Info „kein DiffResult vorhanden“.
 
-9. **Lokale Zustandsführung im `DiffViewer`**
+10. **Lokale Zustandsführung im `DiffViewer`**
    - **Code:** `src/Softwareschmiede/Components/Diff/DiffViewer.razor` (`OnParametersSetAsync`, `LoadDiffAsync`)
    - **Eingaben:** `DiffResultId`, `PresentationMode`.
    - **Ausgaben/Seiteneffekte:** Reset von `selectedLines`, `currentViewMode`, `currentSearchTerm`; Laden des Diffs über `DiffService.GetDiffAsync`.
 
-10. **Parameterwechsel-Stabilität im `DiffViewer` (Cancellation + Version Guard)**
+11. **Parameterwechsel-Stabilität im `DiffViewer` (Cancellation + Version Guard)**
     - **Code:** `src/Softwareschmiede/Components/Diff/DiffViewer.razor` (`loadingCancellationTokenSource`, `loadingVersion`, `LoadDiffAsync`)
     - **Eingaben:** Neues `DiffResultId`-Parameterupdate.
     - **Ausgaben/Seiteneffekte:** Bricht vorherigen Request ab (`Cancel`/`Dispose`), erhöht `loadingVersion`, ignoriert verspätete Antworten bei Version-Mismatch und setzt `isLoading` nur für die aktuelle Version.
 
-11. **Route-Kompatibilität für direkten Deep-Link**
+12. **Route-Kompatibilität für direkten Deep-Link**
     - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`DiffAnzeigen`) und `src/Softwareschmiede/Components/Pages/Diff/DiffViewerPage.razor`
     - **Eingaben:** `_latestDiffResultId`, Routeparameter `DiffResultId`.
     - **Ausgaben/Seiteneffekte:** Navigation nach `/diff/{DiffResultId}`; `DiffViewerPage` reicht die ID als Wrapper an `DiffViewer` im `Standalone`-Modus weiter.
 
-12. **Lifecycle-Cleanup für laufende UI-Operationen**
+13. **Lifecycle-Cleanup für laufende UI-Operationen**
     - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`Dispose`) und `src/Softwareschmiede/Components/Diff/DiffViewer.razor` (`IAsyncDisposable.DisposeAsync`)
     - **Eingaben:** Komponenten-Dispose.
     - **Ausgaben/Seiteneffekte:** `CancellationTokenSource` wird in beiden Komponenten gecancelt und freigegeben, um hängende Requests zu vermeiden.

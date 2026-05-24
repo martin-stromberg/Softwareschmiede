@@ -24,7 +24,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
 | [Issue-, Branch- und PR-Verknüpfung](./issue-branch-pr-linking-flow.md) | `issue-branch-pr-linking-flow.md` | End-to-End-Flow von der Issue-Auswahl über issuebezogenen Branch bis zur PR-Closing-Direktive (`Closes #<Issue>`) |
 | [Diff-Pipeline (Controller, Service, Algorithmus, Cache)](./diff-service-flow.md) | `diff-service-flow.md` | End-to-End-Ablauf für Diff-Generierung, 2-Tier-Caching, Persistierung sowie Validierungs- und Fehlerpfade |
-| [DiffViewer-Integration (UI, FR-4, Route)](./diffviewer-integration-flow.md) | `diffviewer-integration-flow.md` | UI-Integrationsfluss zwischen `AufgabeDetail`, `DiffPreviewPanel` und `DiffViewer` inkl. FR-4-Fallbackpfaden, Parameterwechsel-Stabilität und `/diff/{DiffResultId:guid}`-Kompatibilität |
+| [DiffViewer-Integration (UI, FR-4, Route)](./diffviewer-integration-flow.md) | `diffviewer-integration-flow.md` | UI-Integrationsfluss zwischen `AufgabeDetail`, `DiffPreviewPanel` und `DiffViewer` inkl. dateispezifischer Diff-Auflösung, FR-4-Fallbackpfaden, Parameterwechsel-Stabilität und `/diff/{DiffResultId:guid}`-Kompatibilität |
 | [Repository-Startskript mit freier Portzuweisung](./repository-startskript-freier-port-flow.md) | `repository-startskript-freier-port-flow.md` | Konfigurations- und Laufzeitablauf für repositorybezogene Startskripte inkl. Portreservierung und PowerShell-Ausführung beim Prozessstart |
 | [`start.ps1` für VS-Debug mit freiem HTTP-Port](./start-ps1-visual-studio-freier-http-port-flow.md) | `start-ps1-visual-studio-freier-http-port-flow.md` | Ablauf für Portauflösung (Parameter/Env/Auto), `launchSettings.json`-Update und Exit-Code-Pfade des lokalen Startskripts |
 | [Benachrichtigungssystem für abgeschlossene KI-Aufgaben](./benachrichtigungssystem-flow.md) | `benachrichtigungssystem-flow.md` | End-to-End-Flow von `KiAufgabenAbschlussEreignis` über Hub-Dispatch bis zu Toast/Ton, Modusmatrix, Audit und Einstellungsverwaltung |
@@ -211,7 +211,7 @@ Dokumentiert den Ablauf von `POST /api/diff/generate` über Service-Orchestrieru
 ### [Ablauf 19b: DiffViewer-Integration (UI-Zustandsgrenzen, FR-4, Route)](./diffviewer-integration-flow.md)
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `DiffPreviewPanel`, `DiffViewer`, `DiffService`, `GitWorkspaceBrowserService`
 
-Dokumentiert den End-to-End-Integrationspfad der Diff-Vorschau in der Aufgabenansicht inklusive FR-4-Fallback-Entscheidungen, parameterstabilen Lade-Guards und Wrapper-Route `/diff/{DiffResultId:guid}`.
+Dokumentiert den End-to-End-Integrationspfad der Diff-Vorschau in der Aufgabenansicht inklusive dateispezifischer Diff-Zuordnung pro ausgewählter Datei, FR-4-Fallback-Entscheidungen, parameterstabilen Lade-Guards und Wrapper-Route `/diff/{DiffResultId:guid}`.
 
 ---
 

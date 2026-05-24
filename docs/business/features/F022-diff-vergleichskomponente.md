@@ -40,6 +40,7 @@ Wenn für eine Datei kein Vergleich vorliegt, sehen Sie sofort eine klare Hinwei
 ## Was passiert im Hintergrund?
 
 Die Anwendung zeigt den Vergleich in der Aufgabenansicht eingebettet an.
+Für jede ausgewählte Datei wird der passende Vergleich dateispezifisch ermittelt.
 Der bisherige Direktaufruf über `/diff/{DiffResultId:guid}` bleibt vollständig nutzbar.
 Falls kein Vergleich verfügbar ist, erhalten Sie klare Hinweise statt leerer Flächen.
 Bei schnellem Wechsel zwischen Dateien bleibt die Anzeige stabil auf der letzten Auswahl.
@@ -55,7 +56,7 @@ Nein. Die Vorschau läuft direkt in der Aufgabe.
 Ja. Über **🔎 Diff anzeigen** oder direkt mit `/diff/{DiffResultId:guid}`.
 
 **Was sehe ich, wenn kein Vergleich vorhanden ist?**  
-Sie erhalten eine klare Meldung, zum Beispiel bei gelöschten Dateien.
+Sie erhalten eine klare Meldung nur dann, wenn für die ausgewählte Datei wirklich kein Vergleich vorliegt, zum Beispiel bei gelöschten Dateien.
 
 **Was passiert bei sehr schnellem Dateiwechsel?**  
 Die Anzeige bleibt stabil und zeigt nur die zuletzt gewählte Datei.

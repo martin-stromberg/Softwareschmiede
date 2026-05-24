@@ -78,6 +78,38 @@ public sealed class AufgabeService
             .FirstOrDefaultAsync(ct);
     }
 
+    /// <summary>Gibt die ID des zuletzt generierten Diff-Ergebnisses einer Datei innerhalb einer Aufgabe zurück.</summary>
+    public async Task<Guid?> GetLatestDiffResultIdForFileAsync(Guid aufgabeId, string relativePath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+        var normalizedLookupPath = NormalizeRelativePathForLookup(relativePath);
+
+        _logger.LogInformation(
+            "Dateispezifische DiffResult-ID für Aufgabe {AufgabeId} und Datei {RelativePath} abrufen.",
+            aufgabeId,
+            normalizedLookupPath);
+
+        return await _db.DiffResults
+            .AsNoTracking()
+            .Where(dr => dr.AufgabeId == aufgabeId
+                && dr.FilePath != null
+                && dr.FilePath.Replace('\\', '/').ToLower() == normalizedLookupPath)
+            .OrderByDescending(dr => dr.GeneratedAt)
+            .Select(dr => (Guid?)dr.Id)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    private static string NormalizeRelativePathForLookup(string relativePath)
+    {
+        var normalized = relativePath.Trim().Replace('\\', '/');
+        while (normalized.StartsWith("./", StringComparison.Ordinal))
+        {
+            normalized = normalized[2..];
+        }
+
+        return normalized.TrimStart('/').ToLowerInvariant();
+    }
+
     /// <summary>Erstellt eine neue Aufgabe.</summary>
     public async Task<Aufgabe> CreateAsync(
         Guid projektId,
