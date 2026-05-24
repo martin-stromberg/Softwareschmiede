@@ -1,3 +1,75 @@
+# Dokumentationsplan – Feature „Changed Artifact Detection & Agentendefinitions-Compliance“ – 2026-05-24
+
+## Kontext
+- Feature-Kontext: **„Erkennung geänderter Planungsdokumente zusätzlich zu Codedateien und Sicherstellung der Agentendefinitions-Compliance“**.
+- Planungs-, Implementierungs- und Testarbeiten waren bereits umgesetzt; Ziel dieses Laufs war die vollständige Dokumentationssynchronisation.
+- Hinweis Agentendefinition: `~/.copilot/agents/documentation-orchestrator.agent.md` war in der Laufzeitumgebung nicht vorhanden (`AGENT_FILE_MISSING`), daher wurde der Orchestrator-Ablauf gemäß hinterlegter Definition im Repository-Kontext umgesetzt.
+- Hinweis Subagentenlauf: Der vorgesehene parallele Analyse-Schwarm/Unteragentenlauf war aufgrund API-Rate-Limit (429) nicht verfügbar; Analyse und Ausführung wurden im gleichen Phasenschema manuell abgeschlossen.
+
+## Phase 1 – Analyse
+
+### 1) API-Docs-Analyse
+- `docs/api/` vorhanden; technische Kernverträge sind dokumentiert.
+- Lücken: Feature-Hinweis zu **Changed Artifact Detection + Agentendefinitions-Compliance** fehlte im API-Index und bei HTTP-Endpunkt-Abgrenzung.
+- `docs/api/live-project-browser-git-status.md` enthielt die Klassifikation `CodeFiles`/`PlanningDocuments` und Fallback-Logik noch nicht explizit.
+- `docs/api/plugin-interfaces.md` enthielt teilweise veraltete Aussagen zur Agentenpaketstruktur/Deployment-Topologie und Fehlerbehandlung.
+
+### 2) Flow-Docs-Analyse
+- `docs/flows/` vorhanden inkl. `live-project-browser-git-status-flow.md`.
+- Lücke: Ablauf enthielt keinen expliziten Schritt zur Fallback-Erkennung geänderter Planungsdokumente und deren Wirkung auf den UI-Workflow.
+
+### 3) Business-Docs-Analyse
+- `docs/business/` vorhanden mit Featurekatalog.
+- Lücken:
+  - F021 beschrieb den Live Browser ohne explizite Nutzerwirkung der getrennten Planungsdokument-Erkennung.
+  - F004 beschrieb Agentenpakete ohne klaren Compliance-Hinweis (Kompatibilitätsregeln + robuste Fehlerpfade).
+
+### 4) README-Analyse
+- README-Struktur vollständig.
+- Lücken: Feature-Kontext (Ziel/Verhalten/Komponenten/Compliance/Testabdeckung/Workflow-Auswirkung) war nur fragmentiert sichtbar; Test- und Doku-Links für das Feature fehlten.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** API-/Flow-/Business-Dokumente auf Featureverhalten (`CodeFiles` + `PlanningDocuments`, Fallback, Compliance-Regeln) synchronisieren.
+2. **Hoch:** README um Featureziele, Testabdeckung und Doku-Referenzen ergänzen.
+3. **Mittel:** Test-Dokumentindex und Querverweise vervollständigen.
+
+## Phase 2 – Parallele Dokumentationserstellung
+- `documentation-api`: ausgeführt (Scope `docs/api/`)
+- `documentation-flow`: ausgeführt (Scope `docs/flows/`)
+- `documentation-business`: ausgeführt (Scope `docs/business/`)
+- `documentation-readme-writer`: ausgeführt (Scope `README.md`)
+
+## Anhang: Ergebnis (Phase 3)
+
+### Aktualisiert
+1. `docs/api/README.md`
+2. `docs/api/http-endpoints.md`
+3. `docs/api/live-project-browser-git-status.md`
+4. `docs/api/plugin-interfaces.md`
+5. `docs/flows/README.md`
+6. `docs/flows/live-project-browser-git-status-flow.md`
+7. `docs/flows/development-process-flow.md`
+8. `docs/business/features.md`
+9. `docs/business/features/F004-agentenpakete.md`
+10. `docs/business/features/F021-live-project-browser-git-status.md`
+11. `docs/tests/README.md`
+12. `README.md`
+13. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz-/Nicht-Leerheitsprüfung der aktualisierten Dateien: **erfolgreich**.
+- Konsistenzabgleich gegen implementierte Komponenten/Tests durchgeführt:
+  - `GitWorkspaceBrowserService` (`PlanningDocuments`-Klassifikation + Fallback)
+  - `WorkspaceSnapshot` (`CodeFiles`, `PlanningDocuments`)
+  - `AufgabeDetail` (Weiterverwendung der getrennten Artefaktlisten)
+  - `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader` (Compliance-/Fehlerpfade)
+  - Tests: `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken im Feature-Scope identifiziert.
+
+---
+
 # Dokumentationsplan – Feature „favicon-hammer-pick-svg“ – 2026-05-24
 
 ## Kontext

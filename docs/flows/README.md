@@ -16,9 +16,9 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [KI-Arbeitsprotokoll: Persistierung und Rendering](./ki-arbeitsprotokoll-rendering-flow.md) | `ki-arbeitsprotokoll-rendering-flow.md` | Persistierung des Markdown-Protokolls mit Datumszeile/Schritten sowie sicheres Rendering mit Sanitizing und Fallback |
 | [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
-| [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung und rekursivem Dateibaum |
+| [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung, rekursivem Dateibaum und robusten I/O-Fehlerpfaden |
 | [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
-| [Live Project Browser mit Git-Status](./live-project-browser-git-status-flow.md) | `live-project-browser-git-status-flow.md` | Ablauf für Snapshot-Laden, Tree-/Listenansicht, Datei-Vorschau, Refresh und Rückkehr zur Aufgabenansicht |
+| [Live Project Browser mit Git-Status](./live-project-browser-git-status-flow.md) | `live-project-browser-git-status-flow.md` | Snapshot-Laden mit getrennter `CodeFiles`/`PlanningDocuments`-Klassifikation, Fallback-Erkennung für Planungsdokument-Pfade sowie Compliance-Bezug zum Agentenpaket-Workflow |
 | [Manuelle Aufgaben-Recovery](./aufgabe-recovery-flow.md) | `aufgabe-recovery-flow.md` | UI- und Serviceablauf zur Wiederherstellung festhängender Aufgaben mit Laufzeit-Guard, Audit-Log und Concurrency-Schutz |
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
 | [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
@@ -198,7 +198,7 @@ Dokumentiert den lokalen Skriptablauf von der Portquellen-Auflösung (**Paramete
 ### [Ablauf 18: Live Project Browser mit Git-Status](./live-project-browser-git-status-flow.md)
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `GitWorkspaceBrowserService`
 
-Beschreibt den kompletten UI-Pfad von der Aufgabenansicht über die Query-Parameter-gesteuerte Tree-/Listenansicht bis zur Dateivorschau und zum Refresh.
+Beschreibt den kompletten UI-Pfad von der Aufgabenansicht über die Query-Parameter-gesteuerte Tree-/Listenansicht bis zur Dateivorschau und zum Refresh – inklusive getrennter Klassifikation von `CodeFiles` und `PlanningDocuments`, robuster Fallback-Erkennung bei Slash/Dot-Pfadvarianten sowie Workflow-Bezug zur Agentendefinitions-Compliance.
 
 ---
 

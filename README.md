@@ -54,7 +54,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-05-22**
+Stand: **2026-05-24**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -87,12 +87,22 @@ Stand: **2026-05-22**
 - **LocalDirectoryPlugin**: lokales SCM-Plugin ohne Remote-Provider mit `WorkspaceMode` (`SeparateWorkingDirectory` oder `InSourceDirectory`) und lokalisierten UI-Optionen
 - **Projektspezifische `IGitPlugin`-Auflösung:** `GitOrchestrationService` und `AufgabeDetail` nutzen primär das an Aufgabe/Projekt gebundene Repository-Plugin (inkl. lokalem Repository via `LocalDirectoryPlugin`) und nur bei fehlender/mehrdeutiger Zuordnung den Standard-Fallback.
 - **Live Project Browser mit Git-Status:** Auf der Aufgabenseite werden Commit-Zahl, lokale Änderungen, Tree-/Listenansicht und Datei-Vorschau direkt aus dem lokalen Repositoryzustand geladen.
+- **Changed Artifact Detection im Workspace-Browser:** Geänderte Planungsdokumente unter `docs/requirements`, `docs/architecture`, `docs/improvements` werden zusätzlich zu Codedateien erkannt und separat weiterverarbeitet (inkl. Fallback-Erkennung für Slash-/Dot-Pfadvarianten).
 - **Capability-gesteuerte Aktionsmatrix für LocalDirectory-Arbeitskopien:** Bei `LocalDirectory + SeparateWorkingDirectory` blendet die Aufgabenansicht Push/Pull/PR aus und zeigt stattdessen **Merge** (Workspace -> Source) an.
 - **SeparateWorkingDirectory-Git-Workflow-Fallback**: `git init`-Fallback (policy-gesteuert), Pull ohne Merge mit Nutzerhinweis, Push als Datei-Synchronisation statt `git push`, Delete-Sync über `git status --porcelain`
 - Lokale Git-Basisoperationen: Klonen/Workspace vorbereiten, Branch anlegen, Committen und Reset
 - Aufgabenspezifische Branches (`task/<aufgaben-id>-<kurzname>`) bzw. bei Issue-Verknüpfung `task/issue-<issue>-<aufgaben-id>-<kurzname>`
 - PR-Erstellung ergänzt bei verknüpfter Issue automatisch eine Closing-Direktive (`Closes #<Issue>`), damit GitHub das Issue beim Merge schließt
 - Commit-Verwaltung inkl. Rollback (soft / mixed / hard)
+
+#### Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance
+- **Ziel:** Geänderte Planungsdokumente im Workspace-Browser zusätzlich zu Codedateien sichtbar machen und Agentenpakete robust auf Struktur-/Lesekompatibilität prüfen.
+- **Verhalten:** `WorkspaceSnapshot` trennt Änderungen in `CodeFiles` und `PlanningDocuments`; die Erkennung umfasst `docs/requirements`, `docs/architecture`, `docs/improvements` inkl. Fallback für Slash-/Dot-Pfadvarianten.
+- **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `WorkspaceSnapshot`, `AufgabeDetail`, `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`.
+- **Compliance:** Agentenpakete werden auf kompatible Struktur (u. a. `.github`) sowie robuste Fehlerpfade bei fehlenden Pfaden/Beschreibungen geprüft.
+- **Testabdeckung:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`; ergänzend [Testplan](docs/tests/testplan-changed-artifact-detection-agent-compliance.md) und [Testlückenanalyse](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md).
+- **Workflow-Auswirkung:** In der Aufgabenseite werden geänderte Planungsartefakte getrennt von Codedateien verarbeitet; Agentenpaket-Auswahl und KI-Lauf bleiben bei unvollständigen Paketinhalten fehlertolerant nutzbar.
+- **Doku-Links:** [API Live Project Browser](docs/api/live-project-browser-git-status.md), [API Plugin-Interfaces](docs/api/plugin-interfaces.md), [Flow](docs/flows/live-project-browser-git-status-flow.md), [Business F021](docs/business/features/F021-live-project-browser-git-status.md), [Business F004](docs/business/features/F004-agentenpakete.md), [Planungsübersicht](docs/planning-overview-changed-artifact-detection.md).
 
 ### 🔍 Diff-Vergleichskomponente
 - Öffentliche REST-Endpunkte unter `/api/diff` für Erzeugung, Abruf, Auflistung, Statistik, Löschung und Cache-Invalidierung von Diffs
@@ -142,6 +152,7 @@ Stand: **2026-05-22**
 - Verzeichnisbasierte Pakete mit `.agent.md`-Dateien
 - Deployment ins Repository-Verzeichnis beim Start eines KI-Laufs
 - Vorschau von Dateiliste, Beschreibung und verfügbaren Agenten in der Oberfläche
+- Compliance-Regeln für Agentendefinitionen: kompatible Paketstruktur (`.github`), robuste Behandlung fehlender Pfade und fehlertolerantes Auslesen von Agent-Beschreibungen
 
 ### 🏠 Dashboard
 - Projektübergreifende Übersicht aller aktiven Aufgaben
@@ -611,6 +622,7 @@ Feature-spezifische Testartefakte:
 - UI-bUnit-Tests (DiffPreviewPanel: FR-4-Fallbacks + DiffViewer-Einbettung): `src/Softwareschmiede.Tests/Components/Diff/DiffPreviewPanelBunitTests.cs`
 - UI-bUnit-Tests (Standalone-Route `/diff/{DiffResultId:guid}`): `src/Softwareschmiede.Tests/Components/Pages/Diff/DiffViewerPageBunitTests.cs`
 - UI-bUnit-Tests (AufgabeDetail Workspace-Preview/Stabilität): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailWorkspacePreviewBunitTests.cs`
+- Service-Tests (Changed Artifact Detection: `CodeFiles` + `PlanningDocuments`, Fallback-Pfade): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
 - Service-Tests (dateispezifische Diff-Auflösung): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
@@ -619,6 +631,10 @@ Feature-spezifische Testartefakte:
 - Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`
 - Integrationstests: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
 - UI/Settings-Tests: `src/Softwareschmiede.Tests/Components/Pages/EinstellungenBaseArbeitsverzeichnisTests.cs`
+- Compliance-Tests Agentendefinitionen:
+  - Copilot-Plugin Health/CLI/Package-Kompatibilität: `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubCopilotPluginTests.cs`
+  - Claude-Plugin Package-/Description-Robustheit: `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
+  - AgentPackageReader I/O-Fallback: `src/Softwareschmiede.Tests/Infrastructure/Services/AgentPackageReaderTests.cs`
 - Benachrichtigungssystem für abgeschlossene KI-Aufgaben:
   - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
   - UI-/Dispatch-Logik (Modusmatrix, Dedupe, Audio-/Toast-Verhalten, Audit): `src/Softwareschmiede.Tests/Components/Layout/MainLayoutTests.cs`
@@ -642,6 +658,8 @@ Feature-spezifische Testartefakte:
 - [Testlücken: Repository-Startskript mit freier Portzuweisung](docs/tests/testluecken-repository-startskript-freier-port.md)
 - [Testplan: DiffViewer für geänderte Dateien](docs/tests/testplan-diffviewer-geaenderte-dateien.md)
 - [Testlückenanalyse: DiffViewer für geänderte Dateien](docs/tests/testluecken-diffviewer-geaenderte-dateien.md)
+- [Testplan: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testplan-changed-artifact-detection-agent-compliance.md)
+- [Testlückenanalyse: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md)
 
 ---
 
@@ -678,6 +696,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - `start.ps1`-Skriptvertrag für Visual-Studio-Debug ergänzt (Aufruf, Parameter/Env-Priorität, Exit-Codes, F5-Workflow)
 - DiffViewer-Korrektur dokumentiert: dateispezifische Diff-Auflösung für geänderte Dateien in `AufgabeDetail` inkl. Pfadnormalisierung/Fallback und ergänzter Testabdeckung
 - SVG-Favicon `favicon-hammer-pick.svg` dokumentiert (Features/Usage) inkl. ergänzter Testabdeckung für Head-Markup und statische Asset-Validierung
+- Feature-Dokumentation für „Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“ konsolidiert (API/Flow/Business/Tests): getrennte Workspace-Klassifikation (`CodeFiles`/`PlanningDocuments`), Fallback-Erkennung und Compliance-Regeln für Agentenpakete
 
 ---
 
@@ -723,6 +742,13 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F019: Issue-, Branch- und PR-Verknüpfung](docs/business/features/F019-issue-branch-pr-verknuepfung.md) | Fachliche Beschreibung der durchgängigen Verbindung von Issue-Auswahl, Branch-Namensbildung und PR-Auto-Close |
 | [Feature F020: Repository-Startskript mit freier Portzuweisung](docs/business/features/F020-repository-startskript-freier-port.md) | Fachliche Beschreibung der repositorybezogenen Startskript-Konfiguration mit Portreservierung beim Prozessstart |
 | [Feature F021: Live Project Browser mit Git-Status](docs/business/features/F021-live-project-browser-git-status.md) | Fachliche Beschreibung des Live Project Browsers auf der Aufgabenseite mit Git-Status, Tree-/Listenansicht und Dateivorschau |
+| [Planning Overview: Changed Artifact Detection](docs/planning-overview-changed-artifact-detection.md) | Überblick zu Zielbild, Codeänderungen und verlinkten Planungsartefakten für die erweiterte Artefakt-Erkennung |
+| [Requirements: Changed Artifact Detection](docs/requirements/changed-artifact-detection-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien zur getrennten Erkennung von Code- und Planungsartefakten |
+| [Architektur: Changed Artifact Detection](docs/architecture/changed-artifact-detection-architecture-blueprint.md) | Architekturpfad für Snapshot-Klassifikation, Fallback-Prüfung und Reporting-Trennung |
+| [ERM: Changed Artifact Detection](docs/architecture/changed-artifact-detection-entity-relationship-model.md) | Datenmodell der Artefaktkategorien und Planungsdokument-Regeln |
+| [Architecture Review: Changed Artifact Detection](docs/improvements/changed-artifact-detection-architecture-review.md) | Review-Findings inkl. Empfehlungen zur Wartbarkeit der Erkennungsregeln |
+| [Testplan: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testplan-changed-artifact-detection-agent-compliance.md) | Priorisierte Teststrategie für Feature- und Compliance-Absicherung |
+| [Testlücken: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md) | Dokumentation der abgedeckten und verbleibenden Randpfade |
 | [Feature F022: Diff-Vergleichskomponente](docs/business/features/F022-diff-vergleichskomponente.md) | Fachliche Beschreibung des Diff-Viewers inkl. eingebetteter Nutzung und Standalone-Route |
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
 | [Requirements: LocalDirectoryPlugin](docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | Umsetzungsnahe Anforderungen und Akzeptanzkriterien für WorkspaceMode, Guardrails und Fehlerverhalten |

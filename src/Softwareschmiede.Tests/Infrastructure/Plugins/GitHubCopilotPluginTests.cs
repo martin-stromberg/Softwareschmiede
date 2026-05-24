@@ -4,6 +4,7 @@ using Moq;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
+using System.ComponentModel;
 
 namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 
@@ -337,6 +338,128 @@ public sealed class GitHubCopilotPluginTests : IDisposable
         result.Should().BeFalse();
     }
 
+    /// <summary>CheckHealthAsync gibt false zurück wenn der CLI-Runner null liefert.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ShouldReturnFalse_WhenCliRunnerReturnsNull()
+    {
+        // Arrange
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "copilot", It.IsAny<IEnumerable<string>>(), null,
+                It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CliResult)null!);
+
+        // Act
+        var result = await _sut.CheckHealthAsync();
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    /// <summary>CheckHealthAsync gibt false zurück wenn ein Win32Exception geworfen wird.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ShouldReturnFalse_WhenCliRunnerThrowsWin32Exception()
+    {
+        // Arrange
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "copilot", It.IsAny<IEnumerable<string>>(), null,
+                It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Win32Exception("not found"));
+
+        // Act
+        var result = await _sut.CheckHealthAsync();
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    /// <summary>CheckHealthAsync nutzt den konfigurierten ExecutablePath ohne umschließende Quotes.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ShouldUseConfiguredExecutablePath_WithoutQuotes()
+    {
+        // Arrange
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.ExecutablePath"))
+            .Returns("\"C:\\Program Files\\GitHub Copilot\\copilot.exe\"");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "C:\\Program Files\\GitHub Copilot\\copilot.exe",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "--version" })),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "copilot 1.0.0", string.Empty));
+
+        // Act
+        var result = await _sut.CheckHealthAsync();
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    /// <summary>StartDevelopmentAsync wirft einen hilfreichen Fehler wenn MoveNext eine Win32Exception liefert.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldThrowInvalidOperationException_WhenMoveNextThrowsWin32Exception()
+    {
+        // Arrange
+        Directory.CreateDirectory(_testDirectory);
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                "copilot",
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(new ThrowingOnMoveNextAsyncEnumerable(new Win32Exception("not found")));
+
+        var agent = new AgentInfo("test-agent", "desc", "file");
+
+        // Act
+        var act = async () =>
+        {
+            await foreach (var _ in _sut.StartDevelopmentAsync("Prompt", agent, _testDirectory, "gpt-5"))
+            {
+            }
+        };
+
+        // Assert
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().Contain("Copilot CLI wurde nicht gefunden");
+        exception.Which.Message.Should().Contain("Copilot CLI Pfad");
+        exception.Which.InnerException.Should().BeOfType<Win32Exception>();
+    }
+
+    /// <summary>GetAvailableAgentsAsync nutzt Fallback-Beschreibung wenn kein description-Frontmatter vorhanden ist.</summary>
+    [Fact]
+    public async Task GetAvailableAgentsAsync_ShouldUseFallbackDescription_WhenFrontmatterHasNoDescription()
+    {
+        // Arrange
+        Directory.CreateDirectory(_testDirectory);
+        const string content = """
+            ---
+            name: fallback-agent
+            ---
+            Erste Inhaltszeile
+            """;
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "fallback-agent.agent.md"), content);
+
+        // Act
+        var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).Single();
+
+        // Assert
+        result.Beschreibung.Should().Be("name: fallback-agent");
+    }
+
+    /// <summary>IsAgentPackageCompatibleAsync gibt false zurück wenn der Paketpfad nicht existiert.</summary>
+    [Fact]
+    public async Task IsAgentPackageCompatibleAsync_ShouldReturnFalse_WhenPackagePathDoesNotExist()
+    {
+        // Arrange
+        var nonExistentPath = Path.Combine(_testDirectory, "missing-package");
+
+        // Act
+        var result = await _sut.IsAgentPackageCompatibleAsync(nonExistentPath);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
     private static async IAsyncEnumerable<string> ToAsyncEnumerable(params string[] lines)
     {
         foreach (var line in lines)
@@ -344,5 +467,20 @@ public sealed class GitHubCopilotPluginTests : IDisposable
             yield return line;
             await Task.Yield();
         }
+    }
+
+    private sealed class ThrowingOnMoveNextAsyncEnumerable(Exception exception) : IAsyncEnumerable<string>
+    {
+        public IAsyncEnumerator<string> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+            => new ThrowingOnMoveNextAsyncEnumerator(exception);
+    }
+
+    private sealed class ThrowingOnMoveNextAsyncEnumerator(Exception exception) : IAsyncEnumerator<string>
+    {
+        public string Current => string.Empty;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public ValueTask<bool> MoveNextAsync() => ValueTask.FromException<bool>(exception);
     }
 }

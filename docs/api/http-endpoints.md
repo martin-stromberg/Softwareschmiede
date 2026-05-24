@@ -17,6 +17,17 @@ Für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentl
 Die Umsetzung erfolgt auf App-Ebene über zusätzliche `<link>`-Einträge in `App.razor` und ein neues statisches Asset in `wwwroot`.
 Details: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
 
+## Feature-Hinweis: Changed Artifact Detection & Agentendefinitions-Compliance
+
+Für das Feature **„Erkennung geänderter Planungsdokumente zusätzlich zu Codedateien und Sicherstellung der Agentendefinitions-Compliance“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Die Umsetzung betrifft bestehende Service-/Plugin-Komponenten (`GitWorkspaceBrowserService`, `WorkspaceSnapshot`, `AufgabeDetail`, `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`) und deren interne Vertragslogik.
+
+- **Ziel:** Vollständige Erkennung geänderter Artefakte (Code + Planung) und verlässliche Agentenpaket-Kompatibilität.
+- **Verhalten:** Keine API-Flächenänderung nach außen; interne Contracts liefern getrennte Listen (`CodeFiles`, `PlanningDocuments`) und robuste Plugin-Fehlerpfade.
+- **Compliance-Regeln:** Für produktive KI-Plugins gilt `.github` als Kompatibilitätskriterium; fehlende Paketpfade/fehlender `.github`-Ordner führen zu kontrolliertem Verhalten statt Hard-Fail.
+- **Testbezug:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`.
+- **Workflow-Auswirkung:** Der Aufgaben-Workflow bleibt auch bei reinen Planungsdokument-Änderungen aktiv, und Agentenbereitstellung wird reproduzierbarer.
+
 ## Öffentliche REST-Endpunkte
 
 | Methode | Pfad | Zweck |
@@ -45,4 +56,6 @@ Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftret
 
 - Detaillierte Diff-API: [diff.md](./diff.md)
 - App-Favicon-Contract: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
+- Live Project Browser Contract: [live-project-browser-git-status.md](./live-project-browser-git-status.md)
+- Plugin- und Agentenpaket-Contracts: [plugin-interfaces.md](./plugin-interfaces.md)
 - API-Index: [README.md](./README.md)

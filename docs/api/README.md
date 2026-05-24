@@ -7,6 +7,7 @@ Technische Dokumentation der öffentlichen Schnittstellen und internen API-Contr
 Die Softwareschmiede stellt öffentliche HTTP-Endpunkte für den Diff-Bereich bereit.
 Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“** wurden **keine neuen öffentlichen REST-Endpunkte** eingeführt.
 Auch für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Auch für das Feature **„Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 
 ## Dokumentierte API-Bereiche
@@ -18,10 +19,10 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 | [diff-viewer.md](./diff-viewer.md) | Technischer UI-/Routen-Contract für den Diff Viewer mit Dual-Mode (Embedded/Standalone), Zustandsverantwortung (`AufgabeDetail`/`DiffPreviewPanel`/`DiffViewer`), FR-4-Fallback-Entscheidungen, Parameterwechsel-Stabilität und kompatibler Wrapper-Route `/diff/{DiffResultId:guid}`. |
 | [aufgabe-recovery.md](./aufgabe-recovery.md) | Interner Service-/UI-Contract für die manuelle Wiederherstellung festhängender Aufgaben (Eligibility, Statuswechsel, Audit, Concurrency-Schutz). |
 | [issue-branch-pr-linking.md](./issue-branch-pr-linking.md) | Interner Contract für Issue-Auswahl, issuebezogene Branch-Erzeugung und PR-Closing-Direktive (`Closes #<Issue>`). |
-| [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Dateivorschau und defensiver Git-Status-Auswertung. |
+| [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Dateivorschau, getrennter Klassifikation von Code-/Planungsänderungen, Testbezug und Workflow-Auswirkung in `AufgabeDetail`. |
 | [local-directory-plugin.md](./local-directory-plugin.md) | Technischer Contract der `IGitPlugin`-Implementierung `LocalDirectoryPlugin` inkl. Workspace-Modi, `git-init`-Fallback, Pull ohne Merge, Push-/Delete-Sync sowie Capability-Flags für die Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden bei Arbeitskopie). |
 | [plugin-default-selection.md](./plugin-default-selection.md) | Interner API-Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** sowie die projektspezifische/aufgabenbezogene `IGitPlugin`-Auflösung (vor Default) inkl. Fallback bei fehlender Repo-Verknüpfung. |
-| [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType`, Plugin-Discovery sowie dynamische Repository-Feldschemata (`GetRepositoryLinkFields`). |
+| [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, Plugin-Discovery und Agentenpaket-Compliance (`.github`-Regel, robuste Fehlerpfade, Deploy-Verhalten, Health-Checks) inkl. Workflow-Einordnung. |
 | [repository-startskript-freier-port.md](./repository-startskript-freier-port.md) | Interner Contract für repositorybezogene Startskripte mit freier Portreservierung, Persistenz (`RepositoryStartKonfiguration`) und Ausführung beim Prozessstart. |
 | [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
 | [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
@@ -71,6 +72,16 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - Technischer Contract: [live-project-browser-git-status.md](./live-project-browser-git-status.md)
 - Ablaufdarstellung: [live-project-browser-git-status-flow.md](../flows/live-project-browser-git-status-flow.md)
 - Fachliche Einordnung: [F021 – Live Project Browser mit Git-Status](../business/features/F021-live-project-browser-git-status.md)
+
+## Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance
+
+- **Ziel:** Sichtbarkeit geänderter Planungsdokumente und reproduzierbare Agentenpaket-Ausführung ohne Contract-Brüche.
+- **Verhalten:** `WorkspaceSnapshot` trennt Änderungen in `CodeFiles` und `PlanningDocuments` inkl. Fallback-Erkennung für Slash-/Dot-Varianten der `docs/*`-Pfade.
+- **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `WorkspaceSnapshot`, `AufgabeDetail`, `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`.
+- **Compliance-Regeln:** `.github` ist das verbindliche Kompatibilitätskriterium für produktive KI-Plugins; fehlende Paketpfade oder fehlender `.github`-Ordner werden kontrolliert behandelt (leere Agentenliste, `false` bei Kompatibilität, Deploy-Skip statt Hard-Fail).
+- **Testbezug:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`.
+- **Workflow-Auswirkung:** Die Aufgabenansicht bleibt auch bei reinen Doku-Änderungen aktiv nutzbar; Agentenpaket-Prüfung und Deploy-Verhalten reduzieren Laufzeitabbrüche im Entwicklungsworkflow.
+- Details: [live-project-browser-git-status.md](./live-project-browser-git-status.md), [plugin-interfaces.md](./plugin-interfaces.md), [planning-overview-changed-artifact-detection.md](../planning-overview-changed-artifact-detection.md)
 
 ## Feature-Fokus: Manuelle Aufgaben-Recovery
 
