@@ -33,6 +33,13 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - Stabilitätsmaßnahmen bei Parameterwechseln (`OnParametersSetAsync`, Cancellation, `loadingVersion`-Guard).
 - Route-Kompatibilität über Wrapper-Page auf `/diff/{DiffResultId:guid}`.
 
+## Feature-Fokus: Korrekte Diff-Anzeige für geänderte Dateien (2026-05-24)
+
+- `AufgabeDetail` nutzt für die eingebettete Vorschau eine dateispezifische Diff-Auflösung statt einer globalen Latest-ID.
+- Neue Service-Query: `GetLatestDiffResultIdForFileAsync(aufgabeId, relativePath)` mit Pfadnormalisierung (`\`/`/`, `./`, Case-Insensitivity).
+- Fallbackpfad: Wenn für `RelativePath` kein Diff gefunden wird, erfolgt ein zweiter Lookup über `SourceRelativePath` (falls sinnvoll).
+- Die Route `/diff/{DiffResultId:guid}` bleibt unverändert und verwendet weiterhin die zuletzt bekannte Diff-ID für den Standalone-Deep-Link.
+
 ## Feature-Fokus: Benachrichtigungssystem für abgeschlossene KI-Aufgaben
 
 - Keine neuen öffentlichen REST-Endpunkte.

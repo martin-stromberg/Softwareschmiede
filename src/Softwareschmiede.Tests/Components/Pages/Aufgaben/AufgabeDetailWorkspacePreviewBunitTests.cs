@@ -1,18 +1,21 @@
 using Bunit;
 using FluentAssertions;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Components.Diff;
 using Softwareschmiede.Components.Pages.Aufgaben;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
+using DomainDiffLine = Softwareschmiede.Domain.Entities.DiffLine;
 
 namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
@@ -66,9 +69,40 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         });
     }
 
-    private async Task<TestHarness> ConfigureComponentServicesAsync(bool loadPreviewShouldThrow = false)
+    /// <summary>
+    /// Verifiziert, dass die Dateiauswahl den dateispezifischen Diff lädt und eine Added-Line sichtbar wird.
+    /// </summary>
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderFileSpecificDiff_WhenSelectedFileHasDiff()
+    {
+        await using var harness = await ConfigureComponentServicesAsync(includeDiffPreviewData: true, includePreviewHints: false);
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        var uri = navigationManager.GetUriWithQueryParameter("view", "tree");
+        navigationManager.NavigateTo(uri);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters
+            .Add(page => page.Id, harness.AufgabeId));
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("alpha.cs"));
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("beta.cs"));
+
+        cut.FindAll(".tree-item").Single(item => item.TextContent.Contains("alpha.cs", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Diff Viewer - File Comparison");
+            cut.Markup.Should().Contain("Added:</strong> 1");
+            cut.Markup.Should().NotContain("Für diese Datei ist kein DiffResult vorhanden.");
+        });
+    }
+
+    private async Task<TestHarness> ConfigureComponentServicesAsync(
+        bool loadPreviewShouldThrow = false,
+        bool includeDiffPreviewData = false,
+        bool includePreviewHints = true)
     {
         var db = TestDbContextFactory.Create();
+        var memoryCache = new MemoryCache(new MemoryCacheOptions());
 
         var projekt = new Projekt
         {
@@ -90,6 +124,14 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
 
         db.Projekte.Add(projekt);
         db.Aufgaben.Add(aufgabe);
+
+        if (includeDiffPreviewData)
+        {
+            db.DiffResults.AddRange(
+                CreateDiffResult(aufgabe.Id, "alpha.cs", "alpha-added-line", DateTimeOffset.UtcNow.AddMinutes(-1)),
+                CreateDiffResult(aufgabe.Id, "beta.cs", "beta-added-line", DateTimeOffset.UtcNow));
+        }
+
         await db.SaveChangesAsync();
 
         var aufgabeService = new AufgabeService(db, NullLogger<AufgabeService>.Instance);
@@ -150,11 +192,27 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
                 if (string.Equals(node.RelativePath, "alpha.cs", StringComparison.Ordinal))
                 {
                     await Task.Delay(250, ct);
-                    return new FilePreview(node.RelativePath, null, false, false, false, "alpha", null, "Hint Alpha");
+                    return new FilePreview(
+                        node.RelativePath,
+                        null,
+                        false,
+                        false,
+                        false,
+                        "alpha-current",
+                        "alpha-original",
+                        includePreviewHints ? "Hint Alpha" : null);
                 }
 
                 await Task.Delay(25, ct);
-                return new FilePreview(node.RelativePath, null, false, false, false, "beta", null, "Hint Beta");
+                return new FilePreview(
+                    node.RelativePath,
+                    null,
+                    false,
+                    false,
+                    false,
+                    "beta-current",
+                    "beta-original",
+                    includePreviewHints ? "Hint Beta" : null);
             });
 
         var arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
@@ -179,6 +237,9 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
             gitPluginMock.Object,
             pluginSelection,
             NullLogger<GitOrchestrationService>.Instance);
+        var diffAlgorithmService = new DiffAlgorithmService(NullLogger<DiffAlgorithmService>.Instance);
+        var diffCachingService = new DiffCachingService(db, memoryCache, NullLogger<DiffCachingService>.Instance);
+        var diffService = new DiffService(db, diffAlgorithmService, diffCachingService, NullLogger<DiffService>.Instance);
 
         var runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
         runningStatusSourceMock.Setup(source => source.GetRunningCount()).Returns(0);
@@ -193,13 +254,15 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         Services.AddSingleton(entwicklungsprozessService);
         Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
         Services.AddSingleton(gitService);
+        Services.AddSingleton(diffService);
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);
         Services.AddSingleton(agentPackageServiceMock.Object);
         Services.AddSingleton(workspaceBrowserServiceMock.Object);
+        Services.AddSingleton<ILogger<DiffViewer>>(NullLogger<DiffViewer>.Instance);
         Services.AddSingleton<ILogger<AufgabeDetail>>(NullLogger<AufgabeDetail>.Instance);
 
-        return new TestHarness(db, aufgabe.Id);
+        return new TestHarness(db, memoryCache, aufgabe.Id);
     }
 
     private static WorkspaceSnapshot CreateWorkspaceSnapshot()
@@ -232,14 +295,66 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         };
     }
 
+    private static DiffResult CreateDiffResult(Guid aufgabeId, string filePath, string addedLineContent, DateTimeOffset generatedAt)
+    {
+        var diffResultId = Guid.NewGuid();
+        var blockId = Guid.NewGuid();
+
+        return new DiffResult
+        {
+            Id = diffResultId,
+            AufgabeId = aufgabeId,
+            FilePath = filePath,
+            SourceVersion = "HEAD~1",
+            TargetVersion = "HEAD",
+            Status = DiffResultStatus.Generated,
+            DiffType = DiffType.Full,
+            GeneratedAt = generatedAt,
+            GeneratedBy = nameof(AufgabeDetailWorkspacePreviewBunitTests),
+            AddedLines = 1,
+            RemovedLines = 0,
+            ModifiedLines = 0,
+            LineCount = 1,
+            DiffBlocks =
+            [
+                new DiffBlock
+                {
+                    Id = blockId,
+                    DiffResultId = diffResultId,
+                    BlockType = DiffBlockType.Added,
+                    BlockSequence = 0,
+                    SourceStartLine = 1,
+                    SourceEndLine = 1,
+                    TargetStartLine = 1,
+                    TargetEndLine = 1,
+                    DiffLines =
+                    [
+                        new DomainDiffLine
+                        {
+                            Id = Guid.NewGuid(),
+                            DiffBlockId = blockId,
+                            LineStatus = DiffLineStatus.Added,
+                            Content = addedLineContent,
+                            SourceLineNumber = null,
+                            TargetLineNumber = 1,
+                            LineSequence = 0,
+                        },
+                    ],
+                },
+            ],
+        };
+    }
+
     private sealed class TestHarness(
         Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext db,
+        MemoryCache memoryCache,
         Guid aufgabeId) : IAsyncDisposable
     {
         public Guid AufgabeId { get; } = aufgabeId;
 
         public ValueTask DisposeAsync()
         {
+            memoryCache.Dispose();
             db.Dispose();
             return ValueTask.CompletedTask;
         }

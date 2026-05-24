@@ -48,8 +48,10 @@ Keine.
 ## 6. Zustandsverantwortung und FR-4-Fallbacks
 
 ### `AufgabeDetail` (Orchestrierung)
-- Lädt und hält den Kontext (`_latestDiffResultId`, Dateiauswahl, Workspace-Preview).
-- Übergibt `HasSelectedFile`, `Preview` und `DiffResultId` an `DiffPreviewPanel`.
+- Lädt und hält den Kontext (`_latestDiffResultId` für den Standalone-Button, Dateiauswahl, Workspace-Preview).
+- Ermittelt bei Dateiauswahl eine **dateispezifische** Diff-ID in `_selectedWorkspaceDiffResultId` via `ResolveSelectedWorkspaceDiffResultIdAsync`.
+- Übergibt `HasSelectedFile`, `Preview` und die dateispezifische `DiffResultId` an `DiffPreviewPanel`.
+- Lookup-Logik: `GetLatestDiffResultIdForFileAsync(aufgabeId, relativePath)` mit Pfadnormalisierung sowie Fallback auf `SourceRelativePath`, wenn für `RelativePath` kein Treffer vorliegt.
 - Unterstützt direkte Navigation zur kompatiblen Route per `NavigationManager.NavigateTo($"/diff/{diffResultId}")`.
 
 ### `DiffPreviewPanel` (Fallback-Entscheidung)
@@ -59,7 +61,7 @@ Keine.
   3. `Preview.Hint` vorhanden → FR-4-Fallback-Hinweis (Warning) und optional `CurrentContent`.
   4. `DiffResultId` vorhanden → eingebetteter `DiffViewer`.
   5. Datei gelöscht (`Preview.IsDeleted`) → Hinweis „Datei gelöscht … kein Diff verfügbar.“
-  6. Sonst → Hinweis „kein DiffResult vorhanden“.
+  6. Sonst → Hinweis „kein DiffResult vorhanden“ (nur wenn für die ausgewählte Datei tatsächlich kein Diff gefunden wurde).
 
 ### `DiffViewer` (Laden und Rendern)
 - Lädt das Diff über `DiffService.GetDiffAsync(diffResultId, cancellationToken)`.

@@ -1,3 +1,57 @@
+# Dokumentationsplan – Korrekte Diff-Anzeige im DiffViewer für geänderte Dateien – 2026-05-24
+
+## Kontext
+- Feature laut Auftrag umgesetzt: **Korrekte Diff-Anzeige im DiffViewer für geänderte Dateien**.
+- Vorhandene Artefakte geprüft: `docs/requirements/diffviewer-correct-diff-display-*`, `docs/architecture/diffviewer-correct-diff-display-*`, `docs/tests/testplan-diffviewer-geaenderte-dateien.md`, `docs/tests/testluecken-diffviewer-geaenderte-dateien.md`.
+- Agentendefinition `documentation-orchestrator` wurde befolgt; der vorgesehene Subagentenlauf war wegen API-Rate-Limit nicht verfügbar, daher manueller Vollablauf im selben Schema.
+
+## Phase 1 – Analyse
+
+### 1) API-Docs-Analyse
+- `docs/api/` existiert und ist umfangreich dokumentiert.
+- Spezifischer Soll-Ist-Abgleich zum Feature zeigte veraltete Formulierungen in `docs/api/diff-viewer.md` (globale `_latestDiffResultId`-Sicht statt dateispezifischer Vorschau-ID).
+- Pfad `src/ReceiptScanner.Api/Endpoints/` existiert im Repository nicht; Endpoint-Inventar wurde stattdessen gegen bestehende Softwareschmiede-Struktur abgeglichen (öffentliche Diff-REST-Endpunkte unter `/api/diff` bleiben unverändert).
+
+### 2) Flow-Docs-Analyse
+- `docs/flows/` existiert inkl. `diffviewer-integration-flow.md`.
+- Lücke: Ablaufbeschreibung spiegelte noch nicht vollständig die dateispezifische Auflösung (`ResolveSelectedWorkspaceDiffResultIdAsync` + `GetLatestDiffResultIdForFileAsync`) wider.
+
+### 3) Business-Docs-Analyse
+- `docs/business/` existiert mit Featurekatalog bis F024.
+- Lücke: F022 beschrieb den Nutzen bereits, aber die präzise Aussage „Meldung nur wenn für ausgewählte Datei kein Diff existiert“ war nicht explizit genug.
+
+### 4) README-Analyse
+- README-Struktur vollständig (Projektname, Features, Installation, Usage, Konfiguration, Architektur, Tests, Deployment, Lizenz, Changelog).
+- Lücken: dateispezifische Diff-Auflösung und neue DiffViewer-Testplan/-Lückenartefakte waren nicht vollständig in Features/Tests/Changelog integriert.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** API-/Flow-Doku auf dateispezifische Diff-Zuordnung aktualisieren.
+2. **Hoch:** README auf Feature- und Testartefaktstand synchronisieren.
+3. **Mittel:** Business-Formulierungen zu F022 präzisieren und Querverweise konsistent halten.
+
+## Ergebnis (Phase 3)
+
+### Aktualisiert
+1. `docs/api/diff-viewer.md`
+2. `docs/api/README.md`
+3. `docs/flows/diffviewer-integration-flow.md`
+4. `docs/flows/README.md`
+5. `docs/business/features/F022-diff-vergleichskomponente.md`
+6. `docs/business/features.md`
+7. `README.md`
+
+### Validierung
+- Existenz-/Nicht-Leerheitsprüfung der aktualisierten Dateien: **erfolgreich**.
+- Konsistenzabgleich gegen implementierte Feature-Änderungen durchgeführt:
+  - `AufgabeDetail`: `_selectedWorkspaceDiffResultId`, `ResolveSelectedWorkspaceDiffResultIdAsync`
+  - `AufgabeService`: `GetLatestDiffResultIdForFileAsync` inkl. Pfadnormalisierung
+  - Tests: `AufgabeServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken im Feature-Scope identifiziert.
+
+---
+
 # Dokumentationsplan – Diff-Funktionalität & ergänzte Tests – 2026-05-22
 
 ## Kontext

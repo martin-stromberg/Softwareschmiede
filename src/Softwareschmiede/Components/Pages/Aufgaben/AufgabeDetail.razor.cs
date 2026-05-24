@@ -47,6 +47,7 @@ public partial class AufgabeDetail : IDisposable
     private bool _useTreeLayout = true;
     private bool _loadingWorkspace;
     private Guid? _latestDiffResultId;
+    private Guid? _selectedWorkspaceDiffResultId;
     private long _previewLoadVersion;
     private bool HasSelectedWorkspaceFile => _selectedWorkspaceNode is not null && !_selectedWorkspaceNode.IsDirectory;
 
@@ -150,6 +151,7 @@ public partial class AufgabeDetail : IDisposable
     private async Task LadeAsync()
     {
         _loading = true;
+        _selectedWorkspaceDiffResultId = null;
         _aufgabe = await AufgabeService.GetDetailAsync(Id);
         _latestDiffResultId = await AufgabeService.GetLatestDiffResultIdAsync(Id);
         if (_aufgabe is not null)
@@ -195,6 +197,7 @@ public partial class AufgabeDetail : IDisposable
             var protokollService = scope.ServiceProvider.GetRequiredService<ProtokollService>();
 
             _loading = true;
+            _selectedWorkspaceDiffResultId = null;
             _aufgabe = await aufgabeService.GetDetailAsync(Id);
             _latestDiffResultId = await aufgabeService.GetLatestDiffResultIdAsync(Id);
             if (_aufgabe is not null)
@@ -233,6 +236,7 @@ public partial class AufgabeDetail : IDisposable
         {
             _logger.LogError(ex, "Fehler beim Laden der Aufgabendaten");
             _latestDiffResultId = null;
+            _selectedWorkspaceDiffResultId = null;
             _recoveryAllowed = false;
             _recoveryDisabledReason = null;
             _loading = false;
@@ -609,6 +613,7 @@ public partial class AufgabeDetail : IDisposable
             _workspaceSnapshot = WorkspaceSnapshot.FromError("Kein lokaler Klonpfad vorhanden.");
             _selectedWorkspaceNode = null;
             _selectedWorkspacePreview = null;
+            _selectedWorkspaceDiffResultId = null;
             return;
         }
 
@@ -637,6 +642,7 @@ public partial class AufgabeDetail : IDisposable
             else
             {
                 _selectedWorkspacePreview = null;
+                _selectedWorkspaceDiffResultId = null;
             }
         }
         catch (Exception ex)
@@ -645,6 +651,7 @@ public partial class AufgabeDetail : IDisposable
             _workspaceSnapshot = WorkspaceSnapshot.FromError(ex.Message);
             _selectedWorkspaceNode = null;
             _selectedWorkspacePreview = null;
+            _selectedWorkspaceDiffResultId = null;
         }
         finally
         {
@@ -666,6 +673,7 @@ public partial class AufgabeDetail : IDisposable
             _selectedWorkspacePath = node.RelativePath;
             _selectedWorkspaceNode = node;
             _selectedWorkspacePreview = null;
+            _selectedWorkspaceDiffResultId = null;
             var preview = await GitWorkspaceBrowserService.LoadPreviewAsync(_aufgabe.LokalerKlonPfad, node, _cts.Token);
             if (requestVersion != _previewLoadVersion || !string.Equals(_selectedWorkspacePath, node.RelativePath, StringComparison.OrdinalIgnoreCase))
             {
@@ -673,6 +681,7 @@ public partial class AufgabeDetail : IDisposable
             }
 
             _selectedWorkspacePreview = preview;
+            _selectedWorkspaceDiffResultId = await ResolveSelectedWorkspaceDiffResultIdAsync(preview);
         }
         catch (Exception ex)
         {
@@ -683,7 +692,27 @@ public partial class AufgabeDetail : IDisposable
 
             _logger.LogError(ex, "Workspace preview konnte nicht geladen werden.");
             _selectedWorkspacePreview = new FilePreview(node.RelativePath, node.SourceRelativePath, node.IsDeleted, false, false, null, null, ex.Message);
+            _selectedWorkspaceDiffResultId = null;
         }
+    }
+
+    private async Task<Guid?> ResolveSelectedWorkspaceDiffResultIdAsync(FilePreview preview)
+    {
+        var relativePath = preview.RelativePath;
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return null;
+        }
+
+        var diffResultId = await AufgabeService.GetLatestDiffResultIdForFileAsync(Id, relativePath, _cts.Token);
+        if (diffResultId.HasValue
+            || string.IsNullOrWhiteSpace(preview.SourceRelativePath)
+            || string.Equals(preview.SourceRelativePath, relativePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return diffResultId;
+        }
+
+        return await AufgabeService.GetLatestDiffResultIdForFileAsync(Id, preview.SourceRelativePath, _cts.Token);
     }
 
     private static WorkspaceFileNode? FindNode(IEnumerable<WorkspaceFileNode> nodes, string relativePath)
@@ -781,6 +810,7 @@ public partial class AufgabeDetail : IDisposable
             _selectedWorkspaceNode = node;
             _selectedWorkspacePreview = null;
             _selectedWorkspacePath = node.RelativePath;
+            _selectedWorkspaceDiffResultId = null;
             return;
         }
 

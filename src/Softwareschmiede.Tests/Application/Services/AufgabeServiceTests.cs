@@ -106,6 +106,42 @@ public sealed class AufgabeServiceTests : IDisposable
         result.LokalerKlonPfad.Should().Be("/tmp/klon");
     }
 
+    /// <summary>GetLatestDiffResultIdForFileAsync liefert den neuesten dateispezifischen Diff auch bei unterschiedlicher Pfadnotation.</summary>
+    [Fact]
+    public async Task GetLatestDiffResultIdForFileAsync_ShouldReturnNewestMatchingDiff_WhenPathUsesDifferentSeparators()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Diff-Aufgabe", null);
+        var older = CreateDiffResult(aufgabe.Id, @"src\module\alpha.cs", DateTimeOffset.UtcNow.AddMinutes(-5));
+        var newer = CreateDiffResult(aufgabe.Id, "src/module/alpha.cs", DateTimeOffset.UtcNow);
+        var otherFile = CreateDiffResult(aufgabe.Id, "src/module/beta.cs", DateTimeOffset.UtcNow.AddMinutes(1));
+
+        _db.DiffResults.AddRange(older, newer, otherFile);
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetLatestDiffResultIdForFileAsync(aufgabe.Id, "./src/module/alpha.cs");
+
+        // Assert
+        result.Should().Be(newer.Id);
+    }
+
+    /// <summary>GetLatestDiffResultIdForFileAsync liefert null, wenn kein Diff für die Datei vorhanden ist.</summary>
+    [Fact]
+    public async Task GetLatestDiffResultIdForFileAsync_ShouldReturnNull_WhenNoDiffForFileExists()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Diff-Aufgabe ohne Treffer", null);
+        _db.DiffResults.Add(CreateDiffResult(aufgabe.Id, "src/module/existing.cs", DateTimeOffset.UtcNow));
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetLatestDiffResultIdForFileAsync(aufgabe.Id, "src/module/missing.cs");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
     /// <summary>KiAktiviertAsync setzt Status auf KiAktiv.</summary>
     [Fact]
     public async Task KiAktiviertAsync_ShouldSetStatusKiAktiv_WhenAufgabeExists()
@@ -295,5 +331,54 @@ public sealed class AufgabeServiceTests : IDisposable
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
         result!.Status.Should().Be(AufgabeStatus.Fehlgeschlagen);
+    }
+
+    private static DiffResult CreateDiffResult(Guid aufgabeId, string filePath, DateTimeOffset generatedAt)
+    {
+        var diffResultId = Guid.NewGuid();
+        var blockId = Guid.NewGuid();
+
+        return new DiffResult
+        {
+            Id = diffResultId,
+            AufgabeId = aufgabeId,
+            FilePath = filePath,
+            SourceVersion = "HEAD~1",
+            TargetVersion = "HEAD",
+            Status = DiffResultStatus.Generated,
+            DiffType = DiffType.Full,
+            GeneratedAt = generatedAt,
+            GeneratedBy = nameof(AufgabeServiceTests),
+            AddedLines = 1,
+            RemovedLines = 0,
+            ModifiedLines = 0,
+            LineCount = 1,
+            DiffBlocks =
+            [
+                new DiffBlock
+                {
+                    Id = blockId,
+                    DiffResultId = diffResultId,
+                    BlockType = DiffBlockType.Added,
+                    BlockSequence = 0,
+                    SourceStartLine = 1,
+                    SourceEndLine = 1,
+                    TargetStartLine = 1,
+                    TargetEndLine = 1,
+                    DiffLines =
+                    [
+                        new DiffLine
+                        {
+                            Id = Guid.NewGuid(),
+                            DiffBlockId = blockId,
+                            LineStatus = DiffLineStatus.Added,
+                            Content = "added line",
+                            TargetLineNumber = 1,
+                            LineSequence = 0,
+                        },
+                    ],
+                },
+            ],
+        };
     }
 }
