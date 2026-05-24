@@ -1133,3 +1133,32 @@
 
 ### Offene Punkte
 - Keine kritischen offenen Dokumentationslücken für den Feature-Scope identifiziert.
+
+---
+
+# Dokumentationsplan – AufgabeDetail Projektanzeige (Aktueller Lauf) – 2026-05-24
+
+## Kontext
+- Dokumentationsfokus: Umsetzung der Anforderung aus 4fcaf29-0813-44e1-af72-436adebe6c42.copilot-task.md.
+- Ziel: Projektname in AufgabeDetail unter dem Titel als reiner Text dokumentieren, inklusive Testergänzungen.
+
+## Phase 1 – Analyse
+- Umsetzung identifiziert in:
+  - src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor
+  - src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs
+  - src/Softwareschmiede/Application/Services/AufgabeService.cs
+  - src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs
+
+## Phase 3 – Ergebnis
+### Neu erstellt
+1. docs/requirements/aufgabe-detail-projektanzeige-requirements-analysis.md
+2. docs/tests/testplan-aufgabe-detail-projektanzeige.md
+3. docs/lifecycle-report-aufgabe-detail-projektanzeige.md
+
+### Aktualisiert
+1. docs/business/features/F002-aufgabenverwaltung.md
+2. docs/tests/README.md
+3. docs/documentation-plan.md
+
+### Hinweis
+- Die Datei ~/.copilot/agents/documentation-orchestrator.agent.md war in der Laufzeitumgebung nicht verfügbar; der Ablauf wurde dennoch vollständig nach Orchestrator-Schema durchgeführt.

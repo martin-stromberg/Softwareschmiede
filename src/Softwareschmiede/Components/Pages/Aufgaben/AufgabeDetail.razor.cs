@@ -50,6 +50,10 @@ public partial class AufgabeDetail : IDisposable
     private Guid? _selectedWorkspaceDiffResultId;
     private long _previewLoadVersion;
     private bool HasSelectedWorkspaceFile => _selectedWorkspaceNode is not null && !_selectedWorkspaceNode.IsDirectory;
+    private string ProjektAnzeigeText =>
+        string.IsNullOrWhiteSpace(_aufgabe?.Projekt?.Name)
+            ? "Projekt: ohne projekt"
+            : $"Projekt: {_aufgabe.Projekt.Name}";
 
     // Subscription auf laufende KI-Session (wird beim Dispose freigegeben)
     private IDisposable? _kiSubscription;

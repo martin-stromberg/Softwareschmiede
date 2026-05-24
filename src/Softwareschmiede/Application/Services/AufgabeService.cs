@@ -57,9 +57,10 @@ public sealed class AufgabeService
         _logger.LogInformation("Aufgabe {AufgabeId} mit Details abrufen.", id);
         return await _db.Aufgaben
             .AsNoTracking()
+            .Include(a => a.Projekt)
             .Include(a => a.IssueReferenz)
             .Include(a => a.GitRepository)
-                .ThenInclude(r => r.StartKonfiguration)
+                .ThenInclude(r => r!.StartKonfiguration)
             .Include(a => a.Protokolleintraege)
                 .ThenInclude(p => p.TestErgebnisse)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
