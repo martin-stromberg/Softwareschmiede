@@ -148,6 +148,11 @@ Stand: **2026-05-22**
 - Farbkodierte Statusanzeige (KI aktiv = blau, Fehlgeschlagen = rot, Abgeschlossen = grün)
 - Direktnavigation zum Aufgabenprotokoll per Klick
 
+### 🎨 Branding & UI-Assets
+- Anwendung nutzt ein dediziertes SVG-Favicon `favicon-hammer-pick.svg` (gekreuzter Hammer/Pickel) aus `src/Softwareschmiede/wwwroot/`
+- Browser-Head enthält konsistente SVG-Referenzen (`icon`, `shortcut icon`, `mask-icon`) für moderne Browserdarstellung
+- Legacy-Favicon-Verweise (`favicon.ico`, `favicon.png`) wurden aus `App.razor` entfernt
+
 ---
 
 ## 📸 UI-Status
@@ -294,6 +299,12 @@ Details zu den einzelnen Schritten:
 - [Feature-Dokumentation](docs/business/features.md)
 - [Requirements: Kontextsteuerung bei Folgeanweisungen](docs/requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md)
 - [Architektur: Kontextsteuerung bei Folgeanweisungen](docs/architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md)
+
+### SVG-Favicon im Browser verifizieren
+
+1. Anwendung lokal starten (`dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj`).
+2. Browser-Tab der App öffnen und Favicon prüfen (Hammer/Pickel-Symbol).
+3. Optional DevTools öffnen und im `<head>` prüfen, dass `favicon-hammer-pick.svg` in `icon`, `shortcut icon` und `mask-icon` referenziert wird.
 
 ---
 
@@ -612,6 +623,9 @@ Feature-spezifische Testartefakte:
   - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
   - UI-/Dispatch-Logik (Modusmatrix, Dedupe, Audio-/Toast-Verhalten, Audit): `src/Softwareschmiede.Tests/Components/Layout/MainLayoutTests.cs`
   - Einstellungs- und Audio-Validierung/Persistenz: `src/Softwareschmiede.Tests/Application/Services/BenachrichtigungsEinstellungenServiceTests.cs`
+- SVG-Favicon (Hammer/Pickel):
+  - Markup-Referenzen in `App.razor` (SVG-Link-Tags, keine Legacy-Favicon-Dateien): `src/Softwareschmiede.Tests/Components/AppTests.cs`
+  - Statisches Asset (Existenz + SVG-Struktur/Branding-Marker): `src/Softwareschmiede.Tests/Infrastructure/StaticAssets/FaviconHammerPickSvgTests.cs`
 - [Testplan: Arbeitsverzeichnis](docs/tests/testplan-arbeitsverzeichnis.md)
 - [Testlücken: Arbeitsverzeichnis](docs/tests/testluecken-arbeitsverzeichnis.md)
 - [Testplan: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/tests/testplan-separates-arbeitsverzeichnis-git-workflow-fallback.md)
@@ -663,6 +677,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - Testsektion und Dokumentationsindex um neue Startskript-/Port-Tests und Planungsartefakte erweitert
 - `start.ps1`-Skriptvertrag für Visual-Studio-Debug ergänzt (Aufruf, Parameter/Env-Priorität, Exit-Codes, F5-Workflow)
 - DiffViewer-Korrektur dokumentiert: dateispezifische Diff-Auflösung für geänderte Dateien in `AufgabeDetail` inkl. Pfadnormalisierung/Fallback und ergänzter Testabdeckung
+- SVG-Favicon `favicon-hammer-pick.svg` dokumentiert (Features/Usage) inkl. ergänzter Testabdeckung für Head-Markup und statische Asset-Validierung
 
 ---
 
@@ -709,16 +724,19 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F020: Repository-Startskript mit freier Portzuweisung](docs/business/features/F020-repository-startskript-freier-port.md) | Fachliche Beschreibung der repositorybezogenen Startskript-Konfiguration mit Portreservierung beim Prozessstart |
 | [Feature F021: Live Project Browser mit Git-Status](docs/business/features/F021-live-project-browser-git-status.md) | Fachliche Beschreibung des Live Project Browsers auf der Aufgabenseite mit Git-Status, Tree-/Listenansicht und Dateivorschau |
 | [Feature F022: Diff-Vergleichskomponente](docs/business/features/F022-diff-vergleichskomponente.md) | Fachliche Beschreibung des Diff-Viewers inkl. eingebetteter Nutzung und Standalone-Route |
+| [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
 | [Requirements: LocalDirectoryPlugin](docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | Umsetzungsnahe Anforderungen und Akzeptanzkriterien für WorkspaceMode, Guardrails und Fehlerverhalten |
 | [Architektur: LocalDirectoryPlugin](docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | Technische Architektur für LocalDirectoryPlugin, Settings und Integrationspfad |
 | [Flow: LocalDirectoryPlugin](docs/flows/local-directory-plugin-flow.md) | Ablaufdarstellung für Clone-/Workspace-Auflösung, Guardrails und Folgeoperationen |
 | [Flow: Diff-Pipeline](docs/flows/diff-service-flow.md) | End-to-End-Ablauf der Diff-Erzeugung inkl. Cache-/Persistenzpfad und Fehlerbehandlung |
 | [Flow: DiffViewer-Integration](docs/flows/diffviewer-integration-flow.md) | UI-Integrationsfluss zwischen AufgabeDetail, DiffPreviewPanel und DiffViewer inkl. FR-4-Fallbacklogik |
+| [Flow: Favicon-Auslieferung](docs/flows/favicon-delivery-flow.md) | Ablauf der Favicon-Referenzierung im Head und statischen Auslieferung von `favicon-hammer-pick.svg` |
 | [Flow: Issue-, Branch- und PR-Verknüpfung](docs/flows/issue-branch-pr-linking-flow.md) | End-to-End-Ablauf von der Issue-Auswahl über den issuebezogenen Branch bis zur PR-Closing-Direktive |
 | [Flow: Repository-Startskript mit freier Portzuweisung](docs/flows/repository-startskript-freier-port-flow.md) | Ablauf für Startkonfiguration, Portreservierung und Skriptausführung beim Aufgabenstart |
 | [API: Repository-Startskript mit freier Portzuweisung](docs/api/repository-startskript-freier-port.md) | Technischer Contract für Persistenz, Validierung, Portmodus und Skript-Execution |
 | [API: Diff-Endpunkte](docs/api/http-endpoints.md) | Übersicht der öffentlichen REST-Endpunkte des Diff-Bereichs (`/api/diff`) |
 | [API: Diff Viewer (`/diff/{DiffResultId:guid}`)](docs/api/diff-viewer.md) | Technischer Contract der Standalone-Route und ihres Wrapper-Verhaltens zur eingebetteten Komponente |
+| [API: App-Favicon-Integration](docs/api/favicon-hammer-pick-svg.md) | Technischer App-/Asset-Contract für die SVG-Favicon-Einbindung ohne neue REST-Endpunkte |
 | [API: `start.ps1` für Visual-Studio-Debug](docs/api/start-ps1-visual-studio-freier-http-port.md) | Technischer Skriptvertrag für Aufruf, Portquellen-Priorität, Exit-Codes und Debug-Workflow |
 | [Flow: `start.ps1` für Visual-Studio-Debug](docs/flows/start-ps1-visual-studio-freier-http-port-flow.md) | Ablauf von Portauflösung über `launchSettings`-Update bis zur Rückgabe der Exit-Codes |
 | [Requirements: Repository-Startskript mit freier Portzuweisung](docs/requirements/repository-startskript-freier-port-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für Startskript-Auswahl und konfliktfreie Portzuweisung |
@@ -729,7 +747,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Architektur: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/architecture/separates-arbeitsverzeichnis-git-init-fallback-architecture-blueprint.md) | Architekturentscheidungen und Sequenzen für den separaten Workspace-Workflow |
 | [Architecture Review: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/improvements/separates-arbeitsverzeichnis-git-init-fallback-architecture-review.md) | Review-Findings und Qualitätsauflagen für Pull-/Push-/Delete-Sync-Regeln |
 | [ERM: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/architecture/separates-arbeitsverzeichnis-git-init-fallback-entity-relationship-model.md) | Domänenmodell für Sync-Delta, Delete-Kandidaten und Workflow-Zustände |
-| [Dokumentationsplan](docs/documentation-plan.md) | Analyse und Maßnahmenplan zur Doku-Aktualisierung (inkl. Feature „Benachrichtigungssystem für abgeschlossene KI-Aufgaben“) |
+| [Dokumentationsplan](docs/documentation-plan.md) | Analyse und Maßnahmenplan zur Doku-Aktualisierung (u. a. DiffViewer, Benachrichtigungssystem, SVG-Favicon `favicon-hammer-pick.svg`) |
 | [Anforderungen: Plugin-Klassenbibliotheken](docs/requirements/plugin-klassenbibliotheken-github-und-copilot.md) | Feature-Anforderungen für Plugin-Architektur und Build-Auslieferung |
 | [Architektur: Plugin-Klassenbibliotheken](docs/architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md) | Technische Architektur für Discovery, Build/Pipeline und Plugin-Design |
 | [Architecture Review: Plugin-Klassenbibliotheken](docs/improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md) | Architekturprüfung mit Findings und Maßnahmen |
