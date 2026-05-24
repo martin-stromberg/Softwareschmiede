@@ -36,14 +36,30 @@ public sealed class ClaudeCliPluginTests : IDisposable
         _sut.GetSettingGroups().Single().Fields.Should().ContainSingle(f => f.Key == "Token");
     }
 
-    /// <summary>Reads agents from .github when folder exists.</summary>
+    /// <summary>Reads agents only from .claude/commands when folder exists.</summary>
     [Fact]
-    public async Task GetAvailableAgentsAsync_ShouldUseGithubFolder_WhenPresent()
+    public async Task GetAvailableAgentsAsync_ShouldUseCommandsFolder_WhenPresent()
     {
-        var githubDir = Path.Combine(_testDirectory, ".github");
-        Directory.CreateDirectory(githubDir);
+        var commandsDir = Path.Combine(_testDirectory, ".claude", "commands");
+        Directory.CreateDirectory(commandsDir);
         await File.WriteAllTextAsync(Path.Combine(_testDirectory, "root.agent.md"), "description: root");
-        await File.WriteAllTextAsync(Path.Combine(githubDir, "inside.agent.md"), "description: inside");
+        await File.WriteAllTextAsync(Path.Combine(commandsDir, "inside.agent.md"), "description: inside");
+
+        var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).ToList();
+
+        result.Should().ContainSingle(a => a.Name == "inside");
+        result.Should().NotContain(a => a.Name == "root");
+    }
+
+    /// <summary>Ignores agents outside the .claude/commands folder.</summary>
+    [Fact]
+    public async Task GetAvailableAgentsAsync_ShouldIgnoreAgentsOutsideCommandsFolder()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var commandsDir = Path.Combine(_testDirectory, ".claude", "commands");
+        Directory.CreateDirectory(commandsDir);
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "root.agent.md"), "description: root");
+        await File.WriteAllTextAsync(Path.Combine(commandsDir, "inside.agent.md"), "description: inside");
 
         var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).ToList();
 
@@ -66,14 +82,15 @@ public sealed class ClaudeCliPluginTests : IDisposable
     [Fact]
     public async Task GetAvailableAgentsAsync_ShouldUseFallbackDescription_WhenFrontmatterHasNoDescription()
     {
-        Directory.CreateDirectory(_testDirectory);
+        var commandsDir = Path.Combine(_testDirectory, ".claude", "commands");
+        Directory.CreateDirectory(commandsDir);
         const string content = """
             ---
             name: fallback-agent
             ---
             Fallback description line
             """;
-        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "fallback-agent.agent.md"), content);
+        await File.WriteAllTextAsync(Path.Combine(commandsDir, "fallback-agent.agent.md"), content);
 
         var result = (await _sut.GetAvailableAgentsAsync(_testDirectory)).Single();
 
@@ -163,9 +180,9 @@ public sealed class ClaudeCliPluginTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>Returns false if package has no .github folder.</summary>
+    /// <summary>Returns false if package has no .claude/commands folder.</summary>
     [Fact]
-    public async Task IsAgentPackageCompatibleAsync_ShouldReturnFalse_WhenGithubFolderMissing()
+    public async Task IsAgentPackageCompatibleAsync_ShouldReturnFalse_WhenCommandsFolderMissing()
     {
         Directory.CreateDirectory(_testDirectory);
 
@@ -185,31 +202,31 @@ public sealed class ClaudeCliPluginTests : IDisposable
         result.Should().BeFalse();
     }
 
-    /// <summary>Returns true when package has .github folder.</summary>
+    /// <summary>Returns true when package has .claude/commands folder.</summary>
     [Fact]
-    public async Task IsAgentPackageCompatibleAsync_ShouldReturnTrue_WhenGithubFolderExists()
+    public async Task IsAgentPackageCompatibleAsync_ShouldReturnTrue_WhenCommandsFolderExists()
     {
-        Directory.CreateDirectory(Path.Combine(_testDirectory, ".github"));
+        Directory.CreateDirectory(Path.Combine(_testDirectory, ".claude", "commands"));
 
         var result = await _sut.IsAgentPackageCompatibleAsync(_testDirectory);
 
         result.Should().BeTrue();
     }
 
-    /// <summary>Copies .github files recursively during deploy.</summary>
+    /// <summary>Copies .claude files recursively during deploy.</summary>
     [Fact]
-    public async Task DeployAgentPackageAsync_ShouldCopyGithubFilesRecursively()
+    public async Task DeployAgentPackageAsync_ShouldCopyClaudeFilesRecursively()
     {
         var packagePath = Path.Combine(_testDirectory, "package");
         var repoPath = Path.Combine(_testDirectory, "repo");
-        var sourceWorkflows = Path.Combine(packagePath, ".github", "workflows");
+        var sourceWorkflows = Path.Combine(packagePath, ".claude", "commands");
         Directory.CreateDirectory(sourceWorkflows);
         Directory.CreateDirectory(repoPath);
-        await File.WriteAllTextAsync(Path.Combine(sourceWorkflows, "ci.yml"), "name: CI");
+        await File.WriteAllTextAsync(Path.Combine(sourceWorkflows, "agent.agent.md"), "name: CI");
 
         await _sut.DeployAgentPackageAsync(packagePath, repoPath);
 
-        var targetFile = Path.Combine(repoPath, ".github", "workflows", "ci.yml");
+        var targetFile = Path.Combine(repoPath, ".claude", "commands", "agent.agent.md");
         File.Exists(targetFile).Should().BeTrue();
         (await File.ReadAllTextAsync(targetFile)).Should().Be("name: CI");
     }
@@ -220,21 +237,21 @@ public sealed class ClaudeCliPluginTests : IDisposable
     {
         var packagePath = Path.Combine(_testDirectory, "package");
         var repoPath = Path.Combine(_testDirectory, "repo");
-        var sourceWorkflows = Path.Combine(packagePath, ".github", "workflows");
-        var targetWorkflows = Path.Combine(repoPath, ".github", "workflows");
+        var sourceWorkflows = Path.Combine(packagePath, ".claude", "commands");
+        var targetWorkflows = Path.Combine(repoPath, ".claude", "commands");
         Directory.CreateDirectory(sourceWorkflows);
         Directory.CreateDirectory(targetWorkflows);
-        await File.WriteAllTextAsync(Path.Combine(sourceWorkflows, "ci.yml"), "new");
-        await File.WriteAllTextAsync(Path.Combine(targetWorkflows, "ci.yml"), "old");
+        await File.WriteAllTextAsync(Path.Combine(sourceWorkflows, "agent.agent.md"), "new");
+        await File.WriteAllTextAsync(Path.Combine(targetWorkflows, "agent.agent.md"), "old");
 
         await _sut.DeployAgentPackageAsync(packagePath, repoPath);
 
-        (await File.ReadAllTextAsync(Path.Combine(targetWorkflows, "ci.yml"))).Should().Be("new");
+        (await File.ReadAllTextAsync(Path.Combine(targetWorkflows, "agent.agent.md"))).Should().Be("new");
     }
 
-    /// <summary>Skips deploy when .github does not exist in package.</summary>
+    /// <summary>Skips deploy when .claude does not exist in package.</summary>
     [Fact]
-    public async Task DeployAgentPackageAsync_ShouldDoNothing_WhenGithubFolderMissing()
+    public async Task DeployAgentPackageAsync_ShouldDoNothing_WhenClaudeFolderMissing()
     {
         var packagePath = Path.Combine(_testDirectory, "package");
         var repoPath = Path.Combine(_testDirectory, "repo");
@@ -243,7 +260,7 @@ public sealed class ClaudeCliPluginTests : IDisposable
 
         await _sut.DeployAgentPackageAsync(packagePath, repoPath);
 
-        Directory.Exists(Path.Combine(repoPath, ".github")).Should().BeFalse();
+        Directory.Exists(Path.Combine(repoPath, ".claude")).Should().BeFalse();
     }
 
     /// <summary>Parses passed, failed and skipped entries from combined CLI output.</summary>

@@ -225,7 +225,7 @@ public sealed class AufgabeServiceTests : IDisposable
         result!.Status.Should().Be(AufgabeStatus.Fehlgeschlagen);
     }
 
-    /// <summary>UpdateAsync aktualisiert Titel und AgentenInfos.</summary>
+    /// <summary>UpdateAsync aktualisiert Titel, Agenteninfos und KI-Plugin.</summary>
     [Fact]
     public async Task UpdateAsync_ShouldUpdateTitelAndAgentenInfos_WhenAufgabeExists()
     {
@@ -233,7 +233,7 @@ public sealed class AufgabeServiceTests : IDisposable
         var aufgabe = await _sut.CreateAsync(_projektId, "Alter Titel", "Alte Beschreibung");
 
         // Act
-        await _sut.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Beschreibung", "mein-paket", "mein-agent");
+        await _sut.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Beschreibung", "mein-paket", "mein-agent", "Softwareschmiede.Ki");
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
@@ -241,6 +241,7 @@ public sealed class AufgabeServiceTests : IDisposable
         result.AnforderungsBeschreibung.Should().Be("Neue Beschreibung");
         result.AgentenpaketName.Should().Be("mein-paket");
         result.AgentenName.Should().Be("mein-agent");
+        result.KiPluginPrefix.Should().Be("Softwareschmiede.Ki");
     }
 
     /// <summary>DeleteAsync entfernt die Aufgabe aus der Datenbank.</summary>

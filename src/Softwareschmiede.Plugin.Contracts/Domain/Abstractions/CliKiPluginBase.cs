@@ -1,4 +1,6 @@
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Abstractions;
 
@@ -30,6 +32,34 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// <summary>Erzeugt den Pfad für eine Prompt-Taskdatei eines KI-Runs.</summary>
     public string BuildTaskFilePath(string localRepoPath, Guid runId)
         => Path.Combine(localRepoPath, BuildTaskFileName(runId));
+
+    /// <summary>
+    /// Liest alle Agenten aus dem angegebenen Unterverzeichnis eines Agentenpakets.
+    /// </summary>
+    /// <param name="agentPackagePath">Pfad zum Agentenpaket.</param>
+    /// <param name="relativeAgentDirectory">Relativer Pfad zum Agentenverzeichnis innerhalb des Pakets.</param>
+    /// <returns>Gefundene Agenten in stabiler alphabetischer Reihenfolge.</returns>
+    protected static IReadOnlyList<AgentInfo> DiscoverAgents(string agentPackagePath, string relativeAgentDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(agentPackagePath))
+        {
+            return [];
+        }
+
+        var agentDirectory = Path.Combine(agentPackagePath, relativeAgentDirectory);
+        if (!Directory.Exists(agentDirectory))
+        {
+            return [];
+        }
+
+        return Directory.GetFiles(agentDirectory, "*.md", SearchOption.AllDirectories)
+            .Select(filePath => new AgentInfo(
+                Path.GetFileNameWithoutExtension(filePath).Replace(".agent", string.Empty, StringComparison.OrdinalIgnoreCase),
+                ReadAgentDescription(filePath),
+                filePath))
+            .OrderBy(agent => agent.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
     /// <summary>
     /// Stellt sicher, dass die .gitignore-Datei im angegebenen Verzeichnis
     /// die erforderlichen Ignore-Muster enthält. Die Datei wird nur geändert,
@@ -93,12 +123,35 @@ public abstract class CliKiPluginBase : IKiPlugin
 
     public abstract string PluginName { get; }
     public abstract string PluginPrefix { get; }
-    public abstract Enums.PluginType PluginType { get; }
-    public abstract IReadOnlyList<ValueObjects.PluginSettingGroup> GetSettingGroups();
-    public abstract Task<IEnumerable<ValueObjects.AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default);
+    public abstract PluginType PluginType { get; }
+    public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
+    public abstract Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default);
     public abstract Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default);
     public abstract Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default);
-    public abstract IAsyncEnumerable<string> StartDevelopmentAsync(string prompt, ValueObjects.AgentInfo agent, string localRepoPath, string? model = null, CancellationToken ct = default);
-    public abstract Task<ValueObjects.TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default);
+    public abstract IAsyncEnumerable<string> StartDevelopmentAsync(string prompt, AgentInfo agent, string localRepoPath, string? model = null, CancellationToken ct = default);
+    public abstract Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default);
     public abstract Task<bool> CheckHealthAsync(CancellationToken ct = default);
+
+    private static string? ReadAgentDescription(string agentFilePath)
+    {
+        try
+        {
+            var lines = File.ReadLines(agentFilePath).Take(10).ToList();
+            var descLine = lines.FirstOrDefault(line => line.TrimStart().StartsWith("description:", StringComparison.OrdinalIgnoreCase));
+            if (descLine is not null)
+            {
+                return descLine.Split(':', 2).ElementAtOrDefault(1)?.Trim().Trim('"');
+            }
+
+            return lines.FirstOrDefault(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith("---", StringComparison.Ordinal));
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 }

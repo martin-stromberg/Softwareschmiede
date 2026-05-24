@@ -58,21 +58,6 @@ public sealed class AgentPackageReader : IAgentPackageService
             .Select(f => Path.GetRelativePath(packagePath, f))
             .ToList();
 
-        // Agenten aus .agent.md Dateien ermitteln (GitHub Copilot verwendet .agent.md Dateien)
-        var agents = Directory.GetFiles(packagePath, "*.agent.md", SearchOption.AllDirectories)
-            .Select(f => new AgentInfo(
-                Name: Path.GetFileNameWithoutExtension(f).Replace(".agent", string.Empty),
-                Beschreibung: ReadFirstLine(f),
-                DateiPfad: f
-            ))
-            .ToList();
-
-        return new AgentPackageInfo(name, packagePath, agents, files);
-    }
-
-    private static string? ReadFirstLine(string filePath)
-    {
-        try { return File.ReadLines(filePath).FirstOrDefault(); }
-        catch { return null; }
+        return new AgentPackageInfo(name, packagePath, Array.Empty<AgentInfo>(), files);
     }
 }

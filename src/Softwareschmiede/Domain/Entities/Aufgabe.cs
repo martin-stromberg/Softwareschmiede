@@ -35,6 +35,9 @@ public sealed class Aufgabe
     /// <summary>Name des verwendeten Agenten.</summary>
     public string? AgentenName { get; set; }
 
+    /// <summary>Prefix des für diese Aufgabe verwendeten KI-Plugins.</summary>
+    public string? KiPluginPrefix { get; set; }
+
     /// <summary>Erstellungsdatum der Aufgabe.</summary>
     public DateTimeOffset ErstellungsDatum { get; set; }
 

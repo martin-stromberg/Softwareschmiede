@@ -71,9 +71,9 @@ public sealed class AgentPackageReaderTests : IDisposable
         result.Should().BeNull();
     }
 
-    /// <summary>GetPackageAsync gibt Paket zurück mit erkannten .agent.md Agenten.</summary>
+    /// <summary>GetPackageAsync gibt Paket zurück ohne Agentenerkennung.</summary>
     [Fact]
-    public async Task GetPackageAsync_ShouldReturnPackageWithAgents_WhenAgentMdFilesExist()
+    public async Task GetPackageAsync_ShouldReturnPackageWithoutAgents_WhenAgentMdFilesExist()
     {
         // Arrange
         var packagesPath = Path.Combine(_baseDir, "agent-packages");
@@ -92,9 +92,7 @@ public sealed class AgentPackageReaderTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result!.Name.Should().Be("mein-paket");
-        result.Agenten.Should().HaveCount(2);
-        result.Agenten.Should().Contain(a => a.Name == "developer");
-        result.Agenten.Should().Contain(a => a.Name == "reviewer");
+        result.Agenten.Should().BeEmpty();
     }
 
     /// <summary>GetPackageAsync gibt alle Dateien im Paket zurück.</summary>
@@ -115,26 +113,24 @@ public sealed class AgentPackageReaderTests : IDisposable
         result!.Dateien.Should().HaveCount(2);
     }
 
-    /// <summary>GetPackageAsync setzt Agenten-Beschreibung auf null wenn die Agent-Datei nicht lesbar ist.</summary>
+    /// <summary>GetPackageAsync listet Dateien auch dann auf, wenn Agentendateien vorhanden sind.</summary>
     [Fact]
-    public async Task GetPackageAsync_ShouldSetAgentDescriptionNull_WhenAgentFileReadThrows()
+    public async Task GetPackageAsync_ShouldListFiles_WhenAgentMdFilesExist()
     {
         // Arrange
         var packagesPath = Path.Combine(_baseDir, "agent-packages");
         var paketPath = Path.Combine(packagesPath, "io-error-paket");
         Directory.CreateDirectory(paketPath);
-        var agentFilePath = Path.Combine(paketPath, "broken.agent.md");
-        await File.WriteAllTextAsync(agentFilePath, "description: Nicht lesbar");
-
-        await using var lockStream = new FileStream(agentFilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        await File.WriteAllTextAsync(Path.Combine(paketPath, "broken.agent.md"), "description: Nicht lesbar");
+        await File.WriteAllTextAsync(Path.Combine(paketPath, "config.json"), "{}");
 
         // Act
         var result = await _sut.GetPackageAsync("io-error-paket");
 
         // Assert
         result.Should().NotBeNull();
-        result!.Agenten.Should().ContainSingle();
-        result.Agenten[0].Name.Should().Be("broken");
-        result.Agenten[0].Beschreibung.Should().BeNull();
+        result!.Dateien.Should().Contain("broken.agent.md");
+        result.Dateien.Should().Contain("config.json");
+        result.Agenten.Should().BeEmpty();
     }
 }
