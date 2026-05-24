@@ -42,6 +42,113 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
     }
 
     [Fact]
+    public async Task AufgabeDetail_ShouldShowProjectNameBelowTitle_WhenProjectIsAssigned()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, projectName: "Alpha");
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.Markup.Should().Contain("Projekt: Alpha");
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsEmpty()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, projectName: string.Empty);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.Markup.Should().Contain("Projekt: ohne projekt");
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsWhitespace()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(
+            capabilities,
+            projectName: "   ");
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.Markup.Should().Contain("Projekt: ohne projekt");
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderProjectNameAsPlainText_WhenProjectNameContainsHtml()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(
+            capabilities,
+            projectName: "<b>Alpha</b>");
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.Markup.Should().Contain("Projekt: &lt;b&gt;Alpha&lt;/b&gt;");
+        cut.Markup.Should().NotContain("Projekt: <b>Alpha</b>");
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderProjectTextDirectlyBelowTitle()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, projectName: "Alpha");
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var headerContent = cut.Find(".page-header > div");
+        var titleElement = headerContent.QuerySelector("h2.page-title");
+        var projectElement = headerContent.QuerySelector("div");
+
+        titleElement.Should().NotBeNull();
+        projectElement.Should().NotBeNull();
+        titleElement!.NextElementSibling.Should().BeSameAs(projectElement);
+        projectElement!.TextContent.Should().Contain("Projekt: Alpha");
+    }
+
+    [Fact]
     public async Task AufgabeDetail_ShouldDisableRecoveryButtonAndShowReason_WhenAutomationIsRunning()
     {
         var capabilities = new GitActionCapabilities(
@@ -457,14 +564,14 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         GitActionCapabilities capabilities,
         AufgabeStatus status = AufgabeStatus.InBearbeitung,
         bool isRunning = false,
-        Guid? latestDiffResultId = null)
+        Guid? latestDiffResultId = null,
+        string projectName = "BUnit-Test-Projekt")
     {
         var db = TestDbContextFactory.Create();
-
         var projekt = new Projekt
         {
             Id = Guid.NewGuid(),
-            Name = "BUnit-Test-Projekt",
+            Name = projectName,
             Status = ProjektStatus.Aktiv,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };

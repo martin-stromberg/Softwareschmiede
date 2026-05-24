@@ -25,8 +25,9 @@ Neue Mitarbeitende nutzen sie, um strukturiert in bestehende Projekte einzusteig
 3. Sie prüfen oder ergänzen **Titel** und **Anforderungsbeschreibung**.
 4. Sie klicken auf **Aufgabe anlegen**.
 5. Die Aufgabe öffnet sich direkt in der Detailansicht.
-6. Dort starten Sie später über **Entwicklung starten** den Lauf.
-7. Wenn Sie die Aufgabe nie starten möchten, verwenden Sie auf der Detailseite direkt **Verwerfen** und wählen anschließend **Archivieren** oder **Dauerhaft löschen**.
+6. Unter dem Titel sehen Sie dort den Klartext **„Projekt: <Name>“** (oder **„Projekt: ohne projekt“** bei fehlender Zuordnung).
+7. Dort starten Sie später über **Entwicklung starten** den Lauf.
+8. Wenn Sie die Aufgabe nie starten möchten, verwenden Sie auf der Detailseite direkt **Verwerfen** und wählen anschließend **Archivieren** oder **Dauerhaft löschen**.
 
 ---
 
@@ -45,6 +46,7 @@ Die Anwendung speichert Titel, Beschreibung und die Zuordnung zum Projekt.
 Wenn Sie eine Issue wählen, übernimmt sie die vorhandenen Texte als Startpunkt.  
 Beim Start der Entwicklung wird später ein eigener Arbeitsbereich für diese Aufgabe genutzt.
 Zusätzlich bleibt die Issue-Verknüpfung erhalten, damit Branch und Pull Request automatisch zur richtigen Issue passen.
+Auf der Detailseite wird der Projektname als reiner Text direkt unter dem Aufgabentitel angezeigt.
 
 ---
 

@@ -19,7 +19,10 @@ else
 {
     <div class="page-header">
         <button class="btn btn-ghost" @onclick="Zurueck">← Zurück</button>
-        <h2 class="page-title">@_aufgabe.Titel</h2>
+        <div style="display:flex;flex-direction:column;gap:.25rem;flex:1">
+            <h2 class="page-title" style="margin:0;flex:unset">@_aufgabe.Titel</h2>
+            <div style="color:#94a3b8;font-size:.9rem">@ProjektAnzeigeText</div>
+        </div>
         <StatusBadge Status="_aufgabe.Status" />
     </div>
 
