@@ -696,6 +696,62 @@
 
 ---
 
+# Dokumentationsplan – DiffViewer-Integration (Parameterwechsel-Stabilität, FR-4, Zustandsverantwortung, Route-Kompatibilität) – 2026-05-23
+
+## Kontext
+- Feature-Fokus: DiffViewer-Integration mit stabilen Parameterwechseln, FR-4-Fallback-Logik, klarer Zustandsverantwortung zwischen `AufgabeDetail` / `DiffPreviewPanel` / `DiffViewer` sowie kompatibler Route `/diff/{DiffResultId:guid}`.
+- Implementierung und Tests wurden in Vorphasen bereits umgesetzt; dieser Lauf schließt den Dokumentationsabgleich.
+
+## Phase 1 – Analyse (Agentenschwarm)
+
+### API-Dokumentation (`docs/api/`)
+- `diff-viewer.md` vorhanden, aber Verantwortungsschnitt und Dual-Mode (embedded/standalone) waren nicht ausreichend präzisiert.
+- `docs/api/README.md` musste den Feature-Fokus auf die Integrationsaspekte erweitern.
+
+### Flow-Dokumentation (`docs/flows/`)
+- `diff-service-flow.md` deckt die Backend-Pipeline ab.
+- Es fehlte ein dedizierter UI-Integrationsfluss für `AufgabeDetail -> DiffPreviewPanel -> DiffViewer` inklusive FR-4-Entscheidungslogik und Routenkompatibilität.
+
+### Business-Dokumentation (`docs/business/`)
+- `F022-diff-vergleichskomponente.md` deckte den generellen Diff-Nutzen ab, aber nicht klar genug die eingebettete Vorschau, Fallbacks und Zustandsgrenzen der Komponenten.
+
+### README (`README.md`)
+- Diff-Funktionsumfang vorhanden, aber Feature-Status und Testübersicht mussten um die Integrationsdetails (Dual-Mode, Parameterwechsel-Stabilität, neue bUnit-Tests) ergänzt werden.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** API- und Flow-Dokumentation für Zustandsverantwortung, FR-4-Fallbacks und `/diff/{DiffResultId:guid}` konsistent machen.
+2. **Hoch:** Business-Feature F022 und README an den finalen Integrationsstand anpassen.
+3. **Mittel:** Indizes/Querverweise (`docs/api/README.md`, `docs/flows/README.md`) auf den neuen Integrationsflow erweitern.
+
+## Phase 2 – Ausführung
+- Parallele Delegation an `documentation-api`, `documentation-flow`, `documentation-business`, `documentation-readme-writer` mit diesem Plan als Kontext.
+
+## Phase 3 – Ergebnis
+
+### Neu erstellt
+1. `docs/flows/diffviewer-integration-flow.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/diff-viewer.md`
+4. `docs/flows/README.md`
+5. `docs/business/features/F022-diff-vergleichskomponente.md`
+6. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz- und Nicht-Leerheitsprüfung der neu erstellten/aktualisierten Dokumente erfolgreich.
+- Inhaltsabgleich mit Implementierung durchgeführt (`AufgabeDetail`, `DiffPreviewPanel`, `DiffViewer`, `DiffViewerPage`):
+  - Parameterwechsel-Stabilität (`OnParametersSetAsync`, Cancellation-/Version-Guards),
+  - FR-4-Fallbackpfade im Vorschaupanel,
+  - Route-Kompatibilität `/diff/{DiffResultId:guid}` via Wrapper.
+- Basis-Testlauf wurde ausgeführt; bekannte bestehende Fehler in `Softwareschmiede.IntegrationTests` (LocalDirectoryPlugin) sind vorbestehend und nicht durch Dokumentationsänderungen verursacht.
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken im Feature-Scope identifiziert.
+
+---
+
 # Dokumentationsplan – `start.ps1` für Visual-Studio-Debug mit freiem HTTP-Port – 2026-05-14
 
 ## Kontext

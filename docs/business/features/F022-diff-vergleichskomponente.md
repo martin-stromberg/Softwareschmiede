@@ -2,75 +2,63 @@
 
 ## Einleitung
 
-Mit dieser Funktion vergleichen Sie zwei Versionen einer Datei direkt miteinander.
-Sie sehen, welche Inhalte neu sind und welche entfernt wurden.
-So erkennen Sie Änderungen schneller und treffen sichere Freigabeentscheidungen.
-Die Funktion hilft besonders bei Rückfragen zu unerwarteten Dateiänderungen.
+Mit dieser Funktion prüfen Sie Änderungen an Dateien direkt in der Aufgabenansicht.
+Sie müssen dafür nicht in eine andere Seite wechseln.
+Sie sehen schnell, was neu ist und was entfernt wurde.
+So treffen Sie Freigaben sicherer und klären Rückfragen schneller.
 
 ---
 
 ## Wer nutzt es?
 
-Diese Funktion nutzen Fachanwender, die Änderungen nachvollziehen müssen.
-Sie ist auch für Teamleitungen wichtig, die Ergebnisse prüfen und freigeben.
-Neue Mitarbeitende nutzen sie, um Bearbeitungsschritte besser zu verstehen.
+Diese Funktion nutzen Fachanwender in der Sachbearbeitung und Teamleitungen.
+Sie eignet sich für alle, die Dateistände prüfen und Änderungen bestätigen.
+Neue Mitarbeitende verstehen damit schneller, was sich in einer Aufgabe geändert hat.
 
 ---
 
 ## Schritt-für-Schritt-Anleitung
 
-1. Öffnen Sie einen bereitgestellten Vergleichslink.
-2. Prüfen Sie oben Dateiname und Versionsstand.
-3. Wechseln Sie mit **👬 Side-by-Side**, **⬌ Split** oder **📄 Unified** die Ansicht.
-4. Suchen Sie mit **🔍** gezielt nach Begriffen im Vergleich.
-5. Nutzen Sie **⬆ Prev** und **Next ⬇**, um zwischen Treffern zu springen.
-6. Markieren Sie wichtige Zeilen und nutzen Sie **📋 Copy** bei Bedarf.
+1. Öffnen Sie eine Aufgabe und wechseln Sie über **🗂️ Projektverzeichnis** in die Dateiansicht.
+2. Wählen Sie links eine geänderte Datei aus.
+3. Lesen Sie den Vergleich direkt im Bereich **Dateivorschau**.
+4. Bleiben Sie in derselben Aufgabe und prüfen Sie bei Bedarf weitere Dateien nacheinander.
+5. Nutzen Sie **🔎 Diff anzeigen**, wenn Sie die gleiche Änderung als eigene Seite öffnen möchten.
+6. Teilen Sie bei Bedarf einen Direktlink im Format `/diff/{DiffResultId}`.
 
 ---
 
 ## Beispiel
 
-Sie passen eine Preisregel in einer Datei an.
-Im Vergleich sehen Sie sofort die alte und die neue Fassung nebeneinander.
-So erkennen Sie schnell, ob nur die gewünschte Stelle geändert wurde.
-Fehlerhafte Zusatzänderungen fallen direkt auf.
+Sie prüfen eine abgeschlossene Aufgabe mit mehreren geänderten Dateien.
+Sie klicken zuerst auf `angebot.cs` und direkt danach auf `preisregel.cs`.
+Die Vorschau zeigt am Ende nur die zuletzt gewählte Datei.
+Wenn für eine Datei kein Vergleich vorliegt, sehen Sie sofort eine klare Hinweismeldung.
 
 ---
 
 ## Was passiert im Hintergrund?
 
-Die Anwendung erstellt aus beiden Fassungen ein Vergleichsergebnis.
-Dabei werden neue und entfernte Zeilen gezählt.
-Ergebnisse können zwischengespeichert und später schneller geladen werden.
-Bei Bedarf wird ein gespeichertes Ergebnis gezielt ungültig gemacht.
-
----
-
-## Durch Tests abgesicherte Zusagen
-
-- Ein Vergleich wird nur für vorhandene Aufgaben erzeugt.
-- Leere Eingaben werden abgelehnt und klar als Fehler behandelt.
-- Vergleichsergebnisse werden zuverlässig gespeichert und wieder geladen.
-- Sehr große Inhalte werden nicht vollständig im Ergebnis abgelegt.
-- Die Zählung von neuen und entfernten Zeilen bleibt nachvollziehbar korrekt.
-- Zwischengespeicherte Ergebnisse verfallen kontrolliert oder werden gezielt entfernt.
-- Auswertungen zeigen die Gesamtzahlen pro Aufgabe zuverlässig an.
+Die Anwendung zeigt den Vergleich in der Aufgabenansicht eingebettet an.
+Der bisherige Direktaufruf über `/diff/{DiffResultId:guid}` bleibt vollständig nutzbar.
+Falls kein Vergleich verfügbar ist, erhalten Sie klare Hinweise statt leerer Flächen.
+Bei schnellem Wechsel zwischen Dateien bleibt die Anzeige stabil auf der letzten Auswahl.
 
 ---
 
 ## Häufige Fragen (FAQ)
 
-**Was sehe ich im Vergleich genau?**  
-Sie sehen neue und entfernte Zeilen klar markiert.
+**Muss ich für den Vergleich in eine andere Seite wechseln?**  
+Nein. Die Vorschau läuft direkt in der Aufgabe.
 
-**Werden frühere Vergleiche gespeichert?**  
-Ja, Ergebnisse bleiben je Aufgabe verfügbar und abrufbar.
+**Kann ich den Vergleich trotzdem als eigenen Link öffnen?**  
+Ja. Über **🔎 Diff anzeigen** oder direkt mit `/diff/{DiffResultId:guid}`.
 
-**Welche Ansichten kann ich nutzen?**  
-Sie können zwischen **👬 Side-by-Side**, **⬌ Split** und **📄 Unified** wechseln.
+**Was sehe ich, wenn kein Vergleich vorhanden ist?**  
+Sie erhalten eine klare Meldung, zum Beispiel bei gelöschten Dateien.
 
-**Kann ich einen alten Vergleich löschen?**  
-Ja, ein gespeicherter Vergleich kann entfernt werden.
+**Was passiert bei sehr schnellem Dateiwechsel?**  
+Die Anzeige bleibt stabil und zeigt nur die zuletzt gewählte Datei.
 
 ---
 
@@ -80,4 +68,6 @@ Ja, ein gespeicherter Vergleich kann entfernt werden.
 - [F002 – Aufgabenverwaltung](./F002-aufgabenverwaltung.md)
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md)
 - [F016 – Fehlerbehandlung & Recovery](./F016-fehlerbehandlung-und-recovery.md)
+- [Technischer Ablauf: Diff-Pipeline](../../flows/diff-service-flow.md)
+- [Technische Detailseite: Diff Viewer und Direktlink](../../api/diff-viewer.md)
 - [Zurück zur Übersicht](../features.md)

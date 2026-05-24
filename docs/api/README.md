@@ -14,7 +14,7 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 |---|---|
 | [http-endpoints.md](./http-endpoints.md) | Übersicht aller aktuell verfügbaren öffentlichen HTTP-Endpunkte inkl. Auth- und Content-Type-Konventionen sowie Feature-Hinweis zum Benachrichtigungssystem (keine neuen REST-Endpunkte, interne Service-/UI-Integration). |
 | [diff.md](./diff.md) | Vollständige REST-Dokumentation für `DiffController` (`/api/diff`) mit Request-/Response-Beispielen, Servicevertrags-Referenzen und testabgeglichenen Verhaltensdetails. |
-| [diff-viewer.md](./diff-viewer.md) | Nutzerorientierte Beschreibung der Blazor-Route `DiffViewer` (`/diff/{DiffResultId:guid}`) mit Navigationsweg ab der Startseite und fachlichem Zweck. |
+| [diff-viewer.md](./diff-viewer.md) | Technischer UI-/Routen-Contract für den Diff Viewer mit Dual-Mode (Embedded/Standalone), Zustandsverantwortung (`AufgabeDetail`/`DiffPreviewPanel`/`DiffViewer`), FR-4-Fallback-Entscheidungen, Parameterwechsel-Stabilität und kompatibler Wrapper-Route `/diff/{DiffResultId:guid}`. |
 | [aufgabe-recovery.md](./aufgabe-recovery.md) | Interner Service-/UI-Contract für die manuelle Wiederherstellung festhängender Aufgaben (Eligibility, Statuswechsel, Audit, Concurrency-Schutz). |
 | [issue-branch-pr-linking.md](./issue-branch-pr-linking.md) | Interner Contract für Issue-Auswahl, issuebezogene Branch-Erzeugung und PR-Closing-Direktive (`Closes #<Issue>`). |
 | [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Dateivorschau und defensiver Git-Status-Auswertung. |
@@ -24,6 +24,14 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 | [repository-startskript-freier-port.md](./repository-startskript-freier-port.md) | Interner Contract für repositorybezogene Startskripte mit freier Portreservierung, Persistenz (`RepositoryStartKonfiguration`) und Ausführung beim Prozessstart. |
 | [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
 | [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
+
+## Feature-Fokus: DiffViewer-Integration (2026-05-23)
+
+- Aktualisierter technischer Contract: [diff-viewer.md](./diff-viewer.md)
+- Fokus auf Dual-Mode-Nutzung (`Embedded`/`Standalone`) ohne Divergenz in der Kernlogik.
+- Klare Zustandsverantwortung zwischen `AufgabeDetail` (Kontext/Selektion), `DiffPreviewPanel` (FR-4-Fallback-Entscheidungen) und `DiffViewer` (Laden/Rendern).
+- Stabilitätsmaßnahmen bei Parameterwechseln (`OnParametersSetAsync`, Cancellation, `loadingVersion`-Guard).
+- Route-Kompatibilität über Wrapper-Page auf `/diff/{DiffResultId:guid}`.
 
 ## Feature-Fokus: Benachrichtigungssystem für abgeschlossene KI-Aufgaben
 

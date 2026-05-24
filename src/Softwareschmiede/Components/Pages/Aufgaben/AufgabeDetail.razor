@@ -196,31 +196,9 @@ else
 
                     <div class="card" style="margin-bottom:0">
                         <div class="card-title">Dateivorschau</div>
-                        @if (_selectedWorkspacePreview is null)
-                        {
-                            <p style="color:#94a3b8">Wählen Sie links eine Datei aus.</p>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(_selectedWorkspacePreview.Hint))
-                        {
-                            <div class="alert alert-warning">@_selectedWorkspacePreview.Hint</div>
-                            @if (_selectedWorkspacePreview.CurrentContent is not null)
-                            {
-                                <pre class="workspace-preview">@_selectedWorkspacePreview.CurrentContent</pre>
-                            }
-                        }
-                        else
-                        {
-                            <div class="comparison-grid">
-                                <div class="comparison-pane">
-                                    <div class="comparison-pane-title">Original</div>
-                                    <pre class="workspace-preview">@(_selectedWorkspacePreview.OriginalContent ?? "–")</pre>
-                                </div>
-                                <div class="comparison-pane">
-                                    <div class="comparison-pane-title">Aktuell</div>
-                                    <pre class="workspace-preview">@(_selectedWorkspacePreview.CurrentContent ?? (_selectedWorkspacePreview.IsDeleted ? "Datei gelöscht" : "–"))</pre>
-                                </div>
-                            </div>
-                        }
+                        <DiffPreviewPanel HasSelectedFile="HasSelectedWorkspaceFile"
+                                          Preview="_selectedWorkspacePreview"
+                                          DiffResultId="_latestDiffResultId" />
                     </div>
                 </div>
             }

@@ -1,0 +1,15 @@
+@page "/diff/{DiffResultId:guid}"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Components
+@using Softwareschmiede.Components.Diff
+
+<PageTitle>Diff Viewer</PageTitle>
+
+<DiffViewer DiffResultId="DiffResultId"
+            PresentationMode="DiffViewerPresentationMode.Standalone" />
+
+@code {
+    [Parameter]
+    public Guid DiffResultId { get; set; }
+}

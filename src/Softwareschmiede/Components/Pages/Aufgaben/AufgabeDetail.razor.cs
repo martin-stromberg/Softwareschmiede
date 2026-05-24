@@ -47,6 +47,8 @@ public partial class AufgabeDetail : IDisposable
     private bool _useTreeLayout = true;
     private bool _loadingWorkspace;
     private Guid? _latestDiffResultId;
+    private long _previewLoadVersion;
+    private bool HasSelectedWorkspaceFile => _selectedWorkspaceNode is not null && !_selectedWorkspaceNode.IsDirectory;
 
     // Subscription auf laufende KI-Session (wird beim Dispose freigegeben)
     private IDisposable? _kiSubscription;
@@ -136,6 +138,7 @@ public partial class AufgabeDetail : IDisposable
             _streamingLines = [.. KiAusfuehrungsService.GetBufferedLines(Id)];
             KiLiveSubscribieren();
         }
+
     }
 
     protected override Task OnParametersSetAsync()
@@ -656,14 +659,28 @@ public partial class AufgabeDetail : IDisposable
             return;
         }
 
+        var requestVersion = Interlocked.Increment(ref _previewLoadVersion);
+
         try
         {
             _selectedWorkspacePath = node.RelativePath;
             _selectedWorkspaceNode = node;
-            _selectedWorkspacePreview = await GitWorkspaceBrowserService.LoadPreviewAsync(_aufgabe.LokalerKlonPfad, node, _cts.Token);
+            _selectedWorkspacePreview = null;
+            var preview = await GitWorkspaceBrowserService.LoadPreviewAsync(_aufgabe.LokalerKlonPfad, node, _cts.Token);
+            if (requestVersion != _previewLoadVersion || !string.Equals(_selectedWorkspacePath, node.RelativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _selectedWorkspacePreview = preview;
         }
         catch (Exception ex)
         {
+            if (requestVersion != _previewLoadVersion)
+            {
+                return;
+            }
+
             _logger.LogError(ex, "Workspace preview konnte nicht geladen werden.");
             _selectedWorkspacePreview = new FilePreview(node.RelativePath, node.SourceRelativePath, node.IsDeleted, false, false, null, null, ex.Message);
         }
@@ -756,6 +773,8 @@ public partial class AufgabeDetail : IDisposable
 
     private async Task WorkspaceNodeClickedAsync(WorkspaceFileNode node)
     {
+        Interlocked.Increment(ref _previewLoadVersion);
+
         if (node.IsDirectory)
         {
             node.IsExpanded = !node.IsExpanded;

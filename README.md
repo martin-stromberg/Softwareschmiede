@@ -98,7 +98,9 @@ Stand: **2026-05-22**
 - Öffentliche REST-Endpunkte unter `/api/diff` für Erzeugung, Abruf, Auflistung, Statistik, Löschung und Cache-Invalidierung von Diffs
 - Persistenz von Diff-Ergebnissen inkl. Blöcken/Zeilen sowie Kennzahlen (`AddedLines`, `RemovedLines`, `ModifiedLines`)
 - Caching-Strategien (`TTL`, `LRU`, `Manual`) mit expliziter Invalidierung pro Diff
-- UI-Komponente `src/Softwareschmiede/Components/Diff/DiffViewer.razor` zur Anzeige gespeicherter Diff-Ergebnisse
+- UI-Integration als eingebettete Vorschau (`AufgabeDetail`/`DiffPreviewPanel`) und als Standalone-Route `/diff/{DiffResultId:guid}` über `DiffViewerPage`
+- Stabiler Parameterwechsel im `DiffViewer`: bei Wechsel der `DiffResultId` wird zuverlässig auf den neuen Diff neu geladen (ohne stale Anzeige)
+- FR-4-Fallback-Handling im Preview-Flow: klare Fallbacks bei fehlender Auswahl, fehlendem DiffResult, gelöschten/binären Dateien und Hint-basierten Vorschauzuständen
 
 ### ✅ Aufgabenverwaltung
 - Aufgaben aus GitHub Issues anlegen (Titel, Body, Labels, Milestone werden übernommen)
@@ -593,6 +595,10 @@ dotnet test --collect:"XPlat Code Coverage"
 Feature-spezifische Testartefakte:
 - Service-Tests (Diff-Pipeline/Cache/Algorithmus): `src/Softwareschmiede.Tests/Application/Services/DiffServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffCachingServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffAlgorithmServiceTests.cs`
 - Wiring-Test (DI-Registrierung der Diff-Services): `src/Softwareschmiede.Tests/ProgramDiWiringTests.cs`
+- UI-bUnit-Tests (DiffViewer: Embedded/Standalone + Parameterwechsel): `src/Softwareschmiede.Tests/Components/Diff/DiffViewerBunitTests.cs`
+- UI-bUnit-Tests (DiffPreviewPanel: FR-4-Fallbacks + DiffViewer-Einbettung): `src/Softwareschmiede.Tests/Components/Diff/DiffPreviewPanelBunitTests.cs`
+- UI-bUnit-Tests (Standalone-Route `/diff/{DiffResultId:guid}`): `src/Softwareschmiede.Tests/Components/Pages/Diff/DiffViewerPageBunitTests.cs`
+- UI-bUnit-Tests (AufgabeDetail Workspace-Preview/Stabilität): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailWorkspacePreviewBunitTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
 - UI-bUnit-Tests (Git-Aktionsleiste/Pluginauswahl): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
@@ -697,13 +703,17 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F019: Issue-, Branch- und PR-Verknüpfung](docs/business/features/F019-issue-branch-pr-verknuepfung.md) | Fachliche Beschreibung der durchgängigen Verbindung von Issue-Auswahl, Branch-Namensbildung und PR-Auto-Close |
 | [Feature F020: Repository-Startskript mit freier Portzuweisung](docs/business/features/F020-repository-startskript-freier-port.md) | Fachliche Beschreibung der repositorybezogenen Startskript-Konfiguration mit Portreservierung beim Prozessstart |
 | [Feature F021: Live Project Browser mit Git-Status](docs/business/features/F021-live-project-browser-git-status.md) | Fachliche Beschreibung des Live Project Browsers auf der Aufgabenseite mit Git-Status, Tree-/Listenansicht und Dateivorschau |
+| [Feature F022: Diff-Vergleichskomponente](docs/business/features/F022-diff-vergleichskomponente.md) | Fachliche Beschreibung des Diff-Viewers inkl. eingebetteter Nutzung und Standalone-Route |
 | [Requirements: LocalDirectoryPlugin](docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | Umsetzungsnahe Anforderungen und Akzeptanzkriterien für WorkspaceMode, Guardrails und Fehlerverhalten |
 | [Architektur: LocalDirectoryPlugin](docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | Technische Architektur für LocalDirectoryPlugin, Settings und Integrationspfad |
 | [Flow: LocalDirectoryPlugin](docs/flows/local-directory-plugin-flow.md) | Ablaufdarstellung für Clone-/Workspace-Auflösung, Guardrails und Folgeoperationen |
+| [Flow: Diff-Pipeline](docs/flows/diff-service-flow.md) | End-to-End-Ablauf der Diff-Erzeugung inkl. Cache-/Persistenzpfad und Fehlerbehandlung |
+| [Flow: DiffViewer-Integration](docs/flows/diffviewer-integration-flow.md) | UI-Integrationsfluss zwischen AufgabeDetail, DiffPreviewPanel und DiffViewer inkl. FR-4-Fallbacklogik |
 | [Flow: Issue-, Branch- und PR-Verknüpfung](docs/flows/issue-branch-pr-linking-flow.md) | End-to-End-Ablauf von der Issue-Auswahl über den issuebezogenen Branch bis zur PR-Closing-Direktive |
 | [Flow: Repository-Startskript mit freier Portzuweisung](docs/flows/repository-startskript-freier-port-flow.md) | Ablauf für Startkonfiguration, Portreservierung und Skriptausführung beim Aufgabenstart |
 | [API: Repository-Startskript mit freier Portzuweisung](docs/api/repository-startskript-freier-port.md) | Technischer Contract für Persistenz, Validierung, Portmodus und Skript-Execution |
 | [API: Diff-Endpunkte](docs/api/http-endpoints.md) | Übersicht der öffentlichen REST-Endpunkte des Diff-Bereichs (`/api/diff`) |
+| [API: Diff Viewer (`/diff/{DiffResultId:guid}`)](docs/api/diff-viewer.md) | Technischer Contract der Standalone-Route und ihres Wrapper-Verhaltens zur eingebetteten Komponente |
 | [API: `start.ps1` für Visual-Studio-Debug](docs/api/start-ps1-visual-studio-freier-http-port.md) | Technischer Skriptvertrag für Aufruf, Portquellen-Priorität, Exit-Codes und Debug-Workflow |
 | [Flow: `start.ps1` für Visual-Studio-Debug](docs/flows/start-ps1-visual-studio-freier-http-port-flow.md) | Ablauf von Portauflösung über `launchSettings`-Update bis zur Rückgabe der Exit-Codes |
 | [Requirements: Repository-Startskript mit freier Portzuweisung](docs/requirements/repository-startskript-freier-port-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für Startskript-Auswahl und konfliktfreie Portzuweisung |

@@ -1,64 +1,101 @@
 # Diff Viewer (`/diff/{DiffResultId:guid}`)
 
-Der Diff Viewer ist die Ansicht, in der der Anwender ein bereits erzeugtes Diff-Ergebnis prüft. Er dient dazu, Unterschiede zwischen zwei Ständen einer Datei schnell zu erkennen, zu navigieren und fachlich zu bewerten.
+Der Diff Viewer ist eine wiederverwendbare Blazor-Komponente mit Wrapper-Route. Das Feature unterstützt zwei Darstellungsmodi (Embedded/Standalone), stabile Parameterwechsel und einen klaren Verantwortungsschnitt zwischen Aufgaben-Detailseite, Vorschaupanel und Viewer.
 
-## 1. Nutzerweg von der Startseite
+## 1. Übersicht
 
-1. Der Anwender startet auf der Startseite (`/`) und sieht das Dashboard mit den aktiven Aufgaben.
-2. Er öffnet die gewünschte Aufgabe über den Eintrag in der Aufgabenliste.
-3. In der aktuellen Aufgabenansicht gibt es **keinen eigenen Button**, der direkt zum Diff Viewer navigiert.
-4. Der Aufruf erfolgt über die Detailroute `/diff/{DiffResultId:guid}` (z. B. per direkter URL mit bekannter Diff-ID).
+Der Endpunkt `GET /diff/{DiffResultId:guid}` stellt eine eigenständige Diff-Seite über eine Wrapper-Page bereit. Dieselbe `DiffViewer`-Komponente wird zusätzlich eingebettet in `AufgabeDetail` über `DiffPreviewPanel` verwendet.
 
-Die Diff-Ansicht ist damit keine eigenständige Hauptnavigation, sondern eine Detailansicht zu einem bereits erzeugten Diff.
-
-## 2. Funktionaler Zweck
-
-Der Diff Viewer unterstützt die Sichtprüfung von Änderungen. Er zeigt:
-
-- Datei- und Versionsinformationen
-- die betroffenen Zeilen und Änderungsblöcke
-- eine Zusammenfassung der Änderungen
-- Such- und Navigationsfunktionen im Diff
-- eine Darstellung der Änderung aus Sicht der Zielversion
-
-Damit hilft die Ansicht beim fachlichen Abgleich, bei Reviews und beim schnellen Auffinden von relevanten Änderungen.
-
-## 3. HTTP-Methode & Pfad
+## 2. HTTP-Methode & Pfad
 
 `GET /diff/{DiffResultId:guid}`
 
-## 4. Authentifizierung
+## 3. Authentifizierung
 
 Keine.
 
-## 5. Request
+## 4. Request
 
 **Header**
-- Keine speziellen Header erforderlich
+- Keine speziellen Header erforderlich.
 
 **Path-Parameter**
 
 | Name | Typ | Pflicht | Beschreibung |
 |---|---|---:|---|
-| `DiffResultId` | `Guid` | Ja | ID des anzuzeigenden Diff-Ergebnisses. |
+| `DiffResultId` | `Guid` | Ja *(required)* | ID des anzuzeigenden Diff-Ergebnisses. |
 
 **Query-Parameter**
-- Keine
+- Keine.
 
 **Request-Body**
-- Keiner
+- Keiner.
 
-## 6. Response
+## 5. Dual-Mode-Verhalten (Embedded vs Standalone)
+
+### Embedded
+- Verwendung in `DiffPreviewPanel` innerhalb von `AufgabeDetail`.
+- Aufruf mit `PresentationMode="DiffViewerPresentationMode.Embedded"`.
+- ARIA-Rolle des Root-Containers: `region`.
+- Kein „Back to Home“-Link bei Fehler-/Not-Found-Anzeige.
+
+### Standalone
+- Verwendung über Wrapper-Page `DiffViewerPage` mit Route `/diff/{DiffResultId:guid}`.
+- Aufruf mit `PresentationMode="DiffViewerPresentationMode.Standalone"`.
+- ARIA-Rolle des Root-Containers: `main`.
+- Fehler-/Not-Found-Anzeige enthält „Back to Home“-Link.
+
+## 6. Zustandsverantwortung und FR-4-Fallbacks
+
+### `AufgabeDetail` (Orchestrierung)
+- Lädt und hält den Kontext (`_latestDiffResultId`, Dateiauswahl, Workspace-Preview).
+- Übergibt `HasSelectedFile`, `Preview` und `DiffResultId` an `DiffPreviewPanel`.
+- Unterstützt direkte Navigation zur kompatiblen Route per `NavigationManager.NavigateTo($"/diff/{diffResultId}")`.
+
+### `DiffPreviewPanel` (Fallback-Entscheidung)
+- Entscheidet anhand des Zustands, was gerendert wird:
+  1. Keine Datei ausgewählt → Hinweis „Wählen Sie links eine Datei aus.“
+  2. Preview lädt noch (`Preview is null`) → Ladehinweis.
+  3. `Preview.Hint` vorhanden → FR-4-Fallback-Hinweis (Warning) und optional `CurrentContent`.
+  4. `DiffResultId` vorhanden → eingebetteter `DiffViewer`.
+  5. Datei gelöscht (`Preview.IsDeleted`) → Hinweis „Datei gelöscht … kein Diff verfügbar.“
+  6. Sonst → Hinweis „kein DiffResult vorhanden“.
+
+### `DiffViewer` (Laden und Rendern)
+- Lädt das Diff über `DiffService.GetDiffAsync(diffResultId, cancellationToken)`.
+- Rendert abhängig vom Ladezustand:
+  - Loading
+  - Error
+  - Not Found
+  - Vollständige Diff-Ansicht (`DiffHeader`, `DiffToolbar`, `DiffContent`, `DiffFooter`).
+
+## 7. Stabilitäts-Safeguards bei Parameterwechsel
+
+`DiffViewer` schützt schnelle `DiffResultId`-Wechsel explizit über:
+
+- `OnParametersSetAsync()` als zentralen Umschaltpunkt bei Parameteränderungen.
+- Abbruch laufender Requests via `CancellationTokenSource` vor neuem Load.
+- Versionsschutz via `loadingVersion` (`Interlocked.Increment`) gegen veraltete Async-Ergebnisse.
+- Guard gegen unnötiges Reload, wenn dieselbe `DiffResultId` bereits geladen ist.
+- Reset auf validierten Fehlerzustand bei `Guid.Empty`.
+
+Diese Kombination verhindert, dass verspätete Responses einen neueren Zustand überschreiben.
+
+## 8. Route-Kompatibilität
+
+Die Route `/diff/{DiffResultId:guid}` bleibt kompatibel und wird durch `DiffViewerPage` als Wrapper bereitgestellt:
+
+- `@page "/diff/{DiffResultId:guid}"`
+- Übergabe der Route-Parameter an `DiffViewer`
+- Erzwingung des Standalone-Modus
+
+Damit bleibt Deep-Linking auf bekannte Diff-IDs erhalten, während dieselbe Viewer-Implementierung in der eingebetteten Vorschau genutzt wird.
+
+## 9. Response
 
 **Erfolg (200 OK)**
 
-Die Route liefert die Blazor-Seite. Nach dem Laden zeigt die Anwendung je nach Zustand:
-
-1. eine Ladeanzeige
-2. eine Fehlermeldung, wenn das Laden fehlschlägt
-3. die vollständige Diff-Ansicht mit Kopfbereich, Toolbar, Inhaltsbereich und Footer
-
-Beispiel des gerenderten HTML-Rahmens:
+Die Route liefert die Blazor-Seite, die den Diff Viewer rendert. Beispiel des gerenderten HTML-Rahmens:
 
 ```html
 <div class="diff-viewer" role="main" aria-label="Diff Viewer - File Comparison">
@@ -73,7 +110,7 @@ Beispiel des gerenderten HTML-Rahmens:
 
 **Fehlerfälle**
 
-- `404 Not Found` – ungültige Route oder kein Diff mit der angegebenen ID
+- `404 Not Found` – kein Diff mit der angegebenen ID.
 ```html
 <div class="diff-viewer__not-found alert alert-warning">
   <p>Diff not found.</p>
@@ -81,7 +118,7 @@ Beispiel des gerenderten HTML-Rahmens:
 </div>
 ```
 
-- `500 Internal Server Error` – Fehler beim Laden des Diffs
+- `500 Internal Server Error` – Fehler beim Laden des Diffs.
 ```html
 <div class="diff-viewer__error alert alert-danger" role="alert">
   <h4 class="alert-heading">Error Loading Diff</h4>
@@ -90,13 +127,13 @@ Beispiel des gerenderten HTML-Rahmens:
 </div>
 ```
 
-## 7. Beispiel
+## 10. Beispiel
 
 ```bash
 curl -X GET "http://localhost:5000/diff/22222222-2222-2222-2222-222222222222"
 ```
 
-Antwort:
+Antwort (gekürzt auf den gerenderten Rahmen):
 
 ```html
 <div class="diff-viewer" role="main" aria-label="Diff Viewer - File Comparison">
@@ -109,7 +146,8 @@ Antwort:
 </div>
 ```
 
-## 8. Verwandte Inhalte
+## 11. Verwandte Inhalte
 
 - [HTTP-Endpunkte der Anwendung](./http-endpoints.md)
 - [Diff API](./diff.md)
+- [Live Project Browser mit Git-Status](./live-project-browser-git-status.md)

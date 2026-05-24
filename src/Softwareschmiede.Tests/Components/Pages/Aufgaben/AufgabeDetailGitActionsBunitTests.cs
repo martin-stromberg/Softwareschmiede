@@ -1,5 +1,6 @@
 using Bunit;
 using FluentAssertions;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -408,10 +409,55 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             Times.Never);
     }
 
+    [Fact]
+    public async Task AufgabeDetail_ShouldShowDiffButtonAndNavigateToWrapperRoute_WhenLatestDiffExists()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(
+            capabilities,
+            latestDiffResultId: Guid.NewGuid());
+
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var diffButton = cut.FindAll("button").Single(button => button.TextContent.Trim() == "🔎 Diff anzeigen");
+        diffButton.Click();
+
+        navigationManager.Uri.Should().EndWith($"/diff/{harness.LatestDiffResultId}");
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldNotShowDiffButton_WhenNoLatestDiffExists()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.LocalDirectory,
+            IsWorkingDirectoryCopy: true,
+            CanPush: false,
+            CanPull: false,
+            CanCreatePullRequest: false,
+            CanMergeToSource: true);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, latestDiffResultId: null);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.FindAll("button").Any(button => button.TextContent.Trim() == "🔎 Diff anzeigen").Should().BeFalse();
+    }
+
     private async Task<TestHarness> ConfigureComponentServicesAsync(
         GitActionCapabilities capabilities,
         AufgabeStatus status = AufgabeStatus.InBearbeitung,
-        bool isRunning = false)
+        bool isRunning = false,
+        Guid? latestDiffResultId = null)
     {
         var db = TestDbContextFactory.Create();
 
@@ -437,6 +483,22 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 
         db.Projekte.Add(projekt);
         db.Aufgaben.Add(aufgabe);
+        if (latestDiffResultId.HasValue)
+        {
+            db.DiffResults.Add(new DiffResult
+            {
+                Id = latestDiffResultId.Value,
+                AufgabeId = aufgabe.Id,
+                FilePath = "src/example.cs",
+                SourceVersion = "HEAD~1",
+                TargetVersion = "HEAD",
+                DiffType = DiffType.Full,
+                Status = DiffResultStatus.Generated,
+                GeneratedAt = DateTimeOffset.UtcNow,
+                GeneratedBy = nameof(AufgabeDetailGitActionsBunitTests),
+            });
+        }
+
         await db.SaveChangesAsync();
 
         var aufgabeService = new AufgabeService(db, NullLogger<AufgabeService>.Instance);
@@ -537,7 +599,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(workspaceBrowserServiceMock.Object);
         Services.AddSingleton<ILogger<AufgabeDetail>>(NullLogger<AufgabeDetail>.Instance);
 
-        return new TestHarness(db, aufgabe.Id, defaultGitPlugin: gitPluginMock, selectedGitPlugin: gitPluginMock);
+        return new TestHarness(db, aufgabe.Id, latestDiffResultId, defaultGitPlugin: gitPluginMock, selectedGitPlugin: gitPluginMock);
     }
 
     private async Task<TestHarness> ConfigureComponentServicesWithProjectSelectedPluginAsync(
@@ -696,17 +758,19 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(workspaceBrowserServiceMock.Object);
         Services.AddSingleton<ILogger<AufgabeDetail>>(NullLogger<AufgabeDetail>.Instance);
 
-        return new TestHarness(db, aufgabe.Id, defaultGitPluginMock, selectedGitPluginMock);
+        return new TestHarness(db, aufgabe.Id, null, defaultGitPluginMock, selectedGitPluginMock);
     }
 
     private sealed class TestHarness(
         Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext db,
         Guid aufgabeId,
+        Guid? latestDiffResultId,
         Mock<IGitPlugin> defaultGitPlugin,
         Mock<IGitPlugin> selectedGitPlugin) : IAsyncDisposable
     {
         public Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext Db { get; } = db;
         public Guid AufgabeId { get; } = aufgabeId;
+        public Guid? LatestDiffResultId { get; } = latestDiffResultId;
         public Mock<IGitPlugin> DefaultGitPlugin { get; } = defaultGitPlugin;
         public Mock<IGitPlugin> SelectedGitPlugin { get; } = selectedGitPlugin;
 
