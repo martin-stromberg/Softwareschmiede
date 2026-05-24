@@ -11,7 +11,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F002 | Aufgabenverwaltung | Aufgaben anlegen, verfolgen und verwalten | [F002 – Aufgabenverwaltung](./features/F002-aufgabenverwaltung.md) |
 | F003 | KI-Entwicklungsprozess | KI starten, Echtzeit-Ausgabe beobachten, Folge-Prompts senden | [F003 – KI-Entwicklungsprozess](./features/F003-ki-entwicklungsprozess.md) |
 | F004 | Agentenpakete | Agentenpakete verstehen, anlegen und für Aufgaben einsetzen (inkl. Kompatibilitäts-/Compliance-Regeln) | [F004 – Agentenpakete](./features/F004-agentenpakete.md) |
-| F005 | Aufgabenprotokoll | Das Protokoll einer Aufgabe lesen und verstehen | [F005 – Aufgabenprotokoll](./features/F005-aufgabenprotokoll.md) |
+| F005 | Aufgabenprotokoll | Protokoll mit Markdown-Struktur (Datum + Schritte) lesen und sicher darstellen | [F005 – Aufgabenprotokoll](./features/F005-aufgabenprotokoll.md) |
 | F006 | Aufgabe abschließen | Änderungen committen/pushen (pluginabhängig) und Aufgabe sauber beenden | [F006 – Aufgabe abschließen](./features/F006-aufgabe-abschliessen.md) |
 | F007 | Aufgabe abbrechen | Aufgabe abbrechen ohne Änderungen zu speichern | [F007 – Aufgabe abbrechen](./features/F007-aufgabe-abbrechen.md) |
 | F008 | Dashboard | Projektübergreifende Übersicht aller Aufgaben und deren Status | [F008 – Dashboard](./features/F008-dashboard.md) |

@@ -11,6 +11,17 @@ Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“
 Die Integration erfolgt intern über Service-/UI-Komponenten (Abschlussereignis, Hub-Verteilung, UI-Verarbeitung).
 Im UI-Kontext steuert der **BenachrichtigungsModus** die Ausgabe via **Toast** und optionalem **Hinweiston**; relevante Vorgänge werden im **Audit** erfasst.
 
+## Feature-Hinweis: KI-Arbeitsprotokoll als Markdown
+
+Für das Feature **„KI-Arbeitsprotokoll als strukturiertes Markdown“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Die Umsetzung erfolgt in bestehenden Service-/UI-Komponenten (`EntwicklungsprozessService`, `AufgabeDetail`) über interne Render- und Sicherheitslogik.
+
+- **Strukturregeln:** Datumszeile `# yyyy-MM-dd`, Schrittblöcke `## Schritt n`, Leerzeile zwischen Schritten, Fallback-Schritt bei leerer KI-Antwort.
+- **Webdarstellung:** Markdown wird in HTML gerendert (Heading-/Listen-/Link-/Code-Support).
+- **Sicherheit:** Raw-HTML ist in der Pipeline deaktiviert; nachgelagertes Sanitizing entfernt `on*`-Attribute und neutralisiert unsichere URI-Schemes in `href/src`.
+- **Robustheit:** Bei Render-/Sanitizing-Fehlern greift ein HTML-encodiertes `<pre>`-Fallback.
+- **Details:** [Flow: KI-Arbeitsprotokoll – Persistierung, Rendering und Fallback](../flows/ki-arbeitsprotokoll-rendering-flow.md)
+
 ## Feature-Hinweis: App-Favicon `favicon-hammer-pick-svg`
 
 Für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.

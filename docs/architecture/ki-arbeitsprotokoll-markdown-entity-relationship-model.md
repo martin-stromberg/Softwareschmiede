@@ -1,9 +1,9 @@
 # Entity-Relationship-Modell – KI-Arbeitsprotokoll als Markdown
 
-> **Dokument-Typ:** Feature-spezifisches ERM (DB + Datei-/Runtime-Modell)  
-> **Status:** Erstellt  
-> **Version:** 1.0.0  
-> **Feature:** KI-Arbeitsprotokoll als strukturiertes Markdown persistieren und wirksam rendern
+> **Dokument-Typ:** Feature-spezifisches ERM (Persistenz + logisches Strukturmodell + Runtime-Rendering)  
+> **Status:** Aktualisiert  
+> **Version:** 1.1.0  
+> **Feature:** `ki-arbeitsprotokoll-markdown`
 
 ---
 
@@ -11,24 +11,20 @@
 
 - Requirements: [`../requirements/ki-arbeitsprotokoll-markdown-requirements-analysis.md`](../requirements/ki-arbeitsprotokoll-markdown-requirements-analysis.md)
 - Architektur-Blueprint: [`./ki-arbeitsprotokoll-markdown-architecture-blueprint.md`](./ki-arbeitsprotokoll-markdown-architecture-blueprint.md)
-- Architektur-Review: [`../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md`](../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md)
 - Ablaufdokument: [`../flows/ki-arbeitsprotokoll-rendering-flow.md`](../flows/ki-arbeitsprotokoll-rendering-flow.md)
-- Code-Referenzen:
-  - `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs`
-  - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor`
-  - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs`
+- Implementierungsreferenzen:
+  - `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`BuildKiArbeitsprotokollMarkdown`)
+  - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`RenderProtokollInhalt`, `SanitizeMarkdownHtml`, `BuildFallbackHtml`)
 
 ---
 
-## 2. Modellierungsrahmen (DB- vs. Datei-/Runtime-Ebene)
+## 2. Modellierungsrahmen
 
-Dieses Feature führt **keine neue relationale Entität** ein, sondern präzisiert den Inhalt bestehender Protokolleinträge vom Typ `KiAntwort`:
+Dieses Feature ergänzt **kein physisches Datenbankschema**, sondern definiert:
 
-- **DB-Ebene (bestehend):** `Aufgabe` und `Protokolleintrag` bleiben unverändert; Markdown wird in `Protokolleintrag.Inhalt` gespeichert.
-- **Datei-/Persistenzformat:** Markdown-Text mit fester Struktur (`# {Datum}`, `- RunId`, `## Schritt n`).
-- **Runtime-Ebene:** Rendering in `AufgabeDetail` mit Markdig-Pipeline (`DisableHtml`), Sanitizing und `<pre>`-Fallback.
-
-**Explizite Entscheidung:** Keine DB-Migration; das ERM ergänzt ein logisches Inhalts- und Render-Modell über bestehende Persistenz.
+1. Persistenzbezug über bestehende Entität `Protokolleintrag` (`Typ = KiAntwort`, `Inhalt = Markdown`).
+2. Logische Strukturentitäten für Run, Markdown-Protokoll und Schrittblöcke.
+3. Runtime-Entitäten für Renderdarstellung inkl. Markdown-Rendermodus und Sanitizing/Fallback.
 
 ---
 
@@ -39,7 +35,6 @@ erDiagram
     Aufgabe {
         Guid Id PK
         string Titel
-        string LokalerKlonPfad
         string Status
     }
 
@@ -48,130 +43,124 @@ erDiagram
         Guid AufgabeId FK
         string Typ
         string Inhalt "Markdown bei KiAntwort"
-        string AgentName "optional"
         DateTimeOffset Zeitstempel
+        string AgentName
     }
 
-    KiArbeitsprotokollMarkdown {
-        string ProtokollEintragId PK_FK
-        string DatumHeading "# yyyy-MM-dd"
+    KiRun {
+        Guid RunId PK
+        Guid AufgabeId FK
+        DateTimeOffset ZeitpunktUtc
+        string ErgebnisStatus
+    }
+
+    MarkdownProtokoll {
+        Guid ProtokollEintragId PK_FK
+        string DatumsHeader "# yyyy-MM-dd"
         string RunIdMeta "- RunId: `{guid}`"
-        int SchrittAnzahl
+        int SchrittAnzahl ">= 1"
+        string SchrittTrennregel "Leerzeile zwischen Blöcken"
     }
 
-    ProtokollSchritt {
-        string SchrittId PK
-        string ProtokollEintragId FK
-        int Index ">= 1"
+    Schrittblock {
+        Guid SchrittblockId PK
+        Guid ProtokollEintragId FK
+        int SchrittNr ">= 1"
         string Heading "## Schritt n"
-        string Inhalt
+        string Inhaltszeile
+        bool HatNachfolgendenBlockabstand
     }
 
-    MarkdownRenderVorgang {
-        string RenderId PK
-        string ProtokollEintragId FK
-        bool RenderingErfolgreich
-        bool SanitizingErforderlich
-        bool FallbackVerwendet
-    }
-
-    SanitizingPolicy {
-        string PolicyId PK
+    Renderdarstellung {
+        Guid RenderId PK
+        Guid ProtokollEintragId FK
+        string Rendermodus "MarkdownToHtml"
         bool DisableRawHtml
-        string UnsafeUriSchemes "javascript|data|vbscript"
-        bool EntferntEventHandler
+        bool SanitizingAktiv
+        bool FallbackVerwendet
+        string AusgabeTyp "sanitized-html|encoded-pre"
     }
 
-    Aufgabe ||--o{ Protokolleintrag : protokolliert
-    Protokolleintrag ||--|| KiArbeitsprotokollMarkdown : strukturiert_als
-    KiArbeitsprotokollMarkdown ||--o{ ProtokollSchritt : enthaelt
-    Protokolleintrag ||--o{ MarkdownRenderVorgang : wird_gerendert_in
-    MarkdownRenderVorgang }o--|| SanitizingPolicy : nutzt
+    SanitizingRegel {
+        string RegelId PK
+        bool EntferntEventAttribute
+        string BlockierteUriSchemes "javascript|data|vbscript"
+        string UnsafeUriErsatz "#"
+    }
+
+    Aufgabe ||--o{ Protokolleintrag : hat
+    Aufgabe ||--o{ KiRun : fuehrt_aus
+    KiRun ||--|| MarkdownProtokoll : erzeugt
+    Protokolleintrag ||--|| MarkdownProtokoll : speichert_als
+    MarkdownProtokoll ||--o{ Schrittblock : enthaelt
+    Protokolleintrag ||--o{ Renderdarstellung : wird_angezeigt_als
+    Renderdarstellung }o--|| SanitizingRegel : nutzt
 ```
 
 ---
 
-## 4. Datei-/Runtime-Modell
+## 4. Entitäten, Attribute, Beziehungen, Kardinalitäten
 
-### 4.1 Persistiertes Dateiformat (in `Protokolleintrag.Inhalt`)
-
-| Artefakt | Persistenzort | Zweck | Schlüssel/Korrelation |
-|---|---|---|---|
-| KI-Arbeitsprotokoll-Markdown | `Protokolleintrag.Inhalt` | Strukturierte KI-Antwort statt Textblock | `Protokolleintrag.Id` |
-| Datums-Heading | Erste Zeile im Markdown | Zeitliche Einordnung (`# {Datum}`) | Formatregel `# yyyy-MM-dd` |
-| RunId-Metadaten | Markdown-Metazeile | Lauf-Korrelation | `RunId` im Inhalt |
-| Schrittblöcke | Wiederholte Abschnitte | Schritttrennung statt Fließtext | `## Schritt n` |
-
-### 4.2 Runtime-Modell (Rendering in `AufgabeDetail`)
-
-| Runtime-Objekt | Zweck | Ergebnis |
-|---|---|---|
-| `RenderProtokollInhalt` | Markdown → HTML konvertieren und ausgeben | `MarkupString` |
-| `_protokollMarkdownPipeline` | Definiert Renderregeln (`UseAdvancedExtensions`, `DisableHtml`) | Kein Raw-HTML aus Markdown |
-| `SanitizeMarkdownHtml` | Entfernt `on*`-Attribute und unsichere `href/src`-Schemes | Sicherheitsbereinigtes HTML |
-| `BuildFallbackHtml` | Defensiver Pfad bei Fehler/leerem Sanitizing | HTML-encodiertes `<pre>` |
-
----
-
-## 5. Entitäten-Beziehungstabelle (inkl. Kardinalitäten)
-
-| Entität | Ebene | Schlüssel | Kernattribute | Beziehungen | Kardinalität |
+| Entität | Ebene | Schlüssel | Zentrale Attribute | Beziehungen | Kardinalität |
 |---|---|---|---|---|---|
-| `Aufgabe` | DB (bestehend) | `Id` | `Titel`, `LokalerKlonPfad`, `Status` | zu `Protokolleintrag` | 1:n |
-| `Protokolleintrag` | DB (bestehend) | `Id`, `AufgabeId` | `Typ`, `Inhalt`, `AgentName`, `Zeitstempel` | zu `Aufgabe`, `KiArbeitsprotokollMarkdown`, `MarkdownRenderVorgang` | n:1, 1:1*, 1:n |
-| `KiArbeitsprotokollMarkdown` | Logisch (persistierter Inhalt) | `ProtokollEintragId` | `DatumHeading`, `RunIdMeta`, `SchrittAnzahl` | zu `ProtokollSchritt` | 1:n |
-| `ProtokollSchritt` | Logisch (persistierter Inhalt) | `SchrittId`, `ProtokollEintragId`, `Index` | `Heading`, `Inhalt` | zu `KiArbeitsprotokollMarkdown` | n:1 |
-| `MarkdownRenderVorgang` | Runtime | `RenderId`, `ProtokollEintragId` | `RenderingErfolgreich`, `SanitizingErforderlich`, `FallbackVerwendet` | zu `SanitizingPolicy` | n:1 |
-| `SanitizingPolicy` | Runtime (konfig.) | `PolicyId` | `DisableRawHtml`, `UnsafeUriSchemes`, `EntferntEventHandler` | von `MarkdownRenderVorgang` genutzt | 1:n |
+| `Aufgabe` | DB (bestehend) | `Id` | `Titel`, `Status` | zu `Protokolleintrag`, `KiRun` | 1:n, 1:n |
+| `Protokolleintrag` | DB (bestehend) | `Id`, `AufgabeId` | `Typ`, `Inhalt`, `Zeitstempel`, `AgentName` | zu `MarkdownProtokoll`, `Renderdarstellung` | 1:1* , 1:n |
+| `KiRun` | Logisch (fachlich) | `RunId`, `AufgabeId` | `ZeitpunktUtc`, `ErgebnisStatus` | zu `MarkdownProtokoll` | 1:1 |
+| `MarkdownProtokoll` | Logisch (persistierte Struktur) | `ProtokollEintragId` | `DatumsHeader`, `RunIdMeta`, `SchrittAnzahl`, `SchrittTrennregel` | zu `Schrittblock` | 1:n |
+| `Schrittblock` | Logisch (persistierte Struktur) | `SchrittblockId`, `ProtokollEintragId`, `SchrittNr` | `Heading`, `Inhaltszeile`, `HatNachfolgendenBlockabstand` | zu `MarkdownProtokoll` | n:1 |
+| `Renderdarstellung` | Runtime (UI) | `RenderId`, `ProtokollEintragId` | `Rendermodus`, `DisableRawHtml`, `SanitizingAktiv`, `FallbackVerwendet`, `AusgabeTyp` | zu `SanitizingRegel` | n:1 |
+| `SanitizingRegel` | Runtime-Konfiguration | `RegelId` | `EntferntEventAttribute`, `BlockierteUriSchemes`, `UnsafeUriErsatz` | von `Renderdarstellung` genutzt | 1:n |
 
-\* Die 1:1-Beziehung `Protokolleintrag -> KiArbeitsprotokollMarkdown` gilt fachlich für `Typ = KiAntwort`.
-
----
-
-## 6. Regeln / Invarianten
-
-1. Jeder neu erzeugte KI-Protokolleintrag (`Typ = KiAntwort`) beginnt mit `# yyyy-MM-dd`.
-2. Jede KI-Antwort enthält eine RunId-Metadatenzeile (`- RunId: ...`) zur Lauf-Korrelation.
-3. Inhalt wird in Schrittabschnitte `## Schritt n` segmentiert; bei leerer Antwort wird mindestens `## Schritt 1` mit Fallbacktext erzeugt.
-4. Für die Webausgabe wird Markdown immer über die definierte Pipeline mit `DisableHtml` gerendert.
-5. Nach dem Rendering wird das HTML immer sanitisiert (Entfernung `on*`, Neutralisierung unsicherer URI-Schemes).
-6. Bei Render-/Sanitizing-Fehlern oder leerem Sanitizing-Ergebnis wird ausschließlich encodiertes `<pre>`-Fallback ausgegeben.
-7. Es werden keine zusätzlichen DB-Tabellen für dieses Feature eingeführt.
+\* `Protokolleintrag` ↔ `MarkdownProtokoll` gilt fachlich für `Typ = KiAntwort`.
 
 ---
 
-## 7. Modellierungsentscheidungen und Begründungen
+## 5. Integritätsregeln (fachlich + technisch)
 
-- **Bestehende Persistenz wiederverwenden:** Das Feature ändert die Semantik des Felds `Protokolleintrag.Inhalt`, nicht das Schema. Dadurch bleibt der Migrationsaufwand null.
-- **Logische Entitäten für Markdown-Struktur:** `KiArbeitsprotokollMarkdown` und `ProtokollSchritt` machen die Inhaltsregeln explizit modellierbar und testbar, obwohl sie physisch als Text gespeichert sind.
-- **Rendervorgang als Runtime-Entität:** `MarkdownRenderVorgang` trennt Persistenzmodell und Anzeigeverhalten klar; Sicherheits- und Fallbackregeln lassen sich so als feste Beziehungen dokumentieren.
-- **Explizite Sanitizing-Policy:** Die Sicherheitslogik (DisableHtml + URI/Event-Filter) wird als wiederverwendbare Policy modelliert statt implizit im Fließtext beschrieben.
+1. **Datums-Header-Regel:**  
+   Jeder neue KI-Protokolleintrag beginnt in Zeile 1 mit `# yyyy-MM-dd`.
+2. **Run-Korrelation:**  
+   `MarkdownProtokoll.RunIdMeta` enthält genau eine Metazeile `- RunId: \`{guid}\`` und referenziert `KiRun.RunId`.
+3. **Schritttrennung:**  
+   Für jede nicht-leere Antwortzeile existiert genau ein `Schrittblock` mit `Heading = ## Schritt n`; zwischen aufeinanderfolgenden Blöcken liegt mindestens eine Leerzeile.
+4. **Fallback bei leerer Antwort:**  
+   Ist keine nicht-leere Antwortzeile vorhanden, wird trotzdem `SchrittNr = 1` mit Fallback-Inhalt erzeugt.
+5. **Rendermodus verbindlich:**  
+   `Renderdarstellung.Rendermodus = MarkdownToHtml` (Markdig-Pipeline), nicht Rohtext/Raw-HTML.
+6. **Sicherheitsregel Rendering:**  
+   `DisableRawHtml = true` und `SanitizingAktiv = true`; `on*`-Attribute werden entfernt, unsichere URI-Schemes durch `#` ersetzt.
+7. **Robuster Ausgabepfad:**  
+   Bei Render-/Sanitizing-Fehlern gilt `FallbackVerwendet = true` und `AusgabeTyp = encoded-pre`.
+8. **Schema-Stabilität:**  
+   Für dieses Feature werden keine neuen physischen DB-Tabellen benötigt.
 
 ---
 
-## 8. Konsistenzabgleich mit Architektur-Blueprint
+## 6. Begründungen zu Modellierungsentscheidungen
 
-| Blueprint-Aussage | ERM-Abbildung | Ergebnis |
+- **KiRun als eigene logische Entität:** macht RunId und Zeitpunkt fachlich explizit, ohne DB-Migration.
+- **MarkdownProtokoll + Schrittblock:** modelliert die geforderte Struktur (`# {Datum}`, `## Schritt n`, Leerzeilen) testbar statt nur als Fließtextbeschreibung.
+- **Renderdarstellung als Runtime-Entität:** trennt Persistenzinhalt klar von Anzeigeverhalten (Rendermodus, Sanitizing, Fallback).
+- **SanitizingRegel explizit:** Sicherheitsanforderungen bleiben als wiederverwendbare Integritätsregeln nachvollziehbar.
+
+---
+
+## 7. Konsistenzabgleich mit Architektur-Blueprint
+
+| Blueprint-Anforderung | ERM-Abbildung | Ergebnis |
 |---|---|---|
-| Datumszeile exakt `# {Datum}` | `KiArbeitsprotokollMarkdown.DatumHeading`, Invariante 1 | ✅ Konsistent |
-| Schritttrennung statt Textblock | Entität `ProtokollSchritt` + Invariante 3 | ✅ Konsistent |
-| Persistierung als Markdown-Protokoll | `Protokolleintrag.Inhalt` enthält strukturiertes Markdown | ✅ Konsistent |
-| Wirksames Markdown-Rendering im Web | `MarkdownRenderVorgang` über `RenderProtokollInhalt` | ✅ Konsistent |
-| Sichere Render-Pipeline mit Sanitizing/Fallback | `SanitizingPolicy`, Invarianten 4–6 | ✅ Konsistent |
-| Keine Schemaerweiterung gefordert | Modellierungsrahmen Abschnitt 2 | ✅ Konsistent |
+| Datumskopf `# {Datum}` als erste Zeile | `MarkdownProtokoll.DatumsHeader` + Integritätsregel 1 | ✅ Konsistent |
+| Schritttrennung `## Schritt n` inkl. Leerzeilen | `Schrittblock` + Integritätsregel 3 | ✅ Konsistent |
+| Persistierung als Markdown in `Protokolleintrag.Inhalt` | Beziehung `Protokolleintrag` ↔ `MarkdownProtokoll` | ✅ Konsistent |
+| Definierter Markdown-Rendermodus in UI | `Renderdarstellung.Rendermodus` | ✅ Konsistent |
+| Sanitizing + Fallback bei Problemen | `Renderdarstellung`, `SanitizingRegel`, Integritätsregeln 6–7 | ✅ Konsistent |
+| Keine DB-Schemaänderung | Modellierungsrahmen + Integritätsregel 8 | ✅ Konsistent |
 
 ---
 
-## 9. Architektur-Review
-
-- Verlinkung: [`../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md`](../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md)
-- Hinweis: Sollte die Review-Datei noch nicht existieren, bleibt der Link als Zielreferenz für den nächsten Architektur-Review-Schritt bestehen.
-
----
-
-## 10. Versionshistorie
+## 8. Versionshistorie
 
 | Version | Datum | Autor | Änderung |
 |---|---|---|---|
-| 1.0.0 | 2026-05-11 | planning-entity-relationship-modeler | Initiales ERM für KI-Arbeitsprotokoll-Markdown erstellt (DB-Rahmen, Datei-/Runtime-Modell, Regeln, Konsistenzabgleich) |
-
+| 1.1.0 | 2026-05-24 | planning-entity-relationship-modeler | ERM auf aktualisierte Anforderungen ausgerichtet: explizite Entitäten `KiRun`, `Schrittblock`, `Renderdarstellung`, Integritätsregeln zu Datums-Header, Schritttrennung und Markdown-Rendermodus ergänzt |
+| 1.0.0 | 2026-05-11 | planning-entity-relationship-modeler | Initiale ERM-Fassung erstellt |

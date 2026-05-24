@@ -1,9 +1,17 @@
 # KI-Arbeitsprotokoll – Persistierung, Rendering und Fallback
 
 **Modul/Feature:** `EntwicklungsprozessService`, `ProtokollService`, `AufgabeDetail`  
-**Letzte Aktualisierung:** 2026-05-11
+**Letzte Aktualisierung:** 2026-05-24
 
 Dieser Ablauf dokumentiert, wie KI-Ausgaben als strukturiertes Markdown-Arbeitsprotokoll erzeugt, in der Datenbank persistiert und in der Aufgaben-Detailansicht sicher gerendert werden. Der Fokus liegt auf dem Format `# {Datum}` plus Schritttrennung `## Schritt n`, der Sanitizing-Stufe für HTML-Ausgabe und dem robusten Fallback-Pfad bei Render-/Sanitizing-Problemen.
+
+## Formatvertrag (verbindlich)
+
+1. Jeder persistierte KI-Protokolleintrag beginnt mit `# yyyy-MM-dd`.
+2. Nach der Datumszeile folgt die Metadatenzeile `- RunId: \`{runId}\``.
+3. Antwortblöcke werden als `## Schritt n` mit mindestens einer Leerzeile zwischen den Schritten ausgegeben.
+4. Bei leerer KI-Antwort wird ein Fallback-Schritt `## Schritt 1` mit „Keine Ausgabe vorhanden.“ erzeugt.
+5. In der laufenden Streaming-Ansicht gilt derselbe Aufbau; dort lautet der Fallbacktext „Warte auf Ausgabe...“.
 
 ---
 
@@ -63,7 +71,8 @@ flowchart TD
    **Ausgaben:** Markdown mit:
    - Datumszeile `# yyyy-MM-dd`
    - Metadatenzeile `- RunId: \`{runId}\``
-   - Schrittblöcke `## Schritt 1..n` pro nicht-leerer Antwortzeile  
+   - Schrittblöcke `## Schritt 1..n` pro nicht-leerer Antwortzeile (inkl. Leerzeilentrennung zwischen Schritten)  
+   - Fallback `## Schritt 1` + „Keine Ausgabe vorhanden.“ bei leerer Antwort  
    **Seiteneffekte:** keine (pure String-Erzeugung).
 
 3. **Protokolleintrag wird persistiert**  
@@ -82,7 +91,7 @@ flowchart TD
    **Code:**  
    - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` (`@RenderProtokollInhalt(eintrag.Inhalt)`)  
    - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` (`RenderProtokollInhalt`)  
-   **Eingaben:** `eintrag.Inhalt` (Markdown)  
+   **Eingaben:** `eintrag.Inhalt` (Markdown) sowie laufender Streaming-Output über `BuildStreamingArbeitsprotokollMarkdown`  
    **Ausgaben:** `MarkupString` für die Anzeige im DOM.
 
 6. **HTML wird sanitiziert und unsichere URIs werden neutralisiert**  
@@ -137,3 +146,17 @@ flowchart TD
 **Verwandte Flows:**  
 - [Entwicklungsprozess-Abläufe](./development-process-flow.md) (insb. KI-Streaming)  
 - [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md)
+
+---
+
+## Testabdeckung (Stand 2026-05-24)
+
+- `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
+  - `KiStartenAsync_ShouldPersistMarkdownArbeitsprotokoll_WithDateHeadingAndSeparatedSteps`
+  - `KiStartenAsync_ShouldPersistFallbackStep_WhenKiOutputIsWhitespaceOnly`
+  - `KiStartenAsync_ShouldNormalizeLineBreaks_AndKeepStepOrder`
+- `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
+  - `RenderProtokollInhalt_ShouldRenderMarkdownHeadings`
+  - `RenderProtokollInhalt_ShouldSanitizeUnsafe*`
+  - `SanitizeMarkdownHtml_ShouldRemoveHtmlEventHandlerAttributes`
+  - `BuildStreamingArbeitsprotokollMarkdown_ShouldCreateDateHeadingAndStepSections`

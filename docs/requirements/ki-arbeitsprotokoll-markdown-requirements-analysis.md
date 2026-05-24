@@ -2,7 +2,7 @@
 
 > **Dokument-Typ:** Requirements Analysis  
 > **Status:** 📋 Geplant  
-> **Version:** 1.0.0  
+> **Version:** 1.1.0  
 > **Thema:** Strukturierte Ausgabe des KI-Arbeitsprotokolls mit Markdown-Rendering in der Webansicht
 
 ---
@@ -15,7 +15,7 @@ Bei der Ausführung einer KI-Aufgabe wird das Arbeitsprotokoll aktuell als einfa
 ### 1.2 Geschäftsziele
 | # | Ziel | Messbare Erfolgsgröße |
 |---|---|---|
-| Z-1 | Höhere Lesbarkeit von KI-Protokollen | 100 % neuer KI-Protokolle enthalten Datum als Markdown-H1 und getrennte Schrittblöcke |
+| Z-1 | Höhere Lesbarkeit von KI-Protokollen | 100 % neuer KI-Protokolle enthalten Datum als Markdown-H1 und klar getrennte Schrittblöcke (inkl. Leerzeilen zwischen Schritten) |
 | Z-2 | Einheitliches Anzeigeverhalten im Web | Überschriften (`#`, `##`) und Standard-Markdown-Elemente werden in der Protokollansicht sichtbar gerendert |
 | Z-3 | Sichere Darstellung trotz Rich-Text | Unsichere HTML-Schemata/Event-Handler werden weiterhin sanitisiert |
 
@@ -37,10 +37,10 @@ Bei der Ausführung einer KI-Aufgabe wird das Arbeitsprotokoll aktuell als einfa
 
 | Kennung | Beschreibung | Kategorie | Priorität | Status |
 |---------|--------------|-----------|-----------|--------|
-| **FR-1** | **Markdown-Arbeitsprotokoll erzeugen:** KI-Antworten werden als strukturiertes Markdown gespeichert; Datum, Metadaten und Schritte sind getrennt und maschinen-/menschenlesbar. → [Architektur-Blueprint](../architecture/ki-arbeitsprotokoll-markdown-architecture-blueprint.md) · [ERM](../architecture/ki-arbeitsprotokoll-markdown-entity-relationship-model.md) · [Architecture-Review](../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md) | Kern-Feature | MUST HAVE | 📋 Geplant |
-| **FR-1.1** | **Datumszeile als H1:** Die erste Datumszeile wird exakt als Markdown-Überschrift im Format `# {Datum}` (z. B. `# 2026-05-11`) ausgegeben. | Kern-Feature | MUST HAVE | 📋 Geplant |
-| **FR-1.2** | **Schritttrennung:** Inhalt wird in getrennte Abschnitte `## Schritt n` überführt; mindestens ein Schritt wird auch bei leerer Antwort erzeugt. | Datenverwaltung | MUST HAVE | 📋 Geplant |
-| **FR-2** | **Markdown-Rendering in der Webausgabe:** Protokollinhalte werden in `AufgabeDetail` als Markdown gerendert, sodass Überschriften und weitere Markdown-Formatierung wirksam angezeigt werden. → [Architektur-Blueprint](../architecture/ki-arbeitsprotokoll-markdown-architecture-blueprint.md) · [Architecture-Review](../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md) | UX / Accessibility | MUST HAVE | 📋 Geplant |
+| **FR-1** | **Markdown-Arbeitsprotokoll erzeugen:** Der bisherige einfache Textblock wird in eine strukturierte Markdown-Ausgabe überführt; Datum, Metadaten und Arbeitsschritte sind getrennt und maschinen-/menschenlesbar. → [Architektur-Blueprint](../architecture/ki-arbeitsprotokoll-markdown-architecture-blueprint.md) · [ERM](../architecture/ki-arbeitsprotokoll-markdown-entity-relationship-model.md) · [Architecture-Review](../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md) | Kern-Feature | MUST HAVE | 📋 Geplant |
+| **FR-1.1** | **Datumszeile als H1:** Die erste Datumszeile wird als Markdown-Überschrift im Format `# {Datum}` ausgegeben (z. B. `# 2026-05-24`). | Kern-Feature | MUST HAVE | 📋 Geplant |
+| **FR-1.2** | **Schritttrennung:** Inhalt wird in getrennte Abschnitte `## Schritt n` überführt; zwischen Schritten steht mindestens eine Leerzeile und mindestens ein Schritt wird auch bei leerer Antwort erzeugt. | Datenverwaltung | MUST HAVE | 📋 Geplant |
+| **FR-2** | **Markdown-Rendering in der Webausgabe:** Protokollinhalte werden in `AufgabeDetail` als Markdown gerendert, sodass Überschriften und weitere Markdown-Formatierungen (z. B. Listen, Fett/Kursiv, Code, Links) wirksam angezeigt werden. → [Architektur-Blueprint](../architecture/ki-arbeitsprotokoll-markdown-architecture-blueprint.md) · [Architecture-Review](../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md) | UX / Accessibility | MUST HAVE | 📋 Geplant |
 | **FR-2.1** | **Render-Pipeline mit Sanitizing:** Das Rendering nutzt eine definierte Markdown-Pipeline und anschließende Sanitizing-Logik vor der DOM-Ausgabe. | Sicherheit | MUST HAVE | 📋 Geplant |
 | **FR-2.2** | **Fallback-Ausgabe:** Bei Render-/Sanitizing-Fehlern wird ein sicheres `<pre>`-Fallback mit HTML-Encoding ausgegeben. | Zuverlässigkeit | HIGH | 📋 Geplant |
 | **FR-3** | **Technische Konsistenz im Aufgabenfluss:** Formatierung und Darstellung sind durchgängig zwischen Erzeugung (`EntwicklungsprozessService`) und Anzeige (`AufgabeDetail`) konsistent. → [ERM](../architecture/ki-arbeitsprotokoll-markdown-entity-relationship-model.md) · [Architecture-Review](../improvements/ki-arbeitsprotokoll-markdown-architecture-review.md) | Wartbarkeit | HIGH | 📋 Geplant |
@@ -67,7 +67,7 @@ Bei der Ausführung einer KI-Aufgabe wird das Arbeitsprotokoll aktuell als einfa
 **möchte ich**, dass das Protokolldatum als klare Überschrift angezeigt wird,  
 **damit** ich Einträge schneller zeitlich einordnen kann.
 
-- AC-1.1: Neue KI-Protokolle beginnen mit einer Datumszeile im Format `# yyyy-MM-dd`.
+- AC-1.1: Neue KI-Protokolle beginnen mit einer Datumszeile im Format `# {Datum}`.
 - AC-1.2: In der UI wird diese Datumszeile als `<h1>` gerendert.
 
 ### User Story US-2 – Schrittweise Protokollierung
@@ -75,7 +75,7 @@ Bei der Ausführung einer KI-Aufgabe wird das Arbeitsprotokoll aktuell als einfa
 **möchte ich**, dass KI-Ausgaben in getrennten Schritten erscheinen,  
 **damit** ich den Arbeitsfortschritt nachvollziehen kann.
 
-- AC-2.1: Jede nicht-leere Antwortzeile wird als eigener `## Schritt n`-Block ausgegeben.
+- AC-2.1: Jede nicht-leere Antwortzeile wird als eigener `## Schritt n`-Block mit mindestens einer trennenden Leerzeile zum nächsten Schritt ausgegeben.
 - AC-2.2: Bei leerer Antwort wird dennoch `## Schritt 1` mit einem Fallback-Text erzeugt.
 
 ### User Story US-3 – Markdown wirksam im Web
@@ -101,7 +101,7 @@ Bei der Ausführung einer KI-Aufgabe wird das Arbeitsprotokoll aktuell als einfa
 | Typ | Eintrag | Auswirkung |
 |---|---|---|
 | Annahme | KI-Antworten liegen als zeilenbasierter Rohtext vor. | Schritttrennung (`## Schritt n`) kann deterministisch erzeugt werden. |
-| Annahme | Der Datumswert ist im Ausführungskontext verfügbar (`DateTimeOffset`). | Format `# yyyy-MM-dd` kann stabil erzeugt werden. |
+| Annahme | Der Datumswert ist im Ausführungskontext verfügbar (`DateTimeOffset`). | Format `# {Datum}` kann stabil erzeugt werden. |
 | Abhängigkeit | `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` erzeugt das Markdown-Arbeitsprotokoll. | Änderungen an der Protokollstruktur erfolgen primär in `BuildKiArbeitsprotokollMarkdown`. |
 | Abhängigkeit | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor` bindet die Protokollausgabe ein. | UI-Markup muss die gerenderte Ausgabe korrekt anzeigen. |
 | Abhängigkeit | `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs` rendert und sanitisiert Markdown. | Sicherheit und Fallback hängen direkt von `RenderProtokollInhalt`/`SanitizeMarkdownHtml` ab. |
@@ -221,10 +221,10 @@ classDiagram
 |---|---|---|---|
 | Product Owner | _ausstehend_ | ⏳ Ausstehend | — |
 | Architektur | _ausstehend_ | ⏳ Ausstehend | — |
-| Autor | GitHub Copilot Agent | ✅ Erstellt | 2026-05-11 |
+| Autor | GitHub Copilot Agent | ✅ Erstellt | 2026-05-24 |
 
 ### Versionshistorie
 | Version | Datum | Autor | Änderung |
 |---|---|---|---|
+| 1.1.0 | 2026-05-24 | GitHub Copilot Agent | Anforderungen präzisiert: Datums-H1 als `# {Datum}`, explizite Schritttrennung und erweitertes Markdown-Rendering in der Webausgabe |
 | 1.0.0 | 2026-05-11 | GitHub Copilot Agent | Initiale Anforderungsanalyse für Feature „KI-Arbeitsprotokoll als Markdown“ erstellt |
-

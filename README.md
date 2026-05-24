@@ -637,6 +637,7 @@ Feature-spezifische Testartefakte:
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
 - Service-Tests (Issue 58 Pluginauswahl/Persistenz): `src/Softwareschmiede.Tests/Application/Services/PluginSelectionServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - UI-bUnit-Tests (Issue 58 Reihenfolge/Weitergabe): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
+- Protokoll-Tests (Markdown-Struktur + Sanitizing/Fallback): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
 - UI-bUnit-Tests (Git-Aktionsleiste/Pluginauswahl): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
 - UI-Tests (Projektdetail Startkonfiguration): `src/Softwareschmiede.Tests/Components/Pages/Projekte/ProjektDetailRepositoryFormTests.cs`
@@ -668,6 +669,8 @@ Feature-spezifische Testartefakte:
 - [Testlücken: Claude-CLI-Integration](docs/tests/testluecken-claude-cli-integration.md)
 - [Testplan: Repository-Startskript mit freier Portzuweisung](docs/tests/testplan-repository-startskript-freier-port.md)
 - [Testlücken: Repository-Startskript mit freier Portzuweisung](docs/tests/testluecken-repository-startskript-freier-port.md)
+- [Testplan: AufgabeDetail Markdown-Rendering & Sanitizing](docs/tests/testplan-aufgabe-detail-markdown-rendering-sanitizing.md)
+- [Testlückenanalyse: AufgabeDetail Markdown-Rendering & Sanitizing](docs/tests/testluecken-aufgabe-detail-markdown-rendering-sanitizing.md)
 - [Testplan: DiffViewer für geänderte Dateien](docs/tests/testplan-diffviewer-geaenderte-dateien.md)
 - [Testlückenanalyse: DiffViewer für geänderte Dateien](docs/tests/testluecken-diffviewer-geaenderte-dateien.md)
 - [Testplan: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testplan-changed-artifact-detection-agent-compliance.md)
@@ -710,6 +713,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - SVG-Favicon `favicon-hammer-pick.svg` dokumentiert (Features/Usage) inkl. ergänzter Testabdeckung für Head-Markup und statische Asset-Validierung
 - Feature-Dokumentation für „Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“ konsolidiert (API/Flow/Business/Tests): getrennte Workspace-Klassifikation (`CodeFiles`/`PlanningDocuments`), Fallback-Erkennung und Compliance-Regeln für Agentenpakete
 - Feature-Dokumentation für **Issue 58** ergänzt (API/Flow/Business/README): plugin-spezifische Agenten-Discovery/Auswahl, `KiPluginPrefix`-Persistenz und konsistente Auflösung in Start-/Folgeprompt
+- Dokumentation für **KI-Arbeitsprotokoll als Markdown** präzisiert (API-/Flow-/Business-/Guide-/Test-Doku): verbindliche Struktur `# Datum` + `## Schritt n`, Markdown-Rendering in der Webausgabe und Sanitizing-/Fallback-Regeln
 
 ---
 
