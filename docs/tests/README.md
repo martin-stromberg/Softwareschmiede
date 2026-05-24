@@ -12,6 +12,8 @@
 | [testplan-pull-request-repository-id-removal.md](./testplan-pull-request-repository-id-removal.md) | Testplan für das Feature „PR-Repository-ID entfernen" |
 | [testplan-aufgabe-detail-project-selected-git-plugin.md](./testplan-aufgabe-detail-project-selected-git-plugin.md) | Teststrategie für projektspezifische IGitPlugin-Auswahl in AufgabeDetail/GitOrchestrationService (inkl. LocalRepository) |
 | [testplan-aufgabe-detail-projektanzeige.md](./testplan-aufgabe-detail-projektanzeige.md) | Testplan für die Anzeige `Projekt: <Name>` unterhalb des Aufgabentitels inkl. Fallback und Plain-Text-Rendering |
+| [testplan-aufgabe-detail-markdown-rendering-sanitizing.md](./testplan-aufgabe-detail-markdown-rendering-sanitizing.md) | Umgesetzter Testplan für strukturierte Markdown-Protokolle und sichere Webdarstellung in AufgabeDetail |
+| [testluecken-aufgabe-detail-markdown-rendering-sanitizing.md](./testluecken-aufgabe-detail-markdown-rendering-sanitizing.md) | Restlückenanalyse für Markdown-Strukturgenerierung sowie Rendering-/Sanitizing-Verhalten in AufgabeDetail |
 | [testluecken-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md](./testluecken-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md) | Testlückenanalyse für Git-Plugin-Capabilities und Copy-Flow-Aktionssteuerung |
 | [testplan-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md](./testplan-lokales-verzeichnis-plugin-kopie-aktionsmatrix.md) | Umsetzungsplan zur Schließung der Testlücken für Git-Plugin-Capabilities und Merge nach Source |
 | [testplan-issue-branch-pr-linking.md](./testplan-issue-branch-pr-linking.md) | Testplan für Issue-Auswahl, issuebezogene Branch-Namensbildung und PR-Auto-Close |

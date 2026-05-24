@@ -46,6 +46,13 @@ Unsichere oder fremde Inhalte werden vor der Anzeige automatisch bereinigt.
 Falls die Formatierung einmal nicht korrekt geladen wird, zeigt die Seite den Inhalt in einer einfachen Ersatzansicht.
 So bleibt das Protokoll trotzdem lesbar.
 
+### Sicherheits- und Darstellungsregeln
+
+- Die Webausgabe rendert Überschriften, Listen, Links und Code als Markdown.
+- Unsichere Inhaltsmuster werden vor der Anzeige neutralisiert (z. B. Event-Attribute wie `onclick` oder unsichere Link-Ziele wie `javascript:`).
+- Wenn die reguläre Darstellung fehlschlägt, wird der Inhalt als sichere Ersatzansicht (`<pre>`) angezeigt.
+- Auch während eines laufenden KI-Streams bleibt die Struktur stabil: Datum oben, darunter klare Schrittblöcke.
+
 **Übersicht der Eintragstypen:**
 
 | Typ | Symbol | Bedeutung |

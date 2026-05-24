@@ -6,6 +6,7 @@ Technische Dokumentation der öffentlichen Schnittstellen und internen API-Contr
 
 Die Softwareschmiede stellt öffentliche HTTP-Endpunkte für den Diff-Bereich bereit.
 Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“** wurden **keine neuen öffentlichen REST-Endpunkte** eingeführt.
+Auch für das Feature **„KI-Arbeitsprotokoll als Markdown“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für das Feature **„Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
@@ -55,6 +56,20 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - Keine neuen öffentlichen REST-Endpunkte.
 - Interne Service-/UI-Integration über Abschlussereignisse, Hub-Verteilung und UI-Verarbeitung.
 - Terminologie für dieses Feature: **BenachrichtigungsModus**, **Toast**, **Hinweiston**, **Audit**.
+
+## Feature-Fokus: KI-Arbeitsprotokoll als Markdown (2026-05-24)
+
+- Keine neuen öffentlichen REST-Endpunkte.
+- Formatvertrag in der internen Pipeline:
+  - Datumszeile als `# yyyy-MM-dd`
+  - Schritttrennung als `## Schritt n` mit Leerzeile zwischen Schritten
+  - Fallback bei leerer Antwort (`Keine Ausgabe vorhanden.`) und Streaming-Fallback (`Warte auf Ausgabe...`)
+- Sichere Webdarstellung:
+  - Markdig-Pipeline mit `DisableHtml()`
+  - Sanitizing entfernt `on*`-Eventattribute und neutralisiert unsichere `href/src`-Schemes (`javascript:`, `data:`, `vbscript:`)
+  - Fallback auf HTML-encoded `<pre>` bei Render-/Sanitizing-Fehlern
+- Technische Vertiefung: [KI-Arbeitsprotokoll-Flow](../flows/ki-arbeitsprotokoll-rendering-flow.md)
+- Fachliche Einordnung: [F005 – Aufgabenprotokoll](../business/features/F005-aufgabenprotokoll.md)
 
 ## Feature-Fokus: Standardplugin je Pluginart & KI-Plugin-Auswahl
 

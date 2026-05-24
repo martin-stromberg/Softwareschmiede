@@ -626,6 +626,47 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         result.Value.Should().Contain("href=\"#\"");
     }
 
+    /// <summary>Stellt sicher, dass unsichere URI-Schemes in Bildquellen neutralisiert werden.</summary>
+    [Theory]
+    [InlineData("![Bild](javascript:alert('xss'))", "javascript:")]
+    [InlineData("![Bild](data:text/html;base64,PHNjcmlwdD4=)", "data:")]
+    public void RenderProtokollInhalt_ShouldSanitizeUnsafeImageSchemes(string markdown, string blockedScheme)
+    {
+        var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", markdown);
+
+        result.Value.Should().NotContain(blockedScheme);
+        result.Value.Should().Contain("src=\"#\"");
+    }
+
+    /// <summary>Verifiziert die case-insensitive Erkennung unsicherer URI-Schemes.</summary>
+    [Fact]
+    public void RenderProtokollInhalt_ShouldSanitizeUnsafeSchemesCaseInsensitive()
+    {
+        const string markdown = "[Link](JaVaScRiPt:alert(1)) ![Bild](DaTa:text/html;base64,PHNjcmlwdD4=)";
+
+        var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", markdown);
+        var normalized = result.Value.ToLowerInvariant();
+
+        normalized.Should().NotContain("javascript:");
+        normalized.Should().NotContain("data:");
+        result.Value.Should().Contain("href=\"#\"");
+        result.Value.Should().Contain("src=\"#\"");
+    }
+
+    /// <summary>Stellt sicher, dass sichere URI-Schemes nicht fälschlich blockiert werden.</summary>
+    [Fact]
+    public void RenderProtokollInhalt_ShouldKeepSafeSchemesIntact()
+    {
+        const string markdown = "[Web](https://example.org) [Mail](mailto:test@example.org) ![Bild](https://example.org/logo.png)";
+
+        var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", markdown);
+
+        result.Value.Should().Contain("https://example.org");
+        result.Value.Should().Contain("mailto:test@example.org");
+        result.Value.Should().NotContain("href=\"#\"");
+        result.Value.Should().NotContain("src=\"#\"");
+    }
+
     [Fact]
     public void SanitizeMarkdownHtml_ShouldRemoveHtmlEventHandlerAttributes()
     {
@@ -639,12 +680,89 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         normalized.Should().NotContain("onerror=");
     }
 
+    /// <summary>Stellt sicher, dass leere oder null HTML-Eingaben als leeres Ergebnis verarbeitet werden.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" \t\r\n ")]
+    public void SanitizeMarkdownHtml_ShouldReturnEmpty_WhenInputIsNullOrWhitespace(string? html)
+    {
+        var sanitized = InvokePrivateStatic<string>("SanitizeMarkdownHtml", html);
+
+        sanitized.Should().BeEmpty();
+    }
+
     [Fact]
     public void RenderProtokollInhalt_ShouldReturnDashPre_WhenInputIsWhitespace()
     {
         var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", "  \n\t  ");
 
         result.Value.Should().Be("<pre>&#x2013;</pre>");
+    }
+
+    [Fact]
+    public async Task BuildStreamingArbeitsprotokollMarkdown_ShouldCreateDateHeadingAndStepSections()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        SetPrivateField(sut, "_kiStreamingStartedUtc", new DateTimeOffset(2026, 05, 24, 8, 30, 0, TimeSpan.Zero));
+        SetPrivateField(sut, "_streamingLines", new List<string> { "Analyse", "Implementierung" });
+
+        var markdown = InvokePrivate<string>(sut, "BuildStreamingArbeitsprotokollMarkdown");
+
+        markdown.Should().Contain("# 2026-05-24");
+        markdown.Should().Contain("## Schritt 1");
+        markdown.Should().Contain("Analyse");
+        markdown.Should().Contain("## Schritt 2");
+        markdown.Should().Contain("Implementierung");
+    }
+
+    /// <summary>Verifiziert die Fallback-Ausgabe, solange noch keine Streaming-Zeilen vorliegen.</summary>
+    [Fact]
+    public async Task BuildStreamingArbeitsprotokollMarkdown_ShouldReturnFallback_WhenStreamingLinesAreEmpty()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        SetPrivateField(sut, "_kiStreamingStartedUtc", new DateTimeOffset(2026, 05, 24, 8, 30, 0, TimeSpan.Zero));
+        SetPrivateField(sut, "_streamingLines", new List<string>());
+
+        var markdown = InvokePrivate<string>(sut, "BuildStreamingArbeitsprotokollMarkdown");
+
+        markdown.Should().Contain("# 2026-05-24");
+        markdown.Should().Contain("## Schritt 1");
+        markdown.Should().Contain("Warte auf Ausgabe...");
+        markdown.Should().NotContain("## Schritt 2");
+    }
+
+    /// <summary>Verifiziert das Filtern leerer Zeilen und eine lückenlose Schrittnummerierung.</summary>
+    [Fact]
+    public async Task BuildStreamingArbeitsprotokollMarkdown_ShouldSkipWhitespaceLines_AndKeepStepNumbersContinuous()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        SetPrivateField(sut, "_kiStreamingStartedUtc", new DateTimeOffset(2026, 05, 24, 8, 30, 0, TimeSpan.Zero));
+        SetPrivateField(sut, "_streamingLines", new List<string> { "Analyse", "   ", "\t", "Implementierung", string.Empty });
+
+        var markdown = InvokePrivate<string>(sut, "BuildStreamingArbeitsprotokollMarkdown");
+
+        markdown.Should().Contain("## Schritt 1");
+        markdown.Should().Contain("Analyse");
+        markdown.Should().Contain("## Schritt 2");
+        markdown.Should().Contain("Implementierung");
+        markdown.Should().NotContain("## Schritt 3");
+    }
+
+    /// <summary>Verifiziert das Entfernen von trailing whitespace pro Streaming-Schritt.</summary>
+    [Fact]
+    public async Task BuildStreamingArbeitsprotokollMarkdown_ShouldTrimTrailingWhitespace_PerStep()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        SetPrivateField(sut, "_kiStreamingStartedUtc", new DateTimeOffset(2026, 05, 24, 8, 30, 0, TimeSpan.Zero));
+        SetPrivateField(sut, "_streamingLines", new List<string> { "Analyse   ", "Implementierung\t\t" });
+
+        var markdown = InvokePrivate<string>(sut, "BuildStreamingArbeitsprotokollMarkdown");
+
+        markdown.Should().Contain("Analyse");
+        markdown.Should().Contain("Implementierung");
+        markdown.Should().NotContain("Analyse   ");
+        markdown.Should().NotContain("Implementierung\t\t");
     }
 
     [Fact]
@@ -692,6 +810,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         var css = File.ReadAllText(cssPath);
 
         markup.Should().Contain("protokoll-markdown markdown-preview");
+        markup.Should().Contain("streaming-output protokoll-markdown markdown-preview");
+        markup.Should().Contain("@RenderProtokollInhalt(BuildStreamingArbeitsprotokollMarkdown())");
+        markup.Should().Contain("@if (_aufgabe.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0)");
         markup.Should().Contain("class=\"@GetProtokollCssClass(eintrag.Typ)\"");
         markup.Should().Contain("@GetProtokollLabel(eintrag.Typ):");
 
@@ -926,6 +1047,17 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             BindingFlags.Static | BindingFlags.NonPublic);
         method.Should().NotBeNull($"Static method {methodName} should exist.");
         var result = method!.Invoke(null, args);
+        result.Should().NotBeNull($"{methodName} should return a value.");
+        return (T)result!;
+    }
+
+    private static T InvokePrivate<T>(object target, string methodName, params object?[] args)
+    {
+        var method = typeof(AufgabeDetail).GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull($"Method {methodName} should exist.");
+        var result = method!.Invoke(target, args);
         result.Should().NotBeNull($"{methodName} should return a value.");
         return (T)result!;
     }

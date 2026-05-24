@@ -1,5 +1,6 @@
 namespace Softwareschmiede.Components.Pages.Aufgaben;
 
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using Markdig;
@@ -39,6 +40,7 @@ public partial class AufgabeDetail : IDisposable
     private List<AgentInfo> _agenten = [];
     private IReadOnlyList<IKiPlugin> _kiPlugins = [];
     private List<string> _streamingLines = [];
+    private DateTimeOffset _kiStreamingStartedUtc = DateTimeOffset.UtcNow;
     private WorkspaceSnapshot? _workspaceSnapshot;
     private WorkspaceFileNode? _selectedWorkspaceNode;
     private FilePreview? _selectedWorkspacePreview;
@@ -138,6 +140,7 @@ public partial class AufgabeDetail : IDisposable
         if (KiAusfuehrungsService.IsRunning(Id))
         {
             _processing = true;
+            _kiStreamingStartedUtc = DateTimeOffset.UtcNow;
             _streamingLines = [.. KiAusfuehrungsService.GetBufferedLines(Id)];
             KiLiveSubscribieren();
         }
@@ -624,6 +627,7 @@ public partial class AufgabeDetail : IDisposable
 
         _processing = true;
         _fehler = null;
+        _kiStreamingStartedUtc = DateTimeOffset.UtcNow;
         _streamingLines = [];
 
         // Bisherige Subscription aufräumen
@@ -1323,6 +1327,34 @@ public partial class AufgabeDetail : IDisposable
 
     private static string BuildFallbackHtml(string inhalt)
         => $"<pre>{HtmlEncoder.Default.Encode(inhalt)}</pre>";
+
+    private string BuildStreamingArbeitsprotokollMarkdown()
+    {
+        var zeilen = _streamingLines
+            .Where(zeile => !string.IsNullOrWhiteSpace(zeile))
+            .Select(zeile => zeile.TrimEnd())
+            .ToArray();
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"# {_kiStreamingStartedUtc:yyyy-MM-dd}");
+        builder.AppendLine();
+
+        if (zeilen.Length == 0)
+        {
+            builder.AppendLine("## Schritt 1");
+            builder.AppendLine("Warte auf Ausgabe...");
+            return builder.ToString().TrimEnd();
+        }
+
+        for (var i = 0; i < zeilen.Length; i++)
+        {
+            builder.AppendLine($"## Schritt {i + 1}");
+            builder.AppendLine(zeilen[i]);
+            builder.AppendLine();
+        }
+
+        return builder.ToString().TrimEnd();
+    }
 
     private async Task ClearErfolgAsync()
     {

@@ -188,6 +188,11 @@ Das Protokoll enthält verschiedene Arten von Einträgen:
 Einträge sind chronologisch sortiert – der neueste Eintrag steht unten.
 Sie können im Protokoll scrollen und nach bestimmten Begriffen suchen.
 
+Neue KI-Arbeitsprotokolle erscheinen als strukturiertes Markdown:
+- Datum als Überschrift (z. B. `# 2026-05-24`)
+- klar getrennte Abschnitte (`## Schritt 1`, `## Schritt 2`, …)
+- sichere Webdarstellung mit automatischer Bereinigung unsicherer Inhalte und robuster Ersatzansicht bei Darstellungsfehlern
+
 👉 Mehr dazu: [F005 – Aufgabenprotokoll](./business/features/F005-aufgabenprotokoll.md)
 
 ---
