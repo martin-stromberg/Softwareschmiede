@@ -16,6 +16,11 @@ public sealed class AufgabeDetailRecoveryTests
         var recoveryService = File.ReadAllText(recoveryServicePath);
 
         markup.Should().Contain("Aufgabe wiederherstellen");
+        markup.Should().Contain("Aufgabe Detail Register");
+        markup.Should().Contain(">Aufgabe</button>");
+        markup.Should().Contain(">Ausführung</button>");
+        markup.Should().Contain(">Projektverzeichnis</button>");
+        markup.Should().NotContain("stat-label\">Ansicht");
         markup.Should().Contain("@if (IsRecoveryStatus)");
         markup.Should().Contain("disabled=\"@(_processing || !_recoveryAllowed)\"");
         markup.Should().Contain("_showRecoveryConfirm");

@@ -104,7 +104,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_selectedKiPluginPrefix").Should().Be("Softwareschmiede.KiB");
     }
 
-    /// <summary>Prüft, dass der Query-Parameter die Explorer-Ansicht aktiviert.</summary>
+    /// <summary>Prüft, dass der Query-Parameter das Projektverzeichnis-Register aktiviert.</summary>
     [Fact]
     public async Task OnParametersSetAsync_ShouldEnableExplorer_WhenViewQueryIsTree()
     {
@@ -113,10 +113,10 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.View = "tree";
         await sut.InvokeOnParametersSetAsync();
 
-        GetPrivateField<bool>(sut, "_showExplorer").Should().BeTrue();
+        GetPrivateProperty<bool>(sut, "IsProjektverzeichnisRegisterAktiv").Should().BeTrue();
     }
 
-    /// <summary>Prüft, dass nur die Explorer-Ansicht den Tree-Modus aktiviert.</summary>
+    /// <summary>Prüft, dass nur die Explorer-Ansicht das Projektverzeichnis-Register aktiviert.</summary>
     [Fact]
     public async Task OnParametersSetAsync_ShouldDisableExplorer_WhenViewQueryIsTaskOrMissing()
     {
@@ -125,14 +125,28 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         await taskSut.InvokeOnParametersSetAsync();
 
-        GetPrivateField<bool>(taskSut, "_showExplorer").Should().BeFalse();
+        GetPrivateProperty<bool>(taskSut, "IsProjektverzeichnisRegisterAktiv").Should().BeFalse();
 
         var defaultSut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
         defaultSut.View = null;
 
         await defaultSut.InvokeOnParametersSetAsync();
 
-        GetPrivateField<bool>(defaultSut, "_showExplorer").Should().BeFalse();
+        GetPrivateProperty<bool>(defaultSut, "IsProjektverzeichnisRegisterAktiv").Should().BeFalse();
+    }
+
+    /// <summary>Prüft den Fallback auf Register „Aufgabe“ bei ungültigem register-Querywert.</summary>
+    [Fact]
+    public async Task OnParametersSetAsync_ShouldFallbackToAufgabeRegister_WhenRegisterQueryIsInvalid()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        sut.Register = "ungueltig";
+
+        await sut.InvokeOnParametersSetAsync();
+
+        GetPrivateProperty<bool>(sut, "IsAufgabeRegisterAktiv").Should().BeTrue();
+        GetPrivateProperty<bool>(sut, "IsAusfuehrungRegisterAktiv").Should().BeFalse();
+        GetPrivateProperty<bool>(sut, "IsProjektverzeichnisRegisterAktiv").Should().BeFalse();
     }
 
     [Fact]
@@ -508,7 +522,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         capabilities.CanMergeToSource.Should().BeFalse();
     }
 
-    /// <summary>Verifiziert, dass bei unsichtbaren Aktionen geöffnete Formulare wieder geschlossen werden.</summary>
+    /// <summary>Verifiziert, dass bei deaktivierten Aktionen geöffnete Formulare wieder geschlossen werden.</summary>
     [Fact]
     public async Task LadeGitActionCapabilitiesAsync_ShouldClosePushPullAndPrForms_WhenActionsAreHidden()
     {
@@ -527,12 +541,14 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
                 .Setup(g => g.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(hiddenCapabilities));
         await sut.InvokeOnInitializedAsync();
-        SetPrivateField(sut, "_showPushPullButtons", true);
+        SetPrivateField(sut, "_showPushForm", true);
+        SetPrivateField(sut, "_showPullForm", true);
         SetPrivateField(sut, "_showPullRequestForm", true);
 
         await InvokePrivateAsync(sut, "LadeGitActionCapabilitiesAsync");
 
-        GetPrivateField<bool>(sut, "_showPushPullButtons").Should().BeFalse();
+        GetPrivateField<bool>(sut, "_showPushForm").Should().BeFalse();
+        GetPrivateField<bool>(sut, "_showPullForm").Should().BeFalse();
         GetPrivateField<bool>(sut, "_showPullRequestForm").Should().BeFalse();
     }
 

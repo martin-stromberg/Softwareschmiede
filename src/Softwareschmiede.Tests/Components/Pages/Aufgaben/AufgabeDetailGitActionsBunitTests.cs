@@ -19,6 +19,120 @@ namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
 public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 {
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderExactlyThreeRegisterTabs_WithTabSemantics()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        var tabs = cut.FindAll("button[role='tab']");
+        tabs.Should().HaveCount(3);
+        tabs.Select(tab => tab.TextContent.Trim()).Should().BeEquivalentTo(["Aufgabe", "Ausführung", "Projektverzeichnis"]);
+        cut.Find("div[role='tablist']").GetAttribute("aria-label").Should().Be("Aufgabe Detail Register");
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldKeepGlobalInfoBoxesVisible_AcrossAllRegisters()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        foreach (var register in new[] { "Aufgabe", "Ausführung", "Projektverzeichnis" })
+        {
+            cut.FindAll("button").Single(button => button.TextContent.Trim() == register).Click();
+            cut.WaitForAssertion(() =>
+            {
+                cut.Markup.Should().Contain("Commits");
+                cut.Markup.Should().Contain("Geänderte Dateien");
+            });
+        }
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderExactlyOneRegisterContent_AfterEachTabSwitch()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.Markup.Should().Contain("📋 Anforderung");
+        cut.Markup.Should().NotContain("🗂️ Repository-Explorer");
+        cut.Markup.Should().NotContain("💬 KI-Anfrage");
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Ausführung").Click();
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("📜 Protokoll");
+            cut.Markup.Should().Contain("💬 KI-Anfrage");
+            cut.Markup.Should().NotContain("📋 Anforderung");
+            cut.Markup.Should().NotContain("🗂️ Repository-Explorer");
+        });
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("🗂️ Repository-Explorer");
+            cut.Markup.Should().NotContain("📋 Anforderung");
+            cut.Markup.Should().NotContain("💬 KI-Anfrage");
+        });
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldCloseGitDialogs_WhenLeavingProjectDirectoryRegister()
+    {
+        var capabilities = new GitActionCapabilities(
+            RepositoryKind.RemoteGit,
+            IsWorkingDirectoryCopy: false,
+            CanPush: true,
+            CanPull: true,
+            CanCreatePullRequest: true,
+            CanMergeToSource: false);
+
+        await using var harness = await ConfigureComponentServicesAsync(capabilities);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "⬇️ Pull").Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Jetzt pullen"));
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Aufgabe").Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Jetzt pullen"));
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Jetzt pullen"));
+    }
+
     [Theory]
     [InlineData(AufgabeStatus.KiAktiv)]
     [InlineData(AufgabeStatus.TestsLaufen)]
@@ -346,7 +460,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         loaded.Should().BeNull();
     }
 
-    /// <summary>Prüft, dass Push/Pull und Pull-Request bei lokalem Repo mit separatem Arbeitsverzeichnis ausgeblendet sind.</summary>
+    /// <summary>Prüft, dass Push/Pull und Pull-Request bei lokalem Repo mit separatem Arbeitsverzeichnis deaktiviert sind.</summary>
     [Fact]
     public async Task AufgabeDetail_ShouldHidePushPullAndPullRequestButtons_WhenRepositoryIsLocalWorkingDirectoryCopy()
     {
@@ -362,12 +476,17 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
 
         var buttonTexts = cut.FindAll("button").Select(button => button.TextContent.Trim()).ToArray();
         buttonTexts.Should().Contain("▶️ Startskript ausführen");
-        buttonTexts.Should().NotContain("🔄 Push/Pull");
-        buttonTexts.Should().NotContain("🔀 Pull Request");
-        buttonTexts.Should().Contain("🔀 Merge");
+        buttonTexts.Should().Contain("⬆️ Push");
+        buttonTexts.Should().Contain("⬇️ Pull");
+        buttonTexts.Should().Contain("🔀 Pull Request");
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "⬆️ Push").HasAttribute("disabled").Should().BeTrue();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "⬇️ Pull").HasAttribute("disabled").Should().BeTrue();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "🔀 Pull Request").HasAttribute("disabled").Should().BeTrue();
     }
 
     /// <summary>Prüft, dass Push/Pull und Pull-Request für reguläre Remote-Repositories sichtbar sind.</summary>
@@ -386,12 +505,13 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
 
         var buttonTexts = cut.FindAll("button").Select(button => button.TextContent.Trim()).ToArray();
         buttonTexts.Should().Contain("▶️ Startskript ausführen");
-        buttonTexts.Should().Contain("🔄 Push/Pull");
+        buttonTexts.Should().Contain("⬆️ Push");
+        buttonTexts.Should().Contain("⬇️ Pull");
         buttonTexts.Should().Contain("🔀 Pull Request");
-        buttonTexts.Should().NotContain("🔀 Merge");
     }
 
     /// <summary>Prüft, dass bei GitHub-Auswahl das GitHub-Plugin statt des konkurrierenden Defaults genutzt wird.</summary>
@@ -421,11 +541,12 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
 
         var buttonTexts = cut.FindAll("button").Select(button => button.TextContent.Trim()).ToArray();
-        buttonTexts.Should().Contain("🔄 Push/Pull");
+        buttonTexts.Should().Contain("⬆️ Push");
+        buttonTexts.Should().Contain("⬇️ Pull");
         buttonTexts.Should().Contain("🔀 Pull Request");
-        buttonTexts.Should().NotContain("🔀 Merge");
 
         harness.SelectedGitPlugin.Verify(
             plugin => plugin.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()),
@@ -462,11 +583,16 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
 
         var buttonTexts = cut.FindAll("button").Select(button => button.TextContent.Trim()).ToArray();
-        buttonTexts.Should().NotContain("🔄 Push/Pull");
-        buttonTexts.Should().NotContain("🔀 Pull Request");
-        buttonTexts.Should().Contain("🔀 Merge");
+        buttonTexts.Should().Contain("⬆️ Push");
+        buttonTexts.Should().Contain("⬇️ Pull");
+        buttonTexts.Should().Contain("🔀 Pull Request");
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "⬆️ Push").HasAttribute("disabled").Should().BeTrue();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "⬇️ Pull").HasAttribute("disabled").Should().BeTrue();
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "🔀 Pull Request").HasAttribute("disabled").Should().BeTrue();
 
         harness.SelectedGitPlugin.Verify(
             plugin => plugin.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()),
@@ -502,10 +628,11 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Projektverzeichnis").Click();
 
-        cut.FindAll("button").First(button => button.TextContent.Trim() == "🔄 Push/Pull").Click();
-        cut.WaitForAssertion(() => cut.FindAll("button").Any(button => button.TextContent.Trim() == "⬇️ Pull").Should().BeTrue());
         cut.FindAll("button").First(button => button.TextContent.Trim() == "⬇️ Pull").Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Jetzt pullen"));
+        cut.FindAll("button").First(button => button.TextContent.Trim() == "Jetzt pullen").Click();
 
         cut.WaitForAssertion(() =>
             harness.SelectedGitPlugin.Verify(
