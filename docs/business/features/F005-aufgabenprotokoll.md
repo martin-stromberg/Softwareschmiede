@@ -127,6 +127,7 @@ Nein. Das Protokoll wächst mit der Dauer und Komplexität der Aufgabe mit.
 ## Verwandte Funktionen
 
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – Echtzeit-Ausgabe der KI beobachten
+- [F027 – KI-Protokoll Auto-Scroll](./F027-ki-protokoll-auto-scroll.md) – Automatisches Mitlaufen und stabiles manuelles Lesen
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md) – Aufgabe beenden und Protokoll abschließen
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Abbruch und Protokolleintrag
 - [Technischer Ablauf (Flow)](../../flows/README.md) – Kurzer Überblick über technische Abläufe

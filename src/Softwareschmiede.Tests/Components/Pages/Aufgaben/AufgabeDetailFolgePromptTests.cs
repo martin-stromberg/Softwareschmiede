@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Components.Pages.Aufgaben;
@@ -810,6 +811,8 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         markup.Should().Contain("protokoll-markdown markdown-preview");
         markup.Should().Contain("streaming-output protokoll-markdown markdown-preview");
+        markup.Should().Contain("id=\"streamingOutput\"");
+        markup.Should().Contain("id=\"historyProtokoll\"");
         markup.Should().Contain("@RenderProtokollInhalt(BuildStreamingArbeitsprotokollMarkdown())");
         markup.Should().Contain("@if (_aufgabe.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0)");
         markup.Should().Contain("class=\"@GetProtokollCssClass(eintrag.Typ)\"");
@@ -830,6 +833,145 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         markup.Should().Contain("ToLocalTime().ToString(\"dd.MM.yyyy HH:mm:ss\")");
         markup.Should().Contain("eintrag.AgentName is not null ? $\"[{eintrag.AgentName}]\" : \"\"");
+    }
+
+    [Fact]
+    public void AppMarkup_ShouldIncludeLogScrollScript()
+    {
+        var root = FindRepositoryRoot();
+        var appPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "App.razor");
+        var markup = File.ReadAllText(appPath);
+
+        markup.Should().Contain("js/log-scroll.js");
+    }
+
+    [Fact]
+    public void LogScrollScript_ShouldExposeExpectedInteropFunctions()
+    {
+        var root = FindRepositoryRoot();
+        var scriptPath = Path.Combine(root, "src", "Softwareschmiede", "wwwroot", "js", "log-scroll.js");
+        var script = File.ReadAllText(scriptPath);
+
+        script.Should().Contain("window.softwareschmiedeLogScroll");
+        script.Should().Contain("getMetrics");
+        script.Should().Contain("scrollToEnd");
+    }
+
+    [Theory]
+    [InlineData(100d, 400d, 300d, 16d, true)]
+    [InlineData(84d, 400d, 300d, 16d, true)]
+    [InlineData(80d, 400d, 300d, 16d, false)]
+    public void IsAtEnd_ShouldRespectThreshold(double scrollTop, double scrollHeight, double clientHeight, double thresholdPx, bool expected)
+    {
+        var isAtEnd = InvokePrivateStatic<bool>("IsAtEnd", scrollTop, scrollHeight, clientHeight, thresholdPx);
+
+        isAtEnd.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(84d, 400d, 300d, 1d, true)]
+    [InlineData(80d, 400d, 300d, 1d, false)]
+    public async Task TryReadAtEndStateAsync_ShouldEvaluateMetrics_WhenJsReturnsValidData(
+        double scrollTop,
+        double scrollHeight,
+        double clientHeight,
+        double existsFlag,
+        bool expectedAtEnd)
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        var jsRuntime = new FakeJsRuntime
+        {
+            MetricsResult = [scrollTop, scrollHeight, clientHeight, existsFlag]
+        };
+        SetInjectedProperty(sut, "JsRuntime", jsRuntime);
+
+        var isAtEnd = await InvokePrivateAsync<bool>(sut, "TryReadAtEndStateAsync", "#streamingOutput");
+
+        isAtEnd.Should().Be(expectedAtEnd);
+        jsRuntime.Invocations.Should().ContainSingle(call =>
+            call.Identifier == "softwareschmiedeLogScroll.getMetrics"
+            && call.Args.Length == 1
+            && Equals(call.Args[0], "#streamingOutput"));
+    }
+
+    [Fact]
+    public async Task OnAfterRenderAsync_ShouldScrollToEnd_WhenStreamingBecomesVisibleAndInitialScrollPending()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        var jsRuntime = new FakeJsRuntime { ScrollToEndResult = true };
+        SetInjectedProperty(sut, "JsRuntime", jsRuntime);
+        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.KiAktiv });
+        SetPrivateField(sut, "_streamingLines", new List<string> { "Zeile 1" });
+        SetPrivateField(sut, "_streamingInitialScrollPending", true);
+        SetPrivateField(sut, "_protokoll", new List<Protokolleintrag>());
+
+        await sut.InvokeOnAfterRenderAsync(firstRender: false);
+
+        jsRuntime.Invocations.Should().ContainSingle(call =>
+            call.Identifier == "softwareschmiedeLogScroll.scrollToEnd"
+            && call.Args.Length == 1
+            && Equals(call.Args[0], "#streamingOutput"));
+        GetPrivateField<bool>(sut, "_streamingInitialScrollPending").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ApplyPendingScrollAsync_ShouldAutoScrollOnAppend_WhenUserWasAtEnd()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        var jsRuntime = new FakeJsRuntime
+        {
+            MetricsResult = [84d, 400d, 300d, 1d],
+            ScrollToEndResult = true
+        };
+        SetInjectedProperty(sut, "JsRuntime", jsRuntime);
+        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.KiAktiv });
+        SetPrivateField(sut, "_streamingLines", new List<string> { "Alt" });
+        SetPrivateField(sut, "_streamingInitialScrollPending", false);
+        SetPrivateField(sut, "_protokoll", new List<Protokolleintrag>());
+
+        await InvokePrivateAsync(sut, "CaptureStreamingScrollStateBeforeUpdateAsync");
+        var lines = GetPrivateField<List<string>>(sut, "_streamingLines");
+        lines.Add("Neu");
+        InvokePrivateVoid(sut, "RegisterStreamingContentUpdate");
+        await InvokePrivateAsync(sut, "ApplyPendingScrollAsync");
+
+        jsRuntime.Invocations.Should().Contain(call =>
+            call.Identifier == "softwareschmiedeLogScroll.getMetrics");
+        jsRuntime.Invocations.Should().Contain(call =>
+            call.Identifier == "softwareschmiedeLogScroll.scrollToEnd"
+            && call.Args.Length == 1
+            && Equals(call.Args[0], "#streamingOutput"));
+        GetPrivateField<int>(sut, "_streamingPendingScrollVersion").Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ApplyPendingScrollAsync_ShouldPreserveScrollPositionOnAppend_WhenUserWasNotAtEnd()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        var jsRuntime = new FakeJsRuntime
+        {
+            MetricsResult = [80d, 400d, 300d, 1d],
+            ScrollToEndResult = true
+        };
+        SetInjectedProperty(sut, "JsRuntime", jsRuntime);
+        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.KiAktiv });
+        SetPrivateField(sut, "_streamingLines", new List<string> { "Alt" });
+        SetPrivateField(sut, "_streamingInitialScrollPending", false);
+        SetPrivateField(sut, "_protokoll", new List<Protokolleintrag>());
+
+        await InvokePrivateAsync(sut, "CaptureStreamingScrollStateBeforeUpdateAsync");
+        var lines = GetPrivateField<List<string>>(sut, "_streamingLines");
+        lines.Add("Neu");
+        InvokePrivateVoid(sut, "RegisterStreamingContentUpdate");
+        await InvokePrivateAsync(sut, "ApplyPendingScrollAsync");
+
+        jsRuntime.Invocations.Should().Contain(call =>
+            call.Identifier == "softwareschmiedeLogScroll.getMetrics");
+        jsRuntime.Invocations.Should().NotContain(call =>
+            call.Identifier == "softwareschmiedeLogScroll.scrollToEnd"
+            && call.Args.Length == 1
+            && Equals(call.Args[0], "#streamingOutput"));
+        GetPrivateField<int>(sut, "_streamingPendingScrollVersion").Should().Be(0);
     }
 
     [Fact]
@@ -1039,6 +1181,31 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         throw new InvalidOperationException($"{methodName} did not return Task or ValueTask.");
     }
 
+    private static async Task<T> InvokePrivateAsync<T>(object target, string methodName, params object?[] args)
+    {
+        var method = typeof(AufgabeDetail)
+            .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .FirstOrDefault(m =>
+                m.Name.Equals(methodName, StringComparison.Ordinal)
+                && m.GetParameters().Length == args.Length
+                && m.GetParameters().Zip(args, (parameter, argument) => argument is null || parameter.ParameterType.IsInstanceOfType(argument)).All(x => x));
+        method.Should().NotBeNull($"Method {methodName} should exist.");
+        var result = method!.Invoke(target, args);
+        result.Should().NotBeNull($"{methodName} should return a value.");
+
+        if (result is Task<T> typedTask)
+        {
+            return await typedTask;
+        }
+
+        if (result is ValueTask<T> typedValueTask)
+        {
+            return await typedValueTask;
+        }
+
+        throw new InvalidOperationException($"{methodName} did not return Task<{typeof(T).Name}> or ValueTask<{typeof(T).Name}>.");
+    }
+
     private static T InvokePrivateStatic<T>(string methodName, params object?[] args)
     {
         var method = typeof(AufgabeDetail).GetMethod(
@@ -1059,6 +1226,15 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         var result = method!.Invoke(target, args);
         result.Should().NotBeNull($"{methodName} should return a value.");
         return (T)result!;
+    }
+
+    private static void InvokePrivateVoid(object target, string methodName, params object?[] args)
+    {
+        var method = typeof(AufgabeDetail).GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull($"Method {methodName} should exist.");
+        method!.Invoke(target, args);
     }
 
     private static void SetPrivateField(object target, string fieldName, object? value)
@@ -1113,6 +1289,8 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         public Task InvokeOnParametersSetAsync() => OnParametersSetAsync();
 
+        public Task InvokeOnAfterRenderAsync(bool firstRender) => OnAfterRenderAsync(firstRender);
+
         protected override void StartKiLauf(
             string prompt,
             AgentInfo agent,
@@ -1151,4 +1329,35 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             IsDisposed = true;
         }
     }
+
+    private sealed class FakeJsRuntime : IJSRuntime
+    {
+        public double[] MetricsResult { get; set; } = [0d, 0d, 0d, 0d];
+        public bool ScrollToEndResult { get; set; } = true;
+        public Exception? Exception { get; set; }
+        public List<JsCall> Invocations { get; } = [];
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
+        {
+            Invocations.Add(new JsCall(identifier, args ?? []));
+            if (Exception is not null)
+            {
+                throw Exception;
+            }
+
+            object value = identifier switch
+            {
+                "softwareschmiedeLogScroll.getMetrics" when typeof(TValue) == typeof(double[]) => MetricsResult,
+                "softwareschmiedeLogScroll.scrollToEnd" when typeof(TValue) == typeof(bool) => ScrollToEndResult,
+                _ => default(TValue)!
+            };
+
+            return new ValueTask<TValue>((TValue)value);
+        }
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
+            => InvokeAsync<TValue>(identifier, args);
+    }
+
+    private sealed record JsCall(string Identifier, object?[] Args);
 }

@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using Markdig;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -28,6 +29,7 @@ public partial class AufgabeDetail : IDisposable
     [Inject] private ProjektService ProjektService { get; set; } = null!;
     [Inject] private IAgentPackageService AgentPackageService { get; set; } = null!;
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private IJSRuntime JsRuntime { get; set; } = null!;
     [Inject] private ILogger<AufgabeDetail> _logger { get; set; } = null!;
     [SupplyParameterFromQuery(Name = "view")]
     public string? View { get; set; }
@@ -103,6 +105,19 @@ public partial class AufgabeDetail : IDisposable
         CanCreatePullRequest: true,
         CanMergeToSource: false);
     private (bool ShowPushPullToggle, bool ShowPush, bool ShowPull, bool ShowPullRequest, bool ShowMerge) _gitActionVisibility;
+    private const string StreamingContainerSelector = "#streamingOutput";
+    private const string HistoryContainerSelector = "#historyProtokoll";
+    private const double ScrollEndThresholdPx = 16;
+    private bool _streamingInitialScrollPending = true;
+    private bool _historyInitialScrollPending = true;
+    private bool _streamingShouldScrollAfterAppend = true;
+    private bool _historyShouldScrollAfterAppend = true;
+    private int _streamingUpdateVersion;
+    private int _historyUpdateVersion;
+    private int _streamingPendingScrollVersion;
+    private int _historyPendingScrollVersion;
+    private bool _streamingWasVisibleBeforeUpdate;
+    private bool _historyWasVisibleBeforeUpdate;
 
     // TODO: Liste kann bei Bedarf aus der Plugin-Konfiguration dynamisch befüllt werden
     private static readonly IReadOnlyList<(string Value, string Label)> _verfuegbareModelle =
@@ -153,6 +168,162 @@ public partial class AufgabeDetail : IDisposable
         return Task.CompletedTask;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await ApplyPendingScrollAsync();
+    }
+
+    private bool IsStreamingContainerVisible
+        => _aufgabe?.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0;
+
+    private bool IsHistoryContainerVisible => _protokoll.Count > 0;
+
+    private async Task CaptureStreamingScrollStateBeforeUpdateAsync()
+    {
+        _streamingWasVisibleBeforeUpdate = IsStreamingContainerVisible;
+        _streamingShouldScrollAfterAppend = await TryReadAtEndStateAsync(StreamingContainerSelector);
+        _streamingPendingScrollVersion = _streamingUpdateVersion + 1;
+    }
+
+    private async Task CaptureHistoryScrollStateBeforeUpdateAsync()
+    {
+        _historyWasVisibleBeforeUpdate = IsHistoryContainerVisible;
+        _historyShouldScrollAfterAppend = await TryReadAtEndStateAsync(HistoryContainerSelector);
+        _historyPendingScrollVersion = _historyUpdateVersion + 1;
+    }
+
+    private void RegisterStreamingContentUpdate()
+    {
+        _streamingUpdateVersion++;
+        if (!_streamingWasVisibleBeforeUpdate && _streamingLines.Count > 0)
+        {
+            _streamingInitialScrollPending = true;
+        }
+    }
+
+    private void RegisterHistoryContentUpdate()
+    {
+        _historyUpdateVersion++;
+        if (!_historyWasVisibleBeforeUpdate && _protokoll.Count > 0)
+        {
+            _historyInitialScrollPending = true;
+        }
+    }
+
+    private void ResetStreamingScrollState()
+    {
+        _streamingUpdateVersion = 0;
+        _streamingPendingScrollVersion = 0;
+        _streamingShouldScrollAfterAppend = true;
+        _streamingInitialScrollPending = true;
+    }
+
+    private async Task ApplyPendingScrollAsync()
+    {
+        if (!IsStreamingContainerVisible)
+        {
+            _streamingInitialScrollPending = true;
+            _streamingPendingScrollVersion = 0;
+        }
+        else if (_streamingInitialScrollPending)
+        {
+            var scrolled = await TryScrollToEndAsync(StreamingContainerSelector);
+            if (scrolled)
+            {
+                _streamingInitialScrollPending = false;
+            }
+        }
+        else if (_streamingPendingScrollVersion > 0 && _streamingPendingScrollVersion == _streamingUpdateVersion)
+        {
+            if (_streamingShouldScrollAfterAppend)
+            {
+                await TryScrollToEndAsync(StreamingContainerSelector);
+            }
+
+            _streamingPendingScrollVersion = 0;
+        }
+
+        if (!IsHistoryContainerVisible)
+        {
+            _historyInitialScrollPending = true;
+            _historyPendingScrollVersion = 0;
+            return;
+        }
+
+        if (_historyInitialScrollPending)
+        {
+            var scrolled = await TryScrollToEndAsync(HistoryContainerSelector);
+            if (scrolled)
+            {
+                _historyInitialScrollPending = false;
+            }
+
+            return;
+        }
+
+        if (_historyPendingScrollVersion <= 0 || _historyPendingScrollVersion != _historyUpdateVersion)
+        {
+            return;
+        }
+
+        if (_historyShouldScrollAfterAppend)
+        {
+            await TryScrollToEndAsync(HistoryContainerSelector);
+        }
+
+        _historyPendingScrollVersion = 0;
+    }
+
+    private async Task<bool> TryReadAtEndStateAsync(string selector)
+    {
+        if (JsRuntime is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            var metrics = await JsRuntime.InvokeAsync<double[]>(
+                "softwareschmiedeLogScroll.getMetrics",
+                selector);
+
+            if (metrics.Length < 4 || metrics[3] < 1)
+            {
+                return true;
+            }
+
+            return IsAtEnd(metrics[0], metrics[1], metrics[2], ScrollEndThresholdPx);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Scroll-Endzustand konnte nicht ermittelt werden ({Selector}).", selector);
+            return true;
+        }
+    }
+
+    private async Task<bool> TryScrollToEndAsync(string selector)
+    {
+        if (JsRuntime is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return await JsRuntime.InvokeAsync<bool>(
+                "softwareschmiedeLogScroll.scrollToEnd",
+                selector);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ScrollToEnd konnte nicht ausgeführt werden ({Selector}).", selector);
+            return false;
+        }
+    }
+
+    private static bool IsAtEnd(double scrollTop, double scrollHeight, double clientHeight, double thresholdPx)
+        => scrollHeight - (scrollTop + clientHeight) <= thresholdPx;
+
     private async Task LadeAsync()
     {
         _loading = true;
@@ -161,7 +332,9 @@ public partial class AufgabeDetail : IDisposable
         _latestDiffResultId = await AufgabeService.GetLatestDiffResultIdAsync(Id);
         if (_aufgabe is not null)
         {
+            await CaptureHistoryScrollStateBeforeUpdateAsync();
             _protokoll = (await ProtokollService.GetByAufgabeAsync(Id)).ToList();
+            RegisterHistoryContentUpdate();
             await LadeGitActionCapabilitiesAsync();
             await LadeWorkspaceAsync();
             _prTitel = _aufgabe.Titel;
@@ -209,7 +382,9 @@ public partial class AufgabeDetail : IDisposable
             _latestDiffResultId = await aufgabeService.GetLatestDiffResultIdAsync(Id);
             if (_aufgabe is not null)
             {
+                await CaptureHistoryScrollStateBeforeUpdateAsync();
                 _protokoll = (await protokollService.GetByAufgabeAsync(Id)).ToList();
+                RegisterHistoryContentUpdate();
                 await LadeGitActionCapabilitiesAsync();
                 await LadeWorkspaceAsync();
                 _prTitel = _aufgabe.Titel;
@@ -629,6 +804,7 @@ public partial class AufgabeDetail : IDisposable
         _fehler = null;
         _kiStreamingStartedUtc = DateTimeOffset.UtcNow;
         _streamingLines = [];
+        ResetStreamingScrollState();
 
         // Bisherige Subscription aufräumen
         _kiSubscription?.Dispose();
@@ -658,9 +834,14 @@ public partial class AufgabeDetail : IDisposable
         _kiSubscription?.Dispose();
         _kiSubscription = KiAusfuehrungsService.Subscribe(Id, line =>
         {
-            _streamingLines.Add(line);
             // UI in den Blazor-Circuit-Thread marshalieren
-            InvokeAsync(StateHasChanged);
+            InvokeAsync(async () =>
+            {
+                await CaptureStreamingScrollStateBeforeUpdateAsync();
+                _streamingLines.Add(line);
+                RegisterStreamingContentUpdate();
+                StateHasChanged();
+            });
         });
     }
 

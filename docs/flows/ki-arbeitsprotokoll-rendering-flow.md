@@ -145,7 +145,8 @@ flowchart TD
 
 **Verwandte Flows:**  
 - [Entwicklungsprozess-Abläufe](./development-process-flow.md) (insb. KI-Streaming)  
-- [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md)
+- [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md)  
+- [KI-Protokoll Auto-Scroll](./ki-protokoll-auto-scroll-flow.md)
 
 ---
 

@@ -14,6 +14,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [Arbeitsverzeichnis-Auflösung](./workdir-resolution-flow.md) | `workdir-resolution-flow.md` | Ablauf für Konfiguration, Laufzeit-Auflösung und Fallback des Basis-Arbeitsverzeichnisses |
 | [Plugin-Discovery und Laden](./plugin-discovery-load-flow.md) | `plugin-discovery-load-flow.md` | Host-Start, Lazy-Discovery im PluginManager und robuste Registrierung von SCM-/Automation-Plugins |
 | [KI-Arbeitsprotokoll: Persistierung und Rendering](./ki-arbeitsprotokoll-rendering-flow.md) | `ki-arbeitsprotokoll-rendering-flow.md` | Persistierung des Markdown-Protokolls mit Datumszeile/Schritten sowie sicheres Rendering mit Sanitizing und Fallback |
+| [KI-Protokoll Auto-Scroll](./ki-protokoll-auto-scroll-flow.md) | `ki-protokoll-auto-scroll-flow.md` | Initial-Scroll beim Einblenden, konditionales Follow-Scroll bei neuen Inhalten und Scroll-Lock bei manuellem Hochscrollen |
 | [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
 | [KI-Plugin-spezifische Agenten-Discovery/Auswahl (Issue 58)](./ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | `ki-plugin-spezifische-agenten-discovery-auswahl-flow.md` | Verbindlicher Auswahlfluss `KI-Plugin → Agentenpaket → Agent` inkl. Persistenz `KiPluginPrefix`, plugin-spezifischer Discovery und einheitlicher Auflösung in Start/Folgeprompt |
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
@@ -130,6 +131,13 @@ Beschreibt den Ablauf von der DI-Registrierung bis zur Lazy-Discovery aus `<Prog
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EntwicklungsprozessService`, `ProtokollService`, `AufgabeDetail`
 
 Beschreibt die Ende-zu-Ende-Pipeline vom Erzeugen des Markdown-Protokolls (`# Datum`, `## Schritt n`) über die DB-Persistierung bis zur sicheren HTML-Darstellung in der UI inklusive Sanitizing und `<pre>`-Fallback.
+
+---
+
+### [Ablauf 8b: KI-Protokoll Auto-Scroll (Initial, Follow, Scroll-Lock)](./ki-protokoll-auto-scroll-flow.md)
+**Typ:** `flowchart TD` · **Services:** `AufgabeDetail`, `IJSRuntime`, `softwareschmiedeLogScroll`
+
+Dokumentiert die Scroll-Entscheidungslogik für Streaming- und Historiencontainer: Initial-Scroll beim Einblenden, Follow-Scroll nur bei zuvor erreichtem Ende sowie Positionsbeibehaltung bei manuellem Hochscrollen.
 
 ---
 

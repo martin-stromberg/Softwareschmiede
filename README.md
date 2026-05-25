@@ -149,6 +149,8 @@ Stand: **2026-05-24**
 - Volltextsuche über alle Protokolleinträge einer Aufgabe
 - Webausgabe rendert Markdown inkl. Sanitizing und nutzt bei Bedarf eine lesbare Fallback-Ansicht
 - Test-Ergebnisse strukturiert: Testname, Status, Fehlermeldung, Dauer
+- **Neu (F027): KI-Protokoll Auto-Scroll** – beim Öffnen wird automatisch zum neuesten Protokolleintrag gescrollt; bei neuem Inhalt folgt die Ansicht nur dann automatisch, wenn die Nutzerin/der Nutzer zuvor am Ende war
+- **Manueller Scroll-Lock beim Lesen** – beim Hochscrollen bleibt die Leseposition stabil, auch wenn währenddessen neue KI-Logzeilen eintreffen
 
 ### 📦 Agentenpakete
 - Verzeichnisbasierte Pakete mit `.agent.md`-Dateien
@@ -314,6 +316,13 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 3. Für jede Folgeanweisung wählen Sie zusätzlich den Kontextmodus: **Kontext mitgeben**, **Kontext ignorieren** oder **Kontext neu beginnen**.
 4. Beim Senden wird die Folgeanweisung mit den aktuell gewählten Optionen ausgeführt.
 5. Danach setzt die UI den Folge-Prompt zurück; die Agentenauswahl wird wieder auf den Initial-Agenten gestellt.
+
+### KI-Protokoll Auto-Scroll (F027)
+
+1. Beim Öffnen eines Aufgabenprotokolls scrollt die Ansicht automatisch ans Ende, sodass sofort der neueste Eintrag sichtbar ist.
+2. Während eines laufenden KI-Streams folgt die Ansicht neuen Einträgen nur dann automatisch, wenn Sie sich bereits am unteren Rand befinden.
+3. Sobald Sie manuell nach oben scrollen, bleibt die aktuelle Leseposition erhalten (kein erzwungenes Zurückspringen).
+4. Um das automatische Mitlaufen wieder zu aktivieren, scrollen Sie wieder bis ganz nach unten.
 
 Details zu den einzelnen Schritten:
 - [Benutzerleitfaden](docs/user-guide.md)
@@ -695,6 +704,7 @@ Für die Inbetriebnahme müssen `gh`, `git`, `copilot` und (für Claude-Läufe) 
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- Feature **„KI-Protokoll Auto-Scroll“ (F027)** in README ergänzt (Features/Usage/Changelog) inkl. Verweis auf die neue Fachdokumentation und den Dokumentationsplan-Abschnitt vom 2026-05-25
 - Diff-Funktionalität in README konsolidiert (Implementierungsstatus, Feature- und Usage-Abschnitte) inkl. Verweisen auf `/api/diff`
 - Testsektion um Diff-spezifische Service-/DI-Tests ergänzt (`DiffService`, `DiffCachingService`, `DiffAlgorithmService`, `ProgramDiWiringTests`)
 - LocalDirectoryPlugin als produktiv verfügbares SCM-Plugin ergänzt (inkl. WorkspaceMode und Guardrails)
@@ -769,6 +779,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F022: Diff-Vergleichskomponente](docs/business/features/F022-diff-vergleichskomponente.md) | Fachliche Beschreibung des Diff-Viewers inkl. eingebetteter Nutzung und Standalone-Route |
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
 | [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der verbindlichen Auswahlreihenfolge (Plugin → Paket → Agent) inkl. Persistenz je Aufgabe |
+| [Feature F027: KI-Protokoll Auto-Scroll](docs/business/features/F027-ki-protokoll-auto-scroll.md) | Fachliche Beschreibung des Scroll-Verhaltens im KI-Protokoll (Initial-Scroll, bedingtes Follow-Scrolling, manueller Scroll-Lock) |
+| [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll“ (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll“ – 2026-05-25“ |
 | [API: Issue 58 Agenten-Discovery/Auswahl](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für plugin-spezifische Discovery, Prefix-Auflösung und Persistenz (`KiPluginPrefix`) |
 | [Flow: Issue 58 Agenten-Discovery/Auswahl](docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | Ablaufdiagramm für UI-Reihenfolge, Kompatibilitätsprüfung und Start-/Folgeprompt-Dispatch |
 | [Requirements: Issue 58](docs/requirements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für plugin-spezifische Discovery/Auswahl |

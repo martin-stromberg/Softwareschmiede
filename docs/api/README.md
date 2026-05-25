@@ -7,6 +7,7 @@ Technische Dokumentation der öffentlichen Schnittstellen und internen API-Contr
 Die Softwareschmiede stellt öffentliche HTTP-Endpunkte für den Diff-Bereich bereit.
 Für das Feature **„Benachrichtigungssystem für abgeschlossene KI-Aufgaben“** wurden **keine neuen öffentlichen REST-Endpunkte** eingeführt.
 Auch für das Feature **„KI-Arbeitsprotokoll als Markdown“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Auch für das Feature **„KI-Protokoll Auto-Scroll“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für das Feature **„Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
@@ -29,6 +30,7 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 | [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
 | [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
 | [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md) | App-level Contract für die SVG-Favicon-Integration (`icon`/`shortcut icon`/`mask-icon`) inkl. Static-Asset-Auswirkung und Bestätigung „keine neuen HTTP-Endpunkte“. |
+| [ki-protokoll-auto-scroll.md](./ki-protokoll-auto-scroll.md) | Technischer UI-/Interop-Contract für Auto-Scroll im KI-Protokoll (`AufgabeDetail`, `log-scroll.js`): Initial-Scroll beim Einblenden, konditionales Follow-Scroll nur bei Endposition und Positionsbeibehaltung bei manuellem Hochscrollen. |
 
 ## Feature-Fokus: DiffViewer-Integration (2026-05-23)
 
@@ -70,6 +72,14 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
   - Fallback auf HTML-encoded `<pre>` bei Render-/Sanitizing-Fehlern
 - Technische Vertiefung: [KI-Arbeitsprotokoll-Flow](../flows/ki-arbeitsprotokoll-rendering-flow.md)
 - Fachliche Einordnung: [F005 – Aufgabenprotokoll](../business/features/F005-aufgabenprotokoll.md)
+
+## Feature-Fokus: KI-Protokoll Auto-Scroll (2026-05-25)
+
+- Technischer Contract: [ki-protokoll-auto-scroll.md](./ki-protokoll-auto-scroll.md)
+- Beim Einblenden des Protokolls erfolgt ein Initial-Scroll ans Ende (`_streamingInitialScrollPending`, `_historyInitialScrollPending`).
+- Bei neuem Inhalt erfolgt Auto-Scroll nur, wenn vor dem Append eine Endposition erkannt wurde (`TryReadAtEndStateAsync`, `IsAtEnd`, `ScrollEndThresholdPx = 16`).
+- Bei manuellem Hochscrollen bleibt die Position stabil; `ApplyPendingScrollAsync` verarbeitet das Update dann ohne `scrollToEnd`.
+- Implementierungsbezug: `AufgabeDetail` (`OnAfterRenderAsync`, `Capture*ScrollStateBeforeUpdateAsync`, `Register*ContentUpdate`) und `wwwroot/js/log-scroll.js`.
 
 ## Feature-Fokus: Standardplugin je Pluginart & KI-Plugin-Auswahl
 
