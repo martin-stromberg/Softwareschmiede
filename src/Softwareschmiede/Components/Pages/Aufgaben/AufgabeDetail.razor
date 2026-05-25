@@ -26,78 +26,13 @@ else
         <StatusBadge Status="_aufgabe.Status" />
     </div>
 
-    <!-- Aktionsleiste -->
-    <div class="action-bar">
-        @if (_aufgabe.Status == AufgabeStatus.Offen)
-        {
-            <button class="btn btn-primary" @onclick="StartDialogOeffnen" disabled="@_processing">🚀 Entwicklung starten</button>
-            <button class="btn btn-warning" @onclick="() => _showVerwerfenConfirm = true" disabled="@_processing">🗑️ Verwerfen</button>
-        }
-        @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
-        {
-            <button class="btn btn-secondary" @onclick="RepositoryStartskriptAusfuehrenAsync" disabled="@_processing">▶️ Startskript ausführen</button>
-            <button class="btn btn-success" @onclick="() => _showCommitForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">📝 Commit</button>
-            @if (_gitActionVisibility.ShowPushPullToggle)
-            {
-                <button class="btn btn-secondary" @onclick="() => _showPushPullButtons = !_showPushPullButtons">🔄 Push/Pull</button>
-            }
-            @if (_gitActionVisibility.ShowPullRequest)
-            {
-                <button class="btn btn-warning" @onclick="() => _showPullRequestForm = true">🔀 Pull Request</button>
-            }
-            @if (_gitActionVisibility.ShowMerge)
-            {
-                <button class="btn btn-info" @onclick="MergeToSourceAsync" disabled="@_processing">🔀 Merge</button>
-            }
-            <button class="btn btn-secondary" @onclick="() => _showResetForm = true" disabled="@(_aufgabe.Status == AufgabeStatus.KiAktiv)">↩️ Reset</button>
-            @if (_aufgabe.Status == AufgabeStatus.KiAktiv)
-            {
-                <button class="btn btn-warning"
-                        @onclick="() => _showStatusResetConfirm = true"
-                        disabled="@(_processing || !_statusResetAllowed)"
-                        title="@(_statusResetDisabledReason ?? "Setzt die Aufgabe auf 'In Bearbeitung' zurück, damit eine neue Anfrage möglich ist.")">
-                    ↩️ Status zurücksetzen
-                </button>
-            }
-        }
-        @if (IsRecoveryStatus)
-        {
-            <button class="btn btn-warning"
-                    @onclick="() => _showRecoveryConfirm = true"
-                    disabled="@(_processing || !_recoveryAllowed)"
-                    title="@(_recoveryDisabledReason ?? "Setzt festhängende Aufgabe wieder auf 'In Bearbeitung'.")">
-                🩹 Aufgabe wiederherstellen
-            </button>
-        }
-        @if (_showExplorer)
-        {
-            <button class="btn btn-ghost" @onclick="SwitchToTaskViewAsync">← Zur Aufgabe</button>
-        }
-        else
-        {
-            <button class="btn btn-ghost" @onclick="SwitchToExplorerViewAsync">🗂️ Projektverzeichnis</button>
-        }
-        @if (_latestDiffResultId.HasValue)
-        {
-            <button class="btn btn-ghost" @onclick="DiffAnzeigen">🔎 Diff anzeigen</button>
-        }
-        <button class="btn btn-ghost" @onclick="ExplorerRefreshAsync" disabled="@_loadingWorkspace">↻ Aktualisieren</button>
-        @if (_aufgabe.Status == AufgabeStatus.InBearbeitung)
-        {
-            <button class="btn btn-success" @onclick="AbschliessenAsync">✅ Abschließen</button>
-            <button class="btn btn-danger" @onclick="() => _showAbbrechenConfirm = true">🛑 Abbrechen</button>
-        }
-        @if (_aufgabe.Status is AufgabeStatus.Abgeschlossen or AufgabeStatus.Fehlgeschlagen or AufgabeStatus.Archiviert)
-        {
-            @if (_aufgabe.Status != AufgabeStatus.Archiviert)
-            {
-                <button class="btn btn-warning" @onclick="() => _showArchivierenConfirm = true" disabled="@_processing">📦 Archivieren</button>
-            }
-            <button class="btn btn-danger" @onclick="() => _showDeleteConfirm = true" disabled="@_processing">🗑️ Löschen</button>
-        }
+    <div class="action-bar" role="tablist" aria-label="Aufgabe Detail Register">
+        <button class="btn @(IsAufgabeRegisterAktiv ? "btn-primary" : "btn-ghost")" role="tab" aria-selected="@IsAufgabeRegisterAktiv" @onclick="ActivateAufgabeRegister">Aufgabe</button>
+        <button class="btn @(IsAusfuehrungRegisterAktiv ? "btn-primary" : "btn-ghost")" role="tab" aria-selected="@IsAusfuehrungRegisterAktiv" @onclick="ActivateAusfuehrungRegister">Ausführung</button>
+        <button class="btn @(IsProjektverzeichnisRegisterAktiv ? "btn-primary" : "btn-ghost")" role="tab" aria-selected="@IsProjektverzeichnisRegisterAktiv" @onclick="ActivateProjektverzeichnisRegister">Projektverzeichnis</button>
     </div>
 
-    <div class="grid-3" style="margin-bottom:1rem">
+    <div class="grid-2" style="margin-bottom:1rem">
         <div class="stat-card">
             <div class="stat-value">@(_workspaceSnapshot?.CommitCount ?? 0)</div>
             <div class="stat-label">Commits</div>
@@ -106,11 +41,16 @@ else
             <div class="stat-value">@(_workspaceSnapshot?.ChangedFileCount ?? 0)</div>
             <div class="stat-label">Geänderte Dateien</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value">@(_showExplorer ? "Tree" : "Task")</div>
-            <div class="stat-label">Ansicht</div>
-        </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(_fehler))
+    {
+        <div class="alert alert-error">@_fehler <button @onclick="() => _fehler = null" style="float:right;background:none;border:none;color:inherit;cursor:pointer">✕</button></div>
+    }
+    @if (!string.IsNullOrEmpty(_erfolg))
+    {
+        <div class="alert alert-success">@_erfolg <button @onclick="() => _erfolg = null" style="float:right;background:none;border:none;color:inherit;cursor:pointer">✕</button></div>
+    }
 
     @if (IsRecoveryStatus && !_recoveryAllowed && !string.IsNullOrWhiteSpace(_recoveryDisabledReason))
     {
@@ -122,8 +62,130 @@ else
         <div class="alert alert-info">@_statusResetDisabledReason</div>
     }
 
-    @if (_showExplorer)
+    @if (IsAufgabeRegisterAktiv)
     {
+        <div class="action-bar">
+            <button class="btn btn-secondary" @onclick="RepositoryStartskriptAusfuehrenAsync" disabled="@(_processing || !KannRepositoryAktionenAusfuehren)">▶️ Startskript ausführen</button>
+            <button class="btn btn-success" @onclick="AbschliessenAsync" disabled="@(_processing || !KannAufgabeAbschliessen)">✅ Abschließen</button>
+            <button class="btn btn-danger" @onclick="() => _showAbbrechenConfirm = true" disabled="@(_processing || !KannAufgabeAbbrechen)">🛑 Abbrechen</button>
+            @if (_aufgabe.Status == AufgabeStatus.Offen)
+            {
+                <button class="btn btn-primary" @onclick="StartDialogOeffnen" disabled="@_processing">🚀 Entwicklung starten</button>
+                <button class="btn btn-warning" @onclick="() => _showVerwerfenConfirm = true" disabled="@_processing">🗑️ Verwerfen</button>
+            }
+            @if (IsRecoveryStatus)
+            {
+                <button class="btn btn-warning"
+                        @onclick="() => _showRecoveryConfirm = true"
+                        disabled="@(_processing || !_recoveryAllowed)"
+                        title="@(_recoveryDisabledReason ?? "Setzt festhängende Aufgabe wieder auf 'In Bearbeitung'.")">
+                    🩹 Aufgabe wiederherstellen
+                </button>
+            }
+            @if (_aufgabe.Status == AufgabeStatus.KiAktiv)
+            {
+                <button class="btn btn-warning"
+                        @onclick="() => _showStatusResetConfirm = true"
+                        disabled="@(_processing || !_statusResetAllowed)"
+                        title="@(_statusResetDisabledReason ?? "Setzt die Aufgabe auf 'In Bearbeitung' zurück, damit eine neue Anfrage möglich ist.")">
+                    ↩️ Status zurücksetzen
+                </button>
+            }
+            @if (_latestDiffResultId.HasValue)
+            {
+                <button class="btn btn-ghost" @onclick="DiffAnzeigen">🔎 Diff anzeigen</button>
+            }
+            @if (_aufgabe.Status is AufgabeStatus.Abgeschlossen or AufgabeStatus.Fehlgeschlagen or AufgabeStatus.Archiviert)
+            {
+                @if (_aufgabe.Status != AufgabeStatus.Archiviert)
+                {
+                    <button class="btn btn-warning" @onclick="() => _showArchivierenConfirm = true" disabled="@_processing">📦 Archivieren</button>
+                }
+                <button class="btn btn-danger" @onclick="() => _showDeleteConfirm = true" disabled="@_processing">🗑️ Löschen</button>
+            }
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                    <span>📋 Anforderung</span>
+                    @if (_aufgabe.Status == AufgabeStatus.Offen && !_editAnforderung)
+                    {
+                        <button class="btn btn-ghost" style="padding:.2rem .5rem;font-size:.8rem" @onclick="AnforderungBearbeitenStarten">✏️ Bearbeiten</button>
+                    }
+                </div>
+                @if (_aufgabe.IssueReferenz is not null)
+                {
+                    <div style="margin-bottom:.75rem">
+                        <span class="badge badge-offen">#@_aufgabe.IssueReferenz.IssueNummer @_aufgabe.IssueReferenz.Titel</span>
+                        @if (!string.IsNullOrEmpty(_aufgabe.IssueReferenz.IssueUrl))
+                        {
+                            <a href="@_aufgabe.IssueReferenz.IssueUrl" target="_blank" style="color:#7c3aed;margin-left:.5rem;font-size:.8rem">↗ GitHub</a>
+                        }
+                    </div>
+                }
+                @if (_editAnforderung)
+                {
+                    <textarea class="form-control" @bind="_anforderungInput" rows="8" style="margin-bottom:.75rem" placeholder="Anforderungsbeschreibung..."></textarea>
+                    <div style="display:flex;gap:.5rem">
+                        <button class="btn btn-primary" @onclick="AnforderungSpeichernAsync" disabled="@_processing">💾 Speichern</button>
+                        <button class="btn btn-ghost" @onclick="AnforderungBearbeitenAbbrechen">Abbrechen</button>
+                    </div>
+                }
+                else if (string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung))
+                {
+                    <div class="alert alert-info">Noch keine Anforderungsbeschreibung vorhanden.</div>
+                }
+                else
+                {
+                    <p style="color:#94a3b8;white-space:pre-wrap">@_aufgabe.AnforderungsBeschreibung</p>
+                }
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Kennzahlen</div>
+                <div class="grid-2">
+                    <div>
+                        <div style="font-size:.8rem;color:#94a3b8">Anlagezeitpunkt</div>
+                        <div>@AnlagezeitpunktText</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.8rem;color:#94a3b8">Letzte Ausführung</div>
+                        <div>@LetzteAusfuehrungText</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.8rem;color:#94a3b8">Status</div>
+                        <div>@_aufgabe.Status</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.8rem;color:#94a3b8">Ausführungsdauer</div>
+                        <div>@AusfuehrungsdauerText</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.8rem;color:#94a3b8">Letzter Ausführungsstatus</div>
+                        <div>@LetzterAusfuehrungsstatusText</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else if (IsProjektverzeichnisRegisterAktiv)
+    {
+        <div class="action-bar">
+            <button class="btn btn-secondary" @onclick="RepositoryStartskriptAusfuehrenAsync" disabled="@(_processing || !KannRepositoryAktionenAusfuehren)">▶️ Startskript ausführen</button>
+            <button class="btn btn-success" @onclick="() => _showCommitForm = true" disabled="@(_processing || !KannRepositoryAktionenAusfuehren)">📝 Commit</button>
+            <button class="btn btn-secondary" @onclick="() => _showPushForm = true" disabled="@(_processing || !_gitActionVisibility.ShowPush)">⬆️ Push</button>
+            <button class="btn btn-secondary" @onclick="() => _showPullForm = true" disabled="@(_processing || !_gitActionVisibility.ShowPull)">⬇️ Pull</button>
+            <button class="btn btn-warning" @onclick="() => _showPullRequestForm = true" disabled="@(_processing || !_gitActionVisibility.ShowPullRequest)">🔀 Pull Request</button>
+            <button class="btn btn-ghost" @onclick="ExplorerRefreshAsync" disabled="@_loadingWorkspace">↻ Aktualisieren</button>
+            <button class="btn btn-success" @onclick="AbschliessenAsync" disabled="@(_processing || !KannAufgabeAbschliessen)">✅ Abschließen</button>
+            <button class="btn btn-danger" @onclick="() => _showAbbrechenConfirm = true" disabled="@(_processing || !KannAufgabeAbbrechen)">🛑 Abbrechen</button>
+            @if (_latestDiffResultId.HasValue)
+            {
+                <button class="btn btn-ghost" @onclick="DiffAnzeigen">🔎 Diff anzeigen</button>
+            }
+        </div>
+
         <div class="card">
             <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
                 <span>🗂️ Repository-Explorer</span>
@@ -143,11 +205,11 @@ else
             }
             else if (_workspaceSnapshot is null)
             {
-                <div class="alert alert-warning">Kein Repository-Browser verfügbar.</div>
+                <div class="alert alert-info">Projektverzeichnis noch nicht verfügbar.</div>
             }
             else if (_workspaceSnapshot.ChangedFileCount == 0)
             {
-                <div class="alert alert-info">Keine geänderten Dateien vorhanden.</div>
+                <div class="alert alert-info">Noch keine Änderungen im Projektverzeichnis vorhanden.</div>
             }
             else
             {
@@ -207,16 +269,188 @@ else
             }
         </div>
     }
+    else if (IsAusfuehrungRegisterAktiv)
+    {
+        <div class="action-bar">
+            <button class="btn btn-secondary" @onclick="RepositoryStartskriptAusfuehrenAsync" disabled="@(_processing || !KannRepositoryAktionenAusfuehren)">▶️ Startskript ausführen</button>
+            <button class="btn btn-success" @onclick="AbschliessenAsync" disabled="@(_processing || !KannAufgabeAbschliessen)">✅ Abschließen</button>
+            <button class="btn btn-danger" @onclick="() => _showAbbrechenConfirm = true" disabled="@(_processing || !KannAufgabeAbbrechen)">🛑 Abbrechen</button>
+        </div>
 
-    @if (!_showExplorer)
-    {
-    @if (!string.IsNullOrEmpty(_fehler))
-    {
-        <div class="alert alert-error">@_fehler <button @onclick="() => _fehler = null" style="float:right;background:none;border:none;color:inherit;cursor:pointer">✕</button></div>
+        @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
+        {
+            <div class="card">
+                <div class="card-title">💬 KI-Anfrage</div>
+                <div class="form-group">
+                    <label class="form-label">KI-Plugin</label>
+                    <select class="form-control" @bind="_selectedKiPluginPrefix" @bind:after="KiPluginGeaendertAsync">
+                        @if (_kiPlugins.Count == 0)
+                        {
+                            <option value="">– Kein KI-Plugin verfügbar –</option>
+                        }
+                        else
+                        {
+                            @foreach (var plugin in _kiPlugins)
+                            {
+                                <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Agentenpaket</label>
+                    <select class="form-control" @bind="_selectedPaketName" @bind:after="PaketGeaendertAsync">
+                        <option value="">– Paket wählen –</option>
+                        @foreach (var paket in _agentenpakete)
+                        {
+                            <option value="@paket.Name">@paket.Name (@paket.Agenten.Count Agenten)</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Agent auswählen</label>
+                    <select class="form-control" @bind="_kiAgentName">
+                        <option value="">– Agent wählen –</option>
+                        @foreach (var a in _agenten)
+                        {
+                            <option value="@a.Name">@a.Name</option>
+                        }
+                    </select>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(AgentenauswahlHinweis))
+                {
+                    <div class="alert alert-warning" style="margin-bottom:.75rem">@AgentenauswahlHinweis</div>
+                }
+                @if (_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
+                {
+                    <div class="form-group">
+                        <label class="form-label">Kontextmodus</label>
+                        <select class="form-control" value="@_folgeKontextmodus" @onchange="FolgeKontextmodusGeaendert">
+                            <option value="@FolgeanweisungsKontextmodus.KontextMitgeben">Kontext mitgeben</option>
+                            <option value="@FolgeanweisungsKontextmodus.KontextIgnorieren">Kontext ignorieren</option>
+                            <option value="@FolgeanweisungsKontextmodus.KontextNeuBeginnen">Kontext neu beginnen</option>
+                        </select>
+                    </div>
+                    @if (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen)
+                    {
+                        <div class="alert alert-warning" style="margin-bottom:.75rem">
+                            <strong>Achtung:</strong> Der bisherige Kontextverlauf dieser Aufgabe wird beim Senden zurückgesetzt.
+                            <div style="margin-top:.5rem">
+                                <label style="display:flex;gap:.5rem;align-items:center;cursor:pointer">
+                                    <input type="checkbox" @bind="_folgeKontextNeuBeginnenBestaetigt" />
+                                    Ich habe verstanden, dass der bisherige Kontext verworfen wird.
+                                </label>
+                            </div>
+                        </div>
+                    }
+                }
+                <div class="form-group">
+                    <label class="form-label">Prompt *</label>
+                    <textarea class="form-control" @bind="_prompt" rows="4" placeholder="Beschreibe was die KI tun soll..."></textarea>
+                </div>
+                <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@(_processing || !IsAgentenauswahlGueltig)">
+                    ▶️ Senden
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">Noch keine Ausführung verfügbar. Starten Sie zuerst die Entwicklung.</div>
+        }
+
+        @if (_aufgabe.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0)
+        {
+            <div class="card">
+                <div class="card-title"><div class="spinner" style="display:inline-block;width:12px;height:12px;margin-right:.5rem"></div> KI arbeitet...</div>
+                <div class="streaming-output protokoll-markdown markdown-preview" id="streamingOutput">
+                    @RenderProtokollInhalt(BuildStreamingArbeitsprotokollMarkdown())
+                </div>
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-title">📜 Protokoll</div>
+            @if (_protokoll.Count == 0)
+            {
+                <div class="alert alert-info">Noch keine KI-Ausführungsprotokolle vorhanden.</div>
+            }
+            else
+            {
+                <div class="protokoll-container" id="historyProtokoll">
+                    @foreach (var eintrag in _protokoll)
+                    {
+                        <div class="protokoll-entry">
+                            <div class="protokoll-time">@eintrag.Zeitstempel.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") @(eintrag.AgentName is not null ? $"[{eintrag.AgentName}]" : "")</div>
+                            <div class="@GetProtokollCssClass(eintrag.Typ)">
+                                <strong>@GetProtokollLabel(eintrag.Typ):</strong>
+                                <div class="protokoll-markdown markdown-preview">@RenderProtokollInhalt(eintrag.Inhalt)</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
     }
-    @if (!string.IsNullOrEmpty(_erfolg))
+
+    @if (IsProjektverzeichnisRegisterAktiv)
     {
-        <div class="alert alert-success">@_erfolg <button @onclick="() => _erfolg = null" style="float:right;background:none;border:none;color:inherit;cursor:pointer">✕</button></div>
+        @if (_showCommitForm)
+        {
+            <div class="card">
+                <div class="card-title">📝 Commit</div>
+                <div class="form-group">
+                    <label class="form-label">Commit-Nachricht *</label>
+                    <input class="form-control" @bind="_commitMessage" placeholder="feat: Beschreibung der Änderung" />
+                </div>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-primary" @onclick="CommitAsync" disabled="@_processing">✅ Commit</button>
+                    <button class="btn btn-ghost" @onclick="() => _showCommitForm = false">Abbrechen</button>
+                </div>
+            </div>
+        }
+
+        @if (_showPushForm && _gitActionVisibility.ShowPush)
+        {
+            <div class="card">
+                <div class="card-title">⬆️ Push</div>
+                <p style="color:#94a3b8">Möchten Sie den aktuellen Stand in das Remote-Repository pushen?</p>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-primary" @onclick="PushAsync" disabled="@_processing">Jetzt pushen</button>
+                    <button class="btn btn-ghost" @onclick="() => _showPushForm = false">Abbrechen</button>
+                </div>
+            </div>
+        }
+
+        @if (_showPullForm && _gitActionVisibility.ShowPull)
+        {
+            <div class="card">
+                <div class="card-title">⬇️ Pull</div>
+                <p style="color:#94a3b8">Möchten Sie den neuesten Stand aus dem Remote-Repository übernehmen?</p>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-secondary" @onclick="PullAsync" disabled="@_processing">Jetzt pullen</button>
+                    <button class="btn btn-ghost" @onclick="() => _showPullForm = false">Abbrechen</button>
+                </div>
+            </div>
+        }
+
+        @if (_showPullRequestForm && _gitActionVisibility.ShowPullRequest)
+        {
+            <div class="card">
+                <div class="card-title">🔀 Pull Request erstellen</div>
+                <div class="form-group">
+                    <label class="form-label">Titel *</label>
+                    <input class="form-control" @bind="_prTitel" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Beschreibung</label>
+                    <textarea class="form-control" @bind="_prBody" rows="3"></textarea>
+                </div>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-success" @onclick="PullRequestErstellenAsync" disabled="@_processing">🔀 PR erstellen</button>
+                    <button class="btn btn-ghost" @onclick="() => _showPullRequestForm = false">Abbrechen</button>
+                </div>
+            </div>
+        }
     }
 
     @if (_showAbbrechenConfirm)
@@ -285,235 +519,6 @@ else
             </div>
         </div>
     }
-
-    <div class="grid-2">
-        <!-- Linke Spalte: Anforderung + Aktionen -->
-        <div>
-            <!-- Anforderung -->
-            <div class="card">
-                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                    <span>📋 Anforderung</span>
-                    @if (_aufgabe.Status == AufgabeStatus.Offen && !_editAnforderung)
-                    {
-                        <button class="btn btn-ghost" style="padding:.2rem .5rem;font-size:.8rem" @onclick="AnforderungBearbeitenStarten">✏️ Bearbeiten</button>
-                    }
-                </div>
-                @if (_aufgabe.IssueReferenz is not null)
-                {
-                    <div style="margin-bottom:.75rem">
-                        <span class="badge badge-offen">#@_aufgabe.IssueReferenz.IssueNummer @_aufgabe.IssueReferenz.Titel</span>
-                        @if (!string.IsNullOrEmpty(_aufgabe.IssueReferenz.IssueUrl))
-                        {
-                            <a href="@_aufgabe.IssueReferenz.IssueUrl" target="_blank" style="color:#7c3aed;margin-left:.5rem;font-size:.8rem">↗ GitHub</a>
-                        }
-                    </div>
-                }
-                @if (_editAnforderung)
-                {
-                    <textarea class="form-control" @bind="_anforderungInput" rows="8" style="margin-bottom:.75rem" placeholder="Anforderungsbeschreibung..."></textarea>
-                    <div style="display:flex;gap:.5rem">
-                        <button class="btn btn-primary" @onclick="AnforderungSpeichernAsync" disabled="@_processing">💾 Speichern</button>
-                        <button class="btn btn-ghost" @onclick="AnforderungBearbeitenAbbrechen">Abbrechen</button>
-                    </div>
-                }
-                else
-                {
-                    <p style="color:#94a3b8;white-space:pre-wrap">@(_aufgabe.AnforderungsBeschreibung ?? "–")</p>
-                }
-            </div>
-
-            <!-- Git-Aktionen-Formulare -->
-            @if (_showCommitForm)
-            {
-                <div class="card">
-                    <div class="card-title">📝 Commit</div>
-                    <div class="form-group">
-                        <label class="form-label">Commit-Nachricht *</label>
-                        <input class="form-control" @bind="_commitMessage" placeholder="feat: Beschreibung der Änderung" />
-                    </div>
-                    <div style="display:flex;gap:.5rem">
-                        <button class="btn btn-primary" @onclick="CommitAsync" disabled="@_processing">✅ Commit</button>
-                        <button class="btn btn-ghost" @onclick="() => _showCommitForm = false">Abbrechen</button>
-                    </div>
-                </div>
-            }
-
-            @if (_showPushPullButtons && _gitActionVisibility.ShowPushPullToggle)
-            {
-                <div class="card">
-                    <div class="card-title">🔄 Push / Pull</div>
-                    <div style="display:flex;gap:.5rem">
-                        @if (_gitActionVisibility.ShowPush)
-                        {
-                            <button class="btn btn-primary" @onclick="PushAsync" disabled="@_processing">⬆️ Push</button>
-                        }
-                        @if (_gitActionVisibility.ShowPull)
-                        {
-                            <button class="btn btn-secondary" @onclick="PullAsync" disabled="@_processing">⬇️ Pull</button>
-                        }
-                    </div>
-                </div>
-            }
-
-            @if (_showResetForm)
-            {
-                <div class="card">
-                    <div class="card-title">↩️ Git Reset</div>
-                    <div class="form-group">
-                        <label class="form-label">Reset-Typ</label>
-                        <select class="form-control" @bind="_resetType">
-                            <option value="soft">--soft (Index behalten)</option>
-                            <option value="mixed">--mixed (Änderungen behalten)</option>
-                            <option value="hard">--hard (Alles verwerfen)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Ziel-Ref (optional, z.B. HEAD~1)</label>
-                        <input class="form-control" @bind="_resetRef" placeholder="HEAD~1 oder Commit-Hash" />
-                    </div>
-                    <div style="display:flex;gap:.5rem">
-                        <button class="btn btn-warning" @onclick="ResetAsync" disabled="@_processing">↩️ Reset durchführen</button>
-                        <button class="btn btn-ghost" @onclick="() => _showResetForm = false">Abbrechen</button>
-                    </div>
-                </div>
-            }
-
-            @if (_showPullRequestForm && _gitActionVisibility.ShowPullRequest)
-            {
-                <div class="card">
-                    <div class="card-title">🔀 Pull Request erstellen</div>
-                    <div class="form-group">
-                        <label class="form-label">Titel *</label>
-                        <input class="form-control" @bind="_prTitel" />
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Beschreibung</label>
-                        <textarea class="form-control" @bind="_prBody" rows="3"></textarea>
-                    </div>
-                    <div style="display:flex;gap:.5rem">
-                        <button class="btn btn-success" @onclick="PullRequestErstellenAsync" disabled="@_processing">🔀 PR erstellen</button>
-                        <button class="btn btn-ghost" @onclick="() => _showPullRequestForm = false">Abbrechen</button>
-                    </div>
-                </div>
-            }
-        </div>
-
-        <!-- Rechte Spalte: KI-Prompt + Protokoll -->
-        <div>
-            <!-- KI-Anfrage nach Start bis zum Abschluss sichtbar -->
-            @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
-            {
-                <div class="card">
-                    <div class="card-title">💬 KI-Anfrage</div>
-                    <div class="form-group">
-                        <label class="form-label">KI-Plugin</label>
-                        <select class="form-control" @bind="_selectedKiPluginPrefix" @bind:after="KiPluginGeaendertAsync">
-                            @if (_kiPlugins.Count == 0)
-                            {
-                                <option value="">– Kein KI-Plugin verfügbar –</option>
-                            }
-                            else
-                            {
-                                @foreach (var plugin in _kiPlugins)
-                                {
-                                    <option value="@plugin.PluginPrefix">@plugin.PluginName (@plugin.PluginPrefix)</option>
-                                }
-                            }
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Agentenpaket</label>
-                        <select class="form-control" @bind="_selectedPaketName" @bind:after="PaketGeaendertAsync">
-                            <option value="">– Paket wählen –</option>
-                            @foreach (var paket in _agentenpakete)
-                            {
-                                <option value="@paket.Name">@paket.Name (@paket.Agenten.Count Agenten)</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Agent auswählen</label>
-                        <select class="form-control" @bind="_kiAgentName">
-                            <option value="">– Agent wählen –</option>
-                            @foreach (var a in _agenten)
-                            {
-                                <option value="@a.Name">@a.Name</option>
-                            }
-                        </select>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(AgentenauswahlHinweis))
-                    {
-                        <div class="alert alert-warning" style="margin-bottom:.75rem">@AgentenauswahlHinweis</div>
-                    }
-                    @if (_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
-                    {
-                        <div class="form-group">
-                            <label class="form-label">Kontextmodus</label>
-                            <select class="form-control" value="@_folgeKontextmodus" @onchange="FolgeKontextmodusGeaendert">
-                                <option value="@FolgeanweisungsKontextmodus.KontextMitgeben">Kontext mitgeben</option>
-                                <option value="@FolgeanweisungsKontextmodus.KontextIgnorieren">Kontext ignorieren</option>
-                                <option value="@FolgeanweisungsKontextmodus.KontextNeuBeginnen">Kontext neu beginnen</option>
-                            </select>
-                        </div>
-                        @if (_folgeKontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen)
-                        {
-                            <div class="alert alert-warning" style="margin-bottom:.75rem">
-                                <strong>Achtung:</strong> Der bisherige Kontextverlauf dieser Aufgabe wird beim Senden zurückgesetzt.
-                                <div style="margin-top:.5rem">
-                                    <label style="display:flex;gap:.5rem;align-items:center;cursor:pointer">
-                                        <input type="checkbox" @bind="_folgeKontextNeuBeginnenBestaetigt" />
-                                        Ich habe verstanden, dass der bisherige Kontext verworfen wird.
-                                    </label>
-                                </div>
-                            </div>
-                        }
-                    }
-                    <div class="form-group">
-                        <label class="form-label">Prompt *</label>
-                        <textarea class="form-control" @bind="_prompt" rows="4" placeholder="Beschreibe was die KI tun soll..."></textarea>
-                    </div>
-                    <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@(_processing || !IsAgentenauswahlGueltig)">
-                        ▶️ Senden
-                    </button>
-                </div>
-            }
-
-            @if (_aufgabe.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0)
-            {
-                <div class="card">
-                    <div class="card-title"><div class="spinner" style="display:inline-block;width:12px;height:12px;margin-right:.5rem"></div> KI arbeitet...</div>
-                    <div class="streaming-output protokoll-markdown markdown-preview" id="streamingOutput">
-                        @RenderProtokollInhalt(BuildStreamingArbeitsprotokollMarkdown())
-                    </div>
-                </div>
-            }
-
-            <!-- Protokoll -->
-            <div class="card">
-                <div class="card-title">📜 Protokoll</div>
-                @if (_protokoll.Count == 0)
-                {
-                    <p style="color:#4b5563">Kein Protokoll vorhanden.</p>
-                }
-                else
-                {
-                    <div class="protokoll-container" id="historyProtokoll">
-                        @foreach (var eintrag in _protokoll)
-                        {
-                            <div class="protokoll-entry">
-                                <div class="protokoll-time">@eintrag.Zeitstempel.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") @(eintrag.AgentName is not null ? $"[{eintrag.AgentName}]" : "")</div>
-                                <div class="@GetProtokollCssClass(eintrag.Typ)">
-                                    <strong>@GetProtokollLabel(eintrag.Typ):</strong>
-                                    <div class="protokoll-markdown markdown-preview">@RenderProtokollInhalt(eintrag.Inhalt)</div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-}
 
 <!-- Modal: Agentenpaket & Agent wählen beim Starten -->
 @if (_showStartDialog)

@@ -31,6 +31,8 @@ public partial class AufgabeDetail : IDisposable
     [Inject] private NavigationManager NavigationManager { get; set; } = null!;
     [Inject] private IJSRuntime JsRuntime { get; set; } = null!;
     [Inject] private ILogger<AufgabeDetail> _logger { get; set; } = null!;
+    [SupplyParameterFromQuery(Name = "register")]
+    public string? Register { get; set; }
     [SupplyParameterFromQuery(Name = "view")]
     public string? View { get; set; }
 
@@ -47,7 +49,7 @@ public partial class AufgabeDetail : IDisposable
     private WorkspaceFileNode? _selectedWorkspaceNode;
     private FilePreview? _selectedWorkspacePreview;
     private string? _selectedWorkspacePath;
-    private bool _showExplorer;
+    private AufgabeDetailRegister _activeRegister = AufgabeDetailRegister.Aufgabe;
     private bool _useTreeLayout = true;
     private bool _loadingWorkspace;
     private Guid? _latestDiffResultId;
@@ -58,13 +60,34 @@ public partial class AufgabeDetail : IDisposable
         string.IsNullOrWhiteSpace(_aufgabe?.Projekt?.Name)
             ? "Projekt: ohne projekt"
             : $"Projekt: {_aufgabe.Projekt.Name}";
+    private bool IsAufgabeRegisterAktiv => _activeRegister == AufgabeDetailRegister.Aufgabe;
+    private bool IsAusfuehrungRegisterAktiv => _activeRegister == AufgabeDetailRegister.Ausfuehrung;
+    private bool IsProjektverzeichnisRegisterAktiv => _activeRegister == AufgabeDetailRegister.Projektverzeichnis;
+    private bool KannRepositoryAktionenAusfuehren => _aufgabe?.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv;
+    private bool KannAufgabeAbschliessen => _aufgabe?.Status == AufgabeStatus.InBearbeitung;
+    private bool KannAufgabeAbbrechen => _aufgabe?.Status == AufgabeStatus.InBearbeitung;
+    private string AnlagezeitpunktText => _aufgabe?.ErstellungsDatum.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "–";
+    private string LetzteAusfuehrungText => _protokoll.LastOrDefault()?.Zeitstempel.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "–";
+    private string AusfuehrungsdauerText => BuildAusfuehrungsdauerText();
+    private string LetzterAusfuehrungsstatusText => _aufgabe?.Status switch
+    {
+        AufgabeStatus.KiAktiv => "Läuft",
+        AufgabeStatus.Abgeschlossen => "Erfolgreich",
+        AufgabeStatus.Fehlgeschlagen => "Fehlgeschlagen",
+        AufgabeStatus.Archiviert => "Archiviert",
+        AufgabeStatus.TestsLaufen => "Tests laufen",
+        AufgabeStatus.InBearbeitung => "Bereit",
+        AufgabeStatus.Offen => "Noch nicht gestartet",
+        _ => "–"
+    };
 
     // Subscription auf laufende KI-Session (wird beim Dispose freigegeben)
     private IDisposable? _kiSubscription;
 
     // Forms
     private bool _showCommitForm;
-    private bool _showPushPullButtons;
+    private bool _showPushForm;
+    private bool _showPullForm;
     private bool _showResetForm;
     private bool _showPullRequestForm;
     private bool _showAbbrechenConfirm;
@@ -145,9 +168,16 @@ public partial class AufgabeDetail : IDisposable
 
     private CancellationTokenSource _cts = new();
 
+    private enum AufgabeDetailRegister
+    {
+        Aufgabe,
+        Ausfuehrung,
+        Projektverzeichnis
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        ApplyViewFromQuery();
+        ApplyRegisterFromQuery();
         await LadeAsync();
 
         // Wenn beim Seitenaufruf ein KI-Lauf im Hintergrund läuft: pufferlosen Stand wiederherstellen
@@ -164,7 +194,7 @@ public partial class AufgabeDetail : IDisposable
 
     protected override Task OnParametersSetAsync()
     {
-        ApplyViewFromQuery();
+        ApplyRegisterFromQuery();
         return Task.CompletedTask;
     }
 
@@ -924,9 +954,14 @@ public partial class AufgabeDetail : IDisposable
 
         _gitActionVisibility = EvaluateGitActionVisibility(_gitActionCapabilities);
 
-        if (!_gitActionVisibility.ShowPushPullToggle)
+        if (!_gitActionVisibility.ShowPush)
         {
-            _showPushPullButtons = false;
+            _showPushForm = false;
+        }
+
+        if (!_gitActionVisibility.ShowPull)
+        {
+            _showPullForm = false;
         }
 
         if (!_gitActionVisibility.ShowPullRequest)
@@ -935,25 +970,52 @@ public partial class AufgabeDetail : IDisposable
         }
     }
 
-    private void ApplyViewFromQuery()
+    private void ApplyRegisterFromQuery()
     {
-        _showExplorer = string.Equals(View, "tree", StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(Register, "ausfuehrung", StringComparison.OrdinalIgnoreCase))
+        {
+            SetActiveRegister(AufgabeDetailRegister.Ausfuehrung);
+            return;
+        }
+
+        if (string.Equals(Register, "projektverzeichnis", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(View, "tree", StringComparison.OrdinalIgnoreCase))
+        {
+            SetActiveRegister(AufgabeDetailRegister.Projektverzeichnis);
+            return;
+        }
+
+        SetActiveRegister(AufgabeDetailRegister.Aufgabe);
     }
 
-    private async Task SwitchViewAsync(string view)
+    private void SetActiveRegister(AufgabeDetailRegister register)
     {
-        if (string.Equals(View, view, StringComparison.OrdinalIgnoreCase))
+        if (_activeRegister == register)
         {
             return;
         }
 
-        NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameter("view", view), replace: true);
-        await Task.CompletedTask;
+        _activeRegister = register;
+        if (_activeRegister != AufgabeDetailRegister.Projektverzeichnis)
+        {
+            CloseProjectDirectoryDialogs();
+        }
     }
 
-    private Task SwitchToTaskViewAsync() => SwitchViewAsync("task");
+    private void ActivateAufgabeRegister() => SetActiveRegister(AufgabeDetailRegister.Aufgabe);
 
-    private Task SwitchToExplorerViewAsync() => SwitchViewAsync("tree");
+    private void ActivateAusfuehrungRegister() => SetActiveRegister(AufgabeDetailRegister.Ausfuehrung);
+
+    private void ActivateProjektverzeichnisRegister() => SetActiveRegister(AufgabeDetailRegister.Projektverzeichnis);
+
+    private void CloseProjectDirectoryDialogs()
+    {
+        _showCommitForm = false;
+        _showPushForm = false;
+        _showPullForm = false;
+        _showPullRequestForm = false;
+        _showResetForm = false;
+    }
 
     private async Task LadeWorkspaceAsync()
     {
@@ -1453,6 +1515,29 @@ public partial class AufgabeDetail : IDisposable
         {
             NavigationManager.NavigateTo($"/diff/{diffResultId}");
         }
+    }
+
+    private string BuildAusfuehrungsdauerText()
+    {
+        var letzterPrompt = _protokoll.LastOrDefault(eintrag => eintrag.Typ == ProtokollTyp.Prompt)?.Zeitstempel;
+        if (letzterPrompt is null)
+        {
+            return "–";
+        }
+
+        var letztesEreignis = _protokoll.LastOrDefault()?.Zeitstempel ?? letzterPrompt.Value;
+        var dauer = letztesEreignis - letzterPrompt.Value;
+        if (dauer < TimeSpan.Zero)
+        {
+            dauer = TimeSpan.Zero;
+        }
+
+        if (dauer.TotalHours >= 1)
+        {
+            return $"{(int)dauer.TotalHours:00}:{dauer.Minutes:00}:{dauer.Seconds:00}";
+        }
+
+        return $"{dauer.Minutes:00}:{dauer.Seconds:00}";
     }
 
     private static string GetProtokollCssClass(ProtokollTyp typ) => typ switch
