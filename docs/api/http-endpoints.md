@@ -22,6 +22,16 @@ Die Umsetzung erfolgt in bestehenden Service-/UI-Komponenten (`Entwicklungsproze
 - **Robustheit:** Bei Render-/Sanitizing-Fehlern greift ein HTML-encodiertes `<pre>`-Fallback.
 - **Details:** [Flow: KI-Arbeitsprotokoll – Persistierung, Rendering und Fallback](../flows/ki-arbeitsprotokoll-rendering-flow.md)
 
+## Feature-Hinweis: KI-Protokoll Auto-Scroll
+
+Für das Feature **„KI-Protokoll Auto-Scroll“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Die Umsetzung erfolgt als interner UI-/Interop-Contract in `AufgabeDetail` und `wwwroot/js/log-scroll.js`.
+
+- **Initiales Scrollen:** Beim Einblenden des Streaming-/Historie-Containers wird einmalig ans Ende gescrollt.
+- **Konditionales Follow-Scroll:** Bei neuem Inhalt erfolgt Auto-Scroll nur, wenn vor dem Update eine Endposition erkannt wurde.
+- **Positionsbeibehaltung:** Bei manuellem Hochscrollen unterbleibt `scrollToEnd`, die aktuelle Position bleibt erhalten.
+- **Technischer Contract:** [ki-protokoll-auto-scroll.md](./ki-protokoll-auto-scroll.md)
+
 ## Feature-Hinweis: App-Favicon `favicon-hammer-pick-svg`
 
 Für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
@@ -81,4 +91,5 @@ Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftret
 - Live Project Browser Contract: [live-project-browser-git-status.md](./live-project-browser-git-status.md)
 - Issue-58 Contract: [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md)
 - Plugin- und Agentenpaket-Contracts: [plugin-interfaces.md](./plugin-interfaces.md)
+- KI-Protokoll Auto-Scroll Contract: [ki-protokoll-auto-scroll.md](./ki-protokoll-auto-scroll.md)
 - API-Index: [README.md](./README.md)

@@ -1162,3 +1162,69 @@
 
 ### Hinweis
 - Die Datei ~/.copilot/agents/documentation-orchestrator.agent.md war in der Laufzeitumgebung nicht verfügbar; der Ablauf wurde dennoch vollständig nach Orchestrator-Schema durchgeführt.
+
+---
+
+# Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll“ – 2026-05-25
+
+## Kontext
+- Feature-Anforderungen:
+  1. Beim Einblenden des KI-Protokolls automatisch ans Ende scrollen.
+  2. Bei neuem Inhalt nur automatisch scrollen, wenn der Nutzer zuvor am Ende war.
+  3. Bei manuellem Hochscrollen die Position beibehalten.
+- Ziel: Vollständige Dokumentationssynchronisation für API, Flows, Business und README mit Fokus auf das Feature.
+
+## Phase 1 – Analyse (4 parallele Explore-Agenten, claude-haiku-4.5)
+
+### API-Docs-Analyse
+- `docs/api/` vorhanden.
+- Öffentliche Endpunkte (v. a. `DiffController`) sind dokumentiert.
+- Lücke: Kein dediziertes Dokument für das Feature „KI-Protokoll Auto-Scroll“ und keinen klaren technischen Contract zur Scroll-Logik.
+
+### Flow-Docs-Analyse
+- `docs/flows/` vorhanden und breit abgedeckt.
+- Lücke: Kein eigener Ablaufplan für Auto-Scroll-Verhalten im KI-Protokoll (Initial-Scroll, konditionales Follow-Scroll, manuelles Scroll-Lock).
+
+### Business-Docs-Analyse
+- `docs/business/` vorhanden mit Feature-Katalog.
+- Lücke: Keine fachliche Beschreibung des Auto-Scroll-Verhaltens aus Nutzersicht inkl. erwarteter Interaktion.
+
+### README-Analyse
+- Struktur vollständig (Projektname, Features, Installation, Usage, Konfiguration, Architektur, Tests, Deployment, Lizenz, Changelog).
+- Lücke: Feature „KI-Protokoll Auto-Scroll“ nicht explizit in Features/Usage/Changelog und Doku-Index referenziert.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Neue Feature-Dokumente in API/Flows/Business anlegen (Auto-Scroll-Verhalten vollständig beschreiben).
+2. **Hoch:** README um Feature-Beschreibung, Nutzungsverhalten und Doku-Links ergänzen.
+3. **Mittel:** Relevante Doku-Indizes (`docs/api/README.md`, `docs/flows/README.md`, `docs/business/features.md`) aktualisieren.
+4. **Mittel:** Konsistenzabgleich mit bestehender KI-Protokoll-/Streaming-Dokumentation sicherstellen.
+
+## Phase 2 – Parallele Dokumentationserstellung
+- `documentation-api`: ausgeführt (Scope `docs/api/`)
+- `documentation-flow`: ausgeführt (Scope `docs/flows/`)
+- `documentation-business`: ausgeführt (Scope `docs/business/`)
+- `documentation-readme-writer`: ausgeführt (Scope `README.md`)
+
+## Anhang: Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/api/ki-protokoll-auto-scroll.md`
+2. `docs/flows/ki-protokoll-auto-scroll-flow.md`
+3. `docs/business/features/F027-ki-protokoll-auto-scroll.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/http-endpoints.md`
+4. `docs/flows/README.md`
+5. `docs/flows/ki-arbeitsprotokoll-rendering-flow.md`
+6. `docs/business/features.md`
+7. `docs/business/features/F005-aufgabenprotokoll.md`
+8. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz und Nicht-Leerheit der neu erstellten/aktualisierten Ziel-Dokumente geprüft: **erfolgreich**.
+- Alle relevanten Feature-Dokumente liegen im erwarteten Scope (`docs/api`, `docs/flows`, `docs/business`, `README.md`) und sind in Indizes/Querverweisen eingebunden.
+
+### Offene Punkte
+- Kein kritischer offener Dokumentationspunkt innerhalb des Feature-Scopes identifiziert.
