@@ -827,7 +827,6 @@ public partial class AufgabeDetail : IDisposable
         // Keinen Agenten-Namen übergeben wenn kein passender Agent gefunden wurde –
         // AgentInfo mit leerem Name führt dazu, dass --agent weggelassen wird.
         var agent = _agenten.FirstOrDefault(a => a.Name == selectedAgentName)
-            ?? _agenten.FirstOrDefault()
             ?? new AgentInfo(string.Empty, null, string.Empty);
 
         _processing = true;

@@ -897,7 +897,7 @@ public sealed class EntwicklungsprozessService
             """;
 
         var builder = new StringBuilder();
-        await foreach (var line in kiPlugin.StartDevelopmentAsync(compressionPrompt, agent, localRepoPath, model, ct))
+        await foreach (var line in kiPlugin.StartDevelopmentAsync(compressionPrompt, new AgentInfo("", null, ""), localRepoPath, model, ct))
         {
             builder.AppendLine(line);
         }
