@@ -794,7 +794,6 @@ public sealed class EntwicklungsprozessService
         context = await EnsureContextWithinLimitsAsync(
             aufgabeId,
             context,
-            contextFilePath,
             agent,
             localRepoPath,
             runId,
@@ -830,7 +829,6 @@ public sealed class EntwicklungsprozessService
     private async Task<string> EnsureContextWithinLimitsAsync(
         Guid aufgabeId,
         string context,
-        string contextFilePath,
         AgentInfo agent,
         string localRepoPath,
         Guid runId,
@@ -858,12 +856,11 @@ public sealed class EntwicklungsprozessService
                 ct);
 
             current = await CompressContextAsync(current, agent, localRepoPath, kiPlugin, model, ct);
-            await WriteTextAtomicallyWithBackupAsync(contextFilePath, current, ct);
 
             await _protokollService.AddEintragAsync(
                 aufgabeId,
                 ProtokollTyp.StatusUebergang,
-                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Kontext komprimiert auf {current.Length} Zeichen.",
+                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Prompt-Kontext komprimiert auf {current.Length} Zeichen.",
                 agent.Name,
                 ct);
         }

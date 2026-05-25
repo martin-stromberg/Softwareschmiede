@@ -604,7 +604,7 @@ public partial class AufgabeDetail : IDisposable
             return;
         }
 
-        FolgeanweisungsKontextmodus? kontextmodus = hasKiAntwort ? _folgeKontextmodus : null;
+        FolgeanweisungsKontextmodus? kontextmodus = _folgeKontextmodus;
         await KiMitPromptStartenAsync(_prompt, _kiAgentName, kontextmodus);
         _prompt = string.Empty;
         _folgeKontextNeuBeginnenBestaetigt = false;
