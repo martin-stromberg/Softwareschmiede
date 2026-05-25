@@ -181,11 +181,13 @@ Folgend wrden projekttypische Strukturen und Konventionen für verschiedenste Ar
 - EditorConfig erzwingt Formatierung; CI führt `dotnet build`, `dotnet test`, `dotnet format --verify-no-changes` aus.
 - Analyzers / Warning Level = TreatWarningsAsErrors (nach Stabilisierung).
 - Abhängigkeiten regelmäßig prüfen (Dependabot / Renovate). Sicherheitsupdates bevorzugt.
+- Veröffentlichungen dürfen nicht automatisiert ausgeführt werden. Das Skript publish.ps1 muss stets manuell mit einem expliziten Befehl ausgeführt werden, um unbeabsichtigte Releases zu vermeiden.
 
 ## 9. Git & Branching (Empfehlung)
 - main: stabile Releases.
 - develop: Integrationszweig (optional).
 - feature/<kurz-beschreibung>, bugfix/<id>, hotfix/<id>.
+- Branches basieren auf main oder develop, nicht auf anderen Feature-Branches.
 - Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
 - Pull Requests: Code Review Pflicht (min. 1 Approver), CI grün vor Merge.
 
