@@ -244,7 +244,7 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         // @<pfad> lässt copilot den Prompt aus der Datei lesen
         var args = new List<string>
         {
-            "--prompt", $"@{promptFilePath}",
+            "--prompt", $"\"@{promptFilePath}\"",
             "--allow-all-tools",
             "--allow-all-paths",
             "--no-ask-user",

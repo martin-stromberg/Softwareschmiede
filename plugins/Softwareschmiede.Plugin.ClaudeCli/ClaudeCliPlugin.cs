@@ -144,7 +144,7 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     {
         var args = new List<string>
         {
-            "--prompt", $"@{promptFilePath}",
+            "--prompt", $"\"Aktuelle Aufgabe: @{promptFilePath}\"",
             "--allow-all-tools",
             "--allow-all-paths",
             "--no-ask-user",

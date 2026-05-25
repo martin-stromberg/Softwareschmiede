@@ -28,6 +28,8 @@ public abstract class CliKiPluginBase : IKiPlugin
         => $"{runId}.{ProviderDateiPraefix}-task.md";
     /// <summary>Erzeugt den Dateimaske für eine Prompt-Taskdatei eines KI-Runs.</summary>
     protected string BuildTaskFileMask() => $"*.{ProviderDateiPraefix}-task.md";
+    /// <summary>Erzeugt den Dateimaske für eine Backupdatei der Prompt-Taskdatei eines KI-Runs.</summary>
+    protected string BuildTaskBackupFileMask() => $"{BuildTaskFileMask()}.bak";
 
     /// <summary>Erzeugt den Pfad für eine Prompt-Taskdatei eines KI-Runs.</summary>
     public string BuildTaskFilePath(string localRepoPath, Guid runId)
@@ -118,7 +120,7 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// </param>
     protected void EnsureGitignoreEntries(string directoryPath)
     {
-        EnsureGitignoreEntries(directoryPath, BuildTaskFileMask(), BuildContextFileMask());
+        EnsureGitignoreEntries(directoryPath, BuildTaskFileMask(), BuildTaskBackupFileMask(), BuildContextFileMask());
     }
 
     public abstract string PluginName { get; }
