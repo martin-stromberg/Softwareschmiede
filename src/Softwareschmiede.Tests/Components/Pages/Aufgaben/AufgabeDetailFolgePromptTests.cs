@@ -263,7 +263,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     }
 
     [Fact]
-    public async Task KiStartenAsync_ShouldIgnoreKontextmodus_WhenNoKiAntwortExists()
+    public async Task KiStartenAsync_ShouldForwardKontextmodus_WhenNoKiAntwortExists()
     {
         var sut = await CreateSutAsync(
             initialAgent: "agent-initial",
@@ -272,13 +272,12 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         await sut.InvokeOnInitializedAsync();
         SetPrivateField(sut, "_prompt", "Neuer Start ohne Antwort");
         SetPrivateField(sut, "_kiAgentName", "agent-alt");
-        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextNeuBeginnen);
-        SetPrivateField(sut, "_folgeKontextNeuBeginnenBestaetigt", false);
+        SetPrivateField(sut, "_folgeKontextmodus", FolgeanweisungsKontextmodus.KontextMitgeben);
 
         await InvokePrivateAsync(sut, "KiStartenAsync");
 
         sut.StartedRuns.Should().ContainSingle();
-        sut.StartedRuns[0].Kontextmodus.Should().BeNull();
+        sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextMitgeben);
     }
 
     [Fact]

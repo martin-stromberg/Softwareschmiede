@@ -885,6 +885,122 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task KiStartenAsync_ShouldKeepPreviousEntries_WhenPromptsUseKontextMitgebenConsecutively()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-mitgeben-sequence-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext fortschreiben", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        var prompts = new List<string>();
+        var answers = new Queue<string>(["Antwort 1", "Antwort 2"]);
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((prompt, _, _, _, _) =>
+            {
+                prompts.Add(prompt);
+                return StreamSingleLine(answers.Dequeue());
+            });
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Prompt 1", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        {
+        }
+
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Prompt 2", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        {
+        }
+
+        // Assert
+        prompts.Should().HaveCount(2);
+        prompts[0].Should().Be("Prompt 1");
+        prompts[1].Should().Contain("Prompt 1");
+        prompts[1].Should().Contain("Antwort 1");
+        prompts[1].Should().Contain("Prompt 2");
+
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var context = await File.ReadAllTextAsync(contextPath);
+        context.Should().Contain("Prompt 1");
+        context.Should().Contain("Antwort 1");
+        context.Should().Contain("Prompt 2");
+        context.Should().Contain("Antwort 2");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldKeepCompleteContextHistory_WhenCompressionIsUsedForPrompt()
+    {
+        // Arrange
+        var repoPath = Path.Combine(Path.GetTempPath(), $"ctx-keep-history-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoPath);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext Historie", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["KiKontext:SoftLimitChars"] = "120",
+                ["KiKontext:HardLimitChars"] = "5000"
+            })
+            .Build();
+
+        var runResponses = new Queue<string>(
+        [
+            $"Antwort 1 {new string('x', 240)}",
+            "Antwort 2"
+        ]);
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((prompt, _, _, _, _) =>
+            {
+                if (prompt.Contains("Komprimiere den folgenden Projektkontext", StringComparison.Ordinal))
+                {
+                    return StreamSingleLine(
+                        "## Ziel\nKurz\n\n## Offene Punkte\nKurz\n\n## Letzte Entscheidungen\nKurz");
+                }
+
+                return StreamSingleLine(runResponses.Dequeue());
+            });
+
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            config,
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Prompt 1", agent, null, null, FolgeanweisungsKontextmodus.KontextIgnorieren))
+        {
+        }
+
+        await foreach (var _ in sut.KiStartenAsync(aufgabe.Id, "Prompt 2", agent, null, null, FolgeanweisungsKontextmodus.KontextMitgeben))
+        {
+        }
+
+        // Assert
+        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var context = await File.ReadAllTextAsync(contextPath);
+        context.Should().Contain("Prompt 1");
+        context.Should().Contain("Antwort 1");
+        context.Should().Contain("Prompt 2");
+        context.Should().Contain("Antwort 2");
+    }
+
+    [Fact]
     public async Task KiStartenAsync_ShouldAbort_WhenHardLimitStillExceededAfterCompression()
     {
         // Arrange
