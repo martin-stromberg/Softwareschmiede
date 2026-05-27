@@ -51,6 +51,8 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
         snapshot.HasError.Should().BeFalse();
         snapshot.CommitCount.Should().Be(42);
+        snapshot.BranchCommits.Should().ContainSingle();
+        snapshot.BranchCommits[0].Sha.Should().Be("1111111111111111111111111111111111111111");
         snapshot.ChangedFileCount.Should().Be(12);
         snapshot.CodeFiles.Should().HaveCount(7);
         snapshot.PlanningDocuments.Should().HaveCount(4);
@@ -196,6 +198,229 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var snapshot = await service.LoadSnapshotAsync(repositoryPath);
 
         snapshot.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task LoadSnapshotAsync_ShouldUseFallbackBaseBranch_WhenOriginHeadCannotBeResolved()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(
+            repositoryPath,
+            "?? src/file.cs",
+            resolveBaseRefSuccess: false,
+            fallbackBaseRef: "origin/master",
+            commitCountStdOut: "3",
+            branchLogStdOut: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0aaaaaaa\0fix: branch commit");
+
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+
+        snapshot.CommitCount.Should().Be(3);
+        snapshot.BranchCommits.Should().ContainSingle();
+        snapshot.BranchCommits[0].ShortSha.Should().Be("aaaaaaa");
+    }
+
+    [Fact]
+    public async Task LoadSnapshotAsync_ShouldHandleAmbiguousRemoteHeadOutput_ByUsingFirstValidReference()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(
+            repositoryPath,
+            "?? src/file.cs",
+            resolvedBaseRef: "origin/main\r\norigin/master",
+            fallbackBaseRef: "origin/main",
+            commitCountStdOut: "5",
+            branchLogStdOut: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0aaaaaaa\0fix: branch commit");
+
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+
+        snapshot.CommitCount.Should().Be(5);
+        snapshot.BranchCommits.Should().ContainSingle();
+        snapshot.BranchCommits[0].Sha.Should().Be("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    }
+
+    [Fact]
+    public async Task LoadSnapshotAsync_ShouldNormalizeRemoteHeadArrowReference()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(
+            repositoryPath,
+            "?? src/file.cs",
+            resolvedBaseRef: "origin/HEAD -> origin/main",
+            fallbackBaseRef: "origin/main",
+            commitCountStdOut: "6",
+            branchLogStdOut: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\0bbbbbbb\0feat: branch commit");
+
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+
+        snapshot.CommitCount.Should().Be(6);
+        snapshot.BranchCommits.Should().ContainSingle();
+        snapshot.BranchCommits[0].Sha.Should().Be("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    }
+
+    [Fact]
+    public async Task LoadSnapshotAsync_ShouldFallbackToKnownReference_WhenRemoteHeadOutputIsWhitespace()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(
+            repositoryPath,
+            "?? src/file.cs",
+            resolvedBaseRef: "   \r\n   ",
+            fallbackBaseRef: "origin/master",
+            commitCountStdOut: "4",
+            branchLogStdOut: "cccccccccccccccccccccccccccccccccccccccc\0ccccccc\0feat: fallback");
+
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+
+        snapshot.CommitCount.Should().Be(4);
+        snapshot.BranchCommits.Should().ContainSingle();
+        snapshot.BranchCommits[0].ShortSha.Should().Be("ccccccc");
+    }
+
+    [Fact]
+    public async Task LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(
+            repositoryPath,
+            "?? src/file.cs",
+            resolveBaseRefSuccess: false,
+            fallbackBaseRef: null);
+
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
+
+        snapshot.CommitCount.Should().Be(0);
+        snapshot.BranchCommits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(repositoryPath, string.Empty);
+        var commitSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+        var files = await service.LoadCommitFilesAsync(repositoryPath, commitSha);
+
+        files.Should().Contain(node => node.IsDirectory && node.RelativePath == "src");
+        var fileNode = FindNode(files, Path.Combine("src", "Changed.cs"));
+        fileNode.Should().NotBeNull();
+        fileNode!.CommitSha.Should().Be(commitSha);
+    }
+
+    [Fact]
+    public async Task LoadCommitFilesAsync_ShouldIgnoreIncompleteRenameTokens_AndKeepValidEntries()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var commitSha = "dddddddddddddddddddddddddddddddddddddddd";
+        var service = CreateService(
+            repositoryPath,
+            string.Empty,
+            commitDiffTreeStdOut: "M\0src/Changed.cs\0R100\0src/Old.cs\0");
+
+        var files = await service.LoadCommitFilesAsync(repositoryPath, commitSha);
+
+        var changed = FindNode(files, Path.Combine("src", "Changed.cs"));
+        changed.Should().NotBeNull();
+        changed!.CommitSha.Should().Be(commitSha);
+        FindNode(files, Path.Combine("src", "Old.cs")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var commitSha = "cccccccccccccccccccccccccccccccccccccccc";
+        var service = CreateService(
+            repositoryPath,
+            string.Empty,
+            commitShowBySpec: new Dictionary<string, CliResult>
+            {
+                [$"{commitSha}:src/feature.cs"] = new(0, "new-content", string.Empty),
+                [$"{commitSha}^:src/feature.cs"] = new(0, "old-content", string.Empty),
+            });
+
+        var preview = await service.LoadCommitPreviewAsync(repositoryPath, new WorkspaceFileNode
+        {
+            Name = "feature.cs",
+            RelativePath = Path.Combine("src", "feature.cs"),
+            CommitSha = commitSha,
+        });
+
+        preview.CurrentContent.Should().Be("new-content");
+        preview.OriginalContent.Should().Be("old-content");
+    }
+
+    [Fact]
+    public async Task LoadCommitPreviewAsync_ShouldReturnHint_WhenNodeIsDirectory()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(repositoryPath, string.Empty);
+
+        var preview = await service.LoadCommitPreviewAsync(repositoryPath, new WorkspaceFileNode
+        {
+            Name = "src",
+            RelativePath = "src",
+            IsDirectory = true,
+            CommitSha = "cccccccccccccccccccccccccccccccccccccccc",
+        });
+
+        preview.Hint.Should().Contain("Verzeichnisse");
+        preview.CurrentContent.Should().BeNull();
+        preview.OriginalContent.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var commitSha = "dddddddddddddddddddddddddddddddddddddddd";
+        var service = CreateService(
+            repositoryPath,
+            string.Empty,
+            commitShowBySpec: new Dictionary<string, CliResult>
+            {
+                [$"{commitSha}:src/feature.cs"] = new(0, "new\0content", string.Empty),
+                [$"{commitSha}^:src/feature.cs"] = new(0, "old-content", string.Empty),
+            });
+
+        var preview = await service.LoadCommitPreviewAsync(repositoryPath, new WorkspaceFileNode
+        {
+            Name = "feature.cs",
+            RelativePath = Path.Combine("src", "feature.cs"),
+            CommitSha = commitSha,
+        });
+
+        preview.IsBinary.Should().BeTrue();
+        preview.Hint.Should().Contain("Binärdatei");
+        preview.CurrentContent.Should().BeNull();
+        preview.OriginalContent.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var commitSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        var service = CreateService(
+            repositoryPath,
+            string.Empty,
+            commitShowBySpec: new Dictionary<string, CliResult>
+            {
+                [$"{commitSha}:src/feature.cs"] = new(1, string.Empty, "fatal: no such path"),
+                [$"{commitSha}^:src/feature.cs"] = new(1, string.Empty, "fatal: no parent"),
+            });
+
+        var preview = await service.LoadCommitPreviewAsync(repositoryPath, new WorkspaceFileNode
+        {
+            Name = "feature.cs",
+            RelativePath = Path.Combine("src", "feature.cs"),
+            CommitSha = commitSha,
+        });
+
+        preview.CurrentContent.Should().BeNull();
+        preview.OriginalContent.Should().BeNull();
+        preview.Hint.Should().Contain("Commit-Vorschau konnte nicht geladen werden");
+        preview.Hint.Should().Contain("fatal: no such path");
     }
 
     /// <summary>Liest gelöschte Dateien aus HEAD und verweigert Inline-Vorschau für Binärdateien.</summary>
@@ -416,32 +641,68 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         bool commitCountSuccess = true,
         string commitCountStdOut = "42",
         string? commitCountStdErr = null,
-        IReadOnlyDictionary<string, CliResult>? headContentByPath = null)
+        bool resolveBaseRefSuccess = true,
+        string? resolvedBaseRef = "origin/main",
+        string? fallbackBaseRef = "origin/main",
+        bool branchLogSuccess = true,
+        string branchLogStdOut = "1111111111111111111111111111111111111111\0" + "1111111\0feat: test commit",
+        IReadOnlyDictionary<string, CliResult>? headContentByPath = null,
+        IReadOnlyDictionary<string, CliResult>? commitShowBySpec = null,
+        string commitDiffTreeStdOut = "M\0src/Changed.cs\0")
     {
-        var cliRunner = new Mock<ICliRunner>(MockBehavior.Strict);
+        var cliRunner = new Mock<ICliRunner>();
+        cliRunner
+            .Setup(r => r.RunAsync("git", It.IsAny<IEnumerable<string>>(), repositoryPath, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
         var headResults = new Dictionary<string, CliResult>(StringComparer.OrdinalIgnoreCase);
         if (headContentByPath is not null)
         {
             foreach (var pair in headContentByPath)
             {
-                headResults[pair.Key] = pair.Value;
+                headResults[$"HEAD:{pair.Key.Replace('\\', '/')}"] = pair.Value;
             }
         }
 
-        if (headContent is not null && !headResults.ContainsKey("src/deleted.cs"))
+        if (headContent is not null && !headResults.ContainsKey("HEAD:src/deleted.cs"))
         {
-            headResults["src/deleted.cs"] = new CliResult(0, headContent, string.Empty);
+            headResults["HEAD:src/deleted.cs"] = new CliResult(0, headContent, string.Empty);
+        }
+
+        if (commitShowBySpec is not null)
+        {
+            foreach (var pair in commitShowBySpec)
+            {
+                headResults[pair.Key.Replace('\\', '/')] = pair.Value;
+            }
         }
 
         cliRunner
             .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })), repositoryPath, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(repoCheckSuccess ? 0 : 1, repoCheckStdOut, string.Empty));
         cliRunner
-            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-list", "--count", "HEAD" })), repositoryPath, null, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD" })), repositoryPath, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(resolveBaseRefSuccess ? 0 : 1, resolvedBaseRef ?? string.Empty, resolveBaseRefSuccess ? string.Empty : "missing"));
+        cliRunner
+            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => IsVerifyRefArgument(args)), repositoryPath, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string command, IEnumerable<string> args, string? workingDirectory, IDictionary<string, string>? environmentVariables, CancellationToken cancellationToken) =>
+            {
+                var candidate = args.Last();
+                var isMatch = !string.IsNullOrWhiteSpace(fallbackBaseRef) && string.Equals(candidate, fallbackBaseRef, StringComparison.Ordinal);
+                return new CliResult(isMatch ? 0 : 1, isMatch ? "ok" : string.Empty, isMatch ? string.Empty : "missing");
+            });
+        cliRunner
+            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => IsRevListCountArgument(args)), repositoryPath, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(commitCountSuccess ? 0 : 1, commitCountStdOut, commitCountStdErr ?? string.Empty));
+        cliRunner
+            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => IsBranchLogArgument(args)), repositoryPath, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(branchLogSuccess ? 0 : 1, branchLogStdOut, branchLogSuccess ? string.Empty : "log failed"));
         cliRunner
             .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "status", "--porcelain=v1", "--untracked-files=all" })), repositoryPath, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(statusSuccess ? 0 : 1, statusOutput, statusStdErr ?? string.Empty));
+        cliRunner
+            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => IsDiffTreeArgument(args)), repositoryPath, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, commitDiffTreeStdOut, string.Empty));
 
         if (headResults.Count > 0)
         {
@@ -449,8 +710,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
                 .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(args => IsGitShowArgument(args)), repositoryPath, null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync((string command, IEnumerable<string> args, string? workingDirectory, IDictionary<string, string>? environmentVariables, CancellationToken cancellationToken) =>
                 {
-                    var gitPath = args.Skip(1).First()["HEAD:".Length..];
-                    return headResults.TryGetValue(gitPath, out var result)
+                    var objectSpec = args.Skip(1).First();
+                    objectSpec = objectSpec.StartsWith("show ", StringComparison.Ordinal) ? objectSpec["show ".Length..] : objectSpec;
+                    return headResults.TryGetValue(objectSpec, out var result)
                         ? result
                         : new CliResult(1, string.Empty, "not found");
                 });
@@ -464,7 +726,46 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         var argumentList = args.ToList();
         return argumentList.Count == 2
                && string.Equals(argumentList[0], "show", StringComparison.Ordinal)
-               && argumentList[1].StartsWith("HEAD:", StringComparison.Ordinal);
+               && argumentList[1].Contains(':', StringComparison.Ordinal);
+    }
+
+    private static bool IsVerifyRefArgument(IEnumerable<string> args)
+    {
+        var argumentList = args.ToList();
+        return argumentList.Count == 4
+               && argumentList[0] == "rev-parse"
+               && argumentList[1] == "--verify"
+               && argumentList[2] == "--quiet";
+    }
+
+    private static bool IsRevListCountArgument(IEnumerable<string> args)
+    {
+        var argumentList = args.ToList();
+        return argumentList.Count == 3
+               && argumentList[0] == "rev-list"
+               && argumentList[1] == "--count"
+               && argumentList[2].EndsWith("..HEAD", StringComparison.Ordinal);
+    }
+
+    private static bool IsBranchLogArgument(IEnumerable<string> args)
+    {
+        var argumentList = args.ToList();
+        return argumentList.Count == 3
+               && argumentList[0] == "log"
+               && argumentList[1] == "--format=%H%x00%h%x00%s"
+               && argumentList[2].EndsWith("..HEAD", StringComparison.Ordinal);
+    }
+
+    private static bool IsDiffTreeArgument(IEnumerable<string> args)
+    {
+        var argumentList = args.ToList();
+        return argumentList.Count == 7
+               && argumentList[0] == "diff-tree"
+               && argumentList[1] == "--root"
+               && argumentList[2] == "--no-commit-id"
+               && argumentList[3] == "-r"
+               && argumentList[4] == "--name-status"
+               && argumentList[5] == "-z";
     }
 
     private string CreateTempDirectory()

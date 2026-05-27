@@ -52,6 +52,7 @@ Keine.
 - Ermittelt bei Dateiauswahl eine **dateispezifische** Diff-ID in `_selectedWorkspaceDiffResultId` via `ResolveSelectedWorkspaceDiffResultIdAsync`.
 - Übergibt `HasSelectedFile`, `Preview` und die dateispezifische `DiffResultId` an `DiffPreviewPanel`.
 - Lookup-Logik: `GetLatestDiffResultIdForFileAsync(aufgabeId, relativePath)` mit Pfadnormalisierung sowie Fallback auf `SourceRelativePath`, wenn für `RelativePath` kein Treffer vorliegt.
+- Commit-Dateien aus Branch-Commit-Knoten (`WorkspaceFileNode.CommitSha`) verwenden `LoadCommitPreviewAsync` und setzen bewusst **keine** `DiffResultId`; dadurch zeigt `DiffPreviewPanel` den Commit-Preview-Hinweis/-Inhalt statt eingebettetem `DiffViewer`.
 - Unterstützt direkte Navigation zur kompatiblen Route per `NavigationManager.NavigateTo($"/diff/{diffResultId}")`.
 
 ### `DiffPreviewPanel` (Fallback-Entscheidung)
@@ -153,3 +154,4 @@ Antwort (gekürzt auf den gerenderten Rahmen):
 - [HTTP-Endpunkte der Anwendung](./http-endpoints.md)
 - [Diff API](./diff.md)
 - [Live Project Browser mit Git-Status](./live-project-browser-git-status.md)
+- [Branch-Commit-Anzeige + Commit-Diff-Preview](./branch-commit-diff-preview.md)

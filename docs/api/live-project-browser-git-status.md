@@ -1,79 +1,74 @@
 # Live Project Browser mit Git-Status – Technischer Contract
 
-## Zweck
+## Übersicht
 
-Der Live Project Browser stellt den lokalen Repository-Zustand der Aufgabenseite zur Laufzeit bereit.
-Er liest ausschließlich aus dem lokalen Klon und speichert keinen eigenen Browserzustand.
+Der Contract beschreibt die **interne API** für Repository-Baum, Branch-Commit-Anzeige und Dateivorschau in `AufgabeDetail`.  
+Für dieses Feature wurden **keine neuen öffentlichen REST-Endpunkte** eingeführt.
 
 ## Implementierung und Contract
 
 - Contract: `src/Softwareschmiede/Application/Services/IGitWorkspaceBrowserService.cs`
 - Implementierung: `src/Softwareschmiede/Application/Services/GitWorkspaceBrowserService.cs`
-- Laufzeitmodelle:
-  - `WorkspaceSnapshot`
-  - `WorkspaceFileNode`
-  - `WorkspaceFileStatus`
-  - `FilePreview`
-  - `WorkspaceNodeRow`
+- UI-Orchestrierung: `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor(.cs)`
+- Commit-Tree-Zustandslogik: `src/Softwareschmiede/Components/Pages/Aufgaben/CommitTreePresenter.cs`
 
-## Unterstützte Operationen
+## Öffentliche HTTP-Bezüge
 
-| Methode | Zweck | Rückgabe |
+- Kein eigener Browser-Endpunkt.
+- Diff-Rendering nutzt weiterhin bestehende Diff-API: [diff.md](./diff.md) (`GET /api/diff/{id}`).
+
+## Interne API-Operationen
+
+| Operation | Zweck | Rückgabe |
 |---|---|---|
-| `LoadSnapshotAsync(repositoryPath)` | Lädt Commit-Zahl, Statusdaten und Baum-/Listenmodell eines lokalen Repositories. | `WorkspaceSnapshot` |
-| `LoadPreviewAsync(repositoryPath, node)` | Lädt die Vorschau für die selektierte Datei oder den zugehörigen Hinweis. | `FilePreview` |
+| `LoadSnapshotAsync(repositoryPath)` | Lädt Commit-Zähler relativ zum Basis-Branch, Branch-Commits und Working-Tree-Änderungen. | `WorkspaceSnapshot` |
+| `LoadPreviewAsync(repositoryPath, node)` | Lädt Vorschau für Working-Tree-Dateien. | `FilePreview` |
+| `LoadCommitFilesAsync(repositoryPath, commitSha)` | Lädt Commit-Dateibaum lazy für einen Branch-Commit (`git diff-tree ...`). | `IReadOnlyList<WorkspaceFileNode>` |
+| `LoadCommitPreviewAsync(repositoryPath, node)` | Lädt Commit-spezifische Datei-/Vorversion per `git show <sha>:path` und `<sha>^:path`. | `FilePreview` |
 
-## Snapshot-Regeln
+## Feature-Fokus: Branch-Commit-Anzeige + Commit-Diff-Preview
 
-- `repositoryPath` muss existieren und ein Git-Repository sein.
-- Commit-Zahl kommt aus `git rev-list --count HEAD`.
-- Statusdaten kommen aus `git status --porcelain=v1 --untracked-files=all`.
-- Ignorierte Einträge (`!!`) werden gefiltert.
-- Untracked-Dateien (`??`) werden als eigener Status modelliert.
-- Rename/Copy-Einträge werden aus dem `old -> new`-Pfad aufgelöst.
-- Der Service erzeugt sowohl `RootNodes` als auch `FlatFiles`.
-- Geänderte Planungsdokumente werden zusätzlich zu Codedateien explizit klassifiziert:
-  - `PlanningDocuments`: Markdown-Dateien unter `docs/requirements/`, `docs/architecture/`, `docs/improvements/`
-  - `CodeFiles`: bekannte Quellcode-/Konfigurationsdateitypen aus dem Workspace
-- Wenn initial keine `PlanningDocuments` erkannt werden, greift eine robuste Fallback-Prüfung auf normalisierte Slash-/Dot-Varianten der drei docs-Pfade.
+- `WorkspaceSnapshot.BranchCommits` liefert die sichtbaren Commit-Knoten im Dateibaum.
+- Commit-Knoten werden in der UI lazy geladen (`CommitNodeClickedAsync` → `LoadCommitFilesAsync`).
+- Commit-Dateien tragen `CommitSha`; dadurch wird Commit-Vorschau statt Working-Tree-Vorschau erzwungen (`CommitTreePresenter.RequiresCommitPreview`).
+- Für Commit-Dateien wird **kein** `DiffResultId` aufgelöst; die Vorschau kommt direkt aus Git-Inhalten des Commits.
 
-## Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance
+## Architekturentscheidungen
 
-- **Ziel:** Keine „blinden Flecken“ bei geänderten Planungsdokumenten im Live Project Browser.
-- **Verhalten:** Auch bei ausschließlich geänderten Planungsdokumenten bleibt die Workspace-Ansicht konsistent nutzbar (kein irreführender „Keine Änderungen“-Pfad).
-- **Betroffene Komponenten:**
-  - `GitWorkspaceBrowserService` (Klassifikation + Fallback)
-  - `WorkspaceSnapshot` (`CodeFiles`, `PlanningDocuments`)
-  - `AufgabeDetail` (UI-Weiterverarbeitung der getrennten Artefaktlisten)
-- **Compliance-Regeln (angrenzend):**
-  - Planungsdokumente sind ausschließlich `*.md` unter `docs/requirements/`, `docs/architecture/`, `docs/improvements/`.
-  - Fallback-Prüfung normalisiert Slash-/Dot-Varianten (`/docs/...`, `./docs/...`) nur für diese drei freigegebenen Pfade.
-  - Agentenpakete werden pluginseitig auf kompatible Struktur geprüft (`.github`-Ordner, robuste Fehlerpfade bei nicht lesbaren/nicht vorhandenen Paketdateien), damit Orchestrierungsabläufe reproduzierbar bleiben.
-- **Testbezug:**
-  - `GitWorkspaceBrowserServiceTests` (Klassifikation, Fallback, SourceRelativePath bei Rename/Copy)
-  - `AufgabeDetailWorkspacePreviewBunitTests` (Darstellung von Planning-only und gemischten Änderungen im UI-Workflow)
-- **Workflow-Auswirkung:**
-  - Die Aufgabenansicht zeigt geänderte Planungsdokumente als normale Artefakte im Workspace-Explorer.
-  - Folgeaktionen wie Dateiselektion/Vorschau bleiben verfügbar, auch wenn keine klassischen Codedateien geändert wurden.
+- Basis-Referenz wird robust aufgelöst (`origin/HEAD`, Fallback `origin/main|origin/master|main|master`).
+- Commit-Zähler basiert auf `baseReference..HEAD` (nicht global auf alle Commits).
+- Commit-Dateibaum wird aus `git diff-tree --root --no-commit-id -r --name-status -z` aufgebaut, inkl. Rename/Copy.
+- Commit-Preview liest `current` und `original` aus Git-Objekten; Binärinhalt wird über Null-Byte im Text erkannt.
 
-## Vorschau-Regeln
+## Testabdeckung (Auszug)
 
-- Verzeichnisse liefern nur einen Hinweis.
-- Gelöschte Dateien werden aus `HEAD:path` gelesen.
-- Fehlende Arbeitskopien werden defensiv mit Hinweis behandelt.
-- Dateien > 1 MB werden nicht inline angezeigt.
-- Binärdateien werden per Null-Byte-Heuristik erkannt.
-- Pfad-Traversal außerhalb des Repository-Roots wird blockiert.
+- `GitWorkspaceBrowserServiceTests`
+  - `LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected`
+  - `LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha`
+  - `LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions`
+  - `LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter`
+- `CommitTreePresenterTests`
+  - Lazy Load nur einmal, Retry/Error-Verhalten, Flattening der Commit-Knoten
+- `AufgabeDetailWorkspacePreviewBunitTests`
+  - Commit-Lazy-Load inkl. Retry
+  - Commit-Preview-Flow bei Dateiselektion
+  - dateispezifische Diff-Auflösung für Working-Tree-Dateien
 
-## Fachliche Grenzen
+## Bekannte Grenzen
 
-- Keine Schreiboperationen.
-- Keine Server-seitige Paginierung.
-- Keine Merge-/Commit-/Push-/Pull-Operationen.
+- Kein öffentlicher HTTP-Endpunkt für Commit-Baum/-Preview (nur In-Process-Servicecontract).
+- Bei nicht auflösbarer Basisreferenz sind `CommitCount = 0` und `BranchCommits = []`.
+- Commit-Preview nutzt keine 1-MB-Grenze; große Textantworten werden aus `git show` als String übernommen.
+- Wenn `commitSha^` nicht existiert (z. B. Root-Commit), ist `OriginalContent` ggf. `null`.
+- Keine Schreiboperationen (read-only).
 
 ## Verwandte Dokumentation
 
-- [F021 – Live Project Browser mit Git-Status](../business/features/F021-live-project-browser-git-status.md)
-- [Ablauf – Live Project Browser mit Git-Status](../flows/live-project-browser-git-status-flow.md)
-- [Requirements Analysis](../requirements/live-project-browser-git-status-requirements-analysis.md)
-- [Architecture Blueprint](../architecture/live-project-browser-git-status-architecture-blueprint.md)
+- [Branch-Commit-Anzeige + Commit-Diff-Preview](./branch-commit-diff-preview.md)
+- [Diff Viewer](./diff-viewer.md)
+- [Requirements: Live Project Browser](../requirements/live-project-browser-git-status-requirements-analysis.md)
+- [Architecture: Live Project Browser](../architecture/live-project-browser-git-status-architecture-blueprint.md)
+- [Improvement Review: Live Project Browser](../improvements/live-project-browser-git-status-architecture-review.md)
+- [Requirements: Korrekte Diff-Anzeige](../requirements/diffviewer-correct-diff-display-requirements-analysis.md)
+- [Architecture: Korrekte Diff-Anzeige](../architecture/diffviewer-correct-diff-display-architecture-blueprint.md)
+- [Improvement Review: Korrekte Diff-Anzeige](../improvements/diffviewer-correct-diff-display-architecture-review.md)

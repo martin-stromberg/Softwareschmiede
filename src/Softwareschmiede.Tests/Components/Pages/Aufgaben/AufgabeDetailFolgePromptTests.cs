@@ -547,7 +547,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         directory.IsExpanded.Should().BeTrue();
         GetPrivateField<WorkspaceFileNode?>(sut, "_selectedWorkspaceNode").Should().Be(directory);
         GetPrivateField<FilePreview?>(sut, "_selectedWorkspacePreview").Should().BeNull();
-        GetPrivateField<string?>(sut, "_selectedWorkspacePath").Should().Be("src");
+        GetPrivateField<string?>(sut, "_selectedWorkspaceSelectionKey").Should().Be("src");
     }
 
     [Fact]

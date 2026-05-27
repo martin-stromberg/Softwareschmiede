@@ -11,6 +11,7 @@ Auch für das Feature **„KI-Protokoll Auto-Scroll“** wurden **keine neuen ö
 Auch für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für das Feature **„Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für den Sollzustand **„Agentenpaket/Agent optional beim Aufgabenstart“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Auch für das Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 
 ## Dokumentierte API-Bereiche
@@ -19,10 +20,11 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 |---|---|
 | [http-endpoints.md](./http-endpoints.md) | Übersicht aller aktuell verfügbaren öffentlichen HTTP-Endpunkte inkl. Auth- und Content-Type-Konventionen sowie Feature-Hinweis zum Benachrichtigungssystem (keine neuen REST-Endpunkte, interne Service-/UI-Integration). |
 | [diff.md](./diff.md) | Vollständige REST-Dokumentation für `DiffController` (`/api/diff`) mit Request-/Response-Beispielen, Servicevertrags-Referenzen und testabgeglichenen Verhaltensdetails. |
+| [branch-commit-diff-preview.md](./branch-commit-diff-preview.md) | Feature-spezifischer API-/Contract-Überblick für Branch-Commit-Knoten im Dateibaum und Commit-Vorschau inkl. klarer Abgrenzung „keine neuen REST-Endpunkte“, bestehender Diff-API-Bezüge, Testabdeckung und bekannten Grenzen. |
 | [diff-viewer.md](./diff-viewer.md) | Technischer UI-/Routen-Contract für den Diff Viewer mit Dual-Mode (Embedded/Standalone), Zustandsverantwortung (`AufgabeDetail`/`DiffPreviewPanel`/`DiffViewer`), FR-4-Fallback-Entscheidungen, Parameterwechsel-Stabilität und kompatibler Wrapper-Route `/diff/{DiffResultId:guid}`. |
 | [aufgabe-recovery.md](./aufgabe-recovery.md) | Interner Service-/UI-Contract für die manuelle Wiederherstellung festhängender Aufgaben (Eligibility, Statuswechsel, Audit, Concurrency-Schutz). |
 | [issue-branch-pr-linking.md](./issue-branch-pr-linking.md) | Interner Contract für Issue-Auswahl, issuebezogene Branch-Erzeugung und PR-Closing-Direktive (`Closes #<Issue>`). |
-| [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Dateivorschau, getrennter Klassifikation von Code-/Planungsänderungen, Testbezug und Workflow-Auswirkung in `AufgabeDetail`. |
+| [live-project-browser-git-status.md](./live-project-browser-git-status.md) | Technischer Contract für den lokalen Repository-Browser auf der Aufgabenseite inkl. Snapshot, Tree-/Listenansicht, Branch-Commit-Knoten mit lazy Commit-Dateibaum, Commit-/Working-Tree-Vorschau, getrennter Klassifikation von Code-/Planungsänderungen sowie Testbezug und Workflow-Auswirkung in `AufgabeDetail`. |
 | [local-directory-plugin.md](./local-directory-plugin.md) | Technischer Contract der `IGitPlugin`-Implementierung `LocalDirectoryPlugin` inkl. Workspace-Modi, `git-init`-Fallback, Pull ohne Merge, Push-/Delete-Sync sowie Capability-Flags für die Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden bei Arbeitskopie). |
 | [plugin-default-selection.md](./plugin-default-selection.md) | Interner API-Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** sowie die projektspezifische/aufgabenbezogene `IGitPlugin`-Auflösung (vor Default) inkl. Fallback bei fehlender Repo-Verknüpfung. |
 | [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für Issue 58: plugin-spezifische Agenten-Discovery/Auswahl, Persistenz von `KiPluginPrefix` sowie Pflicht-/Optional-Regeln (KI-Plugin Pflicht, Agentenpaket/Agent optional). |
@@ -48,6 +50,13 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - Neue Service-Query: `GetLatestDiffResultIdForFileAsync(aufgabeId, relativePath)` mit Pfadnormalisierung (`\`/`/`, `./`, Case-Insensitivity).
 - Fallbackpfad: Wenn für `RelativePath` kein Diff gefunden wird, erfolgt ein zweiter Lookup über `SourceRelativePath` (falls sinnvoll).
 - Die Route `/diff/{DiffResultId:guid}` bleibt unverändert und verwendet weiterhin die zuletzt bekannte Diff-ID für den Standalone-Deep-Link.
+
+## Feature-Fokus: Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview (2026-05-27)
+
+- Keine neuen öffentlichen REST-Endpunkte; Umsetzung über bestehende interne Service-Contracts.
+- `WorkspaceSnapshot.BranchCommits` liefert Commit-Knoten, `LoadCommitFilesAsync` lädt Commit-Dateien lazy, `LoadCommitPreviewAsync` liefert Commit-inhaltliche Vorschau.
+- Für Commit-Dateien wird kein `DiffResultId` aufgelöst; für Working-Tree-Dateien bleibt der dateispezifische Diff-Lookup aktiv.
+- Details: [branch-commit-diff-preview.md](./branch-commit-diff-preview.md), [live-project-browser-git-status.md](./live-project-browser-git-status.md), [diff-viewer.md](./diff-viewer.md)
 
 ## Feature-Fokus: App-Favicon `favicon-hammer-pick.svg`
 

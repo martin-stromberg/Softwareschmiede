@@ -48,7 +48,7 @@ public partial class AufgabeDetail : IDisposable
     private WorkspaceSnapshot? _workspaceSnapshot;
     private WorkspaceFileNode? _selectedWorkspaceNode;
     private FilePreview? _selectedWorkspacePreview;
-    private string? _selectedWorkspacePath;
+    private string? _selectedWorkspaceSelectionKey;
     private AufgabeDetailRegister _activeRegister = AufgabeDetailRegister.Aufgabe;
     private bool _useTreeLayout = true;
     private bool _loadingWorkspace;
@@ -56,6 +56,7 @@ public partial class AufgabeDetail : IDisposable
     private Guid? _selectedWorkspaceDiffResultId;
     private long _previewLoadVersion;
     private bool HasSelectedWorkspaceFile => _selectedWorkspaceNode is not null && !_selectedWorkspaceNode.IsDirectory;
+    private readonly CommitTreePresenter _commitTreePresenter = new();
     private string ProjektAnzeigeText =>
         string.IsNullOrWhiteSpace(_aufgabe?.Projekt?.Name)
             ? "Projekt: ohne projekt"
@@ -1032,14 +1033,18 @@ public partial class AufgabeDetail : IDisposable
         try
         {
             _workspaceSnapshot = await GitWorkspaceBrowserService.LoadSnapshotAsync(_aufgabe.LokalerKlonPfad, _cts.Token);
-            if (_selectedWorkspacePath is not null)
+            if (_selectedWorkspaceSelectionKey is not null)
             {
-                ExpandPath(_workspaceSnapshot.RootNodes, _selectedWorkspacePath);
+                var selectedPath = ParseSelectionPath(_selectedWorkspaceSelectionKey);
+                if (!string.IsNullOrWhiteSpace(selectedPath))
+                {
+                    ExpandPath(_workspaceSnapshot.RootNodes, selectedPath);
+                }
             }
 
-            _selectedWorkspaceNode = _selectedWorkspacePath is null
+            _selectedWorkspaceNode = _selectedWorkspaceSelectionKey is null
                 ? null
-                : FindNode(_workspaceSnapshot.RootNodes, _selectedWorkspacePath);
+                : FindNode(_workspaceSnapshot.RootNodes, ParseSelectionPath(_selectedWorkspaceSelectionKey));
 
             if (_selectedWorkspaceNode?.IsDirectory == true)
             {
@@ -1081,12 +1086,12 @@ public partial class AufgabeDetail : IDisposable
 
         try
         {
-            _selectedWorkspacePath = node.RelativePath;
+            _selectedWorkspaceSelectionKey = BuildSelectionKey(node);
             _selectedWorkspaceNode = node;
             _selectedWorkspacePreview = null;
             _selectedWorkspaceDiffResultId = null;
             var preview = await GitWorkspaceBrowserService.LoadPreviewAsync(_aufgabe.LokalerKlonPfad, node, _cts.Token);
-            if (requestVersion != _previewLoadVersion || !string.Equals(_selectedWorkspacePath, node.RelativePath, StringComparison.OrdinalIgnoreCase))
+            if (requestVersion != _previewLoadVersion || !string.Equals(_selectedWorkspaceSelectionKey, BuildSelectionKey(node), StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -1102,6 +1107,44 @@ public partial class AufgabeDetail : IDisposable
             }
 
             _logger.LogError(ex, "Workspace preview konnte nicht geladen werden.");
+            _selectedWorkspacePreview = new FilePreview(node.RelativePath, node.SourceRelativePath, node.IsDeleted, false, false, null, null, ex.Message);
+            _selectedWorkspaceDiffResultId = null;
+        }
+    }
+
+    private async Task LadeCommitPreviewAsync(WorkspaceFileNode node)
+    {
+        if (_aufgabe?.LokalerKlonPfad is null or "")
+        {
+            return;
+        }
+
+        var requestVersion = Interlocked.Increment(ref _previewLoadVersion);
+
+        try
+        {
+            _selectedWorkspaceSelectionKey = BuildSelectionKey(node);
+            _selectedWorkspaceNode = node;
+            _selectedWorkspacePreview = null;
+            _selectedWorkspaceDiffResultId = null;
+
+            var preview = await GitWorkspaceBrowserService.LoadCommitPreviewAsync(_aufgabe.LokalerKlonPfad, node, _cts.Token);
+            if (requestVersion != _previewLoadVersion || !string.Equals(_selectedWorkspaceSelectionKey, BuildSelectionKey(node), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _selectedWorkspacePreview = preview;
+            _selectedWorkspaceDiffResultId = null;
+        }
+        catch (Exception ex)
+        {
+            if (requestVersion != _previewLoadVersion)
+            {
+                return;
+            }
+
+            _logger.LogError(ex, "Commit preview konnte nicht geladen werden.");
             _selectedWorkspacePreview = new FilePreview(node.RelativePath, node.SourceRelativePath, node.IsDeleted, false, false, null, null, ex.Message);
             _selectedWorkspaceDiffResultId = null;
         }
@@ -1173,7 +1216,20 @@ public partial class AufgabeDetail : IDisposable
     }
 
     private bool IsWorkspaceNodeSelected(WorkspaceFileNode node)
-        => string.Equals(_selectedWorkspacePath, node.RelativePath, StringComparison.OrdinalIgnoreCase);
+        => string.Equals(_selectedWorkspaceSelectionKey, BuildSelectionKey(node), StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildSelectionKey(WorkspaceFileNode node)
+        => string.IsNullOrWhiteSpace(node.CommitSha)
+            ? node.RelativePath
+            : $"{node.CommitSha}:{node.RelativePath}";
+
+    private static string ParseSelectionPath(string selectionKey)
+    {
+        var separator = selectionKey.IndexOf(':');
+        return separator >= 0 && separator < selectionKey.Length - 1
+            ? selectionKey[(separator + 1)..]
+            : selectionKey;
+    }
 
     private ICollection<WorkspaceNodeRow> VisibleWorkspaceNodes
     {
@@ -1193,6 +1249,32 @@ public partial class AufgabeDetail : IDisposable
 
             return _workspaceSnapshot.FlatFiles.Select(node => new WorkspaceNodeRow(node, 0)).ToList();
         }
+    }
+
+    private IReadOnlyList<BranchCommit> VisibleBranchCommits
+        => _workspaceSnapshot?.BranchCommits ?? [];
+
+    private IReadOnlyList<WorkspaceNodeRow> GetVisibleCommitRows(BranchCommit commit)
+        => _commitTreePresenter.GetVisibleCommitRows(commit);
+
+    private async Task CommitNodeClickedAsync(BranchCommit commit)
+    {
+        await _commitTreePresenter.ToggleCommitAsync(commit, LoadBranchCommitFilesAsync, _cts.Token);
+    }
+
+    private async Task RetryCommitNodeLoadAsync(BranchCommit commit)
+    {
+        await _commitTreePresenter.RetryLoadCommitFilesAsync(commit, LoadBranchCommitFilesAsync, _cts.Token);
+    }
+
+    private async Task<IReadOnlyList<WorkspaceFileNode>> LoadBranchCommitFilesAsync(BranchCommit commit, CancellationToken ct)
+    {
+        if (_aufgabe?.LokalerKlonPfad is null or "")
+        {
+            throw new InvalidOperationException("Kein lokaler Klonpfad vorhanden.");
+        }
+
+        return await GitWorkspaceBrowserService.LoadCommitFilesAsync(_aufgabe.LokalerKlonPfad, commit.Sha, ct);
     }
 
     private static IEnumerable<WorkspaceNodeRow> FlattenWorkspaceNode(WorkspaceFileNode node, int depth)
@@ -1220,8 +1302,14 @@ public partial class AufgabeDetail : IDisposable
             node.IsExpanded = !node.IsExpanded;
             _selectedWorkspaceNode = node;
             _selectedWorkspacePreview = null;
-            _selectedWorkspacePath = node.RelativePath;
+            _selectedWorkspaceSelectionKey = BuildSelectionKey(node);
             _selectedWorkspaceDiffResultId = null;
+            return;
+        }
+
+        if (CommitTreePresenter.RequiresCommitPreview(node))
+        {
+            await LadeCommitPreviewAsync(node);
             return;
         }
 

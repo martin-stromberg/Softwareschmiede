@@ -15,6 +15,9 @@ public sealed class WorkspaceSnapshot
     /// <summary>Wurzelknoten des Baums.</summary>
     public List<WorkspaceFileNode> RootNodes { get; init; } = [];
 
+    /// <summary>Commits des aktuellen Branches relativ zur Basisreferenz.</summary>
+    public IReadOnlyList<BranchCommit> BranchCommits { get; init; } = [];
+
     /// <summary>Flache Liste aller geänderten Dateien.</summary>
     public List<WorkspaceFileNode> FlatFiles { get; init; } = [];
 

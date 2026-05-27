@@ -74,6 +74,7 @@ Die Originalversion aus `HEAD` wird angezeigt.
 
 ## Verwandte Funktionen
 
+- [F029 – Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview](./F029-branch-commit-anzeige-dateibaum-commit-diff-preview.md)
 - [F002 – Aufgabenverwaltung](./F002-aufgabenverwaltung.md)
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md)
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md)

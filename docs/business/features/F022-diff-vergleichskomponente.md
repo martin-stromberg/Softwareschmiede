@@ -65,6 +65,7 @@ Die Anzeige bleibt stabil und zeigt nur die zuletzt gewählte Datei.
 
 ## Verwandte Funktionen
 
+- [F029 – Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview](./F029-branch-commit-anzeige-dateibaum-commit-diff-preview.md)
 - [F021 – Live Project Browser mit Git-Status](./F021-live-project-browser-git-status.md)
 - [F002 – Aufgabenverwaltung](./F002-aufgabenverwaltung.md)
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md)

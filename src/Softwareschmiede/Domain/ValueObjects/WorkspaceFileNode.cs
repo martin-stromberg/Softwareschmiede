@@ -21,6 +21,9 @@ public sealed class WorkspaceFileNode
     /// <summary>Git-Status des Knotens.</summary>
     public WorkspaceFileStatus? Status { get; init; }
 
+    /// <summary>Optionaler Commit-Hash, wenn der Knoten aus einem Commit-Baum stammt.</summary>
+    public string? CommitSha { get; init; }
+
     /// <summary>Gibt an, ob das Verzeichnis aufgeklappt angezeigt wird.</summary>
     public bool IsExpanded { get; set; }
 

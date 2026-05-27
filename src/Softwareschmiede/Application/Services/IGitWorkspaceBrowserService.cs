@@ -15,4 +15,16 @@ public interface IGitWorkspaceBrowserService
     /// <param name="node">Ausgewählter Dateiknoten.</param>
     /// <param name="ct">Cancellation Token.</param>
     Task<FilePreview> LoadPreviewAsync(string repositoryPath, WorkspaceFileNode node, CancellationToken ct = default);
+
+    /// <summary>Lädt commit-spezifische Dateiknoten für einen Branch-Commit.</summary>
+    /// <param name="repositoryPath">Pfad des lokalen Repositories.</param>
+    /// <param name="commitSha">SHA des Commits.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<IReadOnlyList<WorkspaceFileNode>> LoadCommitFilesAsync(string repositoryPath, string commitSha, CancellationToken ct = default);
+
+    /// <summary>Lädt die Vorschau einer Datei innerhalb eines bestimmten Commits.</summary>
+    /// <param name="repositoryPath">Pfad des lokalen Repositories.</param>
+    /// <param name="node">Ausgewählter Commit-Dateiknoten.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<FilePreview> LoadCommitPreviewAsync(string repositoryPath, WorkspaceFileNode node, CancellationToken ct = default);
 }

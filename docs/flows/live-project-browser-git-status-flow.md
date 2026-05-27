@@ -66,10 +66,10 @@ sequenceDiagram
    - **Eingaben:** Query-Parameter `view`, `LokalerKlonPfad` der Aufgabe  
    - **Ausgaben/Seiteneffekte:** UI wechselt nach `tree`; bei gültigem Pfad wird `LoadSnapshotAsync` aufgerufen.
 
-2. **Git-Status einlesen und in Domänenmodell überführen**  
+2. **Git-Status und Branch-Commit-Liste einlesen und in Domänenmodell überführen**  
    - **Code:** `src/Softwareschmiede/Application/Services/GitWorkspaceBrowserService.cs` (`LoadSnapshotAsync`, `ReadStatusEntriesAsync`, `BuildSnapshot`)  
    - **Eingaben:** `repositoryPath`, `git status --porcelain`  
-   - **Ausgaben/Seiteneffekte:** `WorkspaceSnapshot` mit `RootNodes`, `FlatFiles`, `ChangedFileCount`, `CommitCount`.
+   - **Ausgaben/Seiteneffekte:** `WorkspaceSnapshot` mit `RootNodes`, `FlatFiles`, `ChangedFileCount`, `CommitCount`, `BranchCommits`.
 
 3. **Primäre Planungsdokument-Erkennung ausführen**  
    - **Code:** `GitWorkspaceBrowserService.IsPlanningDocumentPath`, `IsPlanningDocumentNode`  
@@ -126,5 +126,5 @@ sequenceDiagram
 - `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs`
 - Externes System: `git` CLI
 
-> Verwandte Flows: [Entwicklungsprozess-Abläufe](./development-process-flow.md) · [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md)  
+> Verwandte Flows: [Entwicklungsprozess-Abläufe](./development-process-flow.md) · [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) · [Branch-Commit-Anzeige im Dateibaum](./branch-commit-tree-expansion-flow.md) · [Commit-Diff-Preview im Dateibaum](./commit-diff-preview-flow.md)  
 > Verwandte Fachdoku: [F021 – Live Project Browser mit Git-Status](../business/features/F021-live-project-browser-git-status.md)
