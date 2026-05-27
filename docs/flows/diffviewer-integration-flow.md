@@ -170,4 +170,4 @@ flowchart TD
 - `src/Softwareschmiede/Application/Services/DiffService.cs`
 - `src/Softwareschmiede/Application/Services/GitWorkspaceBrowserService.cs`
 
-> Verwandte Dokumentation: [Diff-Pipeline (Backend)](./diff-service-flow.md) · [API-Dokumentation Diff Viewer](../api/diff-viewer.md)
+> Verwandte Dokumentation: [Diff-Pipeline (Backend)](./diff-service-flow.md) · [API-Dokumentation Diff Viewer](../api/diff-viewer.md) · [Commit-Diff-Preview im Dateibaum](./commit-diff-preview-flow.md)

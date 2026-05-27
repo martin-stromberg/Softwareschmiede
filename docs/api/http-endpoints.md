@@ -61,6 +61,16 @@ Die Umsetzung betrifft UI-/Service-Vertragslogik (`AufgabeDetail`, `PluginSelect
 - **Testbezug:** `PluginSelectionServiceTests`, `EntwicklungsprozessServiceTests`, `AufgabeDetailFolgePromptTests`, `AufgabeServiceTests`.
 - **Details:** [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md), [aufgaben-startvalidierung.md](./aufgaben-startvalidierung.md)
 
+## Feature-Hinweis: Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview
+
+Für das Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Die Umsetzung erfolgt über interne Contracts in `GitWorkspaceBrowserService`, `CommitTreePresenter` und `AufgabeDetail`.
+
+- **Interne Operationen:** `LoadSnapshotAsync` (inkl. `BranchCommits`), `LoadCommitFilesAsync`, `LoadCommitPreviewAsync`.
+- **Öffentlicher API-Bezug:** bestehender Diff-Endpunkt `GET /api/diff/{id}` für dateispezifische Working-Tree-Diffanzeige.
+- **Testbezug:** `GitWorkspaceBrowserServiceTests`, `CommitTreePresenterTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `AufgabeServiceTests`.
+- **Details:** [branch-commit-diff-preview.md](./branch-commit-diff-preview.md), [live-project-browser-git-status.md](./live-project-browser-git-status.md), [diff-viewer.md](./diff-viewer.md)
+
 ## Öffentliche REST-Endpunkte
 
 | Methode | Pfad | Zweck |
@@ -88,6 +98,7 @@ Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftret
 ## Verknüpfte Dokumentation
 
 - Detaillierte Diff-API: [diff.md](./diff.md)
+- Branch-Commit-/Commit-Preview-Contract: [branch-commit-diff-preview.md](./branch-commit-diff-preview.md)
 - App-Favicon-Contract: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
 - Live Project Browser Contract: [live-project-browser-git-status.md](./live-project-browser-git-status.md)
 - Issue-58 Contract: [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md)

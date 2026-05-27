@@ -69,6 +69,84 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         });
     }
 
+    [Fact]
+    public async Task AufgabeDetail_ShouldRenderLazyLoadErrorAndRetry_ForBranchCommitNode()
+    {
+        await using var harness = await ConfigureComponentServicesAsync(
+            snapshot: CreateWorkspaceSnapshotWithBranchCommit(),
+            commitFilesShouldThrow: true);
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        var uri = navigationManager.GetUriWithQueryParameter("view", "tree");
+        navigationManager.NavigateTo(uri);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters
+            .Add(page => page.Id, harness.AufgabeId));
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("[abc1234]"));
+        cut.FindAll(".tree-item").First(item => item.TextContent.Contains("[abc1234]", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Commit files failed");
+            cut.Markup.Should().Contain("Retry");
+        });
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldRecoverAfterRetry_WhenCommitFileLoadFailsOnce()
+    {
+        await using var harness = await ConfigureComponentServicesAsync(
+            snapshot: CreateWorkspaceSnapshotWithBranchCommit(),
+            commitFilesFailureCount: 1);
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        var uri = navigationManager.GetUriWithQueryParameter("view", "tree");
+        navigationManager.NavigateTo(uri);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters
+            .Add(page => page.Id, harness.AufgabeId));
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("[abc1234]"));
+        cut.FindAll(".tree-item").First(item => item.TextContent.Contains("[abc1234]", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Commit files failed");
+            cut.Markup.Should().Contain("Retry");
+        });
+
+        cut.FindAll("button")
+            .First(button => button.TextContent.Contains("Retry", StringComparison.Ordinal))
+            .Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("commit-file.cs");
+            cut.Markup.Should().NotContain("Commit files failed");
+        });
+    }
+
+    [Fact]
+    public async Task AufgabeDetail_ShouldUseCommitPreview_WhenCommitFileIsSelected()
+    {
+        await using var harness = await ConfigureComponentServicesAsync(
+            snapshot: CreateWorkspaceSnapshotWithBranchCommit(),
+            includePreviewHints: false,
+            includeCommitPreviewHint: true);
+        var navigationManager = Services.GetRequiredService<NavigationManager>();
+        var uri = navigationManager.GetUriWithQueryParameter("view", "tree");
+        navigationManager.NavigateTo(uri);
+
+        var cut = RenderComponent<AufgabeDetail>(parameters => parameters
+            .Add(page => page.Id, harness.AufgabeId));
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("[abc1234]"));
+        cut.FindAll(".tree-item").First(item => item.TextContent.Contains("[abc1234]", StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("commit-file.cs"));
+        cut.FindAll(".tree-item").First(item => item.TextContent.Contains("commit-file.cs", StringComparison.Ordinal)).Click();
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("Commit Hint"));
+    }
+
     /// <summary>
     /// Verifiziert, dass die Dateiauswahl den dateispezifischen Diff lädt und eine Added-Line sichtbar wird.
     /// </summary>
@@ -146,6 +224,9 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         bool loadPreviewShouldThrow = false,
         bool includeDiffPreviewData = false,
         bool includePreviewHints = true,
+        bool commitFilesShouldThrow = false,
+        int commitFilesFailureCount = 0,
+        bool includeCommitPreviewHint = false,
         WorkspaceSnapshot? snapshot = null)
     {
         var db = TestDbContextFactory.Create();
@@ -224,6 +305,7 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
             .ReturnsAsync([]);
 
         var workspaceBrowserServiceMock = new Mock<IGitWorkspaceBrowserService>();
+        var commitFilesAttemptCount = 0;
         workspaceBrowserServiceMock
             .Setup(service => service.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(snapshot ?? CreateWorkspaceSnapshot());
@@ -261,6 +343,41 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
                     "beta-original",
                     includePreviewHints ? "Hint Beta" : null);
             });
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadCommitFilesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => commitFilesAttemptCount++)
+            .Returns<string, string, CancellationToken>((_, sha, _) =>
+            {
+                if (commitFilesShouldThrow || commitFilesAttemptCount <= commitFilesFailureCount)
+                {
+                    throw new InvalidOperationException("Commit files failed");
+                }
+
+                IReadOnlyList<WorkspaceFileNode> nodes =
+                [
+                    new WorkspaceFileNode
+                    {
+                        Name = "commit-file.cs",
+                        RelativePath = "commit-file.cs",
+                        IsDirectory = false,
+                        CommitSha = sha,
+                        Status = new WorkspaceFileStatus('M', ' '),
+                    },
+                ];
+
+                return Task.FromResult(nodes);
+            });
+        workspaceBrowserServiceMock
+            .Setup(service => service.LoadCommitPreviewAsync(It.IsAny<string>(), It.IsAny<WorkspaceFileNode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, WorkspaceFileNode node, CancellationToken _) => new FilePreview(
+                node.RelativePath,
+                node.SourceRelativePath,
+                node.IsDeleted,
+                false,
+                false,
+                "commit-current",
+                "commit-original",
+                includeCommitPreviewHint ? "Commit Hint" : null));
 
         var arbeitsverzeichnisResolverMock = new Mock<IArbeitsverzeichnisResolver>();
         arbeitsverzeichnisResolverMock
@@ -399,6 +516,45 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
             FlatFiles = [code, planning],
             CodeFiles = [code],
             PlanningDocuments = [planning],
+        };
+    }
+
+    private static WorkspaceSnapshot CreateWorkspaceSnapshotWithBranchCommit()
+    {
+        return new WorkspaceSnapshot
+        {
+            RepositoryPath = Path.GetTempPath(),
+            CommitCount = 1,
+            ChangedFileCount = 1,
+            RootNodes =
+            [
+                new WorkspaceFileNode
+                {
+                    Name = "workspace.cs",
+                    RelativePath = "workspace.cs",
+                    IsDirectory = false,
+                    Status = new WorkspaceFileStatus('M', ' '),
+                },
+            ],
+            FlatFiles =
+            [
+                new WorkspaceFileNode
+                {
+                    Name = "workspace.cs",
+                    RelativePath = "workspace.cs",
+                    IsDirectory = false,
+                    Status = new WorkspaceFileStatus('M', ' '),
+                },
+            ],
+            BranchCommits =
+            [
+                new BranchCommit
+                {
+                    Sha = "abc1234abc1234abc1234abc1234abc1234ab",
+                    ShortSha = "abc1234",
+                    Subject = "feat: branch node",
+                },
+            ],
         };
     }
 

@@ -54,7 +54,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-05-24**
+Stand: **2026-05-27**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -66,6 +66,7 @@ Stand: **2026-05-24**
 | Folgeanweisungen mit Kontextsteuerung | ✅ Implementiert | Kontext mitgeben / ignorieren / neu beginnen |
 | Lokale Deploymentfähigkeit | ✅ Implementiert | Windows-zentrierter Betrieb, lokale SQLite + Credential Store |
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
+| Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
@@ -86,7 +87,8 @@ Stand: **2026-05-24**
 - **GitHub-Plugin**: vollständige GitHub-Integration via `gh` CLI (inkl. Push/Pull/Pull Request/Issues)
 - **LocalDirectoryPlugin**: lokales SCM-Plugin ohne Remote-Provider mit `WorkspaceMode` (`SeparateWorkingDirectory` oder `InSourceDirectory`) und lokalisierten UI-Optionen
 - **Projektspezifische `IGitPlugin`-Auflösung:** `GitOrchestrationService` und `AufgabeDetail` nutzen primär das an Aufgabe/Projekt gebundene Repository-Plugin (inkl. lokalem Repository via `LocalDirectoryPlugin`) und nur bei fehlender/mehrdeutiger Zuordnung den Standard-Fallback.
-- **Live Project Browser mit Git-Status:** Auf der Aufgabenseite werden Commit-Zahl, lokale Änderungen, Tree-/Listenansicht und Datei-Vorschau direkt aus dem lokalen Repositoryzustand geladen.
+- **Live Project Browser mit Git-Status:** Auf der Aufgabenseite werden Branch-Commit-Zahl (relativ zur Basisreferenz), lokale Änderungen, Tree-/Listenansicht und Datei-Vorschau direkt aus dem lokalen Repositoryzustand geladen.
+- **Branch-Commit-Anzeige + Commit-Diff-Preview:** Branch-Commits werden als eigene Knoten im Dateibaum angezeigt; Commit-Dateien werden lazy geladen und für commit-basierte Dateiknoten wird eine commit-spezifische Vorschau geladen.
 - **Changed Artifact Detection im Workspace-Browser:** Geänderte Planungsdokumente unter `docs/requirements`, `docs/architecture`, `docs/improvements` werden zusätzlich zu Codedateien erkannt und separat weiterverarbeitet (inkl. Fallback-Erkennung für Slash-/Dot-Pfadvarianten).
 - **Capability-gesteuerte Aktionsmatrix für LocalDirectory-Arbeitskopien:** Bei `LocalDirectory + SeparateWorkingDirectory` blendet die Aufgabenansicht Push/Pull/PR aus und zeigt stattdessen **Merge** (Workspace -> Source) an.
 - **SeparateWorkingDirectory-Git-Workflow-Fallback**: `git init`-Fallback (policy-gesteuert), Pull ohne Merge mit Nutzerhinweis, Push als Datei-Synchronisation statt `git push`, Delete-Sync über `git status --porcelain`
@@ -103,6 +105,14 @@ Stand: **2026-05-24**
 - **Testabdeckung:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`; ergänzend [Testplan](docs/tests/testplan-changed-artifact-detection-agent-compliance.md) und [Testlückenanalyse](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md).
 - **Workflow-Auswirkung:** In der Aufgabenseite werden geänderte Planungsartefakte getrennt von Codedateien verarbeitet; Agentenpaket-Auswahl und KI-Lauf bleiben bei unvollständigen Paketinhalten fehlertolerant nutzbar.
 - **Doku-Links:** [API Live Project Browser](docs/api/live-project-browser-git-status.md), [API Plugin-Interfaces](docs/api/plugin-interfaces.md), [Flow](docs/flows/live-project-browser-git-status-flow.md), [Business F021](docs/business/features/F021-live-project-browser-git-status.md), [Business F004](docs/business/features/F004-agentenpakete.md), [Planungsübersicht](docs/planning-overview-changed-artifact-detection.md).
+
+#### Feature-Fokus: Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview
+- **Ziel:** Commit-Kontext direkt in der Aufgabenansicht sichtbar machen und für Commit-Dateien eine gezielte Vorschau ohne Wechsel in externe Tools bereitstellen.
+- **Verhalten:** `WorkspaceSnapshot` liefert `BranchCommits`; pro Commit werden Dateiknoten lazy über `LoadCommitFilesAsync` geladen und bei Dateiauswahl mit `LoadCommitPreviewAsync` angezeigt.
+- **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `IGitWorkspaceBrowserService`, `WorkspaceSnapshot`, `WorkspaceFileNode`, `BranchCommit`, `CommitTreePresenter`, `AufgabeDetail.razor` / `AufgabeDetail.razor.cs`.
+- **Bekannte Grenzen:** Wenn keine Basisreferenz (`origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`) auflösbar ist, werden keine Branch-Commits angezeigt; Verzeichnisse und Binärdateien haben keine Inline-Commit-Vorschau (Hint statt Diff-Inhalt).
+- **Testabdeckung (Codebestand):** `GitWorkspaceBrowserServiceTests` (Basisreferenz-Fallback, Branch-Commit-Parsing, Commit-Dateibaum, Commit-Preview), `CommitTreePresenterTests` (Expand/Retry/Flatten), `AufgabeDetailWorkspacePreviewBunitTests` (Lazy-Load-Fehler + Retry, Commit-Preview-Auswahl).
+- **Doku-Links:** [Dokumentationsplan (2026-05-27)](docs/documentation-plan.md), [API Live Project Browser](docs/api/live-project-browser-git-status.md), [Flow Live Project Browser](docs/flows/live-project-browser-git-status-flow.md), [Business F021](docs/business/features/F021-live-project-browser-git-status.md), [Business F022](docs/business/features/F022-diff-vergleichskomponente.md).
 
 ### 🔍 Diff-Vergleichskomponente
 - Öffentliche REST-Endpunkte unter `/api/diff` für Erzeugung, Abruf, Auflistung, Statistik, Löschung und Cache-Invalidierung von Diffs
@@ -629,6 +639,13 @@ public interface IKiPlugin : IPlugin { /* AI operations */ }
 4. `PluginManager` scannt beim ersten Zugriff den Ordner `AppContext.BaseDirectory/plugins` (`*.dll`, TopDirectoryOnly)
 5. Gefundene Typen werden per `ActivatorUtilities` instanziiert und anhand von `PluginType` als Git- oder KI-Plugin registriert
 
+### Architekturbezug: Branch-Commit-Anzeige + Commit-Diff-Preview
+
+- `GitWorkspaceBrowserService` ermittelt eine Basisreferenz (bevorzugt `origin/HEAD`, sonst Fallback) und berechnet daraus `BranchCommits` relativ zu `HEAD`.
+- Commit-Knoten werden in `AufgabeDetail` über den `CommitTreePresenter` zustandsbasiert expandiert (lazy Laden, Fehlerzustand, Retry).
+- Commit-Dateiknoten tragen `WorkspaceFileNode.CommitSha`; damit wird die Vorschau commit-spezifisch über `LoadCommitPreviewAsync` geladen.
+- Für reguläre Workspace-Dateien bleibt die bestehende Vorschaukette (`LoadPreviewAsync` und dateispezifische Diff-Auflösung) unverändert aktiv.
+
 ---
 
 ## 🧪 Tests
@@ -656,6 +673,9 @@ Feature-spezifische Testartefakte:
 - UI-bUnit-Tests (Standalone-Route `/diff/{DiffResultId:guid}`): `src/Softwareschmiede.Tests/Components/Pages/Diff/DiffViewerPageBunitTests.cs`
 - UI-bUnit-Tests (AufgabeDetail Workspace-Preview/Stabilität): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailWorkspacePreviewBunitTests.cs`
 - Service-Tests (Changed Artifact Detection: `CodeFiles` + `PlanningDocuments`, Fallback-Pfade): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
+- Service-Tests (Branch-Commit-Baum & Commit-Preview): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
+- UI-bUnit-Tests (Commit-Knoten Lazy Load, Fehler/Retry, Commit-Preview): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailWorkspacePreviewBunitTests.cs`
+- Presenter-Tests (Expand/Retry/Flatten/Commit-Preview-Entscheidung): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/CommitTreePresenterTests.cs`
 - Service-Tests (dateispezifische Diff-Auflösung): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
 - Service-Tests (Issue 58 Pluginauswahl/Persistenz): `src/Softwareschmiede.Tests/Application/Services/PluginSelectionServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
@@ -718,6 +738,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
 - Sollzustand vom **2026-05-25** eingearbeitet: **KI-Plugin Pflicht**, **Agentenpaket/Agent optional** in Voraussetzungen, Installation, Usage und Issue-58-Beschreibung vereinheitlicht
 - Feature **„KI-Protokoll Auto-Scroll“ (F027)** in README ergänzt (Features/Usage/Changelog) inkl. Verweis auf die neue Fachdokumentation und den Dokumentationsplan-Abschnitt vom 2026-05-25
 - Diff-Funktionalität in README konsolidiert (Implementierungsstatus, Feature- und Usage-Abschnitte) inkl. Verweisen auf `/api/diff`
@@ -784,6 +805,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F019: Issue-, Branch- und PR-Verknüpfung](docs/business/features/F019-issue-branch-pr-verknuepfung.md) | Fachliche Beschreibung der durchgängigen Verbindung von Issue-Auswahl, Branch-Namensbildung und PR-Auto-Close |
 | [Feature F020: Repository-Startskript mit freier Portzuweisung](docs/business/features/F020-repository-startskript-freier-port.md) | Fachliche Beschreibung der repositorybezogenen Startskript-Konfiguration mit Portreservierung beim Prozessstart |
 | [Feature F021: Live Project Browser mit Git-Status](docs/business/features/F021-live-project-browser-git-status.md) | Fachliche Beschreibung des Live Project Browsers auf der Aufgabenseite mit Git-Status, Tree-/Listenansicht und Dateivorschau |
+| [Dokumentationsplan: Feature „Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“ (2026-05-27)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation im Abschnitt „Dokumentationsplan – Feature „Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“ – 2026-05-27“ |
 | [Planning Overview: Changed Artifact Detection](docs/planning-overview-changed-artifact-detection.md) | Überblick zu Zielbild, Codeänderungen und verlinkten Planungsartefakten für die erweiterte Artefakt-Erkennung |
 | [Requirements: Changed Artifact Detection](docs/requirements/changed-artifact-detection-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien zur getrennten Erkennung von Code- und Planungsartefakten |
 | [Architektur: Changed Artifact Detection](docs/architecture/changed-artifact-detection-architecture-blueprint.md) | Architekturpfad für Snapshot-Klassifikation, Fallback-Prüfung und Reporting-Trennung |
@@ -792,6 +814,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Testplan: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testplan-changed-artifact-detection-agent-compliance.md) | Priorisierte Teststrategie für Feature- und Compliance-Absicherung |
 | [Testlücken: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md) | Dokumentation der abgedeckten und verbleibenden Randpfade |
 | [Feature F022: Diff-Vergleichskomponente](docs/business/features/F022-diff-vergleichskomponente.md) | Fachliche Beschreibung des Diff-Viewers inkl. eingebetteter Nutzung und Standalone-Route |
+| [API: Live Project Browser mit Git-Status](docs/api/live-project-browser-git-status.md) | Technischer Contract für Workspace-Snapshot, Baum-/Listenmodell und Vorschaupfad in der Aufgabenseite |
+| [Flow: Live Project Browser mit Git-Status](docs/flows/live-project-browser-git-status-flow.md) | Ablauf vom Repository-Snapshot bis zur Darstellung im Workspace-Browser der Aufgabenseite |
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
 | [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der plugin-spezifischen Auswahl mit **KI-Plugin als Pflichtfeld** sowie optionalem Agentenpaket/Agent inkl. Persistenz je Aufgabe |
 | [Feature F027: KI-Protokoll Auto-Scroll](docs/business/features/F027-ki-protokoll-auto-scroll.md) | Fachliche Beschreibung des Scroll-Verhaltens im KI-Protokoll (Initial-Scroll, bedingtes Follow-Scrolling, manueller Scroll-Lock) |

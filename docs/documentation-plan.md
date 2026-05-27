@@ -1317,3 +1317,90 @@
 - Existenz und Nicht-Leerheit aller neu erstellten/aktualisierten Zieldokumente geprüft: **erfolgreich**.
 - Konsistenzsuche auf alte Konfliktformulierungen durchgeführt (u. a. frühere harte Sequenz-/Blockierungsaussagen zu Paket/Agent): **bereinigt**.
 - Ergebniszustand vereinheitlicht: **KI-Plugin Pflicht**, **Agentenpaket/Agent optional**.
+
+---
+
+# Dokumentationsplan – Feature „Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“ – 2026-05-27
+
+## Kontext
+- Ziel: Vollständige Dokumentationssynchronisation für das Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“**.
+- Vorarbeiten vorhanden in `docs/requirements/`, `docs/architecture/`, `docs/improvements/`; Implementierung und Testabdeckung sind bereits im Codebestand enthalten.
+- Verwendete Agentendefinition: **Projektdatei** `.github/agents/documentation-orchestrator.agent.md` (da `~/.copilot/agents/documentation-orchestrator.agent.md` nicht vorhanden).
+
+## Phase 1 – Analyse (Agentenschwarm)
+
+### API-Docs
+- `docs/api/` vorhanden.
+- Lücken (feature-spezifisch):
+  1. Kein dediziertes API-Dokument für Branch-Commit-Baum und Commit-Preview-Contracts.
+  2. `docs/api/README.md` und `docs/api/http-endpoints.md` ohne klaren Feature-Hinweis.
+  3. `docs/api/live-project-browser-git-status.md` benötigt Präzisierung zur Commit-File-/Preview-Pipeline.
+
+### Flow-Docs
+- `docs/flows/` vorhanden.
+- Lücken (feature-spezifisch):
+  1. Kein dedizierter Ablaufplan für Branch-Commit-Baum-Expansion.
+  2. Kein dedizierter Ablaufplan für Commit-Diff-Preview.
+  3. Bestehende Diff-/Browser-Flows benötigen Ergänzungen zum Commit-Kontext.
+
+### Business-Docs
+- `docs/business/` vorhanden.
+- Lücken (feature-spezifisch):
+  1. Kein eigenständiges Feature-Dokument für „Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“.
+  2. Featureindex `docs/business/features.md` enthält noch keinen dedizierten Eintrag.
+  3. F021/F022 benötigen Synchronisation um Commit-Baum- und Commit-Diff-Verhalten.
+
+### README
+- Struktur vollständig.
+- Lücken (feature-spezifisch):
+  1. Implementierungsstatus ohne expliziten Featureeintrag.
+  2. Featurebeschreibung ohne klaren Commit-Baum-/Commit-Diff-Abschnitt.
+  3. Changelog/Doku-Links ohne dedizierten Verweis auf die neuen Feature-Artefakte.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Dedizierte API-/Flow-/Business-Dokumente für das Feature erstellen.
+2. **Hoch:** `README.md` um Featureverhalten, Architekturbezug, Testabdeckung und Grenzen ergänzen.
+3. **Mittel:** Bestehende Indexe (`docs/api/README.md`, `docs/flows/README.md`, `docs/business/features.md`) aktualisieren.
+4. **Mittel:** Konsistenzabgleich gegen vorhandene Requirements/Architecture/Improvements-Artefakte.
+
+## Phase 2 – Geplante parallele Ausführung
+- `documentation-api` (Scope `docs/api/`)
+- `documentation-flow` (Scope `docs/flows/`)
+- `documentation-business` (Scope `docs/business/`)
+- `documentation-readme-writer` (Scope `README.md`)
+
+## Phase 2 – Ausführung (parallel)
+- `documentation-api`: abgeschlossen
+- `documentation-flow`: abgeschlossen
+- `documentation-business`: abgeschlossen
+- `documentation-readme-writer`: abgeschlossen
+
+## Anhang: Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/api/branch-commit-diff-preview.md`
+2. `docs/flows/branch-commit-tree-expansion-flow.md`
+3. `docs/flows/commit-diff-preview-flow.md`
+4. `docs/business/features/F029-branch-commit-anzeige-dateibaum-commit-diff-preview.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/diff-viewer.md`
+4. `docs/api/http-endpoints.md`
+5. `docs/api/live-project-browser-git-status.md`
+6. `docs/flows/README.md`
+7. `docs/flows/diffviewer-integration-flow.md`
+8. `docs/flows/live-project-browser-git-status-flow.md`
+9. `docs/business/features.md`
+10. `docs/business/features/F021-live-project-browser-git-status.md`
+11. `docs/business/features/F022-diff-vergleichskomponente.md`
+12. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz-/Nicht-Leerheitsprüfung der neu erstellten Feature-Dokumente: **erfolgreich**.
+- Querverweis-/Sichtbarkeitscheck (`README`, API-/Flow-/Business-Indizes) auf Feature-Begriffe und neue Pfade: **erfolgreich**.
+- Dokumentationsinhalt auf implementierten Codepfad ausgerichtet (CommitTreePresenter, GitWorkspaceBrowserService, AufgabeDetail, DiffPreviewPanel): **durchgeführt**.
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationslücken im Scope des Features identifiziert.

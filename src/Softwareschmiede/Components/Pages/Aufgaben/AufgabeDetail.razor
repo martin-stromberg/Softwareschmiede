@@ -207,7 +207,7 @@ else
             {
                 <div class="alert alert-info">Projektverzeichnis noch nicht verfügbar.</div>
             }
-            else if (_workspaceSnapshot.ChangedFileCount == 0)
+            else if (_workspaceSnapshot.ChangedFileCount == 0 && _workspaceSnapshot.BranchCommits.Count == 0)
             {
                 <div class="alert alert-info">Noch keine Änderungen im Projektverzeichnis vorhanden.</div>
             }
@@ -219,6 +219,88 @@ else
                             <span class="tree-header-title">Änderungen</span>
                             <span class="tree-header-title">@(_useTreeLayout ? "Baum" : "Liste")</span>
                         </div>
+
+                        @foreach (var commit in VisibleBranchCommits)
+                        {
+                            <div class="tree-item"
+                                 style="padding-left:8px"
+                                 @onclick="() => CommitNodeClickedAsync(commit)">
+                                <svg class="tree-expand-btn" @onclick:stopPropagation @onclick="() => CommitNodeClickedAsync(commit)">
+                                    @if (commit.IsExpanded)
+                                    {
+                                        <use href="/sprite.svg#icon-chevron-down" />
+                                    }
+                                    else
+                                    {
+                                        <use href="/sprite.svg#icon-chevron-right" />
+                                    }
+                                </svg>
+                                <svg class="tree-item-icon">
+                                    <use href="/sprite.svg#icon-file" />
+                                </svg>
+                                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">[@commit.ShortSha] @commit.Subject</span>
+                                @if (commit.IsLoadingFiles)
+                                {
+                                    <span class="badge badge-offen">lädt…</span>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(commit.ErrorMessage))
+                                {
+                                    <span class="badge badge-konflikt">Fehler</span>
+                                }
+                            </div>
+
+                            @if (commit.IsExpanded && !string.IsNullOrWhiteSpace(commit.ErrorMessage))
+                            {
+                                <div class="alert alert-warning" role="alert" style="margin:.25rem 0 .5rem 1.5rem;padding:.5rem .75rem">
+                                    <strong>Commit [@commit.ShortSha]:</strong> @commit.ErrorMessage
+                                    <button type="button" class="btn btn-ghost" style="margin-left:.5rem;padding:.15rem .45rem" @onclick="() => RetryCommitNodeLoadAsync(commit)">Retry</button>
+                                </div>
+                            }
+
+                            @if (commit.IsExpanded)
+                            {
+                                @foreach (var entry in GetVisibleCommitRows(commit))
+                                {
+                                    <div class="tree-item @(IsWorkspaceNodeSelected(entry.Node) ? "tree-item-selected" : "")"
+                                         style="padding-left:@(entry.Depth * 16 + 8)px"
+                                         @onclick="() => WorkspaceNodeClickedAsync(entry.Node)">
+                                        @if (entry.Node.IsDirectory)
+                                        {
+                                            <svg class="tree-expand-btn" @onclick:stopPropagation @onclick="() => WorkspaceNodeClickedAsync(entry.Node)">
+                                                @if (entry.Node.IsExpanded)
+                                                {
+                                                    <use href="/sprite.svg#icon-chevron-down" />
+                                                }
+                                                else
+                                                {
+                                                    <use href="/sprite.svg#icon-chevron-right" />
+                                                }
+                                            </svg>
+                                        }
+                                        else
+                                        {
+                                            <span style="width:16px;display:inline-block"></span>
+                                        }
+
+                                        <svg class="tree-item-icon">
+                                            <use href="/sprite.svg#@(entry.Node.IsDirectory ? "icon-folder" : "icon-file")" />
+                                        </svg>
+
+                                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@entry.Node.Name</span>
+
+                                        @if (entry.Node.IsDirectory)
+                                        {
+                                            <span class="badge badge-offen">@entry.Node.ChangedFileCount</span>
+                                        }
+                                        else if (entry.Node.Status is not null)
+                                        {
+                                            <span class="badge @entry.Node.Status.CssClass" title="@entry.Node.Status.Description">@entry.Node.Status.BadgeText</span>
+                                        }
+                                    </div>
+                                }
+                            }
+                        }
+
                         <Virtualize TItem="WorkspaceNodeRow" Items="@VisibleWorkspaceNodes" Context="entry" ItemSize="32">
                             <div class="tree-item @(IsWorkspaceNodeSelected(entry.Node) ? "tree-item-selected" : "")"
                                  style="padding-left:@(entry.Depth * 16 + 8)px"

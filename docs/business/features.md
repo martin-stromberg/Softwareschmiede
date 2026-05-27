@@ -35,6 +35,7 @@ Klicken Sie auf den Namen einer Funktion, um die ausführliche Beschreibung zu �
 | F026 | KI-Plugin-spezifische Agenten-Discovery und -Auswahl | KI-Plugin als Pflichtfeld, dazu pluginpassende Anzeige; Agentenpaket und Agent bleiben optional | [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](./features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) |
 | F027 | KI-Protokoll Auto-Scroll | Beim Öffnen und bei neuem Inhalt gezielt scrollen, ohne manuelle Leseposition zu verlieren | [F027 – KI-Protokoll Auto-Scroll](./features/F027-ki-protokoll-auto-scroll.md) |
 | F028 | Startvalidierung beim Aufgabenstart | Klare Regeln für Pflicht- und optionale Felder beim Start: KI-Plugin Pflicht, Agentenpaket und Agent optional | [F028 – Startvalidierung beim Aufgabenstart](./features/F028-startvalidierung-aufgabenstart.md) |
+| F029 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | Eigene Branch-Commits im Dateibaum aufklappen, Commit-Dateien prüfen und Vorschau direkt aus dem Commit-Kontext lesen | [F029 – Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview](./features/F029-branch-commit-anzeige-dateibaum-commit-diff-preview.md) |
 
 ---
 

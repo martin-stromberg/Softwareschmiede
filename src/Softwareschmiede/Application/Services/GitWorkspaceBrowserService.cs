@@ -45,14 +45,17 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
             return WorkspaceSnapshot.FromError($"Pfad '{repositoryPath}' ist kein Git-Repository.");
         }
 
-        var commitCount = await ReadCommitCountAsync(repositoryPath, ct);
+        var baseReference = await ResolveBaseReferenceAsync(repositoryPath, ct);
+        var commitCount = await ReadCommitCountAsync(repositoryPath, baseReference, ct);
+        var branchCommits = await ReadBranchCommitsAsync(repositoryPath, baseReference, ct);
         var entries = await ReadStatusEntriesAsync(repositoryPath, ct);
 
-        var snapshot = BuildSnapshot(repositoryPath, commitCount, entries);
+        var snapshot = BuildSnapshot(repositoryPath, commitCount, branchCommits, entries);
         _logger.LogInformation(
-            "Workspace-Snapshot geladen für {RepositoryPath}: {CommitCount} Commits, {ChangedCount} geänderte Dateien.",
+            "Workspace-Snapshot geladen für {RepositoryPath}: {CommitCount} Branch-Commits, {BranchCommitNodes} Commit-Knoten, {ChangedCount} geänderte Dateien.",
             repositoryPath,
             snapshot.CommitCount,
+            snapshot.BranchCommits.Count,
             snapshot.ChangedFileCount);
 
         return snapshot;
@@ -114,9 +117,88 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return new FilePreview(relativePath, sourceRelativePath, false, false, false, currentContent, original, null);
     }
 
-    private async Task<int> ReadCommitCountAsync(string repositoryPath, CancellationToken ct)
+    public async Task<IReadOnlyList<WorkspaceFileNode>> LoadCommitFilesAsync(string repositoryPath, string commitSha, CancellationToken ct = default)
     {
-        var result = await _cliRunner.RunAsync("git", ["rev-list", "--count", "HEAD"], repositoryPath, null, ct);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(commitSha);
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["diff-tree", "--root", "--no-commit-id", "-r", "--name-status", "-z", commitSha],
+            repositoryPath,
+            null,
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"Commit-Dateien konnten nicht geladen werden: {result.StdErr}");
+        }
+
+        return BuildCommitFileTree(commitSha, result.StdOut);
+    }
+
+    public async Task<FilePreview> LoadCommitPreviewAsync(string repositoryPath, WorkspaceFileNode node, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentException.ThrowIfNullOrWhiteSpace(node.CommitSha);
+
+        if (node.IsDirectory)
+        {
+            return new FilePreview(node.RelativePath, node.SourceRelativePath, node.IsDeleted, false, false, null, null, "Verzeichnisse können nicht direkt in der Vorschau angezeigt werden.");
+        }
+
+        var relativePath = NormalizeRelativePath(node.RelativePath);
+        var sourceRelativePath = string.IsNullOrWhiteSpace(node.SourceRelativePath)
+            ? relativePath
+            : NormalizeRelativePath(node.SourceRelativePath);
+        var gitCurrentPath = ToGitPath(relativePath);
+        var gitOriginalPath = ToGitPath(sourceRelativePath);
+        var commitSha = node.CommitSha!;
+
+        var currentResult = await _cliRunner.RunAsync("git", ["show", $"{commitSha}:{gitCurrentPath}"], repositoryPath, null, ct);
+        var originalResult = await _cliRunner.RunAsync("git", ["show", $"{commitSha}^:{gitOriginalPath}"], repositoryPath, null, ct);
+
+        var currentContent = currentResult.IsSuccess ? currentResult.StdOut : null;
+        var originalContent = originalResult.IsSuccess ? originalResult.StdOut : null;
+
+        if (IsBinaryText(currentContent) || IsBinaryText(originalContent))
+        {
+            return new FilePreview(relativePath, sourceRelativePath, node.IsDeleted, true, false, null, null, "Binärdatei – Vorschau nicht verfügbar.");
+        }
+
+        if (!currentResult.IsSuccess && !originalResult.IsSuccess)
+        {
+            return new FilePreview(
+                relativePath,
+                sourceRelativePath,
+                node.IsDeleted,
+                false,
+                false,
+                null,
+                null,
+                $"Commit-Vorschau konnte nicht geladen werden: {currentResult.StdErr}");
+        }
+
+        return new FilePreview(
+            relativePath,
+            sourceRelativePath,
+            node.IsDeleted,
+            false,
+            false,
+            currentContent,
+            originalContent,
+            null);
+    }
+
+    private async Task<int> ReadCommitCountAsync(string repositoryPath, string? baseReference, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(baseReference))
+        {
+            return 0;
+        }
+
+        var result = await _cliRunner.RunAsync("git", ["rev-list", "--count", $"{baseReference}..HEAD"], repositoryPath, null, ct);
         if (!result.IsSuccess)
         {
             _logger.LogWarning("Commit-Anzahl für {RepositoryPath} konnte nicht geladen werden: {Error}", repositoryPath, result.StdErr);
@@ -124,6 +206,192 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         }
 
         return int.TryParse(result.StdOut.Trim(), out var count) ? count : 0;
+    }
+
+    private async Task<IReadOnlyList<BranchCommit>> ReadBranchCommitsAsync(string repositoryPath, string? baseReference, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(baseReference))
+        {
+            return [];
+        }
+
+        var result = await _cliRunner.RunAsync(
+            "git",
+            ["log", $"--format=%H%x00%h%x00%s", $"{baseReference}..HEAD"],
+            repositoryPath,
+            null,
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("Commit-Liste für {RepositoryPath} konnte nicht geladen werden: {Error}", repositoryPath, result.StdErr);
+            return [];
+        }
+
+        var commits = new List<BranchCommit>();
+        var lines = result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var parts = line.Split('\0', 3, StringSplitOptions.None);
+            if (parts.Length < 3 || string.IsNullOrWhiteSpace(parts[0]))
+            {
+                _logger.LogWarning("Ungültige Commit-Zeile verworfen: {Line}", line);
+                continue;
+            }
+
+            commits.Add(new BranchCommit
+            {
+                Sha = parts[0],
+                ShortSha = string.IsNullOrWhiteSpace(parts[1]) ? parts[0][..Math.Min(7, parts[0].Length)] : parts[1],
+                Subject = parts[2],
+            });
+        }
+
+        return commits;
+    }
+
+    private async Task<string?> ResolveBaseReferenceAsync(string repositoryPath, CancellationToken ct)
+    {
+        var remoteHead = await _cliRunner.RunAsync(
+            "git",
+            ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+            repositoryPath,
+            null,
+            ct);
+
+        if (remoteHead.IsSuccess)
+        {
+            var resolved = NormalizeReferenceCandidate(remoteHead.StdOut);
+            if (!string.IsNullOrWhiteSpace(resolved) &&
+                await ReferenceExistsAsync(repositoryPath, resolved, ct))
+            {
+                return resolved;
+            }
+        }
+
+        var fallbackCandidates = new[] { "origin/main", "origin/master", "main", "master" };
+        var validFallbacks = new List<string>();
+        foreach (var candidate in fallbackCandidates)
+        {
+            if (await ReferenceExistsAsync(repositoryPath, candidate, ct))
+            {
+                validFallbacks.Add(candidate);
+            }
+        }
+
+        if (validFallbacks.Count > 1)
+        {
+            _logger.LogWarning(
+                "Mehrdeutige Basis-Branch-Kandidaten für {RepositoryPath}: {Candidates}. Verwende {Selected}.",
+                repositoryPath,
+                string.Join(", ", validFallbacks),
+                validFallbacks[0]);
+        }
+
+        if (validFallbacks.Count > 0)
+        {
+            return validFallbacks[0];
+        }
+
+        _logger.LogWarning("Basis-Branch konnte für {RepositoryPath} nicht ermittelt werden.", repositoryPath);
+        return null;
+    }
+
+    private static string? NormalizeReferenceCandidate(string rawOutput)
+    {
+        if (string.IsNullOrWhiteSpace(rawOutput))
+        {
+            return null;
+        }
+
+        var firstLine = rawOutput
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
+
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return null;
+        }
+
+        var arrowIndex = firstLine.IndexOf("->", StringComparison.Ordinal);
+        if (arrowIndex >= 0 && arrowIndex < firstLine.Length - 2)
+        {
+            return firstLine[(arrowIndex + 2)..].Trim();
+        }
+
+        return firstLine;
+    }
+
+    private async Task<bool> ReferenceExistsAsync(string repositoryPath, string reference, CancellationToken ct)
+    {
+        var verify = await _cliRunner.RunAsync("git", ["rev-parse", "--verify", "--quiet", reference], repositoryPath, null, ct);
+        return verify.IsSuccess && !string.IsNullOrWhiteSpace(verify.StdOut);
+    }
+
+    private IReadOnlyList<WorkspaceFileNode> BuildCommitFileTree(string commitSha, string diffTreeOutput)
+    {
+        var files = new List<WorkspaceFileNode>();
+        var rootNodes = new List<WorkspaceFileNode>();
+        var pathMap = new Dictionary<string, WorkspaceFileNode>(StringComparer.OrdinalIgnoreCase);
+
+        var tokens = diffTreeOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 0; index < tokens.Length;)
+        {
+            var statusToken = tokens[index++].Trim();
+            if (string.IsNullOrWhiteSpace(statusToken))
+            {
+                continue;
+            }
+
+            var statusCode = statusToken[0];
+            var status = new WorkspaceFileStatus(statusCode, ' ');
+            if (index >= tokens.Length)
+            {
+                continue;
+            }
+
+            string relativePath;
+            string? sourcePath = null;
+            if (statusCode is 'R' or 'C')
+            {
+                sourcePath = NormalizeRelativePath(tokens[index++]);
+                if (index >= tokens.Length)
+                {
+                    continue;
+                }
+
+                relativePath = NormalizeRelativePath(tokens[index++]);
+            }
+            else
+            {
+                relativePath = NormalizeRelativePath(tokens[index++]);
+            }
+
+            var node = new WorkspaceFileNode
+            {
+                Name = Path.GetFileName(relativePath),
+                RelativePath = relativePath,
+                IsDirectory = false,
+                IsDeleted = status.IsDeleted,
+                SourceRelativePath = sourcePath,
+                Status = status,
+                CommitSha = commitSha,
+            };
+
+            files.Add(node);
+            InsertNode(rootNodes, pathMap, node);
+            IncrementAncestorCounts(pathMap, node.RelativePath);
+        }
+
+        SortNodes(rootNodes);
+        return rootNodes;
     }
 
     private async Task<IReadOnlyList<WorkspaceStatusEntry>> ReadStatusEntriesAsync(string repositoryPath, CancellationToken ct)
@@ -185,7 +453,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return entries;
     }
 
-    private WorkspaceSnapshot BuildSnapshot(string repositoryPath, int commitCount, IReadOnlyList<WorkspaceStatusEntry> entries)
+    private WorkspaceSnapshot BuildSnapshot(string repositoryPath, int commitCount, IReadOnlyList<BranchCommit> branchCommits, IReadOnlyList<WorkspaceStatusEntry> entries)
     {
         var fileNodes = new List<WorkspaceFileNode>();
         var rootNodes = new List<WorkspaceFileNode>();
@@ -219,6 +487,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         {
             RepositoryPath = repositoryPath,
             CommitCount = commitCount,
+            BranchCommits = branchCommits,
             ChangedFileCount = fileNodes.Count,
             RootNodes = rootNodes,
             FlatFiles = orderedFlatFiles,
@@ -340,6 +609,8 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
 
         return false;
     }
+
+    private static bool IsBinaryText(string? text) => text?.Contains('\0') == true;
 
     private static string DecodeText(byte[] bytes)
     {
