@@ -133,7 +133,7 @@ Stand: **2026-05-24**
 - Iterative Entwicklung durch Folge-Prompts direkt aus dem Protokoll
 - Optionaler Startskript-Lauf beim Prozessstart mit reserviertem Port (`SOFTWARESCHMIEDE_FREE_PORT`) für branchspezifische lokale Run-Konfiguration
 - Agentenpaket-Auswahl und Agenten-Auswahl pro Prompt
-- **Issue 58: KI-Plugin-spezifische Agenten-Discovery/Auswahl** mit verbindlicher Reihenfolge **KI-Plugin → Agentenpaket → Agent**
+- **Issue 58: KI-Plugin-spezifische Agenten-Discovery/Auswahl** mit **KI-Plugin als Pflichtfeld** und **optionalem Agentenpaket/Agent**
 - Standardplugin je Pluginart in den Einstellungen (SCM und KI) persistierbar
 - Explizite KI-Plugin-Auswahl beim Prompt-Senden, inkl. vorausgewähltem Standardplugin
 - Folgeanweisungen mit eigener Agenten-Auswahl (Initial-Agent als Standardwert, Rücksetzung nach dem Senden)
@@ -185,10 +185,13 @@ Die wichtigsten UI-Abläufe sind im [Benutzerleitfaden](docs/user-guide.md) sowi
 | **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
 | **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen |
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
-| **Copilot CLI** (`copilot`) | aktuell | Für KI-Steuerung im Plugin (`copilot --version`) |
-| **Claude CLI** (`claude`) | aktuell | Für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
-| **GitHub Copilot** | aktives Abo | Wird über die Copilot-CLI genutzt |
-| **Anthropic API Key** | vorhanden | Für Claude-CLI-Läufe (als Credential `Softwareschmiede.ClaudeCli.Token`) |
+| **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
+| **Claude CLI** (`claude`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
+| **GitHub Copilot** | aktives Abo | Optional – nur für Copilot-basierte KI-Läufe |
+| **Anthropic API Key** | vorhanden | Optional – nur für Claude-CLI-Läufe (Credential `Softwareschmiede.ClaudeCli.Token`) |
+
+> Für den Aufgabenstart ist ein **KI-Plugin Pflicht**.  
+> **Agentenpaket und Agent sind optional** und können leer bleiben.
 
 **CLI-Tools prüfen/einrichten:**
 
@@ -240,8 +243,10 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
 3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt erstellen und ein SCM-Plugin wählen
 4. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
-5. **Agentenpaket auswählen** – Passendes Agentenpaket aus `agent-packages/` zuweisen
-6. **KI-Lauf starten** – KI-Plugin (Copilot oder Claude CLI), Prompt und Agent auswählen und den Prozess starten
+5. **KI-Plugin wählen (Pflicht)** – Copilot oder Claude CLI auswählen (explizit oder via Standardplugin/Fallback)
+6. **Optional: Agentenpaket wählen** – bei Bedarf ein kompatibles Paket aus `agent-packages/` zuweisen
+7. **Optional: Agent wählen** – bei Bedarf einen Agenten aus dem gewählten Paket setzen
+8. **KI-Lauf starten** – Prompt eingeben und den Prozess starten
 
 ---
 
@@ -252,7 +257,7 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
 2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
 3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
-4. **KI-Lauf ausführen** (Prompt + Agent + KI-Plugin wählen; Standardplugin ist vorausgewählt).
+4. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; **Agentenpaket/Agent optional**; Standardplugin ist vorausgewählt).
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 6. **Commits durchführen**, bei Remote-SCM optional Push/PR (bei Issue inkl. `Closes #<Issue>`), und Aufgabe abschließen oder abbrechen.
 
@@ -290,17 +295,26 @@ Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurie
 - In den Einstellungen kann je Pluginart (`SourceCodeManagement`, `DevelopmentAutomation`) ein Standardplugin gespeichert werden.
 - Beim Prompt-Senden kann das KI-Plugin explizit ausgewählt werden; in der UI ist das Standardplugin für `DevelopmentAutomation` vorausgewählt.
 - Auflösungskette zur Laufzeit: **explizite Auswahl → gespeichertes Standardplugin → Fallback auf verfügbares Plugin**.
+- Für Start/Senden muss ein KI-Plugin aufgelöst werden (explizit oder über Standard/Fallback).
+- Agentenpaket und Agent bleiben optional; ohne Auswahl greift das Standardverhalten des gewählten KI-Plugins.
 - Bei installierten Plugins stehen aktuell **GitHub Copilot** und **Claude CLI** zur Verfügung.
 - Claude-Läufe nutzen den Credential-Key `Softwareschmiede.ClaudeCli.Token` und setzen `ANTHROPIC_API_KEY` für den CLI-Prozess.
 - Agentenpakete müssen für Claude einen `.github`-Ordner enthalten, damit sie als kompatibel gelten.
 
 ### Issue 58: Plugin-spezifische Agenten-Discovery/Auswahl
 
-1. In der Aufgabe zuerst das **KI-Plugin** wählen.
-2. Danach ein kompatibles **Agentenpaket** wählen.
-3. Danach einen verfügbaren **Agenten** wählen.
+1. In der Aufgabe zuerst das **KI-Plugin** wählen (**Pflicht**).
+2. Optional ein kompatibles **Agentenpaket** wählen.
+3. Optional einen verfügbaren **Agenten** wählen (wenn ein Paket gewählt wurde).
 4. Bei Pluginwechsel werden Paket und Agent zurückgesetzt, bei Paketwechsel der Agent.
 5. Die Auswahl wird pro Aufgabe als `KiPluginPrefix` gespeichert und in Start-/Folgeprompt konsistent genutzt.
+6. Start/Senden bleibt mit reinem KI-Plugin möglich; Paket/Agent sind Zusatzkontext.
+
+Vertiefende Dokumentation:
+- [Business: F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md)
+- [API-Contract: Issue 58](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md)
+- [Flow: Issue 58](docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md)
+- [Dokumentationsplan (Sollzustand 2026-05-25)](docs/documentation-plan.md)
 
 ### Benachrichtigungssystem für abgeschlossene KI-Aufgaben
 
@@ -695,7 +709,7 @@ Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
 - **Publish:** `dotnet publish src/Softwareschmiede/Softwareschmiede.csproj -c Release`
 - Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
 
-Für die Inbetriebnahme müssen `gh`, `git`, `copilot` und (für Claude-Läufe) `claude` auf dem Zielsystem verfügbar sein.
+Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügbar sein (`copilot` oder `claude`; für Claude-Läufe zusätzlich `ANTHROPIC_API_KEY` als Credential).
 
 ---
 
@@ -704,6 +718,7 @@ Für die Inbetriebnahme müssen `gh`, `git`, `copilot` und (für Claude-Läufe) 
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- Sollzustand vom **2026-05-25** eingearbeitet: **KI-Plugin Pflicht**, **Agentenpaket/Agent optional** in Voraussetzungen, Installation, Usage und Issue-58-Beschreibung vereinheitlicht
 - Feature **„KI-Protokoll Auto-Scroll“ (F027)** in README ergänzt (Features/Usage/Changelog) inkl. Verweis auf die neue Fachdokumentation und den Dokumentationsplan-Abschnitt vom 2026-05-25
 - Diff-Funktionalität in README konsolidiert (Implementierungsstatus, Feature- und Usage-Abschnitte) inkl. Verweisen auf `/api/diff`
 - Testsektion um Diff-spezifische Service-/DI-Tests ergänzt (`DiffService`, `DiffCachingService`, `DiffAlgorithmService`, `ProgramDiWiringTests`)
@@ -778,7 +793,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Testlücken: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md) | Dokumentation der abgedeckten und verbleibenden Randpfade |
 | [Feature F022: Diff-Vergleichskomponente](docs/business/features/F022-diff-vergleichskomponente.md) | Fachliche Beschreibung des Diff-Viewers inkl. eingebetteter Nutzung und Standalone-Route |
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
-| [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der verbindlichen Auswahlreihenfolge (Plugin → Paket → Agent) inkl. Persistenz je Aufgabe |
+| [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der plugin-spezifischen Auswahl mit **KI-Plugin als Pflichtfeld** sowie optionalem Agentenpaket/Agent inkl. Persistenz je Aufgabe |
 | [Feature F027: KI-Protokoll Auto-Scroll](docs/business/features/F027-ki-protokoll-auto-scroll.md) | Fachliche Beschreibung des Scroll-Verhaltens im KI-Protokoll (Initial-Scroll, bedingtes Follow-Scrolling, manueller Scroll-Lock) |
 | [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll“ (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll“ – 2026-05-25“ |
 | [API: Issue 58 Agenten-Discovery/Auswahl](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für plugin-spezifische Discovery, Prefix-Auflösung und Persistenz (`KiPluginPrefix`) |
@@ -787,6 +802,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Architektur: Issue 58](docs/architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md) | Architekturentscheidungen und Komponenten für Reihenfolge, Zustände und Auflösung |
 | [ERM: Issue 58](docs/architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-entity-relationship-model.md) | Persistenzsicht auf `Aufgabe.KiPluginPrefix` und Auflösungsregeln |
 | [Architecture Review: Issue 58](docs/improvements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-review.md) | Review-Findings und Auflagen zur robusten Umsetzung |
+| [Dokumentationsplan: Sollzustand „Agentenpaket/Agent optional beim Aufgabenstart“ (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation im Abschnitt „Dokumentationsplan – Sollzustand „Agentenpaket/Agent optional beim Aufgabenstart“ – 2026-05-25“ |
 | [Requirements: LocalDirectoryPlugin](docs/requirements/lokales-verzeichnis-plugin-requirements-analysis.md) | Umsetzungsnahe Anforderungen und Akzeptanzkriterien für WorkspaceMode, Guardrails und Fehlerverhalten |
 | [Architektur: LocalDirectoryPlugin](docs/architecture/lokales-verzeichnis-plugin-architecture-blueprint.md) | Technische Architektur für LocalDirectoryPlugin, Settings und Integrationspfad |
 | [Flow: LocalDirectoryPlugin](docs/flows/local-directory-plugin-flow.md) | Ablaufdarstellung für Clone-/Workspace-Auflösung, Guardrails und Folgeoperationen |

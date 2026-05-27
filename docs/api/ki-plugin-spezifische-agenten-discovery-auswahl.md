@@ -5,7 +5,7 @@
 Dieses Dokument beschreibt den internen technischen Contract für die Umsetzung von **Issue 58**:
 
 - Discovery von Agentenpaketen/Agenten erfolgt **plugin-spezifisch**.
-- Selektionsreihenfolge in der UI ist verbindlich: **KI-Plugin → Agentenpaket → Agent**.
+- Beim Aufgabenstart ist **KI-Plugin Pflicht**, **Agentenpaket/Agent sind optional**.
 - Das gewählte KI-Plugin wird pro Aufgabe als `Aufgabe.KiPluginPrefix` persistiert.
 - Start- und Folgeprompt verwenden dieselbe Auflösungskette.
 
@@ -50,13 +50,25 @@ Für KI-Plugins gilt zur Laufzeit:
 
 ## UI-Validierung und Fehlerzustände
 
-- Start/Senden ist deaktiviert, wenn Auswahl nicht vollständig/gültig ist.
+- Start/Senden ist nur deaktiviert, wenn **kein KI-Plugin verfügbar** ist (`_kiPlugins.Count == 0`).
+- Agentenpaket und Agent sind optional; bei leerer Auswahl wird die KI mit Standardeinstellungen gestartet.
 - Meldungen:
   - „Kein KI-Plugin verfügbar.“
-  - „Für das gewählte KI-Plugin sind keine kompatiblen Agentenpakete verfügbar.“
-  - „Für das gewählte Agentenpaket sind keine kompatiblen Agenten verfügbar.“
+  - „Kein Agentenpaket gewählt – die KI verwendet ihre Standardeinstellungen.“
+  - „Für das gewählte Agentenpaket sind keine kompatiblen Agenten verfügbar. Die KI verwendet ihre Standardeinstellungen.“
+  - „Kein Agent gewählt – die KI verwendet ihre Standardeinstellungen.“
 - Bei Pluginwechsel werden Paket/Agent zurückgesetzt.
 - Bei Paketwechsel wird Agent zurückgesetzt.
+
+## Startvalidierung (Pflicht/Optional)
+
+| Feld | Status | Wirkung |
+|---|---|---|
+| `KI-Plugin` | *(required)* | Ohne verfügbares KI-Plugin kein Start/kein Senden. |
+| `Agentenpaket` | optional | Leerwert ist zulässig; kein Deploy, KI nutzt Standardverhalten. |
+| `Agent` | optional | Leerwert ist zulässig; CLI-Aufruf ohne `--agent`. |
+
+Details zur Startvalidierung: [aufgaben-startvalidierung.md](./aufgaben-startvalidierung.md)
 
 ## Testbezug (bestehende Absicherung)
 
@@ -68,7 +80,7 @@ Für KI-Plugins gilt zur Laufzeit:
   - Inkompatibles Paket bricht Start vor Clone ab
   - Prefix-Auflösung: Aufgabenwert vs. expliziter Wert
 - `AufgabeDetailFolgePromptTests`
-  - Reihenfolge Plugin → Paket → Agent
+  - Reihenfolge/Reset bei Plugin- und Paketwechsel
   - Prefix-Vorbelegung und Weitergabe
 - `AufgabeServiceTests`
   - Persistenz von `KiPluginPrefix` in `UpdateAsync`
@@ -77,4 +89,5 @@ Für KI-Plugins gilt zur Laufzeit:
 
 - [Flow: KI-Plugin-spezifische Agenten-Discovery/Auswahl](../flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md)
 - [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](../business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md)
+- [Startvalidierung beim Aufgabenstart](./aufgaben-startvalidierung.md)
 - [HTTP-Endpunkte](./http-endpoints.md)

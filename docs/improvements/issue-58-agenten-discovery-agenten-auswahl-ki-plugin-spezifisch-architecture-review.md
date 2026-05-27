@@ -23,7 +23,7 @@ Die Zielarchitektur ist tragfähig, wenn der Selektionsflow UI-seitig eindeutig 
 | ID | Priorität | Finding | Risiko | Maßnahme |
 |---|---|---|---|---|
 | F-01 | **Blocker** | Potenziell mehrdeutige UI-Selektion (Plugin/Paket/Agent nicht überall identisch geführt) | Inkonsistente Ausführung und schwer reproduzierbare Fehler | Einen gemeinsamen Zustandsflow für Start- und Folgeprompt-UI erzwingen |
-| F-02 | **Major** | No-Compatibility-Pfad unzureichend abgesichert | Nutzer kann in ungültigen Zustand gelangen | Harte Disable-Regeln + eindeutige Fehlermeldungen |
+| F-02 | **Major** | No-Compatibility-Pfad unzureichend abgesichert | Nutzer erhält unklare Zustände bei optionalen Feldern | Klare Hinweislogik bei optionalem Paket/Agent + eindeutige Fehlermeldungen |
 | F-03 | **Major** | Legacy-Discovery-Pfade könnten partiell verbleiben | Doppelte Logik, divergierende Ergebnisse | Altpfade vollständig entfernen und Plugin-Discovery zentralisieren |
 | F-04 | **Major** | Testabdeckung für Übergangsfälle nicht vollständig | Regressionen bei Refactoring | bUnit-/Integrationsfälle für State-Resets, Fallback und No-Compat ergänzen |
 | F-05 | **Minor** | Dokumentationsdrift zwischen Implementierung und Planungsstand möglich | Spätere Entscheidungsunklarheit | Querverweise in Planungsübersicht und Changelog diszipliniert pflegen |
@@ -32,8 +32,8 @@ Die Zielarchitektur ist tragfähig, wenn der Selektionsflow UI-seitig eindeutig 
 
 ## 3) Maßnahmenplan (priorisiert)
 
-1. **Blocker schließen:** UI-Zustandsmodell vereinheitlichen (`Plugin → Paket → Agent`).
-2. **Fehlerpfade härten:** Kein Start/Senden bei fehlender Kompatibilität.
+1. **Blocker schließen:** UI-Zustandsmodell vereinheitlichen (`KI-Plugin Pflicht, Paket/Agent optional`).
+2. **Fehlerpfade härten:** Nur fehlendes KI-Plugin blockiert Start/Senden; No-Compatibility als Hinweispfad behandeln.
 3. **Legacy entfernen:** plugin-unabhängige Discovery an einer Stelle rückbauen.
 4. **Tests erweitern:** insbesondere Übergang von Alt-Tasks ohne Prefix und Plugin-Wechsel.
 5. **Dokumentation synchron halten:** Anforderungen/Blueprint/ERM gemeinsam versionieren.
@@ -47,4 +47,3 @@ Die Zielarchitektur ist tragfähig, wenn der Selektionsflow UI-seitig eindeutig 
 - robuste Behandlung fehlender kompatibler Pakete/Agenten,
 - vollständige Entfernung der Legacy-Discovery-Pfade,
 - grüne Testmatrix für Discovery, Fallback, Persistenz und UI-Zustände.
-

@@ -219,7 +219,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     }
 
     [Fact]
-    public async Task KiStartenAsync_ShouldShowError_WhenNoCompatibleAgentPackagesExist()
+    public async Task KiStartenAsync_ShouldStartWithoutAgent_WhenNoCompatibleAgentPackagesExist()
     {
         var sut = await CreateSutAsync(
             initialAgent: "agent-initial",
@@ -231,8 +231,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
         await InvokePrivateAsync(sut, "KiStartenAsync");
 
-        sut.StartedRuns.Should().BeEmpty();
-        GetPrivateField<string?>(sut, "_fehler").Should().Contain("keine kompatiblen Agentenpakete");
+        sut.StartedRuns.Should().ContainSingle();
+        sut.StartedRuns[0].Agent.Name.Should().BeEmpty();
+        GetPrivateField<string?>(sut, "_fehler").Should().BeNull();
     }
 
     [Fact]
@@ -259,7 +260,122 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<IReadOnlyList<AgentPackageInfo>>(sut, "_agentenpakete").Should().BeEmpty();
         GetPrivateField<List<AgentInfo>>(sut, "_agenten").Should().BeEmpty();
         GetPrivateProperty<string?>(sut, "AgentenauswahlHinweis")
-            .Should().Contain("keine kompatiblen Agentenpakete");
+            .Should().Contain("Kein Agentenpaket gewählt");
+    }
+
+    [Fact]
+    public async Task IsAgentenauswahlGueltig_ShouldBeTrue_WhenKiPluginExistsAndPackageAgentAreEmpty()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            includeCompatibleAgents: false);
+        await sut.InvokeOnInitializedAsync();
+
+        GetPrivateProperty<bool>(sut, "IsAgentenauswahlGueltig").Should().BeTrue();
+        GetPrivateProperty<string?>(sut, "AgentenauswahlHinweis")
+            .Should().Contain("Kein Agentenpaket gewählt");
+    }
+
+    [Fact]
+    public async Task IsAgentenauswahlGueltig_ShouldBeFalse_WhenNoKiPluginExists()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"], kiPlugins: []);
+        await sut.InvokeOnInitializedAsync();
+
+        GetPrivateProperty<bool>(sut, "IsAgentenauswahlGueltig").Should().BeFalse();
+        GetPrivateProperty<string?>(sut, "AgentenauswahlHinweis")
+            .Should().Contain("Kein KI-Plugin verfügbar");
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            kiPlugins: [],
+            configureGitPlugin: plugin =>
+            {
+                plugin.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+                plugin.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+            });
+        await sut.InvokeOnInitializedAsync();
+
+        await InvokePrivateAsync(sut, "ProzessStartenAsync");
+
+        GetPrivateField<string?>(sut, "_fehler").Should().Contain("Kein KI-Plugin verfügbar");
+        GetPrivateField<bool>(sut, "_processing").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldPersistNullPackageAndAgent_WhenOnlyKiPluginIsSelected()
+    {
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            configureGitPlugin: plugin =>
+            {
+                plugin.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+                plugin.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+            });
+
+        _db.GitRepositories.Add(new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _db.Aufgaben.Single(a => a.Id == sut.Id).ProjektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "https://github.com/test/repo",
+            RepositoryName = "repo",
+            Aktiv = true
+        });
+        await _db.SaveChangesAsync();
+
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_selectedPaketName", string.Empty);
+        SetPrivateField(sut, "_selectedAgentName", string.Empty);
+        SetPrivateField(sut, "_selectedKiPluginPrefix", "Softwareschmiede.TestKi");
+
+        await InvokePrivateAsync(sut, "ProzessStartenAsync");
+
+        var aktualisierteAufgabe = await _db.Aufgaben.FindAsync(sut.Id);
+        aktualisierteAufgabe.Should().NotBeNull();
+        aktualisierteAufgabe!.AgentenpaketName.Should().BeNull();
+        aktualisierteAufgabe.AgentenName.Should().BeNull();
+        aktualisierteAufgabe.KiPluginPrefix.Should().Be("Softwareschmiede.TestKi");
+        GetPrivateField<bool>(sut, "_showStartDialog").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task StartDialogOeffnen_ShouldResetBranchSelection_AndOpenDialog()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_selectedBranchName", "feature/alt");
+        SetPrivateField(sut, "_remoteBranches", new List<string> { "main", "develop" });
+        SetPrivateField(sut, "_showStartDialog", false);
+
+        InvokePrivateVoid(sut, "StartDialogOeffnen");
+
+        GetPrivateField<bool>(sut, "_showStartDialog").Should().BeTrue();
+        GetPrivateField<string>(sut, "_selectedBranchName").Should().BeEmpty();
+        GetPrivateField<List<string>>(sut, "_remoteBranches").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldShowError_WhenNoActiveRepositoryExists()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        await sut.InvokeOnInitializedAsync();
+
+        await InvokePrivateAsync(sut, "ProzessStartenAsync");
+
+        GetPrivateField<string?>(sut, "_fehler").Should().Contain("Kein aktives Repository im Projekt vorhanden");
+        GetPrivateField<bool>(sut, "_showStartDialog").Should().BeFalse();
     }
 
     [Fact]

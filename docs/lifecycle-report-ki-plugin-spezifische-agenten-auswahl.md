@@ -11,7 +11,7 @@ Die Planung wurde vollständig durchgeführt und in folgenden Dokumenten festgeh
 ## Implementierung
 Folgende Kernänderungen wurden umgesetzt:
 - Agenten-Discovery und Agentenkompatibilität wurden strikt KI-Plugin-spezifisch ausgerichtet.
-- Die UI-Sequenz wurde auf **KI-Plugin -> Agentenpaket -> Agent** umgestellt.
+- Die UI-Logik wurde auf **KI-Plugin als Pflichtfeld** sowie **optionales Agentenpaket/optionalem Agent** umgestellt.
 - Das gewählte KI-Plugin wird pro Aufgabe über `KiPluginPrefix` persistent gespeichert.
 - Prompt- und Folgeprompt-Abläufe wurden auf die Plugin-Auswahl abgestimmt.
 - Legacy-Logik für plugin-unabhängige Discovery wurde entfernt.

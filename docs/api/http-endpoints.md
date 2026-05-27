@@ -54,11 +54,12 @@ Die Umsetzung betrifft bestehende Service-/Plugin-Komponenten (`GitWorkspaceBrow
 Für das Feature **„Agenten-Discovery und Agenten-Auswahl KI-Plugin-spezifisch“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Die Umsetzung betrifft UI-/Service-Vertragslogik (`AufgabeDetail`, `PluginSelectionService`, `EntwicklungsprozessService`, `KiAusfuehrungsService`, `AufgabeService`) inklusive Persistenz von `KiPluginPrefix`.
 
-- **Ziel:** Konsistente, plugin-spezifische Auswahlkette `KI-Plugin → Agentenpaket → Agent`.
+- **Ziel:** Konsistente, plugin-spezifische Auswahl mit **KI-Plugin als Pflichtfeld** und **optionalem Agentenpaket/Agent**.
 - **Verhalten:** Start und Folgeprompt nutzen dieselbe Prefix-Auflösung (explizit → Aufgabe → Default → Fallback).
+- **Startvalidierung:** Start/Senden ist nur bei fehlendem KI-Plugin blockiert; ohne Paket/Agent wird mit Standardeinstellungen ausgeführt.
 - **Persistenz:** `Aufgabe.KiPluginPrefix` ist nullable und über Migration eingeführt.
 - **Testbezug:** `PluginSelectionServiceTests`, `EntwicklungsprozessServiceTests`, `AufgabeDetailFolgePromptTests`, `AufgabeServiceTests`.
-- **Details:** [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md)
+- **Details:** [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md), [aufgaben-startvalidierung.md](./aufgaben-startvalidierung.md)
 
 ## Öffentliche REST-Endpunkte
 
@@ -90,6 +91,7 @@ Bei vorgeschalteter Auth-Middleware können `401 Unauthorized`-Antworten auftret
 - App-Favicon-Contract: [favicon-hammer-pick-svg.md](./favicon-hammer-pick-svg.md)
 - Live Project Browser Contract: [live-project-browser-git-status.md](./live-project-browser-git-status.md)
 - Issue-58 Contract: [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md)
+- Startvalidierung beim Aufgabenstart: [aufgaben-startvalidierung.md](./aufgaben-startvalidierung.md)
 - Plugin- und Agentenpaket-Contracts: [plugin-interfaces.md](./plugin-interfaces.md)
 - KI-Protokoll Auto-Scroll Contract: [ki-protokoll-auto-scroll.md](./ki-protokoll-auto-scroll.md)
 - API-Index: [README.md](./README.md)

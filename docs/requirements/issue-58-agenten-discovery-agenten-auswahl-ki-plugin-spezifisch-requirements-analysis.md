@@ -22,7 +22,7 @@ Zusätzlich wird die Plugin-Auswahl pro Aufgabe in `Aufgabe.KiPluginPrefix` pers
 1. **Default ohne gespeichertes Plugin**  
    Reihenfolge: `explizite UI-Auswahl` → `Aufgabe.KiPluginPrefix` → `gespeichertes Default-KI-Plugin` → `deterministischer Fallback`.
 2. **Keine kompatiblen Pakete/Agenten**  
-   UI zeigt leeren Zustand mit Hinweis; Start/Senden sind deaktiviert; kein stilles Ausweichen auf inkompatible Pakete.
+   UI zeigt Hinweiszustände; Start/Senden bleiben möglich, solange ein gültiges KI-Plugin ausgewählt ist; kein stilles Ausweichen auf inkompatible Pakete.
 3. **Rückwärtskompatibilität ohne `KiPluginPrefix`**  
    `KiPluginPrefix` bleibt nullable; bestehende Aufgaben bleiben über die Fallback-Kette ausführbar.
 
@@ -33,7 +33,7 @@ Zusätzlich wird die Plugin-Auswahl pro Aufgabe in `Aufgabe.KiPluginPrefix` pers
 | Kennung | Beschreibung | Kategorie | Priorität | Status |
 |---|---|---|---|---|
 | **FR-1** | **Plugin-spezifische Discovery:** Das gewählte KI-Plugin bestimmt kompatible Agentenpakete und verfügbare Agenten. Nur kompatible Pakete werden angeboten. → [Architektur-Blueprint](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
-| **FR-2** | **Verbindliche UI-Reihenfolge:** Reihenfolge ist in allen relevanten UIs `KI-Plugin → Agentenpaket → Agent`; bei Pluginwechsel werden abhängige Selektionen zurückgesetzt. → [Architektur-Blueprint](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md) | UX / Accessibility | MUST HAVE | 📋 Geplant |
+| **FR-2** | **Verbindliche UI-Logik:** `KI-Plugin` ist Pflichtfeld; `Agentenpaket` und `Agent` sind optional. Bei Pluginwechsel werden abhängige Selektionen zurückgesetzt. → [Architektur-Blueprint](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md) | UX / Accessibility | MUST HAVE | 📋 Geplant |
 | **FR-3** | **Persistenz pro Aufgabe:** Das ausgewählte KI-Plugin wird pro Aufgabe als `KiPluginPrefix` gespeichert und wiederverwendet. → [ERM](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-entity-relationship-model.md) | Datenverwaltung | MUST HAVE | 📋 Geplant |
 | **FR-4** | **DB-Migration absichern:** Migration für `KiPluginPrefix` ist Bestandteil der Umsetzung und bleibt rückwärtskompatibel (nullable). → [ERM](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-entity-relationship-model.md) | Datenverwaltung | MUST HAVE | 📋 Geplant |
 | **FR-5** | **Prompt-/Folgeprompt-Ausrichtung:** Initialprompt und Folgeprompt nutzen dieselbe Plugin-Auflösung und denselben Selektionskontext. → [Architektur-Blueprint](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
@@ -60,7 +60,7 @@ Zusätzlich wird die Plugin-Auswahl pro Aufgabe in `Aufgabe.KiPluginPrefix` pers
 2. Beim Wechsel des KI-Plugins werden inkompatible/selektierte Paket-/Agent-Werte zurückgesetzt.
 3. Das gewählte KI-Plugin wird pro Aufgabe in `KiPluginPrefix` gespeichert und beim Wiederöffnen berücksichtigt.
 4. Startprompt und Folgeprompt verwenden dieselbe aufgelöste Plugin-Auswahl.
-5. Ohne kompatible Pakete/Agenten sind Aktionen deaktiviert und ein klarer Hinweis wird angezeigt.
+5. Ohne kompatible Pakete/Agenten werden klare Hinweise angezeigt; Aktionen bleiben möglich, wenn ein KI-Plugin verfügbar ist.
 6. Aufgaben ohne `KiPluginPrefix` funktionieren weiterhin über definierte Fallback-Auflösung.
 7. Alte plugin-unabhängige Discovery-Pfade sind entfernt und Tests entsprechend angepasst.
 
@@ -82,7 +82,7 @@ Zusätzlich wird die Plugin-Auswahl pro Aufgabe in `Aufgabe.KiPluginPrefix` pers
 
 ### In Scope ✅
 - KI-Plugin-spezifische Agenten-Discovery
-- UI-Reihenfolge und Zustandslogik `Plugin → Paket → Agent`
+- UI-Pflicht-/Optional-Logik `KI-Plugin (Pflicht)`, `Paket/Agent (optional)`
 - Persistenz `KiPluginPrefix` pro Aufgabe inkl. Migrationseinbindung
 - Harmonisierung von Start-/Prompt-/Folgeprompt-Flows
 - Entfernen legacy Discovery-Pfade
@@ -138,4 +138,4 @@ Zusätzlich wird die Plugin-Auswahl pro Aufgabe in `Aufgabe.KiPluginPrefix` pers
 | Version | Datum | Autor | Änderung |
 |---|---|---|---|
 | 1.0.0 | 2026-05-24 | planning-orchestrator | Initiale Anforderungsanalyse für Issue 58 |
-
+| 1.1.0 | 2026-05-25 | documentation-orchestrator | Sollzustand aktualisiert: KI-Plugin Pflicht, Agentenpaket/Agent optional beim Aufgabenstart |

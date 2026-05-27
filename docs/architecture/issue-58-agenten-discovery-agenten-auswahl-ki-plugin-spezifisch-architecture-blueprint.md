@@ -10,10 +10,10 @@
 
 ## 1) Zielbild
 
-Die Lösung erzwingt durchgängig die Reihenfolge:
-1. KI-Plugin auswählen,
-2. kompatibles Agentenpaket auswählen,
-3. verfügbaren Agenten auswählen.
+Die Lösung erzwingt durchgängig die Pflicht-/Optional-Logik:
+1. KI-Plugin auswählen (**Pflicht**),
+2. kompatibles Agentenpaket auswählen (**optional**),
+3. verfügbaren Agenten auswählen (**optional**).
 
 Discovery und Auswahl sind vollständig plugin-spezifisch. Startprompt und Folgeprompt nutzen dieselbe Auflösung.
 
@@ -25,7 +25,7 @@ Discovery und Auswahl sind vollständig plugin-spezifisch. Startprompt und Folge
    `explizit gewählt` → `Aufgabe.KiPluginPrefix` → `Plugin-Default (DevelopmentAutomation)` → `deterministischer Fallback`.
 
 2. **Keine kompatiblen Pakete/Agenten**  
-   UI zeigt leeren/fehlerhaften Zustand, blockiert Start/Senden und gibt klare Handlungsanweisung.
+   UI zeigt Hinweiszustände; Start/Senden bleiben zulässig, sofern ein KI-Plugin verfügbar ist.
 
 3. **Rückwärtskompatibilität**  
    `KiPluginPrefix` bleibt nullable; vorhandene Aufgaben ohne Wert werden über Fallback-Kette verarbeitet.
@@ -92,17 +92,17 @@ sequenceDiagram
 
 ### 5.1 Reihenfolge und Zustände
 
-- Reihenfolge ist immer: **Plugin → Paket → Agent**.
+- Reihenfolge ist: **KI-Plugin (Pflicht) → Paket (optional) → Agent (optional)**.
 - Bei Pluginwechsel werden Paket/Agent zurückgesetzt.
 - Bei Paketwechsel wird Agent zurückgesetzt.
-- Aktionen sind nur aktiv, wenn Zustand `ReadyToRun` erreicht ist.
+- Aktionen sind aktiv, sobald ein gültiges KI-Plugin verfügbar ist (`ReadyToRun` auch ohne Paket/Agent möglich).
 
 ### 5.2 Fehler-/Leerezustände
 
 - **NoPluginAvailable**: Keine KI-Plugins verfügbar.
-- **NoCompatiblePackage**: Für gewähltes Plugin kein kompatibles Paket.
-- **NoCompatibleAgent**: Paket vorhanden, aber keine Agenten.
-- In allen Zuständen: klare Meldung + deaktivierte Aktionsbuttons.
+- **NoCompatiblePackage**: Für gewähltes Plugin kein kompatibles Paket (Hinweis, nicht blockierend).
+- **NoCompatibleAgent**: Paket vorhanden, aber keine Agenten (Hinweis, nicht blockierend).
+- Nur `NoPluginAvailable` bleibt blockierend; alle anderen Zustände liefern Hinweise bei aktivem Start/Senden.
 
 ---
 
@@ -154,4 +154,4 @@ sequenceDiagram
 | Version | Datum | Autor | Änderung |
 |---|---|---|---|
 | 1.0.0 | 2026-05-24 | planning-orchestrator | Initialer Architektur-Blueprint für Issue 58 |
-
+| 1.1.0 | 2026-05-25 | documentation-orchestrator | Sollzustand aktualisiert: KI-Plugin Pflicht, Agentenpaket/Agent optional |

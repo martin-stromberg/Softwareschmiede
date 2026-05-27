@@ -513,11 +513,7 @@ public partial class AufgabeDetail : IDisposable
         => _aufgabe is not null && AufgabeRecoveryService.IstRecoveryStatus(_aufgabe.Status);
 
     private bool IsAgentenauswahlGueltig
-        => _kiPlugins.Count > 0
-           && _agentenpakete.Count > 0
-           && _agenten.Count > 0
-           && !string.IsNullOrWhiteSpace(_selectedPaketName)
-           && !string.IsNullOrWhiteSpace(_selectedAgentName);
+        => _kiPlugins.Count > 0;
 
     private string? AgentenauswahlHinweis
     {
@@ -528,14 +524,19 @@ public partial class AufgabeDetail : IDisposable
                 return "Kein KI-Plugin verfügbar.";
             }
 
-            if (_agentenpakete.Count == 0)
+            if (string.IsNullOrWhiteSpace(_selectedPaketName))
             {
-                return "Für das gewählte KI-Plugin sind keine kompatiblen Agentenpakete verfügbar.";
+                return "Kein Agentenpaket gewählt – die KI verwendet ihre Standardeinstellungen.";
             }
 
             if (_agenten.Count == 0)
             {
-                return "Für das gewählte Agentenpaket sind keine kompatiblen Agenten verfügbar.";
+                return "Für das gewählte Agentenpaket sind keine kompatiblen Agenten verfügbar. Die KI verwendet ihre Standardeinstellungen.";
+            }
+
+            if (string.IsNullOrWhiteSpace(_selectedAgentName) && string.IsNullOrWhiteSpace(_kiAgentName))
+            {
+                return "Kein Agent gewählt – die KI verwendet ihre Standardeinstellungen.";
             }
 
             return null;
@@ -747,7 +748,7 @@ public partial class AufgabeDetail : IDisposable
     {
         if (!IsAgentenauswahlGueltig)
         {
-            _fehler = AgentenauswahlHinweis ?? "Bitte wählen Sie ein kompatibles KI-Plugin, Agentenpaket und einen Agenten aus.";
+            _fehler = AgentenauswahlHinweis ?? "Kein KI-Plugin verfügbar.";
             return;
         }
 
@@ -796,7 +797,7 @@ public partial class AufgabeDetail : IDisposable
     {
         if (!IsAgentenauswahlGueltig)
         {
-            _fehler = AgentenauswahlHinweis ?? "Bitte wählen Sie ein kompatibles KI-Plugin, Agentenpaket und einen Agenten aus.";
+            _fehler = AgentenauswahlHinweis ?? "Kein KI-Plugin verfügbar.";
             return;
         }
 
