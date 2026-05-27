@@ -6,7 +6,7 @@ Agentenpakete bestimmen, wie die KI bei einer Aufgabe vorgeht.
 Sie können sich ein Agentenpaket wie ein Regelwerk oder eine Stellenbeschreibung für die KI vorstellen.
 Darin steht, welche Grundsätze die KI befolgt, welche Prüfungen sie durchführt und welchen Stil sie beim Schreiben von Code einhält.
 Verschiedene Agentenpakete eignen sich für verschiedene Arten von Vorhaben.
-Sie wählen vor dem Start einer Aufgabe das passende Paket aus.
+Sie können vor dem Start einer Aufgabe ein passendes Paket auswählen.
 
 ![Agentenpakete-Übersicht](../images/F004-agentenpakete.png)
 
@@ -54,8 +54,10 @@ Ein Agentenpaket sorgt dafür, dass die KI bei jedem Projekt die gleichen Regeln
 ### Agentenpaket für eine Aufgabe auswählen
 
 1. Sie legen eine neue Aufgabe an oder öffnen eine offene Aufgabe.
-2. Im Feld **Agentenpaket** wählen Sie das gewünschte Paket aus der Auswahlliste.
-3. Die Auswahl wird gespeichert. Die KI nutzt dieses Paket, sobald Sie auf **KI starten** klicken.
+2. Im Feld **Agentenpaket** können Sie optional ein gewünschtes Paket aus der Auswahlliste wählen.
+3. Wenn Sie kein Paket auswählen, bleibt das Feld leer. Das ist erlaubt.
+4. Ein **KI-Plugin** müssen Sie weiterhin auswählen, bevor Sie auf **KI starten** klicken.
+5. Wenn Sie ein Paket auswählen, wird die Auswahl gespeichert.
 
 ---
 
@@ -86,7 +88,10 @@ Zusätzlich wird die **Agentendefinitions-Compliance** geprüft:
 ## Häufige Fragen (FAQ)
 
 **Muss ich ein Agentenpaket auswählen?**
-Nein. Wenn Sie kein Paket auswählen, arbeitet die KI mit ihren Standard-Einstellungen. Für spezifische Anforderungen empfiehlt sich jedoch ein passendes Paket.
+Nein. Das Feld ist optional. Wenn es leer bleibt, arbeitet die KI mit ihren Standard-Einstellungen.
+
+**Was ist beim Start wirklich Pflicht?**
+Pflicht ist nur die Auswahl eines **KI-Plugins**. Agentenpaket und Agent sind optional.
 
 **Kann ich ein Agentenpaket während einer laufenden Aufgabe wechseln?**
 Nein. Das Paket wird beim Start der KI festgelegt und kann danach nicht mehr geändert werden.
@@ -106,4 +111,5 @@ Das sind einfache Textdateien, die in einer strukturierten Form beschreiben, wie
 
 - [F002 – Aufgabenverwaltung](./F002-aufgabenverwaltung.md) – Aufgaben anlegen und Agentenpaket zuweisen
 - [F003 – KI-Entwicklungsprozess](./F003-ki-entwicklungsprozess.md) – KI mit dem gewählten Paket starten
+- [F028 – Startvalidierung beim Aufgabenstart](./F028-startvalidierung-aufgabenstart.md) – Pflicht- und optionale Felder vor dem Start verstehen
 - [Zurück zur Übersicht](../features.md)

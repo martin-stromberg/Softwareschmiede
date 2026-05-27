@@ -22,17 +22,17 @@ sequenceDiagram
     participant UI as AufgabeDetail.razor/.cs
     participant Runner as KiAusfuehrungsService
     participant Prozess as EntwicklungsprozessService
-    participant PM as IPluginManager
+    participant PS as PluginSelectionService
     participant KI as IKiPlugin (Copilot/Claude)
     participant Datei as {id}.<provider>.context.md
     participant Log as ProtokollService
 
-    Anwender->>UI: Folge-Prompt + Agent + Kontextmodus wählen
+    Anwender->>UI: Folge-Prompt + optional Agent + Kontextmodus wählen
     UI->>UI: Neu beginnen bestätigt?
-    UI->>Runner: StartKiLauf(prompt, agent, kontextmodus)
+    UI->>Runner: StartKiLauf(prompt, agent?, kontextmodus, selectedKiPluginPrefix)
     Runner->>Prozess: KiStartenAsync(...)
-    Prozess->>PM: Default-KI-Plugin (DI in Program.cs)
-    PM-->>Prozess: GitHub Copilot oder Claude CLI
+    Prozess->>PS: ResolveDevelopmentAutomationPluginAsync(selected/task/default)
+    PS-->>Prozess: Effektives KI-Plugin (Pflicht)
     Prozess->>Prozess: BuildFollowPromptWithContextAsync(...)
     Prozess->>Datei: Kontext lesen/resetten/komprimieren
     Prozess->>Log: Prompt + Kontextevent protokollieren
@@ -49,16 +49,15 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A([FolgePromptAsync]) --> B{Modus = NeuBeginnen<br/>und unbestätigt?}
+    A([KiStartenAsync in AufgabeDetail]) --> B{Modus = NeuBeginnen<br/>und unbestätigt?}
     B -- Ja -.-> B1[Abbruch mit UI-Fehlerhinweis]
     B -- Nein --> C[KiStartenAsync mit kontextmodus]
-    C --> C0{Default KI-Plugin}
-    C0 -- Copilot --> C1[Dateien mit Präfix copilot]
-    C0 -- Claude CLI --> C2[Dateien mit Präfix claude]
-    C1 --> D{Kontextmodus = KontextNeuBeginnen?}
-    C2 --> D
-    D -- Ja --> E[Kontextdatei atomisch resetten]
-    D -- Nein --> D2{Kontextmodus = KontextIgnorieren?}
+    C --> C0{KI-Plugin auflösbar?}
+    C0 -- Nein -.-> C9[Abbruch: Kein KI-Plugin verfügbar]
+    C0 -- Ja --> D[Kontextdatei mit Provider-Präfix auflösen]
+    D --> D1{Kontextmodus = KontextNeuBeginnen?}
+    D1 -- Ja --> E[Kontextdatei atomisch resetten]
+    D1 -- Nein --> D2{Kontextmodus = KontextIgnorieren?}
     D2 -- Ja --> F[Nur Nutzerprompt verwenden]
     D2 -- Nein --> G[Kontextdatei sicher lesen]
     G --> H{Soft-Limit überschritten?}
@@ -70,8 +69,7 @@ flowchart TD
     K -- Nein --> L[Finalen Prompt senden]
     E --> L
     F --> L
-    L --> M[Streaming verarbeiten]
-    M --> N[Kontexteintrag mit Status anhängen]
+    L --> M[Streaming verarbeiten + Kontexteintrag]
     M -.-> O[Fehlerstatus setzen + Fehlereintrag]
 ```
 
@@ -79,20 +77,20 @@ flowchart TD
 
 ## Schrittbeschreibung
 
-1. **Folge-Prompt-Eingabe mit Modus-Guardrails**  
-   - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor`, `AufgabeDetail.razor.cs` (`FolgePromptAsync`)  
-   - **Eingaben:** `_folgePrompt`, `_folgeAgentName`, `_folgeKontextmodus`, `_folgeKontextNeuBeginnenBestaetigt`  
+1. **Prompt-Eingabe mit Modus-Guardrails**  
+   - **Code:** `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor`, `AufgabeDetail.razor.cs` (`KiStartenAsync`, `KiMitPromptStartenAsync`)  
+   - **Eingaben:** `_prompt`, `_kiAgentName`, `_folgeKontextmodus`, `_folgeKontextNeuBeginnenBestaetigt`  
    - **Ausgabe/Seiteneffekt:** Bei unbestätigtem „Kontext neu beginnen“ wird der Lauf blockiert und `_fehler` gesetzt.
 
 2. **Hintergrundlauf starten und Session verwalten**  
    - **Code:** `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs` (`StartKiLauf`, `Subscribe`)  
-   - **Eingaben:** Prompt, Agent, optionales Model, `FolgeanweisungsKontextmodus`  
+   - **Eingaben:** Prompt, optionaler Agent, optionales Model, `selectedKiPluginPrefix`, `FolgeanweisungsKontextmodus`  
    - **Ausgabe/Seiteneffekt:** Session wird im Singleton gehalten, Running-Count-Event ausgelöst, UI erhält Live-Stream.
 
-3. **Default-KI-Plugin auflösen (Copilot priorisiert, Claude als Fallback)**  
-   - **Code:** `src/Softwareschmiede/Program.cs` (DI für `IKiPlugin`), `src/Softwareschmiede/Infrastructure/Plugins/PluginManager.cs` (`GetDefaultDevelopmentAutomationPlugin`)  
-   - **Eingaben:** Geladene Development-Automation-Plugins  
-   - **Ausgabe/Seiteneffekt:** Nutzung von GitHub Copilot, sofern vorhanden; sonst z. B. Claude CLI.
+3. **Effektives KI-Plugin auflösen (Pflichtfeld)**  
+   - **Code:** `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`KiStartenAsync`), `src/Softwareschmiede/Application/Services/PluginSelectionService.cs` (`ResolveDevelopmentAutomationPluginAsync`)  
+   - **Eingaben:** `selectedKiPluginPrefix` (UI), `Aufgabe.KiPluginPrefix`, konfigurierte Defaults/Fallbacks  
+   - **Ausgabe/Seiteneffekt:** Konsistente Auflösung `explizit → aufgabe → default/fallback`; bei nicht auflösbarem Plugin Abbruch vor Streaming.
 
 4. **Kontextdateipfad provider-spezifisch bestimmen**  
    - **Code:** `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs` (`ResolveContextFilePath`), `src/Softwareschmiede.Plugin.Contracts/Domain/Abstractions/CliKiPluginBase.cs`  
@@ -116,7 +114,7 @@ flowchart TD
    - **Code:** `EntwicklungsprozessService.cs` (`KiStartenAsync`),  
      `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs` (`StartDevelopmentAsync`),  
      `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` (`StartDevelopmentAsync`)  
-   - **Eingaben:** Finaler Prompt, Agent, Modell  
+   - **Eingaben:** Finaler Prompt, optionaler Agent, Modell  
    - **Ausgabe/Seiteneffekt:** CLI-Streaming (`copilot` oder `claude`), Statuswechsel `KiAktiv` → `InBearbeitung` oder `Fehlgeschlagen`, Protokolleinträge.
 
 8. **Kontextverlauf persistieren und UI zurücksetzen**  
@@ -129,12 +127,16 @@ flowchart TD
 ## Fehlerbehandlung
 
 - **Neu-beginnen ohne Bestätigung**  
-  - **Pfad:** `AufgabeDetail.FolgePromptAsync`  
+  - **Pfad:** `AufgabeDetail.KiStartenAsync`  
   - **Behandlung:** Sofortiger UI-Abbruch; kein Hintergrundlauf.
 
 - **Preflight-Fehler vor KI-Start (z. B. Hard-Limit, ungültige Komprimierung)**  
   - **Pfad:** `EntwicklungsprozessService.KiStartenAsync` (`catch` um `BuildFollowPromptWithContextAsync`)  
   - **Behandlung:** Fehler als Kontexteintrag + Protokolleintrag mit `RunId`/`ContextEventId`; Exception wird propagiert.
+
+- **Kein KI-Plugin verfügbar / Prefix nicht auflösbar**  
+  - **Pfad:** `EntwicklungsprozessService.KiStartenAsync` → `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync`  
+  - **Behandlung:** Exception vor Streaming; UI zeigt Fehler und hält Senden deaktiviert, wenn keine Plugins geladen sind.
 
 - **Streamingfehler im KI-Plugin**  
   - **Pfad:** `KiStartenAsync` (Enumerator-Fehlerpfad)  
@@ -163,7 +165,7 @@ flowchart TD
   - `src/Softwareschmiede/Application/Services/AufgabeService.cs`
 
 - **Plugin-Management / Verträge**
-  - `src/Softwareschmiede/Program.cs`
+  - `src/Softwareschmiede/Application/Services/PluginSelectionService.cs`
   - `src/Softwareschmiede/Infrastructure/Plugins/PluginManager.cs`
   - `src/Softwareschmiede.Plugin.Contracts/Domain/Interfaces/IKiPlugin.cs`
   - `src/Softwareschmiede.Plugin.Contracts/Domain/Abstractions/CliKiPluginBase.cs`

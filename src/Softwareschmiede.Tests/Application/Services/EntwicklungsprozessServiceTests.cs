@@ -1458,6 +1458,115 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _agentPackageServiceMock.Verify(a => a.GetPackageAsync("missing-package", It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldPreferExplicitSelectedKiPluginPrefix_OverStoredTaskPrefix()
+    {
+        // Arrange
+        var selectedPluginMock = new Mock<IKiPlugin>();
+        selectedPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Selected KI");
+        selectedPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Softwareschmiede.KiA");
+        selectedPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.DevelopmentAutomation);
+        selectedPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        selectedPluginMock.Setup(plugin => plugin.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        selectedPluginMock.Setup(plugin => plugin.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var storedPluginMock = new Mock<IKiPlugin>();
+        storedPluginMock.SetupGet(plugin => plugin.PluginName).Returns("Stored KI");
+        storedPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Softwareschmiede.KiB");
+        storedPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.DevelopmentAutomation);
+        storedPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        storedPluginMock.Setup(plugin => plugin.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        storedPluginMock.Setup(plugin => plugin.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(selectedPluginMock.Object, storedPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Explicit KI Prefix beim Start", null);
+        await _aufgabeService.UpdateAsync(
+            aufgabe.Id,
+            aufgabe.Titel,
+            aufgabe.AnforderungsBeschreibung,
+            "mein-paket",
+            null,
+            "Softwareschmiede.KiB");
+
+        _agentPackageServiceMock.Setup(service => service.GetPackageAsync("mein-paket", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentPackageInfo("mein-paket", "/pfad/zum/paket", [], []));
+        _gitPluginMock.Setup(git => git.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(git => git.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await sut.ProzessStartenAsync(
+            aufgabe.Id,
+            "https://github.com/test/repo",
+            selectedKiPluginPrefix: "Softwareschmiede.KiA");
+
+        // Assert
+        selectedPluginMock.Verify(plugin => plugin.DeployAgentPackageAsync("/pfad/zum/paket", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        storedPluginMock.Verify(plugin => plugin.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous()
+    {
+        // Arrange
+        _db.GitRepositories.AddRange(
+            new GitRepository
+            {
+                Id = Guid.NewGuid(),
+                ProjektId = _projektId,
+                PluginTyp = "Softwareschmiede.GitHub",
+                RepositoryUrl = "https://github.com/test/repo-a",
+                RepositoryName = "repo-a",
+                Aktiv = true
+            },
+            new GitRepository
+            {
+                Id = Guid.NewGuid(),
+                ProjektId = _projektId,
+                PluginTyp = "Softwareschmiede.GitHub",
+                RepositoryUrl = "https://github.com/test/repo-b",
+                RepositoryName = "repo-b",
+                Aktiv = true
+            });
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Mehrdeutiger Repository-Kontext", null);
+        var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            projektService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _agentPackageServiceMock.Object,
+            _arbeitsverzeichnisResolverMock.Object,
+            null,
+            new ConfigurationBuilder().Build(),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        // Act
+        var act = () => sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/unknown");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*kein eindeutiges Repository*");
+        _gitPluginMock.Verify(git => git.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     /// <summary>TestsAusfuehrenAsync speichert bei Erfolg Test-Ergebnisprotokolle.</summary>
     [Fact]
     public async Task TestsAusfuehrenAsync_ShouldPersistSuccessfulTestSummary()

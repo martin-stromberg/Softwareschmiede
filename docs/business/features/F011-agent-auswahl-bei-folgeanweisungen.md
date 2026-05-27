@@ -88,5 +88,5 @@ Nein. Das Verhalten des ersten Prompts bleibt unverändert.
 - [F004 – Agentenpakete](./F004-agentenpakete.md) – Agenten verstehen und bereitstellen
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md) – Verlauf und Antworten prüfen
 - [F014 – Standardplugin je Pluginart & KI-Plugin-Auswahl](./F014-standardplugin-ki-plugin-auswahl.md) – Standardauswahl für KI-Prompts verstehen
-- [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](./F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) – durchgängige Reihenfolge Plugin → Paket → Agent
+- [F026 – KI-Plugin-spezifische Agenten-Discovery und -Auswahl](./F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) – KI-Plugin als Pflichtfeld, Agentenpaket/Agent optional mit konsistenten Reset-Regeln
 - [Zurück zur Übersicht](../features.md)

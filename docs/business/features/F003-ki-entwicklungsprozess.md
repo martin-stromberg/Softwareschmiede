@@ -25,10 +25,11 @@ Das Ergebnis können Sie prüfen, bevor es dauerhaft gespeichert wird.
 ### KI starten
 
 1. Sie öffnen eine Aufgabe mit dem Status **Offen**.
-2. Sie prüfen, ob Titel, Beschreibung und Agentenpaket korrekt sind.
-3. Sie klicken auf **KI starten**.
-4. Die Softwareschmiede erstellt eine separate Arbeitskopie des Codes.
-5. Die KI beginnt, die Aufgabe zu bearbeiten. Der Status wechselt auf **KI aktiv**.
+2. Sie wählen ein **KI-Plugin**. Ohne KI-Plugin ist **KI starten** nicht möglich.
+3. Sie wählen bei Bedarf ein **Agentenpaket** und einen **Agenten**. Beide Felder sind optional.
+4. Sie klicken auf **KI starten**.
+5. Die Softwareschmiede erstellt eine separate Arbeitskopie des Codes.
+6. Die KI beginnt, die Aufgabe zu bearbeiten. Der Status wechselt auf **KI aktiv**.
 
 ### Echtzeit-Ausgabe beobachten
 
@@ -78,6 +79,9 @@ Ihre Folge-Anweisungen werden direkt an die KI weitergeleitet – wie eine Unter
 
 ## Häufige Fragen (FAQ)
 
+**Kann ich die KI ohne Agentenpaket und ohne Agent starten?**
+Ja. Beide Felder sind optional. Sie müssen nur ein **KI-Plugin** auswählen.
+
 **Kann ich die KI während der Arbeit stoppen?**
 Ja. Klicken Sie auf **Aufgabe abbrechen**. Die lokale Arbeitskopie wird dann gelöscht.
 
@@ -101,6 +105,7 @@ Wenn die Aufgabe festhängt, obwohl nichts mehr läuft, nutzen Sie **🩹 Aufgab
 
 - [F002 – Aufgabenverwaltung](./F002-aufgabenverwaltung.md) – Aufgaben anlegen und vorbereiten
 - [F004 – Agentenpakete](./F004-agentenpakete.md) – Das Verhalten der KI steuern
+- [F028 – Startvalidierung beim Aufgabenstart](./F028-startvalidierung-aufgabenstart.md) – Pflicht- und optionale Felder vor dem Start verstehen
 - [F005 – Aufgabenprotokoll](./F005-aufgabenprotokoll.md) – Ausgabe der KI nachverfolgen
 - [F006 – Aufgabe abschließen](./F006-aufgabe-abschliessen.md) – Ergebnis freigeben
 - [F007 – Aufgabe abbrechen](./F007-aufgabe-abbrechen.md) – Vorgang beenden ohne zu speichern

@@ -76,6 +76,23 @@ public sealed class PluginSelectionServiceTests
         resolved.PluginPrefix.Should().Be("Softwareschmiede.Copilot");
     }
 
+    /// <summary>Verwendet Default-Resolver, wenn keine KI-Plugins zur Auswahl stehen.</summary>
+    [Fact]
+    public async Task ResolveDevelopmentAutomationPluginAsync_ShouldUseDefaultResolver_WhenAvailableListIsEmpty()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var pluginManager = CreatePluginManager([]);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginAsync(null);
+
+        // Assert
+        resolved.PluginPrefix.Should().Be("Softwareschmiede.DefaultKi");
+    }
+
     /// <summary>Verwendet Default-Resolver, wenn keine Plugins zur Auswahl stehen.</summary>
     [Fact]
     public async Task ResolveSourceCodeManagementPluginAsync_ShouldUseDefaultResolver_WhenAvailableListIsEmpty()

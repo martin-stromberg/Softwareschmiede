@@ -6,8 +6,8 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 
 | Ablauf | Datei | Beschreibung |
 |--------|-------|--------------|
-| [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus (inkl. Agent-Auswahl bei Folgeanweisungen) |
-| [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md) | `follow-up-context-steering-flow.md` | Folgeanweisungsfluss inkl. Moduslogik, Plugin-Auflösung (Copilot/Claude CLI), Komprimierung und persistenter Kontextdateien |
+| [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus mit Sollzustand „KI-Plugin Pflicht, Agentenpaket/Agent optional“ |
+| [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md) | `follow-up-context-steering-flow.md` | Folgeanweisungsfluss inkl. Moduslogik, Pflichtauflösung des KI-Plugins, Komprimierung und persistenter Kontextdateien |
 | [AufgabeService Statusübergänge](./aufgabe-service-status-flow.md) | `aufgabe-service-status-flow.md` | Statuslebenszyklus einer Aufgabe mit Guard-Checks, Persistenz und Fehlerpfaden |
 | [AutoShutdownOrchestrator](./auto-shutdown-orchestrator-flow.md) | `auto-shutdown-orchestrator-flow.md` | Ereignisgesteuerter Auto-Shutdown beim Übergang laufender Automatisierungen von >0 auf 0 |
 | [PluginSettingsService](./plugin-settings-service-flow.md) | `plugin-settings-service-flow.md` | Lesen/Schreiben von Plugin-Credentials und Laufzeitbezug zur Claude-CLI-Integration |
@@ -16,14 +16,14 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 | [KI-Arbeitsprotokoll: Persistierung und Rendering](./ki-arbeitsprotokoll-rendering-flow.md) | `ki-arbeitsprotokoll-rendering-flow.md` | Persistierung des Markdown-Protokolls mit Datumszeile/Schritten sowie sicheres Rendering mit Sanitizing und Fallback |
 | [KI-Protokoll Auto-Scroll](./ki-protokoll-auto-scroll-flow.md) | `ki-protokoll-auto-scroll-flow.md` | Initial-Scroll beim Einblenden, konditionales Follow-Scroll bei neuen Inhalten und Scroll-Lock bei manuellem Hochscrollen |
 | [Standardplugin-Auflösung & KI-Dispatch](./plugin-default-selection-flow.md) | `plugin-default-selection-flow.md` | Persistente Standardplugins je Pluginart und Auflösung der effektiven KI-Plugin-Instanz pro Prompt (explizit → Default → Fallback) |
-| [KI-Plugin-spezifische Agenten-Discovery/Auswahl (Issue 58)](./ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | `ki-plugin-spezifische-agenten-discovery-auswahl-flow.md` | Verbindlicher Auswahlfluss `KI-Plugin → Agentenpaket → Agent` inkl. Persistenz `KiPluginPrefix`, plugin-spezifischer Discovery und einheitlicher Auflösung in Start/Folgeprompt |
+| [KI-Plugin-spezifische Agenten-Discovery/Auswahl (Issue 58)](./ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | `ki-plugin-spezifische-agenten-discovery-auswahl-flow.md` | Plugin-spezifische Discovery mit Pflichtfeld KI-Plugin sowie optionalem Agentenpaket/Agent inkl. Persistenz `KiPluginPrefix` |
 | [ProjektService: Projektverwaltung](./projekt-service-flow.md) | `projekt-service-flow.md` | End-to-End-Flow für Projektübersicht, Detailaktionen (Bearbeiten/Archivieren/Löschen) und Repository-Zuordnung |
 | [AgentPackageFileService: Dateisystem & Sicherheit](./agent-package-file-service-flow.md) | `agent-package-file-service-flow.md` | Paket-/Dateioperationen inkl. sicherer Pfadauflösung, Validierung, rekursivem Dateibaum und robusten I/O-Fehlerpfaden |
 | [LocalDirectoryPlugin: WorkspaceMode & Guardrails](./local-directory-plugin-flow.md) | `local-directory-plugin-flow.md` | Plugin-spezifischer Ablauf für InSourceDirectory/SeparateWorkingDirectory inkl. Source-Copy-Bootstrap, Kopier-Guardrails, Dateisynchronisation, Capability-Flags und UI-Aktionsmatrix (Push/Pull/PR ausblenden, Merge einblenden) |
 | [Live Project Browser mit Git-Status](./live-project-browser-git-status-flow.md) | `live-project-browser-git-status-flow.md` | Snapshot-Laden mit getrennter `CodeFiles`/`PlanningDocuments`-Klassifikation, Fallback-Erkennung für Planungsdokument-Pfade sowie Compliance-Bezug zum Agentenpaket-Workflow |
 | [Manuelle Aufgaben-Recovery](./aufgabe-recovery-flow.md) | `aufgabe-recovery-flow.md` | UI- und Serviceablauf zur Wiederherstellung festhängender Aufgaben mit Laufzeit-Guard, Audit-Log und Concurrency-Schutz |
 | [GitOrchestrationService: Git-Aktionen & PR-Auflösung](./git-orchestration-service-flow.md) | `git-orchestration-service-flow.md` | Issue-Import, Commit/Reset/Push/Pull mit plugin-spezifischer Semantik (Remote-Git vs. Datei-Sync) sowie Pull-Request-Erstellung mit Repository-Guards |
-| [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions und RunningCount-Events |
+| [KiAusfuehrungsService: Hintergrundläufe](./ki-ausfuehrungs-service-flow.md) | `ki-ausfuehrungs-service-flow.md` | Singleton-Sessionmanagement für KI-Streaming, Live-Subscriptions, RunningCount-Events und Fehlerpfade bei fehlender KI-Plugin-Auflösung |
 | [Issue-, Branch- und PR-Verknüpfung](./issue-branch-pr-linking-flow.md) | `issue-branch-pr-linking-flow.md` | End-to-End-Flow von der Issue-Auswahl über issuebezogenen Branch bis zur PR-Closing-Direktive (`Closes #<Issue>`) |
 | [Diff-Pipeline (Controller, Service, Algorithmus, Cache)](./diff-service-flow.md) | `diff-service-flow.md` | End-to-End-Ablauf für Diff-Generierung, 2-Tier-Caching, Persistierung sowie Validierungs- und Fehlerpfade |
 | [DiffViewer-Integration (UI, FR-4, Route)](./diffviewer-integration-flow.md) | `diffviewer-integration-flow.md` | UI-Integrationsfluss zwischen `AufgabeDetail`, `DiffPreviewPanel` und `DiffViewer` inkl. dateispezifischer Diff-Auflösung, FR-4-Fallbackpfaden, Parameterwechsel-Stabilität und `/diff/{DiffResultId:guid}`-Kompatibilität |
@@ -39,7 +39,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 ### [Ablauf 1: Entwicklungsprozess starten](./development-process-flow.md#ablauf-1-entwicklungsprozess-starten)
 **Typ:** `sequenceDiagram` · **Services:** `EntwicklungsprozessService`, `IGitPlugin`, `IKiPlugin`
 
-Beschreibt den vollständigen Einstieg in einen KI-gestützten Entwicklungszyklus: von der Aufgabenauswahl über das Repository-Klonen und Branch-Anlegen bis zum optionalen Deployen eines Agentenpakets.
+Beschreibt den vollständigen Einstieg in einen KI-gestützten Entwicklungszyklus: KI-Plugin als Pflichtfeld, optionales Agentenpaket/Agent, Repository-Klonen, Branch-Anlegen und optionales Agentenpaket-Deployment.
 
 ---
 
@@ -53,7 +53,7 @@ Zeigt den Streaming-Ablauf von `KiStartenAsync`: Statusprüfung, Prompt-Protokol
 ### [Ablauf 2b: Agent-Auswahl bei Folgeanweisungen](./development-process-flow.md#ablauf-2b-agent-auswahl-bei-folgeanweisungen)
 **Typ:** `flowchart TD` · **Services:** `AufgabeDetail`, `EntwicklungsprozessService`, `IKiPlugin`
 
-Beschreibt die Folge-Prompt-Logik mit Agenten-Auswahl, Start-Agent als Standardwert, frei änderbarer Auswahl vor dem Senden, Versand an den gewählten Agenten und Reset auf den Start-Agenten.
+Beschreibt die Folge-Prompt-Logik mit optionaler Agenten-Auswahl; bei leerer Auswahl startet das KI-Plugin mit pluginseitigem Default-Agent.
 
 ---
 
@@ -151,7 +151,7 @@ Beschreibt den End-to-End-Pfad von der Default-Konfiguration in den Einstellunge
 ### [Ablauf 9b: KI-Plugin-spezifische Agenten-Discovery/Auswahl (Issue 58)](./ki-plugin-spezifische-agenten-discovery-auswahl-flow.md)
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `AufgabeDetail`, `PluginSelectionService`, `EntwicklungsprozessService`, `KiAusfuehrungsService`, `IAgentPackageService`, `IKiPlugin`, `AufgabeService`
 
-Dokumentiert die verbindliche UI-Reihenfolge **KI-Plugin → Agentenpaket → Agent**, die plugin-spezifische Discovery pro Paket, die Persistenz von `KiPluginPrefix` sowie die konsistente Prefix-Auflösung in Start- und Folgeprompt-Pfaden.
+Dokumentiert die plugin-spezifische Discovery mit **KI-Plugin als Pflichtfeld** sowie **Agentenpaket/Agent als optionalen Feldern**, inklusive Persistenz von `KiPluginPrefix` und konsistenter Prefix-Auflösung in Start- und Folgeprompt-Pfaden.
 
 ---
 

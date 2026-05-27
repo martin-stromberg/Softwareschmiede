@@ -319,7 +319,7 @@ else
                 </div>
                 @if (!string.IsNullOrWhiteSpace(AgentenauswahlHinweis))
                 {
-                    <div class="alert alert-warning" style="margin-bottom:.75rem">@AgentenauswahlHinweis</div>
+                    <div class="alert alert-info" style="margin-bottom:.75rem">@AgentenauswahlHinweis</div>
                 }
                 @if (_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
                 {
@@ -568,7 +568,7 @@ else
             </div>
             @if (!string.IsNullOrWhiteSpace(AgentenauswahlHinweis))
             {
-                <div class="alert alert-warning" style="margin-top:.5rem">@AgentenauswahlHinweis</div>
+                <div class="alert alert-info" style="margin-top:.5rem">@AgentenauswahlHinweis</div>
             }
             <div class="form-group">
                 <label class="form-label">Basis-Branch</label>

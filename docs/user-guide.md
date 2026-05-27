@@ -87,7 +87,7 @@ Bei Bedarf können Sie der KI weitere Hinweise geben, ohne den Vorgang zu unterb
 
 Agentenpakete sind Sammlungen von Anweisungen für die KI.
 Sie legen fest, wie die KI arbeiten soll – zum Beispiel welche Prüfungen sie durchführt oder welchen Stil sie beim Schreiben von Code verwendet.
-Sie wählen beim Start einer Aufgabe aus, welches Agentenpaket die KI nutzen soll.
+Sie können beim Start einer Aufgabe auswählen, welches Agentenpaket die KI nutzen soll (optional).
 
 👉 Mehr dazu: [F004 – Agentenpakete](./business/features/F004-agentenpakete.md)
 
@@ -122,7 +122,7 @@ Dieser Ablauf zeigt, wie eine Aufgabe von Anfang bis Ende bearbeitet wird.
 3. **Arbeitsverzeichnis prüfen** (optional) – Öffnen Sie **Einstellungen** und setzen Sie bei Bedarf ein eigenes Basis-Arbeitsverzeichnis für lokale Klone.
 4. **Claude einrichten** (optional) – Öffnen Sie **Einstellungen**, tragen Sie bei **Anthropic API Key** Ihren Schlüssel ein und klicken Sie **💾 Speichern**.
 5. **Aufgabe erstellen** – Wählen Sie Ihr Projekt aus und klicken Sie auf **Neue Aufgabe**. Optional können Sie eine GitHub-Issue auswählen; Titel und Beschreibung werden übernommen.
-6. **Agentenpaket wählen** – Wählen Sie aus der Liste das passende Agentenpaket für diese Aufgabe aus.
+6. **Agentenpaket wählen** (optional) – Wählen Sie bei Bedarf aus der Liste das passende Agentenpaket für diese Aufgabe aus.
 7. **KI starten** – Klicken Sie auf **KI starten**. Die KI erhält Ihre Aufgabenbeschreibung und beginnt zu arbeiten.
 8. **Echtzeit-Ausgabe beobachten** – Verfolgen Sie auf dem Bildschirm, was die KI gerade tut. Sie sehen Nachrichten, Code-Änderungen und Zwischenergebnisse.
 9. **Folge-Anweisung geben** (optional) – Wenn Sie der KI etwas ergänzen möchten, tippen Sie eine Nachricht in das Eingabefeld und senden Sie sie ab.
@@ -154,8 +154,8 @@ Verschiedene Pakete eignen sich für verschiedene Projektarten.
 ### Wie wählt man ein Agentenpaket für eine Aufgabe aus?
 
 Beim Anlegen oder Starten einer Aufgabe erscheint ein Auswahlfeld **Agentenpaket**.
-Wählen Sie das gewünschte Paket aus der Liste.
-Die KI verwendet dann beim Bearbeiten dieser Aufgabe genau die Anweisungen dieses Pakets.
+Die Auswahl ist optional: Sie können ein gewünschtes Paket aus der Liste wählen oder das Feld leer lassen.
+Ohne Auswahl arbeitet die KI mit ihren Standard-Einstellungen.
 
 👉 Mehr dazu: [F004 – Agentenpakete](./business/features/F004-agentenpakete.md)
 
@@ -210,7 +210,7 @@ Neue KI-Arbeitsprotokolle erscheinen als strukturiertes Markdown:
 ### Claude im Aufgabenablauf verwenden
 
 1. Öffnen Sie eine Aufgabe und klicken Sie auf **🚀 Starten**.
-2. Wählen Sie Agentenpaket und Agent wie gewohnt aus.
+2. Wählen Sie Agentenpaket und Agent bei Bedarf aus (optional).
 3. Geben Sie im Bereich **💬 KI-Prompt** Ihre Anweisung ein.
 4. Klicken Sie auf **🤖 KI starten**.
 5. Verfolgen Sie den Fortschritt im **📜 Protokoll**.

@@ -21,7 +21,7 @@
 
 ### Flow-Docs
 - `docs/flows/` vorhanden.
-- Lücke identifiziert: Kein eigener Ablauf für Issue 58 (Reihenfolge Plugin → Paket → Agent inkl. Persistenz/Reset-Regeln).
+- Lücke identifiziert: Kein eigener Ablauf für Issue 58 (Auswahllogik inkl. Persistenz/Reset-Regeln).
 
 ### Business-Docs
 - `docs/business/features/` vorhanden.
@@ -1228,3 +1228,92 @@
 
 ### Offene Punkte
 - Kein kritischer offener Dokumentationspunkt innerhalb des Feature-Scopes identifiziert.
+
+---
+
+# Dokumentationsplan – Sollzustand „Agentenpaket/Agent optional beim Aufgabenstart“ – 2026-05-25
+
+## Kontext
+- Zielzustand: **Agentenpaket und Agent beim Aufgabenstart optional**; **KI-Plugin bleibt Pflicht**.
+- Dokumentation muss konsistent über API-, Flow-, Business- und README-Dokumente aktualisiert werden.
+
+## Phase 1 – Analyse (4 parallele Explore-Agenten, `claude-haiku-4.5`)
+
+### API-Docs-Analyse
+- `docs/api/` vorhanden und umfangreich.
+- Konfliktstellen gefunden, insbesondere in:
+  - `docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md`
+  - `docs/api/http-endpoints.md`
+  - `docs/api/README.md` (Referenzen/Index)
+- Neue technische Vertragsdokumentation für Startvalidierung empfohlen.
+
+### Flow-Docs-Analyse
+- `docs/flows/` vorhanden und breit gepflegt.
+- Konfliktstellen bzgl. bisheriger strikter Auswahlannahmen in:
+  - `docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md`
+  - `docs/flows/development-process-flow.md`
+  - `docs/flows/ki-ausfuehrungs-service-flow.md`
+  - `docs/flows/follow-up-context-steering-flow.md`
+- Optionalitätslogik und Aktivierungsbedingungen für Start/Senden müssen vereinheitlicht werden.
+
+### Business-Docs-Analyse
+- `docs/business/` vorhanden und detailliert.
+- Konfliktstellen/Unschärfen in:
+  - `docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md`
+  - `docs/business/features/F003-ki-entwicklungsprozess.md`
+  - `docs/business/features/F004-agentenpakete.md`
+- Ergänzung einer klaren, zentralen Fachsicht auf Pflicht-/Optional-Felder für den Aufgabenstart erforderlich.
+
+### README-Analyse
+- `README.md` strukturell vollständig, aber inhaltlich teils widersprüchlich zum Zielzustand.
+- Kritische Anpassungsstellen:
+  - Voraussetzungen
+  - Installation („Erste Schritte“)
+  - Usage
+  - Feature-Beschreibung zu Issue 58
+  - Changelog
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Alle Aussagen vereinheitlichen auf „KI-Plugin Pflicht, Agentenpaket/Agent optional“.
+2. **Hoch:** API-/Flow-/Business-Dokumente zur Startvalidierung und Entscheidungslogik aktualisieren.
+3. **Mittel:** README in Voraussetzungen, Installation, Usage, Feature-Text und Changelog synchronisieren.
+4. **Mittel:** Indizes/Querverweise (`docs/api/README.md`, `docs/flows/README.md`, `docs/business/features.md`) auf neue/angepasste Dokumente ausrichten.
+5. **Mittel:** Konsistenzsuche auf veraltete Aussagen zur Startvalidierung durchführen und bereinigen.
+
+## Phase 2 – Geplante parallele Ausführung
+- `documentation-api` (Scope: `docs/api/`)
+- `documentation-flow` (Scope: `docs/flows/`)
+- `documentation-business` (Scope: `docs/business/`)
+- `documentation-readme-writer` (Scope: `README.md`)
+
+## Anhang: Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/api/aufgaben-startvalidierung.md`
+2. `docs/business/features/F028-startvalidierung-aufgabenstart.md`
+
+### Aktualisiert
+1. `README.md`
+2. `docs/api/README.md`
+3. `docs/api/http-endpoints.md`
+4. `docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md`
+5. `docs/flows/README.md`
+6. `docs/flows/development-process-flow.md`
+7. `docs/flows/follow-up-context-steering-flow.md`
+8. `docs/flows/ki-ausfuehrungs-service-flow.md`
+9. `docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md`
+10. `docs/business/features.md`
+11. `docs/business/features/F003-ki-entwicklungsprozess.md`
+12. `docs/business/features/F004-agentenpakete.md`
+13. `docs/business/features/F011-agent-auswahl-bei-folgeanweisungen.md`
+14. `docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md`
+15. `docs/requirements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-requirements-analysis.md`
+16. `docs/architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-blueprint.md`
+17. `docs/improvements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-review.md`
+18. `docs/lifecycle-report-ki-plugin-spezifische-agenten-auswahl.md`
+19. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz und Nicht-Leerheit aller neu erstellten/aktualisierten Zieldokumente geprüft: **erfolgreich**.
+- Konsistenzsuche auf alte Konfliktformulierungen durchgeführt (u. a. frühere harte Sequenz-/Blockierungsaussagen zu Paket/Agent): **bereinigt**.
+- Ergebniszustand vereinheitlicht: **KI-Plugin Pflicht**, **Agentenpaket/Agent optional**.

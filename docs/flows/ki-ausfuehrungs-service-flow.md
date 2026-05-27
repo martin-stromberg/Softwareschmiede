@@ -4,7 +4,8 @@
 
 Dieser Ablauf beschreibt die Hintergrundausführung von KI-Läufen über `KiAusfuehrungsService`.
 Der Service entkoppelt die Laufzeit von der Blazor-Komponente: Ein KI-Lauf läuft weiter, auch wenn Nutzer:innen navigieren, und die Ausgabe bleibt in einer Session gepuffert.
-Zusätzlich publiziert der Service Running-Count-Übergänge für Orchestrierungen wie `AutoShutdownOrchestrator`.
+Zusätzlich publiziert der Service Running-Count-Übergänge für Orchestrierungen wie `AutoShutdownOrchestrator`.  
+Im Sollzustand 2026-05-25 gilt: KI-Plugin ist Pflicht, Agentenpaket/Agent sind optionale Eingaben aus der UI.
 
 ---
 
@@ -20,7 +21,7 @@ sequenceDiagram
     participant AS as AutoShutdownOrchestrator
 
     U->>UI: "KI starten" / Folgeprompt senden
-    UI->>KS: StartKiLauf(aufgabeId, prompt, agent, callbacks)
+    UI->>KS: StartKiLauf(aufgabeId, prompt, agent?, selectedKiPluginPrefix, callbacks)
     KS->>KS: IsRunning prüfen
     KS->>Sess: neue Session anlegen
     KS->>AS: RunningCountChanged(0,1)
@@ -58,7 +59,7 @@ flowchart TD
     L --> M[onCompleted(false)]
     M --> N([Lauf erfolgreich beendet])
 
-    F -.-> O[Exception oder Cancel]:::error
+    F -.-> O[Exception, Cancel oder Plugin-Auflösung fehlgeschlagen]:::error
     O -.-> P[Fehlerzeile hinzufügen und Complete(true)]:::error
     P -.-> Q[RunningCountChanged + onCompleted(true)]:::error
     Q -.-> R([Fehlerpfad beendet]):::error
@@ -77,7 +78,7 @@ flowchart TD
 
 2. **Neustart vorbereiten und alte Session bereinigen**
    - **Code:** `AufgabeDetail.KiMitPromptStartenAsync` + `KiAusfuehrungsService.SessionBereinigen`
-   - **Eingaben:** Prompt, Agent, optional `model`, `selectedKiPluginPrefix`, `FolgeanweisungsKontextmodus`
+   - **Eingaben:** Prompt, optionaler Agent, optional `model`, `selectedKiPluginPrefix`, `FolgeanweisungsKontextmodus`
    - **Ausgaben/Seiteneffekte:** Abgeschlossene Session wird entfernt; neue Live-Subscription wird vorbereitet.
 
 3. **Singleton-Session erzeugen und Running-Count aktualisieren**
@@ -112,6 +113,10 @@ flowchart TD
   - Pfad: Background-Task `catch (Exception ex)`
   - Behandlung: Fehler wird geloggt, Session erhält `[Fehler] ...`, `onCompleted(true)` wird ausgelöst.
 
+- **Kein KI-Plugin verfügbar / Prefix nicht auflösbar**
+  - Pfad: `EntwicklungsprozessService.KiStartenAsync` → `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync`
+  - Behandlung: Exception wird im Background-Task gefangen, als Fehlerzeile gepuffert und via `onCompleted(true)` an die UI signalisiert.
+
 - **Abbruch durch Cancellation**
   - Pfad: `AbortKiLauf` → `OperationCanceledException`
   - Behandlung: Lauf endet kontrolliert als Fehlerpfad (`onCompleted(true)`), Session bleibt auslesbar bis `SessionBereinigen`.
@@ -126,6 +131,7 @@ flowchart TD
 
 - `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs`
 - `src/Softwareschmiede/Application/Services/EntwicklungsprozessService.cs`
+- `src/Softwareschmiede/Application/Services/PluginSelectionService.cs`
 - `src/Softwareschmiede/Components/Pages/Aufgaben/AufgabeDetail.razor.cs`
 - `src/Softwareschmiede/Application/Services/AutoShutdownOrchestrator.cs`
 - `src/Softwareschmiede/Domain/Interfaces/IRunningAutomationStatusSource.cs`

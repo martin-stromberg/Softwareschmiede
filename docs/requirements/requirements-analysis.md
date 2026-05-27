@@ -85,12 +85,12 @@
 | **FR-3.7** | **Commit-Verwaltung:** Anwender kann manuell Commits auf dem Branch durchführen. Anwender kann Commits zurücksetzen (soft / mixed / hard). KI kann selbstständig Commits durchführen (abhängig vom KI-Plugin). | Git-Integration | MUST HAVE | 📋 Geplant |
 | **FR-3.8** | **Offene Aufgabe verwerfen:** Anwender kann eine Aufgabe im Status `Offen` direkt archivieren oder dauerhaft löschen, ohne sie zuvor zu starten. | Kern-Feature | MUST HAVE | 📋 Geplant |
 | **FR-4** | **Entwicklungsprozess (KI-gestützt):** Für jede Aufgabe kann der Anwender den KI-gestützten Entwicklungsprozess starten. Die Anwendung klont das Repository, legt einen Branch an, steuert das KI-Plugin und zeigt die Ausgabe in Echtzeit. → [Architektur-Blueprint](../architecture/architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
-| **FR-4.1** | **Prozess starten:** Anwender wählt Agentenpaket und Agenten aus, gibt Anforderungsprompt ein und startet den KI-Lauf. Das KI-Plugin erhält Prompt und Agenten-Kontext. | KI-Integration | MUST HAVE | 📋 Geplant |
+| **FR-4.1** | **Prozess starten:** Anwender kann optional Agentenpaket und Agenten auswählen, gibt Anforderungsprompt ein und startet den KI-Lauf. Das KI-Plugin erhält Prompt und optionalen Agenten-Kontext. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.2** | **Echtzeit-Ausgabe:** Ausgabe des KI-Plugins wird per Streaming in Echtzeit im Aufgabenprotokoll angezeigt (< 500 ms Latenz pro Stream-Chunk). | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.3** | **Iterationen / Folge-Prompts:** Nach jedem KI-Lauf kann der Anwender direkt aus dem Protokoll heraus eine Folgeanweisung eingeben, ohne die Seite zu wechseln. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.4** | **Rollback:** Anwender kann Commits manuell zurücksetzen (soft/mixed/hard). KI kann eigenständig Rollbacks durchführen, sofern das KI-Plugin dies unterstützt. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-4.5** | **Tests ausführen und auswerten:** KI-Plugin führt Tests aus; Ergebnisse werden strukturiert im Protokoll abgelegt (Testname, Status, Fehlermeldung, Dauer). | KI-Integration | MUST HAVE | 📋 Geplant |
-| **FR-4.6** | **Agenten-Auswahl pro Prompt:** Vor jedem KI-Lauf wählt der Anwender den zu verwendenden Agenten aus der vom KI-Plugin gelieferten Liste aus. Bei Folgeanweisungen ist der Start-Agent vorbelegt, die Auswahl bleibt änderbar und wird nach dem Senden wieder auf den Start-Agenten gesetzt. | KI-Integration | MUST HAVE | 📋 Geplant |
+| **FR-4.6** | **Agenten-Auswahl pro Prompt:** Vor jedem KI-Lauf kann der Anwender optional den zu verwendenden Agenten aus der vom KI-Plugin gelieferten Liste auswählen. Bei Folgeanweisungen ist der Start-Agent vorbelegt, die Auswahl bleibt änderbar und wird nach dem Senden wieder auf den Start-Agenten gesetzt; ohne Auswahl verwendet das Plugin sein Standardverhalten. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5** | **KI-Plugin-System:** Die Anwendung stellt ein erweiterbares Plugin-System für KI-Systeme bereit. Jedes KI-Plugin implementiert ein definiertes Interface. → [Architektur-Blueprint](../architecture/architecture-blueprint.md) | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5.1** | **KI-Plugin-Interface:** Schnittstelle umfasst: Prompt entgegennehmen, Agentenpaket ablegen, KI steuern, Tests ausführen, Ergebnisse streamen, verfügbare Agenten liefern. | KI-Integration | MUST HAVE | 📋 Geplant |
 | **FR-5.2** | **GitHub-Copilot-Plugin (copilot CLI):** Erstes konkretes KI-Plugin; nutzt `copilot`-CLI; legt das Agentenpaket im `.github/`-Verzeichnis des Branches ab. | KI-Integration | MUST HAVE | 📋 Geplant |
@@ -465,7 +465,7 @@ classDiagram
 | **ID** | UC-3 |
 | **Name** | Entwicklungsprozess starten |
 | **Akteur** | Anwender |
-| **Vorbedingung** | Aufgabe existiert im Status „Offen" oder „In Bearbeitung"; Agentenpaket und Agent sind ausgewählt. |
+| **Vorbedingung** | Aufgabe existiert im Status „Offen" oder „In Bearbeitung"; ein KI-Plugin ist verfügbar, Agentenpaket und Agent sind optional. |
 | **Auslöser** | Anwender klickt auf „Entwicklungsprozess starten" und gibt Anforderungsprompt ein. |
 | **Hauptszenario** | 1. System klont das verknüpfte Repository in aufgabenspezifisches Verzeichnis. 2. Branch `task/<id>-<kurzname>` wird angelegt. 3. KI-Plugin legt Agentenpaket im `.github/`-Verzeichnis ab. 4. KI-Plugin startet mit Prompt und Agent. 5. Ausgabe wird in Echtzeit im Protokoll angezeigt. 6. Status wechselt auf „KI aktiv". |
 | **Alternativszenario A** | Klon schlägt fehl → Fehlermeldung; Status bleibt auf „Offen". |

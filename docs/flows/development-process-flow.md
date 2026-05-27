@@ -23,7 +23,7 @@ Dieses Dokument beschreibt die zentralen Programmabläufe der KI-gestützten Sof
 
 ### Kontext
 
-Dieser Ablauf beschreibt den Einstieg in einen KI-gestützten Entwicklungszyklus. Der Benutzer wählt eine Aufgabe aus, konfiguriert das Agentenpaket und den Prompt, woraufhin `EntwicklungsprozessService` den Workspace vorbereitet (Git-Clone oder Fallback-Strategie), einen Feature-Branch anlegt und die KI aktiviert. Der Ablauf umfasst zwei Phasen: die Repository-Vorbereitung (`ProzessStartenAsync`) und den KI-Start (`KiStartenAsync`).
+Dieser Ablauf beschreibt den Einstieg in einen KI-gestützten Entwicklungszyklus. Der Benutzer wählt eine Aufgabe aus, wählt ein **KI-Plugin (Pflicht)** und optional ein Agentenpaket/Agent, woraufhin `EntwicklungsprozessService` den Workspace vorbereitet (Git-Clone oder Fallback-Strategie), einen Feature-Branch anlegt und die KI aktiviert. Der Ablauf umfasst zwei Phasen: die Repository-Vorbereitung (`ProzessStartenAsync`) und den KI-Start (`KiStartenAsync`).
 
 ### Diagramm
 
@@ -36,11 +36,13 @@ sequenceDiagram
     participant IKiPlugin
 
     Benutzer->>BlazorUI: Aufgabe auswählen
-    Benutzer->>BlazorUI: Agentenpaket wählen (optional)
+    Benutzer->>BlazorUI: KI-Plugin wählen (Pflicht)
+    Benutzer->>BlazorUI: Agentenpaket/Agent wählen (optional)
     Benutzer->>BlazorUI: "Prozess starten" klicken
 
-    BlazorUI->>EntwicklungsprozessService: ProzessStartenAsync(aufgabeId, repositoryUrl)
+    BlazorUI->>EntwicklungsprozessService: ProzessStartenAsync(aufgabeId, repositoryUrl, ..., selectedKiPluginPrefix)
     EntwicklungsprozessService->>EntwicklungsprozessService: AufgabeService.GetByIdAsync(aufgabeId)
+    EntwicklungsprozessService->>EntwicklungsprozessService: KI-Plugin auflösen (selected/task/default)
     EntwicklungsprozessService->>EntwicklungsprozessService: Agentenpaket-Kompatibilität prüfen (optional)
     EntwicklungsprozessService->>EntwicklungsprozessService: Basis-Pfad via Resolver ermitteln + Klon-Pfad bilden
     EntwicklungsprozessService->>IGitPlugin: CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)
@@ -58,7 +60,7 @@ sequenceDiagram
     EntwicklungsprozessService->>EntwicklungsprozessService: Protokolleintrag (GitAktion): "Klon und Branch angelegt"
     EntwicklungsprozessService-->>BlazorUI: Prozess gestartet
 
-    Benutzer->>BlazorUI: Prompt eingeben & Agenten wählen
+    Benutzer->>BlazorUI: Prompt eingeben & optional Agent wählen
     Benutzer->>BlazorUI: "KI starten" klicken
     BlazorUI->>EntwicklungsprozessService: KiStartenAsync(aufgabeId, prompt, agent)
     Note over EntwicklungsprozessService,IKiPlugin: Weiter in Ablauf 2
@@ -69,14 +71,15 @@ sequenceDiagram
 | # | Schritt | Quellcode-Referenz | Eingabe / Ausgabe |
 |---|---------|-------------------|-------------------|
 | 1 | Aufgabe aus Datenbank laden | `EntwicklungsprozessService.ProzessStartenAsync` → `AufgabeService.GetByIdAsync(aufgabeId)` | Eingabe: `aufgabeId` (Guid); Ausgabe: `Aufgabe`-Objekt |
-| 2 | Agentenpaket-Kompatibilität vorab prüfen | `EntwicklungsprozessService.ProzessStartenAsync` → `IKiPlugin.IsAgentPackageCompatibleAsync(paketPfad)` | Bei Inkompatibilität (`.github` fehlt) wird mit `InvalidOperationException` abgebrochen |
-| 3 | Basis-Pfad auflösen und Klon-Pfad bestimmen | `EntwicklungsprozessService.ProzessStartenAsync` + `IArbeitsverzeichnisResolver.ResolveAsync` | Pfad: `<resolvedBase>/softwareschmiede/<aufgabeId>`; bei Fallback: `Path.GetTempPath()/softwareschmiede/<aufgabeId>` |
-| 4 | Repository/Workspace vorbereiten | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` → je Plugin `git clone` **oder** `git init`-Fallback + Dateikopie | Eingabe: URL/Pfad + Zielpfad; Seiteneffekt: lokales Arbeitsverzeichnis wird erstellt |
-| 5 | Branch-Namen erzeugen | `EntwicklungsprozessService.ProzessStartenAsync` | Ohne Issue: `task/<aufgabeIdN>-<titel-slug>`; mit Issue: `task/issue-<issueNummer>-<aufgabeIdN>-<titel-slug>` (Slug max. 30 Zeichen) |
-| 6 | Branch anlegen | `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName)` → `GitHubPlugin`: `git checkout -b {branchName}` | Seiteneffekt: neuer Branch im lokalen Klon |
-| 7 | Agentenpaket deployen (optional) | `IKiPlugin.DeployAgentPackageAsync(paketPfad, lokalerKlonPfad)` → `GitHubCopilotPlugin`/`ClaudeCliPlugin`: Dateien rekursiv nach `.github/` kopieren | Nur wenn Paket konfiguriert und kompatibel |
-| 8 | Aufgabe als gestartet markieren | `AufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad)` | Statusübergang: `Offen → InBearbeitung`; BranchName + Pfad werden persistiert |
-| 9 | Protokolleintrag schreiben | `EntwicklungsprozessService.ProzessStartenAsync` | GitAktion-Eintrag: "Klon und Branch angelegt: {branchName} in {pfad}" |
+| 2 | KI-Plugin auflösen (Pflicht) | `EntwicklungsprozessService.ProzessStartenAsync` → `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync(selected/task/default)` | Eingabe: `selectedKiPluginPrefix` bzw. `Aufgabe.KiPluginPrefix`; Ausgabe: effektives `IKiPlugin` |
+| 3 | Agentenpaket-Kompatibilität vorab prüfen (optional) | `EntwicklungsprozessService.ProzessStartenAsync` → `IKiPlugin.IsAgentPackageCompatibleAsync(paketPfad)` | Nur wenn `Aufgabe.AgentenpaketName` gesetzt; bei Inkompatibilität Abbruch |
+| 4 | Basis-Pfad auflösen und Klon-Pfad bestimmen | `EntwicklungsprozessService.ProzessStartenAsync` + `IArbeitsverzeichnisResolver.ResolveAsync` | Pfad: `<resolvedBase>/softwareschmiede/<aufgabeId>`; bei Fallback: `Path.GetTempPath()/softwareschmiede/<aufgabeId>` |
+| 5 | Repository/Workspace vorbereiten | `IGitPlugin.CloneRepositoryAsync(repositoryUrl, lokalerKlonPfad)` → je Plugin `git clone` **oder** `git init`-Fallback + Dateikopie | Eingabe: URL/Pfad + Zielpfad; Seiteneffekt: lokales Arbeitsverzeichnis wird erstellt |
+| 6 | Branch-Namen erzeugen | `EntwicklungsprozessService.ProzessStartenAsync` | Ohne Issue: `task/<aufgabeIdN>-<titel-slug>`; mit Issue: `task/issue-<issueNummer>-<aufgabeIdN>-<titel-slug>` (Slug max. 30 Zeichen) |
+| 7 | Branch anlegen | `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName)` → `GitHubPlugin`: `git checkout -b {branchName}` | Seiteneffekt: neuer Branch im lokalen Klon |
+| 8 | Agentenpaket deployen (optional) | `IKiPlugin.DeployAgentPackageAsync(paketPfad, lokalerKlonPfad)` → `GitHubCopilotPlugin`/`ClaudeCliPlugin`: Dateien rekursiv nach `.github/` kopieren | Nur wenn Paket konfiguriert und kompatibel |
+| 9 | Aufgabe als gestartet markieren | `AufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad)` | Statusübergang: `Offen → InBearbeitung`; BranchName + Pfad werden persistiert |
+| 10 | Protokolleintrag schreiben | `EntwicklungsprozessService.ProzessStartenAsync` | GitAktion-Eintrag: "Klon und Branch angelegt: {branchName} in {pfad}" |
 
 ### Fehlerbehandlung
 
@@ -85,6 +88,7 @@ sequenceDiagram
 | Aufgabe nicht gefunden (`GetByIdAsync` wirft Exception) | Abbruch; Exception propagiert an BlazorUI |
 | Workspace-Vorbereitung schlägt fehl (`git init` oder Copy/Bootstrap) | `IGitPlugin` wirft Exception; Zielverzeichnis verbleibt ggf. teilweise; Statuswechsel findet **nicht** statt |
 | Konfigurierter Workdir-Pfad nicht nutzbar | Resolver nutzt Fallback (`Path.GetTempPath()`), schreibt ReasonCode in Logs; Prozess läuft mit Fallback weiter |
+| Kein KI-Plugin verfügbar | Plugin-Auflösung wirft `InvalidOperationException`; UI verhindert den Start bereits vorab |
 | `git checkout -b` schlägt fehl (Branch existiert bereits) | `IGitPlugin` wirft Exception; Prozess wird nicht als gestartet markiert |
 | Agentenpaket inkompatibel (kein `.github`) | Früher Abbruch vor Clone via `InvalidOperationException`; verhindert fehlerhaftes Deployment |
 | `DeployAgentPackageAsync` schlägt fehl | Exception propagiert; Aufgabe bleibt im Status `Offen` |
@@ -94,6 +98,7 @@ sequenceDiagram
 - `EntwicklungsprozessService` (Orchestrator)
 - `AufgabeService` (Datenbankzugriff, Statusverwaltung)
 - `IGitPlugin` / `GitHubPlugin` (Git-Operationen via CLI)
+- `PluginSelectionService` (Auflösung des effektiven KI-Plugins)
 - `IKiPlugin` / `GitHubCopilotPlugin` / `ClaudeCliPlugin` (Kompatibilitätscheck + Agentenpaket-Deployment)
 
 > **Verwandte Abläufe:** [Ablauf 2: KI-Streaming und Protokollierung](#ablauf-2-ki-streaming-und-protokollierung) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [KiAusfuehrungsService – Hintergrundläufe](./ki-ausfuehrungs-service-flow.md)
@@ -115,21 +120,23 @@ flowchart TD
     C -- Ja --> D[Exception: KI bereits aktiv]:::error
     C -- Nein --> E{LokalerKlonPfad gesetzt?}
     E -- Nein --> F[Exception: Kein Klon-Pfad]:::error
-    E -- Ja --> G[Protokolleintrag: Prompt + Agent-Name]
-    G --> H[AufgabeService.KiAktiviertAsync\nStatus → KiAktiv]
-    H --> I[IKiPlugin.StartDevelopmentAsync\nStreaming starten]
-    I --> J{Nächster Stream-Chunk?}
-    J -- Chunk vorhanden --> K[Chunk protokollieren]
-    K --> L[yield return Chunk an Caller]
-    L --> J
-    J -- Stream beendet --> M[Gesamte Antwort als\nKiAntwort-Protokolleintrag speichern]
-    M --> N[AufgabeService.KiAbgeschlossenAsync\nStatus → InBearbeitung]
-    N --> O([Erfolgreich abgeschlossen])
+    E -- Ja --> G[KI-Plugin auflösen (selected/task/default)]
+    G --> H{Plugin auflösbar?}
+    H -- Nein -.-> H1[Exception: Kein KI-Plugin]:::error
+    H -- Ja --> I[Protokolleintrag: Prompt + Agent-Name]
+    I --> J[AufgabeService.KiAktiviertAsync\nStatus → KiAktiv]
+    J --> K[IKiPlugin.StartDevelopmentAsync\nStreaming starten]
+    K --> L{Nächster Stream-Chunk?}
+    L -- Chunk vorhanden --> M[Chunk protokollieren]
+    M --> N[yield return Chunk an Caller]
+    N --> L
+    L -- Stream beendet --> O[Gesamte Antwort als\nKiAntwort-Protokolleintrag speichern]
+    O --> P[AufgabeService.KiAbgeschlossenAsync\nStatus → InBearbeitung]
+    P --> Q([Erfolgreich abgeschlossen])
 
-    I -.-> P[Exception beim Streaming]:::error
-    P -.-> Q[AufgabeService.FehlgeschlagenAsync\nStatus → Fehlgeschlagen]
-    Q -.-> R[Fehler protokollieren]
-    R -.-> S([Fehlerfall beendet]):::error
+    K -.-> R[Exception beim Streaming]:::error
+    R -.-> S[AufgabeService.FehlgeschlagenAsync\nStatus → Fehlgeschlagen]
+    S -.-> T([Fehler protokollieren und beenden]):::error
 
     classDef error fill:#ffcccc,stroke:#cc0000,color:#333
 ```
@@ -140,12 +147,13 @@ flowchart TD
 |---|---------|-------------------|-------------------|
 | 1 | Aufgabe laden und Status prüfen | `EntwicklungsprozessService.KiStartenAsync` → `AufgabeService.GetByIdAsync` | Wirft Exception wenn `Status == KiAktiv` |
 | 2 | Klon-Pfad validieren | `EntwicklungsprozessService.KiStartenAsync` | Wirft Exception wenn `LokalerKlonPfad` null oder leer |
-| 3 | Prompt protokollieren | `EntwicklungsprozessService.KiStartenAsync` | Protokolleintrag (Typ: Prompt): Prompt-Text + Agent-Name |
-| 4 | Status auf KiAktiv setzen | `AufgabeService.KiAktiviertAsync(aufgabeId)` | Statusübergang: `InBearbeitung → KiAktiv` |
-| 5 | KI starten und Stream öffnen | `IKiPlugin.StartDevelopmentAsync(prompt, agent, lokalerKlonPfad)` → `GitHubCopilotPlugin`: `copilot suggest --type shell {prompt}` | Rückgabe: `IAsyncEnumerable<string>` |
-| 6 | Chunks protokollieren und weiterleiten | `EntwicklungsprozessService.KiStartenAsync` (Schleife) | Jeder Chunk wird protokolliert + per `yield return` an BlazorUI übergeben |
-| 7 | Abschluss-Protokolleintrag | `EntwicklungsprozessService.KiStartenAsync` | Gesamte Antwort als KiAntwort-Protokolleintrag (Typ: KiAntwort) |
-| 8 | Status zurücksetzen | `AufgabeService.KiAbgeschlossenAsync(aufgabeId)` | Statusübergang: `KiAktiv → InBearbeitung` |
+| 3 | KI-Plugin auflösen (Pflicht) | `EntwicklungsprozessService.KiStartenAsync` → `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync(selected/task/default)` | Eingabe: `selectedKiPluginPrefix` oder gespeicherter `KiPluginPrefix` |
+| 4 | Prompt protokollieren | `EntwicklungsprozessService.KiStartenAsync` | Protokolleintrag (Typ: Prompt): Prompt-Text + Agent-Name |
+| 5 | Status auf KiAktiv setzen | `AufgabeService.KiAktiviertAsync(aufgabeId)` | Statusübergang: `InBearbeitung → KiAktiv` |
+| 6 | KI starten und Stream öffnen | `IKiPlugin.StartDevelopmentAsync(prompt, agent, lokalerKlonPfad)` → `GitHubCopilotPlugin`: `copilot suggest --type shell {prompt}` | Rückgabe: `IAsyncEnumerable<string>`; leerer `agent.Name` führt zu pluginseitigem Default-Agent |
+| 7 | Chunks protokollieren und weiterleiten | `EntwicklungsprozessService.KiStartenAsync` (Schleife) | Jeder Chunk wird protokolliert + per `yield return` an BlazorUI übergeben |
+| 8 | Abschluss-Protokolleintrag | `EntwicklungsprozessService.KiStartenAsync` | Gesamte Antwort als KiAntwort-Protokolleintrag (Typ: KiAntwort) |
+| 9 | Status zurücksetzen | `AufgabeService.KiAbgeschlossenAsync(aufgabeId)` | Statusübergang: `KiAktiv → InBearbeitung` |
 
 ### Fehlerbehandlung
 
@@ -153,12 +161,14 @@ flowchart TD
 |-----------|-----------|
 | `Status == KiAktiv` beim Aufruf | Sofortige Exception: "KI ist bereits aktiv für diese Aufgabe" |
 | `LokalerKlonPfad` nicht gesetzt | Sofortige Exception: Prozess wurde nicht gestartet |
+| Kein KI-Plugin verfügbar / Prefix nicht auflösbar | Plugin-Auflösung wirft Exception vor Streamingstart |
 | Exception während des Streamings | `AufgabeService.FehlgeschlagenAsync` → Status `Fehlgeschlagen`; Fehlerdetails als Protokolleintrag |
 
 ### Abhängigkeiten
 
 - `EntwicklungsprozessService.KiStartenAsync`
 - `AufgabeService` (Status: `KiAktiviertAsync`, `KiAbgeschlossenAsync`, `FehlgeschlagenAsync`)
+- `PluginSelectionService` (Pflichtauflösung des KI-Plugins)
 - `IKiPlugin` / `GitHubCopilotPlugin` (`StartDevelopmentAsync` via `copilot suggest`)
 
 > **Verwandte Abläufe:** [Ablauf 1: Entwicklungsprozess starten](#ablauf-1-entwicklungsprozess-starten) · [Ablauf 3: Aufgabe abschließen](#ablauf-3-aufgabe-abschlie%C3%9Fen) · [KiAusfuehrungsService – Hintergrundläufe](./ki-ausfuehrungs-service-flow.md)
@@ -169,7 +179,7 @@ flowchart TD
 
 ### Kontext
 
-Dieser Ablauf beschreibt das Verhalten der Folgeanweisungen in `AufgabeDetail`. Nach mindestens einer KI-Antwort kann ein weiterer Prompt mit eigener Agenten-Auswahl gesendet werden. Der Start-Agent bleibt der Standardwert, die Auswahl ist vor dem Senden änderbar und wird nach dem Senden wieder auf den Start-Agenten gesetzt.
+Dieser Ablauf beschreibt das Verhalten der Folgeanweisungen in `AufgabeDetail`. Nach mindestens einer KI-Antwort kann ein weiterer Prompt mit optionaler Agenten-Auswahl gesendet werden. Ist kein Agent gewählt, wird das KI-Plugin ohne `--agent` gestartet und nutzt den pluginseitigen Default.
 
 ### Diagramm
 
@@ -178,25 +188,27 @@ flowchart TD
     A([Aufgabe in Bearbeitung]) --> B{KiAntwort vorhanden?}
     B -- Nein --> C[Kein Folge-Prompt-Bereich]
     B -- Ja --> D[Folge-Prompt + Agent-Auswahl anzeigen]
-    D --> E[_folgeAgentName = Start-Agent]
-    E --> F[Anwender kann Agent ändern]
-    F --> G[Prompt senden]
-    G --> H[KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName)]
-    H --> I[StartKiLauf -> EntwicklungsprozessService.KiStartenAsync]
-    I --> J[IKiPlugin.StartDevelopmentAsync mit gewähltem Agenten]
-    J --> K[_folgePrompt leeren]
-    K --> L[_folgeAgentName auf Start-Agent zurücksetzen]
+    D --> E[Anwender wählt optional Agent]
+    E --> F{Agent gewählt?}
+    F -- Nein --> G[AgentInfo.Name = leer]
+    F -- Ja --> H[Gewählten Agent übernehmen]
+    G --> I[Prompt senden]
+    H --> I
+    I --> J[KiMitPromptStartenAsync(_prompt, _kiAgentName)]
+    J --> K[StartKiLauf -> EntwicklungsprozessService.KiStartenAsync]
+    K --> L[IKiPlugin.StartDevelopmentAsync]
+    L --> M[_prompt leeren]
 ```
 
 ### Akzeptanzkriterien und Nachweise
 
 | Kriterium | Umsetzung | Test-Nachweis |
 |---|---|---|
-| Agent-Auswahl bei Folgeanweisungen sichtbar/verfügbar | `AufgabeDetail.razor` (`@bind="_folgeAgentName"` im Folge-Prompt-Block) | `FolgePromptMarkup_ShouldContainAgentSelectionBinding` |
-| Standardwert = initial gewählter Agent | `AufgabeDetail.razor.cs` (`LadeAsync*`: `_folgeAgentName = _aufgabe.AgentenName`) | `OnInitializedAsync_ShouldDefaultFolgeAgentToInitialAgent` |
-| Auswahl vor Absenden änderbar | Select-Element im Folge-Prompt-Bereich (`_folgeAgentName`) | `FolgePromptAsync_ShouldUseSelectedFollowAgent_AndResetToInitialAgent` |
-| Folgeanweisung an ausgewählten Agenten | `FolgePromptAsync` → `KiMitPromptStartenAsync(_folgePrompt, _folgeAgentName)` | `FolgePromptAsync_ShouldUseSelectedFollowAgent_AndResetToInitialAgent`, `KiStartenAsync_ShouldForwardSelectedAgentToPlugin` |
-| Initialprompt unverändert | Initialer KI-Start läuft weiterhin über `_kiAgentName` | `KiStartenAsync_ShouldKeepInitialPromptBehavior` |
+| Agent-Auswahl bei Folgeanweisungen sichtbar/verfügbar | `AufgabeDetail.razor` (`@bind="_kiAgentName"` im KI-Anfrage-Block) | `FolgePromptMarkup_ShouldContainAgentSelectionBinding` |
+| Standardwert = in Aufgabe gespeicherter Agent oder leer | `AufgabeDetail.razor.cs` (`LadeAsync*`: `_kiAgentName = _aufgabe.AgentenName`) | `OnInitializedAsync_ShouldDefaultFolgeAgentToInitialAgent` |
+| Auswahl vor Absenden änderbar | Select-Element im Folge-Prompt-Bereich (`_kiAgentName`) | `FolgePromptAsync_ShouldUseSelectedFollowAgent_AndResetToInitialAgent` |
+| Folgeanweisung ohne Agent möglich | `KiMitPromptStartenAsync`: Fallback auf `new AgentInfo(string.Empty, null, string.Empty)` | `KiStartenAsync_ShouldForwardSelectedAgentToPlugin` |
+| Initialprompt unverändert | Initialer KI-Start läuft weiterhin über `_kiAgentName` und optional `selectedKiPluginPrefix` | `KiStartenAsync_ShouldKeepInitialPromptBehavior` |
 
 ### Abhängigkeiten
 
