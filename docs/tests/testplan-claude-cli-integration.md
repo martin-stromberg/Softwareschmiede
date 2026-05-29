@@ -1,51 +1,64 @@
-# Testplan – Claude-CLI-Integration
+# Testplan – Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)
 
 ## Ziel
-Vollständige Schließung der in `docs/tests/testluecken-claude-cli-integration.md` dokumentierten Testlücken und Absicherung gegen Regressionen.
+Absicherung der Claude-CLI-Integration gegen Regressionen mit Fokus auf:
+- stabile CLI-Aufrufe,
+- Session-Wiederverwendung (`-n`/`-r`),
+- Fallback bei `session not found`,
+- Large-Prompt-Pipe-Weg,
+- Token-Weitergabe als `ANTHROPIC_API_KEY`.
 
 ## Ausgangsbasis
+- Implementierung: `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs`
+- Testklasse: `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
 - Lückenliste: `docs/tests/testluecken-claude-cli-integration.md`
-- Ergebnis der Analyse: **alle identifizierten Lücken sind umgesetzt** (keine offenen Restpunkte)
 
-## Abgedeckte Testbereiche (Schließung der Lücken)
+## Testumfang
 
-1. **ClaudeCliPlugin – Agent-Discovery, Deploy, Testparsing, Health-Check**  
-   Datei: `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
-   - `.github`-Suchroot mit Fallback-Beschreibung
-   - Überschreiben bestehender `.github`-Dateien beim Deploy
-   - Parsing kombinierter `StdOut`/`StdErr`-Ausgaben (`Passed`/`Failed`/`Skipped`)
-   - Negativer Health-Check-Pfad (`claude --version` fehlschlägt)
+### 1) Session-Wiederverwendung
+- `StartDevelopmentAsync_ShouldUseResumeArguments_OnFollowUpRun`
+- `StartDevelopmentAsync_ShouldReuseGeneratedSessionId_WhenNoContextFileExists`
 
-2. **EntwicklungsprozessService – Paketkompatibilität & Testprotokoll-Persistenz**  
-   Datei: `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
-   - `ProzessStartenAsync`: Abbruch bei inkompatiblem Agentenpaket **vor** Clone
-   - `TestsAusfuehrenAsync`: Persistenz von Erfolgs-/Fehlerzusammenfassungen in `ProtokollService`
+**Erwartung:** Erstlauf nutzt `-n`; Folgeaufruf nutzt `-r` mit derselben `taskId`.
 
-3. **PluginManager – Default-Auswahl für KI-Plugin**  
-   Datei: `src/Softwareschmiede.Tests/Infrastructure/Plugins/PluginManagerTests.cs`
-   - Default-Auswahl, wenn ausschließlich Claude-Plugin verfügbar ist
+### 2) Fallback bei Sitzungsverlust
+- `StartDevelopmentAsync_ShouldFallbackToFirstRun_WhenSessionIsMissing`
 
-4. **CliKiPluginBase – provider-spezifische Dateinamen/Pfade**  
-   Datei: `src/Softwareschmiede.Tests/Domain/Abstractions/CliKiPluginBaseTests.cs`
-   - Helfer für provider-spezifische Präfixe (`*.context.md`, `*-task.md`)
+**Erwartung:** Bei `session not found` wird derselbe Task auf Erstlauf zurückgesetzt und erneut gestartet.
 
-5. **GitHubCopilotPlugin – negativer Health-Check**  
-   Datei: `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubCopilotPluginTests.cs`
-   - Negativer Pfad für `copilot --version`
+### 3) Aufruf-Fix für große Prompts
+- `StartDevelopmentAsync_ShouldUseResumeArgs_WithCommandWrapper_WhenLargePromptOnFollowUp`
+- `StartDevelopmentAsync_ShouldUsePowerShellPipe_WhenPromptIsLarge`
 
-## Konkrete Abschluss- und Regressionsschritte
+**Erwartung:** Große Prompts laufen über `powershell`/`sh`-Pipe statt Inline-Argument.
 
-1. **Gezielte Tests für Claude-CLI-Feature ausführen**
-   - `dotnet test .\src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "ClaudeCliPluginTests|EntwicklungsprozessServiceTests|PluginManagerTests|CliKiPluginBaseTests|GitHubCopilotPluginTests"`
+### 4) Token- und CLI-Verhalten
+- `StartDevelopmentAsync_ShouldUseClaudeCommandAndProviderTaskFile`
+- `CheckHealthAsync_ShouldReturnTrue_WhenClaudeVersionSucceeds`
+- `CheckHealthAsync_ShouldReturnFalse_WhenClaudeVersionFails`
 
-2. **Gesamte Testsuite ausführen**
+**Erwartung:** Token wird als `ANTHROPIC_API_KEY` übergeben; Health-Check-Verhalten ist deterministisch.
+
+### 5) Paket-/Agentenverhalten
+- `GetAvailableAgentsAsync_*` (Discovery in `.claude/commands`)
+- `IsAgentPackageCompatibleAsync_*` (Kompatibilität über `.claude/commands`)
+- `DeployAgentPackageAsync_*` (Deploy von `.claude`)
+
+## Ausführung
+1. Selektiver Lauf:
+   - `dotnet test .\src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "ClaudeCliPluginTests"`
+2. Regression im Gesamtsystem:
    - `dotnet test .\Softwareschmiede.slnx`
 
-3. **Abgleich mit Lückenliste**
-   - Prüfen, dass in `docs/tests/testluecken-claude-cli-integration.md` alle Punkte auf `[x]` stehen.
-   - Bei neuen Befunden: Lückenliste aktualisieren und Folgepaket im Testplan ergänzen.
-
 ## Abnahmekriterien
-- Alle oben genannten Tests laufen erfolgreich.
-- In der Lückenliste sind keine offenen Punkte mehr vorhanden.
-- Die Claude-CLI-Integration ist in Plugin-, Service- und Basisklassen-Ebene regressionssicher abgedeckt.
+- Alle oben genannten Claude-Tests bestehen.
+- In `testluecken-claude-cli-integration.md` sind keine priorisierten offenen Punkte.
+- Dokumentation und Implementierung sind konsistent (Requirements/Architecture/Flow/Lifecycle).
+
+## Verknüpfte Artefakte
+- [Requirements Analysis](../requirements/claude-cli-integration-requirements-analysis.md)
+- [Architektur-Blueprint](../architecture/claude-cli-integration-architecture-blueprint.md)
+- [Entity-Relationship-Model](../architecture/claude-cli-integration-entity-relationship-model.md)
+- [Architecture-Review](../improvements/claude-cli-integration-architecture-review.md)
+- [Planungsübersicht](../planning-overview-claude-cli-integration.md)
+- [Lifecycle Report](../lifecycle-report-claude-cli-integration.md)

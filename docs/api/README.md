@@ -12,6 +12,7 @@ Auch für das Feature **„favicon-hammer-pick-svg“** wurden **keine neuen öf
 Auch für das Feature **„Erkennung geänderter Planungsdokumente + Agentendefinitions-Compliance“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für den Sollzustand **„Agentenpaket/Agent optional beim Aufgabenstart“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Auch für das Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Auch für das Feature **„Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
 Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 
 ## Dokumentierte API-Bereiche
@@ -29,7 +30,7 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 | [plugin-default-selection.md](./plugin-default-selection.md) | Interner API-Contract für **Standardplugin** je **Pluginart**, **KI-Plugin-Auswahl** sowie die projektspezifische/aufgabenbezogene `IGitPlugin`-Auflösung (vor Default) inkl. Fallback bei fehlender Repo-Verknüpfung. |
 | [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für Issue 58: plugin-spezifische Agenten-Discovery/Auswahl, Persistenz von `KiPluginPrefix` sowie Pflicht-/Optional-Regeln (KI-Plugin Pflicht, Agentenpaket/Agent optional). |
 | [aufgaben-startvalidierung.md](./aufgaben-startvalidierung.md) | Technischer UI-/Service-Contract für die Startvalidierung in `AufgabeDetail` inkl. Pflichtfeldlogik, optionaler Agentenselektion und Fehler-/Hinweispfaden beim Aufgabenstart. |
-| [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, Plugin-Discovery und Agentenpaket-Compliance (`.github`-Regel, robuste Fehlerpfade, Deploy-Verhalten, Health-Checks) inkl. Workflow-Einordnung. |
+| [plugin-interfaces.md](./plugin-interfaces.md) | Schnittstellenreferenz für `IPlugin`, `IGitPlugin`, `IKiPlugin`, Plugin-Discovery und provider-spezifische Agentenpaket-Compliance (`.github` bei Copilot, `.claude/commands` bei Claude CLI) inkl. Deploy-/Fallback-/Health-Details. |
 | [repository-startskript-freier-port.md](./repository-startskript-freier-port.md) | Interner Contract für repositorybezogene Startskripte mit freier Portreservierung, Persistenz (`RepositoryStartKonfiguration`) und Ausführung beim Prozessstart. |
 | [start-ps1-visual-studio-freier-http-port.md](./start-ps1-visual-studio-freier-http-port.md) | Skriptvertrag für `start.ps1`: parameterloser Aufruf, autonome Mehrprojekt-Portzuweisung, Exit-Codes und VS-kompatibler Host-Fallback auf `localhost`. |
 | [workdir-configuration.md](./workdir-configuration.md) | Interner Contract für Arbeitsverzeichnis-Auflösung und Laufzeit-**Fallback** beim Klonpfad. |
@@ -110,6 +111,22 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
   - [ERM](../architecture/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-entity-relationship-model.md)
   - [Architecture-Review](../improvements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-architecture-review.md)
 
+## Feature-Fokus: Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung) (2026-05-28)
+
+- Keine neuen öffentlichen REST-Endpunkte; die Umsetzung erfolgt im internen `IKiPlugin`-/CLI-Contract.
+- Claude-spezifische Agenten-Discovery und Deploy laufen über `.claude/commands` bzw. `.claude`.
+- Prompt-Ausführung nutzt First-Run `-n` und Follow-up `-r`; bei `session not found` erfolgt ein transparenter Fallback auf First-Run.
+- Große Prompts werden über einen stdin-Wrapper (`powershell`/`sh`) statt Inline-Argument übergeben.
+- Technische Referenz: [plugin-interfaces.md](./plugin-interfaces.md), [http-endpoints.md](./http-endpoints.md)
+- Verknüpfte Planungs-/Testartefakte:
+  - [Requirements](../requirements/claude-cli-integration-requirements-analysis.md)
+  - [Architektur-Blueprint](../architecture/claude-cli-integration-architecture-blueprint.md)
+  - [ERM](../architecture/claude-cli-integration-entity-relationship-model.md)
+  - [Architecture-Review](../improvements/claude-cli-integration-architecture-review.md)
+  - [Planungsübersicht](../planning-overview-claude-cli-integration.md)
+  - [Testplan](../tests/testplan-claude-cli-integration.md)
+  - [Testlücken](../tests/testluecken-claude-cli-integration.md)
+
 ## Feature-Fokus: Lokales Verzeichnis Plugin
 
 - Technischer Contract: [local-directory-plugin.md](./local-directory-plugin.md)
@@ -127,7 +144,7 @@ Details: [http-endpoints.md](./http-endpoints.md) und [diff.md](./diff.md)
 - **Ziel:** Sichtbarkeit geänderter Planungsdokumente und reproduzierbare Agentenpaket-Ausführung ohne Contract-Brüche.
 - **Verhalten:** `WorkspaceSnapshot` trennt Änderungen in `CodeFiles` und `PlanningDocuments` inkl. Fallback-Erkennung für Slash-/Dot-Varianten der `docs/*`-Pfade.
 - **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `WorkspaceSnapshot`, `AufgabeDetail`, `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`.
-- **Compliance-Regeln:** `.github` ist das verbindliche Kompatibilitätskriterium für produktive KI-Plugins; fehlende Paketpfade oder fehlender `.github`-Ordner werden kontrolliert behandelt (leere Agentenliste, `false` bei Kompatibilität, Deploy-Skip statt Hard-Fail).
+- **Compliance-Regeln:** Kompatibilität ist provider-spezifisch (`GitHubCopilotPlugin`: `.github`, `ClaudeCliPlugin`: `.claude/commands`); fehlende Paketpfade oder fehlende Pflichtordner werden kontrolliert behandelt (leere Agentenliste, `false` bei Kompatibilität, Deploy-Skip statt Hard-Fail).
 - **Testbezug:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`.
 - **Workflow-Auswirkung:** Die Aufgabenansicht bleibt auch bei reinen Doku-Änderungen aktiv nutzbar; Agentenpaket-Prüfung und Deploy-Verhalten reduzieren Laufzeitabbrüche im Entwicklungsworkflow.
 - Details: [live-project-browser-git-status.md](./live-project-browser-git-status.md), [plugin-interfaces.md](./plugin-interfaces.md), [planning-overview-changed-artifact-detection.md](../planning-overview-changed-artifact-detection.md)

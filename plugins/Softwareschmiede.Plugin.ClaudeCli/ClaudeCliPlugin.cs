@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -14,9 +15,19 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<ClaudeCliPlugin> _logger;
 
+    private readonly Dictionary<string, Guid> _repoTaskIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<Guid> _startedTaskIds = [];
+    private readonly object _sessionLock = new();
+    private const int PromptInlineLimitBytes = 8 * 1024;
+    private const string SessionNotFoundMarker = "session not found";
+
+    /// <inheritdoc/>
     public override string PluginName => "Claude CLI";
+    /// <inheritdoc/>
     public override string ProviderDateiPraefix => "claude";
+    /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.ClaudeCli";
+    /// <inheritdoc/>
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
@@ -129,44 +140,207 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
         var promptFile = BuildTaskFilePath(localRepoPath, Guid.NewGuid());
         await File.WriteAllTextAsync(promptFile, prompt, ct);
 
-        var args = BuildClaudeArgs(promptFile, agent, model);
         var env = GetClaudeEnvironment();
+        var taskId = ResolveTaskId(localRepoPath);
+        var isFollowUp = IsTaskStarted(taskId);
+        var useStdIn = Encoding.UTF8.GetByteCount(prompt) > PromptInlineLimitBytes;
+        var execution = CreateExecutionRequest(prompt, promptFile, agent, model, taskId, isFollowUp, useStdIn);
 
-        _logger.LogInformation("Rufe claude CLI mit Agent {AgentName} auf.", agent.Name);
+        _logger.LogInformation(
+            "Rufe claude CLI mit Agent {AgentName} auf. Aufgabe: {TaskId}, FollowUp: {IsFollowUp}.",
+            agent.Name,
+            taskId,
+            isFollowUp);
+        _logger.LogDebug("{Command} {Args}", execution.Command, BuildDebugArgs(execution));
 
-        await foreach (var line in _cliRunner.StreamAsync("claude", args, localRepoPath, env, ct))
+        if (isFollowUp)
+        {
+            var followUpLines = new List<string>();
+            var sessionNotFound = false;
+            await foreach (var line in _cliRunner.StreamAsync(execution.Command, execution.Args, localRepoPath, env, ct))
+            {
+                followUpLines.Add(line);
+                sessionNotFound |= line.Contains(SessionNotFoundMarker, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (sessionNotFound)
+            {
+                _logger.LogWarning("Claude-Session {TaskId} nicht gefunden. Starte neuen Erstlauf.", taskId);
+                MarkTaskAsNotStarted(taskId);
+                var fallbackExecution = CreateExecutionRequest(prompt, promptFile, agent, model, taskId, isFollowUp: false, useStdIn);
+                _logger.LogDebug("{Command} {Args}", fallbackExecution.Command, BuildDebugArgs(fallbackExecution));
+
+                await foreach (var line in _cliRunner.StreamAsync(fallbackExecution.Command, fallbackExecution.Args, localRepoPath, env, ct))
+                {
+                    yield return line;
+                }
+
+                MarkTaskAsStarted(taskId);
+                yield break;
+            }
+
+            foreach (var line in followUpLines)
+            {
+                yield return line;
+            }
+
+            yield break;
+        }
+
+        await foreach (var line in _cliRunner.StreamAsync(execution.Command, execution.Args, localRepoPath, env, ct))
         {
             yield return line;
         }
+
+        MarkTaskAsStarted(taskId);
     }
 
-    private static IEnumerable<string> BuildClaudeArgs(string promptFilePath, AgentInfo agent, string? model)
+    private CliExecutionRequest CreateExecutionRequest(
+        string prompt,
+        string promptFilePath,
+        AgentInfo agent,
+        string? model,
+        Guid taskId,
+        bool isFollowUp,
+        bool useStdIn)
     {
-        var args = new List<string>
+        var baseArgs = BuildClaudeArgs(prompt, agent, model, taskId, isFollowUp, includePromptArgument: !useStdIn).ToList();
+        if (!useStdIn)
         {
-            "--prompt", $"\"Aktuelle Aufgabe: @{promptFilePath}\"",
-            "--allow-all-tools",
-            "--allow-all-paths",
-            "--no-ask-user",
-            "--silent",
-        };
+            return new CliExecutionRequest("claude", baseArgs, ContainsInlinePrompt: true);
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            var escapedPromptPath = EscapePowerShellString(promptFilePath);
+            var escapedArgs = baseArgs.Select(arg => $"'{EscapePowerShellString(arg)}'").ToList();
+            var script = $"Get-Content -Raw -LiteralPath '{escapedPromptPath}' | claude {string.Join(" ", escapedArgs)}";
+            return new CliExecutionRequest("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], ContainsInlinePrompt: false);
+        }
+
+        var escapedPromptPathUnix = EscapeBashString(promptFilePath);
+        var escapedUnixArgs = baseArgs.Select(arg => $"'{EscapeBashString(arg)}'").ToList();
+        var unixScript = $"cat '{escapedPromptPathUnix}' | claude {string.Join(" ", escapedUnixArgs)}";
+        return new CliExecutionRequest("sh", ["-c", unixScript], ContainsInlinePrompt: false);
+    }
+
+    private static IEnumerable<string> BuildClaudeArgs(
+        string prompt,
+        AgentInfo agent,
+        string? model,
+        Guid taskId,
+        bool isFollowUp,
+        bool includePromptArgument)
+    {
+        var args = new List<string>();
+        if (isFollowUp)
+        {
+            args.AddRange(["-r", taskId.ToString(), "-p"]);
+        }
+        else
+        {
+            args.AddRange(["-p", "-n", taskId.ToString()]);
+        }
+
+        args.Add("--dangerously-skip-permissions");
+        args.AddRange(["--output-format", "stream-json"]);
 
         if (!string.IsNullOrWhiteSpace(agent.Name))
         {
             args.AddRange(["--agent", agent.Name]);
         }
 
-        if (!string.IsNullOrWhiteSpace(model))
+        args.AddRange(["--model", NormalizeModel(model)]);
+
+        if (includePromptArgument)
         {
-            args.AddRange(["--model", model]);
-        }
-        else
-        {
-            args.AddRange(["--model", "auto"]);
+            args.Add(prompt);
         }
 
         return args;
     }
+
+    private static string NormalizeModel(string? model)
+    {
+        if (string.IsNullOrWhiteSpace(model) || string.Equals(model, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return "sonnet";
+        }
+
+        return model;
+    }
+
+    private static string BuildDebugArgs(CliExecutionRequest execution)
+    {
+        if (!execution.ContainsInlinePrompt || execution.Args.Count == 0)
+        {
+            return string.Join(" ", execution.Args);
+        }
+
+        var args = execution.Args.ToList();
+        args[^1] = "<prompt-redacted>";
+        return string.Join(" ", args);
+    }
+
+    private Guid ResolveTaskId(string localRepoPath)
+    {
+        var contextFiles = Directory.GetFiles(localRepoPath, BuildContextFileMask());
+        foreach (var contextFile in contextFiles.OrderByDescending(File.GetLastWriteTimeUtc))
+        {
+            var fileName = Path.GetFileName(contextFile);
+            var suffix = $".{ProviderDateiPraefix}.context.md";
+            if (!fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var idCandidate = fileName[..^suffix.Length];
+            if (Guid.TryParse(idCandidate, out var taskId))
+            {
+                return taskId;
+            }
+        }
+
+        var key = Path.GetFullPath(localRepoPath);
+        lock (_sessionLock)
+        {
+            if (_repoTaskIds.TryGetValue(key, out var existingTaskId))
+            {
+                return existingTaskId;
+            }
+
+            var createdTaskId = Guid.NewGuid();
+            _repoTaskIds[key] = createdTaskId;
+            return createdTaskId;
+        }
+    }
+
+    private bool IsTaskStarted(Guid taskId)
+    {
+        lock (_sessionLock)
+        {
+            return _startedTaskIds.Contains(taskId);
+        }
+    }
+
+    private void MarkTaskAsStarted(Guid taskId)
+    {
+        lock (_sessionLock)
+        {
+            _startedTaskIds.Add(taskId);
+        }
+    }
+
+    private void MarkTaskAsNotStarted(Guid taskId)
+    {
+        lock (_sessionLock)
+        {
+            _startedTaskIds.Remove(taskId);
+        }
+    }
+
+    private static string EscapePowerShellString(string value) => value.Replace("'", "''", StringComparison.Ordinal);
+    private static string EscapeBashString(string value) => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
 
     public override async Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default)
     {
@@ -221,4 +395,5 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
         return result.IsSuccess;
     }
 
+    private sealed record CliExecutionRequest(string Command, IReadOnlyList<string> Args, bool ContainsInlinePrompt);
 }

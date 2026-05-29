@@ -45,7 +45,7 @@ Die Umsetzung betrifft bestehende Service-/Plugin-Komponenten (`GitWorkspaceBrow
 
 - **Ziel:** Vollständige Erkennung geänderter Artefakte (Code + Planung) und verlässliche Agentenpaket-Kompatibilität.
 - **Verhalten:** Keine API-Flächenänderung nach außen; interne Contracts liefern getrennte Listen (`CodeFiles`, `PlanningDocuments`) und robuste Plugin-Fehlerpfade.
-- **Compliance-Regeln:** Für produktive KI-Plugins gilt `.github` als Kompatibilitätskriterium; fehlende Paketpfade/fehlender `.github`-Ordner führen zu kontrolliertem Verhalten statt Hard-Fail.
+- **Compliance-Regeln:** Das Kompatibilitätskriterium ist provider-spezifisch (`GitHubCopilotPlugin`: `.github`, `ClaudeCliPlugin`: `.claude/commands`); fehlende Paketpfade/Pflichtordner führen zu kontrolliertem Verhalten statt Hard-Fail.
 - **Testbezug:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`.
 - **Workflow-Auswirkung:** Der Aufgaben-Workflow bleibt auch bei reinen Planungsdokument-Änderungen aktiv, und Agentenbereitstellung wird reproduzierbarer.
 
@@ -60,6 +60,19 @@ Die Umsetzung betrifft UI-/Service-Vertragslogik (`AufgabeDetail`, `PluginSelect
 - **Persistenz:** `Aufgabe.KiPluginPrefix` ist nullable und über Migration eingeführt.
 - **Testbezug:** `PluginSelectionServiceTests`, `EntwicklungsprozessServiceTests`, `AufgabeDetailFolgePromptTests`, `AufgabeServiceTests`.
 - **Details:** [ki-plugin-spezifische-agenten-discovery-auswahl.md](./ki-plugin-spezifische-agenten-discovery-auswahl.md), [aufgaben-startvalidierung.md](./aufgaben-startvalidierung.md)
+
+## Feature-Hinweis: Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)
+
+Für das Feature **„Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)“** wurden **keine neuen öffentlichen HTTP-Endpunkte** eingeführt.
+Die Umsetzung liegt ausschließlich in der internen Plugin-/CLI-Orchestrierung (`ClaudeCliPlugin`, `EntwicklungsprozessService`).
+
+- **Agentenpaket-Contract (Claude):** Discovery nur aus `.claude/commands`; Deploy kopiert `.claude` ins Repository.
+- **Session-Verhalten:** First-Run mit `-n <taskId>`, Follow-up mit `-r <taskId> -p`; bei `session not found` erfolgt ein Fallback auf neuen First-Run.
+- **Large-Prompt-Verhalten:** Prompts > 8 KB werden per stdin (`powershell`/`sh` Wrapper) statt Inline-Argument an `claude` übergeben.
+- **Token-Weitergabe:** Optionales Secret wird als `ANTHROPIC_API_KEY` an den Prozess übergeben.
+- **Dokumentations-Fallback (transparent):** Für den Dokumentationslauf wurde bei fehlender `~/.copilot/agents/documentation-orchestrator.agent.md` auf `.github/agents/documentation-orchestrator.agent.md` gewechselt (siehe [documentation-plan.md](../documentation-plan.md)).
+- **Details:** [plugin-interfaces.md](./plugin-interfaces.md)
+- **Verknüpfte Planungs-/Testartefakte:** [Requirements](../requirements/claude-cli-integration-requirements-analysis.md), [Architektur-Blueprint](../architecture/claude-cli-integration-architecture-blueprint.md), [ERM](../architecture/claude-cli-integration-entity-relationship-model.md), [Architecture-Review](../improvements/claude-cli-integration-architecture-review.md), [Planungsübersicht](../planning-overview-claude-cli-integration.md), [Testplan](../tests/testplan-claude-cli-integration.md), [Testlücken](../tests/testluecken-claude-cli-integration.md)
 
 ## Feature-Hinweis: Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview
 

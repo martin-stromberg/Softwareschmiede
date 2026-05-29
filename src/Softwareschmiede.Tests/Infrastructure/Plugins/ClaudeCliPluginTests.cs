@@ -122,15 +122,27 @@ public sealed class ClaudeCliPluginTests : IDisposable
         Directory.GetFiles(_testDirectory, "*.claude-task.md").Should().ContainSingle();
         _cliRunnerMock.Verify(c => c.StreamAsync(
             "claude",
-            It.Is<IEnumerable<string>>(args => args.Contains("--model") && args.Contains("claude-model") && args.Contains("--agent") && args.Contains("test-agent")),
+            It.Is<IEnumerable<string>>(args =>
+                args.Contains("-p")
+                && args.Contains("-n")
+                && args.Contains("--dangerously-skip-permissions")
+                && args.Contains("--model")
+                && args.Contains("claude-model")
+                && args.Contains("--agent")
+                && args.Contains("test-agent")
+                && !args.Contains("--prompt")
+                && !args.Contains("--allow-all-tools")
+                && !args.Contains("--allow-all-paths")
+                && !args.Contains("--no-ask-user")
+                && !args.Contains("--silent")),
             _testDirectory,
             It.Is<IDictionary<string, string>?>(env => env != null && env["ANTHROPIC_API_KEY"] == "claude-token"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>Uses auto-model when no explicit model was provided.</summary>
+    /// <summary>Uses sonnet-model alias when no explicit model was provided.</summary>
     [Fact]
-    public async Task StartDevelopmentAsync_ShouldUseAutoModel_WhenModelIsNull()
+    public async Task StartDevelopmentAsync_ShouldUseSonnetModel_WhenModelIsNull()
     {
         Directory.CreateDirectory(_testDirectory);
         _cliRunnerMock.Setup(c => c.StreamAsync(
@@ -148,7 +160,243 @@ public sealed class ClaudeCliPluginTests : IDisposable
 
         _cliRunnerMock.Verify(c => c.StreamAsync(
             "claude",
-            It.Is<IEnumerable<string>>(args => args.Contains("--model") && args.Contains("auto")),
+            It.Is<IEnumerable<string>>(args => args.Contains("--model") && args.Contains("sonnet")),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Maps "auto" model alias to sonnet for Claude CLI compatibility.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldMapAutoModelToSonnet()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                "claude",
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable());
+        var agent = new AgentInfo("agent-a", null, "file");
+
+        await foreach (var _ in _sut.StartDevelopmentAsync("Prompt", agent, _testDirectory, "auto"))
+        {
+        }
+
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            "claude",
+            It.Is<IEnumerable<string>>(args => args.Contains("--model") && args.Contains("sonnet") && !args.Contains("auto")),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Uses task-based session resume on follow-up runs in the same repository.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldUseResumeArguments_OnFollowUpRun()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var taskId = Guid.NewGuid();
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, $"{taskId}.claude.context.md"), "context");
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                "claude",
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("ok"));
+
+        var agent = new AgentInfo("agent-a", null, "file");
+        await foreach (var _ in _sut.StartDevelopmentAsync("Prompt 1", agent, _testDirectory, null))
+        {
+        }
+
+        await foreach (var _ in _sut.StartDevelopmentAsync("Prompt 2", agent, _testDirectory, null))
+        {
+        }
+
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            "claude",
+            It.Is<IEnumerable<string>>(args =>
+                args.Contains("-n")
+                && args.Contains(taskId.ToString())
+                && args.Contains("-p")
+                && !args.Contains("-r")),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            "claude",
+            It.Is<IEnumerable<string>>(args =>
+                args.Contains("-r")
+                && args.Contains(taskId.ToString())
+                && args.Contains("-p")
+                && !args.Contains("-n")),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Retries as first run when resume reports that the session was not found.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldFallbackToFirstRun_WhenSessionIsMissing()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var taskId = Guid.NewGuid();
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, $"{taskId}.claude.context.md"), "context");
+        var callCount = 0;
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                callCount++;
+                return callCount switch
+                {
+                    1 => ToAsyncEnumerable("ok"),
+                    2 => ToAsyncEnumerable("[Fehler] session not found"),
+                    3 => ToAsyncEnumerable("recovered"),
+                    _ => ToAsyncEnumerable()
+                };
+            });
+
+        var agent = new AgentInfo("agent-a", null, "file");
+        await foreach (var _ in _sut.StartDevelopmentAsync("Prompt 1", agent, _testDirectory, null))
+        {
+        }
+
+        var lines = new List<string>();
+        await foreach (var line in _sut.StartDevelopmentAsync("Prompt 2", agent, _testDirectory, null))
+        {
+            lines.Add(line);
+        }
+
+        lines.Should().Contain("recovered");
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            "claude",
+            It.Is<IEnumerable<string>>(args => args.Contains("-r") && args.Contains(taskId.ToString())),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            "claude",
+            It.Is<IEnumerable<string>>(args => args.Contains("-n") && args.Contains(taskId.ToString())),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    /// <summary>Reuses generated session id across runs in the same repository even without context files.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldReuseGeneratedSessionId_WhenNoContextFileExists()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var capturedArgs = new List<IReadOnlyList<string>>();
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                "claude",
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("ok"))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => capturedArgs.Add(args.ToList()));
+
+        var agent = new AgentInfo("agent-a", null, "file");
+
+        await foreach (var _ in _sut.StartDevelopmentAsync("Prompt 1", agent, _testDirectory, null))
+        {
+        }
+
+        await foreach (var _ in _sut.StartDevelopmentAsync("Prompt 2", agent, _testDirectory, null))
+        {
+        }
+
+        capturedArgs.Should().HaveCount(2);
+        var firstRunArgs = capturedArgs[0];
+        var firstTaskId = firstRunArgs.SkipWhile(a => a != "-n").Skip(1).FirstOrDefault();
+        firstTaskId.Should().NotBeNullOrWhiteSpace();
+
+        firstRunArgs.Should().Contain("-n");
+        firstRunArgs.Should().NotContain("-r");
+        capturedArgs[1].Should().Contain("-r");
+        capturedArgs[1].Should().Contain(firstTaskId!);
+        capturedArgs[1].Should().NotContain("-n");
+    }
+
+    /// <summary>Uses stdin command wrapper and resume arguments on large follow-up prompts.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldUseResumeArgs_WithCommandWrapper_WhenLargePromptOnFollowUp()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var largePrompt = new string('x', 9000);
+        var commands = new List<string>();
+        var allArgs = new List<IReadOnlyList<string>>();
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("ok"))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (command, args, _, _, _) =>
+                {
+                    commands.Add(command);
+                    allArgs.Add(args.ToList());
+                });
+        var agent = new AgentInfo("agent-a", null, "file");
+
+        await foreach (var _ in _sut.StartDevelopmentAsync(largePrompt, agent, _testDirectory, null))
+        {
+        }
+
+        await foreach (var _ in _sut.StartDevelopmentAsync(largePrompt, agent, _testDirectory, null))
+        {
+        }
+
+        commands.Should().HaveCount(2);
+        commands.Should().OnlyContain(c => c == (OperatingSystem.IsWindows() ? "powershell" : "sh"));
+
+        var firstArgs = string.Join(" ", allArgs[0]);
+        var secondArgs = string.Join(" ", allArgs[1]);
+        firstArgs.Should().Contain("'-n'");
+        firstArgs.Should().NotContain("'-r'");
+        secondArgs.Should().Contain("'-r'");
+        secondArgs.Should().NotContain("'-n'");
+        firstArgs.Should().NotContain(largePrompt[..100]);
+        secondArgs.Should().NotContain(largePrompt[..100]);
+    }
+
+    /// <summary>Uses stdin piping through PowerShell when prompt text is larger than 8 KB.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldUsePowerShellPipe_WhenPromptIsLarge()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var largePrompt = new string('x', 9000);
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("ok"));
+        var agent = new AgentInfo("agent-a", null, "file");
+
+        await foreach (var _ in _sut.StartDevelopmentAsync(largePrompt, agent, _testDirectory, null))
+        {
+        }
+
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            OperatingSystem.IsWindows() ? "powershell" : "sh",
+            It.Is<IEnumerable<string>>(args =>
+                args.Any(a => a.Contains("Get-Content -Raw -LiteralPath", StringComparison.Ordinal) || a.StartsWith("cat ", StringComparison.Ordinal))
+                && args.Any(a => a.Contains("--dangerously-skip-permissions", StringComparison.Ordinal))),
             _testDirectory,
             It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Once);

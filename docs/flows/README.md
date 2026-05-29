@@ -8,6 +8,7 @@ Dieses Verzeichnis enthält die Programmablaufplan-Dokumentation für **Software
 |--------|-------|--------------|
 | [Entwicklungsprozess-Abläufe](./development-process-flow.md) | `development-process-flow.md` | Alle zentralen Abläufe des Entwicklungszyklus mit Sollzustand „KI-Plugin Pflicht, Agentenpaket/Agent optional“ |
 | [Kontextsteuerung bei Folgeanweisungen](./follow-up-context-steering-flow.md) | `follow-up-context-steering-flow.md` | Folgeanweisungsfluss inkl. Moduslogik, Pflichtauflösung des KI-Plugins, Komprimierung und persistenter Kontextdateien |
+| [Claude-CLI Aufruf-Fix & Session-Wiederverwendung](./claude-cli-session-reuse-flow.md) | `claude-cli-session-reuse-flow.md` | Task-ID-Auflösung, `-n`/`-r`-Logik, `session not found`-Fallback, Large-Prompt-Pipe und Token-Übergabe als `ANTHROPIC_API_KEY` |
 | [AufgabeService Statusübergänge](./aufgabe-service-status-flow.md) | `aufgabe-service-status-flow.md` | Statuslebenszyklus einer Aufgabe mit Guard-Checks, Persistenz und Fehlerpfaden |
 | [AutoShutdownOrchestrator](./auto-shutdown-orchestrator-flow.md) | `auto-shutdown-orchestrator-flow.md` | Ereignisgesteuerter Auto-Shutdown beim Übergang laufender Automatisierungen von >0 auf 0 |
 | [PluginSettingsService](./plugin-settings-service-flow.md) | `plugin-settings-service-flow.md` | Lesen/Schreiben von Plugin-Credentials und Laufzeitbezug zur Claude-CLI-Integration |
@@ -84,6 +85,13 @@ Dokumentiert den Toggle-gesteuerten Shutdown-Mechanismus mit Idempotenz pro Zero
 **Typ:** `sequenceDiagram` + `flowchart TD` · **Services:** `EinstellungenBase`, `PluginSettingsService`, `IPluginManager`, `ICredentialStore`
 
 Beschreibt die Schlüsselbildung `<PluginPrefix>.<FieldKey>`, das Speichern/Löschen von Credentials und die konkrete Nutzung des Claude-Tokens in `ClaudeCliPlugin`.
+
+---
+
+### [Ablauf 2g: Claude-CLI Aufruf-Fix & Session-Wiederverwendung](./claude-cli-session-reuse-flow.md)
+**Typ:** `flowchart TD` + `sequenceDiagram` · **Services:** `ClaudeCliPlugin`, `ICliRunner`, `ICredentialStore`
+
+Beschreibt den Claude-spezifischen Ausführungspfad für Task-ID-Auflösung aus Kontextdatei/Repo-Session, Erstlauf (`-n`) versus Follow-up (`-r`), Fallback bei `session not found`, den Large-Prompt-Pfad via `powershell`/`sh`-Pipe sowie die Token-Übergabe nach `ANTHROPIC_API_KEY`.
 
 ---
 
