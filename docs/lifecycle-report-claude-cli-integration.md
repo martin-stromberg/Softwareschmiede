@@ -1,45 +1,31 @@
-# Lifecycle Report: Claude CLI Integration
+# Lifecycle Report – Claude-CLI-Integration
 
-## Planned artifacts
-- `docs/requirements/claude-cli-integration-requirements-analysis.md`
-- `docs/architecture/claude-cli-integration-architecture-blueprint.md`
-- `docs/architecture/claude-cli-integration-entity-relationship-model.md`
-- `docs/improvements/claude-cli-integration-architecture-review.md`
-- `docs/planning-overview-claude-cli-integration.md`
+## Was wurde geplant?
+- Anforderungen, Architektur, ERM und Review wurden konsistent dokumentiert:
+  - [Requirements Analysis](./requirements/claude-cli-integration-requirements-analysis.md)
+  - [Architektur-Blueprint](./architecture/claude-cli-integration-architecture-blueprint.md)
+  - [Entity-Relationship-Model](./architecture/claude-cli-integration-entity-relationship-model.md)
+  - [Architecture-Review](./improvements/claude-cli-integration-architecture-review.md)
+  - [Planungsübersicht](./planning-overview-claude-cli-integration.md)
 
-## Implemented
-- Added new plugin project `Softwareschmiede.Plugin.ClaudeCli` implementing `IKiPlugin`.
-- Introduced shared CLI base class `CliKiPluginBase` in contracts for reusable provider-independent behavior.
-- Refactored context file naming to provider-specific keys (`copilot`, `claude`) including follow-up instruction context handling.
-- Wired plugin discovery/usage and updated host/plugin project references and solution entries.
+## Was wurde implementiert?
+- `ClaudeCliPlugin` auf gültige Claude-CLI-Argumente umgestellt (`-p/--print`, `--dangerously-skip-permissions`).
+- Session-Wiederverwendung pro Aufgabe ergänzt (Erstlauf mit `-n`, Folgeaufrufe mit `-r`).
+- Fallback auf Erstlauf bei `session not found` integriert.
+- Große Prompts (>8 KB) via stdin-Pipe robust ausgeführt.
+- Model-Alias und Logging-Verhalten gemäß Review konsolidiert.
 
-## Tests added/extended
-- Added and extended plugin/service tests, including:
-  - `src/Softwareschmiede.Tests/Domain/Abstractions/CliKiPluginBaseTests.cs` (new)
-  - `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
-  - `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
-  - `src/Softwareschmiede.Tests/Infrastructure/Plugins/PluginManagerTests.cs`
-  - `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubCopilotPluginTests.cs`
-- Test coverage analysis and execution docs:
-  - `docs/tests/testluecken-claude-cli-integration.md`
-  - `docs/tests/testplan-claude-cli-integration.md`
+## Welche Tests wurden ergänzt?
+- `ClaudeCliPluginTests` für Argumentschema, Session-Reuse, Resume-Fallback und Large-Prompt-Pipe erweitert.
+- Relevanter Feature-Scope läuft grün (`ClaudeCliPluginTests` vollständig erfolgreich).
 
-## Documentation updated
-- New business and flow documentation:
-  - `docs/business/features/F013-claude-cli-integration.md`
-  - `docs/flows/aufgabe-service-status-flow.md`
-  - `docs/flows/auto-shutdown-orchestrator-flow.md`
-  - `docs/flows/plugin-settings-service-flow.md`
-- Updated core documentation:
-  - `README.md`
-  - `docs/documentation-plan.md`
-  - `docs/api/README.md`
-  - `docs/api/plugin-interfaces.md`
-  - `docs/api/http-endpoints.md`
-  - `docs/flows/README.md`
-  - `docs/flows/follow-up-context-steering-flow.md`
-  - `docs/business/features.md`
-  - `docs/user-guide.md`
+## Was wurde dokumentiert?
+- Fachliche, technische und testbezogene Doku zum Feature harmonisiert:
+  - [Business Feature F013](./business/features/F013-claude-cli-integration.md)
+  - [Flow: Claude-CLI Session Reuse](./flows/claude-cli-session-reuse-flow.md)
+  - [Testplan](./tests/testplan-claude-cli-integration.md)
+  - [Testlücken](./tests/testluecken-claude-cli-integration.md)
 
-## Open points / notes
-- Documentation orchestrator reported an environment hang during integration test execution; test process was terminated there. Implementation and test-coverage phases already reported successful build/unit/integration validation before that.
+## Offene Punkte / Hinweise
+- Keine kritischen offenen Punkte im Feature-Scope.
+- In der Laufzeitumgebung fehlte `~/.copilot/agents/documentation-orchestrator.agent.md`; verwendet wurde die Projektdefinition unter `.github/agents/`.

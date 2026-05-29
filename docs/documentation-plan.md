@@ -1404,3 +1404,82 @@
 
 ### Offene Punkte
 - Keine kritischen offenen Dokumentationslücken im Scope des Features identifiziert.
+
+---
+
+# Dokumentationsplan – Feature „Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)“ – 2026-05-28
+
+## Kontext
+- Ziel: Vollständige Aktualisierung der Dokumentation für das bereits implementierte Feature **„Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)“**.
+- Verpflichtender Ablauf gemäß `documentation-orchestrator.agent.md` wurde ausgeführt.
+- **Fallback-Entscheidung:** `~/.copilot/agents/documentation-orchestrator.agent.md` war in der Laufzeitumgebung nicht vorhanden. Daher wurde transparent auf `.github/agents/documentation-orchestrator.agent.md` gewechselt.
+- Relevante Codebasis zur Ist-Prüfung:
+  - `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs`
+  - `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
+
+## Phase 1 – Analyse (kompakt)
+
+### API-Docs (`docs/api/`)
+- `docs/api/` vorhanden; öffentliche HTTP-Endpunkte weiterhin ausschließlich `/api/diff`.
+- Für Claude-CLI gibt es keinen öffentlichen REST-Endpoint; es handelt sich um Plugin-/CLI-Contract-Verhalten.
+- Lücken:
+  1. Feature-Fokus „Aufruf-Fix & Session-Wiederverwendung“ in API-Index/HTTP-Abgrenzung nicht explizit genug.
+  2. `plugin-interfaces.md` enthält veraltete Formulierungen zur Agentenpaketstruktur (`.github`) für `ClaudeCliPlugin`; Implementierung nutzt `.claude/commands` und `.claude`-Deploy.
+
+### Flow-Docs (`docs/flows/`)
+- Bestehende Flows vorhanden (`plugin-settings-service-flow.md`, `follow-up-context-steering-flow.md`), aber ohne dedizierten Claude-Session-Ablauf.
+- Lücke:
+  1. Kein eigener Ablaufplan für Session-ID-Auflösung, Follow-up-Resume (`-r`), Fallback bei `session not found` und Large-Prompt-Wrapper.
+
+### Business-Docs (`docs/business/`)
+- `F013-claude-cli-integration.md` vorhanden.
+- Lücken:
+  1. „Aufruf-Fix“ und „Session-Wiederverwendung“ noch nicht fachlich präzise beschrieben.
+  2. Querverweise gingen auf generische statt featurespezifische Requirements/Architecture/Review-Artefakte.
+
+### README-Analyse
+- Durchführung gemäß Orchestrator-Phase 1 erledigt; im Feature-Scope sind keine zwingenden README-Änderungen erforderlich.
+
+## Phase 1 – Priorisierter Ausführungsplan
+1. **Hoch:** Fehlende feature-spezifische Planungsartefakte anlegen (`requirements`, `architecture blueprint`, `ERM`, `architecture review`, `planning-overview`).
+2. **Hoch:** Bestehende Claude-Dokumente (`F013`, `testplan`, `testluecken`, `lifecycle-report`) auf den tatsächlichen Implementierungsstand synchronisieren.
+3. **Mittel:** API-/Flow-Doku für Claude-spezifische CLI-Aufruflogik und Session-Wiederverwendung konsistent ergänzen.
+4. **Mittel:** Querverweise/Pfade/Feature-Bezeichnung vereinheitlichen.
+
+## Phase 2 – Parallele Dokumentationserstellung
+- `documentation-api`: ausgeführt (Änderungen unter `docs/api/`)
+- `documentation-flow`: ausgeführt (Änderungen unter `docs/flows/`)
+- `documentation-business`: ausgeführt (Änderungen unter `docs/business/`)
+- `documentation-readme-writer`: ausgeführt (Ergebnis: kein zwingender README-Änderungsbedarf im Feature-Scope)
+
+## Anhang: Ergebnis (Phase 3)
+
+### Neu erstellt
+1. `docs/requirements/claude-cli-integration-requirements-analysis.md`
+2. `docs/architecture/claude-cli-integration-architecture-blueprint.md`
+3. `docs/architecture/claude-cli-integration-entity-relationship-model.md`
+4. `docs/improvements/claude-cli-integration-architecture-review.md`
+5. `docs/planning-overview-claude-cli-integration.md`
+6. `docs/flows/claude-cli-session-reuse-flow.md`
+
+### Aktualisiert
+1. `docs/api/README.md`
+2. `docs/api/http-endpoints.md`
+3. `docs/api/plugin-interfaces.md`
+4. `docs/flows/README.md`
+5. `docs/business/features.md`
+6. `docs/business/features/F013-claude-cli-integration.md`
+7. `docs/tests/testplan-claude-cli-integration.md`
+8. `docs/tests/testluecken-claude-cli-integration.md`
+9. `docs/lifecycle-report-claude-cli-integration.md`
+10. `docs/documentation-plan.md`
+
+### Validierung
+- Existenz- und Nicht-Leerheitsprüfung aller neu erzeugten/aktualisierten Claude-CLI-Artefakte: erfolgreich.
+- Querverweise auf Requirements/Architecture/Tests/Lifecycle im Feature-Scope konsistent gesetzt.
+- Ist-Abgleich gegen Implementierung/Tests durchgeführt:
+  - `ClaudeCliPlugin.cs`
+  - `ClaudeCliPluginTests.cs`
+
+### Offene Punkte
+- Keine kritischen offenen Dokumentationspunkte im Scope „Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)“.

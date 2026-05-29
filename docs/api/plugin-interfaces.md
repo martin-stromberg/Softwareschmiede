@@ -75,13 +75,12 @@ Diese Logik ist im Detail dokumentiert unter:
 ### 1.2 Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance
 
 - **Ziel:** Agentenpakete und Workspace-Artefakte so zu verarbeiten, dass Planungs-/Code-Änderungen und Agentenkompatibilität stabil in einem gemeinsamen Workflow funktionieren.
-- **Verhalten:** `IKiPlugin`-Contracts bleiben unverändert; die produktiven Implementierungen (`GitHubCopilotPlugin`, `ClaudeCliPlugin`) setzen zusätzliche Validierungs- und Fallback-Regeln um.
+- **Verhalten:** `IKiPlugin`-Contracts bleiben unverändert; produktive Implementierungen setzen provider-spezifische Validierungs- und Fallback-Regeln um.
 - **Betroffene Komponenten:** `IKiPlugin`, `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`, `EntwicklungsprozessService`.
-- **Compliance-Regeln:**
-  - `.github` ist das verbindliche Kompatibilitätskriterium für produktive KI-Plugins (`IsAgentPackageCompatibleAsync`).
-  - `GetAvailableAgentsAsync` durchsucht bevorzugt `.github`, fällt sonst auf Paket-Root zurück.
+- **Compliance-Regeln (provider-spezifisch):**
+  - `GitHubCopilotPlugin`: Kompatibilität/Discovery über `.github`.
+  - `ClaudeCliPlugin`: Kompatibilität/Discovery über `.claude/commands`; Deploy über `.claude`.
   - Fehlender Paketpfad führt zu leerer Agentenliste statt Ausnahme.
-  - `DeployAgentPackageAsync` kopiert den paketinternen `.github`-Inhalt nach `{localRepoPath}/.github`; fehlt `.github`, wird robust übersprungen.
   - `CheckHealthAsync` signalisiert Betriebsbereitschaft per `bool` (statt workflowbrechender Ausnahme).
 - **Testbezug:** `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`, `CliKiPluginBaseTests`.
 - **Workflow-Auswirkung:** Agentenauswahl, Paketprüfung, Deploy und KI-Start verhalten sich auch bei unvollständigen Paketen vorhersehbar; dadurch sinken Fehlabbrüche im Entwicklungsablauf.
@@ -523,7 +522,7 @@ Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
     CancellationToken ct = default);
 ```
 
-**Beschreibung:** Liest alle verfügbaren Agenten aus einem Agentenpaket-Verzeichnis. Ein Agent wird durch eine `*.agent.md`-Datei repräsentiert. Implementierungen durchsuchen bevorzugt den `.github`-Unterordner (falls vorhanden), sonst das Paket-Root.
+**Beschreibung:** Liest alle verfügbaren Agenten aus einem Agentenpaket-Verzeichnis. Ein Agent wird durch eine `*.agent.md`-Datei repräsentiert. Der effektive Suchpfad ist provider-spezifisch (z. B. `ClaudeCliPlugin`: `.claude/commands`; `GitHubCopilotPlugin`: `.github`).
 
 **Parameter:**
 
@@ -545,7 +544,7 @@ public sealed record AgentInfo(
 ```
 
 **Erkennungslogik:**
-- Es werden alle Dateien mit dem Muster `*.agent.md` im effektiven Suchpfad gesucht (`.github` bevorzugt, sonst Paket-Root).
+- Es werden alle Dateien mit dem Muster `*.agent.md` im provider-spezifischen Suchpfad gesucht.
 - Der Agent-Name ergibt sich aus dem Dateinamen **ohne** das Suffix `.agent.md`.
 - Die Beschreibung wird aus dem YAML-Frontmatter-Feld `description:` gelesen (optional); bei fehlendem Frontmatter/Lesefehlern greift ein robuster Fallback (erste Inhaltszeile bzw. `null`).
 
@@ -564,7 +563,7 @@ Task DeployAgentPackageAsync(
     CancellationToken ct = default);
 ```
 
-**Beschreibung:** Kopiert den paketinternen `.github`-Inhalt in das `.github`-Verzeichnis des geklonten Repositories. Ist kein `.github`-Ordner im Paket vorhanden, wird der Deploy robust übersprungen (mit Log-Warnung).
+**Beschreibung:** Kopiert den provider-spezifischen Agentenpaket-Inhalt in das lokale Repository (z. B. `ClaudeCliPlugin`: `.claude` -> `{localRepoPath}/.claude`; `GitHubCopilotPlugin`: `.github` -> `{localRepoPath}/.github`). Fehlt der erwartete Quellordner, wird der Deploy robust übersprungen (mit Log-Warnung).
 
 **Parameter:**
 
@@ -576,10 +575,10 @@ Task DeployAgentPackageAsync(
 
 **Rückgabewert:** `Task` – abgeschlossen, wenn alle Dateien kopiert wurden.
 
-**Deployment-Ziel:** `{localRepoPath}/.github/`
+**Deployment-Ziel:** provider-spezifisch (`.claude` oder `.github`)
 
 **Fehlerverhalten:**
-- Fehlt der paketseitige `.github`-Ordner, erfolgt kein harter Fehler, sondern ein kontrollierter Skip.
+- Fehlt der jeweils erwartete paketseitige Quellordner, erfolgt kein harter Fehler, sondern ein kontrollierter Skip.
 - Bei I/O-/Rechteproblemen können Dateisystem-Ausnahmen auftreten.
 - `OperationCanceledException` – Abbruch über `ct`.
 
@@ -605,7 +604,7 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 | `prompt` | `string` | *(required)* | Aufgabenbeschreibung / Entwicklungsauftrag für den Agenten |
 | `agent` | `AgentInfo` | *(required)* | Der zu verwendende Agent (aus [`GetAvailableAgentsAsync`](#getavailableagentsasync)) |
 | `localRepoPath` | `string` | *(required)* | Absoluter Pfad zum lokalen Repository, in dem entwickelt werden soll |
-| `model` | `string?` | optional | Optionales Modell-Override. Bei `null` verwenden die CLI-Implementierungen den Wert `auto`. |
+| `model` | `string?` | optional | Optionales Modell-Override. Die konkrete Normalisierung ist provider-spezifisch (z. B. `ClaudeCliPlugin`: `null`/`auto` → `sonnet`). |
 | `ct` | `CancellationToken` | optional | Abbruch-Token – bricht den Stream ab |
 
 **Rückgabewert:** `IAsyncEnumerable<string>` – Sequenz von Textfragmenten (Streaming-Ausgabe des KI-Systems).
@@ -617,10 +616,13 @@ IAsyncEnumerable<string> StartDevelopmentAsync(
 - HTTP-Status zum Feature: [http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen](./http-endpoints.md#feature-impact-kontextsteuerung-bei-folgeanweisungen)
 - Architektur- und Testreferenzen: [Kontextsteuerung-Blueprint](../architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md), [Testplan](../tests/testplan-kontextsteuerung-folgeanweisungen.md)
 
-**Feature-Hinweis „claude-cli-integration“:**
-- `ClaudeCliPlugin` ist als zusätzliche produktive `IKiPlugin`-Implementierung verfügbar, ohne Änderung des Contracts.
-- API-Status auf HTTP-Ebene: [http-endpoints.md#feature-impact-claude-cli-integration](./http-endpoints.md#feature-impact-claude-cli-integration)
-- Verknüpfte Nachweise: [Anforderungen](../requirements/plugin-klassenbibliotheken-github-und-copilot.md), [Architektur](../architecture/plugin-klassenbibliotheken-github-und-copilot-architecture-blueprint.md), [Review](../improvements/plugin-klassenbibliotheken-github-und-copilot-architecture-review.md), [Testplan](../tests/testplan-claude-cli-integration.md), [Testlücken](../tests/testluecken-claude-cli-integration.md)
+**Feature-Hinweis „Claude-CLI-Integration (Aufruf-Fix & Session-Wiederverwendung)“:**
+- `ClaudeCliPlugin` ist als produktive `IKiPlugin`-Implementierung verfügbar, ohne Contract-Änderung.
+- Agenten-Discovery erfolgt aus `.claude/commands`, Deploy kopiert `.claude` in das Ziel-Repository.
+- Prompt-Session-Verhalten: Erstlauf mit `-n <taskId>`, Folgeprompt mit `-r <taskId> -p`; bei `session not found` erfolgt Fallback auf Erstlauf.
+- Große Prompts (> 8 KB) werden per stdin-Wrapper (`powershell`/`sh`) statt Inline-CLI-Argument übergeben.
+- API-Status auf HTTP-Ebene: [http-endpoints.md#feature-hinweis-claude-cli-integration-aufruf-fix--session-wiederverwendung](./http-endpoints.md#feature-hinweis-claude-cli-integration-aufruf-fix--session-wiederverwendung)
+- Verknüpfte Nachweise: [Requirements](../requirements/claude-cli-integration-requirements-analysis.md), [Architektur-Blueprint](../architecture/claude-cli-integration-architecture-blueprint.md), [ERM](../architecture/claude-cli-integration-entity-relationship-model.md), [Architecture-Review](../improvements/claude-cli-integration-architecture-review.md), [Planungsübersicht](../planning-overview-claude-cli-integration.md), [Testplan](../tests/testplan-claude-cli-integration.md), [Testlücken](../tests/testluecken-claude-cli-integration.md)
 
 **Streaming-Verwendung:**
 
@@ -939,7 +941,7 @@ public sealed class ClaudeCliPlugin : IKiPlugin
 
 ### Schritt 2: `GetAvailableAgentsAsync` implementieren
 
-Liest `*.agent.md`-Dateien robust aus dem Agentenpaket. Der Suchpfad bevorzugt `.github`; bei fehlendem Paketpfad wird eine leere Liste zurückgegeben (kein Hard-Fail):
+Liest `*.agent.md`-Dateien robust aus dem Agentenpaket. Für `ClaudeCliPlugin` ist der Suchpfad `.claude/commands`; bei fehlendem Paketpfad wird eine leere Liste zurückgegeben (kein Hard-Fail):
 
 ```csharp
 public async Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
@@ -949,8 +951,11 @@ public async Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
     if (!Directory.Exists(agentPackagePath))
         return [];
 
-    var githubDir = Path.Combine(agentPackagePath, ".github");
-    var searchRoot = Directory.Exists(githubDir) ? githubDir : agentPackagePath;
+    var commandsDir = Path.Combine(agentPackagePath, ".claude", "commands");
+    if (!Directory.Exists(commandsDir))
+        return [];
+
+    var searchRoot = commandsDir;
     var agentFiles = Directory.GetFiles(searchRoot, "*.agent.md", SearchOption.AllDirectories);
     var agents = new List<AgentInfo>();
 
@@ -973,7 +978,7 @@ public async Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(
 
 ### Schritt 3: `DeployAgentPackageAsync` implementieren
 
-Kopiert den paketinternen `.github`-Inhalt rekursiv in das Repository-Ziel `.github/`. Fehlt `.github`, wird der Deploy kontrolliert übersprungen:
+Kopiert den paketinternen `.claude`-Inhalt rekursiv in das Repository-Ziel `.claude/`. Fehlt `.claude`, wird der Deploy kontrolliert übersprungen:
 
 ```csharp
 public async Task DeployAgentPackageAsync(
@@ -981,19 +986,19 @@ public async Task DeployAgentPackageAsync(
     string localRepoPath,
     CancellationToken ct = default)
 {
-    var githubSourceDir = Path.Combine(agentPackagePath, ".github");
-    if (!Directory.Exists(githubSourceDir))
+    var claudeSourceDir = Path.Combine(agentPackagePath, ".claude");
+    if (!Directory.Exists(claudeSourceDir))
     {
-        _logger.LogWarning("Kein '.github'-Ordner im Agentenpaket gefunden. Deploy wird übersprungen.");
+        _logger.LogWarning("Kein '.claude'-Ordner im Agentenpaket gefunden. Deploy wird übersprungen.");
         return;
     }
 
-    var githubTargetDir = Path.Combine(localRepoPath, ".github");
-    foreach (var sourceFile in Directory.GetFiles(githubSourceDir, "*", SearchOption.AllDirectories))
+    var claudeTargetDir = Path.Combine(localRepoPath, ".claude");
+    foreach (var sourceFile in Directory.GetFiles(claudeSourceDir, "*", SearchOption.AllDirectories))
     {
         ct.ThrowIfCancellationRequested();
-        var relativePath = Path.GetRelativePath(githubSourceDir, sourceFile);
-        var targetFile = Path.Combine(githubTargetDir, relativePath);
+        var relativePath = Path.GetRelativePath(claudeSourceDir, sourceFile);
+        var targetFile = Path.Combine(claudeTargetDir, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(targetFile)!);
         File.Copy(sourceFile, targetFile, overwrite: true);
     }
@@ -1002,7 +1007,15 @@ public async Task DeployAgentPackageAsync(
 
 ### Schritt 4: `StartDevelopmentAsync` mit Streaming implementieren
 
-Die Methode gibt `IAsyncEnumerable<string>` zurück und streamt die KI-Ausgabe zeilenweise:
+Die Methode gibt `IAsyncEnumerable<string>` zurück und streamt die KI-Ausgabe zeilenweise. Für `ClaudeCliPlugin` gelten zusätzlich diese Laufzeitregeln:
+
+- Token wird optional als `ANTHROPIC_API_KEY` an den Prozess übergeben.
+- Erstlauf: `-p -n <taskId>`.
+- Folgeprompt: `-r <taskId> -p`.
+- Bei `session not found` im Folgeprompt: Fallback auf Erstlauf.
+- Große Prompts (> 8 KB): stdin-Wrapper (`powershell -Command "Get-Content ... | claude ..."` bzw. `sh -c "cat ... | claude ..."`) statt Inline-Prompt.
+
+Auszug:
 
 ```csharp
 public async IAsyncEnumerable<string> StartDevelopmentAsync(
@@ -1012,23 +1025,18 @@ public async IAsyncEnumerable<string> StartDevelopmentAsync(
     string? model = null,
     [EnumeratorCancellation] CancellationToken ct = default)
 {
-    var token = _credentialStore.GetCredential(CredentialKey)
-        ?? throw new InvalidOperationException("Claude-Token nicht konfiguriert.");
+    var env = GetClaudeEnvironment(); // enthält optional ANTHROPIC_API_KEY
+    var taskId = ResolveTaskId(localRepoPath);
+    var isFollowUp = IsTaskStarted(taskId);
+    var useStdIn = Encoding.UTF8.GetByteCount(prompt) > 8 * 1024;
+    var execution = CreateExecutionRequest(prompt, promptFile, agent, model, taskId, isFollowUp, useStdIn);
 
-    // Token als Umgebungsvariable setzen (nie als CLI-Argument!)
-    Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", token);
-
-    _logger.LogInformation(
-        "Starte Entwicklung mit Agent '{Agent}' in {RepoPath}",
-        agent.Name, localRepoPath);
-
-    // Beispiel: Claude CLI-Stream aufrufen
-    // Der Stream liefert die Ausgabe Fragment für Fragment
     await foreach (var fragment in _cliRunner.StreamAsync(
-        "claude",
-        $"--agent {agent.DateiPfad} \"{prompt}\"",
-        workingDirectory: localRepoPath,
-        ct: ct))
+        execution.Command,
+        execution.Args,
+        localRepoPath,
+        env,
+        ct))
     {
         yield return fragment;
     }
@@ -1088,23 +1096,27 @@ Analog zum Git-Plugin wird das KI-Plugin als eigenes Projekt unter `plugins/` an
 
 ### Verzeichnisstruktur
 
-Agentenpakete werden unter `<AppVerzeichnis>/agent-packages/` abgelegt. Für die produktiven KI-Plugins gilt: ein `.github`-Ordner ist das maßgebliche Kompatibilitätskriterium.
+Agentenpakete werden unter `<AppVerzeichnis>/agent-packages/` abgelegt. Das Kompatibilitätskriterium ist provider-spezifisch:
+
+- `GitHubCopilotPlugin`: `.github`
+- `ClaudeCliPlugin`: `.claude/commands`
 
 ```
 agent-packages/
 └── mein-paket/
-    ├── .github/
-    │   ├── planner.agent.md       ← Agent "planner"
-    │   ├── implementer.agent.md   ← Agent "implementer"
-    │   └── reviewer.agent.md      ← Agent "reviewer"
+    ├── .claude/
+    │   └── commands/
+    │       ├── planner.agent.md       ← Agent "planner"
+    │       ├── implementer.agent.md   ← Agent "implementer"
+    │       └── reviewer.agent.md      ← Agent "reviewer"
     └── README.md              ← Optionale Paketbeschreibung
 ```
 
 ### Datei-Erkennung
 
-Das Plugin sucht nach dem Glob-Muster `*.agent.md` im effektiven Suchpfad. Existiert `.github`, wird dort gesucht; sonst im Paket-Root. Nur Dateien mit dieser Endung werden als Agenten erkannt.
+Das Plugin sucht nach dem Glob-Muster `*.agent.md` im provider-spezifischen Suchpfad. Für Claude ist dies `.claude/commands`; nur Dateien mit dieser Endung werden als Agenten erkannt.
 
-> **Compliance-Hinweis:** Für produktive Plugins (`GitHubCopilotPlugin`, `ClaudeCliPlugin`) ist ein fehlender `.github`-Ordner weiterhin **nicht kompatibel** (`IsAgentPackageCompatibleAsync = false`), auch wenn die reine Agentenauflistung technisch auf Paket-Root zurückfallen kann.
+> **Compliance-Hinweis:** Für `ClaudeCliPlugin` ist ein fehlender `.claude/commands`-Ordner **nicht kompatibel** (`IsAgentPackageCompatibleAsync = false`).
 
 ### Namenskonvention
 
@@ -1168,13 +1180,15 @@ Erstelle einen strukturierten Plan im Markdown-Format mit:
 <AppVerzeichnis>/
 └── agent-packages/
     ├── basis-agenten/
-    │   └── .github/
-    │       ├── planner.agent.md
-    │       └── implementer.agent.md
+    │   └── .claude/
+    │       └── commands/
+    │           ├── planner.agent.md
+    │           └── implementer.agent.md
     └── spezialisiert/
-        └── .github/
-            ├── api-designer.agent.md
-            └── test-writer.agent.md
+        └── .claude/
+            └── commands/
+                ├── api-designer.agent.md
+                └── test-writer.agent.md
 ```
 
 > **Hinweis:** `<AppVerzeichnis>` entspricht dem Verzeichnis, aus dem die Softwareschmiede-Anwendung gestartet wird (z. B. das Ausgabeverzeichnis von `dotnet publish`).
@@ -1185,13 +1199,14 @@ Nach dem Aufruf von [`DeployAgentPackageAsync`](#deployagentpackageasync) werden
 
 ```
 {localRepoPath}/
-└── .github/
-    ├── planner.agent.md
-    ├── implementer.agent.md
-    └── ...
+└── .claude/
+    └── commands/
+        ├── planner.agent.md
+        ├── implementer.agent.md
+        └── ...
 ```
 
-Das Verzeichnis `.github/` wird automatisch erstellt, falls es nicht existiert. Vorhandene Dateien können überschrieben werden.
+Das Verzeichnis `.claude/` wird automatisch erstellt, falls es nicht existiert. Vorhandene Dateien können überschrieben werden.
 
 ---
 
