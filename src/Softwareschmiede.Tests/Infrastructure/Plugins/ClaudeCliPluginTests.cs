@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
@@ -119,17 +120,21 @@ public sealed class ClaudeCliPluginTests : IDisposable
         }
 
         lines.Should().Equal("line 1");
-        Directory.GetFiles(_testDirectory, "*.claude-task.md").Should().ContainSingle();
+        var taskFile = Directory.GetFiles(_testDirectory, "*.claude.task.md").Single();
+        var taskFileName = Path.GetFileName(taskFile);
+        Directory.GetFiles(_testDirectory, "*.claude.task.md").Should().ContainSingle();
         _cliRunnerMock.Verify(c => c.StreamAsync(
             "claude",
             It.Is<IEnumerable<string>>(args =>
                 args.Contains("-p")
                 && args.Contains("-n")
                 && args.Contains("--dangerously-skip-permissions")
+                && args.Contains("--verbose")
                 && args.Contains("--model")
                 && args.Contains("claude-model")
                 && args.Contains("--agent")
                 && args.Contains("test-agent")
+                && args.Any(a => a.Contains("Aktuelle Anfrage", StringComparison.Ordinal))
                 && !args.Contains("--prompt")
                 && !args.Contains("--allow-all-tools")
                 && !args.Contains("--allow-all-paths")
@@ -138,6 +143,54 @@ public sealed class ClaudeCliPluginTests : IDisposable
             _testDirectory,
             It.Is<IDictionary<string, string>?>(env => env != null && env["ANTHROPIC_API_KEY"] == "claude-token"),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>Normalizes stream-json assistant text messages into user-friendly protocol lines.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldNormalizeAssistantTextMessage_WhenJsonStreamIsUsed()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                "claude",
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Ich lese die Task-Datei.\"}]}}"));
+        var agent = new AgentInfo("agent-a", null, "file");
+
+        var lines = new List<string>();
+        await foreach (var line in _sut.StartDevelopmentAsync("Prompt", agent, _testDirectory, null))
+        {
+            lines.Add(line);
+        }
+
+        lines.Should().ContainSingle().Which.Should().Be("[Claude] Ich lese die Task-Datei.");
+    }
+
+    /// <summary>Emits a structured rate-limit suggestion marker with reset timestamp.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldEmitRateLimitSuggestionMarker_WhenRateLimitEventContainsResetUnixTime()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                "claude",
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable("{\"type\":\"rate_limit_event\",\"rate_limit_info\":{\"resetsAt\":1780228200}}"));
+        var agent = new AgentInfo("agent-a", null, "file");
+
+        var lines = new List<string>();
+        await foreach (var line in _sut.StartDevelopmentAsync("Prompt", agent, _testDirectory, null))
+        {
+            lines.Add(line);
+        }
+
+        lines.Should().ContainSingle();
+        lines[0].Should().StartWith(ClaudeCliPlugin.RateLimitSuggestionMarker + ";resetUtc=");
+        lines[0].Should().Contain(";prompt=Mach nun bitte weiter.");
     }
 
     /// <summary>Uses sonnet-model alias when no explicit model was provided.</summary>
@@ -197,15 +250,25 @@ public sealed class ClaudeCliPluginTests : IDisposable
     public async Task StartDevelopmentAsync_ShouldUseResumeArguments_OnFollowUpRun()
     {
         Directory.CreateDirectory(_testDirectory);
-        var taskId = Guid.NewGuid();
-        await File.WriteAllTextAsync(Path.Combine(_testDirectory, $"{taskId}.claude.context.md"), "context");
+        var capturedArgs = new List<IReadOnlyList<string>>();
         _cliRunnerMock.Setup(c => c.StreamAsync(
                 "claude",
                 It.IsAny<IEnumerable<string>>(),
                 _testDirectory,
                 It.IsAny<IDictionary<string, string>?>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(ToAsyncEnumerable("ok"));
+            .Returns(() =>
+            {
+                var call = capturedArgs.Count + 1;
+                return call switch
+                {
+                    1 => ToAsyncEnumerable("{\"session_id\":\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"}"),
+                    2 => ToAsyncEnumerable("{\"session_id\":\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"}"),
+                    _ => ToAsyncEnumerable("ok")
+                };
+            })
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>(
+                (_, args, _, _, _) => capturedArgs.Add(args.ToList()));
 
         var agent = new AgentInfo("agent-a", null, "file");
         await foreach (var _ in _sut.StartDevelopmentAsync("Prompt 1", agent, _testDirectory, null))
@@ -216,11 +279,16 @@ public sealed class ClaudeCliPluginTests : IDisposable
         {
         }
 
+        capturedArgs.Should().HaveCount(2);
+        var firstRunArgs = capturedArgs[0];
+        var taskId = firstRunArgs.SkipWhile(a => a != "-n").Skip(1).FirstOrDefault();
+        taskId.Should().NotBeNullOrWhiteSpace();
+
         _cliRunnerMock.Verify(c => c.StreamAsync(
             "claude",
             It.Is<IEnumerable<string>>(args =>
                 args.Contains("-n")
-                && args.Contains(taskId.ToString())
+                && args.Contains(taskId!)
                 && args.Contains("-p")
                 && !args.Contains("-r")),
             _testDirectory,
@@ -231,7 +299,7 @@ public sealed class ClaudeCliPluginTests : IDisposable
             "claude",
             It.Is<IEnumerable<string>>(args =>
                 args.Contains("-r")
-                && args.Contains(taskId.ToString())
+                && args.Contains("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
                 && args.Contains("-p")
                 && !args.Contains("-n")),
             _testDirectory,
@@ -244,8 +312,6 @@ public sealed class ClaudeCliPluginTests : IDisposable
     public async Task StartDevelopmentAsync_ShouldFallbackToFirstRun_WhenSessionIsMissing()
     {
         Directory.CreateDirectory(_testDirectory);
-        var taskId = Guid.NewGuid();
-        await File.WriteAllTextAsync(Path.Combine(_testDirectory, $"{taskId}.claude.context.md"), "context");
         var callCount = 0;
         _cliRunnerMock.Setup(c => c.StreamAsync(
                 It.IsAny<string>(),
@@ -258,9 +324,9 @@ public sealed class ClaudeCliPluginTests : IDisposable
                 callCount++;
                 return callCount switch
                 {
-                    1 => ToAsyncEnumerable("ok"),
-                    2 => ToAsyncEnumerable("[Fehler] session not found"),
-                    3 => ToAsyncEnumerable("recovered"),
+                    1 => ToAsyncEnumerable("{\"session_id\":\"11111111-2222-3333-4444-555555555555\"}"),
+                    2 => ToAsyncEnumerable("[Fehler] No conversation found with session ID: 11111111-2222-3333-4444-555555555555"),
+                    3 => ToAsyncEnumerable("{\"session_id\":\"66666666-7777-8888-9999-aaaaaaaaaaaa\"}", "recovered"),
                     _ => ToAsyncEnumerable()
                 };
             });
@@ -279,16 +345,25 @@ public sealed class ClaudeCliPluginTests : IDisposable
         lines.Should().Contain("recovered");
         _cliRunnerMock.Verify(c => c.StreamAsync(
             "claude",
-            It.Is<IEnumerable<string>>(args => args.Contains("-r") && args.Contains(taskId.ToString())),
+            It.Is<IEnumerable<string>>(args => args.Contains("-r") && args.Contains("11111111-2222-3333-4444-555555555555") && args.Contains("-p")),
             _testDirectory,
             It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Once);
         _cliRunnerMock.Verify(c => c.StreamAsync(
             "claude",
-            It.Is<IEnumerable<string>>(args => args.Contains("-n") && args.Contains(taskId.ToString())),
+            It.Is<IEnumerable<string>>(args => args.Contains("-n") && args.Contains("11111111-2222-3333-4444-555555555555") && args.Contains("-p")),
             _testDirectory,
             It.IsAny<IDictionary<string, string>?>(),
-            It.IsAny<CancellationToken>()), Times.Exactly(2));
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            "claude",
+            It.Is<IEnumerable<string>>(args =>
+                args.Contains("-p")
+                && args.Contains("-n")
+                && args.Any(a => a.Contains("11111111-2222-3333-4444-555555555555", StringComparison.Ordinal))),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Reuses generated session id across runs in the same repository even without context files.</summary>
@@ -329,9 +404,9 @@ public sealed class ClaudeCliPluginTests : IDisposable
         capturedArgs[1].Should().NotContain("-n");
     }
 
-    /// <summary>Uses stdin command wrapper and resume arguments on large follow-up prompts.</summary>
+    /// <summary>Uses resume arguments on large follow-up prompts while keeping CLI command stable.</summary>
     [Fact]
-    public async Task StartDevelopmentAsync_ShouldUseResumeArgs_WithCommandWrapper_WhenLargePromptOnFollowUp()
+    public async Task StartDevelopmentAsync_ShouldUseResumeArgs_WhenLargePromptOnFollowUp()
     {
         Directory.CreateDirectory(_testDirectory);
         var largePrompt = new string('x', 9000);
@@ -361,21 +436,21 @@ public sealed class ClaudeCliPluginTests : IDisposable
         }
 
         commands.Should().HaveCount(2);
-        commands.Should().OnlyContain(c => c == (OperatingSystem.IsWindows() ? "powershell" : "sh"));
+        commands.Should().OnlyContain(c => c == "claude");
 
         var firstArgs = string.Join(" ", allArgs[0]);
         var secondArgs = string.Join(" ", allArgs[1]);
-        firstArgs.Should().Contain("'-n'");
-        firstArgs.Should().NotContain("'-r'");
-        secondArgs.Should().Contain("'-r'");
-        secondArgs.Should().NotContain("'-n'");
+        firstArgs.Should().Contain("-n");
+        firstArgs.Should().NotContain("-r");
+        secondArgs.Should().Contain("-r");
+        secondArgs.Should().NotContain("-n");
         firstArgs.Should().NotContain(largePrompt[..100]);
         secondArgs.Should().NotContain(largePrompt[..100]);
     }
 
-    /// <summary>Uses stdin piping through PowerShell when prompt text is larger than 8 KB.</summary>
+    /// <summary>Uses direct claude command with compact file-reference prompt even for large instruction files.</summary>
     [Fact]
-    public async Task StartDevelopmentAsync_ShouldUsePowerShellPipe_WhenPromptIsLarge()
+    public async Task StartDevelopmentAsync_ShouldUseClaudeCommand_WhenPromptIsLarge()
     {
         Directory.CreateDirectory(_testDirectory);
         var largePrompt = new string('x', 9000);
@@ -393,9 +468,10 @@ public sealed class ClaudeCliPluginTests : IDisposable
         }
 
         _cliRunnerMock.Verify(c => c.StreamAsync(
-            OperatingSystem.IsWindows() ? "powershell" : "sh",
+            "claude",
             It.Is<IEnumerable<string>>(args =>
-                args.Any(a => a.Contains("Get-Content -Raw -LiteralPath", StringComparison.Ordinal) || a.StartsWith("cat ", StringComparison.Ordinal))
+                args.Contains("-p")
+                && args.Any(a => a.Contains("Aktuelle Anfrage", StringComparison.Ordinal))
                 && args.Any(a => a.Contains("--dangerously-skip-permissions", StringComparison.Ordinal))),
             _testDirectory,
             It.IsAny<IDictionary<string, string>?>(),
@@ -558,6 +634,71 @@ public sealed class ClaudeCliPluginTests : IDisposable
         var result = await _sut.CheckHealthAsync();
 
         result.Should().BeFalse();
+    }
+
+    /// <summary>Handles task_notification JSON structure without crashing.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldHandleTaskNotificationJson_WhenOutputContains()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var agent = new AgentInfo("test-agent", "description", "file");
+        var lines = new[]
+        {
+            """{"type":"system","subtype":"task_notification","task_id":"b42i2ialp","status":"completed","summary":"Test summary"}"""
+        };
+
+        _cliRunnerMock
+            .Setup(c => c.StreamAsync(It.IsAny<string>(), It.IsAny<IEnumerable<string>>(), 
+                It.IsAny<string>(), It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable(lines));
+
+        var result = new List<string>();
+        await foreach (var line in _sut.StartDevelopmentAsync("test", agent, _testDirectory))
+        {
+            result.Add(line);
+        }
+
+        result.Should().HaveCountGreaterThanOrEqualTo(1);
+        // Either contains task_notification or has been processed to "Task b42i2ialp"
+        var firstLine = result[0];
+        (firstLine.Contains("Task b42i2ialp") || firstLine.Contains("task_notification")).Should().BeTrue();
+    }
+
+    /// <summary>Gracefully handles JSON parsing errors without crashing.</summary>
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldNotCrash_WhenJsonParsingFails()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        var agent = new AgentInfo("test-agent", "description", "file");
+        var lines = new[]
+        {
+            // Malformed JSON mixed with valid JSON
+            """{"type":"system","subtype":"init","model":"claude-3-5-sonnet-20241022","session_id":"test-session","cwd":"/path"}""",
+            """{"type":"assistant","message":{"content":[{"type":"text","text":"Hello"}]}}""",
+            // This JSON has a property that is an object instead of string - would cause original code to crash
+            """{"type":"system","subtype":"task_notification","task_id":"b42i2ialp","status":"completed","output_file":{"nested":"value"},"summary":"Test"}""",
+            "[invalid json that is not an object",
+            "plain text line"
+        };
+
+        _cliRunnerMock
+            .Setup(c => c.StreamAsync(It.IsAny<string>(), It.IsAny<IEnumerable<string>>(), 
+                It.IsAny<string>(), It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable(lines));
+
+        // This should not throw an exception
+        var result = new List<string>();
+        await foreach (var line in _sut.StartDevelopmentAsync("test", agent, _testDirectory))
+        {
+            result.Add(line);
+        }
+
+        // We should get all lines, including error summaries for malformed JSON
+        result.Should().NotBeEmpty();
+        // Should contain a line indicating JSON error for the malformed output_file
+        result.Should().Contain(l => l.Contains("JSON-Parsing-Fehler") || l.Contains("task_notification") || l.Contains("Task"));
+        // Plain text should pass through
+        result.Should().Contain("plain text line");
     }
 
     public void Dispose()

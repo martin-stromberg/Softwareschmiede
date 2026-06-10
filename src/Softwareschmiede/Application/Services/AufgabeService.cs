@@ -292,6 +292,40 @@ public sealed class AufgabeService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Speichert einen Vorschlagsprompt und optionalen Ausführungszeitpunkt für die Aufgabe.</summary>
+    public async Task SavePromptVorschlagAsync(Guid id, string? prompt, DateTimeOffset? ausfuehrenAbUtc, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt speichern (mit Ausführungszeitpunkt: {HasAusfuehrenAb}).", id, ausfuehrenAbUtc.HasValue);
+
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        var normalizedPrompt = string.IsNullOrWhiteSpace(prompt)
+            ? null
+            : prompt.Trim();
+
+        aufgabe.VorschlagPrompt = normalizedPrompt;
+        aufgabe.VorschlagAusfuehrenAbUtc = normalizedPrompt is null
+            ? null
+            : ausfuehrenAbUtc;
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Entfernt den gespeicherten Vorschlagsprompt und den geplanten Ausführungszeitpunkt.</summary>
+    public async Task ClearPromptVorschlagAsync(Guid id, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt löschen.", id);
+
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        aufgabe.VorschlagPrompt = null;
+        aufgabe.VorschlagAusfuehrenAbUtc = null;
+
+        await _db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Setzt den Status zurück auf InBearbeitung nach KI-Abschluss.</summary>
     public async Task KiAbgeschlossenAsync(Guid id, CancellationToken ct = default)
     {

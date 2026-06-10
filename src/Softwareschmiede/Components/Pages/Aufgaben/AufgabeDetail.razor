@@ -26,6 +26,7 @@ else
         <StatusBadge Status="_aufgabe.Status" />
     </div>
 
+
     <div class="action-bar" role="tablist" aria-label="Aufgabe Detail Register">
         <button class="btn @(IsAufgabeRegisterAktiv ? "btn-primary" : "btn-ghost")" role="tab" aria-selected="@IsAufgabeRegisterAktiv" @onclick="ActivateAufgabeRegister">Aufgabe</button>
         <button class="btn @(IsAusfuehrungRegisterAktiv ? "btn-primary" : "btn-ghost")" role="tab" aria-selected="@IsAusfuehrungRegisterAktiv" @onclick="ActivateAusfuehrungRegister">Ausführung</button>
@@ -430,14 +431,37 @@ else
                     <label class="form-label">Prompt *</label>
                     <textarea class="form-control" @bind="_prompt" rows="4" placeholder="Beschreibe was die KI tun soll..."></textarea>
                 </div>
-                <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@(_processing || !IsAgentenauswahlGueltig)">
-                    ▶️ Senden
-                </button>
+                <div class="form-group">
+                    <label class="form-label">Ausführen ab (optional, HH:mm)</label>
+                    <input class="form-control" @bind="_ausfuehrenAbZeitText" placeholder="z. B. 13:50" />
+                </div>
+                @if (_wartetAufAusfuehrungszeitpunkt && !string.IsNullOrWhiteSpace(_warteHinweis))
+                {
+                    <div class="alert alert-info" style="margin-bottom:.75rem">
+                        @_warteHinweis
+                    </div>
+                }
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                    <button class="btn btn-primary" @onclick="KiStartenAsync" disabled="@(_processing || _wartetAufAusfuehrungszeitpunkt || !IsAgentenauswahlGueltig)">
+                        ▶️ Senden
+                    </button>
+                    <button class="btn btn-warning" @onclick="AbbrechenWartenAufAusfuehrungszeitpunkt" disabled="@(!_wartetAufAusfuehrungszeitpunkt)">
+                        ⏹️ Warten abbrechen
+                    </button>
+                </div>
             </div>
         }
         else
         {
             <div class="alert alert-info">Noch keine Ausführung verfügbar. Starten Sie zuerst die Entwicklung.</div>
+        }
+
+        @if (ShowCliTerminal)
+        {
+            <div class="card">
+                <div class="card-title">🖥️ KI-Terminal (@AktuellesCliName)</div>
+                <CliTerminal CliName="@(AktuellesCliName ?? string.Empty)" WorkingDirectory="@(AktuellesWorkingDirectory ?? string.Empty)" />
+            </div>
         }
 
         @if (_aufgabe.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0)

@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="XtermBlazor" Version="2.4.0" />
     <ProjectReference Include="..\Softwareschmiede.Client\Softwareschmiede.Client.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" />

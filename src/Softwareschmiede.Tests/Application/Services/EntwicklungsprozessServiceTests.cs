@@ -573,6 +573,70 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         kiAntwort.Should().Contain("Implementierung");
     }
 
+    [Fact]
+    public async Task KiStartenAsync_ShouldPersistPromptSuggestion_WhenRateLimitSuggestionMarkerIsStreamed()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Rate Limit Vorschlag", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+        var resetUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) =>
+                StreamSingleLine($"[[SOFTWARESCHMIEDE_RATE_LIMIT]];resetUtc={resetUtc:O};prompt=Mach nun bitte weiter."));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Prompt", agent))
+        {
+        }
+
+        // Assert
+        var result = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        result!.VorschlagPrompt.Should().Be("Mach nun bitte weiter.");
+        result.VorschlagAusfuehrenAbUtc.Should().Be(resetUtc);
+
+        var protokoll = (await _protokollService.GetByAufgabeAsync(aufgabe.Id)).ToList();
+        protokoll.Last(p => p.Typ == ProtokollTyp.KiAntwort).Inhalt
+            .Should().Contain("Rate-Limit erreicht. Vorschlag gespeichert");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldClearExistingPromptSuggestion_WhenNewPromptIsSent()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Rate Limit Folgeprompt", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "branch", "/repo");
+        await _aufgabeService.SavePromptVorschlagAsync(
+            aufgabe.Id,
+            "Mach nun bitte weiter.",
+            new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero));
+        var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.IsAny<string>(),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Normale Antwort"));
+
+        // Act
+        await foreach (var _ in _sut.KiStartenAsync(aufgabe.Id, "Neuer Prompt", agent))
+        {
+        }
+
+        // Assert
+        var result = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        result!.VorschlagPrompt.Should().BeNull();
+        result.VorschlagAusfuehrenAbUtc.Should().BeNull();
+    }
+
     [Theory]
     [InlineData(" ")]
     [InlineData("\t")]
@@ -669,7 +733,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             null,
             It.IsAny<CancellationToken>()), Times.Once);
 
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
         File.Exists(contextPath).Should().BeTrue();
         var content = await File.ReadAllTextAsync(contextPath);
         content.Should().Contain("Neue Folgeanweisung");
@@ -702,8 +766,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
 
         // Assert
-        var claudeContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.claude.context.md");
-        var copilotContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var claudeContextPath = Path.Combine(repoPath, "claude.context.md");
+        var copilotContextPath = Path.Combine(repoPath, "copilot.context.md");
         File.Exists(claudeContextPath).Should().BeTrue();
         File.Exists(copilotContextPath).Should().BeFalse();
     }
@@ -718,7 +782,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
 
         var plugin = new TestCliKiPluginBase("claude", StreamSingleLine("Antwort"));
-        var claudeContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.claude.context.md");
+        var claudeContextPath = Path.Combine(repoPath, "claude.context.md");
         await File.WriteAllTextAsync(claudeContextPath, "Claude-Kontext");
 
         var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
@@ -739,10 +803,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
         // Assert
         plugin.LastPrompt.Should().NotBeNull();
-        plugin.LastPrompt.Should().StartWith("Claude-Kontext");
-        plugin.LastPrompt.Should().Contain("\n\n---\n\nNeue Folgeanweisung");
+        plugin.LastPrompt.Should().StartWith(CliKiPluginBase.IncludeContextMarker);
+        plugin.LastPrompt.Should().Contain("Neue Folgeanweisung");
 
-        var copilotContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var copilotContextPath = Path.Combine(repoPath, "copilot.context.md");
         File.Exists(claudeContextPath).Should().BeTrue();
         File.Exists(copilotContextPath).Should().BeFalse();
     }
@@ -757,8 +821,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
 
         var plugin = new TestCliKiPluginBase("claude", StreamSingleLine("Antwort"));
-        var claudeContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.claude.context.md");
-        var copilotContextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var claudeContextPath = Path.Combine(repoPath, "claude.context.md");
+        var copilotContextPath = Path.Combine(repoPath, "copilot.context.md");
         await File.WriteAllTextAsync(claudeContextPath, "Alter Claude-Kontext");
         await File.WriteAllTextAsync(copilotContextPath, "Unveraenderter Copilot-Kontext");
 
@@ -779,11 +843,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
 
         // Assert
-        var claudeContent = await File.ReadAllTextAsync(claudeContextPath);
+        File.Exists(claudeContextPath).Should().BeFalse();
         var copilotContent = await File.ReadAllTextAsync(copilotContextPath);
-
-        claudeContent.Should().Contain("Reset durch Folgeanweisung");
-        claudeContent.Should().Contain($"# Kontextverlauf Aufgabe {aufgabe.Id}");
         copilotContent.Should().Be("Unveraenderter Copilot-Kontext");
     }
 
@@ -795,7 +856,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         Directory.CreateDirectory(repoPath);
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext mitgeben", null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
         await File.WriteAllTextAsync(contextPath, "Bisheriger Kontext");
         var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
 
@@ -814,7 +875,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
         // Assert
         _kiPluginMock.Verify(k => k.StartDevelopmentAsync(
-            It.Is<string>(p => p.StartsWith("Bisheriger Kontext", StringComparison.Ordinal) && p.Contains("\n\n---\n\nNeue Folgeanweisung")),
+            It.Is<string>(p => p.StartsWith(CliKiPluginBase.IncludeContextMarker, StringComparison.Ordinal) && p.Contains("Neue Folgeanweisung")),
             It.IsAny<AgentInfo>(),
             repoPath,
             null,
@@ -861,8 +922,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         Directory.CreateDirectory(repoPath);
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kontext reset", null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
-        await File.WriteAllTextAsync(contextPath, "Alter Verlauf");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
+        var contextPath2 = Path.Combine(repoPath, "copilot.context.2.md");
+        await File.WriteAllTextAsync(contextPath, "Alter Verlauf 1");
+        await File.WriteAllTextAsync(contextPath2, "Alter Verlauf 2");
         var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
 
         _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
@@ -879,8 +942,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
 
         // Assert
+        File.Exists(contextPath).Should().BeTrue();
         var updated = await File.ReadAllTextAsync(contextPath);
-        updated.Should().NotContain("Alter Verlauf");
         updated.Should().Contain("Neu anfangen");
     }
 
@@ -920,11 +983,11 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Assert
         prompts.Should().HaveCount(2);
         prompts[0].Should().Be("Prompt 1");
-        prompts[1].Should().Contain("Prompt 1");
-        prompts[1].Should().Contain("Antwort 1");
+        prompts[1].Should().StartWith(CliKiPluginBase.IncludeContextMarker);
         prompts[1].Should().Contain("Prompt 2");
 
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
+        File.Exists(contextPath).Should().BeTrue();
         var context = await File.ReadAllTextAsync(contextPath);
         context.Should().Contain("Prompt 1");
         context.Should().Contain("Antwort 1");
@@ -963,7 +1026,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .Returns<string, AgentInfo, string, string?, CancellationToken>((prompt, _, _, _, _) =>
             {
-                if (prompt.Contains("Komprimiere den folgenden Projektkontext", StringComparison.Ordinal))
+                if (prompt.Contains("Komprimiere den Inhalt der Datei copilot.context.md", StringComparison.Ordinal))
                 {
                     return StreamSingleLine(
                         "## Ziel\nKurz\n\n## Offene Punkte\nKurz\n\n## Letzte Entscheidungen\nKurz");
@@ -992,10 +1055,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
 
         // Assert
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
+        File.Exists(contextPath).Should().BeTrue();
         var context = await File.ReadAllTextAsync(contextPath);
-        context.Should().Contain("Prompt 1");
-        context.Should().Contain("Antwort 1");
         context.Should().Contain("Prompt 2");
         context.Should().Contain("Antwort 2");
     }
@@ -1008,9 +1070,19 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         Directory.CreateDirectory(repoPath);
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Hard limit", null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
+        var contextPath2 = Path.Combine(repoPath, "copilot.context.2.md");
         await File.WriteAllTextAsync(contextPath, new string('x', 300));
+        await File.WriteAllTextAsync(contextPath2, new string('y', 300));
         var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.Is<string>(p => p.StartsWith(CliKiPluginBase.IncludeContextMarker, StringComparison.Ordinal)),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -1031,7 +1103,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
-                It.Is<string>(p => p.Contains("Komprimiere den folgenden Projektkontext")),
+                It.Is<string>(p => p.Contains("Komprimiere den Inhalt der Datei copilot.context.md", StringComparison.Ordinal)),
                 It.IsAny<AgentInfo>(),
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
@@ -1062,9 +1134,17 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         Directory.CreateDirectory(repoPath);
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Komprimierung Pflichtabschnitte", null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "branch", repoPath);
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
         await File.WriteAllTextAsync(contextPath, new string('x', 260));
         var agent = new AgentInfo("test-agent", "Beschreibung", "/pfad/agent.md");
+
+        _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
+                It.Is<string>(p => p.StartsWith(CliKiPluginBase.IncludeContextMarker, StringComparison.Ordinal)),
+                It.IsAny<AgentInfo>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, AgentInfo, string, string?, CancellationToken>((_, _, _, _, _) => StreamSingleLine("Antwort"));
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -1085,7 +1165,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         _kiPluginMock.Setup(k => k.StartDevelopmentAsync(
-                It.Is<string>(p => p.Contains("Komprimiere den folgenden Projektkontext", StringComparison.Ordinal)),
+                It.Is<string>(p => p.Contains("Komprimiere den Inhalt der Datei copilot.context.md", StringComparison.Ordinal)),
                 It.IsAny<AgentInfo>(),
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
@@ -1132,7 +1212,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
 
         // Assert
-        var contextPath = Path.Combine(repoPath, $"{aufgabe.Id}.copilot.context.md");
+        var contextPath = Path.Combine(repoPath, "copilot.context.md");
         var context = await File.ReadAllTextAsync(contextPath);
         context.Should().Contain("Status: Fehler");
         context.Should().Contain("plugin boom");

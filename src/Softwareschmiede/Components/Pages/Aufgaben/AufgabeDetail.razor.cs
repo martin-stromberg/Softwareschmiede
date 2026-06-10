@@ -1,5 +1,6 @@
 namespace Softwareschmiede.Components.Pages.Aufgaben;
 
+using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
@@ -67,6 +68,15 @@ public partial class AufgabeDetail : IDisposable
     private bool KannRepositoryAktionenAusfuehren => _aufgabe?.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv;
     private bool KannAufgabeAbschliessen => _aufgabe?.Status == AufgabeStatus.InBearbeitung;
     private bool KannAufgabeAbbrechen => _aufgabe?.Status == AufgabeStatus.InBearbeitung;
+    private string? AktuellesCliName => ResolveCliName();
+    private string? AktuellesWorkingDirectory =>
+        !string.IsNullOrWhiteSpace(_aufgabe?.LokalerKlonPfad)
+            ? _aufgabe.LokalerKlonPfad
+            : _workspaceSnapshot?.RepositoryPath;
+    private bool ShowCliTerminal =>
+        _aufgabe?.Status == AufgabeStatus.InBearbeitung
+        && !string.IsNullOrWhiteSpace(AktuellesCliName)
+        && !string.IsNullOrWhiteSpace(AktuellesWorkingDirectory);
     private string AnlagezeitpunktText => _aufgabe?.ErstellungsDatum.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "–";
     private string LetzteAusfuehrungText => _protokoll.LastOrDefault()?.Zeitstempel.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "–";
     private string AusfuehrungsdauerText => BuildAusfuehrungsdauerText();
@@ -110,6 +120,9 @@ public partial class AufgabeDetail : IDisposable
     private FolgeanweisungsKontextmodus _folgeKontextmodus = FolgeanweisungsKontextmodus.KontextMitgeben;
     private bool _folgeKontextNeuBeginnenBestaetigt;
     private string _prompt = string.Empty;
+    private string _ausfuehrenAbZeitText = string.Empty;
+    private bool _wartetAufAusfuehrungszeitpunkt;
+    private string? _warteHinweis;
     private string _commitMessage = string.Empty;
     private string _resetType = "mixed";
     private string? _resetRef;
@@ -385,12 +398,26 @@ public partial class AufgabeDetail : IDisposable
             _selectedKiPluginPrefix = _aufgabe.KiPluginPrefix ?? string.Empty;
             await LadeKiPluginsAsync();
 
-            // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
-            if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
-                && string.IsNullOrWhiteSpace(_prompt)
-                && !_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
+            // Persistierten Vorschlagsprompt bevorzugt vorbelegen.
+            if (!string.IsNullOrWhiteSpace(_aufgabe.VorschlagPrompt))
             {
-                _prompt = _aufgabe.AnforderungsBeschreibung;
+                _prompt = _aufgabe.VorschlagPrompt;
+                _ausfuehrenAbZeitText = _aufgabe.VorschlagAusfuehrenAbUtc?.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentUICulture) ?? string.Empty;
+            }
+            else
+            {
+                // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
+                if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
+                    && string.IsNullOrWhiteSpace(_prompt)
+                    && !_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
+                {
+                    _prompt = _aufgabe.AnforderungsBeschreibung;
+                }
+
+                if (string.IsNullOrWhiteSpace(_prompt))
+                {
+                    _ausfuehrenAbZeitText = string.Empty;
+                }
             }
         }
         AktualisiereRecoveryZustand();
@@ -435,12 +462,26 @@ public partial class AufgabeDetail : IDisposable
                 _selectedKiPluginPrefix = _aufgabe.KiPluginPrefix ?? string.Empty;
                 await LadeKiPluginsAsync();
 
-                // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
-                if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
-                    && string.IsNullOrWhiteSpace(_prompt)
-                    && !_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
+                // Persistierten Vorschlagsprompt bevorzugt vorbelegen.
+                if (!string.IsNullOrWhiteSpace(_aufgabe.VorschlagPrompt))
                 {
-                    _prompt = _aufgabe.AnforderungsBeschreibung;
+                    _prompt = _aufgabe.VorschlagPrompt;
+                    _ausfuehrenAbZeitText = _aufgabe.VorschlagAusfuehrenAbUtc?.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentUICulture) ?? string.Empty;
+                }
+                else
+                {
+                    // Anforderungsbeschreibung als initialen Prompt vorbelegen, solange noch kein Prompt gesendet wurde
+                    if (!string.IsNullOrWhiteSpace(_aufgabe.AnforderungsBeschreibung)
+                        && string.IsNullOrWhiteSpace(_prompt)
+                        && !_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))
+                    {
+                        _prompt = _aufgabe.AnforderungsBeschreibung;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(_prompt))
+                    {
+                        _ausfuehrenAbZeitText = string.Empty;
+                    }
                 }
             }
             AktualisiereRecoveryZustand();
@@ -811,9 +852,40 @@ public partial class AufgabeDetail : IDisposable
             return;
         }
 
+        _warteHinweis = null;
+
+        if (!TryResolveRequestedExecutionUtc(_ausfuehrenAbZeitText, out var requestedExecutionUtc, out var validationError))
+        {
+            _fehler = validationError;
+            return;
+        }
+
+        if (requestedExecutionUtc is not null)
+        {
+            _wartetAufAusfuehrungszeitpunkt = true;
+            _warteHinweis = $"Anfrage wartet bis {requestedExecutionUtc.Value.ToLocalTime():dd.MM.yyyy HH:mm:ss}.";
+            StateHasChanged();
+
+            try
+            {
+                await Task.Delay(requestedExecutionUtc.Value - DateTimeOffset.UtcNow, _cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                _wartetAufAusfuehrungszeitpunkt = false;
+                _warteHinweis = null;
+                _erfolg = "Anfrage während der Wartezeit abgebrochen.";
+                return;
+            }
+
+            _wartetAufAusfuehrungszeitpunkt = false;
+            _warteHinweis = null;
+        }
+
         FolgeanweisungsKontextmodus? kontextmodus = _folgeKontextmodus;
         await KiMitPromptStartenAsync(_prompt, _kiAgentName, kontextmodus);
         _prompt = string.Empty;
+        _ausfuehrenAbZeitText = string.Empty;
         _folgeKontextNeuBeginnenBestaetigt = false;
     }
 
@@ -887,6 +959,75 @@ public partial class AufgabeDetail : IDisposable
         if (_folgeKontextmodus != FolgeanweisungsKontextmodus.KontextNeuBeginnen)
         {
             _folgeKontextNeuBeginnenBestaetigt = false;
+        }
+    }
+
+    private string? ResolveCliName()
+    {
+        var pluginPrefix = string.IsNullOrWhiteSpace(_selectedKiPluginPrefix)
+            ? _aufgabe?.KiPluginPrefix
+            : _selectedKiPluginPrefix;
+
+        if (string.IsNullOrWhiteSpace(pluginPrefix))
+        {
+            return null;
+        }
+
+        if (pluginPrefix.Contains("ClaudeCli", StringComparison.OrdinalIgnoreCase))
+        {
+            return "claude";
+        }
+
+        if (pluginPrefix.Contains("GitHubCopilot", StringComparison.OrdinalIgnoreCase))
+        {
+            return "copilot";
+        }
+
+        return null;
+    }
+
+    private static bool TryResolveRequestedExecutionUtc(string? requestedTimeText, out DateTimeOffset? requestedUtc, out string? validationError)
+    {
+        requestedUtc = null;
+        validationError = null;
+
+        if (string.IsNullOrWhiteSpace(requestedTimeText))
+        {
+            return true;
+        }
+
+        if (!TimeOnly.TryParse(requestedTimeText, CultureInfo.CurrentUICulture, DateTimeStyles.None, out var parsedTime)
+            && !TimeOnly.TryParse(requestedTimeText, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedTime))
+        {
+            validationError = "Der Ausführungszeitpunkt muss im Format HH:mm angegeben werden.";
+            return false;
+        }
+
+        var nowLocal = DateTimeOffset.Now;
+        var localToday = new DateTimeOffset(
+            nowLocal.Year,
+            nowLocal.Month,
+            nowLocal.Day,
+            parsedTime.Hour,
+            parsedTime.Minute,
+            0,
+            nowLocal.Offset);
+
+        var scheduledLocal = localToday <= nowLocal
+            ? localToday.AddDays(1)
+            : localToday;
+
+        requestedUtc = scheduledLocal.ToUniversalTime();
+        return true;
+    }
+
+    private void AbbrechenWartenAufAusfuehrungszeitpunkt()
+    {
+        if (_wartetAufAusfuehrungszeitpunkt)
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = new CancellationTokenSource();
         }
     }
 
@@ -1695,14 +1836,12 @@ public partial class AufgabeDetail : IDisposable
 
         if (zeilen.Length == 0)
         {
-            builder.AppendLine("## Schritt 1");
             builder.AppendLine("Warte auf Ausgabe...");
             return builder.ToString().TrimEnd();
         }
 
         for (var i = 0; i < zeilen.Length; i++)
         {
-            builder.AppendLine($"## Schritt {i + 1}");
             builder.AppendLine(zeilen[i]);
             builder.AppendLine();
         }

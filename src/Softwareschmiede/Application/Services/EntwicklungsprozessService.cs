@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +30,7 @@ public sealed class EntwicklungsprozessService
     private readonly ILogger<EntwicklungsprozessService> _logger;
     private const int DefaultContextCompressionSoftLimit = 12_000;
     private const int DefaultContextCompressionHardLimit = 20_000;
+    private const string RateLimitSuggestionMarker = "[[SOFTWARESCHMIEDE_RATE_LIMIT]]";
 
     /// <inheritdoc cref="EntwicklungsprozessService"/>
     public EntwicklungsprozessService(
@@ -210,6 +212,11 @@ public sealed class EntwicklungsprozessService
         _logger.LogInformation("Repository '{RepositoryUrl}' nach '{KlonPfad}' klonen (Plugin: {PluginPrefix}).", repository.RepositoryUrl, lokalerKlonPfad, gitPlugin.PluginPrefix);
         await gitPlugin.CloneRepositoryAsync(repository.RepositoryUrl, lokalerKlonPfad, ct);
 
+        if (kiPlugin is CliKiPluginBase cliKiPlugin)
+        {
+            cliKiPlugin.ClearContextFiles(lokalerKlonPfad);
+        }
+
         string branchName;
 
         // Prüfen ob ein vorhandener Remote-Branch genutzt werden soll
@@ -364,7 +371,7 @@ public sealed class EntwicklungsprozessService
             string.IsNullOrWhiteSpace(selectedKiPluginPrefix) ? aufgabe.KiPluginPrefix : selectedKiPluginPrefix,
             ct);
         var finalPrompt = prompt;
-        var contextFilePath = ResolveContextFilePath(kiPlugin, aufgabe.LokalerKlonPfad, aufgabeId);
+        var contextFilePath = ResolveContextFilePath(kiPlugin, aufgabe.LokalerKlonPfad);
 
         if (kontextmodus is not null)
         {
@@ -375,7 +382,6 @@ public sealed class EntwicklungsprozessService
                     prompt,
                     agent,
                     aufgabe.LokalerKlonPfad,
-                    contextFilePath,
                     runId,
                     kiPlugin,
                     kontextmodus.Value,
@@ -409,6 +415,7 @@ public sealed class EntwicklungsprozessService
             $"[RunId:{runId}] {(kontextmodus is null ? "Initialprompt" : $"Kontextmodus={kontextmodus}")}\n- KI-Plugin: {kiPlugin.PluginName} ({kiPlugin.PluginPrefix})\n{finalPrompt}",
             agent.Name,
             ct);
+        await _aufgabeService.ClearPromptVorschlagAsync(aufgabeId, ct);
         await _aufgabeService.KiAktiviertAsync(aufgabeId, ct);
 
         var vollstaendigeAntwort = new StringBuilder();
@@ -436,7 +443,29 @@ public sealed class EntwicklungsprozessService
                 }
 
                 if (!hasNext)
+                {
                     break;
+                }
+
+                if (TryParseRateLimitSuggestion(enumerator.Current, out var rateLimitSuggestion))
+                {
+                    await _aufgabeService.SavePromptVorschlagAsync(
+                        aufgabeId,
+                        rateLimitSuggestion.Prompt,
+                        rateLimitSuggestion.AusfuehrenAbUtc,
+                        CancellationToken.None);
+
+                    var localTime = rateLimitSuggestion.AusfuehrenAbUtc.ToLocalTime();
+                    var waitMessage = string.Format(
+                        CultureInfo.CurrentUICulture,
+                        "Rate-Limit erreicht. Vorschlag gespeichert: \"{0}\" ab {1:dd.MM.yyyy HH:mm:ss}.",
+                        rateLimitSuggestion.Prompt,
+                        localTime);
+
+                    vollstaendigeAntwort.AppendLine(waitMessage);
+                    yield return waitMessage;
+                    continue;
+                }
 
                 vollstaendigeAntwort.AppendLine(enumerator.Current);
                 yield return enumerator.Current;
@@ -489,15 +518,12 @@ public sealed class EntwicklungsprozessService
                         DateTimeOffset.UtcNow));
             }
 
-            if (kontextmodus is not null)
-            {
-                var contextEventId = Guid.NewGuid();
-                var responseContent = fehler is null
-                    ? vollstaendigeAntwort.ToString().Trim()
-                    : $"Fehler: {fehler.Message}";
-                var contextEntry = BuildContextEntry(runId, contextEventId, kontextmodus.Value, prompt, responseContent, fehler is not null);
-                await AppendContextEntryAsync(contextFilePath, contextEntry, CancellationToken.None);
-            }
+            var contextEventId = Guid.NewGuid();
+            var responseContent = fehler is null
+                ? vollstaendigeAntwort.ToString().Trim()
+                : $"Fehler: {fehler.Message}";
+            var contextEntry = BuildContextEntry(runId, contextEventId, kontextmodus, prompt, responseContent, fehler is not null);
+            await AppendContextEntryAsync(contextFilePath, contextEntry, CancellationToken.None);
         }
     }
 
@@ -757,7 +783,6 @@ public sealed class EntwicklungsprozessService
         string userPrompt,
         AgentInfo agent,
         string localRepoPath,
-        string contextFilePath,
         Guid runId,
         IKiPlugin kiPlugin,
         FolgeanweisungsKontextmodus kontextmodus,
@@ -768,8 +793,11 @@ public sealed class EntwicklungsprozessService
 
         if (kontextmodus == FolgeanweisungsKontextmodus.KontextNeuBeginnen)
         {
-            var resetHeader = $"# Kontextverlauf Aufgabe {aufgabeId}\n\nReset durch Folgeanweisung.\nRunId: {runId}\nContextEventId: {contextEventId}\nZeit: {DateTimeOffset.UtcNow:O}\n";
-            await WriteTextAtomicallyWithBackupAsync(contextFilePath, resetHeader, ct);
+            if (kiPlugin is CliKiPluginBase contextPlugin)
+            {
+                contextPlugin.ClearContextFiles(localRepoPath);
+            }
+
             await _protokollService.AddEintragAsync(
                 aufgabeId,
                 ProtokollTyp.StatusUebergang,
@@ -790,10 +818,21 @@ public sealed class EntwicklungsprozessService
             return userPrompt;
         }
 
-        var context = await ReadFileTextSafeAsync(contextFilePath, ct);
-        context = await EnsureContextWithinLimitsAsync(
+        var existingContextFilePath = ResolveExistingContextFilePath(kiPlugin, localRepoPath, ResolveContextFilePath(kiPlugin, localRepoPath));
+        if (string.IsNullOrWhiteSpace(existingContextFilePath))
+        {
+            await _protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.StatusUebergang,
+                $"[RunId:{runId}][ContextEventId:{contextEventId}] Keine vorhandene Kontextdatei gefunden, Folgeanweisung ohne Kontextpräfix gesendet.",
+                agent.Name,
+                ct);
+            return userPrompt;
+        }
+
+        await EnsureContextWithinLimitsAsync(
             aufgabeId,
-            context,
+            existingContextFilePath,
             agent,
             localRepoPath,
             runId,
@@ -804,31 +843,38 @@ public sealed class EntwicklungsprozessService
         await _protokollService.AddEintragAsync(
             aufgabeId,
             ProtokollTyp.StatusUebergang,
-            $"[RunId:{runId}][ContextEventId:{contextEventId}] Folgeanweisung mit Kontextpräfix gesendet.",
+            $"[RunId:{runId}][ContextEventId:{contextEventId}] Folgeanweisung mit Kontextdatei-Referenz gesendet.",
             agent.Name,
             ct);
 
-        if (string.IsNullOrWhiteSpace(context))
-        {
-            return userPrompt;
-        }
-
-        return $"{context.TrimEnd()}\n\n---\n\n{userPrompt}";
+        return CliKiPluginBase.MarkPromptToIncludeContextFile(userPrompt);
     }
 
-    private static string ResolveContextFilePath(IKiPlugin kiPlugin, string localRepoPath, Guid aufgabeId)
+    private static string ResolveContextFilePath(IKiPlugin kiPlugin, string localRepoPath)
     {
         if (kiPlugin is CliKiPluginBase cliKiPlugin)
         {
-            return cliKiPlugin.BuildContextFilePath(localRepoPath, aufgabeId);
+            return cliKiPlugin.BuildContextFilePath(localRepoPath);
         }
 
-        return Path.Combine(localRepoPath, $"{aufgabeId}.copilot.context.md");
+        return Path.Combine(localRepoPath, "copilot.context.md");
     }
 
-    private async Task<string> EnsureContextWithinLimitsAsync(
+    private static string? ResolveExistingContextFilePath(IKiPlugin kiPlugin, string localRepoPath, string fallbackContextFilePath)
+    {
+        if (kiPlugin is CliKiPluginBase cliKiPlugin)
+        {
+            return cliKiPlugin.GetLatestContextFilePath(localRepoPath);
+        }
+
+        return File.Exists(fallbackContextFilePath)
+            ? fallbackContextFilePath
+            : null;
+    }
+
+    private async Task EnsureContextWithinLimitsAsync(
         Guid aufgabeId,
-        string context,
+        string contextFilePath,
         AgentInfo agent,
         string localRepoPath,
         Guid runId,
@@ -836,64 +882,65 @@ public sealed class EntwicklungsprozessService
         string? model,
         CancellationToken ct)
     {
+        var context = await ReadFileTextSafeAsync(contextFilePath, ct);
         if (string.IsNullOrWhiteSpace(context))
         {
-            return string.Empty;
+            return;
         }
 
         var softLimit = _configuration.GetValue<int?>("KiKontext:SoftLimitChars") ?? DefaultContextCompressionSoftLimit;
         var hardLimit = _configuration.GetValue<int?>("KiKontext:HardLimitChars") ?? DefaultContextCompressionHardLimit;
 
-        var current = context;
-        if (current.Length > softLimit)
+        if (context.Length > softLimit)
         {
             var compressionEventId = Guid.NewGuid();
             await _protokollService.AddEintragAsync(
                 aufgabeId,
                 ProtokollTyp.StatusUebergang,
-                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Soft-Limit ({softLimit}) überschritten, starte KI-Komprimierung.",
+                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Soft-Limit ({softLimit}) überschritten, starte KI-Komprimierung der Kontextdatei.",
                 agent.Name,
                 ct);
 
-            current = await CompressContextAsync(current, agent, localRepoPath, kiPlugin, model, ct);
+            context = await CompressContextAsync(contextFilePath, agent, localRepoPath, kiPlugin, model, ct);
+            await WriteTextAtomicallyAsync(contextFilePath, context, ct);
 
             await _protokollService.AddEintragAsync(
                 aufgabeId,
                 ProtokollTyp.StatusUebergang,
-                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Prompt-Kontext komprimiert auf {current.Length} Zeichen.",
+                $"[RunId:{runId}][ContextEventId:{compressionEventId}] Kontextdatei komprimiert auf {context.Length} Zeichen.",
                 agent.Name,
                 ct);
         }
 
-        if (current.Length > hardLimit)
+        if (context.Length > hardLimit)
         {
-            throw new InvalidOperationException(
-                $"Kontextdatei überschreitet das Hard-Limit ({hardLimit} Zeichen) trotz Komprimierung. " +
-                "Bitte mit 'Kontext ignorieren' fortsetzen oder 'Kontext neu beginnen'.");
+            await _protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.StatusUebergang,
+                $"[RunId:{runId}] Kontextdatei konnte nicht zufriedenstellend komprimiert werden. Aktuelle Anzahl Zeichen: {context.Length}",
+                agent.Name,
+                ct);
         }
-
-        return current;
     }
 
     private async Task<string> CompressContextAsync(
-        string context,
+        string contextFilePath,
         AgentInfo agent,
         string localRepoPath,
         IKiPlugin kiPlugin,
         string? model,
         CancellationToken ct)
     {
+        var contextFileName = Path.GetFileName(contextFilePath);
         var compressionPrompt = $"""
-            Komprimiere den folgenden Projektkontext in eine knappe, strukturierte Markdown-Zusammenfassung.
-            Gib ausschließlich Markdown zurück, ohne Einleitung und ohne Codeblock.
+            Komprimiere den Inhalt der Datei {contextFileName} in eine knappe, strukturierte Markdown-Zusammenfassung.
+            Schreibe die komprimierte Fassung direkt in dieselbe Datei zurück.
+            Gib anschließend ausschließlich den finalen Dateiinhalt als Markdown zurück, ohne Einleitung und ohne Codeblock.
             Pflichtabschnitte:
             - Ziel
             - Offene Punkte
             - Letzte Entscheidungen
             - Relevante Randbedingungen
-
-            Kontext:
-            {context}
             """;
 
         var builder = new StringBuilder();
@@ -920,6 +967,57 @@ public sealed class EntwicklungsprozessService
         => markdown.Contains("Ziel", StringComparison.OrdinalIgnoreCase)
             && markdown.Contains("Offene Punkte", StringComparison.OrdinalIgnoreCase)
             && markdown.Contains("Letzte Entscheidungen", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryParseRateLimitSuggestion(string line, out RateLimitSuggestion suggestion)
+    {
+        suggestion = default;
+        if (string.IsNullOrWhiteSpace(line) || !line.StartsWith(RateLimitSuggestionMarker, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var payload = line[RateLimitSuggestionMarker.Length..].TrimStart(';');
+        var parts = payload.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        string? resetUtcRaw = null;
+        string? prompt = null;
+        foreach (var part in parts)
+        {
+            var separatorIndex = part.IndexOf('=');
+            if (separatorIndex <= 0)
+            {
+                continue;
+            }
+
+            var key = part[..separatorIndex].Trim();
+            var value = part[(separatorIndex + 1)..].Trim();
+            if (key.Equals("resetUtc", StringComparison.OrdinalIgnoreCase))
+            {
+                resetUtcRaw = value;
+            }
+            else if (key.Equals("prompt", StringComparison.OrdinalIgnoreCase))
+            {
+                prompt = value;
+            }
+        }
+
+        if (!DateTimeOffset.TryParse(
+                resetUtcRaw,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var resetUtc))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            prompt = "Mach nun bitte weiter.";
+        }
+
+        suggestion = new RateLimitSuggestion(prompt.Trim(), resetUtc);
+        return true;
+    }
 
     private static string BuildKiArbeitsprotokollMarkdown(Guid runId, DateTimeOffset zeitpunktUtc, string antwortRohtext)
     {
@@ -956,7 +1054,7 @@ public sealed class EntwicklungsprozessService
     private static string BuildContextEntry(
         Guid runId,
         Guid contextEventId,
-        FolgeanweisungsKontextmodus kontextmodus,
+        FolgeanweisungsKontextmodus? kontextmodus,
         string userPrompt,
         string response,
         bool isError)
@@ -964,7 +1062,7 @@ public sealed class EntwicklungsprozessService
             ## Verlaufseintrag
             - RunId: {runId}
             - ContextEventId: {contextEventId}
-            - Modus: {kontextmodus}
+            - Modus: {(kontextmodus?.ToString() ?? "Initialprompt")}
             - Zeit: {DateTimeOffset.UtcNow:O}
             - Status: {(isError ? "Fehler" : "Erfolgreich")}
 
@@ -976,6 +1074,8 @@ public sealed class EntwicklungsprozessService
 
             """;
 
+    private readonly record struct RateLimitSuggestion(string Prompt, DateTimeOffset AusfuehrenAbUtc);
+
     private async Task AppendContextEntryAsync(string contextFilePath, string entry, CancellationToken ct)
     {
         var current = await ReadFileTextSafeAsync(contextFilePath, ct);
@@ -983,7 +1083,7 @@ public sealed class EntwicklungsprozessService
             ? entry
             : $"{current.TrimEnd()}\n\n{entry}";
 
-        await WriteTextAtomicallyWithBackupAsync(contextFilePath, next, ct);
+        await WriteTextAtomicallyAsync(contextFilePath, next, ct);
     }
 
     private static async Task<string> ReadFileTextSafeAsync(string path, CancellationToken ct)
@@ -993,23 +1093,10 @@ public sealed class EntwicklungsprozessService
             return string.Empty;
         }
 
-        try
-        {
-            return await File.ReadAllTextAsync(path, ct);
-        }
-        catch
-        {
-            var backupPath = $"{path}.bak";
-            if (File.Exists(backupPath))
-            {
-                return await File.ReadAllTextAsync(backupPath, ct);
-            }
-
-            throw;
-        }
+        return await File.ReadAllTextAsync(path, ct);
     }
 
-    private static async Task WriteTextAtomicallyWithBackupAsync(string targetPath, string content, CancellationToken ct)
+    private static async Task WriteTextAtomicallyAsync(string targetPath, string content, CancellationToken ct)
     {
         var directory = Path.GetDirectoryName(targetPath);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -1018,12 +1105,6 @@ public sealed class EntwicklungsprozessService
         }
 
         var tempPath = $"{targetPath}.tmp";
-        var backupPath = $"{targetPath}.bak";
-
-        if (File.Exists(targetPath))
-        {
-            File.Copy(targetPath, backupPath, overwrite: true);
-        }
 
         try
         {
@@ -1037,12 +1118,10 @@ public sealed class EntwicklungsprozessService
 
             if (File.Exists(targetPath))
             {
-                File.Replace(tempPath, targetPath, backupPath, ignoreMetadataErrors: true);
+                File.Delete(targetPath);
             }
-            else
-            {
-                File.Move(tempPath, targetPath, overwrite: true);
-            }
+
+            File.Move(tempPath, targetPath);
         }
         finally
         {
