@@ -1,0 +1,45 @@
+# Einstellungen — Installation und Konfiguration
+
+## Arbeitsverzeichnis einrichten
+
+1. Einstellungsseite öffnen (`/einstellungen`).
+2. Im Abschnitt „Arbeitsverzeichnis" einen absoluten Pfad eingeben, z.B. `C:\Dev\Workdir`.
+3. Speichern.
+
+Das Verzeichnis muss existieren und beschreibbar sein. Unterverzeichnisse werden von der Anwendung automatisch angelegt (`softwareschmiede/<aufgabe-id>/`).
+
+## KI-Kontext-Limits konfigurieren
+
+Die Grenzen für die automatische Kontextkomprimierung können in `appsettings.json` überschrieben werden:
+
+| Parameter | Standardwert | Beschreibung |
+|-----------|-------------|--------------|
+| `KiKontext:SoftLimitChars` | `12000` | Ab dieser Zeichenzahl wird Komprimierung ausgelöst |
+| `KiKontext:HardLimitChars` | `20000` | Ab dieser Zeichenzahl erscheint Warnung |
+
+Beispiel:
+
+```json
+{
+  "KiKontext": {
+    "SoftLimitChars": 15000,
+    "HardLimitChars": 25000
+  }
+}
+```
+
+## Benachrichtigungen konfigurieren
+
+Benachrichtigungseinstellungen werden pro Aufgabe oder global in der Einstellungsseite verwaltet.
+
+| Modus | Beschreibung |
+|-------|-------------|
+| Immer | Nach jedem KI-Lauf-Abschluss benachrichtigen |
+| Nie | Keine Benachrichtigungen |
+| Nur bei Fehler | Nur bei fehlgeschlagenen Läufen |
+
+Audiodateien für Benachrichtigungen können als `BenachrichtigungsAudioDatei` hinterlegt werden.
+
+## Überprüfung
+
+Nach dem Speichern des Arbeitsverzeichnisses zeigt die Einstellungsseite den aufgelösten Pfad an. Ist ein Fallback aktiv, erscheint ein Hinweis mit dem Reason-Code.
