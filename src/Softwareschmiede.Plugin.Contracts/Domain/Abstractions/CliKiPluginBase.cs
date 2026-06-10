@@ -13,27 +13,102 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// </summary>
     public abstract string ProviderDateiPraefix { get; }
 
-    /// <summary>Erzeugt den Dateinamen für die Kontextdatei einer Aufgabe.</summary>
+    /// <summary>Erzeugt den Dateinamen für die erste provider-spezifische Kontextdatei.</summary>
     public string BuildContextFileName(Guid aufgabeId)
-        => $"{aufgabeId}.{ProviderDateiPraefix}.context.md";
-    /// <summary>Erzeugt den Dateimaske für die Kontextdatei einer Aufgabe.</summary>
-    protected string BuildContextFileMask() => $"*.{ProviderDateiPraefix}.context.md";
+        => BuildContextFileName(1);
 
-    /// <summary>Erzeugt den Pfad für die Kontextdatei einer Aufgabe.</summary>
+    /// <summary>Erzeugt den Dateinamen für die provider-spezifische Kontextdatei mit Sequenznummer.</summary>
+    public string BuildContextFileName(int index)
+        => index <= 1
+            ? $"{ProviderDateiPraefix}.context.md"
+            : $"{ProviderDateiPraefix}.context.{index}.md";
+
+    /// <summary>Erzeugt den Dateinamen für die nächste freie Kontextdatei im Repository.</summary>
+    public string BuildContextFileName(string localRepoPath)
+        => BuildContextFileName(GetNextContextFileIndex(localRepoPath));
+
+    /// <summary>Erzeugt den Dateimuster-Filter für alle Kontextdateien eines Providers.</summary>
+    protected string BuildContextFileMask() => $"{ProviderDateiPraefix}.context*.md";
+
+    /// <summary>Erzeugt den Dateinamen für den aktuellen Kontextlauf im Repository.</summary>
+    public string BuildContextFilePath(string localRepoPath)
+        => Path.Combine(localRepoPath, BuildContextFileName(localRepoPath));
+
+    /// <summary>Erzeugt den Pfad für die erste Kontextdatei einer Aufgabe.</summary>
     public string BuildContextFilePath(string localRepoPath, Guid aufgabeId)
         => Path.Combine(localRepoPath, BuildContextFileName(aufgabeId));
 
+    /// <summary>Gibt alle vorhandenen provider-spezifischen Kontextdateien in stabiler Reihenfolge zurück.</summary>
+    public IReadOnlyList<string> GetContextFileNames(string localRepoPath)
+    {
+        if (string.IsNullOrWhiteSpace(localRepoPath) || !Directory.Exists(localRepoPath))
+        {
+            return [];
+        }
+
+        return Directory.GetFiles(localRepoPath, BuildContextFileMask(), SearchOption.AllDirectories)
+            .Select(Path.GetFileName)
+            .Where(fileName => !string.IsNullOrWhiteSpace(fileName))
+            .Select(fileName => fileName!)
+            .OrderBy(fileName => GetContextFileIndex(fileName) ?? int.MaxValue)
+            .ThenBy(fileName => fileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>Gibt die zuletzt vorhandene provider-spezifische Kontextdatei im Repository zurück.</summary>
+    public string? GetLatestContextFilePath(string localRepoPath)
+    {
+        var contextFileName = GetContextFileNames(localRepoPath).LastOrDefault();
+        return string.IsNullOrWhiteSpace(contextFileName)
+            ? null
+            : Path.Combine(localRepoPath, contextFileName);
+    }
+
+    /// <summary>Entfernt alle provider-spezifischen Kontextdateien aus dem Repository.</summary>
+    public void ClearContextFiles(string localRepoPath)
+    {
+        if (string.IsNullOrWhiteSpace(localRepoPath) || !Directory.Exists(localRepoPath))
+        {
+            return;
+        }
+
+        foreach (var fileName in GetContextFileNames(localRepoPath))
+        {
+            var filePath = Path.Combine(localRepoPath, fileName);
+            TryDeleteFile(filePath);
+        }
+    }
+
     /// <summary>Erzeugt den Dateinamen für eine Prompt-Taskdatei eines KI-Runs.</summary>
     public string BuildTaskFileName(Guid runId)
-        => $"{runId}.{ProviderDateiPraefix}-task.md";
+        => $"{runId}.{ProviderDateiPraefix}.task.md";
+
     /// <summary>Erzeugt den Dateimaske für eine Prompt-Taskdatei eines KI-Runs.</summary>
-    protected string BuildTaskFileMask() => $"*.{ProviderDateiPraefix}-task.md";
-    /// <summary>Erzeugt den Dateimaske für eine Backupdatei der Prompt-Taskdatei eines KI-Runs.</summary>
-    protected string BuildTaskBackupFileMask() => $"{BuildTaskFileMask()}.bak";
+    protected string BuildTaskFileMask() => $"*.{ProviderDateiPraefix}.task.md";
 
     /// <summary>Erzeugt den Pfad für eine Prompt-Taskdatei eines KI-Runs.</summary>
     public string BuildTaskFilePath(string localRepoPath, Guid runId)
         => Path.Combine(localRepoPath, BuildTaskFileName(runId));
+
+    /// <summary>Erzeugt den Prompt-Text für den CLI-Aufruf.</summary>
+    protected string BuildCliPrompt(string localRepoPath, string taskFilePath, bool includeContext)
+    {
+        var lines = new List<string>();
+
+        lines.Add($"Aktuelle Anfrage: {Path.GetFileName(taskFilePath)}");
+
+        if (includeContext)
+        {
+            var contextFiles = GetContextFileNames(localRepoPath);
+            if (contextFiles.Count > 0)
+            {
+                lines.Add($"Für das Verständnis des bisherigen Chatverlaufs schau in den Kontextdateien nach:");
+                lines.Add($"Bisheriger Kontext: {string.Join(", ", contextFiles.Reverse())}");
+            }
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
 
     /// <summary>
     /// Liest alle Agenten aus dem angegebenen Unterverzeichnis eines Agentenpakets.
@@ -62,6 +137,7 @@ public abstract class CliKiPluginBase : IKiPlugin
             .OrderBy(agent => agent.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
     /// <summary>
     /// Stellt sicher, dass die .gitignore-Datei im angegebenen Verzeichnis
     /// die erforderlichen Ignore-Muster enthält. Die Datei wird nur geändert,
@@ -77,13 +153,13 @@ public abstract class CliKiPluginBase : IKiPlugin
     protected void EnsureGitignoreEntries(string directoryPath, params string[] requiredPatterns)
     {
         if (string.IsNullOrWhiteSpace(directoryPath))
+        {
             throw new ArgumentException("Directory path must not be empty.", nameof(directoryPath));
+        }
 
-        // Prüfen, ob es ein Git-Repository ist
         var gitFolder = Path.Combine(directoryPath, ".git");
         if (!Directory.Exists(gitFolder))
         {
-            // Kein Git-Repo → keine Änderungen vornehmen
             return;
         }
 
@@ -93,7 +169,7 @@ public abstract class CliKiPluginBase : IKiPlugin
             ? File.ReadAllLines(gitignorePath).ToList()
             : new List<string>();
 
-        bool changed = false;
+        var changed = false;
 
         foreach (var pattern in requiredPatterns)
         {
@@ -109,6 +185,7 @@ public abstract class CliKiPluginBase : IKiPlugin
             File.WriteAllLines(gitignorePath, existingLines);
         }
     }
+
     /// <summary>
     /// Stellt sicher, dass die .gitignore-Datei im angegebenen Verzeichnis
     /// die erforderlichen Ignore-Muster enthält. Die Datei wird nur geändert,
@@ -120,7 +197,22 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// </param>
     protected void EnsureGitignoreEntries(string directoryPath)
     {
-        EnsureGitignoreEntries(directoryPath, BuildTaskFileMask(), BuildTaskBackupFileMask(), BuildContextFileMask());
+        EnsureGitignoreEntries(directoryPath, BuildTaskFileMask(), BuildContextFileMask());
+    }
+
+    public const string IncludeContextMarker = "[[INCLUDE_CONTEXT_FILE_REFERENCE]]";
+
+    public static string MarkPromptToIncludeContextFile(string prompt) =>
+        $"{IncludeContextMarker}\n{prompt}";
+
+    public static (string Prompt, bool IncludeContext) UnwrapPromptContextMarker(string prompt)
+    {
+        if (prompt.StartsWith(IncludeContextMarker, StringComparison.Ordinal))
+        {
+            return (prompt[IncludeContextMarker.Length..].TrimStart('\r', '\n'), true);
+        }
+
+        return (prompt, false);
     }
 
     public abstract string PluginName { get; }
@@ -133,6 +225,63 @@ public abstract class CliKiPluginBase : IKiPlugin
     public abstract IAsyncEnumerable<string> StartDevelopmentAsync(string prompt, AgentInfo agent, string localRepoPath, string? model = null, CancellationToken ct = default);
     public abstract Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default);
     public abstract Task<bool> CheckHealthAsync(CancellationToken ct = default);
+
+    private int GetNextContextFileIndex(string localRepoPath)
+    {
+        var highestIndex = GetContextFileNames(localRepoPath)
+            .Select(GetContextFileIndex)
+            .Where(index => index is not null)
+            .Select(index => index!.Value)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return highestIndex + 1;
+    }
+
+    private static int? GetContextFileIndex(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || !fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        const string marker = ".context";
+        var markerIndex = fileName.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex < 0)
+        {
+            return null;
+        }
+
+        var suffix = fileName[(markerIndex + marker.Length)..^3];
+        if (string.IsNullOrEmpty(suffix))
+        {
+            return 1;
+        }
+
+        if (suffix.StartsWith(".", StringComparison.Ordinal) && int.TryParse(suffix[1..], out var index) && index > 0)
+        {
+            return index;
+        }
+
+        return null;
+    }
+
+    private static void TryDeleteFile(string filePath)
+    {
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
 
     private static string? ReadAgentDescription(string agentFilePath)
     {

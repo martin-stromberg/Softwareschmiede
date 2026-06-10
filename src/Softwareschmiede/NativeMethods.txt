@@ -1,0 +1,4 @@
+﻿CreatePseudoConsole
+ResizePseudoConsole
+ClosePseudoConsole
+CreatePipe

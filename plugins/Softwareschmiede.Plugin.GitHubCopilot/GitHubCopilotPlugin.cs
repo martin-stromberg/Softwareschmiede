@@ -190,10 +190,12 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         
         EnsureGitignoreEntries(localRepoPath);
 
+        var (instruction, includeContext) = CliKiPluginBase.UnwrapPromptContextMarker(prompt);
         var promptFile = BuildTaskFilePath(localRepoPath, Guid.NewGuid());
-        await File.WriteAllTextAsync(promptFile, prompt, ct);
+        await File.WriteAllTextAsync(promptFile, instruction, ct);
 
-        var args = BuildCopilotArgs(promptFile, agent, model);
+        var cliPrompt = BuildCliPrompt(localRepoPath, promptFile, includeContext);
+        var args = BuildCopilotArgs(cliPrompt, agent, model);
         var env = GetGhEnvironment(localRepoPath);
         var copilotCommand = GetCopilotCommand();
 
@@ -228,8 +230,8 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
     /// <summary>
     /// Baut die Argument-Liste für den <c>copilot</c>-CLI-Aufruf zusammen.
     /// <para>
-    /// Der Prompt wird als Dateireferenz übergeben (<c>@pfad</c>), damit Zeilenumbrüche
-    /// und beliebige Länge kein Problem für den Konsolenaufruf darstellen.
+    /// Der Prompt wird als kompakter Steuertext übergeben und verweist auf die
+    /// zuvor erzeugte Task-Datei (und optional die Kontextdatei).
     /// Für den nicht-interaktiven Skript-Modus sind folgende Flags erforderlich:
     /// <list type="bullet">
     ///   <item><c>--allow-all-tools</c> – alle Tool-Aufrufe ohne Bestätigung (Pflicht im Skript-Modus, sonst Exit-Code 1)</item>
@@ -239,12 +241,11 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
     /// </list>
     /// </para>
     /// </summary>
-    private static IEnumerable<string> BuildCopilotArgs(string promptFilePath, AgentInfo agent, string? model)
+    private static IEnumerable<string> BuildCopilotArgs(string cliPrompt, AgentInfo agent, string? model)
     {
-        // @<pfad> lässt copilot den Prompt aus der Datei lesen
         var args = new List<string>
         {
-            "--prompt", $"\"@{promptFilePath}\"",
+            "--prompt", $"\"{cliPrompt}\"",
             "--allow-all-tools",
             "--allow-all-paths",
             "--no-ask-user",
@@ -268,6 +269,9 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
 
         return args;
     }
+
+    private string BuildCliPrompt(string localRepoPath, string taskFilePath, bool includeContext)
+        => base.BuildCliPrompt(localRepoPath, taskFilePath, includeContext);
 
     /// <inheritdoc/>
     public override async Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default)

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
@@ -213,15 +214,16 @@ public sealed class GitHubCopilotPluginTests : IDisposable
 
         // Assert
         lines.Should().Equal("line 1", "line 2");
-        var promptFile = Directory.GetFiles(_testDirectory, "*.copilot-task.md").Single();
+        var promptFile = Directory.GetFiles(_testDirectory, "*.copilot.task.md").Single();
         File.Exists(promptFile).Should().BeTrue();
         (await File.ReadAllTextAsync(promptFile)).Should().Be("Prompt-Inhalt");
 
+        var taskFileName = Path.GetFileName(promptFile);
         _cliRunnerMock.Verify(c => c.StreamAsync(
             "copilot",
             It.Is<IEnumerable<string>>(args =>
                 args.Contains("--prompt") &&
-                args.Any(a => a.StartsWith("@", StringComparison.Ordinal)) &&
+                args.Any(a => a.Contains("Aktuelle Anfrage:", StringComparison.Ordinal) && a.Contains(taskFileName, StringComparison.Ordinal)) &&
                 args.Contains("--allow-all-tools") &&
                 args.Contains("--allow-all-paths") &&
                 args.Contains("--no-ask-user") &&
@@ -232,6 +234,39 @@ public sealed class GitHubCopilotPluginTests : IDisposable
                 args.Contains("gpt-5")),
             _testDirectory,
             It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "gh-token"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task StartDevelopmentAsync_ShouldIncludeContextReference_WhenMarkerPrefixIsProvided()
+    {
+        Directory.CreateDirectory(_testDirectory);
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "copilot.context.md"), "Bisheriger Kontext");
+        _cliRunnerMock.Setup(c => c.StreamAsync(
+                "copilot",
+                It.IsAny<IEnumerable<string>>(),
+                _testDirectory,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable());
+        var agent = new AgentInfo("agent-a", null, "file");
+
+        var markedPrompt = CliKiPluginBase.MarkPromptToIncludeContextFile("Folgeanweisung");
+        await foreach (var _ in _sut.StartDevelopmentAsync(markedPrompt, agent, _testDirectory, null))
+        {
+        }
+
+        var taskFile = Directory.GetFiles(_testDirectory, "*.copilot.task.md").Single();
+        var taskFileName = Path.GetFileName(taskFile);
+        _cliRunnerMock.Verify(c => c.StreamAsync(
+            "copilot",
+            It.Is<IEnumerable<string>>(args =>
+                args.Contains("--prompt")
+                && args.Any(a => a.Contains("Bisheriger Kontext: copilot.context.md", StringComparison.Ordinal)
+                    && a.Contains("Aktuelle Anfrage:", StringComparison.Ordinal)
+                    && a.Contains(taskFileName, StringComparison.Ordinal))),
+            _testDirectory,
+            It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

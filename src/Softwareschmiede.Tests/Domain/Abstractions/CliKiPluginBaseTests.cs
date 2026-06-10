@@ -16,8 +16,8 @@ public sealed class CliKiPluginBaseTests
         var id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         var runId = Guid.Parse("11111111-2222-3333-4444-555555555555");
 
-        sut.BuildContextFileName(id).Should().Be("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.claude.context.md");
-        sut.BuildTaskFileName(runId).Should().Be("11111111-2222-3333-4444-555555555555.claude-task.md");
+        sut.BuildContextFileName(id).Should().Be("claude.context.md");
+        sut.BuildTaskFileName(runId).Should().Be("11111111-2222-3333-4444-555555555555.claude.task.md");
     }
 
     /// <summary>Builds expected provider-specific context and task paths.</summary>
@@ -30,9 +30,11 @@ public sealed class CliKiPluginBaseTests
         var runId = Guid.Parse("11111111-2222-3333-4444-555555555555");
 
         sut.BuildContextFilePath(repoPath, id)
-            .Should().Be(Path.Combine(repoPath, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.copilot.context.md"));
+            .Should().Be(Path.Combine(repoPath, "copilot.context.md"));
+        sut.BuildContextFilePath(repoPath)
+            .Should().Be(Path.Combine(repoPath, "copilot.context.md"));
         sut.BuildTaskFilePath(repoPath, runId)
-            .Should().Be(Path.Combine(repoPath, "11111111-2222-3333-4444-555555555555.copilot-task.md"));
+            .Should().Be(Path.Combine(repoPath, "11111111-2222-3333-4444-555555555555.copilot.task.md"));
     }
 
     /// <summary>Preserves unusual provider prefixes for deterministic naming.</summary>
@@ -42,7 +44,7 @@ public sealed class CliKiPluginBaseTests
         var sut = new TestCliKiPlugin("custom.prefix");
         var id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
-        sut.BuildContextFileName(id).Should().Be("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.custom.prefix.context.md");
+        sut.BuildContextFileName(id).Should().Be("custom.prefix.context.md");
     }
 
     private sealed class TestCliKiPlugin(string prefix) : CliKiPluginBase

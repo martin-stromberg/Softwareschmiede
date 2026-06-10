@@ -259,6 +259,63 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().BeNull();
     }
 
+    /// <summary>SavePromptVorschlagAsync speichert Prompt und Ausführungszeitpunkt.</summary>
+    [Fact]
+    public async Task SavePromptVorschlagAsync_ShouldPersistPromptAndSchedule_WhenValuesAreProvided()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag", null);
+        var ausfuehrenAbUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
+
+        // Act
+        await _sut.SavePromptVorschlagAsync(aufgabe.Id, "Mach nun bitte weiter.", ausfuehrenAbUtc);
+
+        // Assert
+        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        result!.VorschlagPrompt.Should().Be("Mach nun bitte weiter.");
+        result.VorschlagAusfuehrenAbUtc.Should().Be(ausfuehrenAbUtc);
+    }
+
+    /// <summary>SavePromptVorschlagAsync entfernt Zeitstempel, wenn der Prompt leer ist.</summary>
+    [Fact]
+    public async Task SavePromptVorschlagAsync_ShouldClearSchedule_WhenPromptIsWhitespace()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag löschen", null);
+        await _sut.SavePromptVorschlagAsync(
+            aufgabe.Id,
+            "Mach nun bitte weiter.",
+            new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero));
+
+        // Act
+        await _sut.SavePromptVorschlagAsync(aufgabe.Id, "  ", new DateTimeOffset(2026, 06, 01, 12, 0, 0, TimeSpan.Zero));
+
+        // Assert
+        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        result!.VorschlagPrompt.Should().BeNull();
+        result.VorschlagAusfuehrenAbUtc.Should().BeNull();
+    }
+
+    /// <summary>ClearPromptVorschlagAsync entfernt Prompt und Ausführungszeitpunkt vollständig.</summary>
+    [Fact]
+    public async Task ClearPromptVorschlagAsync_ShouldRemovePromptAndSchedule_WhenValuesExist()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Prompt-Vorschlag entfernen", null);
+        await _sut.SavePromptVorschlagAsync(
+            aufgabe.Id,
+            "Mach nun bitte weiter.",
+            new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero));
+
+        // Act
+        await _sut.ClearPromptVorschlagAsync(aufgabe.Id);
+
+        // Assert
+        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        result!.VorschlagPrompt.Should().BeNull();
+        result.VorschlagAusfuehrenAbUtc.Should().BeNull();
+    }
+
     /// <summary>VerwerfenAsync archiviert eine offene Aufgabe.</summary>
     [Fact]
     public async Task VerwerfenAsync_ShouldSetStatusArchiviert_WhenOffeneAufgabeArchiviertWird()

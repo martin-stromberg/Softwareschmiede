@@ -53,6 +53,12 @@ public sealed class Aufgabe
     /// <summary>Concurrency-Token für Recovery-relevante Statusänderungen.</summary>
     public int RecoveryVersion { get; set; }
 
+    /// <summary>Persistierter Vorschlag für den nächsten Prompt.</summary>
+    public string? VorschlagPrompt { get; set; }
+
+    /// <summary>Geplanter Ausführungszeitpunkt für den nächsten Prompt.</summary>
+    public DateTimeOffset? VorschlagAusfuehrenAbUtc { get; set; }
+
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
 

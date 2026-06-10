@@ -1,0 +1,73 @@
+﻿@using System.Text
+@using XtermBlazor
+@inject ILogger<CliTerminal> Logger
+
+<Xterm @ref="_terminal"
+       Options="_options"
+       OnData="OnData"
+       OnFirstRender="OnFirstRender" />
+
+@code {
+    [Parameter] public string CliName { get; set; } = "copilot";
+    [Parameter] public string WorkingDirectory { get; set; } = ".";
+
+    private Xterm _terminal = default!;
+    private TerminalOptions _options = new()
+    {
+        CursorBlink = true,
+        CursorStyle = CursorStyle.Block
+    };
+
+    private System.Net.WebSockets.ClientWebSocket? _ws;
+
+    private async Task OnFirstRender()
+    {
+        _ws = new System.Net.WebSockets.ClientWebSocket();
+        await _ws.ConnectAsync(new Uri("ws://localhost:3001"), CancellationToken.None);
+
+        await _ws.SendAsync(
+            Encoding.UTF8.GetBytes($"SET_CWD:{WorkingDirectory}"),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true,
+            CancellationToken.None
+        );
+
+        await _ws.SendAsync(
+            Encoding.UTF8.GetBytes($"START_CLI:{CliName}"),
+            System.Net.WebSockets.WebSocketMessageType.Text,
+            true,
+            CancellationToken.None
+        );
+
+
+
+        _ = Task.Run(ReceiveLoop);
+
+        await _terminal.WriteLine($"Connected. CLI: {CliName}, Dir: {WorkingDirectory}");
+    }
+
+    private async Task ReceiveLoop()
+    {
+        var buffer = new byte[4096];
+
+        while (_ws?.State == System.Net.WebSockets.WebSocketState.Open)
+        {
+            var result = await _ws.ReceiveAsync(buffer, CancellationToken.None);
+            var text = Encoding.UTF8.GetString(buffer, 0, result.Count);
+
+            await InvokeAsync(async () =>
+            {
+                await _terminal.Write(text);
+            });
+        }
+    }
+
+    private async Task OnData(string data)
+    {
+        if (_ws?.State == System.Net.WebSockets.WebSocketState.Open)
+        {
+            var bytes = Encoding.UTF8.GetBytes(data);
+            await _ws.SendAsync(bytes, System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
+        }
+    }
+}

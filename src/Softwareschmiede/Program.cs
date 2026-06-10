@@ -35,6 +35,8 @@ namespace Softwareschmiede
             builder.Services.AddScoped<IAgentPackageFileService, AgentPackageFileService>();
             builder.Services.AddScoped<IArbeitsverzeichnisResolver, ArbeitsverzeichnisResolver>();
             builder.Services.AddScoped<IBenutzerkontextService, BenutzerkontextService>();
+            builder.Services.AddSingleton<CliSessionService>();
+
 
             // Plugins
             builder.Services.AddSingleton<IPluginManager, PluginManager>();

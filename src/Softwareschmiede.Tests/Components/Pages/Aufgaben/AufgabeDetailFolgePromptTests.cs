@@ -104,6 +104,22 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_selectedKiPluginPrefix").Should().Be("Softwareschmiede.KiB");
     }
 
+    [Fact]
+    public async Task OnInitializedAsync_ShouldPrefillPromptAndExecutionTime_WhenTaskContainsSuggestion()
+    {
+        var suggestionUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
+        var sut = await CreateSutAsync(
+            initialAgent: "agent-initial",
+            weitereAgenten: ["agent-alt"],
+            suggestedPrompt: "Mach nun bitte weiter.",
+            suggestedExecutionUtc: suggestionUtc);
+
+        await sut.InvokeOnInitializedAsync();
+
+        GetPrivateField<string>(sut, "_prompt").Should().Be("Mach nun bitte weiter.");
+        GetPrivateField<string>(sut, "_ausfuehrenAbZeitText").Should().Be(suggestionUtc.ToLocalTime().ToString("HH:mm"));
+    }
+
     /// <summary>Prüft, dass der Query-Parameter das Projektverzeichnis-Register aktiviert.</summary>
     [Fact]
     public async Task OnParametersSetAsync_ShouldEnableExplorer_WhenViewQueryIsTree()
@@ -165,7 +181,23 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.StartedRuns[0].Agent.Name.Should().Be("agent-alt");
         sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextIgnorieren);
         GetPrivateField<string>(sut, "_prompt").Should().BeEmpty();
+        GetPrivateField<string>(sut, "_ausfuehrenAbZeitText").Should().BeEmpty();
         GetPrivateField<string>(sut, "_kiAgentName").Should().Be("agent-alt");
+    }
+
+    [Fact]
+    public async Task KiStartenAsync_ShouldShowError_WhenExecutionTimeFormatIsInvalid()
+    {
+        var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
+        await sut.InvokeOnInitializedAsync();
+        SetPrivateField(sut, "_kiAgentName", "agent-alt");
+        SetPrivateField(sut, "_prompt", "Initialer Prompt");
+        SetPrivateField(sut, "_ausfuehrenAbZeitText", "ungueltig");
+
+        await InvokePrivateAsync(sut, "KiStartenAsync");
+
+        sut.StartedRuns.Should().BeEmpty();
+        GetPrivateField<string?>(sut, "_fehler").Should().Contain("HH:mm");
     }
 
     [Fact]
@@ -1128,6 +1160,8 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         string? storedDefaultKiPluginPrefix = null,
         bool includeCompatibleAgents = true,
         bool includeKiAntwort = true,
+        string? suggestedPrompt = null,
+        DateTimeOffset? suggestedExecutionUtc = null,
         Func<string, IEnumerable<AgentInfo>>? availableAgentsByPluginPrefix = null,
         Action<Mock<IGitPlugin>>? configureGitPlugin = null)
     {
@@ -1149,6 +1183,8 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             AgentenName = initialAgent,
             KiPluginPrefix = storedTaskKiPluginPrefix,
             LokalerKlonPfad = Path.GetTempPath(),
+            VorschlagPrompt = suggestedPrompt,
+            VorschlagAusfuehrenAbUtc = suggestedExecutionUtc,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
