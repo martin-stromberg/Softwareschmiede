@@ -4,6 +4,7 @@
 
 [![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor)](https://blazor.net/)
+[![WPF](https://img.shields.io/badge/WPF-Desktop-512BD4?logo=dotnet)](https://learn.microsoft.com/dotnet/desktop/wpf/)
 [![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-zu%20definieren-lightgrey)](#-lizenz)
@@ -32,13 +33,17 @@
 18. [Lizenz](#-lizenz)
 19. [Kontakt](#-kontakt)
 
+> **Hinweis:** Das Projekt befindet sich in der Migration von Blazor Server zu einer nativen **WPF-Desktopanwendung**. Beide Frontends nutzen dieselben Domain- und Service-Schichten. Details unter [WPF-Desktopanwendung (in Entwicklung)](#️-wpf-desktopanwendung-in-entwicklung).
+
 ---
 
 ## 📖 Projektbeschreibung
 
-**Softwareschmiede** ist eine webbasierte **Einzelnutzer-Anwendung** auf Basis von **Blazor Server (.NET 10+)**, die den vollständigen Workflow der **KI-gestützten Softwareentwicklung** in einer einheitlichen Oberfläche verwaltet.
+**Softwareschmiede** ist eine **Einzelnutzer-Anwendung**, die den vollständigen Workflow der **KI-gestützten Softwareentwicklung** in einer einheitlichen Oberfläche verwaltet.
 
 Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Login** und verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung und KI-Steuerung an einem zentralen Ort.
+
+Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WPF-Desktopanwendung** migriert. Das neue WPF-Projekt (`src/Softwareschmiede.App`) ist bereits in der Solution enthalten; die bisherige Blazor-Oberfläche ist weiterhin aktiv bis zur vollständigen Ablösung.
 
 ### Geschäftsziele
 
@@ -54,7 +59,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-05-27**
+Stand: **2026-06-11**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -68,6 +73,7 @@ Stand: **2026-05-27**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Blazor-Ablösung noch ausstehend |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -173,6 +179,32 @@ Stand: **2026-05-27**
 - Farbkodierte Statusanzeige (KI aktiv = blau, Fehlgeschlagen = rot, Abgeschlossen = grün)
 - Direktnavigation zum Aufgabenprotokoll per Klick
 
+### 🖥️ WPF-Desktopanwendung (in Entwicklung)
+
+Das Projekt `src/Softwareschmiede.App` enthält die neue native WPF-Oberfläche als Ablösung der Blazor-Anwendung:
+
+- **MVVM-Architektur:** Alle Views besitzen eigene ViewModels (`ViewModelBase` mit `INotifyPropertyChanged`)
+- **Dark Mode:** `DarkModeService` wechselt WPF-ResourceDictionary zwischen `DarkTheme.xaml` und `LightTheme.xaml`
+- **CLI-Fenstereinbettung:** `ProcessWindowHost`-Control bettet CLI-Prozessfenster via Win32 `SetParent` in die WPF-UI ein
+- **Recovery-Banner:** `RecoveryBannerControl` zeigt beim Start automatisch erkannte Recovery-Kandidaten an (Aufgaben mit Heartbeat > 5 Min und Status `InArbeit`/`Wartend`)
+- **Status-Anzeige:** `StatusIndicatorControl` visualisiert den aktuellen Aufgabenstatus
+- **Audio-Benachrichtigungen:** `WpfAudioService` spielt WAV/MP3-Dateien über WPF-`MediaPlayer` ab
+- **Eingebettetes DI:** Startup via `Microsoft.Extensions.Hosting` + `Microsoft.Extensions.DependencyInjection`
+- **Logging:** Serilog mit File- und Console-Sink
+- **Plugin-Kopie via MSBuild:** Nach dem Build werden Plugin-DLLs automatisch in `bin/<Config>/plugins/` kopiert
+
+**Neues Aufgaben-Statusmodell (WPF):**
+
+| Status | Bedeutung |
+|--------|-----------|
+| `Neu` | Aufgabe angelegt, noch nicht gestartet |
+| `ArbeitsverzeichnisEingerichtet` | Git-Repository geklont, Branch erstellt |
+| `Gestartet` | CLI-Prozess gestartet |
+| `InArbeit` | CLI aktiv, Heartbeat läuft |
+| `Wartend` | Rate-Limit erkannt, Prompt-Vorschlag gespeichert |
+| `Beendet` | Aufgabe abgeschlossen oder fehlgeschlagen |
+| `Archiviert` | Aufgabe archiviert |
+
 ### 🎨 Branding & UI-Assets
 - Anwendung nutzt ein dediziertes SVG-Favicon `favicon-hammer-pick.svg` (gekreuzter Hammer/Pickel) aus `src/Softwareschmiede/wwwroot/`
 - Browser-Head enthält konsistente SVG-Referenzen (`icon`, `shortcut icon`, `mask-icon`) für moderne Browserdarstellung
@@ -191,8 +223,8 @@ Die wichtigsten UI-Abläufe sind im [Benutzerleitfaden](docs/user-guide.md) sowi
 
 | Voraussetzung | Version | Hinweis |
 |---------------|---------|---------|
-| **Windows** | 10 / 11 | Pflicht – Windows Credential Store wird benötigt |
-| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| **Windows** | 10 / 11 | Pflicht – Windows Credential Store und WPF werden benötigt |
+| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) – WPF-Projekt (`net10.0-windows`) erfordert Windows-SDK |
 | **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen |
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
 | **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
@@ -232,20 +264,39 @@ cd Softwareschmiede
 
 ### 2. Abhängigkeiten wiederherstellen & bauen
 
+**Blazor Server (aktuell produktiv):**
+
 ```powershell
 dotnet restore
 dotnet build src/Softwareschmiede/Softwareschmiede.csproj
 ```
 
-Beim Build des Host-Projekts werden die Plugin-DLLs automatisch nach `bin/<Config>/<TFM>/plugins/` kopiert (inkl. Publish-Ausgabe).
+**WPF-Desktopanwendung (in Entwicklung):**
+
+```powershell
+dotnet restore
+dotnet build src/Softwareschmiede.App/Softwareschmiede.App.csproj
+```
+
+Beim Build werden die Plugin-DLLs automatisch nach `bin/<Config>/plugins/` kopiert (MSBuild-Target `CopyPluginsToOutput`).
 
 ### 3. Anwendung starten
+
+**Blazor Server:**
 
 ```powershell
 dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj
 ```
 
-Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurierten Port) erreichbar.
+Die Blazor-Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurierten Port) erreichbar.
+
+**WPF-Desktop:**
+
+```powershell
+dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj
+```
+
+Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 
 ### 4. Erste Schritte
 
@@ -540,6 +591,13 @@ Softwareschmiede/                            # Solution Root
 │   │   │       ├── Aufgaben/
 │   │   │       └── Agentenpakete/
 │   │   └── wwwroot/                         # Statische Assets (CSS, JS, Bilder)
+│   ├── Softwareschmiede.App/                # WPF-Desktopanwendung (net10.0-windows)
+│   │   ├── Views/                           # MainWindow, Dashboard-, Projekt-, Aufgaben-, Einstellungs-Views
+│   │   ├── ViewModels/                      # MVVM-ViewModels (ViewModelBase, MainWindowViewModel, ...)
+│   │   ├── Controls/                        # ProcessWindowHost, StatusIndicatorControl, RecoveryBannerControl
+│   │   ├── Services/                        # DarkModeService, WpfAudioService
+│   │   ├── Themes/                          # DarkTheme.xaml, LightTheme.xaml
+│   │   └── Converters/                      # AppConverters (WPF-Wertkonverter)
 │   ├── Softwareschmiede.Client/             # Blazor WebAssembly Client Assembly
 │   ├── Softwareschmiede.IntegrationTests/   # Integrations-Tests
 │   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, PluginType
@@ -550,6 +608,9 @@ Softwareschmiede/                            # Solution Root
 │   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
 │   └── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
 ├── docs/                                    # Planungsdokumente und Architektur
+│   ├── features/72-wpf/                     # WPF-Migrationsdokumentation
+│   │   ├── requirement.md                   # Technische Anforderungsspezifikation
+│   │   └── plan.md                          # Umsetzungsplan inkl. Designentscheidungen
 │   ├── requirements/
 │   │   ├── requirements-analysis.md
 │   │   └── plugin-klassenbibliotheken-github-und-copilot.md
@@ -566,7 +627,7 @@ Softwareschmiede/                            # Solution Root
 
 ## 🏗️ Architektur
 
-Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten:
+Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten. Die Präsentationsschicht wird derzeit von Blazor Server auf WPF migriert; Domain, Application und Infrastructure bleiben für beide Frontends identisch:
 
 ```mermaid
 flowchart TB
@@ -609,7 +670,8 @@ flowchart TB
 
 | Schicht | Verantwortung |
 |---------|---------------|
-| **Presentation** | UI-Rendering, Benutzerinteraktion, ViewModel-Binding, Echtzeit-Updates via SignalR |
+| **Presentation (Blazor)** | UI-Rendering, Benutzerinteraktion, ViewModel-Binding, Echtzeit-Updates via SignalR |
+| **Presentation (WPF, in Entwicklung)** | Native Windows-UI, MVVM (ViewModelBase), Dark Mode, CLI-Fenstereinbettung via Win32 SetParent |
 | **Application** | Anwendungsfalllogik, Koordination von Domain und Infrastructure, Plugin-Aufruf |
 | **Domain** | Fachentitäten, Domänenregeln, Plugin-Interfaces – **keine** äußeren Abhängigkeiten |
 | **Infrastructure** | DB-Zugriff, CLI-Prozesse, Credential Store, Dateisystem |
@@ -725,9 +787,17 @@ Feature-spezifische Testartefakte:
 
 Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
 
+**Blazor Server:**
+
 - **Development:** `dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj`
 - **Publish:** `dotnet publish src/Softwareschmiede/Softwareschmiede.csproj -c Release`
 - Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
+
+**WPF-Desktopanwendung (in Entwicklung):**
+
+- **Development:** `dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj`
+- **Publish:** `dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release`
+- Log-Dateien werden unter `{Programmverzeichnis}/logs` abgelegt (Serilog File-Sink).
 
 Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügbar sein (`copilot` oder `claude`; für Claude-Läufe zusätzlich `ANTHROPIC_API_KEY` als Credential).
 
@@ -738,7 +808,8 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
-- Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
+- **WPF-Migration (Feature #72):** `src/Softwareschmiede.App` als neues WPF-Projekt ergänzt — MVVM-Gerüst, Views, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Service, neues Aufgaben-Statusmodell (`Neu` → `ArbeitsverzeichnisEingerichtet` → `Gestartet` → `InArbeit` → `Wartend` → `Beendet`) in README dokumentiert (**2026-06-11**)
+- Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview”** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
 - Sollzustand vom **2026-05-25** eingearbeitet: **KI-Plugin Pflicht**, **Agentenpaket/Agent optional** in Voraussetzungen, Installation, Usage und Issue-58-Beschreibung vereinheitlicht
 - Feature **„KI-Protokoll Auto-Scroll“ (F027)** in README ergänzt (Features/Usage/Changelog) inkl. Verweis auf die neue Fachdokumentation und den Dokumentationsplan-Abschnitt vom 2026-05-25
 - Diff-Funktionalität in README konsolidiert (Implementierungsstatus, Feature- und Usage-Abschnitte) inkl. Verweisen auf `/api/diff`
@@ -775,7 +846,20 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] Folgeanweisungen mit Agent- und Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
 - [x] Windows Credential Store Integration
 
-### v1.x – Erweiterungen
+### v2.0 – WPF-Desktopanwendung (in Entwicklung)
+- [x] WPF-Projekt `src/Softwareschmiede.App` erstellt (net10.0-windows)
+- [x] MVVM-Gerüst: Views, ViewModels, ViewModelBase
+- [x] Dark Mode via `DarkModeService` + ResourceDictionary-Themes
+- [x] CLI-Fenstereinbettung via `ProcessWindowHost` (Win32 SetParent)
+- [x] Recovery-Banner (`RecoveryBannerControl`) und Status-Indikator (`StatusIndicatorControl`)
+- [x] Audio-Benachrichtigungen via `WpfAudioService` (WPF MediaPlayer)
+- [x] Plugin-DLL-Kopie via MSBuild-Target
+- [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
+- [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
+- [ ] Blazor-Code vollständig entfernt
+- [ ] E2E-Tests für WPF-UI-Workflows
+
+### v2.x – Erweiterungen
 - [ ] GitLab-Plugin
 - [ ] Azure DevOps-Plugin
 - [ ] Weitere KI-Plugins (z. B. OpenAI, Gemini als dedizierte Provider)

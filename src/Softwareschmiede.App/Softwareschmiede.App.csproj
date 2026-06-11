@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <OutputType>WinExe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Softwareschmiede.App</RootNamespace>
+    <AssemblyName>Softwareschmiede.App</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>Softwareschmiede.App.App</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
+    <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.*" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.*" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.*" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.*" />
+  </ItemGroup>
+
+  <Target Name="CopyPluginsToOutput" AfterTargets="Build">
+    <ItemGroup>
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\net10.0\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\net10.0\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\net10.0\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\net10.0\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugins" />
+    <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(OutDir)plugins" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

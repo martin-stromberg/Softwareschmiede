@@ -1,5 +1,6 @@
 using FluentAssertions;
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Softwareschmiede.Infrastructure.Services;
@@ -17,7 +18,7 @@ public sealed class AgentPackageReaderTests : IDisposable
         _baseDir = Path.Combine(Path.GetTempPath(), "agent-packages-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_baseDir);
 
-        var envMock = new Mock<IWebHostEnvironment>();
+        var envMock = new Mock<IHostEnvironment>();
         envMock.Setup(e => e.ContentRootPath).Returns(_baseDir);
 
         _sut = new AgentPackageReader(

@@ -1,0 +1,88 @@
+<UserControl x:Class="Softwareschmiede.App.Views.TaskListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Ladesymbol -->
+        <TextBlock Grid.Row="0"
+                   Text="Wird geladen…"
+                   Foreground="{DynamicResource SecondaryTextBrush}"
+                   Margin="0,0,0,8"
+                   Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+        <!-- Statusfilter -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Filter:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+            <ComboBox Width="160"
+                      SelectedItem="{Binding StatusFilter}"
+                      Background="{DynamicResource SurfaceBrush}"
+                      Foreground="{DynamicResource PrimaryTextBrush}">
+                <ComboBox.Items>
+                    <x:Null />
+                </ComboBox.Items>
+            </ComboBox>
+            <Button Content="Alle"
+                    Command="{Binding FilterZuruecksetzenCommand}"
+                    Padding="8,4"
+                    Margin="8,0,0,0"
+                    Background="{DynamicResource SurfaceBrush}"
+                    Foreground="{DynamicResource PrimaryTextBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" />
+        </StackPanel>
+
+        <!-- Aufgabenliste -->
+        <ListView Grid.Row="2"
+                  ItemsSource="{Binding GefiltereAufgaben}"
+                  Background="Transparent"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="4,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding Titel}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Status}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Margin="8,0,0,0" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Fehlermeldung -->
+        <Border Grid.Row="3"
+                Background="{DynamicResource ErrorBrush}"
+                CornerRadius="4"
+                Padding="8,4"
+                Margin="0,4,0,0"
+                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" FontSize="12" />
+        </Border>
+    </Grid>
+</UserControl>

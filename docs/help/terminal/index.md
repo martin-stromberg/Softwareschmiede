@@ -1,6 +1,6 @@
-# CLI-Terminal
+# CLI-Fenster-Einbettung
 
-Das CLI-Terminal ist ein interaktives Vollbild-Terminal in der Aufgabendetailansicht, das direkt mit Claude CLI oder GitHub Copilot CLI kommuniziert. Es basiert auf einer echten PTY-Session (via `node-pty`) und ist über WebSocket mit der Blazor-Anwendung verbunden.
+Das CLI-Fenster-Einbettungssystem bettet das native Terminalfenster eines KI-CLI-Tools (Claude CLI, GitHub Copilot CLI) direkt in die WPF-Aufgabendetailansicht ein. Die Integration erfolgt via Win32 `SetParent`-API und erfordert kein separates Backend-Prozess.
 
 ## Inhalt
 

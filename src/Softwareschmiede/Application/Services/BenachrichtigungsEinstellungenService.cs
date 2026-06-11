@@ -45,11 +45,11 @@ public sealed class BenachrichtigungsEinstellungenService
         if (einstellung is null)
         {
             return new BenachrichtigungsEinstellungenDto(
-                BenachrichtigungsModus.Global,
-                BenachrichtigungsModus.NurAufgabenseite);
+                BenachrichtigungsModus.Banner,
+                BenachrichtigungsModus.Deaktiviert);
         }
 
-        return new BenachrichtigungsEinstellungenDto(einstellung.ToastModus, einstellung.TonModus);
+        return new BenachrichtigungsEinstellungenDto(einstellung.BannerModus, einstellung.TonModus);
     }
 
     public async Task SaveAsync(string benutzerId, BenachrichtigungsEinstellungenDto dto, CancellationToken ct = default)
@@ -67,7 +67,7 @@ public sealed class BenachrichtigungsEinstellungenService
             _db.BenachrichtigungsEinstellungen.Add(einstellung);
         }
 
-        einstellung.ToastModus = dto.ToastModus;
+        einstellung.BannerModus = dto.BannerModus;
         einstellung.TonModus = dto.TonModus;
         einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);

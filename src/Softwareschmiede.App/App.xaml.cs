@@ -1,0 +1,144 @@
+using System.IO;
+using System.Windows;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Serilog;
+using Softwareschmiede.App.Services;
+using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.App.Views;
+using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Infrastructure.Data;
+using Softwareschmiede.Infrastructure.Plugins;
+using Softwareschmiede.Infrastructure.Services;
+
+namespace Softwareschmiede.App;
+
+/// <summary>Einstiegspunkt der WPF-Desktopanwendung Softwareschmiede.</summary>
+public sealed partial class App : System.Windows.Application
+{
+    private IHost? _host;
+
+    /// <inheritdoc/>
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+        Directory.CreateDirectory(logDirectory);
+
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Information()
+            .WriteTo.Console()
+            .WriteTo.File(
+                Path.Combine(logDirectory, "softwareschmiede-.log"),
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 14)
+            .CreateLogger();
+
+        StartupAsync(e).ContinueWith(t =>
+        {
+            if (t.IsFaulted)
+            {
+                Log.Logger.Fatal(t.Exception, "Fehler beim Starten der Anwendung.");
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(
+                        $"Die Anwendung konnte nicht gestartet werden:\n\n{t.Exception?.InnerException?.Message ?? t.Exception?.Message}",
+                        "Startfehler",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    Shutdown(1);
+                });
+            }
+        }, System.Threading.Tasks.TaskScheduler.Default);
+    }
+
+    private async System.Threading.Tasks.Task StartupAsync(StartupEventArgs e)
+    {
+        _host = Host.CreateDefaultBuilder()
+            .UseSerilog()
+            .ConfigureServices(ConfigureServices)
+            .Build();
+
+        await _host.StartAsync();
+
+        var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+        mainWindow.Show();
+    }
+
+    /// <inheritdoc/>
+    protected override async void OnExit(ExitEventArgs e)
+    {
+        if (_host is not null)
+        {
+            await _host.StopAsync(TimeSpan.FromSeconds(10));
+            _host.Dispose();
+        }
+
+        Log.CloseAndFlush();
+        base.OnExit(e);
+    }
+
+    private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
+    {
+        var dbPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Softwareschmiede",
+            "softwareschmiede.db");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+
+        services.AddDbContext<SoftwareschmiededDbContext>(options =>
+            options.UseSqlite($"Data Source={dbPath}"));
+
+        // Domain Services
+        services.AddScoped<AufgabeService>();
+        services.AddScoped<ProjektService>();
+        services.AddScoped<ProtokollService>();
+        services.AddScoped<EntwicklungsprozessService>();
+        services.AddScoped<BenachrichtigungsService>();
+        services.AddScoped<BenachrichtigungsEinstellungenService>();
+        services.AddScoped<BenachrichtigungsAuditService>();
+        services.AddScoped<AppEinstellungService>();
+        services.AddScoped<ArbeitsverzeichnisSettingsService>();
+        services.AddScoped<PluginSettingsService>();
+        services.AddScoped<PluginSelectionService>();
+        services.AddScoped<AufgabeRecoveryService>();
+
+        // Infrastructure Services
+        services.AddSingleton<KiAusfuehrungsService>();
+        services.AddSingleton<CliProcessManager>();
+        services.AddSingleton<ProcessWindowEmbedder>();
+        services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
+        services.AddSingleton<IRunningAutomationStatusSource>(sp =>
+            sp.GetRequiredService<KiAusfuehrungsService>());
+        services.AddSingleton<DarkModeService>();
+
+        // Plugin Infrastructure
+        services.AddSingleton<PluginManager>();
+        services.AddSingleton<IPluginManager>(sp => sp.GetRequiredService<PluginManager>());
+
+        // Infrastructure implementations for domain interfaces
+        services.AddScoped<IBenutzerkontextService, BenutzerkontextService>();
+        services.AddScoped<IArbeitsverzeichnisResolver, ArbeitsverzeichnisResolver>();
+        services.AddScoped<PluginDefaultSettingsService>();
+        services.AddScoped<IGitPlugin>(sp => sp.GetRequiredService<IPluginManager>().GetDefaultSourceCodeManagementPlugin());
+
+        // ViewModels
+        services.AddTransient<MainWindowViewModel>();
+        services.AddTransient<NavigationViewModel>();
+        services.AddTransient<DashboardViewModel>();
+        services.AddTransient<ProjectListViewModel>();
+        services.AddTransient<ProjectDetailViewModel>();
+        services.AddTransient<TaskListViewModel>();
+        services.AddTransient<TaskDetailViewModel>();
+        services.AddTransient<SettingsViewModel>();
+        services.AddTransient<PluginSettingsViewModel>();
+
+        // Windows
+        services.AddTransient<MainWindow>();
+    }
+}

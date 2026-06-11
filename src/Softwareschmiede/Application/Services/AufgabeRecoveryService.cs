@@ -15,6 +15,8 @@ public sealed class AufgabeRecoveryService
     private readonly IRunningAutomationStatusSource _runningStatusSource;
     private readonly ILogger<AufgabeRecoveryService> _logger;
 
+    private const int HeartbeatTimeoutMinutes = 5;
+
     /// <summary>Erstellt eine neue Instanz des <see cref="AufgabeRecoveryService"/>.</summary>
     public AufgabeRecoveryService(
         SoftwareschmiededDbContext db,
@@ -27,8 +29,28 @@ public sealed class AufgabeRecoveryService
     }
 
     /// <summary>
-    /// Führt eine manuelle Recovery auf <see cref="AufgabeStatus.InBearbeitung"/> aus.
-    /// Erlaubt nur Recovery aus <see cref="AufgabeStatus.KiAktiv"/> oder <see cref="AufgabeStatus.TestsLaufen"/>.
+    /// Scannt alle Aufgaben nach Recovery-Kandidaten.
+    /// Kandidaten: Status <see cref="AufgabeStatus.InArbeit"/> oder <see cref="AufgabeStatus.Wartend"/>,
+    /// Heartbeat älter als 5 Minuten, kein laufender CLI-Prozess.
+    /// </summary>
+    public async Task<IEnumerable<Guid>> ScanForRecoveryCandidatesAsync(CancellationToken ct = default)
+    {
+        var cutoff = DateTimeOffset.UtcNow.AddMinutes(-HeartbeatTimeoutMinutes);
+
+        var kandidaten = await _db.Aufgaben
+            .AsNoTracking()
+            .Where(a => (a.Status == AufgabeStatus.InArbeit || a.Status == AufgabeStatus.Wartend)
+                && a.LastHeartbeatUtc != null
+                && a.LastHeartbeatUtc < cutoff)
+            .Select(a => a.Id)
+            .ToListAsync(ct);
+
+        return kandidaten.Where(id => !_runningStatusSource.IsRunning(id));
+    }
+
+    /// <summary>
+    /// Führt eine manuelle Recovery durch.
+    /// Erlaubt nur Recovery aus <see cref="AufgabeStatus.InArbeit"/> oder <see cref="AufgabeStatus.Wartend"/>.
     /// </summary>
     public async Task RecoverManuellAsync(Guid aufgabeId, CancellationToken ct = default)
     {
@@ -98,7 +120,7 @@ public sealed class AufgabeRecoveryService
                         && a.Status == aufgabe.Status
                         && a.RecoveryVersion == aufgabe.RecoveryVersion)
                     .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(a => a.Status, AufgabeStatus.InBearbeitung)
+                        .SetProperty(a => a.Status, AufgabeStatus.Gestartet)
                         .SetProperty(a => a.RecoveryVersion, a => a.RecoveryVersion + 1), ct);
             }
             else
@@ -112,7 +134,7 @@ public sealed class AufgabeRecoveryService
                 }
                 else
                 {
-                    tracked.Status = AufgabeStatus.InBearbeitung;
+                    tracked.Status = AufgabeStatus.Gestartet;
                     tracked.RecoveryVersion++;
                     rowCount = 1;
                 }
@@ -133,7 +155,7 @@ public sealed class AufgabeRecoveryService
                 AufgabeId = aufgabeId,
                 Typ = ProtokollTyp.StatusUebergang,
                 Inhalt =
-                    $"Manuelle Wiederherstellung: {aufgabe.Status} → {AufgabeStatus.InBearbeitung}\n" +
+                    $"Manuelle Wiederherstellung: {aufgabe.Status} → {AufgabeStatus.Gestartet}\n" +
                     $"ReasonCode: RecoveryManual\n" +
                     $"CorrelationId: {correlationId}",
                 Zeitstempel = DateTimeOffset.UtcNow
@@ -146,12 +168,11 @@ public sealed class AufgabeRecoveryService
             }
 
             _logger.LogInformation(
-                "TaskRecoverySucceeded CorrelationId={CorrelationId} TaskId={TaskId} FromStatus={FromStatus} ToStatus={ToStatus} AuditEntryId={AuditEntryId}",
+                "TaskRecoverySucceeded CorrelationId={CorrelationId} TaskId={TaskId} FromStatus={FromStatus} ToStatus={ToStatus}",
                 correlationId,
                 aufgabeId,
                 aufgabe.Status,
-                AufgabeStatus.InBearbeitung,
-                auditEintrag.Id);
+                AufgabeStatus.Gestartet);
         }
         catch
         {
@@ -178,5 +199,5 @@ public sealed class AufgabeRecoveryService
             reasonCode);
 
     internal static bool IstRecoveryStatus(AufgabeStatus status)
-        => status is AufgabeStatus.KiAktiv or AufgabeStatus.TestsLaufen;
+        => status is AufgabeStatus.InArbeit or AufgabeStatus.Wartend;
 }

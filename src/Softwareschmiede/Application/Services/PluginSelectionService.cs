@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -45,6 +46,18 @@ public sealed class PluginSelectionService
             ct);
 
         return resolved;
+    }
+
+    /// <summary>Gibt alle verfügbaren KI-Plugin-Prefixe zurück.</summary>
+    public Task<IReadOnlyList<string>> GetAvailableKiPluginPrefixesAsync(CancellationToken ct = default)
+    {
+        var plugins = _pluginManager.GetDevelopmentAutomationPlugins();
+        var prefixe = (IReadOnlyList<string>)plugins
+            .Select(p => p.PluginPrefix)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return Task.FromResult(prefixe);
     }
 
     /// <summary>Löst das KI-Plugin auf.</summary>

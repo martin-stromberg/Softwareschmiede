@@ -1,6 +1,6 @@
 # Einstellungen
 
-Die Einstellungsseite bündelt alle systemweiten Konfigurationen: Plugin-Einstellungen, Arbeitsverzeichnis, Benachrichtigungen und automatisches Herunterfahren.
+Die Einstellungsseite bündelt alle systemweiten Konfigurationen: Plugin-Einstellungen, Arbeitsverzeichnis, Benachrichtigungen, Erscheinungsbild (Dark Mode) und automatisches Herunterfahren.
 
 ## Inhalt
 

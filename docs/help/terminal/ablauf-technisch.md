@@ -1,78 +1,89 @@
-# CLI-Terminal — Technischer Ablauf
+← [Zurück zur Übersicht](index.md)
+
+# CLI-Fenster-Einbettung — Technischer Ablauf
 
 ## Übersicht
 
-Die Kommunikation zwischen `CliTerminal.razor` und dem Node.js-Backend erfolgt über ein einfaches Text-basiertes WebSocket-Protokoll. Das Backend öffnet eine PTY-Shell über `node-pty` und leitet alle Ein-/Ausgaben durch.
+`ProcessWindowHost` ist ein von `HwndHost` abgeleitetes WPF-Control. Es erstellt ein natives Win32-Hostfenster und bettet ein externes Prozessfenster via `SetParent` ein. `KiAusfuehrungsService` verwaltet den CLI-Prozess; `TaskDetailViewModel` koordiniert den Übergang von Prozessstart zu Einbettung.
 
 ## Ablauf
 
-### 1. Backend starten (manuell vor App-Start)
-
-Das Skript `src/Softwareschmiede/terminal-backend/server.js` muss mit Node.js gestartet werden.
+### 1. CLI-Prozess starten
 
 Beteiligte Komponenten:
-- `terminal-backend/server.js` — WebSocket-Server auf Port 3001
-- `node-pty` — PTY-Emulation unter Windows/Linux/macOS
-- `ws` — WebSocket-Bibliothek
+- `TaskDetailViewModel.CliStartenAsync` — ruft `KiAusfuehrungsService.StartCliAsync` auf
+- `KiAusfuehrungsService.StartCliAsync` — ruft `IKiPlugin.StartCliAsync` auf, erhält `ProcessStartInfo`, startet `Process`
+- `IKiPlugin.StartCliAsync` — Plugin-Implementierung liefert Executable-Pfad, Argumente und Arbeitsverzeichnis
+- `CliProcessHandle` — kapselt `Process` und `LastHeartbeat`
 
-### 2. Komponente rendern
+### 2. Handle bekannt geben
 
 Beteiligte Komponenten:
-- `CliTerminal.razor` — Blazor-Komponente mit `XtermBlazor`
-- Parameter `CliName` — `"claude"` oder `"copilot"`
-- Parameter `WorkingDirectory` — Absoluter Pfad zum Aufgaben-Klonverzeichnis
+- `TaskDetailViewModel.CliProzessGestartet` — Event mit `Process`-Objekt
+- `TaskDetailView.xaml.cs` — abonniert Event, liest `Process.MainWindowHandle`
+- `ProcessWindowHost.EmbeddedHandle` — DependencyProperty; Setter löst Einbettung aus
 
-### 3. Verbindung herstellen (`OnFirstRender`)
+### 3. Fenster einbetten (`EmbedWindow`)
 
 ```
-[CliTerminal] --> WebSocket Connect --> ws://localhost:3001
-[CliTerminal] --> Send: "SET_CWD:<WorkingDirectory>"
-[Backend]     --> pty.spawn("powershell.exe", ["-NoExit"], { cwd: WorkingDirectory })
-[CliTerminal] --> Send: "START_CLI:<CliName>"
-[Backend]     --> ptyProcess.write("claude\r")  // oder "copilot\r"
+ProcessWindowHost.EmbedWindow(handle):
+  1. GetWindowLong(handle, GWL_STYLE)          ← Stil lesen
+  2. style |= WS_CHILD                          ← Kind-Fenster-Flag setzen
+  3. style &= ~(WS_CAPTION | WS_THICKFRAME)     ← Titelleiste/Rahmen entfernen
+  4. SetWindowLong(handle, GWL_STYLE, style)
+  5. SetParent(handle, _hostHandle)             ← Einbetten
+  6. SetWindowPos(handle, ...)                  ← Größe anpassen
 ```
 
-### 4. Empfangsschleife (`ReceiveLoop`)
+Beteiligte Komponenten:
+- `ProcessWindowHost.NativeMethods.SetParent` — Win32 P/Invoke
+- `ProcessWindowHost.NativeMethods.SetWindowLong` — Fensterstil anpassen
+- `ProcessWindowHost.NativeMethods.SetWindowPos` — Position und Größe
 
-Läuft als `Task.Run` im Hintergrund:
-- Empfängt `WebSocketMessage` vom Backend.
-- Ruft `_terminal.Write(text)` auf — Ausgabe erscheint im xterm-Terminal.
+### 4. Größenanpassung
 
-### 5. Benutzereingabe (`OnData`)
+- `ProcessWindowHost.OnRenderSizeChanged` — aufgerufen bei Layout-Änderungen
+- `ResizeEmbeddedWindow` — `SetWindowPos` mit aktuellen `ActualWidth` / `ActualHeight`
 
-Jede Tastatureingabe im xterm-Terminal:
-- `OnData`-Callback wird aufgerufen mit dem rohen Zeichenstrom.
-- `_ws.SendAsync(bytes)` leitet die Eingabe an das Backend weiter.
-- Das Backend ruft `ptyProcess.write(msg)` auf.
+### 5. CLI-Prozess beendet sich
 
-### 6. Verbindung trennen
+- `Process.Exited`-Event → `KiAusfuehrungsService.CliProcessStatusChanged` (Gestoppt)
+- `TaskDetailViewModel.OnCliProcessStatusChanged` → `IsCliRunning = false`, `EmbeddedWindowHandle = IntPtr.Zero`
+- `ProcessWindowHost.EmbedWindow(IntPtr.Zero)` — Host-Fenster bleibt, eingebettetes Fenster ist weg
 
-Bei WebSocket-Close (`socket.on("close")`) tötet das Backend den PTY-Prozess (`ptyProcess.kill()`).
+### 6. Control zerstören (`DestroyWindowCore`)
+
+- `SetParent(_embeddedHandle, IntPtr.Zero)` — Einbettung trennen
+- `DestroyWindow(_hostHandle)` — Host-Fenster freigeben
 
 ## Diagramm
 
 ```mermaid
 sequenceDiagram
-    participant U as Anwender
-    participant T as CliTerminal.razor
-    participant WS as WebSocket (ws://localhost:3001)
-    participant B as terminal-backend/server.js
-    participant P as node-pty (PowerShell)
+    participant VM as TaskDetailViewModel
+    participant SVC as KiAusfuehrungsService
+    participant PLUGIN as IKiPlugin
+    participant VIEW as TaskDetailView
+    participant HOST as ProcessWindowHost
+    participant WIN32 as Win32 (user32.dll)
 
-    T->>WS: Connect
-    T->>WS: SET_CWD:/pfad/zum/repo
-    WS->>B: SET_CWD:/pfad/zum/repo
-    B->>P: pty.spawn("powershell.exe", cwd=/pfad)
-    T->>WS: START_CLI:claude
-    WS->>B: START_CLI:claude
-    B->>P: write("claude\r")
-    P-->>B: PTY-Ausgabe
-    B-->>WS: Ausgabe weiterleiten
-    WS-->>T: WebSocket-Nachricht
-    T->>T: _terminal.Write(text)
-
-    U->>T: Tastatureingabe
-    T->>WS: SendAsync(bytes)
-    WS->>B: Eingabe
-    B->>P: ptyProcess.write(msg)
+    VM->>SVC: StartCliAsync(aufgabeId, kiPlugin, repoPath)
+    SVC->>PLUGIN: StartCliAsync(repoPath, params)
+    PLUGIN-->>SVC: ProcessStartInfo
+    SVC->>SVC: Process.Start()
+    SVC-->>VM: CliProcessHandle
+    VM-->>VIEW: CliProzessGestartet(Process)
+    VIEW->>HOST: EmbeddedHandle = Process.MainWindowHandle
+    HOST->>WIN32: GetWindowLong(handle, GWL_STYLE)
+    HOST->>WIN32: SetWindowLong(handle, GWL_STYLE, style)
+    HOST->>WIN32: SetParent(handle, hostHandle)
+    HOST->>WIN32: SetWindowPos(handle, 0, 0, width, height)
 ```
+
+## Fehlerbehandlung
+
+| Situation | Verhalten |
+|-----------|-----------|
+| `Process.MainWindowHandle` ist `IntPtr.Zero` | `EmbedWindow` kehrt sofort zurück; Handle wird gesetzt sobald verfügbar |
+| `SetParent` schlägt fehl | Win32-Fehler; CLI-Fenster bleibt eigenständig; kein Absturz |
+| `DestroyWindowCore` bei noch laufendem Prozess | `SetParent(handle, IntPtr.Zero)` trennt Einbettung; Prozess läuft weiter |

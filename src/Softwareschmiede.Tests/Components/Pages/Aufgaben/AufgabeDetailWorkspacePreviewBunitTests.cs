@@ -245,7 +245,7 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
             Id = Guid.NewGuid(),
             ProjektId = projekt.Id,
             Titel = "Workspace Preview Test Aufgabe",
-            Status = AufgabeStatus.InBearbeitung,
+            Status = AufgabeStatus.InArbeit,
             LokalerKlonPfad = Path.GetTempPath(),
             ErstellungsDatum = DateTimeOffset.UtcNow,
         };

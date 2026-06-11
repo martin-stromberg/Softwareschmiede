@@ -9,4 +9,5 @@
   <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj" />
   <Project Path="src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj" />
   <Project Path="src/Softwareschmiede/Softwareschmiede.csproj" />
+  <Project Path="src/Softwareschmiede.App/Softwareschmiede.App.csproj" />
 </Solution>

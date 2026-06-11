@@ -12,49 +12,46 @@ Eine Aufgabe durchläuft folgende Status:
 
 | Status | Bedeutung |
 |--------|-----------|
-| `Offen` | Angelegt, noch nicht gestartet |
-| `InBearbeitung` | Prozess gestartet, KI nicht aktiv |
-| `KiAktiv` | KI-Agent läuft gerade |
-| `TestsLaufen` | Automatisierte Tests laufen |
-| `Abgeschlossen` | Erfolgreich beendet, Klon gelöscht |
-| `Fehlgeschlagen` | KI-Fehler oder Abbruch |
+| `Neu` | Angelegt, noch nicht gestartet |
+| `ArbeitsverzeichnisEingerichtet` | Lokaler Git-Klon wurde angelegt |
+| `Gestartet` | Branch erstellt, bereit für CLI-Start |
+| `InArbeit` | CLI-Prozess läuft aktiv |
+| `Wartend` | CLI hat Rate-Limit erreicht; wartet auf Wiederaufnahme |
+| `Beendet` | Abgeschlossen (erfolgreich oder mit Fehler) |
 | `Archiviert` | Dauerhaft archiviert |
 
-### Ausführungsregister
+### Ausführungsansicht (WPF)
 
-Die Aufgabendetailansicht hat drei Register:
+Die WPF-Aufgabendetailansicht (`TaskDetailView`) zeigt:
 
-- **Aufgabe** — Anforderungsbeschreibung und Kennzahlen
-- **Ausführung** — KI-Plugin wählen, Agentenpaket, Prompt senden, Terminal, Protokoll
-- **Projektverzeichnis** — Repository-Explorer mit Dateivorschau und Git-Aktionen (Commit, Push, Pull, Pull Request)
+- **Aufgabentitel und Status** — mit farbigem `StatusIndicatorControl`
+- **CLI-Steuerung** — KI-Plugin auswählen, optionale Parameter eingeben, „CLI starten" / „CLI stoppen"
+- **Eingebettetes CLI-Fenster** — das Terminalfenster des KI-Tools wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`)
+- **Protokoll** — alle gespeicherten `Protokolleintrag`-Einträge der Aufgabe
+- **Status-Übergänge** — Buttons „Gestartet setzen" und „Aufgabe abschließen"
 
-### KI-Hintergrundausführung
+### CLI-Prozess-Management
 
-Der `KiAusfuehrungsService` läuft als Singleton. KI-Läufe werden als `Task` im Hintergrund gehalten — der Anwender kann wegnavigieren und zurückkehren, der Lauf läuft weiter. Ausgaben werden gepuffert und können nach Rückkehr nachgelesen werden.
-
-### Kontextsteuerung
-
-Für Folgeanweisungen steuert der Kontextmodus, ob der bisherige Gesprächsverlauf mitgegeben wird:
-
-- **Kontext mitgeben** — Bisherige Kontextdatei wird referenziert
-- **Kontext ignorieren** — Kein Kontextpräfix, Verlauf wird weiter fortgeschrieben
-- **Kontext neu beginnen** — Bisherige Kontextdateien werden gelöscht, frischer Start
+Der `KiAusfuehrungsService` läuft als Singleton. Er startet und stoppt CLI-Prozesse und gibt Statusänderungen über das `CliProcessStatusChanged`-Event weiter. Für jede Aufgabe kann nur ein CLI-Prozess gleichzeitig laufen.
 
 ### Rate-Limit-Vorschlag
 
-Erkennt die KI ein Rate-Limit, speichert der `EntwicklungsprozessService` automatisch einen Prompt-Vorschlag mit Ausführungszeitpunkt. Der Anwender sieht einen Hinweis und kann den Zeitplan übernehmen oder manuell abweichen.
+Erkennt die KI ein Rate-Limit (Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601]]` in der Ausgabe), speichert der `ProtokollService` automatisch einen Prompt-Vorschlag mit Ausführungszeitpunkt in der Aufgabe. Der Status wechselt auf `Wartend`.
+
+### Recovery-Mechanismus
+
+Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `InArbeit` oder `Wartend`, deren Heartbeat älter als 5 Minuten ist und für die kein aktiver Prozess läuft. Diese werden im `RecoveryBannerControl` angezeigt. Ein Klick auf „Wiederherstellen" setzt den Status auf `Gestartet` und inkrementiert `RecoveryVersion` (optimistic concurrency).
 
 ## Beispiele
 
 1. Aufgabe „Login-Bug beheben" im Projekt „Backend-API" anlegen.
-2. Entwicklung starten: GitHub als SCM-Plugin, Claude CLI als KI-Plugin, Agentenpaket „Entwicklung" wählen.
-3. Prompt eingeben: „Behebe den NullReferenceException in AuthController.cs".
-4. KI bearbeitet den Branch, Protokoll erscheint live in der Ausführungsansicht.
-5. Im Register „Projektverzeichnis" geänderte Dateien reviewen, ggf. commiten und pushen.
-6. Pull Request erstellen, Aufgabe abschließen.
+2. In der Aufgabendetailansicht „Gestartet setzen" klicken.
+3. KI-Plugin auswählen (z.B. Claude CLI), „CLI starten" klicken.
+4. Das CLI-Fenster erscheint eingebettet in der Ansicht — Aufgabe wechselt auf `InArbeit`.
+5. KI bearbeitet den Branch; nach Abschluss „Aufgabe abschließen" klicken.
 
 ## Einschränkungen
 
-- Für eine Aufgabe kann immer nur ein KI-Lauf gleichzeitig aktiv sein.
-- Das lokale Klonverzeichnis wird beim Abschließen oder Abbrechen gelöscht.
+- Für eine Aufgabe kann immer nur ein CLI-Prozess gleichzeitig aktiv sein.
+- Das CLI-Fenster-Einbetten via `SetParent` funktioniert nur auf Windows; bei Scheitern erscheint das Fenster separat.
 - Die Aufgabenwiederherstellung (Recovery) steht nur zur Verfügung, wenn der letzte Heartbeat älter als 5 Minuten ist.

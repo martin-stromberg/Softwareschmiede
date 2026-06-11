@@ -1,0 +1,150 @@
+<UserControl x:Class="Softwareschmiede.App.Views.TaskDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
+             Background="{DynamicResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding AufgabeTitel}"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource PrimaryTextBrush}" />
+                    <TextBlock Text="{Binding AufgabeStatus}"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                </StackPanel>
+
+                <!-- Aktionen -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ComboBox ItemsSource="{Binding VerfuegbareKiPlugins}"
+                              SelectedItem="{Binding SelectedKiPluginPrefix}"
+                              Width="150"
+                              Margin="0,0,8,0"
+                              Visibility="{Binding IsCliRunning, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+
+                    <Button Content="▶ CLI Starten"
+                            Command="{Binding CliStartenCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource AccentBrush}"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding IsCliRunning, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+
+                    <Button Content="■ Stoppen"
+                            Command="{Binding CliStoppenCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource ErrorBrush}"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding IsCliRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                    <Button Content="✓ Abschließen"
+                            Command="{Binding AufgabeAbschliessenCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource SuccessBrush}"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Visibility="{Binding IsCliRunning, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Fehler -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource ErrorBrush}"
+                Padding="12,8"
+                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" />
+        </Border>
+
+        <!-- Hauptinhalt: CLI-Fenster oder Protokoll -->
+        <Grid Grid.Row="2">
+            <!-- Eingebettetes CLI-Fenster (sichtbar wenn CLI läuft) -->
+            <controls:ProcessWindowHost x:Name="CliWindowHost"
+                                         EmbeddedHandle="{Binding EmbeddedWindowHandle}"
+                                         Visibility="{Binding IsCliRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+            <!-- Protokoll (sichtbar wenn kein CLI läuft) -->
+            <Grid Visibility="{Binding IsCliRunning, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Text="Protokoll"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           Margin="16,12,16,8" />
+
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding Protokolleintraege}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="8,4" MaxWidth="800">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Zeitstempel, StringFormat='{}{0:dd.MM.yyyy HH:mm:ss}'}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           VerticalAlignment="Top" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Typ}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource AccentBrush}"
+                                           VerticalAlignment="Top" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding Inhalt}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Grid>
+
+        <!-- Statusleiste -->
+        <Border Grid.Row="3"
+                Background="{DynamicResource SidebarBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,4">
+            <TextBlock Foreground="{DynamicResource SecondaryTextBrush}" FontSize="11">
+                <Run Text="Status: " />
+                <Run Text="{Binding AufgabeStatus, Mode=OneWay}" />
+            </TextBlock>
+        </Border>
+    </Grid>
+</UserControl>

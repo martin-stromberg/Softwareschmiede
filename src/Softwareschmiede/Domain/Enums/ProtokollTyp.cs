@@ -16,5 +16,11 @@ public enum ProtokollTyp
     TestErgebnis,
 
     /// <summary>Git-Aktion (Commit, Push, Branch, etc.).</summary>
-    GitAktion
+    GitAktion,
+
+    /// <summary>Ausgabezeile eines eingebetteten CLI-Prozesses.</summary>
+    CliOutput,
+
+    /// <summary>Erkannter Rate-Limit-Marker aus der CLI-Ausgabe.</summary>
+    RateLimit
 }

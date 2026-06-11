@@ -1,33 +1,40 @@
-# CLI-Terminal — Ablauf für Anwender
+← [Zurück zur Übersicht](index.md)
+
+# CLI-Fenster-Einbettung — Ablauf für Anwender
 
 ## Voraussetzungen
 
-- Das Terminal-Backend ist gestartet (siehe [Installation](installation.md)).
-- Eine Aufgabe ist im Status „In Bearbeitung" und hat ein lokales Klonverzeichnis.
-- Ein KI-Plugin (Claude CLI oder GitHub Copilot) ist ausgewählt.
+- Eine Aufgabe ist im Status **Gestartet** (Repository geklont, Branch angelegt).
+- Ein KI-Plugin ist in den Einstellungen konfiguriert.
 
 ## Schritt-für-Schritt-Anleitung
 
-### 1. Aufgabe öffnen
+### 1. KI-Plugin auswählen
 
-Navigiere zu einer Aufgabe im Status **In Bearbeitung**.
+In der Aufgabendetailansicht das gewünschte KI-Plugin aus dem Dropdown wählen (z.B. „Claude CLI" oder „GitHub Copilot").
 
-### 2. Register „Ausführung" öffnen
+### 2. CLI starten
 
-Klicke auf den Tab **Ausführung** in der Aufgabendetailansicht.
+**CLI starten** klicken. Die Softwareschmiede:
 
-### 3. KI-Plugin wählen
+- Startet das CLI-Programm des Plugins im Aufgabenverzeichnis.
+- Bettet das CLI-Fenster in die Ansicht ein.
+- Wechselt den Aufgabenstatus auf **In Arbeit**.
 
-Stelle sicher, dass ein KI-Plugin ausgewählt ist (z.B. „Claude CLI"). Das Terminal erscheint automatisch im unteren Bereich.
+> **Hinweis:** Das Einbetten kann einen kurzen Moment dauern, bis das CLI-Fenster seinen Start abgeschlossen hat. Falls das Fenster zunächst leer bleibt, kurz warten.
 
-### 4. Terminal bedienen
+### 3. Mit dem CLI arbeiten
 
-Im Bereich **🖥️ KI-Terminal** ist das CLI bereits gestartet. Du kannst direkt mit dem KI-Tool interagieren:
-- Prompts eingeben und mit Enter bestätigen.
-- Ausgabe wird live angezeigt.
+Das eingebettete Fenster verhält sich wie ein normales Terminalfenster. Prompts können direkt getippt werden. Das Fenster füllt automatisch den gesamten verfügbaren Platz der Ansicht aus.
 
-> **Hinweis:** Das Terminal ist eine echte Shell-Session. Alle Befehle wirken sich direkt auf das lokale Klonverzeichnis aus.
+### 4. CLI beenden
+
+Das CLI beendet sich entweder selbst (nach Abschluss einer Sitzung) oder kann über **CLI stoppen** manuell beendet werden. Nach dem Beenden ist der „CLI starten"-Button wieder aktiv.
 
 ## Ergebnis
 
-Die KI-CLI-Session läuft direkt im Terminal. Geänderte Dateien erscheinen danach im Register **Projektverzeichnis**.
+Das CLI hat seine Arbeit verrichtet. Der Anwender kann anschließend mit **Aufgabe abschließen** den Status auf **Beendet** setzen.
+
+## Barrierefreiheit
+
+Das eingebettete CLI-Fenster ist eine native Windows-Anwendung und verhält sich entsprechend: Tastatur, Screenreader und andere Hilfsmittel funktionieren so, wie das jeweilige CLI-Programm sie unterstützt.

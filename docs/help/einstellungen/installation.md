@@ -30,15 +30,23 @@ Beispiel:
 
 ## Benachrichtigungen konfigurieren
 
-Benachrichtigungseinstellungen werden pro Aufgabe oder global in der Einstellungsseite verwaltet.
+Benachrichtigungseinstellungen werden global in der Einstellungsseite verwaltet.
 
 | Modus | Beschreibung |
 |-------|-------------|
-| Immer | Nach jedem KI-Lauf-Abschluss benachrichtigen |
-| Nie | Keine Benachrichtigungen |
-| Nur bei Fehler | Nur bei fehlgeschlagenen Läufen |
+| `Deaktiviert` | Keine Benachrichtigungen |
+| `Banner` | Windows-Toast-Benachrichtigung nach Statuswechsel |
+| `Ton` | Audiodatei abspielen (MP3 oder WAV) |
 
-Audiodateien für Benachrichtigungen können als `BenachrichtigungsAudioDatei` hinterlegt werden.
+Audiodateien für Ton-Benachrichtigungen werden über den Einstellungsschlüssel `NotificationAudioPath` hinterlegt. Die Wiedergabe erfolgt über den WPF-`MediaPlayer` — kein separates Backend erforderlich.
+
+## Dark Mode konfigurieren
+
+Dark Mode kann entweder:
+- In den Einstellungen über den Schalter **Dark Mode** aktiviert werden, oder
+- Direkt in der Seitenleiste des Hauptfensters über die Schaltfläche „Dark Mode" umgeschaltet werden.
+
+Die Einstellung wird sofort wirksam und beim nächsten Start automatisch beibehalten.
 
 ## Überprüfung
 

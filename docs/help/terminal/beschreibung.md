@@ -1,34 +1,34 @@
-# CLI-Terminal — Beschreibung
+← [Zurück zur Übersicht](index.md)
+
+# CLI-Fenster-Einbettung — Beschreibung
 
 ## Zweck
 
-Das CLI-Terminal ermöglicht die direkte, interaktive Bedienung von Claude CLI oder GitHub Copilot CLI innerhalb der Softwareschmiede. Im Gegensatz zur automatisierten KI-Ausführung kann der Anwender hier frei im Terminal arbeiten — zum Beispiel für manuelle Debugging-Sessions oder exploratives Prompting.
+Die CLI-Fenster-Einbettung ermöglicht die direkte, interaktive Bedienung von Claude CLI oder GitHub Copilot CLI innerhalb der Softwareschmiede. Das native Terminalfenster des CLI-Tools wird physisch in die WPF-Aufgabendetailansicht eingebettet — der Anwender arbeitet mit dem echten CLI, ohne ein separates Fenster öffnen zu müssen.
 
 ## Funktionsweise
 
-Die Komponente `CliTerminal.razor` bettet einen `xterm.js`-Terminal (via `XtermBlazor`) in die Ausführungsansicht einer Aufgabe ein. Die Terminalausgabe wird über eine WebSocket-Verbindung zu einem Node.js-Backend gestreamt, das eine echte PTY-Shell startet.
+Der `ProcessWindowHost` (von `HwndHost` abgeleitet) erstellt ein natives Win32-Hostfenster innerhalb der WPF-Ansicht. Sobald der CLI-Prozess gestartet ist und sein Hauptfenster-Handle verfügbar ist, wird via `SetParent` das CLI-Fenster als Kind-Fenster eingebettet. Titelleiste und Rahmen des eingebetteten Fensters werden durch `SetWindowLong` entfernt.
 
-### Verbindungsaufbau
+### Prozess-Lifecycle
 
-1. Bei der ersten Darstellung der Komponente (`OnFirstRender`) wird eine WebSocket-Verbindung zu `ws://localhost:3001` geöffnet.
-2. Die Komponente sendet `SET_CWD:<pfad>` — das Backend startet daraufhin eine PowerShell-Shell im angegebenen Arbeitsverzeichnis.
-3. Die Komponente sendet `START_CLI:<name>` (`claude` oder `copilot`) — das Backend tippt den Befehl in die Shell ein.
-4. Alle weiteren Tastatureingaben werden direkt an die PTY-Shell weitergeleitet.
+1. `KiAusfuehrungsService.StartCliAsync` startet den CLI-Prozess über `ProcessStartInfo` des KI-Plugins.
+2. Das `CliProzessGestartet`-Event des `TaskDetailViewModel` gibt das `Process`-Objekt weiter.
+3. `TaskDetailView.xaml.cs` setzt `ProcessWindowHost.EmbeddedHandle` auf `Process.MainWindowHandle`.
+4. `ProcessWindowHost.EmbedWindow` ruft `SetParent` auf und passt die Fenstergröße an.
 
-### Sichtbarkeit
+### Größenanpassung
 
-Das Terminal erscheint im Register **Ausführung** der Aufgabendetailansicht, wenn:
-- Ein KI-Plugin aktiv ist (`_selectedKiPluginPrefix` gesetzt), und
-- Ein lokales Arbeitsverzeichnis vorhanden ist (`AktuellesWorkingDirectory` nicht leer).
+Das eingebettete Fenster füllt immer den gesamten verfügbaren Platz aus. Bei Größenänderungen des WPF-Containers reagiert `OnRenderSizeChanged` mit einem `SetWindowPos`-Aufruf.
 
 ## Beispiele
 
-- Manuell `claude chat .` im Aufgabenverzeichnis bedienen.
-- Mit dem Copilot CLI explorative Fragen stellen, ohne einen vollständigen KI-Lauf zu starten.
+- Claude CLI direkt in der Aufgabenansicht bedienen, ohne das Fenster zu wechseln.
+- GitHub Copilot CLI für explorative Aufgaben starten und das Ergebnis direkt im Kontext der Aufgabe sehen.
 
 ## Einschränkungen
 
-- Das Node.js-Backend (`terminal-backend/server.js`) muss separat gestartet werden.
-- Die WebSocket-Adresse `ws://localhost:3001` ist fest kodiert.
-- Verbindungsfehler (z.B. Backend nicht gestartet) führen zu einer stillen Exception; das Terminal bleibt leer.
-- `CliSessionService` ist registriert, aber derzeit nicht mit der `CliTerminal`-Komponente verbunden (alternative prozessbasierte Implementierung).
+- Die Einbettung funktioniert nur auf Windows; auf anderen Plattformen scheitert `SetParent`.
+- Falls `Process.MainWindowHandle` zum Einbettungszeitpunkt noch `IntPtr.Zero` ist (CLI noch nicht vollständig gestartet), bleibt der Host leer. Das Handle kann erneut gesetzt werden, sobald es verfügbar ist.
+- Das eingebettete Fenster reagiert nicht auf WPF-Themen (Dark Mode): es behält sein natives Erscheinungsbild.
+- Multi-Monitor-Layouts können in seltenen Fällen die Handle-Ermittlung beeinflussen.

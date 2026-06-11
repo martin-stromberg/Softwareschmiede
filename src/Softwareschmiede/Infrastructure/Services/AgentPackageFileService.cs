@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -14,7 +14,7 @@ public sealed class AgentPackageFileService : IAgentPackageFileService
     /// <summary>Erstellt eine neue Instanz des <see cref="AgentPackageFileService"/>.</summary>
     /// <param name="logger">Logger-Instanz.</param>
     /// <param name="env">Web-Host-Umgebung für den Basispfad.</param>
-    public AgentPackageFileService(ILogger<AgentPackageFileService> logger, IWebHostEnvironment env)
+    public AgentPackageFileService(ILogger<AgentPackageFileService> logger, IHostEnvironment env)
     {
         _logger = logger;
         _packagesBasePath = Path.GetFullPath(Path.Combine(env.ContentRootPath, "agent-packages"));

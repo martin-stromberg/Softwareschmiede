@@ -3,7 +3,7 @@ using Softwareschmiede.Domain.Enums;
 namespace Softwareschmiede.Application.Services;
 
 public sealed record BenachrichtigungsEinstellungenDto(
-    BenachrichtigungsModus ToastModus,
+    BenachrichtigungsModus BannerModus,
     BenachrichtigungsModus TonModus);
 
 public sealed record BenachrichtigungsAudioInfoDto(

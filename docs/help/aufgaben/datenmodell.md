@@ -50,15 +50,16 @@
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Offen : Neu angelegt
-    Offen --> InBearbeitung : Entwicklung starten
-    InBearbeitung --> KiAktiv : KI senden
-    KiAktiv --> InBearbeitung : KI abgeschlossen
-    KiAktiv --> Fehlgeschlagen : Fehler / Abbruch
-    InBearbeitung --> Abgeschlossen : Abschließen
-    Fehlgeschlagen --> InBearbeitung : Recovery / Status zurücksetzen
-    Abgeschlossen --> Archiviert : Archivieren
-    Fehlgeschlagen --> Archiviert : Archivieren
+    [*] --> Neu : Neu angelegt
+    Neu --> ArbeitsverzeichnisEingerichtet : Klon erstellt
+    ArbeitsverzeichnisEingerichtet --> Gestartet : Branch erstellt
+    Gestartet --> InArbeit : CLI gestartet
+    InArbeit --> Wartend : Rate-Limit erkannt
+    InArbeit --> Beendet : CLI beendet / Abschließen
+    Wartend --> Gestartet : Recovery (manuell)
+    Beendet --> Archiviert : Archivieren
+    Neu --> Archiviert : Archivieren
+    Gestartet --> Archiviert : Archivieren
 ```
 
 ## Beziehungen

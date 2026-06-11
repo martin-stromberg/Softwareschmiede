@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -12,7 +12,7 @@ public sealed class AgentPackageReader : IAgentPackageService
     private readonly string _packagesBasePath;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="AgentPackageReader"/>.</summary>
-    public AgentPackageReader(ILogger<AgentPackageReader> logger, IWebHostEnvironment env)
+    public AgentPackageReader(ILogger<AgentPackageReader> logger, IHostEnvironment env)
     {
         _logger = logger;
         _packagesBasePath = Path.Combine(env.ContentRootPath, "agent-packages");

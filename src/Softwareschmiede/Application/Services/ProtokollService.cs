@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
@@ -115,6 +116,90 @@ public sealed class ProtokollService
         var inhalt = $"Status geändert: {vonStatus} → {nachStatus}";
 
         return await AddEintragAsync(aufgabeId, ProtokollTyp.StatusUebergang, inhalt, null, ct);
+    }
+
+    private const string RateLimitMarkerPrefix = "[[SOFTWARESCHMIEDE_RATE_LIMIT";
+
+    /// <summary>
+    /// Speichert eine einzelne CLI-Ausgabezeile als Protokolleintrag vom Typ <see cref="ProtokollTyp.CliOutput"/>.
+    /// Wenn die Zeile einen Rate-Limit-Marker enthält, wird zusätzlich ein Eintrag vom Typ
+    /// <see cref="ProtokollTyp.RateLimit"/> gespeichert.
+    /// </summary>
+    public async Task AddCliOutputAsync(Guid aufgabeId, string outputLine, CancellationToken ct = default)
+    {
+        var eintrag = new Protokolleintrag
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabeId,
+            Typ = ProtokollTyp.CliOutput,
+            Inhalt = outputLine,
+            Zeitstempel = DateTimeOffset.UtcNow
+        };
+
+        _db.Protokolleintraege.Add(eintrag);
+
+        if (TryParseRateLimitMarker(outputLine, out var resetUtc))
+        {
+            var rateLimitInhalt = resetUtc.HasValue
+                ? $"Rate-Limit erkannt. Weiter ab: {resetUtc.Value:O}"
+                : "Rate-Limit erkannt (kein Zeitstempel).";
+
+            var rateLimitEintrag = new Protokolleintrag
+            {
+                Id = Guid.NewGuid(),
+                AufgabeId = aufgabeId,
+                Typ = ProtokollTyp.RateLimit,
+                Inhalt = rateLimitInhalt,
+                Zeitstempel = DateTimeOffset.UtcNow
+            };
+            _db.Protokolleintraege.Add(rateLimitEintrag);
+
+            _logger.LogInformation(
+                "Rate-Limit-Marker für Aufgabe {AufgabeId} erkannt. Reset: {ResetUtc}",
+                aufgabeId,
+                resetUtc?.ToString("O") ?? "(unbekannt)");
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Parst einen Rate-Limit-Marker aus einer CLI-Ausgabezeile.
+    /// Format: <c>[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601_DATETIME]]</c>
+    /// </summary>
+    /// <returns><c>true</c> wenn ein Marker gefunden wurde; <c>resetUtc</c> enthält den Zeitstempel oder <c>null</c> wenn kein gültiger Zeitstempel vorliegt.</returns>
+    public static bool TryParseRateLimitMarker(string outputLine, out DateTimeOffset? resetUtc)
+    {
+        resetUtc = null;
+
+        if (string.IsNullOrWhiteSpace(outputLine))
+            return false;
+
+        var startIndex = outputLine.IndexOf(RateLimitMarkerPrefix, StringComparison.Ordinal);
+        if (startIndex < 0)
+            return false;
+
+        var markerStart = startIndex + RateLimitMarkerPrefix.Length;
+        var endIndex = outputLine.IndexOf("]]", markerStart, StringComparison.Ordinal);
+        if (endIndex < 0)
+            return false;
+
+        var payload = outputLine[markerStart..endIndex];
+
+        if (payload.StartsWith(":", StringComparison.Ordinal))
+        {
+            var timestampRaw = payload[1..].Trim();
+            if (DateTimeOffset.TryParse(
+                    timestampRaw,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out var parsed))
+            {
+                resetUtc = parsed;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>Sucht in Inhalt und AgentName der Protokolleinträge einer Aufgabe.</summary>

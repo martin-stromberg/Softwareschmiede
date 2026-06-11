@@ -1,0 +1,119 @@
+<UserControl x:Class="Softwareschmiede.App.Views.PluginSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource BackgroundBrush}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Ladesymbol -->
+        <TextBlock Grid.Row="0"
+                   Text="Wird geladen…"
+                   Foreground="{DynamicResource SecondaryTextBrush}"
+                   Margin="0,0,0,8"
+                   Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+        <!-- Plugin-Liste -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Plugins}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Margin="0,0,0,16"
+                                Padding="12">
+                            <StackPanel>
+                                <!-- Plugin-Name -->
+                                <TextBlock Text="{Binding Plugin.PluginName}"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,0,0,8" />
+
+                                <!-- Einstellungsgruppen -->
+                                <ItemsControl ItemsSource="{Binding SettingGroups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding GroupName}"
+                                                           FontSize="13"
+                                                           FontWeight="Medium"
+                                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                                           Margin="0,0,0,4" />
+
+                                                <!-- Felder der Gruppe -->
+                                                <ItemsControl ItemsSource="{Binding Entries}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Margin="0,4,0,4">
+                                                                <TextBlock Text="{Binding Field.Label}"
+                                                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                           FontSize="12"
+                                                                           Margin="0,0,0,2" />
+                                                                <PasswordBox x:Name="SecretBox"
+                                                                             Width="320"
+                                                                             HorizontalAlignment="Left"
+                                                                             Visibility="Collapsed" />
+                                                                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                         Width="320"
+                                                                         HorizontalAlignment="Left"
+                                                                         Background="{DynamicResource SurfaceBrush}"
+                                                                         Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                         BorderBrush="{DynamicResource BorderBrush}"
+                                                                         Padding="4,2" />
+                                                                <TextBlock Text="{Binding Field.Description}"
+                                                                           FontSize="11"
+                                                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                           Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                                                                           Margin="0,2,0,0" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Erfolgsmeldung -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource SuccessBrush}"
+                CornerRadius="4"
+                Padding="8,4"
+                Margin="0,4,0,4"
+                Visibility="{Binding ErfolgMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding ErfolgMeldung}" Foreground="White" FontSize="12" />
+        </Border>
+
+        <!-- Fehlermeldung -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource ErrorBrush}"
+                CornerRadius="4"
+                Padding="8,4"
+                Margin="0,4,0,4"
+                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" FontSize="12" />
+        </Border>
+
+        <!-- Aktionen -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal">
+            <Button Content="Speichern"
+                    Command="{Binding SpeichernCommand}"
+                    Padding="16,8"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="White"
+                    BorderThickness="0" />
+        </StackPanel>
+    </Grid>
+</UserControl>

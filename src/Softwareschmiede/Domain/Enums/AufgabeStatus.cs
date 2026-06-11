@@ -4,22 +4,22 @@ namespace Softwareschmiede.Domain.Enums;
 public enum AufgabeStatus
 {
     /// <summary>Aufgabe wurde erstellt und wartet auf Bearbeitung.</summary>
-    Offen,
+    Neu,
 
-    /// <summary>Aufgabe wird manuell bearbeitet.</summary>
-    InBearbeitung,
+    /// <summary>Arbeitsverzeichnis (lokaler Klon) wurde eingerichtet.</summary>
+    ArbeitsverzeichnisEingerichtet,
 
-    /// <summary>KI-Agent ist aktiv und bearbeitet die Aufgabe.</summary>
-    KiAktiv,
+    /// <summary>Aufgabe wurde gestartet (Branch erstellt, bereit für CLI).</summary>
+    Gestartet,
 
-    /// <summary>Automatisierte Tests werden ausgeführt.</summary>
-    TestsLaufen,
+    /// <summary>CLI-Prozess läuft aktiv.</summary>
+    InArbeit,
 
-    /// <summary>Aufgabe wurde erfolgreich abgeschlossen.</summary>
-    Abgeschlossen,
+    /// <summary>CLI hat Rate-Limit erreicht; wartet auf Wiederaufnahme.</summary>
+    Wartend,
 
-    /// <summary>Aufgabe ist fehlgeschlagen.</summary>
-    Fehlgeschlagen,
+    /// <summary>Aufgabe wurde beendet (erfolgreich oder mit Fehler).</summary>
+    Beendet,
 
     /// <summary>Aufgabe wurde archiviert und ist nicht mehr aktiv.</summary>
     Archiviert

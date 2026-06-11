@@ -1,0 +1,34 @@
+<UserControl x:Class="Softwareschmiede.App.Controls.RecoveryBannerControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="{DynamicResource WarningBrush}"
+            CornerRadius="4"
+            Padding="12,8"
+            Visibility="{Binding HasRecoveryCandidates, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="! "
+                           FontSize="14"
+                           FontWeight="Bold"
+                           Foreground="Black" />
+                <TextBlock FontSize="13" Foreground="Black">
+                    <Run Text="{Binding CandidateCount, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" />
+                    <Run Text=" Aufgabe(n) benötigen Wiederherstellung." />
+                </TextBlock>
+            </StackPanel>
+
+            <Button Grid.Column="1"
+                    Content="Wiederherstellen"
+                    Command="{Binding RecoverCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    Padding="12,4"
+                    Background="White"
+                    Foreground="Black"
+                    BorderThickness="0" />
+        </Grid>
+    </Border>
+</UserControl>

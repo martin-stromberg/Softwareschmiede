@@ -1,11 +1,4 @@
-﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using Microsoft.Win32.SafeHandles;
-using System.Runtime.InteropServices;
-using Windows.Win32;
-using Windows.Win32.Foundation;
-
+using System.Diagnostics;
 
 namespace Softwareschmiede.Infrastructure.Services
 {
@@ -45,10 +38,11 @@ namespace Softwareschmiede.Infrastructure.Services
                 CreateNoWindow = true
             };
 
-            _process = Process.Start(psi);
+            _process = Process.Start(psi)!;
             _stdin = _process.StandardInput;
 
             _ = Task.Run(ReadOutputLoop);
+            _ = Task.Run(DrainStderrLoop);
         }
 
         private async Task ReadOutputLoop()
@@ -58,6 +52,16 @@ namespace Softwareschmiede.Infrastructure.Services
                 var line = await _process.StandardOutput.ReadLineAsync();
                 if (line != null && _onOutput != null)
                     await _onOutput(line + "\n");
+            }
+        }
+
+        private async Task DrainStderrLoop()
+        {
+            if (_process == null)
+                return;
+            while (!_process.HasExited)
+            {
+                await _process.StandardError.ReadLineAsync();
             }
         }
 

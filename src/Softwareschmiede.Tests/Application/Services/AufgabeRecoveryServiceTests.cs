@@ -27,41 +27,41 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsStuckAndNotRunning()
+    public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.KiAktiv);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
         await sut.RecoverManuellAsync(aufgabe.Id);
 
         var loaded = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        loaded!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         _db.Protokolleintraege.Count(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.StatusUebergang).Should().Be(1);
         _db.Protokolleintraege.Single(e => e.AufgabeId == aufgabe.Id).Inhalt.Should().Contain("Manuelle Wiederherstellung");
     }
 
     [Fact]
-    public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInTestsLaufenAndNotRunning()
+    public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.TestsLaufen);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Wartend);
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
         await sut.RecoverManuellAsync(aufgabe.Id);
 
         var loaded = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        loaded!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.RecoveryVersion.Should().Be(1);
         _db.Protokolleintraege.Count(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.StatusUebergang).Should().Be(1);
     }
 
     [Theory]
-    [InlineData(AufgabeStatus.KiAktiv, true)]
-    [InlineData(AufgabeStatus.TestsLaufen, true)]
-    [InlineData(AufgabeStatus.Offen, false)]
-    [InlineData(AufgabeStatus.InBearbeitung, false)]
-    [InlineData(AufgabeStatus.Abgeschlossen, false)]
+    [InlineData(AufgabeStatus.InArbeit, true)]
+    [InlineData(AufgabeStatus.Wartend, true)]
+    [InlineData(AufgabeStatus.Neu, false)]
+    [InlineData(AufgabeStatus.ArbeitsverzeichnisEingerichtet, false)]
+    [InlineData(AufgabeStatus.Beendet, false)]
     public void IstRecoveryStatus_ShouldMatchAllowedStates(AufgabeStatus status, bool expected)
     {
         AufgabeRecoveryService.IstRecoveryStatus(status).Should().Be(expected);
@@ -70,7 +70,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.KiAktiv);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
         var running = new FakeRunningAutomationStatusSource(true);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
@@ -83,7 +83,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Offen);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Neu);
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
@@ -96,7 +96,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.KiAktiv);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
         var running = new ThrowingRunningAutomationStatusSource();
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
@@ -104,6 +104,94 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Prüfung der Laufzeit war nicht möglich.");
+    }
+
+    /// <summary>TestRecoveryCandidates: Aufgaben mit Heartbeat > 5 Min und Status InArbeit/Wartend werden erkannt.</summary>
+    [Fact]
+    public async Task TestRecoveryCandidates()
+    {
+        // Arrange – Aufgabe InArbeit mit altem Heartbeat
+        var aufgabeAlt = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Alte InArbeit Aufgabe",
+            Status = AufgabeStatus.InArbeit,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+
+        // Aufgabe Wartend mit altem Heartbeat
+        var aufgabeWartend = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Alte Wartend Aufgabe",
+            Status = AufgabeStatus.Wartend,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-6),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+
+        // Aufgabe InArbeit mit frischem Heartbeat (soll nicht erkannt werden)
+        var aufgabeFrisch = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Frische InArbeit Aufgabe",
+            Status = AufgabeStatus.InArbeit,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+
+        // Aufgabe Neu (soll nie erkannt werden)
+        var aufgabeNeu = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Neue Aufgabe",
+            Status = AufgabeStatus.Neu,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+
+        _db.Aufgaben.AddRange(aufgabeAlt, aufgabeWartend, aufgabeFrisch, aufgabeNeu);
+        await _db.SaveChangesAsync();
+
+        var running = new FakeRunningAutomationStatusSource(false);
+        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+
+        // Act
+        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync()).ToList();
+
+        // Assert
+        kandidaten.Should().Contain(aufgabeAlt.Id);
+        kandidaten.Should().Contain(aufgabeWartend.Id);
+        kandidaten.Should().NotContain(aufgabeFrisch.Id);
+        kandidaten.Should().NotContain(aufgabeNeu.Id);
+    }
+
+    /// <summary>ScanForRecoveryCandidates ignoriert Aufgaben, für die ein Prozess noch läuft.</summary>
+    [Fact]
+    public async Task ScanForRecoveryCandidates_ShouldExcludeRunningTasks()
+    {
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Laufende Aufgabe",
+            Status = AufgabeStatus.InArbeit,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+        _db.Aufgaben.Add(aufgabe);
+        await _db.SaveChangesAsync();
+
+        var running = new FakeRunningAutomationStatusSource(true);
+        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+
+        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync()).ToList();
+
+        kandidaten.Should().BeEmpty();
     }
 
     public void Dispose() => _db.Dispose();

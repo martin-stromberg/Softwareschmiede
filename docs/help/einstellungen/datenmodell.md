@@ -13,11 +13,19 @@ Schlüssel-Wert-Tabelle für anwendungsweite Einstellungen.
 
 Bekannte Schlüssel:
 
-| Schlüssel | Beschreibung |
-|-----------|--------------|
-| `WorkDir` | Lokales Arbeitsverzeichnis für Repository-Klons |
-| `DefaultScmPlugin` | Prefix des Standard-SCM-Plugins |
-| `DefaultKiPlugin` | Prefix des Standard-KI-Plugins |
+| Schlüssel | Typ | Beschreibung |
+|-----------|-----|--------------|
+| `WorkDir` | string | Lokales Arbeitsverzeichnis für Repository-Klons |
+| `DefaultScmPlugin` | string | Prefix des Standard-SCM-Plugins |
+| `DefaultKiPlugin` | string | Prefix des Standard-KI-Plugins |
+| `DarkModeEnabled` | bool | Dark Mode aktiviert (`"true"` / `"false"`) |
+| `WindowPosition.X` | int | Fenster-X-Position (Pixel) |
+| `WindowPosition.Y` | int | Fenster-Y-Position (Pixel) |
+| `WindowPosition.Width` | int | Fensterbreite (Pixel) |
+| `WindowPosition.Height` | int | Fensterhöhe (Pixel) |
+| `NotificationMode` | Enum | Benachrichtigungsmodus (`Deaktiviert` / `Banner` / `Ton`) |
+| `NotificationAudioPath` | string | Pfad zur Benachrichtigungs-Audiodatei (MP3/WAV) |
+| `LogLevel` | Enum | Logging-Granularität (`Debug` / `Information`) |
 
 ### `BenachrichtigungsEinstellung`
 

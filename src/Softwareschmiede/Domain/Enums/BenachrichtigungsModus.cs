@@ -1,9 +1,9 @@
 namespace Softwareschmiede.Domain.Enums;
 
-/// <summary>Modus für Benachrichtigungskanäle.</summary>
+/// <summary>Modus für Benachrichtigungen.</summary>
 public enum BenachrichtigungsModus
 {
     Deaktiviert = 0,
-    NurAufgabenseite = 1,
-    Global = 2
+    Banner = 1,
+    Ton = 2
 }

@@ -63,7 +63,7 @@ public partial class MainLayout : IDisposable
             var einstellungen = await BenachrichtigungsEinstellungen.GetAsync(benutzerId);
             var istAufgabenseite = IstAktiveAufgabenseite(ereignis.AufgabeId);
 
-            await VerarbeiteToastAsync(ereignis, benutzerId, einstellungen.ToastModus, istAufgabenseite);
+            await VerarbeiteToastAsync(ereignis, benutzerId, einstellungen.BannerModus, istAufgabenseite);
             await VerarbeiteTonAsync(ereignis, benutzerId, einstellungen.TonModus, istAufgabenseite);
 
             StateHasChanged();
@@ -88,21 +88,21 @@ public partial class MainLayout : IDisposable
                 ereignis.EreignisId,
                 ereignis.AufgabeId,
                 benutzerId,
-                BenachrichtigungsKanal.Toast,
+                BenachrichtigungsKanal.Banner,
                 modus,
                 BenachrichtigungsEntscheidung.Unterdrueckt,
                 BestimmeUnterdrueckungsgrund(modus, istAufgabenseite));
             return;
         }
 
-        var statusText = ereignis.AbschlussStatus == AufgabeStatus.Fehlgeschlagen ? "fehlgeschlagen" : "abgeschlossen";
+        var statusText = ereignis.AbschlussStatus == AufgabeStatus.Beendet ? "abgeschlossen" : "mit Fehler beendet";
         AddToast("KI-Aufgabe", $"{ereignis.Aufgabentitel} wurde {statusText}.", "toast-info");
 
         await BenachrichtigungsAudit.LogAsync(
             ereignis.EreignisId,
             ereignis.AufgabeId,
             benutzerId,
-            BenachrichtigungsKanal.Toast,
+            BenachrichtigungsKanal.Banner,
             modus,
             BenachrichtigungsEntscheidung.Gesendet,
             "ToastAngezeigt");
@@ -212,8 +212,8 @@ public partial class MainLayout : IDisposable
         return modus switch
         {
             BenachrichtigungsModus.Deaktiviert => false,
-            BenachrichtigungsModus.NurAufgabenseite => istAufgabenseite,
-            BenachrichtigungsModus.Global => true,
+            BenachrichtigungsModus.Banner => true,
+            BenachrichtigungsModus.Ton => true,
             _ => false
         };
     }
@@ -223,11 +223,6 @@ public partial class MainLayout : IDisposable
         if (modus == BenachrichtigungsModus.Deaktiviert)
         {
             return "KanalDeaktiviert";
-        }
-
-        if (modus == BenachrichtigungsModus.NurAufgabenseite && !istAufgabenseite)
-        {
-            return "NichtAufAufgabenseite";
         }
 
         return "Unterdrueckt";
