@@ -9,7 +9,6 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 ## Offene Planelemente
 
 - [ ] ProtokollService: Methode `ParseRateLimitMarker(outputLine) → (bool, string?, DateTimeOffset?)` optional als öffentliche Methode extrahieren (aktuell inline in `EntwicklungsprozessService`)
-- [ ] EntwicklungsprozessService: Kontextkomprimierung mit Soft-Limit (12.000 Zeichen) und Hard-Limit (20.000 Zeichen) implementieren
 - [ ] DarkModeService: ViewModels müssen `DarkModeChanged`-Event abonnieren und UI aktualisieren
 - [ ] Audio-Dateipfad-Konfiguration: `PluginSettingsView` soll Audio-Datei-Auswahl ermöglichen
 - [ ] Fenster-Geometrie-Persistierung: `MainWindow.xaml.cs` muss beim Laden Geometrie via `GetWindowGeometryAsync()` restaurieren und beim Schließen via `SetWindowGeometryAsync()` speichern

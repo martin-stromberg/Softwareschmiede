@@ -89,20 +89,6 @@ Beteiligte Klassen/Komponenten: `PluginManager`, `IPlugin.GetSettingGroups()`, `
 
 Beteiligte Klassen/Komponenten: `AufgabeService`, `ProtokollService`, `BenachrichtigungsService`, `MediaPlayer` (WPF), `ToastNotification` (Windows.UI.Notifications)
 
-### Kontextkomprimierung bei Hard-Limit-Überschreitung
-
-1. Nach jeder Ausgabezeile aus CLI wird Kontext gezählt
-2. Bei Soft-Limit (12.000 Zeichen) wird Benachrichtigung an UI gesendet (optional)
-3. Bei Hard-Limit (20.000 Zeichen):
-   - CLI wird pausiert
-   - Komprimierungs-Prompt wird erzeugt: „Zusammenfasse diese Konversation gemäß Pflicht-Abschnitten: Ziel, Offene Punkte, Letzte Entscheidungen"
-   - Neuer KI-Lauf wird gestartet mit Komprimierungs-Prompt
-   - Komprimierter Kontext wird aktualisiert
-   - Ursprüngliche CLI wird mit komprimiertem Kontext fortgesetzt
-4. `ContainsMandatoryCompressionSections(compressed)` prüft, ob Pflicht-Abschnitte vorhanden sind
-
-Beteiligte Klassen/Komponenten: `EntwicklungsprozessService`, `KiAusfuehrungsService`, `ProtokollService`
-
 ### Dark Mode Toggle
 
 1. Benutzer öffnet "Einstellungen > Erscheinungsbild"
