@@ -4,10 +4,10 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Stdout-Streaming und Protokoll-Eintrag in UI.</summary>
-public sealed class ProtocolLoggingE2ETests : IDisposable
+public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly ProtokollService _protokollService;
@@ -15,7 +15,7 @@ public sealed class ProtocolLoggingE2ETests : IDisposable
     private readonly ProjektService _projektService;
     private Guid _aufgabeId;
 
-    public ProtocolLoggingE2ETests()
+    public ProtocolLoggingServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);

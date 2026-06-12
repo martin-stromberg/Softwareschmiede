@@ -17,6 +17,7 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 - [ ] `BenachrichtigungsService.ShowBannerAsync()` — echte Windows Notifications API implementieren (aktuell nur Logging-Fallback).
 - [ ] Tests für neue Status-Transitions ergänzen: `TestNewStatusEnum`, `TestStatusTransitions`, `TestCliStartAsync`, `TestProcessWindowEmbedding` (via `ProcessWindowHost`), `TestHeartbeatUpdate`, `TestRecoveryCandidates`, `TestRateLimitMarkerParsing`.
 - [x] Bestehende Tests anpassen: `AufgabeServiceTests`, `KiAusfuehrungsServiceTests`, `AufgabeRecoveryServiceTests`, `EntwicklungsprozessServiceTests`, Plugin-Tests — auf neue Enums/Methoden-Signaturen aktualisieren.
+- [ ] **Echte E2E-Tests implementieren** — Die bisherigen „E2E-Tests" wurden in `ServiceIntegrationTests` umbenannt, weil sie nur Services gegen eine In-Memory-Datenbank testen. Echte E2E-Tests starten die WPF-App als Prozess und steuern die UI über Windows UI Automation (z. B. FlaUI oder Microsoft.TestPlatform.UIAutomation). Abzudeckende Szenarien: Projekt anlegen via UI, Aufgabe starten (CLI sichtbar eingebettet), Dark Mode umschalten und Neustart, Recovery-Banner erscheint nach Heartbeat-Timeout. Voraussetzung: Windows-Desktop im CI, App muss ohne DB-Seiteneffekte startbar sein (Test-Profil).
 - [ ] Blazor-Code-Entfernung prüfen — bestehende Blazor-Komponenten aus dem Repo entfernen (falls noch vorhanden).
 
 ## Code-Review-Befunde

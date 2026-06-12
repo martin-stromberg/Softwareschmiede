@@ -4,16 +4,16 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Projekt erstellen und Aufgabe hinzufügen.</summary>
-public sealed class ProjectE2ETests : IDisposable
+public sealed class ProjectServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
 
-    public ProjectE2ETests()
+    public ProjectServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);

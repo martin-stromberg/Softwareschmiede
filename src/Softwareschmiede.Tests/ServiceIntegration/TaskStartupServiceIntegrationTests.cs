@@ -4,16 +4,16 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Aufgabe starten → Arbeitsverzeichnis einrichten → Branch erstellen.</summary>
-public sealed class TaskStartupE2ETests : IDisposable
+public sealed class TaskStartupServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
 
-    public TaskStartupE2ETests()
+    public TaskStartupServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);

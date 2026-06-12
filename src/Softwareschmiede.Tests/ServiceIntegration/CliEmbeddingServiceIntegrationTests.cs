@@ -4,15 +4,15 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: CLI-Prozess starten und Fenster in WPF-Control einbetten.</summary>
-public sealed class CliEmbeddingE2ETests : IDisposable
+public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly KiAusfuehrungsService _kiService;
 
-    public CliEmbeddingE2ETests()
+    public CliEmbeddingServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance);

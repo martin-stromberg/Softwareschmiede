@@ -7,16 +7,16 @@ using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Status-Wechsel triggert Banner/Audio basierend auf Modus.</summary>
-public sealed class NotificationE2ETests : IDisposable
+public sealed class NotificationServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly BenachrichtigungsEinstellungenService _einstellungenService;
     private readonly BenachrichtigungsAuditService _auditService;
 
-    public NotificationE2ETests()
+    public NotificationServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _einstellungenService = new BenachrichtigungsEinstellungenService(_db);

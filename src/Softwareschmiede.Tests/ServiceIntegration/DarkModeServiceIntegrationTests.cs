@@ -3,15 +3,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Dark Mode aktivieren, persistieren, beim Neustart wiederherstellen.</summary>
-public sealed class DarkModeE2ETests : IDisposable
+public sealed class DarkModeServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AppEinstellungService _einstellungService;
 
-    public DarkModeE2ETests()
+    public DarkModeServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);

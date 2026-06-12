@@ -6,17 +6,17 @@ using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: App startet, erkennt InArbeit/Wartend-Aufgaben, zeigt Recovery-Banner.</summary>
-public sealed class RecoveryE2ETests : IDisposable
+public sealed class RecoveryServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AufgabeService _aufgabeService;
     private readonly ProjektService _projektService;
     private readonly Guid _projektId;
 
-    public RecoveryE2ETests()
+    public RecoveryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);

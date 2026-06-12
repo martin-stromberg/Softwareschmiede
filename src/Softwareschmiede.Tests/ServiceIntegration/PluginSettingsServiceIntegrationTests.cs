@@ -5,15 +5,15 @@ using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Plugin-Einstellung speichern, verschlüsseln, beim Reload laden.</summary>
-public sealed class PluginSettingsE2ETests
+public sealed class PluginSettingsServiceIntegrationTests
 {
     private readonly InMemoryCredentialStore _credentialStore = new();
     private readonly PluginSettingsService _sut;
 
-    public PluginSettingsE2ETests()
+    public PluginSettingsServiceIntegrationTests()
     {
         _sut = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
     }

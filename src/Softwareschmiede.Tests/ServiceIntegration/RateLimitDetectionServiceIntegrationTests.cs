@@ -4,17 +4,17 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Marker erkennen, Vorschlag speichern, Status → Wartend.</summary>
-public sealed class RateLimitDetectionE2ETests : IDisposable
+public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly ProtokollService _protokollService;
     private readonly AufgabeService _aufgabeService;
     private readonly ProjektService _projektService;
 
-    public RateLimitDetectionE2ETests()
+    public RateLimitDetectionServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);

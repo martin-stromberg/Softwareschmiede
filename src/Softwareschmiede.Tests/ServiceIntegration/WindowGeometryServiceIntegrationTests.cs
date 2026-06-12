@@ -3,15 +3,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Tests.Helpers;
 
-namespace Softwareschmiede.Tests.E2E;
+namespace Softwareschmiede.Tests.ServiceIntegration;
 
 /// <summary>E2E-Test: Fensterposition verschieben/skalieren und beim Neustart wiederherstellen.</summary>
-public sealed class WindowGeometryE2ETests : IDisposable
+public sealed class WindowGeometryServiceIntegrationTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AppEinstellungService _einstellungService;
 
-    public WindowGeometryE2ETests()
+    public WindowGeometryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
