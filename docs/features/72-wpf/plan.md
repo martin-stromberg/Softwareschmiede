@@ -104,7 +104,7 @@ Beteiligte Klassen/Komponenten: `DarkModeService`, `AppEinstellungService`, `Mai
 7. Status wird basierend auf CLI-Exit-Code aktualisiert: `Beendet` (erfolgreich) oder `Wartend` (Rate-Limit erkannt)
 8. Heartbeat wird aktualisiert
 
-Beteiligte Klassen/Komponenten: `KiAusfuehrungsService`, `IKiPlugin`, `ProcessWindowEmbedder`, `ProtokollService`, `AufgabeService`
+Beteiligte Klassen/Komponenten: `KiAusfuehrungsService`, `IKiPlugin`, `ProcessWindowHost`, `ProtokollService`, `AufgabeService`
 
 ### Rate-Limit-Erkennung & Vorschlag-Speicherung
 
@@ -172,12 +172,11 @@ Beteiligte Klassen/Komponenten: `PluginSettingsService`, `AppEinstellungService`
 | `PluginSettingsView` | UserControl | Automatisch generierte UI-Felder basierend auf `PluginSettingGroup`-Typen |
 | `PluginSettingsViewModel` | ViewModel | Logic für Plugin-Einstellungen |
 | `DarkModeService` | Service | Verwaltung Dark Mode (Theme-Wechsel, Persistierung) |
-| `ProcessWindowEmbedder` | Service | Win32 `SetParent` API-Wrapper für Fenster-Einbettung |
 | `CliProcessManager` | Service | Verwaltung von CLI-Prozessen: Start, Stop, Heartbeat-Tracking |
 | `BenachrichtigungsService` (erweitert) | Service | Audio-Support, Toast-Integration, Dispatch-Logging |
 | `DiffViewControl` | UserControl (optional) | Visuelle Darstellung von Diff-Ergebnissen (aus `DiffResult`-Entity) |
 | `DiffViewViewModel` (optional) | ViewModel | Logic für Diff-Anzeige |
-| `ProcessWindowHost` | WPF Control | Host-Container für eingebettete CLI-Prozesse |
+| `ProcessWindowHost` | WPF Control | Host-Container für eingebettete CLI-Prozesse inkl. Win32 `SetParent`-Einbettung |
 | `StatusIndicatorControl` | UserControl | Visuelle Anzeige des Task-Status mit Animationen |
 | `RecoveryBannerControl` | UserControl | Banner für Recovery-Kandidaten |
 
@@ -242,7 +241,7 @@ Beteiligte Klassen/Komponenten: `PluginSettingsService`, `AppEinstellungService`
 - **Geändertes Verhalten:** Keine Prompt-Pufferung; nur Prozess-Management und Stdout-Parsing für Rate-Limit-Erkennung
 - **Neue Property:**
   - `CliProcessStatusChanged` { event } — Wird ausgelöst bei Prozess-Start, -Stop, -Fehler
-- **Abhängigkeiten:** `IKiPlugin`, `ProcessWindowEmbedder`, `AufgabeService`, `ProtokollService`
+- **Abhängigkeiten:** `IKiPlugin`, `ProcessWindowHost`, `AufgabeService`, `ProtokollService`
 
 ### `EntwicklungsprozessService` (Service)
 
@@ -372,7 +371,7 @@ Beteiligte Klassen/Komponenten: `PluginSettingsService`, `AppEinstellungService`
 3. **`IKiPlugin`-Interface überarbeiten** (alte Methoden entfernen, neue hinzufügen)
 4. **`CliKiPluginBase` anpassen** (neue Methoden für ProcessStartInfo-Konstruktion)
 5. **`KiAusfuehrungsService` redesignen** (Prozess-Management statt Prompt-Streaming)
-6. **`ProcessWindowEmbedder` + `CliProcessManager` Implementierung** (Win32 SetParent)
+6. **`ProcessWindowHost` + `CliProcessManager` Implementierung** (Win32 SetParent)
 7. **`AufgabeService` Status-Methoden aktualisieren** (`SetStatusAsync()`, `UpdateHeartbeatAsync()`)
 8. **`AufgabeRecoveryService` auf neue Status anpassen**
 9. **`EntwicklungsprozessService` vereinfachen** (nur Git + Rate-Limit-Parsing)
@@ -397,7 +396,7 @@ Beteiligte Klassen/Komponenten: `PluginSettingsService`, `AppEinstellungService`
 | `TestNewStatusEnum()` | `AufgabeStatusEnumTests` | Neue Enum-Werte vorhanden und typsicher |
 | `TestStatusTransitions()` | `AufgabeStatusTransitionTests` | Nur erlaubte Übergänge (Neu → ArbeitsverzeichnisEingerichtet → Gestartet → InArbeit → Beendet/Wartend; * → Archiviert) |
 | `TestCliStartAsync()` | `KiAusfuehrungsServiceTests` | CLI wird gestartet, ProcessHandle wird zurückgegeben, Stdout wird gepuffert |
-| `TestProcessWindowEmbedding()` | `ProcessWindowEmbedderTests` | SetParent wird aufgerufen, Handle wird in WPF-Control eingebettet |
+| `TestProcessWindowEmbedding()` | `ProcessWindowHostTests` | SetParent wird aufgerufen, Handle wird in WPF-Control eingebettet |
 | `TestHeartbeatUpdate()` | `AufgabeServiceTests` | LastHeartbeatUtc wird aktualisiert, Alter wird korrekt berechnet |
 | `TestRecoveryCandidates()` | `AufgabeRecoveryServiceTests` | Aufgaben mit Heartbeat > 5 Min und Status InArbeit/Wartend werden erkannt |
 | `TestRateLimitMarkerParsing()` | `ProtokollServiceTests` | Marker wird geparst, Vorschlag wird gespeichert, DateTimeOffset wird extrahiert |

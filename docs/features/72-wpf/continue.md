@@ -8,7 +8,6 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 
 ## Offene Planelemente
 
-- [ ] `ProcessWindowEmbedder` Service — fehlt vollständig. Laut Plan sollte ein separater Service vorhanden sein, der Win32-API-Wrapper zur Fenster-Identifikation und Einbettung mit Fallback auf separates Fenster (HWND_TOPMOST) bereitstellt.
 - [ ] `CliKiPluginBase` — neue Methoden implementieren: `BuildProcessStartInfo(localRepoPath, parameters) → ProcessStartInfo` und `ExtractWindowTitleFromProcess(process) → string`; alte Methoden (`BuildContextFilePath`, `GetLatestContextFilePath`, `ClearContextFiles` etc.) entfernen.
 - [ ] `IKiPlugin` entfernte Methoden überprüfen — alte Implementierungen in Plugin-Klassen (GitHub-Plugin, Claude CLI Plugin, Local Directory Plugin) auf neues Interface angepasst?
 - [ ] `EntwicklungsprozessService` vereinfachen — `StartDevelopmentAsync` entfernen (falls noch vorhanden), Fokus nur auf Git-Setup und Rate-Limit-Parsing; Kontextkomprimierungs-Logik prüfen.
@@ -16,7 +15,7 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 - [ ] `StartenAsync()` — Status muss zu `ArbeitsverzeichnisEingerichtet` führen (nicht `InBearbeitung`).
 - [ ] `AbschliessenAsync()` — Status muss zu `Beendet` führen (nicht `Abgeschlossen`).
 - [ ] `BenachrichtigungsService.ShowBannerAsync()` — echte Windows Notifications API implementieren (aktuell nur Logging-Fallback).
-- [ ] Tests für neue Status-Transitions ergänzen: `TestNewStatusEnum`, `TestStatusTransitions`, `TestCliStartAsync`, `TestProcessWindowEmbedding`, `TestHeartbeatUpdate`, `TestRecoveryCandidates`, `TestRateLimitMarkerParsing`.
+- [ ] Tests für neue Status-Transitions ergänzen: `TestNewStatusEnum`, `TestStatusTransitions`, `TestCliStartAsync`, `TestProcessWindowEmbedding` (via `ProcessWindowHost`), `TestHeartbeatUpdate`, `TestRecoveryCandidates`, `TestRateLimitMarkerParsing`.
 - [x] Bestehende Tests anpassen: `AufgabeServiceTests`, `KiAusfuehrungsServiceTests`, `AufgabeRecoveryServiceTests`, `EntwicklungsprozessServiceTests`, Plugin-Tests — auf neue Enums/Methoden-Signaturen aktualisieren.
 - [ ] Blazor-Code-Entfernung prüfen — bestehende Blazor-Komponenten aus dem Repo entfernen (falls noch vorhanden).
 
