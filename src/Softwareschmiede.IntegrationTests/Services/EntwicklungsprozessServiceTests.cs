@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
@@ -15,7 +14,7 @@ namespace Softwareschmiede.IntegrationTests.Services;
 
 /// <summary>
 /// Integrationstests für <see cref="EntwicklungsprozessService"/> mit echter SQLite-Datenbank.
-/// CLI-Plugins (IGitPlugin, IKiPlugin, IAgentPackageService) werden gemockt.
+/// CLI-Plugins (IGitPlugin, IKiPlugin) werden gemockt.
 /// </summary>
 public sealed class EntwicklungsprozessServiceTests
 {
@@ -37,7 +36,6 @@ public sealed class EntwicklungsprozessServiceTests
         DatabaseFixture db,
         Mock<IGitPlugin> gitMock,
         Mock<IKiPlugin> kiMock,
-        Mock<IAgentPackageService> packageMock,
         IArbeitsverzeichnisResolver? arbeitsverzeichnisResolver = null)
     {
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
@@ -51,9 +49,7 @@ public sealed class EntwicklungsprozessServiceTests
             protokollService,
             gitMock.Object,
             CreatePluginSelectionService(db, gitMock.Object, kiMock.Object),
-            packageMock.Object,
             arbeitsverzeichnisResolver,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
     }
 
@@ -89,9 +85,8 @@ public sealed class EntwicklungsprozessServiceTests
             .Returns(Task.CompletedTask);
 
         var kiMock = new Mock<IKiPlugin>();
-        var packageMock = new Mock<IAgentPackageService>();
 
-        var service = CreateService(db, gitMock, kiMock, packageMock);
+        var service = CreateService(db, gitMock, kiMock);
 
         // Act
         await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
@@ -100,7 +95,7 @@ public sealed class EntwicklungsprozessServiceTests
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Aufgaben.FindAsync(aufgabeId);
 
-        loaded!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
         loaded.BranchName.Should().StartWith("task/");
         loaded.BranchName.Should().Contain(aufgabeId.ToString("N"));
         loaded.LokalerKlonPfad.Should().NotBeNullOrEmpty();
@@ -122,7 +117,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
         await service.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
 
@@ -148,9 +143,8 @@ public sealed class EntwicklungsprozessServiceTests
             .Returns(Task.CompletedTask);
 
         var kiMock = new Mock<IKiPlugin>();
-        var packageMock = new Mock<IAgentPackageService>();
 
-        var service = CreateService(db, gitMock, kiMock, packageMock);
+        var service = CreateService(db, gitMock, kiMock);
 
         // Act
         await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
@@ -165,10 +159,10 @@ public sealed class EntwicklungsprozessServiceTests
     }
 
     /// <summary>
-    /// Testet, dass AbschliessenAsync den Status auf Abgeschlossen setzt und einen Statusübergang protokolliert.
+    /// Testet, dass AbschliessenAsync den Status auf Beendet setzt und einen Statusübergang protokolliert.
     /// </summary>
     [Fact]
-    public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndCreateStatusUebergang_WhenAufgabeInBearbeitung()
+    public async Task AbschliessenAsync_ShouldSetStatusBeendetAndCreateStatusUebergang_WhenAufgabeInBearbeitung()
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
@@ -180,9 +174,8 @@ public sealed class EntwicklungsprozessServiceTests
 
         var gitMock = new Mock<IGitPlugin>();
         var kiMock = new Mock<IKiPlugin>();
-        var packageMock = new Mock<IAgentPackageService>();
 
-        var service = CreateService(db, gitMock, kiMock, packageMock);
+        var service = CreateService(db, gitMock, kiMock);
 
         // Act
         await service.AbschliessenAsync(aufgabeId);
@@ -193,83 +186,9 @@ public sealed class EntwicklungsprozessServiceTests
         var statusEintrag = await db2.Protokolleintraege
             .FirstOrDefaultAsync(p => p.AufgabeId == aufgabeId && p.Typ == ProtokollTyp.StatusUebergang);
 
-        loaded!.Status.Should().Be(AufgabeStatus.Abgeschlossen);
+        loaded!.Status.Should().Be(AufgabeStatus.Beendet);
         statusEintrag.Should().NotBeNull();
-        statusEintrag!.Inhalt.Should().Contain("Abgeschlossen");
-    }
-
-    /// <summary>
-    /// Testet, dass AbbrechenAsync den Status auf Offen zurücksetzt und einen Statusübergang protokolliert.
-    /// </summary>
-    [Fact]
-    public async Task AbbrechenAsync_ShouldResetStatusToOffenAndCreateStatusUebergang_WhenAufgabeInBearbeitung()
-    {
-        // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
-        var (_, aufgabeId) = await CreateTestDataAsync(db);
-
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
-        await aufgabeService.StartenAsync(aufgabeId, "task/abzubrechen", @"C:\nicht\vorhanden\pfad");
-
-        var gitMock = new Mock<IGitPlugin>();
-        var kiMock = new Mock<IKiPlugin>();
-        var packageMock = new Mock<IAgentPackageService>();
-
-        var service = CreateService(db, gitMock, kiMock, packageMock);
-
-        // Act
-        await service.AbbrechenAsync(aufgabeId);
-
-        // Assert
-        await using var db2 = db.CreateNewContext();
-        var loaded = await db2.Aufgaben.FindAsync(aufgabeId);
-        var statusEintrag = await db2.Protokolleintraege
-            .FirstOrDefaultAsync(p => p.AufgabeId == aufgabeId && p.Typ == ProtokollTyp.StatusUebergang);
-
-        loaded!.Status.Should().Be(AufgabeStatus.Offen);
-        statusEintrag.Should().NotBeNull();
-        statusEintrag!.Inhalt.Should().Contain("Offen");
-    }
-
-    /// <summary>
-    /// Testet, dass ProzessStartenAsync das Agentenpaket deployt, wenn AgentenpaketName gesetzt ist.
-    /// </summary>
-    [Fact]
-    public async Task ProzessStartenAsync_ShouldDeployAgentPackage_WhenAgentenpaketNameIsSet()
-    {
-        // Arrange
-        await using var db = await DatabaseFixture.CreateAsync();
-        var (_, aufgabeId) = await CreateTestDataAsync(db, "Aufgabe mit Agentenpaket");
-
-        // AgentenpaketName setzen
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
-        await aufgabeService.UpdateAsync(aufgabeId, "Aufgabe mit Agentenpaket", null, "MeinPaket", "MeinAgent");
-
-        var gitMock = new Mock<IGitPlugin>();
-        gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var kiMock = new Mock<IKiPlugin>();
-        kiMock.Setup(k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        kiMock.Setup(k => k.IsAgentPackageCompatibleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-
-        var packageMock = new Mock<IAgentPackageService>();
-        packageMock.Setup(p => p.GetPackageAsync("MeinPaket", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AgentPackageInfo("MeinPaket", @"C:\pakete\meinpaket", [], []));
-
-        var service = CreateService(db, gitMock, kiMock, packageMock);
-
-        // Act
-        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
-
-        // Assert – DeployAgentPackageAsync wurde aufgerufen
-        kiMock.Verify(
-            k => k.DeployAgentPackageAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        statusEintrag!.Inhalt.Should().Contain("Beendet");
     }
 
     [Fact]
@@ -289,7 +208,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
         // Act
         await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
@@ -318,7 +237,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
         // Act
         await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
@@ -353,7 +272,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>());
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
 
         // Act
         await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
@@ -386,7 +305,7 @@ public sealed class EntwicklungsprozessServiceTests
         resolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), true, "no-configured-path", null));
 
-        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), new Mock<IAgentPackageService>(), resolverMock.Object);
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>(), resolverMock.Object);
 
         // Act
         await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");

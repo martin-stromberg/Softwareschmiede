@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Infrastructure.Services;
@@ -21,7 +21,7 @@ public sealed class AgentPackageFileServiceTests : IDisposable
         _tempBasePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_tempBasePath);
 
-        var envMock = new Mock<IWebHostEnvironment>();
+        var envMock = new Mock<IHostEnvironment>();
         envMock.Setup(e => e.ContentRootPath).Returns(_tempBasePath);
 
         _sut = new AgentPackageFileService(
