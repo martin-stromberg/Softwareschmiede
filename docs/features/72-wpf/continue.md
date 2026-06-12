@@ -17,7 +17,7 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 - [ ] `AbschliessenAsync()` — Status muss zu `Beendet` führen (nicht `Abgeschlossen`).
 - [ ] `BenachrichtigungsService.ShowBannerAsync()` — echte Windows Notifications API implementieren (aktuell nur Logging-Fallback).
 - [ ] Tests für neue Status-Transitions ergänzen: `TestNewStatusEnum`, `TestStatusTransitions`, `TestCliStartAsync`, `TestProcessWindowEmbedding`, `TestHeartbeatUpdate`, `TestRecoveryCandidates`, `TestRateLimitMarkerParsing`.
-- [ ] Bestehende Tests anpassen: `AufgabeServiceTests`, `KiAusfuehrungsServiceTests`, `AufgabeRecoveryServiceTests`, `EntwicklungsprozessServiceTests`, Plugin-Tests — auf neue Enums/Methoden-Signaturen aktualisieren.
+- [x] Bestehende Tests anpassen: `AufgabeServiceTests`, `KiAusfuehrungsServiceTests`, `AufgabeRecoveryServiceTests`, `EntwicklungsprozessServiceTests`, Plugin-Tests — auf neue Enums/Methoden-Signaturen aktualisieren.
 - [ ] Blazor-Code-Entfernung prüfen — bestehende Blazor-Komponenten aus dem Repo entfernen (falls noch vorhanden).
 
 ## Code-Review-Befunde
