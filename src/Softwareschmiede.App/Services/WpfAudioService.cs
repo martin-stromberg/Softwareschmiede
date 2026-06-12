@@ -12,6 +12,7 @@ namespace Softwareschmiede.App.Services;
 public sealed class WpfAudioService : IBenachrichtigungsAudioService
 {
     private readonly ILogger<WpfAudioService> _logger;
+    private readonly HashSet<MediaPlayer> _activePlayers = new();
 
     /// <inheritdoc cref="WpfAudioService"/>
     public WpfAudioService(ILogger<WpfAudioService> logger)
@@ -40,13 +41,17 @@ public sealed class WpfAudioService : IBenachrichtigungsAudioService
             try
             {
                 var player = new MediaPlayer();
+                _activePlayers.Add(player);
+
                 player.MediaEnded += (_, _) =>
                 {
+                    _activePlayers.Remove(player);
                     player.Close();
                     tcs.TrySetResult(true);
                 };
                 player.MediaFailed += (_, args) =>
                 {
+                    _activePlayers.Remove(player);
                     _logger.LogError("MediaPlayer-Fehler beim Abspielen von '{FilePath}': {Error}", filePath, args.ErrorException.Message);
                     player.Close();
                     tcs.TrySetException(args.ErrorException);
@@ -67,8 +72,11 @@ public sealed class WpfAudioService : IBenachrichtigungsAudioService
         if (dispatcherOp.Status == System.Windows.Threading.DispatcherOperationStatus.Aborted)
         {
             _logger.LogDebug("Dispatcher-Operation wurde abgebrochen – Audio übersprungen: {FilePath}", filePath);
+            tcs.TrySetCanceled(ct);
             return;
         }
+
+        dispatcherOp.Aborted += (_, _) => tcs.TrySetCanceled();
 
         await tcs.Task;
     }

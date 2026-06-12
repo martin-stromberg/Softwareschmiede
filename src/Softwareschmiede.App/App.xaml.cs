@@ -22,7 +22,7 @@ public sealed partial class App : System.Windows.Application
     private IHost? _host;
 
     /// <inheritdoc/>
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -38,22 +38,20 @@ public sealed partial class App : System.Windows.Application
                 retainedFileCountLimit: 14)
             .CreateLogger();
 
-        StartupAsync(e).ContinueWith(t =>
+        try
         {
-            if (t.IsFaulted)
-            {
-                Log.Logger.Fatal(t.Exception, "Fehler beim Starten der Anwendung.");
-                Dispatcher.Invoke(() =>
-                {
-                    MessageBox.Show(
-                        $"Die Anwendung konnte nicht gestartet werden:\n\n{t.Exception?.InnerException?.Message ?? t.Exception?.Message}",
-                        "Startfehler",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    Shutdown(1);
-                });
-            }
-        }, System.Threading.Tasks.TaskScheduler.Default);
+            await StartupAsync(e);
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Fatal(ex, "Fehler beim Starten der Anwendung.");
+            MessageBox.Show(
+                $"Die Anwendung konnte nicht gestartet werden:\n\n{ex.Message}",
+                "Startfehler",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(1);
+        }
     }
 
     private async System.Threading.Tasks.Task StartupAsync(StartupEventArgs e)
@@ -64,6 +62,12 @@ public sealed partial class App : System.Windows.Application
             .Build();
 
         await _host.StartAsync();
+
+        using (var scope = _host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            await db.Database.MigrateAsync();
+        }
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
@@ -111,7 +115,6 @@ public sealed partial class App : System.Windows.Application
         // Infrastructure Services
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton<CliProcessManager>();
-        services.AddSingleton<ProcessWindowEmbedder>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());

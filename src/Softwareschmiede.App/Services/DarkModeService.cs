@@ -1,4 +1,5 @@
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services;
 
@@ -11,7 +12,7 @@ namespace Softwareschmiede.App.Services;
 /// </summary>
 public sealed class DarkModeService
 {
-    private readonly AppEinstellungService _einstellungService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<DarkModeService> _logger;
 
     private static readonly Uri LightThemeUri = new("pack://application:,,,/Softwareschmiede.App;component/Themes/LightTheme.xaml");
@@ -26,9 +27,9 @@ public sealed class DarkModeService
     public event Action<bool>? DarkModeChanged;
 
     /// <inheritdoc cref="DarkModeService"/>
-    public DarkModeService(AppEinstellungService einstellungService, ILogger<DarkModeService> logger)
+    public DarkModeService(IServiceScopeFactory scopeFactory, ILogger<DarkModeService> logger)
     {
-        _einstellungService = einstellungService;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -38,7 +39,9 @@ public sealed class DarkModeService
     /// </summary>
     public async Task InitializeAsync(CancellationToken ct = default)
     {
-        var darkModeEnabled = await _einstellungService.GetBoolSettingAsync(
+        using var scope = _scopeFactory.CreateScope();
+        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        var darkModeEnabled = await einstellungService.GetBoolSettingAsync(
             AppEinstellungService.DarkModeEnabledKey, ct);
         _isDarkMode = darkModeEnabled ?? false;
         ApplyTheme(_isDarkMode);
@@ -66,7 +69,9 @@ public sealed class DarkModeService
         ApplyTheme(enabled);
         DarkModeChanged?.Invoke(enabled);
 
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, enabled, ct);
+        using var scope = _scopeFactory.CreateScope();
+        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        await einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, enabled, ct);
         _logger.LogInformation("Dark Mode {Status}.", enabled ? "aktiviert" : "deaktiviert");
     }
 

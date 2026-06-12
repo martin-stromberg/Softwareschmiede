@@ -39,6 +39,11 @@ wss.on("connection", (socket) => {
         if (msg.startsWith("START_CLI:")) {
             const cli = msg.replace("START_CLI:", "").trim();
 
+            if (!ptyProcess) {
+                socket.send("ERROR:SET_CWD_REQUIRED");
+                return;
+            }
+
             if (cli === "copilot") {
                 ptyProcess.write("copilot\r");
             }

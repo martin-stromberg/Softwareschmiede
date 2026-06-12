@@ -42,6 +42,21 @@ public sealed class AufgabeService
             .ToListAsync(ct);
     }
 
+    /// <summary>Gibt die Anzahl aktiver (InArbeit) und wartender (Wartend) Aufgaben als Tupel zurück — eine einzige Abfrage.</summary>
+    public async Task<(int Aktiv, int Wartend)> GetAktiveUndWartendeCountAsync(CancellationToken ct = default)
+    {
+        var counts = await _db.Aufgaben
+            .AsNoTracking()
+            .Where(a => a.Status == AufgabeStatus.InArbeit || a.Status == AufgabeStatus.Wartend)
+            .GroupBy(a => a.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var aktiv = counts.FirstOrDefault(c => c.Status == AufgabeStatus.InArbeit)?.Count ?? 0;
+        var wartend = counts.FirstOrDefault(c => c.Status == AufgabeStatus.Wartend)?.Count ?? 0;
+        return (aktiv, wartend);
+    }
+
     /// <summary>Gibt eine Aufgabe anhand ihrer ID zurück.</summary>
     public async Task<Aufgabe?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {

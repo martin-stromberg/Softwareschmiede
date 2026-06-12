@@ -29,6 +29,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _selectedKiPluginPrefix;
     private string? _optionalCliParameters;
     private IntPtr _embeddedWindowHandle = IntPtr.Zero;
+    private CancellationTokenSource? _ladenCts;
 
     /// <summary>Die ID der angezeigten Aufgabe.</summary>
     public Guid AufgabeId
@@ -37,7 +38,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         set
         {
             if (SetProperty(ref _aufgabeId, value))
-                _ = LadenAsync(CancellationToken.None);
+            {
+                _ladenCts?.Cancel();
+                _ladenCts?.Dispose();
+                _ladenCts = new CancellationTokenSource();
+                _ = LadenAsync(_ladenCts.Token);
+            }
         }
     }
 
@@ -341,5 +347,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
+        _ladenCts?.Cancel();
+        _ladenCts?.Dispose();
+        _ladenCts = null;
     }
 }

@@ -140,6 +140,17 @@ public sealed class AsyncRelayCommand : ICommand
         {
             // Abgebrochen - kein Fehler
         }
+        catch (Exception ex)
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher is not null && !dispatcher.HasShutdownStarted)
+            {
+                var capturedEx = ex;
+                _ = dispatcher.BeginInvoke(new Action(() =>
+                    throw new InvalidOperationException(
+                        $"Unbehandelte Ausnahme in AsyncRelayCommand: {capturedEx.Message}", capturedEx)));
+            }
+        }
         finally
         {
             _isExecuting = false;

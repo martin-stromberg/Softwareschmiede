@@ -4,141 +4,101 @@
 
 **Status:** Keine Fehler
 
+## Fehlgeschlagene Tests
+
+Keine fehlgeschlagenen Tests vorhanden.
+
 ## Zusammenfassung
 
-- Gesamt: 438
-- Bestanden: 438
+- Gesamt: 477
+- Bestanden: 477
 - Fehlgeschlagen: 0
 - Übersprungen: 0
 
+### Details nach Test-Projekt
+
+#### Unit Tests (Softwareschmiede.Tests)
+- Gesamt: 391
+- Bestanden: 391
+- Fehler: 0
+- Laufzeit: 3,97 Sekunden
+
+#### Integration Tests (Softwareschmiede.IntegrationTests)
+- Gesamt: 86
+- Bestanden: 86
+- Fehler: 0
+- Laufzeit: 7,19 Sekunden
+
 ## Testabdeckung
 
-**Abdeckung:** 27.14 %
+**Gesamt Abdeckung:**
 
-| Datei | Abdeckung |
-|-------|-----------|
-| Softwareschmiede.Domain.Abstractions.CliKiPluginBase | 9.3 % |
-| Softwareschmiede.Application.Services.KiAusfuehrungsService/<StopCliAsync>d__12 | 21.73 % |
-| Softwareschmiede.Application.Services.EntwicklungsprozessService/<PushDurchfuehrenAsync>d__14 | 40 % |
-| Softwareschmiede.Application.Services.GitOrchestrationService/<PushAsync>d__10 | 41.17 % |
-| Softwareschmiede.Application.Services.DiffCachingService/<GetFromCacheAsync>d__7 | 42.42 % |
-| Softwareschmiede.Application.Services.EntwicklungsprozessService/<CommitDurchfuehrenAsync>d__12 | 42.85 % |
-| Softwareschmiede.Domain.ValueObjects.BranchCommit | 50 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<EnsureInitializedInWorkingDirectoryAsync>d__52 | 55.55 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<CreateInitialWorkspaceCommitAsync>d__53 | 57.14 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<ConfigureBootstrapIdentityAsync>d__54 | 60 % |
-| Softwareschmiede.Application.Services.ArbeitsverzeichnisSettingsService | 60 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<ResolveSourcePathForWorkspaceAsync>d__55 | 62.06 % |
-| Softwareschmiede.Domain.ValueObjects.PluginSettingField | 62.5 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<ApplyDeletedFilesToSourceAsync>d__57 | 63.15 % |
-| Softwareschmiede.Application.Services.EntwicklungsprozessService | 63.33 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<EnumerateFilesForSync>d__59 | 63.63 % |
-| Softwareschmiede.Domain.ValueObjects.PluginSettingGroup | 66.66 % |
-| Softwareschmiede.Application.Services.PluginSelectionService | 67.64 % |
-| Softwareschmiede.Application.Services.AufgabeRecoveryService/<RecoverManuellAsync>d__6 | 68.46 % |
-| Softwareschmiede.Domain.ValueObjects.FilePreview | 70 % |
-| Softwareschmiede.Application.Services.BenachrichtigungsEinstellungenService | 71.42 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<PullAsync>d__39 | 72.72 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<MergeToSourceAsync>d__40 | 73.68 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<SynchronizeDestinationAsync>d__58 | 73.91 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<PushBranchAsync>d__41 | 75 % |
-| Softwareschmiede.Domain.ValueObjects.RepositoryLinkInfo | 75 % |
-| Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<CloneRepositoryAsync>d__29 | 75.51 % |
-| Softwareschmiede.Application.Services.GitWorkspaceBrowserService/<LoadSnapshotAsync>d__3 | 76.56 % |
+| Testsuite | Zeilenabdeckung | Branchabdeckung | Zeilen (bedeckt/valid) |
+|-----------|-----------------|-----------------|----------------------|
+| Unit Tests | 28,35 % | 63,83 % | 4359 / 15371 |
+| Integration Tests | 44,55 % | 8,83 % | 8133 / 18255 |
 
 ## Fehlende Tests
 
-Quelle: `Coverage-Daten`
+**Quelle:** Coverage-Daten
 
-### Dateien mit 0% Abdeckung (96 Dateien insgesamt)
+### Migrations (0% Abdeckung)
+Migrationen sind generierte EF Core-Dateien, die ausgeschlossen werden können:
 
-- `Softwareschmiede.Application.Services.AppEinstellungService` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AppEinstellungService/<GetBoolSettingAsync>d__12` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AppEinstellungService/<GetIntSettingAsync>d__11` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AppEinstellungService/<GetSettingAsync>d__10` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AppEinstellungService/<GetWindowGeometryAsync>d__16` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AppEinstellungService/<SetSettingAsync>d__13` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AppEinstellungService/<SetWindowGeometryAsync>d__17` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AufgabeService/<ArchivierenAsync>d__15` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AufgabeService/<GetArchiviertByProjektAsync>d__4` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.AufgabeService/<GetLatestDiffResultIdAsync>d__7` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.BenachrichtigungsAuditService` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.BenachrichtigungsAuditService/<LogAsync>d__3` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.BenachrichtigungsService` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.BenachrichtigungsService/<DispatchAsync>d__6` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.BenachrichtigungsService/<DispatchFuerKanalAsync>d__9` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.BenachrichtigungsService/<PlayAudioAsync>d__8` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.BenachrichtigungsService/<SchreibeTemporaereAudioDateiAsync>d__10` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.CliProcessManager` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.DiffService/<GetDiffAsync>d__8` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.DiffService/<GetDiffCountAsync>d__13` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.DiffService/<GetDiffsByAufgabeAsync>d__9` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.DiffService/<InvalidateDiffCacheAsync>d__14` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.DiffService/<SearchDiffsAsync>d__11` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.DiffService/<SearchDiffsAsync>d__12` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.DiffStatistics` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.EntwicklungsprozessService/<PullDurchfuehrenAsync>d__15` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.EntwicklungsprozessService/<PullRequestErstellenAsync>d__16` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.EntwicklungsprozessService/<ResetDurchfuehrenAsync>d__13` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.KiAufgabenAbschlussEreignis` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.KiAufgabenBenachrichtigungsHub` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.KiAufgabenBenachrichtigungsHub/<PublishAsync>d__4` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.KiAufgabenBenachrichtigungsHub/Subscription` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.KiAusfuehrungsService/<WaitForExitAsync>d__19` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.PluginSettingsService` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.SuggestionInfo` — 0 % Abdeckung
-- `Softwareschmiede.Application.Services.WindowGeometrySettings` — 0 % Abdeckung
-- `Softwareschmiede.Domain.Entities.BenachrichtigungsDispatchLog` — 0 % Abdeckung
-- `Softwareschmiede.Domain.Entities.PluginKonfiguration` — 0 % Abdeckung
-- `Softwareschmiede.Domain.Interfaces.IGitPlugin` — 0 % Abdeckung
-- `Softwareschmiede.Domain.ValueObjects.AgentInfo` — 0 % Abdeckung
-- `Softwareschmiede.Domain.ValueObjects.FileTreeNode` — 0 % Abdeckung
-- `Softwareschmiede.Domain.ValueObjects.WorkspaceNodeRow` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Plugins.ClaudeCliPlugin/<CheckHealthAsync>d__13` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Plugins.GitHubCopilotPlugin/<CheckHealthAsync>d__14` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<CommitAsync>d__34` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<CreateBranchAsync>d__30` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Plugins.LocalDirectoryPlugin/<ResetAsync>d__35` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.AgentPackageFileService` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.AgentPackageFileService/<CreateEmptyFileAsync>d__12` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.AgentPackageFileService/<ReadFileAsync>d__10` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.AgentPackageFileService/<UploadFileAsync>d__13` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.AgentPackageFileService/<WriteFileAsync>d__11` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.BenutzerkontextService` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliRunner` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliRunner/<>c__DisplayClass3_0` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliRunner/<RunAsync>d__2` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliRunner/<StreamAsync>d__3` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliSessionService` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliSessionService/<DrainStderrLoop>d__7` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliSessionService/<ReadOutputLoop>d__6` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.CliSessionService/<StartAsync>d__5` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.ProcessWindowEmbedder` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.ProcessWindowEmbedder/<EmbedProcessWindowAsync>d__13` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.ProcessWindowEmbedder/<WaitForMainWindowHandleAsync>d__15` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.SystemShutdownService` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.SystemShutdownService/<RequestShutdownAsync>d__2` — 0 % Abdeckung
-- `Softwareschmiede.Infrastructure.Services.WindowsCredentialStore` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202507_Fix_DateTimeOffset_SQLiteOrdering` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202605090001_Add_AppEinstellung_Workdir` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202605141200_AddRepositoryStartKonfiguration` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202605161100_RemoveStartScriptArguments` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202605161130_RemoveRepositoryStartPortSettings` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202605171230_AddDiffComparison` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202605230001_AddTaskRecoveryIndicators` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202605241703_AddKiPluginPrefix` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202606011955_AddTaskPromptSuggestionColumns` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202606100001_UpdateAufgabeStatusEnum` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202606100002_UpdateBenachrichtigungsEnums` — 0 % Abdeckung
-- `Softwareschmiede.Migrations._202606100003_AddWindowGeometrySettings` — 0 % Abdeckung
-- `Softwareschmiede.Migrations.AddKiTaskNotifications` — 0 % Abdeckung
-- `Softwareschmiede.Migrations.InitialCreate` — 0 % Abdeckung
-- `Softwareschmiede.Migrations.SoftwareschmiededDbContextModelSnapshot` — 0 % Abdeckung
+- `src\Softwareschmiede\Migrations\20260506195327_InitialCreate.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260506195327_InitialCreate.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260507051631_202507_Fix_DateTimeOffset_SQLiteOrdering.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260507051631_202507_Fix_DateTimeOffset_SQLiteOrdering.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260509200234_202605090001_Add_AppEinstellung_Workdir.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260509200234_202605090001_Add_AppEinstellung_Workdir.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260514114235_202605141200_AddRepositoryStartKonfiguration.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260514114235_202605141200_AddRepositoryStartKonfiguration.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260516085728_202605161100_RemoveStartScriptArguments.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260516085728_202605161100_RemoveStartScriptArguments.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260516093219_202605161130_RemoveRepositoryStartPortSettings.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260516093219_202605161130_RemoveRepositoryStartPortSettings.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260522192947_202605171230_AddDiffComparison.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260522192947_202605171230_AddDiffComparison.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260523052722_202605230001_AddTaskRecoveryIndicators.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260523052722_202605230001_AddTaskRecoveryIndicators.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260523113807_AddKiTaskNotifications.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260523113807_AddKiTaskNotifications.Designer.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260524151645_202605241703_AddKiPluginPrefix.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\20260524151645_202605241703_AddKiPluginPrefix.Designer.cs` — 0% Abdeckung
+
+### Entry Points (0% Abdeckung)
+Entry Points werden von Tests nicht direkt aufgerufen (erwartet):
+
+- `src\Softwareschmiede.Client\Program.cs` — 0% Abdeckung (WPF-Client-Einstiegspunkt)
+- `src\Softwareschmiede\Program.cs` — 0% Abdeckung (Web-Einstiegspunkt)
+
+### Infrastructure Services (0% Abdeckung in Integration Tests)
+Services ohne direkte Abdeckung in den erfassten Tests:
+
+- `src\Softwareschmiede\Infrastructure\Services\AgentPackageReader.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Infrastructure\Services\BenutzerkontextService.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Infrastructure\Services\CliRunner.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Infrastructure\Services\CliSessionService.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Infrastructure\Services\SystemShutdownService.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Infrastructure\Services\WindowsCredentialStore.cs` — 0% Abdeckung
+
+### Value Objects & Models (0% Abdeckung in Integration Tests)
+Domain Value Objects und Models:
+
+- `src\Softwareschmiede\Domain\ValueObjects\BranchCommit.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Domain\ValueObjects\FilePreview.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Domain\ValueObjects\WorkspaceFileNode.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Domain\ValueObjects\WorkspaceFileStatus.cs` — 0% Abdeckung
+
+### Other (0% Abdeckung in Integration Tests)
+
+- `src\Softwareschmiede\Infrastructure\Plugins\PluginManager.cs` — 0% Abdeckung
+- `src\Softwareschmiede\Migrations\SoftwareschmiededDbContextModelSnapshot.cs` — 0% Abdeckung (EF Core Snapshot)
 
 ## Hinweise
 
-- **Test-Runner:** .NET (dotnet test mit XPlat Code Coverage)
-- **Testsuite 1:** Softwareschmiede.Tests (352 Tests)
-- **Testsuite 2:** Softwareschmiede.IntegrationTests (86 Tests)
-- **Gesamtlaufzeit:** 12.4 Sekunden
-- **Abdeckung:** Die gesamte Codeabdeckung liegt bei 27.14 %, was unter dem idealen Threshold von 80 % liegt. Dies ist erwartbar bei einem neuen WPF-Feature (Branch 72-wpf), da die neuen Desktop-Komponenten noch nicht getestet sind. Die Migrationsdateien und neue Services (AppEinstellungService, WindowGeometrySettings, ProcessWindowEmbedder, etc.) haben 0 % Abdeckung und sollten priorisiert werden, wenn weitere Tests geplant sind.
+1. **Alle Tests erfolgreich** — Keine Regressionen erkannt.
+2. **Migrationen** — EF Core-Migrationsdateien haben erwartungsgemäß 0% Coverage (generierte Code, nicht getestet).
+3. **Entry Points** — `Program.cs`-Dateien sind Einstiegspunkte und werden von Unit/Integration Tests nicht direkt ausgeführt.
+4. **Infrastructure Services** — Einige Infrastruktur-Services haben keine expliziten Tests. Dies erfordert eine separate Code-Review zur Bestätigung, ob Tests notwendig sind.
+5. **Coverage Varianz** — Die Abdeckung unterscheidet sich zwischen Unit Tests (28%) und Integration Tests (44%), da Integration Tests mehr produktiven Code ausführen.

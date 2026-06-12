@@ -1,7 +1,101 @@
 <UserControl x:Class="Softwareschmiede.App.Views.PluginSettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Softwareschmiede.App.Views"
              Background="{DynamicResource BackgroundBrush}">
+    <UserControl.Resources>
+        <local:PluginSettingFieldTemplateSelector x:Key="FieldTemplateSelector">
+            <!-- Text -->
+            <local:PluginSettingFieldTemplateSelector.TextTemplate>
+                <DataTemplate>
+                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                             Width="320"
+                             HorizontalAlignment="Left"
+                             Background="{DynamicResource SurfaceBrush}"
+                             Foreground="{DynamicResource PrimaryTextBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             Padding="4,2" />
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.TextTemplate>
+            <!-- Secret -->
+            <local:PluginSettingFieldTemplateSelector.SecretTemplate>
+                <DataTemplate>
+                    <PasswordBox x:Name="SecretBox"
+                                 Width="320"
+                                 HorizontalAlignment="Left"
+                                 Background="{DynamicResource SurfaceBrush}"
+                                 Foreground="{DynamicResource PrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource BorderBrush}"
+                                 Padding="4,2" />
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.SecretTemplate>
+            <!-- URL -->
+            <local:PluginSettingFieldTemplateSelector.UrlTemplate>
+                <DataTemplate>
+                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                             Width="320"
+                             HorizontalAlignment="Left"
+                             Background="{DynamicResource SurfaceBrush}"
+                             Foreground="{DynamicResource PrimaryTextBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             Padding="4,2" />
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.UrlTemplate>
+            <!-- Integer -->
+            <local:PluginSettingFieldTemplateSelector.IntegerTemplate>
+                <DataTemplate>
+                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                             Width="120"
+                             HorizontalAlignment="Left"
+                             Background="{DynamicResource SurfaceBrush}"
+                             Foreground="{DynamicResource PrimaryTextBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             Padding="4,2" />
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.IntegerTemplate>
+            <!-- Boolean -->
+            <local:PluginSettingFieldTemplateSelector.BooleanTemplate>
+                <DataTemplate>
+                    <CheckBox IsChecked="{Binding BoolValue, UpdateSourceTrigger=PropertyChanged}"
+                              Foreground="{DynamicResource PrimaryTextBrush}" />
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.BooleanTemplate>
+            <!-- Enum -->
+            <local:PluginSettingFieldTemplateSelector.EnumTemplate>
+                <DataTemplate>
+                    <ComboBox SelectedValue="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                              ItemsSource="{Binding Field.EnumOptions}"
+                              Width="220"
+                              HorizontalAlignment="Left"
+                              Background="{DynamicResource SurfaceBrush}"
+                              Foreground="{DynamicResource PrimaryTextBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" />
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.EnumTemplate>
+            <!-- FilePath -->
+            <local:PluginSettingFieldTemplateSelector.FilePathTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="280"
+                                 Background="{DynamicResource SurfaceBrush}"
+                                 Foreground="{DynamicResource PrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource BorderBrush}"
+                                 Padding="4,2"
+                                 VerticalAlignment="Center" />
+                        <Button Content="…"
+                                Width="28"
+                                Margin="4,0,0,0"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                Click="OnDateiAuswaehlenClick" />
+                    </StackPanel>
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.FilePathTemplate>
+        </local:PluginSettingFieldTemplateSelector>
+    </UserControl.Resources>
+
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -55,17 +149,8 @@
                                                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                                                            FontSize="12"
                                                                            Margin="0,0,0,2" />
-                                                                <PasswordBox x:Name="SecretBox"
-                                                                             Width="320"
-                                                                             HorizontalAlignment="Left"
-                                                                             Visibility="Collapsed" />
-                                                                <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
-                                                                         Width="320"
-                                                                         HorizontalAlignment="Left"
-                                                                         Background="{DynamicResource SurfaceBrush}"
-                                                                         Foreground="{DynamicResource PrimaryTextBrush}"
-                                                                         BorderBrush="{DynamicResource BorderBrush}"
-                                                                         Padding="4,2" />
+                                                                <ContentControl Content="{Binding}"
+                                                                                ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
                                                                 <TextBlock Text="{Binding Field.Description}"
                                                                            FontSize="11"
                                                                            Foreground="{DynamicResource SecondaryTextBrush}"

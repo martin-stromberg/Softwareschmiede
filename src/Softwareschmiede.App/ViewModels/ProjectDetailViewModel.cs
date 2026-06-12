@@ -8,7 +8,7 @@ using Softwareschmiede.Domain.Entities;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für die Projektdetailansicht mit Aufgabenliste.</summary>
-public sealed class ProjectDetailViewModel : ViewModelBase
+public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 {
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
@@ -57,7 +57,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase
     public ViewModelBase? SelectedTaskViewModel
     {
         get => _selectedTaskViewModel;
-        private set => SetProperty(ref _selectedTaskViewModel, value);
+        private set
+        {
+            if (_selectedTaskViewModel is IDisposable disposable)
+                disposable.Dispose();
+            SetProperty(ref _selectedTaskViewModel, value);
+        }
     }
 
     /// <summary>Liste der Aufgaben des Projekts.</summary>
@@ -156,5 +161,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase
             _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe.");
             FehlerMeldung = $"Fehler: {ex.Message}";
         }
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_selectedTaskViewModel is IDisposable disposable)
+            disposable.Dispose();
     }
 }

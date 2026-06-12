@@ -3,7 +3,6 @@ using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
-using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.App.ViewModels;
 
@@ -99,15 +98,7 @@ public sealed class DashboardViewModel : ViewModelBase
             foreach (var projekt in projekte.Take(5))
                 LetzteProjects.Add(projekt);
 
-            var aktiveCount = 0;
-            var wartendCount = 0;
-            foreach (var projekt in projekte)
-            {
-                var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id, ct);
-                aktiveCount += aufgaben.Count(a => a.Status == AufgabeStatus.InArbeit);
-                wartendCount += aufgaben.Count(a => a.Status == AufgabeStatus.Wartend);
-            }
-
+            var (aktiveCount, wartendCount) = await _aufgabeService.GetAktiveUndWartendeCountAsync(ct);
             AktiveAufgaben = aktiveCount;
             WartendAufgaben = wartendCount;
         }

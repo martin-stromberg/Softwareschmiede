@@ -11,15 +11,40 @@ namespace Softwareschmiede.App.ViewModels;
 public sealed class PluginSettingEntry : ViewModelBase
 {
     private string _value = string.Empty;
+    private bool _boolValue;
 
     /// <summary>Feld-Definition des Einstellungsfelds.</summary>
     public PluginSettingField Field { get; }
 
-    /// <summary>Aktueller Wert des Felds.</summary>
+    /// <summary>Feldt-Typ des Einstellungsfelds (Shortcut zu Field.FieldType).</summary>
+    public PluginSettingFieldType FieldType => Field.FieldType;
+
+    /// <summary>Aktueller Wert des Felds als Zeichenkette.</summary>
     public string Value
     {
         get => _value;
-        set => SetProperty(ref _value, value);
+        set
+        {
+            if (SetProperty(ref _value, value) && Field.FieldType == PluginSettingFieldType.Boolean)
+            {
+                _boolValue = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+                OnPropertyChanged(nameof(BoolValue));
+            }
+        }
+    }
+
+    /// <summary>Aktueller Wert als Boolean (für Checkbox-Binding bei FieldType == Boolean).</summary>
+    public bool BoolValue
+    {
+        get => _boolValue;
+        set
+        {
+            if (SetProperty(ref _boolValue, value))
+            {
+                _value = value ? "true" : "false";
+                OnPropertyChanged(nameof(Value));
+            }
+        }
     }
 
     /// <inheritdoc cref="PluginSettingEntry"/>
@@ -27,6 +52,7 @@ public sealed class PluginSettingEntry : ViewModelBase
     {
         Field = field;
         _value = currentValue ?? string.Empty;
+        _boolValue = string.Equals(_value, "true", StringComparison.OrdinalIgnoreCase);
     }
 }
 

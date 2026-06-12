@@ -167,6 +167,17 @@ public sealed class ProtokollService
     /// Parst einen Rate-Limit-Marker aus einer CLI-Ausgabezeile.
     /// Format: <c>[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601_DATETIME]]</c>
     /// </summary>
+    /// <returns>Tuple: gefunden, optionaler Vorschlagsprompt (null), optionaler Reset-Zeitpunkt.</returns>
+    public static (bool Found, string? Prompt, DateTimeOffset? ResetUtc) ParseRateLimitMarker(string outputLine)
+    {
+        var found = TryParseRateLimitMarker(outputLine, out var resetUtc);
+        return (found, null, resetUtc);
+    }
+
+    /// <summary>
+    /// Parst einen Rate-Limit-Marker aus einer CLI-Ausgabezeile.
+    /// Format: <c>[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601_DATETIME]]</c>
+    /// </summary>
     /// <returns><c>true</c> wenn ein Marker gefunden wurde; <c>resetUtc</c> enthält den Zeitstempel oder <c>null</c> wenn kein gültiger Zeitstempel vorliegt.</returns>
     public static bool TryParseRateLimitMarker(string outputLine, out DateTimeOffset? resetUtc)
     {

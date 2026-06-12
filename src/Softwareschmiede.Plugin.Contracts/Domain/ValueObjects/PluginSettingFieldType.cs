@@ -19,5 +19,8 @@ public enum PluginSettingFieldType
     Boolean,
 
     /// <summary>Auswahl über feste Werte (Select).</summary>
-    Enum
+    Enum,
+
+    /// <summary>Dateipfad mit Datei-Auswahl-Dialog.</summary>
+    FilePath
 }

@@ -1,47 +1,38 @@
 # Offene Aufgaben
 
-Erstellt am: 2026-06-11
-Abbruchgrund: Maximale Iterationsanzahl erreicht
+Erstellt am: 2026-06-12
+Abbruchgrund: Kein Fortschritt zwischen den letzten zwei Iterationen
 
 Die folgenden Aufgaben konnten im automatisierten Zyklus nicht abgeschlossen werden
 und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 
 ## Offene Planelemente
 
-- [ ] ProtokollService: Methode `ParseRateLimitMarker(outputLine) → (bool, string?, DateTimeOffset?)` optional als öffentliche Methode extrahieren (aktuell inline in `EntwicklungsprozessService`)
-- [ ] DarkModeService: ViewModels müssen `DarkModeChanged`-Event abonnieren und UI aktualisieren
-- [ ] Audio-Dateipfad-Konfiguration: `PluginSettingsView` soll Audio-Datei-Auswahl ermöglichen
-- [ ] Fenster-Geometrie-Persistierung: `MainWindow.xaml.cs` muss beim Laden Geometrie via `GetWindowGeometryAsync()` restaurieren und beim Schließen via `SetWindowGeometryAsync()` speichern
-- [ ] PluginSettingsView: Prüfen, ob alle `PluginSettingFieldType`-Werte (String, Integer, Boolean, File-Path etc.) in der automatischen UI-Generierung unterstützt werden
-- [ ] NavigationViewModel: Menu-Toggle-Logik (Einklappbarkeit des Seitenmenüs) prüfen und ggf. implementieren
+- [ ] `ProcessWindowEmbedder` Service — fehlt vollständig. Laut Plan sollte ein separater Service vorhanden sein, der Win32-API-Wrapper zur Fenster-Identifikation und Einbettung mit Fallback auf separates Fenster (HWND_TOPMOST) bereitstellt.
+- [ ] `CliKiPluginBase` — neue Methoden implementieren: `BuildProcessStartInfo(localRepoPath, parameters) → ProcessStartInfo` und `ExtractWindowTitleFromProcess(process) → string`; alte Methoden (`BuildContextFilePath`, `GetLatestContextFilePath`, `ClearContextFiles` etc.) entfernen.
+- [ ] `IKiPlugin` entfernte Methoden überprüfen — alte Implementierungen in Plugin-Klassen (GitHub-Plugin, Claude CLI Plugin, Local Directory Plugin) auf neues Interface angepasst?
+- [ ] `EntwicklungsprozessService` vereinfachen — `StartDevelopmentAsync` entfernen (falls noch vorhanden), Fokus nur auf Git-Setup und Rate-Limit-Parsing; Kontextkomprimierungs-Logik prüfen.
+- [ ] Status-Validierungslogik in `AufgabeService.ValidateStatusTransition()` — Validierungsregeln verifizieren: nur Übergänge Neu→ArbeitsverzeichnisEingerichtet→Gestartet→InArbeit→(Beendet|Wartend); * → Archiviert.
+- [ ] `StartenAsync()` — Status muss zu `ArbeitsverzeichnisEingerichtet` führen (nicht `InBearbeitung`).
+- [ ] `AbschliessenAsync()` — Status muss zu `Beendet` führen (nicht `Abgeschlossen`).
+- [ ] `BenachrichtigungsService.ShowBannerAsync()` — echte Windows Notifications API implementieren (aktuell nur Logging-Fallback).
+- [ ] Tests für neue Status-Transitions ergänzen: `TestNewStatusEnum`, `TestStatusTransitions`, `TestCliStartAsync`, `TestProcessWindowEmbedding`, `TestHeartbeatUpdate`, `TestRecoveryCandidates`, `TestRateLimitMarkerParsing`.
+- [ ] Bestehende Tests anpassen: `AufgabeServiceTests`, `KiAusfuehrungsServiceTests`, `AufgabeRecoveryServiceTests`, `EntwicklungsprozessServiceTests`, Plugin-Tests — auf neue Enums/Methoden-Signaturen aktualisieren.
+- [ ] Blazor-Code-Entfernung prüfen — bestehende Blazor-Komponenten aus dem Repo entfernen (falls noch vorhanden).
 
 ## Code-Review-Befunde
 
-- [ ] `src/Softwareschmiede.App/App.xaml.cs:88` — PluginManager ist als konkreter Typ registriert, nicht als IPluginManager; PluginSelectionService wirft InvalidOperationException beim DI-Auflösen. Außerdem fehlen IGitPlugin, IBenutzerkontextService, IArbeitsverzeichnisResolver und PluginDefaultSettingsService im Container.
-- [ ] `src/Softwareschmiede/Application/Services/CliProcessManager.cs:38` — Timer-Callback ist async void; unkontrollierte Exceptions aus UpdateHeartbeatAsync reißen den Prozess ab.
-- [ ] `src/Softwareschmiede.App/App.xaml.cs:25` — OnStartup ist async void; Exceptions aus `_host.StartAsync()` landen als unhandledException ohne Fehlerdialog.
-- [ ] `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs:45` — TOCTOU-Race zwischen IsRunning-Prüfung und `_handles[aufgabeId]`-Zugriff bei gleichzeitigem Dispose oder Doppelstart.
-- [ ] `src/Softwareschmiede/Application/Services/BenachrichtigungsService.cs:207` — Temporäre Audiodateien (`softwareschmiede-audio-<guid>.mp3`) werden niemals gelöscht; dauerhaftes Leck im Temp-Verzeichnis.
-- [ ] `src/Softwareschmiede.App/Controls/ProcessWindowHost.cs:97` — `ResizeEmbeddedWindow` setzt `SWP_SHOWWINDOW` ohne `SWP_NOACTIVATE`; jede Größenänderung stiehlt den Tastaturfokus vom WPF-Bereich.
-- [ ] `src/Softwareschmiede.App/ViewModels/TaskDetailViewModel.cs:91` — Nach CLI-Start via `KannCliStarten` wird der Aufgabenstatus nicht auf `InArbeit` gesetzt; Status läuft auseinander und `AufgabeRecoveryService` findet die Aufgabe nicht.
-- [ ] `src/Softwareschmiede.App/Services/WpfAudioService.cs:29` — `Dispatcher.InvokeAsync`-Rückgabewert wird verworfen; bei Shutdown-Zustand des Dispatchers wartet der Aufrufer unendlich auf `tcs.Task`.
-- [ ] `src/Softwareschmiede.App/ViewModels/DashboardViewModel.cs:104` — N+1-Datenbankabfragen in `LadenAsync`: eine Query pro Projekt für aktive Aufgaben; bei 50 Projekten = 51 Rundtrips.
-- [ ] `src/Softwareschmiede.App/ViewModels/MainWindowViewModel.cs:68` — `DarkModeChanged`-Event wird im Konstruktor abonniert, aber nie abgemeldet; Singleton hält Referenz auf transiente ViewModel-Instanzen.
-
-## Fehlende E2E-Tests (aus Plan, Pflicht)
-
-Die folgenden E2E-Testklassen sind im Plan als Pflicht definiert, aber nicht implementiert:
-
-- [ ] `ProjectE2ETests` — Projekt erstellen und Aufgabe hinzufügen
-- [ ] `TaskStartupE2ETests` — Aufgabe starten → Repository klonen → Branch erstellen; Status-Übergang `ArbeitsverzeichnisEingerichtet` → `Gestartet`
-- [ ] `CliEmbeddingE2ETests` — CLI-Prozess starten und Fenster in WPF-Control einbetten
-- [ ] `ProtocolLoggingE2ETests` — Stdout-Streaming und Protokoll-Eintrag in UI
-- [ ] `RateLimitDetectionE2ETests` — Marker erkennen, Vorschlag speichern, Status → `Wartend`
-- [ ] `RecoveryE2ETests` — App startet, erkennt `InArbeit`/`Wartend`-Aufgaben, zeigt Recovery-Banner
-- [ ] `DarkModeE2ETests` — Dark Mode aktivieren, persistieren, beim Neustart wiederherstellen
-- [ ] `NotificationE2ETests` — Status-Wechsel triggert Banner/Audio basierend auf Modus
-- [ ] `PluginSettingsE2ETests` — Plugin-Einstellung speichern, verschlüsseln, beim Reload laden
-- [ ] `WindowGeometryE2ETests` — Fensterposition verschieben/skalieren und beim Neustart wiederherstellen
+- [ ] `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs` — Double-checked Locking mit Lücke in `StartCliAsync`: Semaphor wird zwischen erster Prüfung und `process.Start()` freigegeben; zwei parallele Aufrufe für dieselbe aufgabeId können beide die erste Prüfung passieren. Semaphor über die gesamte Operation halten.
+- [ ] `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs` — `IsCliRunning` ist ein reiner Middle-Man-Wrapper auf `IsRunning` ohne eigene Logik. Entfernen, Aufrufer direkt auf `IsRunning` zeigen lassen.
+- [ ] `src/Softwareschmiede/Application/Services/CliProcessManager.cs` — `AufgabeService` (Scoped) direkt in Singleton `CliProcessManager` injiziert → Scope-Leak / de facto Singleton-DbContext. `IServiceScopeFactory` injizieren und pro Heartbeat-Tick einen neuen Scope erzeugen und verwerfen.
+- [ ] `src/Softwareschmiede/Application/Services/CliProcessManager.cs` — `AktualisierungDurchfuehren` ist redundante Wrapper-Methode um Fire-and-forget. Direkt `_ = AktualisierungAsync(aufgabeId)` im Timer-Callback; Wrapper entfernen.
+- [ ] `src/Softwareschmiede.App/ViewModels/ProjectDetailViewModel.cs` — `ProjektId`-Setter startet `LadenAsync(CancellationToken.None)` fire-and-forget ohne Abbruchmechanismus. CancellationTokenSource-Muster analog zu `TaskDetailViewModel.AufgabeId` implementieren.
+- [ ] `src/Softwareschmiede.App/ViewModels/TaskListViewModel.cs` — `ProjektId`-Setter identisches Fire-and-forget-Problem. CancellationTokenSource-Muster anwenden; IDisposable implementieren.
+- [ ] `src/Softwareschmiede.App/ViewModels/SettingsViewModel.cs` — `IsDarkMode`-Setter ruft `_darkModeService.SetDarkModeAsync(value, CancellationToken.None)` fire-and-forget auf. Toggle ausschließlich über `MainWindowViewModel.ToggleDarkModeCommand` steuern; `IsDarkMode` im SettingsViewModel als read-only Property belassen.
+- [ ] `src/Softwareschmiede/Infrastructure/Services/CliSessionService.cs` — Namenskonventionen: `sealed` fehlt, doppelter `using System.Diagnostics`, kein `ICliSessionService`-Interface, hardcodierte CLI-Kommandos in switch-Anweisung. Code bereinigen und Interface extrahieren.
+- [ ] `src/Softwareschmiede/Infrastructure/Services/CliSessionService.cs` — `ReadOutputLoop`: keine Exception-Behandlung; `IOException` bei Prozessabbruch terminiert den Loop ohne Log. try/catch mit Logging ergänzen.
+- [ ] `src/Softwareschmiede/Application/Services/AppEinstellungService.cs` — `GetWindowGeometryAsync` führt 4 sequenzielle DB-Queries aus. In eine Abfrage zusammenfassen (`WHERE Schluessel IN (...) + ToDictionaryAsync`).
+- [ ] `src/Softwareschmiede.App/Controls/ProcessWindowHost.cs` — `SetLastError = true` fehlt bei `SetParent`, `SetWindowPos`, `GetWindowLong`, `SetWindowLong`. Ergänzen und Rückgabewerte nach dem Aufruf prüfen; bei Fehler loggen.
 
 ## Fehlgeschlagene Tests
 

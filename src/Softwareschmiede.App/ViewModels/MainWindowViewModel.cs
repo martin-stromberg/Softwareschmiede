@@ -5,7 +5,7 @@ using Softwareschmiede.App.Services;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für das Hauptfenster: Navigation und Dark-Mode-Toggle.</summary>
-public sealed class MainWindowViewModel : ViewModelBase
+public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
@@ -97,5 +97,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void OnDarkModeChanged(bool enabled)
     {
         IsDarkMode = enabled;
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _darkModeService.DarkModeChanged -= OnDarkModeChanged;
     }
 }

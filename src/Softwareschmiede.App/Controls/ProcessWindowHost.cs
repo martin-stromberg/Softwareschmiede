@@ -53,6 +53,10 @@ public sealed class ProcessWindowHost : HwndHost
             IntPtr.Zero,
             IntPtr.Zero);
 
+        if (_hostHandle == IntPtr.Zero)
+            throw new InvalidOperationException(
+                $"CreateWindowEx ist fehlgeschlagen (Win32-Fehler: {System.Runtime.InteropServices.Marshal.GetLastWin32Error()}).");
+
         if (_embeddedHandle != IntPtr.Zero)
             EmbedWindow(_embeddedHandle);
 
@@ -107,7 +111,7 @@ public sealed class ProcessWindowHost : HwndHost
             IntPtr.Zero,
             0, 0,
             width, height,
-            0x0040 | 0x0010); // SWP_SHOWWINDOW | SWP_NOACTIVATE
+            0x0010); // SWP_NOACTIVATE
     }
 
     private static class NativeMethods
@@ -127,7 +131,7 @@ public sealed class ProcessWindowHost : HwndHost
         [DllImport("user32.dll")]
         public static extern bool DestroyWindow(IntPtr hWnd);
 
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr CreateWindowEx(
             int dwExStyle,
             string lpClassName,
