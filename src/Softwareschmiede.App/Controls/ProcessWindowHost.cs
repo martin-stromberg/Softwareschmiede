@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using Microsoft.Extensions.Logging;
 
 namespace Softwareschmiede.App.Controls;
 
@@ -16,6 +17,11 @@ public sealed class ProcessWindowHost : HwndHost
 
     private IntPtr _embeddedHandle = IntPtr.Zero;
     private IntPtr _hostHandle = IntPtr.Zero;
+
+    private ILogger? _logger;
+
+    /// <summary>Setzt den Logger für Win32-Fehlermeldungen.</summary>
+    public void SetLogger(ILogger logger) => _logger = logger;
 
     /// <summary>Dependency Property für das einzubettende Fenster-Handle.</summary>
     public static readonly DependencyProperty EmbeddedHandleProperty =
@@ -55,7 +61,7 @@ public sealed class ProcessWindowHost : HwndHost
 
         if (_hostHandle == IntPtr.Zero)
             throw new InvalidOperationException(
-                $"CreateWindowEx ist fehlgeschlagen (Win32-Fehler: {System.Runtime.InteropServices.Marshal.GetLastWin32Error()}).");
+                $"CreateWindowEx ist fehlgeschlagen (Win32-Fehler: {Marshal.GetLastWin32Error()}).");
 
         if (_embeddedHandle != IntPtr.Zero)
             EmbedWindow(_embeddedHandle);
@@ -68,7 +74,14 @@ public sealed class ProcessWindowHost : HwndHost
     {
         if (_embeddedHandle != IntPtr.Zero)
         {
-            NativeMethods.SetParent(_embeddedHandle, IntPtr.Zero);
+            var result = NativeMethods.SetParent(_embeddedHandle, IntPtr.Zero);
+            if (result == IntPtr.Zero)
+            {
+                _logger?.LogWarning(
+                    "SetParent beim Trennen fehlgeschlagen (Win32-Fehler: {ErrorCode}).",
+                    Marshal.GetLastWin32Error());
+            }
+
             _embeddedHandle = IntPtr.Zero;
         }
 
@@ -91,44 +104,93 @@ public sealed class ProcessWindowHost : HwndHost
             return;
 
         var style = NativeMethods.GetWindowLong(handle, GWL_STYLE);
-        style = (style | WS_CHILD) & ~0x00C00000; // Entfernt WS_CAPTION und WS_THICKFRAME
-        NativeMethods.SetWindowLong(handle, GWL_STYLE, style);
+        if (style == 0)
+        {
+            _logger?.LogWarning(
+                "GetWindowLong fehlgeschlagen (Win32-Fehler: {ErrorCode}).",
+                Marshal.GetLastWin32Error());
+        }
 
-        NativeMethods.SetParent(handle, _hostHandle);
+        style = (style | WS_CHILD) & ~0x00C00000; // Entfernt WS_CAPTION und WS_THICKFRAME
+        var setLongResult = NativeMethods.SetWindowLong(handle, GWL_STYLE, style);
+        if (setLongResult == 0)
+        {
+            var errorCode = Marshal.GetLastWin32Error();
+            if (errorCode != 0)
+            {
+                _logger?.LogWarning(
+                    "SetWindowLong fehlgeschlagen (Win32-Fehler: {ErrorCode}).",
+                    errorCode);
+            }
+        }
+
+        var parentResult = NativeMethods.SetParent(handle, _hostHandle);
+        if (parentResult == IntPtr.Zero)
+        {
+            _logger?.LogWarning(
+                "SetParent fehlgeschlagen (Win32-Fehler: {ErrorCode}). Fallback auf AlwaysOnTop.",
+                Marshal.GetLastWin32Error());
+            SetAlwaysOnTopFallback(handle);
+            return;
+        }
+
         ResizeEmbeddedWindow();
+    }
+
+    private static void SetAlwaysOnTopFallback(IntPtr handle)
+    {
+        var hwndTopmost = new IntPtr(-1); // HWND_TOPMOST
+        NativeMethods.SetWindowPos(handle, hwndTopmost, 0, 0, 800, 600, 0x0002 | 0x0001); // SWP_NOMOVE | SWP_NOSIZE ignoriert
     }
 
     private void ResizeEmbeddedWindow()
     {
-        if (_embeddedHandle == IntPtr.Zero || _hostHandle == IntPtr.Zero)
+        if (_hostHandle == IntPtr.Zero)
             return;
 
-        var width = (int)ActualWidth;
-        var height = (int)ActualHeight;
+        var width = Math.Max(1, (int)ActualWidth);
+        var height = Math.Max(1, (int)ActualHeight);
 
         NativeMethods.SetWindowPos(
+            _hostHandle,
+            IntPtr.Zero,
+            0, 0,
+            width, height,
+            0x0010 | 0x0002); // SWP_NOACTIVATE | SWP_NOMOVE
+
+        if (_embeddedHandle == IntPtr.Zero)
+            return;
+
+        var result = NativeMethods.SetWindowPos(
             _embeddedHandle,
             IntPtr.Zero,
             0, 0,
             width, height,
             0x0010); // SWP_NOACTIVATE
+
+        if (!result)
+        {
+            _logger?.LogWarning(
+                "SetWindowPos fehlgeschlagen (Win32-Fehler: {ErrorCode}).",
+                Marshal.GetLastWin32Error());
+        }
     }
 
     private static class NativeMethods
     {
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern bool DestroyWindow(IntPtr hWnd);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

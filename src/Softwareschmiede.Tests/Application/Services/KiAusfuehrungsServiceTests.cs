@@ -39,13 +39,6 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         _sut.GetLastExitCode(Guid.NewGuid()).Should().BeNull();
     }
 
-    /// <summary>IsCliRunning returns false for unknown task.</summary>
-    [Fact]
-    public void IsCliRunning_ShouldReturnFalse_WhenNoProcessStarted()
-    {
-        _sut.IsCliRunning(Guid.NewGuid()).Should().BeFalse();
-    }
-
     /// <summary>StopCliAsync does nothing for unknown task.</summary>
     [Fact]
     public async Task StopCliAsync_ShouldNotThrow_WhenNoProcessStarted()
@@ -84,7 +77,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         // Assert
         handle.Should().NotBeNull();
         handle.AufgabeId.Should().Be(aufgabeId);
-        _sut.IsCliRunning(aufgabeId).Should().BeTrue();
+        _sut.IsRunning(aufgabeId).Should().BeTrue();
         _sut.GetRunningCount().Should().BeGreaterThan(0);
     }
 

@@ -63,6 +63,8 @@ public sealed partial class App : System.Windows.Application
 
         await _host.StartAsync();
 
+        _host.Services.GetRequiredService<CliProcessManager>();
+
         using (var scope = _host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
@@ -78,8 +80,18 @@ public sealed partial class App : System.Windows.Application
     {
         if (_host is not null)
         {
-            await _host.StopAsync(TimeSpan.FromSeconds(10));
-            _host.Dispose();
+            try
+            {
+                await _host.StopAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Fehler beim Beenden des Hosts.");
+            }
+            finally
+            {
+                _host.Dispose();
+            }
         }
 
         Log.CloseAndFlush();
@@ -116,6 +128,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
+        services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();

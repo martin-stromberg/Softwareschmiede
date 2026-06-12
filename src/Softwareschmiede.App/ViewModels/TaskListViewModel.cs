@@ -9,7 +9,7 @@ using Softwareschmiede.Domain.Enums;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für die Aufgabenliste eines Projekts mit Filterung.</summary>
-public sealed class TaskListViewModel : ViewModelBase
+public sealed class TaskListViewModel : ViewModelBase, IDisposable
 {
     private readonly AufgabeService _aufgabeService;
     private readonly IServiceProvider _serviceProvider;
@@ -19,6 +19,7 @@ public sealed class TaskListViewModel : ViewModelBase
     private AufgabeStatus? _statusFilter;
     private bool _isLoading;
     private string? _fehlerMeldung;
+    private CancellationTokenSource? _ladenCts;
 
     /// <summary>Die Projekt-ID, deren Aufgaben angezeigt werden.</summary>
     public Guid ProjektId
@@ -27,7 +28,12 @@ public sealed class TaskListViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _projektId, value))
-                _ = LadenAsync(CancellationToken.None);
+            {
+                _ladenCts?.Cancel();
+                _ladenCts?.Dispose();
+                _ladenCts = new CancellationTokenSource();
+                _ = LadenAsync(_ladenCts.Token);
+            }
         }
     }
 
@@ -128,5 +134,12 @@ public sealed class TaskListViewModel : ViewModelBase
             : AlleAufgaben;
         foreach (var aufgabe in quelle)
             GefiltereAufgaben.Add(aufgabe);
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _ladenCts?.Cancel();
+        _ladenCts?.Dispose();
     }
 }

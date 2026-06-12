@@ -102,14 +102,30 @@ public sealed class AppEinstellungService
     public Task SetBoolSettingAsync(string schluessel, bool wert, CancellationToken ct = default)
         => SetSettingAsync(schluessel, wert.ToString(), ct);
 
-    /// <summary>Liest alle Fenstergeometrie-Einstellungen auf einmal.</summary>
+    /// <summary>Liest alle Fenstergeometrie-Einstellungen in einer einzigen Datenbankabfrage.</summary>
     public async Task<WindowGeometrySettings> GetWindowGeometryAsync(CancellationToken ct = default)
     {
-        var x = await GetIntSettingAsync(WindowPositionXKey, ct);
-        var y = await GetIntSettingAsync(WindowPositionYKey, ct);
-        var width = await GetIntSettingAsync(WindowWidthKey, ct);
-        var height = await GetIntSettingAsync(WindowHeightKey, ct);
-        return new WindowGeometrySettings(x, y, width, height);
+        var keys = new[]
+        {
+            WindowPositionXKey,
+            WindowPositionYKey,
+            WindowWidthKey,
+            WindowHeightKey
+        };
+
+        var werte = await _db.AppEinstellungen
+            .AsNoTracking()
+            .Where(s => keys.Contains(s.Schluessel))
+            .ToDictionaryAsync(s => s.Schluessel, s => s.Wert, ct);
+
+        static int? ParseInt(Dictionary<string, string?> d, string key)
+            => d.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : null;
+
+        return new WindowGeometrySettings(
+            ParseInt(werte, WindowPositionXKey),
+            ParseInt(werte, WindowPositionYKey),
+            ParseInt(werte, WindowWidthKey),
+            ParseInt(werte, WindowHeightKey));
     }
 
     /// <summary>Speichert alle Fenstergeometrie-Einstellungen auf einmal.</summary>

@@ -20,6 +20,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private bool _isLoading;
     private string? _fehlerMeldung;
     private ViewModelBase? _selectedTaskViewModel;
+    private CancellationTokenSource? _ladenCts;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -28,7 +29,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         set
         {
             if (SetProperty(ref _projektId, value))
-                _ = LadenAsync(CancellationToken.None);
+            {
+                _ladenCts?.Cancel();
+                _ladenCts?.Dispose();
+                _ladenCts = new CancellationTokenSource();
+                _ = LadenAsync(_ladenCts.Token);
+            }
         }
     }
 
@@ -166,6 +172,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        _ladenCts?.Cancel();
+        _ladenCts?.Dispose();
         if (_selectedTaskViewModel is IDisposable disposable)
             disposable.Dispose();
     }

@@ -11,7 +11,11 @@ public sealed class NavigationViewModel : ViewModelBase
     public bool IsExpanded
     {
         get => _isExpanded;
-        set => SetProperty(ref _isExpanded, value);
+        set
+        {
+            if (SetProperty(ref _isExpanded, value))
+                OnPropertyChanged(nameof(NavigationWidth));
+        }
     }
 
     /// <summary>Gibt die Breite des Navigationsbereichs zurück (expandiert oder eingeklappt).</summary>

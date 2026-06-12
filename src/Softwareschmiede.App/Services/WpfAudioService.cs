@@ -69,14 +69,17 @@ public sealed class WpfAudioService : IBenachrichtigungsAudioService
             }
         });
 
-        if (dispatcherOp.Status == System.Windows.Threading.DispatcherOperationStatus.Aborted)
+        dispatcherOp.Aborted += (_, _) =>
         {
             _logger.LogDebug("Dispatcher-Operation wurde abgebrochen – Audio übersprungen: {FilePath}", filePath);
+            tcs.TrySetCanceled();
+        };
+
+        if (dispatcherOp.Status == System.Windows.Threading.DispatcherOperationStatus.Aborted)
+        {
             tcs.TrySetCanceled(ct);
             return;
         }
-
-        dispatcherOp.Aborted += (_, _) => tcs.TrySetCanceled();
 
         await tcs.Task;
     }

@@ -65,13 +65,13 @@ public sealed class DarkModeService
         if (_isDarkMode == enabled)
             return;
 
-        _isDarkMode = enabled;
-        ApplyTheme(enabled);
-        DarkModeChanged?.Invoke(enabled);
-
         using var scope = _scopeFactory.CreateScope();
         var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
         await einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, enabled, ct);
+
+        _isDarkMode = enabled;
+        ApplyTheme(enabled);
+        DarkModeChanged?.Invoke(enabled);
         _logger.LogInformation("Dark Mode {Status}.", enabled ? "aktiviert" : "deaktiviert");
     }
 

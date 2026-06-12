@@ -25,10 +25,10 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void IsCliRunning_GibtFalse_WennKeinProzessGestartet()
+    public void IsRunning_GibtFalse_WennKeinProzessGestartet()
     {
         var aufgabeId = Guid.NewGuid();
-        _kiService.IsCliRunning(aufgabeId).Should().BeFalse();
+        _kiService.IsRunning(aufgabeId).Should().BeFalse();
     }
 
     [Fact]

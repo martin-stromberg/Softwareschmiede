@@ -29,15 +29,11 @@ public sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _arbeitsverzeichnis, value);
     }
 
-    /// <summary>Gibt an, ob Dark Mode aktiviert ist.</summary>
+    /// <summary>Gibt an, ob Dark Mode aktiviert ist (read-only; Toggle über MainWindowViewModel.ToggleDarkModeCommand).</summary>
     public bool IsDarkMode
     {
         get => _isDarkMode;
-        set
-        {
-            if (SetProperty(ref _isDarkMode, value))
-                _ = _darkModeService.SetDarkModeAsync(value, CancellationToken.None);
-        }
+        private set => SetProperty(ref _isDarkMode, value);
     }
 
     /// <summary>Standard-KI-Plugin-Prefix.</summary>
@@ -94,7 +90,7 @@ public sealed class SettingsViewModel : ViewModelBase
         _logger = logger;
 
         _isDarkMode = _darkModeService.IsDarkMode;
-        _darkModeService.DarkModeChanged += enabled => SetProperty(ref _isDarkMode, enabled, nameof(IsDarkMode));
+        _darkModeService.DarkModeChanged += enabled => IsDarkMode = enabled;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync);

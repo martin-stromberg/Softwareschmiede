@@ -52,54 +52,38 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
                 return existing;
             }
-        }
-        finally
-        {
-            _startLock.Release();
-        }
 
-        _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} starten.", aufgabeId);
+            var psi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct);
 
-        var psi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct);
+            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} starten.", aufgabeId);
 
-        var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            var handle = new CliProcessHandle(aufgabeId, process);
 
-        var handle = new CliProcessHandle(aufgabeId, process);
-
-        await _startLock.WaitAsync(ct);
-        try
-        {
-            if (_handles.TryGetValue(aufgabeId, out var existing) && !existing.Process.HasExited)
+            process.Exited += (_, _) =>
             {
-                process.Dispose();
-                _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} wurde bereits gestartet – zweiter Start abgewiesen.", aufgabeId);
-                return existing;
-            }
+                _logger.LogInformation(
+                    "CLI-Prozess für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
+                    aufgabeId,
+                    TryGetExitCode(process));
+                RaiseRunningCountChanged();
+                CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
+            };
 
             _handles[aufgabeId] = handle;
+
+            process.Start();
+
+            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
+            RaiseRunningCountChanged();
+            CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
+
+            return handle;
         }
         finally
         {
             _startLock.Release();
         }
-
-        process.Exited += (_, _) =>
-        {
-            _logger.LogInformation(
-                "CLI-Prozess für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
-                aufgabeId,
-                TryGetExitCode(process));
-            RaiseRunningCountChanged();
-            CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
-        };
-
-        process.Start();
-
-        _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
-        RaiseRunningCountChanged();
-        CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
-
-        return handle;
     }
 
     /// <summary>Stoppt den laufenden CLI-Prozess für eine Aufgabe (SIGTERM → 5s → Kill).</summary>
@@ -133,9 +117,6 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             _logger.LogError(ex, "Fehler beim Beenden des CLI-Prozesses für Aufgabe {AufgabeId}.", aufgabeId);
         }
     }
-
-    /// <summary>Prüft ob der CLI-Prozess für eine Aufgabe läuft.</summary>
-    public bool IsCliRunning(Guid aufgabeId) => IsRunning(aufgabeId);
 
     /// <summary>Gibt den Exit-Code des letzten Prozesses zurück.</summary>
     public int? GetLastExitCode(Guid aufgabeId)
@@ -182,8 +163,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
     private void RaiseRunningCountChanged()
     {
-        RunningCountChanged?.Invoke(0, GetRunningCount());
+        var previous = _previousRunningCount;
+        var current = GetRunningCount();
+        _previousRunningCount = current;
+        RunningCountChanged?.Invoke(previous, current);
     }
+
+    private int _previousRunningCount;
 
     private static int? TryGetExitCode(Process process)
     {

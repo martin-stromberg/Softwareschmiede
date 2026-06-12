@@ -186,7 +186,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
-            IsCliRunning = _kiService.IsCliRunning(_aufgabeId);
+            IsCliRunning = _kiService.IsRunning(_aufgabeId);
 
             var protokolleintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, ct);
             Protokolleintraege.Clear();

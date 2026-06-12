@@ -12,6 +12,7 @@ public sealed class BenachrichtigungsService
     private readonly BenachrichtigungsEinstellungenService _einstellungenService;
     private readonly BenachrichtigungsAuditService _auditService;
     private readonly IBenachrichtigungsAudioService? _audioService;
+    private readonly IBenachrichtigungsBannerService? _bannerService;
     private readonly IBenutzerkontextService _benutzerkontextService;
     private readonly ILogger<BenachrichtigungsService> _logger;
 
@@ -21,13 +22,15 @@ public sealed class BenachrichtigungsService
         BenachrichtigungsAuditService auditService,
         IBenutzerkontextService benutzerkontextService,
         ILogger<BenachrichtigungsService> logger,
-        IBenachrichtigungsAudioService? audioService = null)
+        IBenachrichtigungsAudioService? audioService = null,
+        IBenachrichtigungsBannerService? bannerService = null)
     {
         _einstellungenService = einstellungenService;
         _auditService = auditService;
         _benutzerkontextService = benutzerkontextService;
         _logger = logger;
         _audioService = audioService;
+        _bannerService = bannerService;
     }
 
     /// <summary>
@@ -64,15 +67,20 @@ public sealed class BenachrichtigungsService
 
     /// <summary>
     /// Zeigt eine Banner-Benachrichtigung für eine Aufgabe an.
-    /// Die Darstellung hängt von der Plattform ab (WPF: eigenes Toast-Fenster, Fallback: Log).
+    /// Delegiert an <see cref="IBenachrichtigungsBannerService"/> sofern verfügbar; sonst Logging-Fallback.
     /// </summary>
-    public Task ShowBannerAsync(Guid aufgabeId, string message, CancellationToken ct = default)
+    public async Task ShowBannerAsync(Guid aufgabeId, string message, CancellationToken ct = default)
     {
+        if (_bannerService is not null)
+        {
+            await _bannerService.ShowAsync(message, ct);
+            return;
+        }
+
         _logger.LogInformation(
             "Banner-Benachrichtigung für Aufgabe {AufgabeId}: {Message}",
             aufgabeId,
             message);
-        return Task.CompletedTask;
     }
 
     /// <summary>

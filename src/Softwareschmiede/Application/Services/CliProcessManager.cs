@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Softwareschmiede.Application.Services;
@@ -10,7 +11,7 @@ namespace Softwareschmiede.Application.Services;
 public sealed class CliProcessManager : IDisposable
 {
     private readonly KiAusfuehrungsService _kiService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CliProcessManager> _logger;
 
     private readonly ConcurrentDictionary<Guid, Timer> _heartbeatTimers = new();
@@ -19,11 +20,11 @@ public sealed class CliProcessManager : IDisposable
     /// <summary>Erstellt eine neue Instanz des <see cref="CliProcessManager"/>.</summary>
     public CliProcessManager(
         KiAusfuehrungsService kiService,
-        AufgabeService aufgabeService,
+        IServiceScopeFactory scopeFactory,
         ILogger<CliProcessManager> logger)
     {
         _kiService = kiService;
-        _aufgabeService = aufgabeService;
+        _scopeFactory = scopeFactory;
         _logger = logger;
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
@@ -35,7 +36,7 @@ public sealed class CliProcessManager : IDisposable
         StopHeartbeat(aufgabeId);
 
         var timer = new Timer(
-            _ => AktualisierungDurchfuehren(aufgabeId),
+            _ => _ = AktualisierungAsync(aufgabeId),
             null,
             HeartbeatInterval,
             HeartbeatInterval);
@@ -54,23 +55,21 @@ public sealed class CliProcessManager : IDisposable
         }
     }
 
-    private void AktualisierungDurchfuehren(Guid aufgabeId)
-    {
-        _ = AktualisierungAsync(aufgabeId);
-    }
-
     private async Task AktualisierungAsync(Guid aufgabeId)
     {
         try
         {
-            if (!_kiService.IsCliRunning(aufgabeId))
+            if (!_kiService.IsRunning(aufgabeId))
             {
                 StopHeartbeat(aufgabeId);
                 return;
             }
 
             _kiService.UpdateHeartbeat(aufgabeId);
-            await _aufgabeService.UpdateHeartbeatAsync(aufgabeId);
+
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+            await aufgabeService.UpdateHeartbeatAsync(aufgabeId);
         }
         catch (Exception ex)
         {
