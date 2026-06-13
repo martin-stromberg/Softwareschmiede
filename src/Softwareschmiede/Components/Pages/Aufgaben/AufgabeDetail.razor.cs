@@ -65,16 +65,16 @@ public partial class AufgabeDetail : IDisposable
     private bool IsAufgabeRegisterAktiv => _activeRegister == AufgabeDetailRegister.Aufgabe;
     private bool IsAusfuehrungRegisterAktiv => _activeRegister == AufgabeDetailRegister.Ausfuehrung;
     private bool IsProjektverzeichnisRegisterAktiv => _activeRegister == AufgabeDetailRegister.Projektverzeichnis;
-    private bool KannRepositoryAktionenAusfuehren => _aufgabe?.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv;
-    private bool KannAufgabeAbschliessen => _aufgabe?.Status == AufgabeStatus.InBearbeitung;
-    private bool KannAufgabeAbbrechen => _aufgabe?.Status == AufgabeStatus.InBearbeitung;
+    private bool KannRepositoryAktionenAusfuehren => _aufgabe?.Status is AufgabeStatus.Gestartet or AufgabeStatus.InArbeit;
+    private bool KannAufgabeAbschliessen => _aufgabe?.Status == AufgabeStatus.Gestartet;
+    private bool KannAufgabeAbbrechen => _aufgabe?.Status == AufgabeStatus.Gestartet;
     private string? AktuellesCliName => ResolveCliName();
     private string? AktuellesWorkingDirectory =>
         !string.IsNullOrWhiteSpace(_aufgabe?.LokalerKlonPfad)
             ? _aufgabe.LokalerKlonPfad
             : _workspaceSnapshot?.RepositoryPath;
     private bool ShowCliTerminal =>
-        _aufgabe?.Status == AufgabeStatus.InBearbeitung
+        _aufgabe?.Status == AufgabeStatus.Gestartet
         && !string.IsNullOrWhiteSpace(AktuellesCliName)
         && !string.IsNullOrWhiteSpace(AktuellesWorkingDirectory);
     private string AnlagezeitpunktText => _aufgabe?.ErstellungsDatum.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "–";
@@ -82,13 +82,13 @@ public partial class AufgabeDetail : IDisposable
     private string AusfuehrungsdauerText => BuildAusfuehrungsdauerText();
     private string LetzterAusfuehrungsstatusText => _aufgabe?.Status switch
     {
-        AufgabeStatus.KiAktiv => "Läuft",
-        AufgabeStatus.Abgeschlossen => "Erfolgreich",
-        AufgabeStatus.Fehlgeschlagen => "Fehlgeschlagen",
+        AufgabeStatus.InArbeit => "Läuft",
+        AufgabeStatus.Beendet => "Abgeschlossen",
         AufgabeStatus.Archiviert => "Archiviert",
-        AufgabeStatus.TestsLaufen => "Tests laufen",
-        AufgabeStatus.InBearbeitung => "Bereit",
-        AufgabeStatus.Offen => "Noch nicht gestartet",
+        AufgabeStatus.Wartend => "Wartend",
+        AufgabeStatus.Gestartet => "Bereit",
+        AufgabeStatus.Neu => "Noch nicht gestartet",
+        AufgabeStatus.ArbeitsverzeichnisEingerichtet => "Arbeitsverzeichnis eingerichtet",
         _ => "–"
     };
 
@@ -218,7 +218,7 @@ public partial class AufgabeDetail : IDisposable
     }
 
     private bool IsStreamingContainerVisible
-        => _aufgabe?.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0;
+        => _aufgabe?.Status == AufgabeStatus.InArbeit && _streamingLines.Count > 0;
 
     private bool IsHistoryContainerVisible => _protokoll.Count > 0;
 
@@ -530,7 +530,7 @@ public partial class AufgabeDetail : IDisposable
         _statusResetAllowed = false;
         _statusResetDisabledReason = null;
 
-        if (_aufgabe is null || _aufgabe.Status != AufgabeStatus.KiAktiv)
+        if (_aufgabe is null || _aufgabe.Status != AufgabeStatus.InArbeit)
         {
             return;
         }
@@ -824,7 +824,6 @@ public partial class AufgabeDetail : IDisposable
                 repo.RepositoryUrl,
                 string.IsNullOrEmpty(_selectedBranchName) ? null : _selectedBranchName,
                 repo.PluginTyp,
-                string.IsNullOrWhiteSpace(_selectedKiPluginPrefix) ? null : _selectedKiPluginPrefix,
                 _cts.Token);
             _showStartDialog = false;
             _erfolg = "Entwicklungsumgebung erfolgreich gestartet.";
@@ -1583,9 +1582,9 @@ public partial class AufgabeDetail : IDisposable
 
         try
         {
-            if (_aufgabe is null || _aufgabe.Status != AufgabeStatus.KiAktiv)
+            if (_aufgabe is null || _aufgabe.Status != AufgabeStatus.InArbeit)
             {
-                throw new InvalidOperationException("Status zurücksetzen ist nur für Aufgaben im Status 'KI Aktiv' verfügbar.");
+                throw new InvalidOperationException("Status zurücksetzen ist nur für Aufgaben im Status 'In Arbeit' verfügbar.");
             }
 
             var isRunning = RunningAutomationStatusSource.IsRunning(_aufgabe.Id);
@@ -1594,7 +1593,7 @@ public partial class AufgabeDetail : IDisposable
                 throw new InvalidOperationException("Status kann nicht zurückgesetzt werden, solange die Verarbeitung läuft.");
             }
 
-            await AufgabeService.KiAbgeschlossenAsync(Id, _cts.Token);
+            await AufgabeService.StatusSetzenAsync(Id, AufgabeStatus.Gestartet, _cts.Token);
             _erfolg = "Status wurde zurückgesetzt. Eine neue Anfrage kann jetzt gesendet werden.";
             await LadeAsync();
         }
@@ -1700,7 +1699,7 @@ public partial class AufgabeDetail : IDisposable
         _showAbbrechenConfirm = false;
         try
         {
-            await EntwicklungsprozessService.AbbrechenAsync(Id, _cts.Token);
+            await AufgabeService.AbschliessenAsync(Id, _cts.Token);
             _erfolg = "Aufgabe abgebrochen.";
             await LadeAsync();
         }

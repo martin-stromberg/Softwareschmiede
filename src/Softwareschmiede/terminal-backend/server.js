@@ -18,9 +18,11 @@ wss.on("connection", (socket) => {
 
             console.log("Starting shell in:", cwd);
 
-            const shell = os.platform() === "win32" ? "powershell.exe" : "bash";
+            const isWindows = os.platform() === "win32";
+            const shell = isWindows ? "powershell.exe" : "bash";
+            const shellArgs = isWindows ? ["-NoExit"] : [];
 
-            ptyProcess = pty.spawn(shell, ["-NoExit"], {
+            ptyProcess = pty.spawn(shell, shellArgs, {
                 name: "xterm-color",
                 cols: 120,
                 rows: 30,

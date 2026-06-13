@@ -7,24 +7,24 @@
 
     private string GetCssClass() => Status switch
     {
-        AufgabeStatus.Offen => "badge-offen",
-        AufgabeStatus.InBearbeitung => "badge-in-bearbeitung",
-        AufgabeStatus.KiAktiv => "badge-ki-aktiv",
-        AufgabeStatus.TestsLaufen => "badge-tests-laufen",
-        AufgabeStatus.Abgeschlossen => "badge-abgeschlossen",
-        AufgabeStatus.Fehlgeschlagen => "badge-fehlgeschlagen",
+        AufgabeStatus.Neu => "badge-offen",
+        AufgabeStatus.ArbeitsverzeichnisEingerichtet => "badge-in-bearbeitung",
+        AufgabeStatus.Gestartet => "badge-in-bearbeitung",
+        AufgabeStatus.InArbeit => "badge-ki-aktiv",
+        AufgabeStatus.Wartend => "badge-tests-laufen",
+        AufgabeStatus.Beendet => "badge-abgeschlossen",
         AufgabeStatus.Archiviert => "badge-archiviert",
         _ => ""
     };
 
     private string GetLabel() => Status switch
     {
-        AufgabeStatus.Offen => "Offen",
-        AufgabeStatus.InBearbeitung => "In Bearbeitung",
-        AufgabeStatus.KiAktiv => "KI Aktiv",
-        AufgabeStatus.TestsLaufen => "Tests laufen",
-        AufgabeStatus.Abgeschlossen => "Abgeschlossen",
-        AufgabeStatus.Fehlgeschlagen => "Fehlgeschlagen",
+        AufgabeStatus.Neu => "Neu",
+        AufgabeStatus.ArbeitsverzeichnisEingerichtet => "Eingerichtet",
+        AufgabeStatus.Gestartet => "Gestartet",
+        AufgabeStatus.InArbeit => "In Arbeit",
+        AufgabeStatus.Wartend => "Wartend",
+        AufgabeStatus.Beendet => "Beendet",
         AufgabeStatus.Archiviert => "Archiviert",
         _ => Status.ToString()
     };

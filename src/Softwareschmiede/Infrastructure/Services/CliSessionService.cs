@@ -59,10 +59,10 @@ public sealed class CliSessionService : ICliSessionService
 
         try
         {
-            while (!_process.HasExited)
+            string? line;
+            while ((line = await _process.StandardOutput.ReadLineAsync()) != null)
             {
-                var line = await _process.StandardOutput.ReadLineAsync();
-                if (line != null && _onOutput != null)
+                if (_onOutput != null)
                     await _onOutput(line + "\n");
             }
         }
@@ -83,9 +83,8 @@ public sealed class CliSessionService : ICliSessionService
 
         try
         {
-            while (!_process.HasExited)
+            while (await _process.StandardError.ReadLineAsync() != null)
             {
-                await _process.StandardError.ReadLineAsync();
             }
         }
         catch (IOException ex)

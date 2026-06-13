@@ -53,6 +53,7 @@
 
                 <!-- Navigation Items -->
                 <Button Command="{Binding NavigateToDashboardCommand}"
+                        AutomationProperties.Name="Dashboard"
                         Margin="4,2"
                         Padding="8,8"
                         Background="Transparent"
@@ -67,6 +68,7 @@
                 </Button>
 
                 <Button Command="{Binding NavigateToProjectListCommand}"
+                        AutomationProperties.Name=" Projekte"
                         Margin="4,2"
                         Padding="8,8"
                         Background="Transparent"
@@ -85,6 +87,7 @@
 
                 <!-- Dark Mode Toggle -->
                 <Button Command="{Binding ToggleDarkModeCommand}"
+                        AutomationProperties.Name=" Dark Mode"
                         Margin="4,2"
                         Padding="8,8"
                         Background="Transparent"
@@ -99,6 +102,7 @@
                 </Button>
 
                 <Button Command="{Binding NavigateToSettingsCommand}"
+                        AutomationProperties.Name=" Einstellungen"
                         Margin="4,2"
                         Padding="8,8"
                         Background="Transparent"

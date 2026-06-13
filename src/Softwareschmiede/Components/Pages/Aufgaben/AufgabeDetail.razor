@@ -58,7 +58,7 @@ else
         <div class="alert alert-info">@_recoveryDisabledReason</div>
     }
 
-    @if (_aufgabe.Status == AufgabeStatus.KiAktiv && !_statusResetAllowed && !string.IsNullOrWhiteSpace(_statusResetDisabledReason))
+    @if (_aufgabe.Status == AufgabeStatus.InArbeit && !_statusResetAllowed && !string.IsNullOrWhiteSpace(_statusResetDisabledReason))
     {
         <div class="alert alert-info">@_statusResetDisabledReason</div>
     }
@@ -69,7 +69,7 @@ else
             <button class="btn btn-secondary" @onclick="RepositoryStartskriptAusfuehrenAsync" disabled="@(_processing || !KannRepositoryAktionenAusfuehren)">▶️ Startskript ausführen</button>
             <button class="btn btn-success" @onclick="AbschliessenAsync" disabled="@(_processing || !KannAufgabeAbschliessen)">✅ Abschließen</button>
             <button class="btn btn-danger" @onclick="() => _showAbbrechenConfirm = true" disabled="@(_processing || !KannAufgabeAbbrechen)">🛑 Abbrechen</button>
-            @if (_aufgabe.Status == AufgabeStatus.Offen)
+            @if (_aufgabe.Status == AufgabeStatus.Neu)
             {
                 <button class="btn btn-primary" @onclick="StartDialogOeffnen" disabled="@_processing">🚀 Entwicklung starten</button>
                 <button class="btn btn-warning" @onclick="() => _showVerwerfenConfirm = true" disabled="@_processing">🗑️ Verwerfen</button>
@@ -83,7 +83,7 @@ else
                     🩹 Aufgabe wiederherstellen
                 </button>
             }
-            @if (_aufgabe.Status == AufgabeStatus.KiAktiv)
+            @if (_aufgabe.Status == AufgabeStatus.InArbeit)
             {
                 <button class="btn btn-warning"
                         @onclick="() => _showStatusResetConfirm = true"
@@ -96,7 +96,7 @@ else
             {
                 <button class="btn btn-ghost" @onclick="DiffAnzeigen">🔎 Diff anzeigen</button>
             }
-            @if (_aufgabe.Status is AufgabeStatus.Abgeschlossen or AufgabeStatus.Fehlgeschlagen or AufgabeStatus.Archiviert)
+            @if (_aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
             {
                 @if (_aufgabe.Status != AufgabeStatus.Archiviert)
                 {
@@ -110,7 +110,7 @@ else
             <div class="card">
                 <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
                     <span>📋 Anforderung</span>
-                    @if (_aufgabe.Status == AufgabeStatus.Offen && !_editAnforderung)
+                    @if (_aufgabe.Status == AufgabeStatus.Neu && !_editAnforderung)
                     {
                         <button class="btn btn-ghost" style="padding:.2rem .5rem;font-size:.8rem" @onclick="AnforderungBearbeitenStarten">✏️ Bearbeiten</button>
                     }
@@ -360,7 +360,7 @@ else
             <button class="btn btn-danger" @onclick="() => _showAbbrechenConfirm = true" disabled="@(_processing || !KannAufgabeAbbrechen)">🛑 Abbrechen</button>
         </div>
 
-        @if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)
+        @if (_aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.InArbeit)
         {
             <div class="card">
                 <div class="card-title">💬 KI-Anfrage</div>
@@ -464,7 +464,7 @@ else
             </div>
         }
 
-        @if (_aufgabe.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0)
+        @if (_aufgabe.Status == AufgabeStatus.InArbeit && _streamingLines.Count > 0)
         {
             <div class="card">
                 <div class="card-title"><div class="spinner" style="display:inline-block;width:12px;height:12px;margin-right:.5rem"></div> KI arbeitet...</div>

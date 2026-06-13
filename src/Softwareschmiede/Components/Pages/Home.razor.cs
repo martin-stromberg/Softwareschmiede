@@ -30,10 +30,10 @@ public partial class Home
             alleAufgaben.AddRange(aufgaben);
         }
 
-        _offeneAufgaben = alleAufgaben.Count(a => a.Status == AufgabeStatus.Offen);
-        _kiAktiveAufgaben = alleAufgaben.Count(a => a.Status == AufgabeStatus.KiAktiv);
+        _offeneAufgaben = alleAufgaben.Count(a => a.Status == AufgabeStatus.Neu);
+        _kiAktiveAufgaben = alleAufgaben.Count(a => a.Status == AufgabeStatus.InArbeit);
         _aktiveAufgaben = alleAufgaben
-            .Where(a => a.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv or AufgabeStatus.TestsLaufen)
+            .Where(a => a.Status is AufgabeStatus.Gestartet or AufgabeStatus.InArbeit or AufgabeStatus.Wartend)
             .OrderByDescending(a => a.ErstellungsDatum)
             .ToList();
 

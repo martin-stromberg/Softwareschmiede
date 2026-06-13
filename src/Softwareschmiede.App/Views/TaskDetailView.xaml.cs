@@ -21,7 +21,10 @@ public sealed partial class TaskDetailView : UserControl
         Unloaded += (_, _) =>
         {
             if (DataContext is TaskDetailViewModel vm)
+            {
                 vm.CliProzessGestartet -= OnCliProzessGestartet;
+                vm.Dispose();
+            }
         };
     }
 

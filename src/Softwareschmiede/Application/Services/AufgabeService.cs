@@ -224,6 +224,12 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
+        if (aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.InArbeit or AufgabeStatus.Wartend)
+        {
+            throw new InvalidOperationException(
+                $"Aufgabe {id} kann nicht gelöscht werden, da sie aktiv ist (Status: {aufgabe.Status}). Bitte zuerst abbrechen oder abschließen.");
+        }
+
         _db.Aufgaben.Remove(aufgabe);
         await _db.SaveChangesAsync(ct);
 

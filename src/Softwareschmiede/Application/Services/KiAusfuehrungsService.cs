@@ -62,17 +62,21 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
             process.Exited += (_, _) =>
             {
+                var exitCode = TryGetExitCode(process);
                 _logger.LogInformation(
                     "CLI-Prozess für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
                     aufgabeId,
-                    TryGetExitCode(process));
+                    exitCode);
                 RaiseRunningCountChanged();
-                CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
+                var status = exitCode.HasValue && exitCode.Value != 0
+                    ? CliProcessStatus.Fehler
+                    : CliProcessStatus.Gestoppt;
+                CliProcessStatusChanged?.Invoke(aufgabeId, status);
             };
 
-            _handles[aufgabeId] = handle;
-
             process.Start();
+
+            _handles[aufgabeId] = handle;
 
             _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
             RaiseRunningCountChanged();

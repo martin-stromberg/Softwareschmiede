@@ -15,7 +15,7 @@ namespace Softwareschmiede.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.16");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.17");
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.AppEinstellung", b =>
                 {
@@ -211,13 +211,13 @@ namespace Softwareschmiede.Migrations
                     b.Property<long>("AktualisiertAm")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("BannerModus")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("BenutzerId")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ToastModus")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("TonModus")
