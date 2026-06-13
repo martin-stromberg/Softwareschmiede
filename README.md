@@ -73,7 +73,7 @@ Stand: **2026-06-11**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen, Projektdetailansicht mit Ribbon-Menü und Repository-Verwaltung; Blazor-Ablösung noch ausstehend |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Blazor-Ablösung noch ausstehend |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -204,10 +204,12 @@ Die erweiterte Projektdetailansicht (`ProjectDetailView.xaml`) bietet eine volls
   - **Projekt:** Speichern und Löschen von Projektdaten
   - **Aufgaben:** Neue Aufgabe anlegen, Status-Filter für Aufgabenliste
   - **Repository:** Zuweisen von Repositories, Öffnen im Browser
-- **Projekt-Kachel:** Anzeige und Bearbeitung von Projektsymbol, Titel und Beschreibung
-- **Aufgaben-Kachel:** Filterbare Liste der Aufgaben des Projekts (Status: Alle, Aktiv, Archiviert)
+- **Projekt-Kachel:** Anzeige und Bearbeitung von Projektsymbol (📁), Titel und Beschreibung
+- **Aufgaben-Kachel:** Filterbare Liste der Aufgaben des Projekts (Filter: Alle, Aktiv, Archiviert)
 - **Repository-Zuweisungs-Dialog:** Wahl und Zuweisung aus bestehenden Repositories (`RepositoryAssignDialog`, `RepositoryAssignViewModel`)
-- **Konsistente UX:** Ansicht für Projektanlage und -bearbeitung (Status "Neu" bei Anlage)
+- **Konsistente UX:** Ansicht für Projektanlage und -bearbeitung (Status "Neu" bei Anlage, bearbeitbare Felder)
+- **Validierung:** Projektname erforderlich, max. 100 Zeichen; Beschreibung max. 500 Zeichen
+- **Bestätigungsdialog:** MessageBox-Bestätigung vor dem Löschen eines Projekts
 
 **Neues Aufgaben-Statusmodell (WPF):**
 
@@ -830,6 +832,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **WPF-Projektdetailansicht (Feature #72):** Projektdetailansicht mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (Symbol, Titel, Beschreibung — bearbeitbar), Aufgaben-Kachel (filterbar nach Status), Repository-Zuweisungs-Dialog und E2E-Tests vollständig implementiert; README und Roadmap aktualisiert (**2026-06-13**)
 - **WPF-Migration (Feature #72):** `src/Softwareschmiede.App` als neues WPF-Projekt ergänzt — MVVM-Gerüst, Views, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Service, neues Aufgaben-Statusmodell (`Neu` → `ArbeitsverzeichnisEingerichtet` → `Gestartet` → `InArbeit` → `Wartend` → `Beendet`) in README dokumentiert (**2026-06-11**)
 - Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview”** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
 - Sollzustand vom **2026-05-25** eingearbeitet: **KI-Plugin Pflicht**, **Agentenpaket/Agent optional** in Voraussetzungen, Installation, Usage und Issue-58-Beschreibung vereinheitlicht
@@ -876,10 +879,11 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] Recovery-Banner (`RecoveryBannerControl`) und Status-Indikator (`StatusIndicatorControl`)
 - [x] Audio-Benachrichtigungen via `WpfAudioService` (WPF MediaPlayer)
 - [x] Plugin-DLL-Kopie via MSBuild-Target
+- [x] Projektdetailansicht mit Ribbon-Menü, Projekt-/Aufgaben-Kacheln und Repository-Verwaltung
+- [x] E2E-Tests für Projektdetailansicht (Bearbeitung, Löschen, Aufgaben, Repository-Verwaltung, Navigation)
 - [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
 - [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
 - [ ] Blazor-Code vollständig entfernt
-- [ ] E2E-Tests für WPF-UI-Workflows
 
 ### v2.x – Erweiterungen
 - [ ] GitLab-Plugin
