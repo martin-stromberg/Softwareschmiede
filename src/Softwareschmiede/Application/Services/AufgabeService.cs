@@ -330,7 +330,7 @@ public sealed class AufgabeService
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Schließt eine Aufgabe ab: Status → Beendet, AbschlussDatum setzen.</summary>
+    /// <summary>Schließt eine Aufgabe ab: Status → Beendet, AbschlussDatum setzen, Branch- und Klonpfad-Felder leeren.</summary>
     public async Task AbschliessenAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abschließen.", id);
@@ -340,6 +340,8 @@ public sealed class AufgabeService
 
         aufgabe.Status = AufgabeStatus.Beendet;
         aufgabe.AbschlussDatum = DateTimeOffset.UtcNow;
+        aufgabe.BranchName = null;
+        aufgabe.LokalerKlonPfad = null;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} abgeschlossen (Status: Beendet).", id);

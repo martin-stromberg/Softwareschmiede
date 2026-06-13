@@ -11,6 +11,13 @@ namespace Softwareschmiede.App.Services;
 /// </summary>
 public sealed class WpfBannerService : IBenachrichtigungsBannerService
 {
+    // Hinweis: Diese AppId muss als AUMID (Application User Model ID) in der Windows-Registry
+    // registriert sein, damit Toast-Benachrichtigungen funktionieren. Bei nicht-paketierten
+    // Installationen (ohne MSIX/AppX) ist die AUMID nicht automatisch registriert, was dazu führt,
+    // dass ToastNotificationManager.CreateToastNotifier() einen COM-Fehler wirft.
+    // Der Fehler wird in ShowAsync() abgefangen und protokolliert; die Anwendung läuft weiter,
+    // aber Toast-Benachrichtigungen erscheinen nicht. Für eine vollständige Unterstützung muss
+    // die Anwendung entweder als MSIX paketiert oder die AUMID manuell über die Registry registriert werden.
     private const string AppId = "Softwareschmiede";
 
     private readonly ILogger<WpfBannerService> _logger;

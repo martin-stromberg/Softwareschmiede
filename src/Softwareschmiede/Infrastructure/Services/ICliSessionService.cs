@@ -1,7 +1,7 @@
 namespace Softwareschmiede.Infrastructure.Services;
 
 /// <summary>Interface für den CLI-Session-Service.</summary>
-public interface ICliSessionService
+public interface ICliSessionService : IAsyncDisposable
 {
     /// <summary>Gibt an, ob der CLI-Prozess läuft.</summary>
     bool IsRunning { get; }
@@ -11,4 +11,7 @@ public interface ICliSessionService
 
     /// <summary>Sendet Eingabe an den CLI-Prozess.</summary>
     Task SendAsync(string input);
+
+    /// <summary>Stoppt den CLI-Prozess und räumt alle Ressourcen auf.</summary>
+    Task StopAsync();
 }

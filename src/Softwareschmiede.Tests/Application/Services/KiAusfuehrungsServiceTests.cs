@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
@@ -13,7 +14,8 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     public KiAusfuehrungsServiceTests()
     {
-        _sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance);
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        _sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
     }
 
     public void Dispose() => _sut.Dispose();

@@ -94,6 +94,8 @@ public sealed class AufgabeServiceTests
         loaded.AbschlussDatum.Should().NotBeNull();
         // Toleranz von 2 Sekunden, da DateTimeOffset als Unix-Millisekunden gespeichert wird (Präzisionsverlust < 1 ms)
         loaded.AbschlussDatum!.Value.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(2));
+        loaded.BranchName.Should().BeNull();
+        loaded.LokalerKlonPfad.Should().BeNull();
     }
 
     /// <summary>

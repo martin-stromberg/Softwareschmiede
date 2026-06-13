@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 
 namespace Softwareschmiede.Application.Services;
@@ -13,11 +15,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 {
     private readonly ConcurrentDictionary<Guid, CliProcessHandle> _handles = new();
     private readonly ILogger<KiAusfuehrungsService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
-    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger)
+    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
     /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
@@ -83,6 +87,12 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 var status = exitCode.HasValue && exitCode.Value != 0
                     ? CliProcessStatus.Fehler
                     : CliProcessStatus.Gestoppt;
+
+                if (status == CliProcessStatus.Fehler)
+                {
+                    _ = PersistFehlgeschlagenAsync(aufgabeId);
+                }
+
                 CliProcessStatusChanged?.Invoke(aufgabeId, status);
             };
 
@@ -175,6 +185,21 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
         _handles.Clear();
         _startLock.Dispose();
+    }
+
+    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+            await aufgabeService.StatusSetzenAsync(aufgabeId, AufgabeStatus.Beendet);
+            _logger.LogInformation("Aufgabe {AufgabeId}: Status nach Fehler auf Beendet gesetzt.", aufgabeId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Persistieren des Beendet-Status für Aufgabe {AufgabeId}.", aufgabeId);
+        }
     }
 
     private void RaiseRunningCountChanged()

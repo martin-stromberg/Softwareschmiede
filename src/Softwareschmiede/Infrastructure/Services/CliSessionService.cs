@@ -127,4 +127,42 @@ public sealed class CliSessionService : ICliSessionService
         _stdin?.Flush();
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc/>
+    public async Task StopAsync()
+    {
+        _loopCts?.Cancel();
+
+        try
+        {
+            if (_outputLoopTask is not null) await _outputLoopTask.ConfigureAwait(false);
+            if (_stderrLoopTask is not null) await _stderrLoopTask.ConfigureAwait(false);
+        }
+        catch { }
+
+        if (_process is not null && !_process.HasExited)
+        {
+            try
+            {
+                _process.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Fehler beim Beenden des CLI-Prozesses.");
+            }
+        }
+
+        _stdin?.Dispose();
+        _stdin = null;
+        _process?.Dispose();
+        _process = null;
+        _loopCts?.Dispose();
+        _loopCts = null;
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
+        await StopAsync().ConfigureAwait(false);
+    }
 }

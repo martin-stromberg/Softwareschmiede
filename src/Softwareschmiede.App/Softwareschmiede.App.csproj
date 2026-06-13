@@ -16,6 +16,15 @@
   <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
+    <!-- Plugin-Projekte als Build-Abhängigkeit ohne Assembly-Referenz, damit ihre DLLs vor dem CopyPluginsToOutput-Target vorliegen -->
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>

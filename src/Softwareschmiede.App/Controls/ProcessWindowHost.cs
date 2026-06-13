@@ -139,8 +139,11 @@ public sealed class ProcessWindowHost : HwndHost
 
     private static void SetAlwaysOnTopFallback(IntPtr handle)
     {
+        // SetParent ist fehlgeschlagen; als Fallback wird das Fenster als "Always on Top" gesetzt.
+        // SWP_NOMOVE (0x0002) und SWP_NOSIZE (0x0001) werden gesetzt, damit Position und Größe
+        // des Fensters unverändert bleiben – cx/cy-Parameter werden ignoriert.
         var hwndTopmost = new IntPtr(-1); // HWND_TOPMOST
-        NativeMethods.SetWindowPos(handle, hwndTopmost, 0, 0, 800, 600, 0x0002 | 0x0001); // SWP_NOMOVE | SWP_NOSIZE ignoriert
+        NativeMethods.SetWindowPos(handle, hwndTopmost, 0, 0, 0, 0, 0x0002 | 0x0001);
     }
 
     private void ResizeEmbeddedWindow()

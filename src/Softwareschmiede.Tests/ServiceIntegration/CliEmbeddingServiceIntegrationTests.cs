@@ -1,5 +1,7 @@
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Tests.Helpers;
@@ -15,7 +17,8 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     public CliEmbeddingServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance);
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
     }
 
     public void Dispose()

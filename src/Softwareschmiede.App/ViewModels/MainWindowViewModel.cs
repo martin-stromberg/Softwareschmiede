@@ -76,9 +76,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         NavigateToDashboard();
     }
 
+    private DashboardViewModel? _dashboardViewModel;
+
     private void NavigateToDashboard()
     {
-        CurrentView = _serviceProvider.GetRequiredService<DashboardViewModel>();
+        _dashboardViewModel ??= _serviceProvider.GetRequiredService<DashboardViewModel>();
+        CurrentView = _dashboardViewModel;
         Title = "Softwareschmiede – Dashboard";
     }
 
@@ -88,9 +91,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         Title = "Softwareschmiede – Projekte";
     }
 
+    private SettingsViewModel? _settingsViewModel;
+
     private void NavigateToSettings()
     {
-        CurrentView = _serviceProvider.GetRequiredService<SettingsViewModel>();
+        _settingsViewModel ??= _serviceProvider.GetRequiredService<SettingsViewModel>();
+        CurrentView = _settingsViewModel;
         Title = "Softwareschmiede – Einstellungen";
     }
 

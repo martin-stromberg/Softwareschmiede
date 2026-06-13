@@ -51,9 +51,18 @@ public sealed class WpfAudioService : IBenachrichtigungsAudioService
                 player.MediaFailed += (_, args) =>
                 {
                     _activePlayers.Remove(player);
-                    _logger.LogError("MediaPlayer-Fehler beim Abspielen von '{FilePath}': {Error}", filePath, args.ErrorException.Message);
-                    player.Close();
-                    tcs.TrySetException(args.ErrorException);
+                    if (args.ErrorException is not null)
+                    {
+                        _logger.LogError("MediaPlayer-Fehler beim Abspielen von '{FilePath}': {Error}", filePath, args.ErrorException.Message);
+                        player.Close();
+                        tcs.TrySetException(args.ErrorException);
+                    }
+                    else
+                    {
+                        _logger.LogError("MediaPlayer-Fehler beim Abspielen von '{FilePath}' (keine Ausnahme verfügbar).", filePath);
+                        player.Close();
+                        tcs.TrySetException(new InvalidOperationException($"MediaPlayer-Fehler beim Abspielen von '{filePath}'."));
+                    }
                 };
 
                 player.Open(new Uri(filePath, UriKind.Absolute));
@@ -69,6 +78,7 @@ public sealed class WpfAudioService : IBenachrichtigungsAudioService
             }
         });
 
+        // Aborted-Event vor Statusprüfung subscriben, um Race Condition zu vermeiden.
         dispatcherOp.Aborted += (_, _) =>
         {
             _logger.LogDebug("Dispatcher-Operation wurde abgebrochen – Audio übersprungen: {FilePath}", filePath);
