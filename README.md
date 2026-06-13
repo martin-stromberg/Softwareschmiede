@@ -73,7 +73,7 @@ Stand: **2026-06-11**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Blazor-Ablösung noch ausstehend |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen, Projektdetailansicht mit Ribbon-Menü und Repository-Verwaltung; Blazor-Ablösung noch ausstehend |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -183,6 +183,8 @@ Stand: **2026-06-11**
 
 Das Projekt `src/Softwareschmiede.App` enthält die neue native WPF-Oberfläche als Ablösung der Blazor-Anwendung:
 
+#### Kernfeatures
+
 - **MVVM-Architektur:** Alle Views besitzen eigene ViewModels (`ViewModelBase` mit `INotifyPropertyChanged`)
 - **Dark Mode:** `DarkModeService` wechselt WPF-ResourceDictionary zwischen `DarkTheme.xaml` und `LightTheme.xaml`
 - **CLI-Fenstereinbettung:** `ProcessWindowHost`-Control bettet CLI-Prozessfenster via Win32 `SetParent` in die WPF-UI ein
@@ -192,6 +194,20 @@ Das Projekt `src/Softwareschmiede.App` enthält die neue native WPF-Oberfläche 
 - **Eingebettetes DI:** Startup via `Microsoft.Extensions.Hosting` + `Microsoft.Extensions.DependencyInjection`
 - **Logging:** Serilog mit File- und Console-Sink
 - **Plugin-Kopie via MSBuild:** Nach dem Build werden Plugin-DLLs automatisch in `bin/<Config>/plugins/` kopiert
+
+#### Projektdetailansicht (neu)
+
+Die erweiterte Projektdetailansicht (`ProjectDetailView.xaml`) bietet eine vollständige Bearbeitungsoberfläche mit:
+
+- **Ribbon-Menü:** Gruppierte Aktionsleiste mit vier Gruppen:
+  - **Navigation:** Zurück-Button zur Projektübersicht
+  - **Projekt:** Speichern und Löschen von Projektdaten
+  - **Aufgaben:** Neue Aufgabe anlegen, Status-Filter für Aufgabenliste
+  - **Repository:** Zuweisen von Repositories, Öffnen im Browser
+- **Projekt-Kachel:** Anzeige und Bearbeitung von Projektsymbol, Titel und Beschreibung
+- **Aufgaben-Kachel:** Filterbare Liste der Aufgaben des Projekts (Status: Alle, Aktiv, Archiviert)
+- **Repository-Zuweisungs-Dialog:** Wahl und Zuweisung aus bestehenden Repositories (`RepositoryAssignDialog`, `RepositoryAssignViewModel`)
+- **Konsistente UX:** Ansicht für Projektanlage und -bearbeitung (Status "Neu" bei Anlage)
 
 **Neues Aufgaben-Statusmodell (WPF):**
 
@@ -593,7 +609,13 @@ Softwareschmiede/                            # Solution Root
 │   │   └── wwwroot/                         # Statische Assets (CSS, JS, Bilder)
 │   ├── Softwareschmiede.App/                # WPF-Desktopanwendung (net10.0-windows)
 │   │   ├── Views/                           # MainWindow, Dashboard-, Projekt-, Aufgaben-, Einstellungs-Views
+│   │   │   ├── ProjectDetailView.xaml       # Projektdetailansicht mit Ribbon-Menü und Kacheln
+│   │   │   ├── RepositoryAssignDialog.xaml # Dialog zur Repository-Zuweisung
+│   │   │   └── ...
 │   │   ├── ViewModels/                      # MVVM-ViewModels (ViewModelBase, MainWindowViewModel, ...)
+│   │   │   ├── ProjectDetailViewModel.cs    # ViewModel für Projektdetailansicht
+│   │   │   ├── RepositoryAssignViewModel.cs # ViewModel für Repository-Dialog
+│   │   │   └── ...
 │   │   ├── Controls/                        # ProcessWindowHost, StatusIndicatorControl, RecoveryBannerControl
 │   │   ├── Services/                        # DarkModeService, WpfAudioService
 │   │   ├── Themes/                          # DarkTheme.xaml, LightTheme.xaml
