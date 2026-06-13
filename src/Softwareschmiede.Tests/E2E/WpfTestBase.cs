@@ -1,4 +1,6 @@
 using System.IO;
+using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Conditions;
 using FlaUI.UIA3;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -84,6 +86,33 @@ public abstract class WpfTestBase : IDisposable
             // Temporäre DB-Datei bereinigen – Fehler ignorieren.
         }
     }
+
+    /// <summary>
+    /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> gefunden wird.
+    /// Wirft <see cref="TimeoutException"/>, wenn das Element nicht innerhalb von <paramref name="timeout"/> erscheint.
+    /// </summary>
+    protected static AutomationElement WaitForElement(
+        AutomationElement parent,
+        Func<ConditionFactory, ConditionBase> conditionFunc,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = parent.FindFirstDescendant(conditionFunc);
+            if (element is not null)
+                return element;
+            Thread.Sleep(200);
+        }
+        throw new TimeoutException(
+            $"Element wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
+    }
+
+    /// <summary>
+    /// Wartet, bis ein Top-Level-Fenster mit dem angegebenen Titel auf dem Desktop erscheint.
+    /// </summary>
+    protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
+        => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title), timeout);
 
     private static string ResolveAppExePath()
     {

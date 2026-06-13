@@ -8,13 +8,13 @@ und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 
 ## Offene Planelemente
 
-- [ ] E2E-Test: Projekt bearbeiten und speichern — fehlt vollständig
-- [ ] E2E-Test: Projekt löschen — fehlt vollständig
-- [ ] E2E-Test: Aufgabe neu anlegen — fehlt vollständig
-- [ ] E2E-Test: Aufgaben filtern — fehlt vollständig
-- [ ] E2E-Test: Repository zuweisen — fehlt vollständig
-- [ ] E2E-Test: Repository öffnen — fehlt vollständig
-- [ ] E2E-Test: Zurück zur Übersicht — fehlt vollständig
+- [x] E2E-Test: Projekt bearbeiten und speichern — `ProjectDetailE2ETests.ProjektBearbeitenUndSpeichern_AktualisierterNameBleibt_E2E`
+- [x] E2E-Test: Projekt löschen — `ProjectDetailE2ETests.ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E`
+- [x] E2E-Test: Aufgabe neu anlegen — `ProjectDetailE2ETests.AufgabeNeuAnlegen_ErscheintInAufgabenliste_E2E`
+- [x] E2E-Test: Aufgaben filtern — `ProjectDetailE2ETests.AufgabenFiltern_OverlayOeffnetUndSchliesst_E2E`
+- [x] E2E-Test: Repository zuweisen — `ProjectDetailE2ETests.RepositoryZuweisen_DialogOeffnetUndSchliessbarPerAbbrechen_E2E`
+- [x] E2E-Test: Repository öffnen — `ProjectDetailE2ETests.RepositoryOeffnen_ButtonExistiertInDetailansicht_E2E`
+- [x] E2E-Test: Zurück zur Übersicht — `ProjectDetailE2ETests.ZurueckZurUebersicht_SchliesstOverlayUndZeigtListe_E2E`
 
 ## Code-Review-Befunde
 
