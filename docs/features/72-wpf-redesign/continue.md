@@ -26,3 +26,7 @@ Keine.
 ## Fehlgeschlagene Tests
 
 Keine fehlgeschlagenen Tests.
+
+## Kundenfeedback
+
+die Pröjektübersichtansicht benötigt ein Ribbonmenü

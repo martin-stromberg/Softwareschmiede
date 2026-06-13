@@ -19,7 +19,7 @@ Branch: `72-wpf-redesign`
 | [x] | – | Iteration oder Abschluss entscheiden | Schleife nach 3 Iterationen abgebrochen (Code-Review-Befunde verbleiben) |
 | [x] | 8a | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
 | [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
-| [ ] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
-| [ ] | 9b | README aktualisieren (Unteragent) | `README.md` |
+| [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
+| [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
 | [ ] | – | Feature-Verzeichnis löschen | – |
 | [ ] | – | Commit durchführen | – |
