@@ -28,11 +28,23 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
     /// <inheritdoc/>
     public bool IsRunning(Guid aufgabeId)
-        => _handles.TryGetValue(aufgabeId, out var handle) && !handle.Process.HasExited;
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        {
+            return false;
+        }
+
+        try { return !handle.Process.HasExited; }
+        catch { return false; }
+    }
 
     /// <inheritdoc/>
     public int GetRunningCount()
-        => _handles.Values.Count(h => !h.Process.HasExited);
+        => _handles.Values.Count(h =>
+        {
+            try { return !h.Process.HasExited; }
+            catch { return false; }
+        });
 
     private readonly SemaphoreSlim _startLock = new(1, 1);
 
@@ -167,13 +179,20 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
     private void RaiseRunningCountChanged()
     {
-        var previous = _previousRunningCount;
-        var current = GetRunningCount();
-        _previousRunningCount = current;
+        int previous;
+        int current;
+        lock (_runningCountLock)
+        {
+            previous = _previousRunningCount;
+            current = GetRunningCount();
+            _previousRunningCount = current;
+        }
+
         RunningCountChanged?.Invoke(previous, current);
     }
 
     private int _previousRunningCount;
+    private readonly object _runningCountLock = new();
 
     private static int? TryGetExitCode(Process process)
     {

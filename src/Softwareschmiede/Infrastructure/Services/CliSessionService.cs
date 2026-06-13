@@ -11,6 +11,9 @@ public sealed class CliSessionService : ICliSessionService
     private Process? _process;
     private StreamWriter? _stdin;
     private Func<string, Task>? _onOutput;
+    private CancellationTokenSource? _loopCts;
+    private Task? _outputLoopTask;
+    private Task? _stderrLoopTask;
 
     /// <inheritdoc cref="CliSessionService"/>
     public CliSessionService(ILogger<CliSessionService> logger)
@@ -26,6 +29,17 @@ public sealed class CliSessionService : ICliSessionService
     {
         if (IsRunning)
             return;
+
+        _loopCts?.Cancel();
+        try
+        {
+            if (_outputLoopTask is not null) await _outputLoopTask.ConfigureAwait(false);
+            if (_stderrLoopTask is not null) await _stderrLoopTask.ConfigureAwait(false);
+        }
+        catch { }
+
+        _loopCts?.Dispose();
+        _loopCts = new CancellationTokenSource();
 
         _onOutput = onOutput;
 
@@ -44,15 +58,16 @@ public sealed class CliSessionService : ICliSessionService
             ?? throw new InvalidOperationException($"CLI-Prozess '{cliName}' konnte nicht gestartet werden.");
         _stdin = _process.StandardInput;
 
-        _ = Task.Run(ReadOutputLoop);
-        _ = Task.Run(DrainStderrLoop);
+        var loopToken = _loopCts.Token;
+        _outputLoopTask = Task.Run(() => ReadOutputLoop(loopToken), loopToken);
+        _stderrLoopTask = Task.Run(() => DrainStderrLoop(loopToken), loopToken);
 
         _logger.LogInformation("CLI-Prozess '{CliName}' gestartet (PID: {Pid}).", cliName, _process.Id);
 
         await Task.CompletedTask;
     }
 
-    private async Task ReadOutputLoop()
+    private async Task ReadOutputLoop(CancellationToken ct)
     {
         if (_process == null)
             return;
@@ -60,11 +75,15 @@ public sealed class CliSessionService : ICliSessionService
         try
         {
             string? line;
-            while ((line = await _process.StandardOutput.ReadLineAsync()) != null)
+            while (!ct.IsCancellationRequested
+                && (line = await _process.StandardOutput.ReadLineAsync(ct).ConfigureAwait(false)) != null)
             {
                 if (_onOutput != null)
-                    await _onOutput(line + "\n");
+                    await _onOutput(line + "\n").ConfigureAwait(false);
             }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (IOException ex)
         {
@@ -76,16 +95,20 @@ public sealed class CliSessionService : ICliSessionService
         }
     }
 
-    private async Task DrainStderrLoop()
+    private async Task DrainStderrLoop(CancellationToken ct)
     {
         if (_process == null)
             return;
 
         try
         {
-            while (await _process.StandardError.ReadLineAsync() != null)
+            while (!ct.IsCancellationRequested
+                && await _process.StandardError.ReadLineAsync(ct).ConfigureAwait(false) != null)
             {
             }
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (IOException ex)
         {

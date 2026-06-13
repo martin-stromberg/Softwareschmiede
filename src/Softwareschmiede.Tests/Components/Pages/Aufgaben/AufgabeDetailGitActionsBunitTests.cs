@@ -811,9 +811,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             protokollService,
             gitPluginMock.Object,
             pluginSelection,
-            agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var gitService = new GitOrchestrationService(
@@ -834,7 +832,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance));
         Services.AddSingleton(gitService);
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);
@@ -877,7 +875,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             ProjektId = projekt.Id,
             GitRepositoryId = repository.Id,
             Titel = "BUnit-Test-Aufgabe",
-            Status = AufgabeStatus.InBearbeitung,
+            Status = AufgabeStatus.Gestartet,
             AgentenpaketName = "paket-a",
             AgentenName = "agent-a",
             LokalerKlonPfad = Path.GetTempPath(),
@@ -979,9 +977,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             protokollService,
             selectedGitPluginMock.Object,
             pluginSelection,
-            agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var gitService = new GitOrchestrationService(
@@ -1002,7 +998,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance));
         Services.AddSingleton(gitService);
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);

@@ -1276,9 +1276,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             protokollService,
             gitPluginMock.Object,
             pluginSelectionService,
-            agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
         var gitService = new GitOrchestrationService(
             aufgabeService,
@@ -1307,7 +1305,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         SetInjectedProperty(sut, "PluginSelection", pluginSelectionService);
         SetInjectedProperty(sut, "AufgabeService", aufgabeService);
         SetInjectedProperty(sut, "EntwicklungsprozessService", entwicklungsprozessService);
-        SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
+        SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance));
         SetInjectedProperty(sut, "GitService", gitService);
         SetInjectedProperty(sut, "GitWorkspaceBrowserService", workspaceBrowserServiceMock.Object);
         SetInjectedProperty(sut, "ProtokollService", protokollService);

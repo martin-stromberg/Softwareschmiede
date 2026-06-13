@@ -389,9 +389,7 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
             protokollService,
             gitPluginMock.Object,
             pluginSelection,
-            agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var gitService = new GitOrchestrationService(
@@ -416,7 +414,7 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance));
         Services.AddSingleton(gitService);
         Services.AddSingleton(diffService);
         Services.AddSingleton(protokollService);

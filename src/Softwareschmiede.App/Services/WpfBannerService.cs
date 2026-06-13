@@ -24,7 +24,10 @@ public sealed class WpfBannerService : IBenachrichtigungsBannerService
     /// <inheritdoc/>
     public Task ShowAsync(string message, CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
+        if (ct.IsCancellationRequested)
+        {
+            return Task.FromCanceled(ct);
+        }
 
         try
         {

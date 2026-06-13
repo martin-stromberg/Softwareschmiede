@@ -4,8 +4,7 @@
   <Project Path="plugins/Softwareschmiede.Plugin.LocalDirectory/Softwareschmiede.Plugin.LocalDirectory.csproj" />
   <Project Path="plugins/Softwareschmiede.Plugin.GitHubCopilot/Softwareschmiede.Plugin.GitHubCopilot.csproj" />
   <Project Path="plugins/Softwareschmiede.Plugin.KiSimulator/Softwareschmiede.Plugin.KiSimulator.csproj" />
-  <Project Path="src/Softwareschmiede.Client/Softwareschmiede.Client.csproj" />
-  <Project Path="src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj" />
+<Project Path="src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj" />
   <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj" />
   <Project Path="src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj" />
   <Project Path="src/Softwareschmiede/Softwareschmiede.csproj" />

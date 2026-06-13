@@ -194,14 +194,12 @@ public partial class AufgabeDetail : IDisposable
         ApplyRegisterFromQuery();
         await LadeAsync();
 
-        // Wenn beim Seitenaufruf ein KI-Lauf im Hintergrund läuft: pufferlosen Stand wiederherstellen
-        // und auf neue Zeilen subscriben, damit die Ausgabe live weiterläuft.
+        // Wenn beim Seitenaufruf ein KI-Lauf im Hintergrund läuft: Verarbeitungsstatus setzen.
         if (KiAusfuehrungsService.IsRunning(Id))
         {
             _processing = true;
             _kiStreamingStartedUtc = DateTimeOffset.UtcNow;
-            _streamingLines = [.. KiAusfuehrungsService.GetBufferedLines(Id)];
-            KiLiveSubscribieren();
+            KiStatusAenderungSubscribieren();
         }
 
     }
@@ -728,8 +726,6 @@ public partial class AufgabeDetail : IDisposable
                 Id,
                 _aufgabe.Titel,
                 _anforderungInput,
-                _aufgabe.AgentenpaketName,
-                _aufgabe.AgentenName,
                 _aufgabe.KiPluginPrefix);
             _editAnforderung = false;
             _erfolg = "Anforderungsbeschreibung gespeichert.";
@@ -798,13 +794,11 @@ public partial class AufgabeDetail : IDisposable
         _fehler = null;
         try
         {
-            // Agentenpaket, Agent und KI-Plugin speichern
+            // KI-Plugin speichern
             await AufgabeService.UpdateAsync(
                 Id,
                 _aufgabe!.Titel,
                 _aufgabe.AnforderungsBeschreibung,
-                string.IsNullOrWhiteSpace(_selectedPaketName) ? null : _selectedPaketName,
-                string.IsNullOrWhiteSpace(_selectedAgentName) ? null : _selectedAgentName,
                 string.IsNullOrWhiteSpace(_selectedKiPluginPrefix) ? null : _selectedKiPluginPrefix);
 
             // Repository-URL ermitteln: erst verknüpftes Repo, dann erstes aktives des Projekts
@@ -908,12 +902,9 @@ public partial class AufgabeDetail : IDisposable
         _streamingLines = [];
         ResetStreamingScrollState();
 
-        // Bisherige Subscription aufräumen
+        // Bisherige Status-Subscription aufräumen
         _kiSubscription?.Dispose();
         _kiSubscription = null;
-
-        // Bereinigt eine ggf. bereits abgeschlossene Session, damit eine neue angelegt wird
-        KiAusfuehrungsService.SessionBereinigen(Id);
 
         // Hintergrundlauf starten – kehrt sofort zurück
         StartKiLauf(
@@ -923,28 +914,48 @@ public partial class AufgabeDetail : IDisposable
             kontextmodus,
             string.IsNullOrWhiteSpace(_selectedKiPluginPrefix) ? null : _selectedKiPluginPrefix);
 
-        // Auf Live-Ausgabe subscriben – neue Zeilen werden direkt in _streamingLines eingefügt
-        KiLiveSubscribieren();
+        // Auf Prozess-Status-Änderungen subscriben
+        KiStatusAenderungSubscribieren();
 
         NotifyStateChanged();
         await Task.CompletedTask;
     }
 
-    /// <summary>Subscribed auf neue Ausgabezeilen des laufenden KI-Hintergrundlaufs.</summary>
-    private void KiLiveSubscribieren()
+    /// <summary>Subscribed auf Prozess-Status-Änderungen des laufenden KI-Hintergrundlaufs.</summary>
+    private void KiStatusAenderungSubscribieren()
     {
         _kiSubscription?.Dispose();
-        _kiSubscription = KiAusfuehrungsService.Subscribe(Id, line =>
+
+        void Handler(Guid aufgabeId, CliProcessStatus status)
         {
-            // UI in den Blazor-Circuit-Thread marshalieren
-            InvokeAsync(async () =>
+            if (aufgabeId != Id)
             {
-                await CaptureStreamingScrollStateBeforeUpdateAsync();
-                _streamingLines.Add(line);
-                RegisterStreamingContentUpdate();
-                StateHasChanged();
-            });
-        });
+                return;
+            }
+
+            if (status is CliProcessStatus.Gestoppt or CliProcessStatus.Fehler)
+            {
+                InvokeAsync(async () =>
+                {
+                    _processing = false;
+                    if (status == CliProcessStatus.Fehler)
+                    {
+                        _fehler = "KI-Ausführung fehlgeschlagen. Siehe Protokoll für Details.";
+                    }
+
+                    await LadeAsyncWithScope();
+                    StateHasChanged();
+                });
+            }
+        }
+
+        KiAusfuehrungsService.CliProcessStatusChanged += Handler;
+        _kiSubscription = new DelegateDisposable(() => KiAusfuehrungsService.CliProcessStatusChanged -= Handler);
+    }
+
+    private sealed class DelegateDisposable(Action onDispose) : IDisposable
+    {
+        public void Dispose() => onDispose();
     }
 
     private void FolgeKontextmodusGeaendert(ChangeEventArgs e)
@@ -972,17 +983,11 @@ public partial class AufgabeDetail : IDisposable
             return null;
         }
 
-        if (pluginPrefix.Contains("ClaudeCli", StringComparison.OrdinalIgnoreCase))
-        {
-            return "claude";
-        }
+        var plugin = _kiPlugins
+            .OfType<Softwareschmiede.Domain.Abstractions.CliKiPluginBase>()
+            .FirstOrDefault(p => string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase));
 
-        if (pluginPrefix.Contains("GitHubCopilot", StringComparison.OrdinalIgnoreCase))
-        {
-            return "copilot";
-        }
-
-        return null;
+        return plugin?.ProviderDateiPraefix;
     }
 
     private static bool TryResolveRequestedExecutionUtc(string? requestedTimeText, out DateTimeOffset? requestedUtc, out string? validationError)
@@ -1024,9 +1029,9 @@ public partial class AufgabeDetail : IDisposable
     {
         if (_wartetAufAusfuehrungszeitpunkt)
         {
-            _cts.Cancel();
-            _cts.Dispose();
+            var oldCts = _cts;
             _cts = new CancellationTokenSource();
+            oldCts.Cancel();
         }
     }
 
@@ -1037,28 +1042,48 @@ public partial class AufgabeDetail : IDisposable
         FolgeanweisungsKontextmodus? kontextmodus,
         string? selectedKiPluginPrefix)
     {
-        KiAusfuehrungsService.StartKiLauf(
-            Id,
-            prompt,
-            agent,
-            selectedKiPluginPrefix,
-            model: model,
-            kontextmodus: kontextmodus,
-            onStarted: () => InvokeAsync(async () =>
+        _ = StartKiLaufAsync(prompt, agent, model, kontextmodus, selectedKiPluginPrefix);
+    }
+
+    private async Task StartKiLaufAsync(
+        string prompt,
+        AgentInfo agent,
+        string? model,
+        FolgeanweisungsKontextmodus? kontextmodus,
+        string? selectedKiPluginPrefix)
+    {
+        try
+        {
+            var plugin = await PluginSelection.ResolveDevelopmentAutomationPluginAsync(selectedKiPluginPrefix, _cts.Token);
+            var optionalParameters = BuildOptionalParameters(prompt, agent, model, kontextmodus);
+            await KiAusfuehrungsService.StartCliAsync(Id, plugin, _aufgabe?.LokalerKlonPfad ?? string.Empty, optionalParameters, _cts.Token);
+            await InvokeAsync(async () =>
             {
                 await LadeAsync();
                 StateHasChanged();
-            }),
-            onCompleted: fehler => InvokeAsync(async () =>
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Starten des KI-Laufs für Aufgabe {AufgabeId}.", Id);
+            await InvokeAsync(() =>
             {
                 _processing = false;
-                _kiSubscription?.Dispose();
-                _kiSubscription = null;
-                if (fehler)
-                    _fehler = "KI-Ausführung fehlgeschlagen. Siehe Protokoll für Details.";
-                await LadeAsyncWithScope(); // Protokoll neu laden nach Abschluss
+                _fehler = ex.Message;
                 StateHasChanged();
-            }));
+                return Task.CompletedTask;
+            });
+        }
+    }
+
+    private static string? BuildOptionalParameters(string prompt, AgentInfo agent, string? model, FolgeanweisungsKontextmodus? kontextmodus)
+    {
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return null;
+        }
+
+        return prompt;
     }
 
     protected virtual void NotifyStateChanged() => StateHasChanged();
@@ -1699,8 +1724,8 @@ public partial class AufgabeDetail : IDisposable
         _showAbbrechenConfirm = false;
         try
         {
-            await AufgabeService.AbschliessenAsync(Id, _cts.Token);
-            _erfolg = "Aufgabe abgebrochen.";
+            await KiAusfuehrungsService.StopCliAsync(Id, _cts.Token);
+            _erfolg = "KI-Ausführung abgebrochen.";
             await LadeAsync();
         }
         catch (Exception ex) { _fehler = ex.Message; }

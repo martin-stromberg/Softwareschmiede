@@ -304,6 +304,33 @@ public sealed class EntwicklungsprozessService
         return await gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
     }
 
+    /// <summary>Führt das Repository-Startskript für eine Aufgabe manuell aus.</summary>
+    public async Task<StartskriptErgebnis> RepositoryStartskriptAusfuehrenAsync(Guid aufgabeId, CancellationToken ct = default)
+    {
+        if (_repositoryStartskriptService is null)
+        {
+            return new StartskriptErgebnis("Startskript-Dienst ist nicht konfiguriert.");
+        }
+
+        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+
+        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
+        {
+            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        }
+
+        var repository = await ResolveRepositoryAsync(aufgabe, aufgabe.GitRepository?.RepositoryUrl ?? string.Empty, ct);
+
+        if (repository.StartKonfiguration is null || !repository.StartKonfiguration.Aktiv)
+        {
+            return new StartskriptErgebnis("Kein aktives Startskript konfiguriert.");
+        }
+
+        await _repositoryStartskriptService.RunAsync(aufgabe.LokalerKlonPfad, repository.StartKonfiguration, ct);
+        return new StartskriptErgebnis("Startskript erfolgreich ausgeführt.");
+    }
+
     /// <summary>
     /// Parst einen Rate-Limit-Marker aus einer CLI-Ausgabezeile.
     /// Format: <c>[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601_DATETIME]]</c>
@@ -441,3 +468,6 @@ public sealed class EntwicklungsprozessService
 
 /// <summary>Information zu einem erkannten Rate-Limit-Marker.</summary>
 public sealed record SuggestionInfo(DateTimeOffset? AusfuehrenAbUtc);
+
+/// <summary>Ergebnis der manuellen Ausführung eines Repository-Startskripts.</summary>
+public sealed record StartskriptErgebnis(string Message);

@@ -1,32 +1,28 @@
 # Offene Aufgaben
 
 Erstellt am: 2026-06-13
-Abbruchgrund: Kein Fortschritt zwischen den letzten zwei Iterationen (Iteration 2 durch Session-Limit unterbrochen; Befunde stammen aus Altlasten im Branch-Diff)
+Abbruchgrund: Kein Fortschritt zwischen den letzten zwei Iterationen (Iteration 2: 10 Befunde → Iteration 3: ebenfalls 10 Befunde; Code-Review findet neue Folgebefunde nach jeder Korrektur)
 
 Die folgenden Aufgaben konnten im automatisierten Zyklus nicht abgeschlossen werden
 und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 
 ## Offene Planelemente
 
-(Kein Plan-Review durchgeführt – kein plan.md vorhanden für diesen Fortsetzungslauf)
+(Kein Plan-Review durchgeführt – kein plan.md für diesen Fortsetzungslauf)
 
 ## Code-Review-Befunde
 
-- [ ] **Kritisch** `AufgabeDetail.razor.cs:68` — Referenzen auf entfernte Enum-Werte (Offen, InBearbeitung, KiAktiv, …) und nicht mehr existierende Service-Methoden (KiAbgeschlossenAsync, UpdateAsync mit 6 Parametern) → CS0117/CS1061-Kompilierfehler, Blazor-Projekt startet nicht
-- [ ] **Kritisch** `AufgabeDetail.razor.cs:1703` — Aufruf von `EntwicklungsprozessService.AbbrechenAsync`, das vollständig entfernt wurde → CS1061, Abbrechen-Button defekt
-- [ ] **Hoch** `KiAusfuehrungsService.cs:73` — `_handles[aufgabeId] = handle` wird vor `process.Start()` gesetzt; schlägt Start fehl, verbleibt ein ungültiger Handle im Dictionary
-- [ ] **Hoch** `KiAusfuehrungsService.cs:63` — Exited-Handler emittiert immer `Gestoppt` unabhängig vom Exit-Code; Abstürze sind von sauberem Stop ununterscheidbar
-- [ ] **Hoch** `CliSessionService.cs:62` — `!_process.HasExited` als Schleifenbedingung statt EOF → gepufferte Ausgabe-Zeilen gehen bei schnellem Prozessende verloren
-- [ ] **Hoch** `CliSessionService.cs:62` — Stdout ohne Prozessende geschlossen → `ReadLineAsync()` gibt dauerhaft null → 100 % CPU-Spin
-- [ ] **Mittel** `server.js:23` — `["-NoExit"]` auf allen Plattformen; auf Linux/macOS kein Shell-Flag → PTY startet nicht
-- [ ] **Mittel** `AufgabeService.cs:220` — `DeleteAsync` ohne Status-Guard → aktive Aufgaben (InArbeit, Gestartet) löschbar ohne Prozessstopp
-- [ ] **Mittel** `ProcessWindowHost.cs:106` — `GetWindowLong` Fehlerbehandlung fehlt; `SetWindowLong` wird bedingungslos mit potentiell invalidem Wert aufgerufen
-- [ ] **Niedrig** `TaskDetailViewModel.cs:169` — Event-Subscription auf Singleton-Service nur in `Dispose` abgemeldet → Memory Leak bei WPF-Navigation
+- [ ] **Hoch** `WpfAudioService.cs:54` — `args.ErrorException` im `MediaFailed`-Handler ohne Null-Check; bei bestimmten WPF-Medienfehlern ist `ErrorException` null → `NullReferenceException` im Dispatcher → `TaskCompletionSource` bleibt unresolved → `PlayAudioAsync` hängt für immer
+- [ ] **Hoch** `AufgabeDetail.razor.cs:219` — `_streamingLines` wird nie befüllt; neue `KiAusfuehrungsService`-Implementierung verwaltet nur Process-Handles ohne Ausgabe-Callbacks → `IsStreamingContainerVisible` dauerhaft `false`, Live-Ausgabe-Panel permanent ausgeblendet (Regression)
+- [ ] **Hoch** `CliSessionService.cs:130` — `ICliSessionService` hat kein `StopAsync`/`Dispose`; Background-Loops und Child-Prozess werden beim Host-Shutdown nicht aufgeräumt
+- [ ] **Mittel** `AufgabeService.AbschliessenAsync` — löscht `BranchName` und `LokalerKlonPfad` nicht mehr aus der DB; nach Abschluss zeigt Entität auf gelöschtes Verzeichnis
+- [ ] **Mittel** `WpfAudioService.cs:72` — Race: `Aborted`-Event wird nach `InvokeAsync()` subscribed; bei Dispatcher-Shutdown zwischen den beiden Zeilen bleibt `tcs` unresolved
+- [ ] **Mittel** `WpfBannerService.cs:44` — AppId `"Softwareschmiede"` nicht als Windows-AUMID registriert → Toast-Feature schlägt auf allen nicht-paketierten Installationen lautlos fehl
+- [ ] **Niedrig** `AufgabeDetail.razor.cs` — 18-zeiliger Prompt-Lade-Block doppelt in zwei Lifecycle-Methoden
+- [ ] **Niedrig** `AufgabeDetail.razor.cs:ResolveCliName` — Plugin-Namen weiterhin via fragile Substring-Checks statt Plugin-seitigem `ProviderDateiPraefix` (Fix aus Iteration 2 unvollständig)
+- [ ] **Niedrig** `KiAusfuehrungsService` — CLI-Prozess-Exit mit Fehlercode persistiert keinen `Fehlgeschlagen`-Status in der DB
+- [ ] **Niedrig** `ProcessWindowHost.SetAlwaysOnTopFallback` — irreführender Kommentar und hardcodierte 800×600
 
 ## Fehlgeschlagene Tests
 
-- [ ] **ProduktErstellenUndAufgabeHinzufuegen_E2E** — Softwareschmiede.App.exe wurde nicht gefunden. App-Projekt muss vor dem Testlauf gebaut werden.
-- [ ] **AufgabeStarten_RepositoryKlonen_BranchErstellen_E2E** — Softwareschmiede.App.exe wurde nicht gefunden.
-- [ ] **CliProzessStartenUndFensterEinbetten_E2E** — Softwareschmiede.App.exe wurde nicht gefunden.
-- [ ] **DarkModeAktivierenUndPersistieren_E2E** — Softwareschmiede.App.exe wurde nicht gefunden.
-- [ ] **RecoveryBannerNachHeartbeatTimeout_E2E** — Softwareschmiede.App.exe wurde nicht gefunden.
+(Keine – alle 474 Tests bestehen, 5 E2E-Tests korrekt mit Skip markiert)

@@ -41,7 +41,6 @@ public sealed class WpfAudioService : IBenachrichtigungsAudioService
             try
             {
                 var player = new MediaPlayer();
-                _activePlayers.Add(player);
 
                 player.MediaEnded += (_, _) =>
                 {
@@ -58,6 +57,7 @@ public sealed class WpfAudioService : IBenachrichtigungsAudioService
                 };
 
                 player.Open(new Uri(filePath, UriKind.Absolute));
+                _activePlayers.Add(player);
                 player.Play();
 
                 _logger.LogDebug("Audiodatei '{FilePath}' wird abgespielt.", filePath);
