@@ -33,17 +33,23 @@ public sealed class BoolToVisibilityConverter : IValueConverter
         => value is Visibility.Visible;
 }
 
-/// <summary>Konvertiert einen Boolean-Wert in eine Breite (240 wenn true, 48 wenn false).</summary>
+/// <summary>Konvertiert einen Boolean-Wert in eine Breite (ExpandedWidth wenn true, CollapsedWidth wenn false).</summary>
 [ValueConversion(typeof(bool), typeof(double))]
 public sealed class BoolToWidthConverter : IValueConverter
 {
+    /// <summary>Breite im aufgeklappten Zustand (true). Standard: 240.</summary>
+    public double ExpandedWidth { get; set; } = 240.0;
+
+    /// <summary>Breite im eingeklappten Zustand (false). Standard: 48.</summary>
+    public double CollapsedWidth { get; set; } = 48.0;
+
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => value is true ? 240.0 : 48.0;
+        => value is true ? ExpandedWidth : CollapsedWidth;
 
     /// <inheritdoc/>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        => (double)value > 48.0;
+        => value is double d && d > CollapsedWidth;
 }
 
 /// <summary>Konvertiert einen inversen Boolean-Wert in <see cref="Visibility"/>.</summary>
@@ -59,13 +65,17 @@ public sealed class InverseBoolToVisibilityConverter : IValueConverter
         => value is not Visibility.Visible;
 }
 
-/// <summary>Konvertiert einen String in <see cref="Visibility"/> (Collapsed wenn null/leer).</summary>
-[ValueConversion(typeof(string), typeof(Visibility))]
+/// <summary>Konvertiert einen Wert in <see cref="Visibility"/> (Collapsed wenn null, leer oder Leerstring).</summary>
+[ValueConversion(typeof(object), typeof(Visibility))]
 public sealed class NullOrEmptyToVisibilityConverter : IValueConverter
 {
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+    {
+        if (value is null) return Visibility.Collapsed;
+        if (value is string s) return string.IsNullOrEmpty(s) ? Visibility.Collapsed : Visibility.Visible;
+        return Visibility.Visible;
+    }
 
     /// <inheritdoc/>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

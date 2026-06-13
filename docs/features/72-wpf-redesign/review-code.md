@@ -6,63 +6,76 @@
 
 ## Befunde
 
-### ProjectDetailViewModel.cs
+### ProjectDetailViewModel.cs (ProjectDetailViewModel)
 
-- **Fehlerbehandlung / Doppeltes Dispose** — `Dispose()` setzt `_selectedTaskViewModel` und `_ladenCts` nach dem Entsorgen nicht auf `null`. Wird `Dispose()` zweimal aufgerufen (z. B. durch `DetailViewModel`-Setter in `ProjectListViewModel` und nachfolgend durch den DI-Container), wird dasselbe `IDisposable`-Objekt ein zweites Mal disposed, was `ObjectDisposedException` auslöst.
+- **Toter Code / Fehlende Kapselung** — `AktualisierenCallbackAusfuehrenAsync()` (Zeile 277–280) ist eine Ein-Zeiler-Methode, die ausschließlich `ProjektListeAktualisierenCallback?.Invoke()` kapselt. Der Methodenname verschleiert, dass sie nichts weiter tut als einen Null-Check vor dem Callback-Aufruf — das ist kein eigenes Konzept, sondern eine unnötige Indirektion.
 
-  Empfehlung: Nach dem Aufruf von `Dispose()` auf beiden Feldern das jeweilige Feld auf `null` setzen.
+  Empfehlung: Inline-Aufruf `await ProjektListeAktualisierenCallback?.Invoke()!` an den drei Aufrufstellen (oder Pattern `if (ProjektListeAktualisierenCallback is {} cb) await cb()`) und `AktualisierenCallbackAusfuehrenAsync` entfernen.
 
-- **Fehlerbehandlung / Fire-and-forget nach Erstellen** — In `ProjektSpeichernAsync` (Zeile 269) setzt das Setzen von `ProjektId` im Setter sofort ein `LadenAsync` als Fire-and-forget auf einem frischen `CancellationTokenSource`. Kurz danach wird `ProjektListeAktualisierenCallback?.Invoke()` aufgerufen. Nach der Rückkehr verbleiben `ProjektName` und `ProjektBeschreibung` unverändert, das Overlay bleibt offen, und ein erneuter Klick auf „Speichern" trifft nun den Update-Pfad (Zeile 273) und speichert das Projekt ein zweites Mal stillschweigend.
+- **Inappropriate Intimacy / Kopplung** — `LoeschenBestaetigenFunc` und `RepositoryDialogOeffnenFunc` sind öffentliche `Func`-Properties auf dem ViewModel (Zeilen 161–176). Damit kennt und steuert der Aufrufer direkt UI-Interaktionen aus dem ViewModel heraus. Das verletzt MVVM: Dialog-Logik gehört nicht als inject­ierbarer Func in das ViewModel, sondern in einen dedizierten `IDialogService` (Interface).
 
-  Empfehlung: Nach erfolgreicher Erstellung `ZurueckAction?.Invoke()` aufrufen oder `ProjektName`/`ProjektBeschreibung` zurücksetzen und dem Nutzer eine Erfolgsmeldung anzeigen.
+  Empfehlung: `IDialogService`-Interface mit Methoden `bool BestaetigenDialog(string nachricht)` und `bool RepositoryZuweisenDialog(RepositoryAssignViewModel vm)` einführen. Dieses Interface per Konstruktor injizieren; im Produktivcode durch WPF-Implementierung, in Tests durch Mock ersetzen. Die öffentlichen `Func`-Properties entfallen.
 
-- **Fehlerbehandlung / Toter Code in `RepositoryOeffnenAsync`** — `RepositoryOeffnenAsync` ist als `async Task` deklariert und akzeptiert einen `CancellationToken`, enthält aber ausschließlich synchronen Code (`Process.Start`). Der `catch (OperationCanceledException)`-Block (Zeile 368) ist unerreichbarer Code, da nichts im `try`-Block eine solche Exception werfen kann. Dies vermittelt fälschlicherweise den Eindruck, dass Abbruch korrekt behandelt wird.
+- **Temporäres Feld** — `_disposed` (Zeile 39) wird als Instanzfeld verwendet, um in `RepositoryZuweisenAsync` (Zeilen 347, 359) Folgeoperationen nach einem abgeschlossenen Dialog zu verhindern. Der Check `if (_disposed) return;` mitten im Async-Ablauf deutet darauf hin, dass der CancellationToken (`ct`) für diesen Zweck nicht genutzt wird, obwohl er vorhanden ist.
 
-  Empfehlung: Methode in eine synchrone Methode umwandeln (`void`) oder zumindest den toten `catch`-Block entfernen. Das `async`-Schlüsselwort und den `CancellationToken`-Parameter entfernen, da sie nicht benötigt werden.
+  Empfehlung: Statt des `_disposed`-Checks mitten in `RepositoryZuweisenAsync` den bereits vorhandenen `_ladenCts`-Token konsistent nutzen. `ct.IsCancellationRequested` nach dem Dialog-Aufruf prüfen, oder alternativ den Dialog erst gar nicht weiterlaufen lassen, wenn bereits disposed wurde — dann genügt der Standard-`ObjectDisposedException`-Schutz in `Dispose()`.
 
-- **Kopplung / ShowDialog über CancellationToken** — `RepositoryZuweisenAsync` übergibt den `CancellationToken` des `AsyncRelayCommand` über den synchronen `ShowDialog()`-Aufruf hinaus. Wenn das ViewModel während des offenen Dialogs disposed wird (z. B. durch Navigation), wird `_ladenCts` abgebrochen – aber das ist ein *anderes* `CancellationTokenSource` als das des `AsyncRelayCommand`. Nach Schließen des Dialogs schreibt `LadenAsync(ct)` (Zeile 337) in die Felder eines bereits disposed ViewModels.
+- **Fehlende Kapselung (doppelter Code)** — `FehlerMeldung = $"Fehler: {ex.Message}"` kommt in `ProjectListViewModel` (Zeilen 129, 155, 191) dreimal vor, während `ProjectDetailViewModel` denselben String per `SetFehler(ex)` (Zeile 398) setzt, also eine Hilfsmethode hat — aber nur in der Detail-Klasse. Die List-Klasse hat keine entsprechende Methode.
 
-  Empfehlung: Nach `ShowDialog()` den Zustand des ViewModels prüfen (z. B. ein `_disposed`-Flag) und bei Bedarf abbrechen, bevor asynchrone Folgeoperationen gestartet werden.
+  Empfehlung: `SetFehler(Exception ex)` in `ViewModelBase` hochziehen oder eine gemeinsame Basisklasse für Projekt-ViewModels einführen, damit beide Klassen dieselbe Methode nutzen.
 
-- **Vereinfachung / Redundante Lambda** — `LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct))` (Zeile 175) verwendet eine unnötige Lambda-Hülle. `LadenAsync` erfüllt die erwartete Signatur `Func<CancellationToken, Task>` direkt.
+### ProjectListViewModel.cs (ProjectListViewModel)
 
-  Empfehlung: `new AsyncRelayCommand(LadenAsync)` verwenden, wie es bei `AufgabeErstellenCommand` (Zeile 177) korrekt gemacht wird.
+- **Doppelter Code** — `FehlerMeldung = $"Fehler: {ex.Message}"` wird an drei Stellen (Zeilen 129, 155, 191) direkt inline gesetzt, statt über eine Hilfsmethode — im Gegensatz zu `ProjectDetailViewModel`, das eine `SetFehler`-Methode besitzt. (Siehe auch Befund oben.)
 
-### ProjectDetailView.xaml.cs
+  Empfehlung: Hilfsmethode `SetFehler(Exception ex)` in `ViewModelBase` oder einer gemeinsamen Basis einführen.
 
-*Keine Befunde.*
+- **Middle Man** — `LadenProjekteInternAsync` (Zeilen 104–110) hat keinen eigenen Mehrwert gegenüber einem direkten Aufruf von `_projektService.GetAllAsync`. Sie existiert nur, um die `ObservableCollection` zu befüllen — das ist jedoch genau das, was `LadenAsync` ebenfalls tun würde. Der Aufruf in `NeuesProjektHinzufuegen` (Zeile 186) umgeht die `IsLoading`/`FehlerMeldung`-Behandlung aus `LadenAsync`, was zu inkonsistenter UI-Zustandsverwaltung führt.
 
-### ProjectListViewModel.cs
+  Empfehlung: `LadenProjekteInternAsync` entfernen. In `NeuesProjektHinzufuegen` direkt `LadenAsync` aufrufen (ggf. mit einem neuen `CancellationToken.None`), damit `IsLoading` und `FehlerMeldung` einheitlich gesetzt werden.
 
-- **Fehlerbehandlung / `async void` ohne CancellationToken** — `NeuesProjektHinzufuegen` (Zeile 174) ist `async void` und übergibt keinen `CancellationToken` an `GetAllAsync()`. Exceptions aus dem try/catch werden korrekt gefangen, aber die `async void`-Deklaration verhindert, dass der Aufrufer die Operation awaiten oder abbrechen kann. Zukünftige Änderungen, die Code außerhalb des try-Blocks hinzufügen, könnten unbehandelte Exceptions auf dem `SynchronizationContext` verursachen, die die Anwendung abstürzen lassen.
+### WpfTestBase.cs (WpfTestBase)
 
-  Empfehlung: Die Methode mit einem `CancellationToken`-Parameter versehen und `GetAllAsync(ct)` aufrufen. Da die Methode als Callback übergeben wird, entweder den Callback-Typ auf `Func<CancellationToken, Task>` ändern oder eine eigene `CancellationTokenSource` im ViewModel verwalten.
+- **Fehlerbehandlung ohne aussagekräftigen Kontext** — In `Dispose()` (Zeilen 76–88) werden Fehler beim Schließen der Anwendung und beim Warten auf das Prozessende mit `Console.WriteLine` ausgegeben. In einem xUnit-Testkontext wird `Console.WriteLine` oft nicht in der Testausgabe angezeigt und ist nicht mit dem konkreten Test verknüpft.
 
-- **Namenskonventionen / Falsches Async-Suffix** — `ZeigeDetailErstellungsFormularAsync` (Zeile 163) und `ZeigeDetailAsync` (Zeile 154) sind synchrone `void`-Methoden, tragen aber das Suffix `Async`. Im .NET-Konvention zeigt dieses Suffix eine `Task`- oder `ValueTask`-Rückgabe an.
+  Empfehlung: Exceptions im `Dispose` entweder mit `ITestOutputHelper` (xUnit) ausgeben oder still ignorieren (`catch { }`) — je nach gewünschtem Verhalten. Aktuell täuscht `Console.WriteLine` Transparenz vor, die im Testsystem nicht vorhanden ist.
 
-  Empfehlung: Beide Methoden in `ZeigeDetailErstellungsFormular` und `ZeigeDetail` umbenennen.
+- **Hardcodierter Pfad** — `ResolveAppExePath()` (Zeilen 133–163) enthält die hartkodierten Build-Konfigurationen `"Debug"` und `"Release"` sowie das Framework-Moniker `"net10.0-windows10.0.17763.0"` als Stringliterale.
 
-### RepositoryAssignDialog.xaml.cs
+  Empfehlung: Framework-Moniker und Build-Konfiguration als Konstanten (z. B. `private const string FrameworkMoniker = "net10.0-windows10.0.17763.0"`) auslagern, damit Änderungen zentral und einmalig vorgenommen werden müssen.
 
-- **Kopplung / Öffentlicher parameterloser Konstruktor** — `RepositoryAssignDialog()` ist `public` und lässt `DataContext` auf `null`. Wird dieser Konstruktor von externem Code, dem XAML-Designer oder einem Test ohne ViewModel aufgerufen, bleibt der Dialog offen, weil `CloseRequested` nie abonniert wird und `DialogResult` nie gesetzt wird.
+### ProjectDetailE2ETests.cs (ProjectDetailE2ETests)
 
-  Empfehlung: Den parameterlosen Konstruktor auf `private` setzen, da er ausschließlich über `: this()` intern gekettet wird.
+- **Toter Code** — `Thread.Sleep`-Aufrufe ohne Kommentar (z. B. Zeile 64: `Thread.Sleep(500)` in `OpenProject`, Zeile 94, 99, etc.) sind Smell für busy-waiting. `WaitForElement` mit Polling ist bereits vorhanden — die Sleep-Aufrufe sind in vielen Fällen Doppelarbeit oder verbergen ein fehlendes `WaitForElement`.
 
-### ViewModelBase.cs (`AsyncRelayCommand`)
+  Empfehlung: Alle `Thread.Sleep`-Aufrufe ohne zwingend notwendigen Grund durch `WaitForElement` mit passendem Condition ersetzen. Ausnahmen (z. B. Warten auf Animation) mit Kommentar kennzeichnen.
 
-- **Effizienz / Fehlende Thread-Sicherheit auf `_isExecuting`** — Der Guard `if (_isExecuting)` (Zeile 128) und die Zuweisung `_isExecuting = true` (Zeile 132) sind nicht atomar. Bei Aufrufen aus mehreren Threads (theoretisch möglich bei Tests oder `Dispatcher.Invoke`) können beide gleichzeitig die Bedingung als `false` sehen und die Ausführung doppelt starten.
+- **Doppelter Code** — Die Hilfsmethoden `NavigateToProjecten`, `CreateProject`, `OpenProject` und `CreateAndOpenProject` duplizieren nahezu identische Schritte aus `WpfE2EPlaceholderTests.cs` (Klasse `WpfE2ETests`). In `WpfE2ETests` sind dieselben Navigation- und Erstellungsschritte inline in jedem Test wiederholt (z. B. Zeilen 28–38, 51–67, 89–103).
 
-  Empfehlung: `_isExecuting` durch ein `volatile int`-Feld ersetzen und `Interlocked.CompareExchange` für den Guard verwenden – oder auf `CommunityToolkit.Mvvm.Input.AsyncRelayCommand` migrieren, das dieses Problem bereits löst.
+  Empfehlung: Die Hilfsmethoden aus `ProjectDetailE2ETests` in `WpfTestBase` verschieben (oder eine gemeinsame Basisklasse `ProjectE2ETestBase : WpfTestBase` einführen), damit `WpfE2ETests` dieselben Methoden nutzen kann und die Duplizierung entfällt.
+
+### WpfE2EPlaceholderTests.cs (WpfE2ETests)
+
+- **Doppelter Code** — Jeder der sieben Tests wiederholt den Block `LaunchApp() → GetMainWindow() → WaitForElement(projekteButton)`. Die identischen Setup-Schritte sind nicht in eine Hilfsmethode extrahiert.
+
+  Empfehlung: Gemeinsame Hilfsmethode (idealerweise in `WpfTestBase`) für `LaunchApp` + `GetMainWindow` + optional Navigation erstellen; in jeden Test nur den spezifischen Teil belassen.
+
+### ViewModelBase.cs (AsyncRelayCommand)
+
+- **Fehlende Fehlerbehandlung bei `OnError = null`** — `AsyncRelayCommand` (Zeilen 98–164) schluckt Exceptions still, wenn `OnError` nicht gesetzt ist (Zeile 151: `OnError?.Invoke(ex)`). Ist `OnError` null, werden Fehler lautlos ignoriert.
+
+  Empfehlung: Falls kein `OnError` gesetzt ist, Exception an den WPF-`Dispatcher.UnhandledException`-Handler weiterleiten oder zumindest per `Debug.WriteLine`/`Trace.TraceError` protokollieren, damit Fehler im Entwicklungs-Build sichtbar sind.
 
 ## Geprüfte Dateien
 
+- `src/Softwareschmiede.App/Converters/AppConverters.cs`
+- `src/Softwareschmiede.App/ViewModels/ViewModelBase.cs`
 - `src/Softwareschmiede.App/ViewModels/ProjectDetailViewModel.cs`
 - `src/Softwareschmiede.App/ViewModels/ProjectListViewModel.cs`
-- `src/Softwareschmiede.App/ViewModels/RepositoryAssignViewModel.cs`
-- `src/Softwareschmiede.App/ViewModels/ViewModelBase.cs`
 - `src/Softwareschmiede.App/Views/ProjectDetailView.xaml`
-- `src/Softwareschmiede.App/Views/ProjectDetailView.xaml.cs`
-- `src/Softwareschmiede.App/Views/ProjectListView.xaml`
-- `src/Softwareschmiede.App/Views/ProjectListView.xaml.cs`
 - `src/Softwareschmiede.App/Views/RepositoryAssignDialog.xaml.cs`
-- `src/Softwareschmiede/Application/Services/ProjektService.cs`
+- `src/Softwareschmiede.App/Views/SettingsView.xaml`
+- `src/Softwareschmiede.Tests/App/ViewModels/ProjectDetailViewModelTests.cs`
+- `src/Softwareschmiede.Tests/E2E/ProjectDetailE2ETests.cs`
+- `src/Softwareschmiede.Tests/E2E/WpfE2EPlaceholderTests.cs`
+- `src/Softwareschmiede.Tests/E2E/WpfTestBase.cs`

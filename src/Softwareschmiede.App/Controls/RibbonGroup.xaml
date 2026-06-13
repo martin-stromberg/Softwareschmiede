@@ -1,0 +1,27 @@
+<UserControl x:Class="Softwareschmiede.App.Controls.RibbonGroup"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <Grid>
+        <!-- Rahmen mit Inhalt -->
+        <Border BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Background="{DynamicResource SurfaceBrush}"
+                Padding="8,6,8,18"
+                Margin="0,0,8,0"
+                MinWidth="60">
+            <ContentPresenter Content="{Binding ItemsContent, ElementName=Root}" />
+        </Border>
+
+        <!-- Gruppenname als Label unten am Rahmen -->
+        <TextBlock Text="{Binding GruppenName, ElementName=Root}"
+                   FontSize="10"
+                   Foreground="{DynamicResource SecondaryTextBrush}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,8,4"
+                   Padding="4,1"
+                   Background="{DynamicResource SurfaceBrush}" />
+    </Grid>
+</UserControl>

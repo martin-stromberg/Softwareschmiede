@@ -99,8 +99,11 @@ public sealed class AsyncRelayCommand : ICommand
 {
     private readonly Func<CancellationToken, Task> _execute;
     private readonly Func<bool>? _canExecute;
-    private bool _isExecuting;
+    private volatile int _isExecuting;
     private CancellationTokenSource? _cts;
+
+    /// <summary>Optionaler Fehler-Callback, der bei unbehandelten Ausnahmen aufgerufen wird. Wenn nicht gesetzt, werden Ausnahmen stillschweigend ignoriert.</summary>
+    public Action<Exception>? OnError { get; set; }
 
     /// <inheritdoc cref="AsyncRelayCommand"/>
     public AsyncRelayCommand(Func<CancellationToken, Task> execute, Func<bool>? canExecute = null)
@@ -117,19 +120,22 @@ public sealed class AsyncRelayCommand : ICommand
     }
 
     /// <summary>Gibt an, ob der Command gerade ausgeführt wird.</summary>
-    public bool IsExecuting => _isExecuting;
+    public bool IsExecuting => _isExecuting == 1;
 
     /// <inheritdoc/>
-    public bool CanExecute(object? parameter) => !_isExecuting && (_canExecute?.Invoke() ?? true);
+    public bool CanExecute(object? parameter) => _isExecuting == 0 && (_canExecute?.Invoke() ?? true);
 
     /// <inheritdoc/>
-    public async void Execute(object? parameter)
+    public async void Execute(object? parameter) => await ExecuteAsync(parameter);
+
+    /// <summary>Führt den Command aus und gibt den Task zurück, der im Test direkt awaited werden kann.</summary>
+    public async Task ExecuteAsync(object? parameter = null)
     {
-        if (_isExecuting)
+        if (Interlocked.CompareExchange(ref _isExecuting, 1, 0) != 0)
             return;
 
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
-        _isExecuting = true;
         CommandManager.InvalidateRequerySuggested();
 
         try
@@ -142,18 +148,11 @@ public sealed class AsyncRelayCommand : ICommand
         }
         catch (Exception ex)
         {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher is not null && !dispatcher.HasShutdownStarted)
-            {
-                var capturedEx = ex;
-                _ = dispatcher.BeginInvoke(new Action(() =>
-                    throw new InvalidOperationException(
-                        $"Unbehandelte Ausnahme in AsyncRelayCommand: {capturedEx.Message}", capturedEx)));
-            }
+            OnError?.Invoke(ex);
         }
         finally
         {
-            _isExecuting = false;
+            Interlocked.Exchange(ref _isExecuting, 0);
             _cts?.Dispose();
             _cts = null;
             CommandManager.InvalidateRequerySuggested();

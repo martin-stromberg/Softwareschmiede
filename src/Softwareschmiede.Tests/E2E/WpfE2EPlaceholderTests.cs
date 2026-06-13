@@ -1,6 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -15,6 +16,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// CI-Ausschluss:      dotnet test --filter "Category!=E2E"
 /// </summary>
 [Trait("Category", "E2E")]
+[Collection("E2E")]
 public sealed class WpfE2ETests : WpfTestBase
 {
     [Fact]
@@ -30,7 +32,8 @@ public sealed class WpfE2ETests : WpfTestBase
         neuButton.AsButton().Click();
 
         var nameTextBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
-        nameTextBox.AsTextBox().Text = "E2E-Testprojekt";
+        nameTextBox.Click();
+        Keyboard.Type("E2E-Testprojekt");
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
         speichernButton.AsButton().Click();
@@ -52,11 +55,17 @@ public sealed class WpfE2ETests : WpfTestBase
         neuButton.AsButton().Click();
 
         var nameTextBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
-        nameTextBox.AsTextBox().Text = "E2E-Startprojekt";
+        nameTextBox.Click();
+        Keyboard.Type("E2E-Startprojekt");
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
         speichernButton.AsButton().Click();
-        Thread.Sleep(1000);
+        Thread.Sleep(1000); // CreateAsync + Callback + ZurueckAction abwarten
+
+        // Nach dem Speichern navigiert das ViewModel zurück zur Liste — Projekt erneut öffnen
+        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName("E2E-Startprojekt"), TimeSpan.FromSeconds(5));
+        projektKachel.Click();
+        Thread.Sleep(500);
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();
@@ -82,11 +91,17 @@ public sealed class WpfE2ETests : WpfTestBase
         neuButton.AsButton().Click();
 
         var nameTextBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
-        nameTextBox.AsTextBox().Text = "E2E-CLI-Projekt";
+        nameTextBox.Click();
+        Keyboard.Type("E2E-CLI-Projekt");
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
         speichernButton.AsButton().Click();
-        Thread.Sleep(1000);
+        Thread.Sleep(1000); // CreateAsync + Callback + ZurueckAction abwarten
+
+        // Nach dem Speichern navigiert das ViewModel zurück zur Liste — Projekt erneut öffnen
+        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName("E2E-CLI-Projekt"), TimeSpan.FromSeconds(5));
+        projektKachel.Click();
+        Thread.Sleep(500);
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();

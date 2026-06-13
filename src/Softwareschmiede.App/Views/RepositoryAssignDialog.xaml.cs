@@ -6,8 +6,7 @@ namespace Softwareschmiede.App.Views;
 /// <summary>Dialog für die Zuweisung eines Repository zu einem Projekt.</summary>
 public partial class RepositoryAssignDialog : Window
 {
-    /// <inheritdoc/>
-    public RepositoryAssignDialog()
+    private RepositoryAssignDialog()
     {
         InitializeComponent();
     }

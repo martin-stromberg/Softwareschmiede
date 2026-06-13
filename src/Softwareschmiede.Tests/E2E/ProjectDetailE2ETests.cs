@@ -1,5 +1,6 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -13,11 +14,21 @@ namespace Softwareschmiede.Tests.E2E;
 /// CI-Ausschluss: dotnet test --filter "Category!=E2E"
 /// </summary>
 [Trait("Category", "E2E")]
+[Collection("E2E")]
 public sealed class ProjectDetailE2ETests : WpfTestBase
 {
     private static readonly TimeSpan Short  = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan Medium = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan Long   = TimeSpan.FromSeconds(20);
+
+    // Startet die Anwendung, holt das Hauptfenster und navigiert zur Projektliste.
+    private AutomationElement StartAndNavigateToProjects()
+    {
+        var app = LaunchApp();
+        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        NavigateToProjecten(mainWindow);
+        return mainWindow;
+    }
 
     // Navigiert zur Projektliste.
     private void NavigateToProjecten(AutomationElement mainWindow)
@@ -26,22 +37,79 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         button.AsButton().Click();
     }
 
-    // Legt ein neues Projekt an und speichert es.
-    // Das Detailoverlay bleibt nach dem ersten Speichern offen (CreateAsync setzt ProjektId).
-    private void CreateAndSaveProject(AutomationElement mainWindow, string name)
+    // Legt ein neues Projekt an, speichert es und schließt das Overlay.
+    // Nach dem Speichern navigiert das ViewModel automatisch zurück (ZurueckAction).
+    private void CreateProject(AutomationElement mainWindow, string name)
     {
         var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
         neuButton.AsButton().Click();
 
+        // Fokus setzen und Text per Tastatur eingeben, damit die WPF-Bindung (UpdateSourceTrigger=PropertyChanged)
+        // zuverlässig ausgelöst wird. AsTextBox().Text verwendet IValueProvider.SetValue(),
+        // das den TextChanged-Event in WPF nicht immer auslöst.
         var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        nameBox.AsTextBox().Text = name;
+        nameBox.Click();
+        Keyboard.Type(name);
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
-        Thread.Sleep(1000); // CreateAsync + LadenAsync fire-and-forget abwarten
+        Thread.Sleep(1000); // CreateAsync + Callback-Ausführung abwarten
+    }
+
+    // Öffnet ein Projekt aus der Liste anhand seines Namens.
+    private void OpenProject(AutomationElement mainWindow, string name)
+    {
+        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), Short);
+        projektKachel.Click();
+        Thread.Sleep(500); // Overlay-Animation abwarten
+    }
+
+    // Legt ein neues Projekt an, speichert es und öffnet es wieder.
+    private void CreateAndOpenProject(AutomationElement mainWindow, string name)
+    {
+        CreateProject(mainWindow, name);
+        OpenProject(mainWindow, name);
     }
 
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Szenario: Projektnamen ändern, zurücknavigieren, erneut öffnen.
+    /// Prüft: Projektkachel zeigt aktualisierten Namen und lässt sich erneut öffnen.
+    /// </summary>
+    [Fact]
+    public void ProjektNamenAendern_KachelAktualisiert_UndErneutoeffnen_E2E()
+    {
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Umbenennen-Original");
+
+        // Namen ändern und speichern (UpdateAsync-Pfad, bleibt in Detailansicht)
+        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
+        nameBox.Click();
+        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
+        Keyboard.Type("Umbenennen-Aktualisiert");
+
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        speichernButton.AsButton().Click();
+        Thread.Sleep(1000);
+
+        // Zurück zur Übersicht navigieren
+        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        zurueckButton.AsButton().Click();
+        Thread.Sleep(500);
+
+        // Projektkachel zeigt jetzt den neuen Namen
+        var aktualisierteKachel = WaitForElement(mainWindow, cf => cf.ByName("Umbenennen-Aktualisiert"), Short);
+        Assert.NotNull(aktualisierteKachel);
+
+        // Kachel erneut anklicken → Detailansicht öffnet sich
+        aktualisierteKachel.Click();
+        Thread.Sleep(500);
+
+        // Speichern-Button bestätigt, dass die Detailansicht geöffnet ist
+        var speichernNachWiederoeffnen = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        Assert.NotNull(speichernNachWiederoeffnen);
+    }
 
     /// <summary>
     /// Szenario: Projekt bearbeiten und speichern.
@@ -50,14 +118,14 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     [Fact]
     public void ProjektBearbeitenUndSpeichern_AktualisierterNameBleibt_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndSaveProject(mainWindow, "Edit-Test");
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Edit-Test");
 
         // Namen aktualisieren und erneut speichern (UpdateAsync-Pfad)
         var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        nameBox.AsTextBox().Text = "Edit-Test-Aktualisiert";
+        nameBox.Click();
+        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
+        Keyboard.Type("Edit-Test-Aktualisiert");
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
@@ -74,10 +142,8 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     [Fact]
     public void ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndSaveProject(mainWindow, "Loeschen-Test");
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Loeschen-Test");
 
         var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
         loeschenButton.AsButton().Click();
@@ -100,10 +166,8 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     [Fact]
     public void AufgabeNeuAnlegen_ErscheintInAufgabenliste_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndSaveProject(mainWindow, "Aufgabe-Test");
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Aufgabe-Test");
 
         // Neue Aufgabe erstellen (AutomationProperties.Name="AufgabeNeu")
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
@@ -111,7 +175,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         Thread.Sleep(1000); // Aufgabe anlegen + LadenAsync abwarten
 
         // Aufgabenliste enthält jetzt mindestens eine Aufgabe
-        var listBox = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), Short);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Short);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
     }
@@ -123,10 +187,8 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     [Fact]
     public void AufgabenFiltern_OverlayOeffnetUndSchliesst_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndSaveProject(mainWindow, "Filter-Test");
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Filter-Test");
 
         // Filter-Overlay öffnen
         var filterButton = WaitForElement(mainWindow, cf => cf.ByName("Filter"), Short);
@@ -160,10 +222,8 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     [Fact]
     public void RepositoryZuweisen_DialogOeffnetUndSchliessbarPerAbbrechen_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndSaveProject(mainWindow, "Repo-Zuweisen-Test");
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Repo-Zuweisen-Test");
 
         // "Zuweisen"-Button im Ribbon klicken
         var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
@@ -191,10 +251,8 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     [Fact]
     public void RepositoryOeffnen_ButtonExistiertInDetailansicht_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndSaveProject(mainWindow, "Repo-Oeffnen-Test");
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Repo-Oeffnen-Test");
 
         var oeffnenButton = WaitForElement(mainWindow, cf => cf.ByName("Öffnen"), Short);
         Assert.NotNull(oeffnenButton);
@@ -207,15 +265,13 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     [Fact]
     public void ZurueckZurUebersicht_SchliesstOverlayUndZeigtListe_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndSaveProject(mainWindow, "Zurueck-Test");
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Zurueck-Test");
 
         // Zurück klicken
         var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         zurueckButton.AsButton().Click();
-        Thread.Sleep(300);
+        Thread.Sleep(1000);
 
         // Overlay geschlossen — "Speichern" nicht mehr sichtbar
         var speichernNachZurueck = mainWindow.FindFirstDescendant(cf => cf.ByName("Speichern"));

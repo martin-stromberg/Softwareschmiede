@@ -23,7 +23,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     public Action? ZurueckAction { get; set; }
 
     /// <summary>Wird nach dem Erstellen oder Löschen eines Projekts aufgerufen, damit die Listenansicht die Liste aktualisiert.</summary>
-    public Action? ProjektListeAktualisierenCallback { get; set; }
+    public Func<Task>? ProjektListeAktualisierenCallback { get; set; }
 
     private Guid _projektId;
     private Projekt? _projekt;
@@ -36,6 +36,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private GitRepository? _selectedRepository;
     private AufgabenFilterTyp _aufgabenFilter = AufgabenFilterTyp.Alle;
     private bool _isFilterOverlayVisible;
+    private bool _disposed;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -45,6 +46,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref _projektId, value))
             {
+                OnPropertyChanged(nameof(IsNeuanlage));
                 _ladenCts?.Cancel();
                 _ladenCts?.Dispose();
                 _ladenCts = new CancellationTokenSource();
@@ -125,6 +127,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _isFilterOverlayVisible, value);
     }
 
+    /// <summary>Gibt an, ob die Ansicht im Neuanlage-Modus ist (noch kein persistiertes Projekt).</summary>
+    public bool IsNeuanlage => _projektId == Guid.Empty;
+
     /// <summary>Lädt das Projekt neu.</summary>
     public ICommand LadenCommand { get; }
 
@@ -160,6 +165,16 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
+    /// <summary>Öffnet den Repository-Zuweisungs-Dialog und gibt zurück, ob der Nutzer bestätigt hat. Kann in Tests überschrieben werden.</summary>
+    public Func<RepositoryAssignViewModel, bool> RepositoryDialogOeffnenFunc { get; set; } = vm =>
+    {
+        var dialog = new RepositoryAssignDialog(vm)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        return dialog.ShowDialog() == true;
+    };
+
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
         ProjektService projektService,
@@ -172,7 +187,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         _serviceProvider = serviceProvider;
         _logger = logger;
 
-        LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
+        LadenCommand = new AsyncRelayCommand(LadenAsync);
         AufgabeErstellenCommand = new AsyncRelayCommand(
             AufgabeErstellenAsync,
             () => _projektId != Guid.Empty);
@@ -187,7 +202,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         LoeschenCommand = new AsyncRelayCommand(ProjektLoeschenAsync, () => _projektId != Guid.Empty);
         FilterCommand = new RelayCommand(() => IsFilterOverlayVisible = !IsFilterOverlayVisible);
         RepositoryZuweisenCommand = new AsyncRelayCommand(RepositoryZuweisenAsync, () => _projektId != Guid.Empty);
-        RepositoryOeffnenCommand = new AsyncRelayCommand(RepositoryOeffnenAsync, () => _selectedRepository != null);
+        RepositoryOeffnenCommand = new RelayCommand(RepositoryOeffnen, () => _selectedRepository != null);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -220,7 +235,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden des Projekts {ProjektId}.", _projektId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
         finally
         {
@@ -255,8 +270,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
+    }
+
+    private async Task AktualisierenCallbackAusfuehrenAsync()
+    {
+        if (ProjektListeAktualisierenCallback != null)
+            await ProjektListeAktualisierenCallback();
     }
 
     private async Task ProjektSpeichernAsync(CancellationToken ct)
@@ -265,13 +286,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         {
             if (_projektId == Guid.Empty)
             {
-                var neuesProjekt = await _projektService.CreateAsync(ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
-                ProjektId = neuesProjekt.Id;
-                ProjektListeAktualisierenCallback?.Invoke();
+                await _projektService.CreateAsync(ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
+                await AktualisierenCallbackAusfuehrenAsync();
+                ZurueckAction?.Invoke();
             }
             else
             {
                 await _projektService.UpdateAsync(_projektId, ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
+                await AktualisierenCallbackAusfuehrenAsync();
                 await LadenAsync(ct);
             }
         }
@@ -282,7 +304,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Speichern des Projekts {ProjektId}.", _projektId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
     }
 
@@ -297,7 +319,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         try
         {
             await _projektService.DeleteAsync(_projektId, ct);
-            ProjektListeAktualisierenCallback?.Invoke();
+            await AktualisierenCallbackAusfuehrenAsync();
             ZurueckAction?.Invoke();
         }
         catch (OperationCanceledException)
@@ -307,7 +329,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Löschen des Projekts {ProjektId}.", _projektId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
     }
 
@@ -320,11 +342,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         {
             var vm = _serviceProvider.GetRequiredService<RepositoryAssignViewModel>();
             await vm.LadenAsync(ct);
-            var dialog = new RepositoryAssignDialog(vm)
-            {
-                Owner = System.Windows.Application.Current.MainWindow
-            };
-            var confirmed = dialog.ShowDialog() == true;
+            var confirmed = RepositoryDialogOeffnenFunc(vm);
+
+            if (_disposed)
+                return;
 
             if (confirmed && vm.SelectedRepository is { } repo)
             {
@@ -334,7 +355,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                     repo.RepositoryUrl,
                     repo.RepositoryName,
                     ct);
-                await LadenAsync(ct);
+
+                if (!_disposed)
+                    await LadenAsync(ct);
             }
         }
         catch (OperationCanceledException)
@@ -344,11 +367,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Zuweisen des Repositories.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
     }
 
-    private async Task RepositoryOeffnenAsync(CancellationToken ct)
+    private void RepositoryOeffnen()
     {
         if (_selectedRepository == null)
             return;
@@ -365,23 +388,28 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 });
             }
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Öffnen der Repository-URL.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
     }
+
+    private void SetFehler(Exception ex) => FehlerMeldung = $"Fehler: {ex.Message}";
 
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (_disposed)
+            return;
+        _disposed = true;
+
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
+        _ladenCts = null;
+
         if (_selectedTaskViewModel is IDisposable disposable)
             disposable.Dispose();
+        _selectedTaskViewModel = null;
     }
 }

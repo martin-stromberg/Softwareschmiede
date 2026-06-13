@@ -16,10 +16,12 @@ public abstract class WpfTestBase : IDisposable
     private readonly string _testDbPath;
 
     /// <summary>Gibt den FlaUI-Automatisierungskontext zurück.</summary>
-    protected UIA3Automation Automation => _automation!;
+    /// <exception cref="InvalidOperationException">Wird geworfen, wenn <see cref="LaunchApp"/> noch nicht aufgerufen wurde.</exception>
+    protected UIA3Automation Automation => _automation ?? throw new InvalidOperationException("LaunchApp muss vor dem Zugriff auf Automation aufgerufen werden.");
 
     /// <summary>Gibt den gestarteten FlaUI-Application-Handle zurück.</summary>
-    protected FlaUI.Core.Application FlaUiApp => _application!;
+    /// <exception cref="InvalidOperationException">Wird geworfen, wenn <see cref="LaunchApp"/> noch nicht aufgerufen wurde.</exception>
+    protected FlaUI.Core.Application FlaUiApp => _application ?? throw new InvalidOperationException("LaunchApp muss vor dem Zugriff auf FlaUiApp aufgerufen werden.");
 
     /// <summary>Initialisiert eine neue Instanz und erzeugt einen temporären DB-Pfad.</summary>
     protected WpfTestBase()
@@ -28,15 +30,32 @@ public abstract class WpfTestBase : IDisposable
             Path.GetTempPath(),
             $"softwareschmiede_e2e_{Guid.NewGuid():N}.db");
     }
+    /// <summary>
+    /// Löscht die temporäre Testdatenbank, falls sie existiert. Sollte nach jedem Test aufgerufen werden, um sicherzustellen, dass keine Testdaten zurückbleiben.
+    /// </summary>
+    protected void DeleteTestDatabase()
+    {
+        if (File.Exists(_testDbPath))
+            File.Delete(_testDbPath);
+    }
 
     /// <summary>
     /// Startet die Anwendung als Prozess mit einem temporären Datenbankpfad.
     /// Wartet, bis das Hauptfenster sichtbar ist.
     /// </summary>
-    protected FlaUI.Core.Application LaunchApp()
+    /// <param name="ensureDatabaseDeleted">Gibt an, ob die Testdatenbank vor dem Start gelöscht werden soll. Sollte normalerweise auf true gesetzt werden, um sicherzustellen, dass jeder Test mit einer frischen Datenbank beginnt.</param>
+    protected FlaUI.Core.Application LaunchApp(bool ensureDatabaseDeleted = true)
     {
+        if (ensureDatabaseDeleted)
+        {
+            DeleteTestDatabase();
+        }
+
         var appPath = ResolveAppExePath();
 
+        // WICHTIG: Die Umgebungsvariable gilt prozessweit für alle parallel laufenden Tests.
+        // Deshalb ist [Collection("E2E")] zwingend erforderlich, um parallele Ausführung zu verhindern
+        // und sicherzustellen, dass jeder Test seine eigene Datenbankinstanz isoliert benutzt.
         Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", _testDbPath);
 
         _automation = new UIA3Automation();
@@ -56,34 +75,31 @@ public abstract class WpfTestBase : IDisposable
         {
             _application?.Close();
         }
-        catch
+        catch (Exception ex)
         {
-            // Prozess könnte bereits beendet sein.
+            Console.WriteLine($"WpfTestBase.Dispose: Fehler beim Schließen der Anwendung: {ex.Message}");
         }
 
         // Warten, bis der Prozess vollständig beendet ist, damit der nächste Test
         // nicht mit einem noch laufenden Prozess konkurriert.
         try
         {
-            _application?.WaitWhileMainHandleIsMissing(TimeSpan.FromMilliseconds(1));
+            _application?.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(5));
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignorieren – Prozess ist bereits beendet.
+            Console.WriteLine($"WpfTestBase.Dispose: Warten auf Prozessende fehlgeschlagen: {ex.Message}");
         }
-
-        Thread.Sleep(1000);
 
         _automation?.Dispose();
 
         try
         {
-            if (File.Exists(_testDbPath))
-                File.Delete(_testDbPath);
+            DeleteTestDatabase();
         }
-        catch
+        catch (Exception ex)
         {
-            // Temporäre DB-Datei bereinigen – Fehler ignorieren.
+            Console.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Testdatenbank: {ex.Message}");
         }
     }
 

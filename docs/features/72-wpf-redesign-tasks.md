@@ -31,10 +31,10 @@
 | 27 | Tests | ProjektLoeschenAsync_Aborted-Test erstellen | Erledigt | ProjectDetailViewModelTests.ProjektLoeschenAsync_Aborted_RuftDeleteAsyncNichtAuf |
 | 28 | Tests | RepositoryZuweisenAsync_Success-Test erstellen | Erledigt | ProjectDetailViewModelTests.RepositoryZuweisenAsync_Success_RuftAddRepositoryAsyncAuf |
 | 29 | Tests | RepositoryOeffnenAsync_Success-Test erstellen | Erledigt | ProjectDetailViewModelTests.RepositoryOeffnenAsync_Success_OeffnetRepositoryUrl |
-| 30 | E2E-Tests | Projekt bearbeiten und speichern E2E-Test erstellen | Offen | — |
-| 31 | E2E-Tests | Projekt löschen E2E-Test erstellen | Offen | — |
-| 32 | E2E-Tests | Aufgabe neu anlegen E2E-Test erstellen | Offen | — |
-| 33 | E2E-Tests | Aufgaben filtern E2E-Test erstellen | Offen | — |
-| 34 | E2E-Tests | Repository zuweisen E2E-Test erstellen | Offen | — |
-| 35 | E2E-Tests | Repository öffnen E2E-Test erstellen | Offen | — |
-| 36 | E2E-Tests | Zurück zur Übersicht E2E-Test erstellen | Offen | — |
+| 30 | E2E-Tests | Projekt bearbeiten und speichern E2E-Test erstellen | Erledigt | ProjectDetailE2ETests.ProjektBearbeitenUndSpeichern_AktualisierterNameBleibt_E2E |
+| 31 | E2E-Tests | Projekt löschen E2E-Test erstellen | Erledigt | ProjectDetailE2ETests.ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E |
+| 32 | E2E-Tests | Aufgabe neu anlegen E2E-Test erstellen | Erledigt | ProjectDetailE2ETests.AufgabeNeuAnlegen_ErscheintInAufgabenliste_E2E |
+| 33 | E2E-Tests | Aufgaben filtern E2E-Test erstellen | Erledigt | ProjectDetailE2ETests.AufgabenFiltern_OverlayOeffnetUndSchliesst_E2E |
+| 34 | E2E-Tests | Repository zuweisen E2E-Test erstellen | Erledigt | ProjectDetailE2ETests.RepositoryZuweisen_DialogOeffnetUndSchliessbarPerAbbrechen_E2E |
+| 35 | E2E-Tests | Repository öffnen E2E-Test erstellen | Erledigt | ProjectDetailE2ETests.RepositoryOeffnen_ButtonExistiertInDetailansicht_E2E |
+| 36 | E2E-Tests | Zurück zur Übersicht E2E-Test erstellen | Erledigt | ProjectDetailE2ETests.ZurueckZurUebersicht_SchliesstOverlayUndZeigtListe_E2E |

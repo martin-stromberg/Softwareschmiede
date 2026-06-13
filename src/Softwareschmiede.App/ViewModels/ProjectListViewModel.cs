@@ -30,7 +30,7 @@ public sealed class ProjectListViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedProjekt, value) && value is not null)
             {
-                ZeigeDetailAsync(value.Id);
+                ZeigeDetail(value.Id);
             }
         }
     }
@@ -87,7 +87,7 @@ public sealed class ProjectListViewModel : ViewModelBase
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
-        ZeigeErstellungsFormularCommand = new RelayCommand(ZeigeDetailErstellungsFormularAsync);
+        ZeigeErstellungsFormularCommand = new RelayCommand(ZeigeDetailErstellungsFormular);
         ProjektArchivierenCommand = new AsyncRelayCommand(
             ProjektArchivierenAsync,
             () => SelectedProjekt is not null);
@@ -101,6 +101,14 @@ public sealed class ProjectListViewModel : ViewModelBase
         });
     }
 
+    private async Task LadenProjekteInternAsync(CancellationToken ct = default)
+    {
+        var projekte = await _projektService.GetAllAsync(ct);
+        Projekte.Clear();
+        foreach (var projekt in projekte)
+            Projekte.Add(projekt);
+    }
+
     private async Task LadenAsync(CancellationToken ct)
     {
         IsLoading = true;
@@ -108,10 +116,7 @@ public sealed class ProjectListViewModel : ViewModelBase
 
         try
         {
-            var projekte = await _projektService.GetAllAsync(ct);
-            Projekte.Clear();
-            foreach (var projekt in projekte)
-                Projekte.Add(projekt);
+            await LadenProjekteInternAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -151,34 +156,34 @@ public sealed class ProjectListViewModel : ViewModelBase
         }
     }
 
-    private void ZeigeDetailAsync(Guid projektId)
+    private void InitDetailViewModel(ProjectDetailViewModel viewModel)
     {
-        var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
         viewModel.ZurueckAction = () => DetailViewModel = null;
         viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
+    }
+
+    private void ZeigeDetail(Guid projektId)
+    {
+        var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
+        InitDetailViewModel(viewModel);
         viewModel.ProjektId = projektId;
         DetailViewModel = viewModel;
     }
 
-    private void ZeigeDetailErstellungsFormularAsync()
+    private void ZeigeDetailErstellungsFormular()
     {
         var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
-        viewModel.ZurueckAction = () => DetailViewModel = null;
-        viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
+        InitDetailViewModel(viewModel);
         viewModel.ProjektId = Guid.Empty;
         viewModel.ProjektName = string.Empty;
-        viewModel.ProjektBeschreibung = string.Empty;
         DetailViewModel = viewModel;
     }
 
-    private async void NeuesProjektHinzufuegen()
+    private async Task NeuesProjektHinzufuegen()
     {
         try
         {
-            var projekte = await _projektService.GetAllAsync();
-            Projekte.Clear();
-            foreach (var projekt in projekte)
-                Projekte.Add(projekt);
+            await LadenProjekteInternAsync();
         }
         catch (Exception ex)
         {

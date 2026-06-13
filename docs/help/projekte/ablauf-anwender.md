@@ -108,16 +108,17 @@ Die neue Aufgabe wird in der Aufgaben-Kachel angezeigt und kann bearbeitet werde
 ### Schritte
 
 1. Klicken Sie auf den „Filter"-Button im Ribbon-Menü (Gruppe „Aufgaben").
-2. Ein Overlay-Panel erscheint mit drei Filteroptionen:
-   - **Alle**: Zeigt alle Aufgaben des Projekts
+2. Ein Overlay-Panel erscheint mit drei Filteroptionen (Radio-Buttons):
+   - **Alle**: Zeigt alle Aufgaben des Projekts (Standard)
    - **Aktiv**: Zeigt nur Aufgaben mit Status „Neu", „ArbeitsverzeichnisEingerichtet", „Gestartet", „InArbeit" oder „Wartend"
    - **Archiviert**: Zeigt nur Aufgaben mit Status „Archiviert"
 3. Wählen Sie einen Filter durch Anklicken der entsprechenden Radio-Button.
+4. Klicken Sie erneut auf den „Filter"-Button, um das Panel zu schließen.
 
 ### Ergebnis
-Die Aufgabenliste wird gefiltert und zeigt nur Aufgaben des gewählten Status. Der Filter bleibt aktiv, solange Sie die Ansicht offen halten.
+Der gewählte Filter-Status bleibt aktiv und die Aufgabenliste wird entsprechend angezeigt. Der Filter wird nicht persistiert und wird auf „Alle" zurückgesetzt, wenn Sie die Projektdetailansicht erneut öffnen.
 
-> **Hinweis:** Der Filter ist nur eine Anzeigefilter; die Daten werden nicht gelöscht, nur ausgeblendet. Klicken Sie erneut auf „Filter", um das Panel zu schließen.
+> **Hinweis:** Der Filter ist ein Anzeigefilter; alle Aufgaben werden geladen, aber nur die gefilterten werden angezeigt. Die Daten werden nicht gelöscht, nur ausgeblendet.
 
 ## Aufgabe öffnen
 

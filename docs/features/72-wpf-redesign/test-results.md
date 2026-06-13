@@ -6,75 +6,78 @@
 
 ## Fehlgeschlagene Tests
 
-Keine fehlgeschlagenen Tests vorhanden.
+Keine Tests fehlgeschlagen.
 
 ## Zusammenfassung
 
-- Gesamt: 407
-- Bestanden: 399
+- Gesamt: 416
+- Bestanden: 416
 - Fehlgeschlagen: 0
-- Übersprungen: 8
-
-### Details nach Test-Assembly
-
-#### Softwareschmiede.Tests
-- Gesamt: 407
-- Bestanden: 399
-- Übersprungen: 8
-- Gesamtdauer: 3,97 Sekunden
-
-#### Softwareschmiede.IntegrationTests
-- Gesamt: 84
-- Bestanden: 84
 - Übersprungen: 0
-- Gesamtdauer: 12,96 Sekunden
 
 ## Testabdeckung
 
-**Abdeckung:** 46.8 %
+**Abdeckung:** 25.36 %
 
-| Paket | Zeilenabdeckung | Zeilen |
-|-------|-----------------|--------|
-| Softwareschmiede | 22.5 % | 4523/17969 |
-| Softwareschmiede.App | 8.0 % | 0 % Abdeckung |
-| Softwareschmiede.Plugin.ClaudeCli | 67.1 % | Gut |
-| Softwareschmiede.Plugin.Contracts | 34.8 % | Teilweise |
-| Softwareschmiede.Plugin.GitHubCopilot | 70.7 % | Gut |
-| Softwareschmiede.Plugin.LocalDirectory | 66.0 % | Teilweise |
-
-**Gesamt:** 15.740 Lines of Code covered / 33.638 total
-
-## Übersprungene Tests
-
-Alle 8 übersprungenen Tests sind WPF-E2E-Tests, die in einer Headless-CI-Umgebung nicht ausführbar sind:
-
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.ProjektErstellen_UndNeueAufgabeAnlegen_E2E`
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.EinstellungenOeffnen_ZeigtEinstellungsSeite_E2E`
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.AufgabeAnlegen_ZeigtCliStartenButton_E2E`
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.Dashboard_KeineRecoveryBanner_BeiSauberemStart_E2E`
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.DarkModeAktivierenUndPersistieren_E2E`
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.EinstellungenNavigation_BleibtNachMehrerenKlicks_Stabil_E2E`
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.ProjektErstellen_ZeigtAufgabenListe_E2E`
-- `Softwareschmiede.Tests.E2E.WpfE2ETests.EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E`
-
-**Grund:** „Erfordert eine Windows-Desktop-Session und ein vorab gebautes Softwareschmiede.App.exe. Nicht in Headless-CI ausführbar."
+| Datei | Abdeckung |
+|-------|-----------|
+| src\Softwareschmiede.App\ViewModels\MainWindowViewModel.cs | 0% |
+| src\Softwareschmiede\Migrations\20260507051631_202507_Fix_DateTimeOffset_SQLiteOrdering.cs | 0% |
+| src\Softwareschmiede\Domain\ValueObjects\FileTreeNode.cs | 0% |
+| src\Softwareschmiede.App\Controls\RibbonGroup.xaml | 0% |
+| src\Softwareschmiede.App\Controls\RecoveryBannerControl.xaml | 0% |
+| src\Softwareschmiede.App\ViewModels\DashboardViewModel.cs | 0% |
+| src\Softwareschmiede.App\Controls\RibbonSmallButton.xaml.cs | 0% |
+| src\Softwareschmiede\Infrastructure\Services\CliRunner.cs | 0% |
+| src\Softwareschmiede\Migrations\SoftwareschmiededDbContextModelSnapshot.cs | 0% |
+| src\Softwareschmiede.App\Services\WpfAudioService.cs | 0% |
+| src\Softwareschmiede.Plugin.Contracts\Domain\ValueObjects\AgentInfo.cs | 0% |
+| src\Softwareschmiede\Infrastructure\Data\SoftwareschmiededDbContextDesignTimeFactory.cs | 0% |
+| src\Softwareschmiede\Application\Services\CliProcessManager.cs | 0% |
+| src\Softwareschmiede\Migrations\20260506195327_InitialCreate.cs | 0% |
+| src\Softwareschmiede\Migrations\20260612193852_202606120001_RenameBannerModus.cs | 0% |
+| src\Softwareschmiede\Migrations\20260610000003_202606100003_AddWindowGeometrySettings.cs | 0% |
+| src\Softwareschmiede.App\Views\SettingsView.xaml.cs | 0% |
+| src\Softwareschmiede.App\Controls\RibbonGroup.xaml.cs | 0% |
+| src\Softwareschmiede\Application\Services\KiAufgabenBenachrichtigungsHub.cs | 0% |
+| src\Softwareschmiede.App\Controls\RibbonSmallButton.xaml | 0% |
+| src\Softwareschmiede\Migrations\20260531192120_202606011955_AddTaskPromptSuggestionColumns.cs | 0% |
+| src\Softwareschmiede.App\ViewModels\ProjectListViewModel.cs | 0% |
+| src\Softwareschmiede.App\Views\TaskDetailView.xaml.cs | 0% |
+| src\Softwareschmiede.App\Views\PluginSettingsView.xaml.cs | 0% |
+| src\Softwareschmiede.App\Views\TaskDetailView.xaml | 0% |
+| src\Softwareschmiede\Migrations\20260610000001_202606100001_UpdateAufgabeStatusEnum.cs | 0% |
+| src\Softwareschmiede\Infrastructure\Services\SystemShutdownService.cs | 0% |
+| src\Softwareschmiede\Domain\Entities\PluginKonfiguration.cs | 0% |
+| src\Softwareschmiede.Plugin.Contracts\Domain\Interfaces\IGitPlugin.cs | 0% |
+| src\Softwareschmiede.App\Controls\ProcessWindowHost.cs | 0% |
+| src\Softwareschmiede.App\Controls\RecoveryBannerControl.xaml.cs | 0% |
+| src\Softwareschmiede.App\Views\RepositoryAssignDialog.xaml | 0% |
+| src\Softwareschmiede.App\Views\ProjectListView.xaml.cs | 0% |
+| src\Softwareschmiede.App\Views\PluginSettingsView.xaml | 0% |
+| src\Softwareschmiede\Migrations\20260523113807_AddKiTaskNotifications.cs | 0% |
+| src\Softwareschmiede.App\Views\DashboardView.xaml.cs | 0% |
+| src\Softwareschmiede.App\App.xaml.cs | 0% |
+| src\Softwareschmiede\Migrations\20260523052722_202605230001_AddTaskRecoveryIndicators.cs | 0% |
+| src\Softwareschmiede.App\Controls\RibbonLargeButton.xaml | 0% |
+| src\Softwareschmiede\Infrastructure\Services\WindowsCredentialStore.cs | 0% |
+| src\Softwareschmiede.App\Views\ProjectDetailView.xaml | 0% |
+| src\Softwareschmiede\Infrastructure\Services\BenutzerkontextService.cs | 0% |
+| src\Softwareschmiede.App\ViewModels\TaskListViewModel.cs | 0% |
+| src\Softwareschmiede.App\ViewModels\SettingsViewModel.cs | 0% |
+| src\Softwareschmiede.App\Controls\StatusIndicatorControl.xaml | 0% |
+| src\Softwareschmiede.App\Views\TaskListView.xaml | 0% |
+| src\Softwareschmiede.App\Views\RepositoryAssignDialog.xaml.cs | 0% |
+| src\Softwareschmiede\Migrations\20260610000002_202606100002_UpdateBenachrichtigungsEnums.cs | 0% |
+| src\Softwareschmiede\Migrations\20260522192947_202605171230_AddDiffComparison.cs | 0% |
+| src\Softwareschmiede\Migrations\20260516085728_202605161100_RemoveStartScriptArguments.cs | 0% |
 
 ## Fehlende Tests
 
-Quelle: `Coverage-Daten`
+Quelle: Coverage-Daten
 
-Die folgenden Pakete haben niedrige oder 0 % Zeilenabdeckung:
-
-- `Softwareschmiede.App` — 8.0 % Abdeckung (WPF UI-Layer, wird nur durch übersprungene E2E-Tests getestet)
-- `Softwareschmiede` — 22.5 % Abdeckung (Domain und Geschäftslogik teilweise ungetestet)
-- `Softwareschmiede.Plugin.Contracts` — 34.8 % Abdeckung (Plugin-Verträge unvollständig getestet)
-- `Softwareschmiede.Plugin.LocalDirectory` — 66.0 % Abdeckung (Lokales Verzeichnis-Plugin teilweise ungetestet)
-- `Softwareschmiede.Plugin.ClaudeCli` — 67.1 % Abdeckung (Claude CLI-Plugin teilweise ungetestet)
-- `Softwareschmiede.Plugin.GitHubCopilot` — 70.7 % Abdeckung (GitHub Copilot-Plugin teilweise ungetestet)
-
-## Hinweise
-
-- Die niedrige Abdeckung bei `Softwareschmiede.App` ist erwartungsgemäß, da WPF-Code nur über E2E-Tests (mit FlaUI) prüfbar ist, die in dieser CI-Umgebung nicht ausgeführt werden
-- Die Domain- und Infrastructure-Schichten haben relativ gute Abdeckung
-- Plugin-Pakete haben reduzierte Abdeckung wegen Mock-Dependencies und externen Service-Abhängigkeiten
-- Die neuen WPF-Redesign-Komponenten (`ProjectDetailViewModel`, `ProjectListViewModel`, `RepositoryAssignViewModel`) sind Unit-getestet, aber die XAML-Layer wird nur durch übersprungene E2E-Tests abgedeckt
+Dateien ohne Testabdeckung (0 % Abdeckung) umfassen primär:
+- **Migrations** (Designer.cs und Snapshot-Dateien) — automatisch generiert
+- **WPF-Views und ViewModels** (XAML, Code-Behind) — UI-Layer ohne Unit-Tests
+- **App-Services und Plugin-Implementierungen** — werden durch E2E-Tests verdeckt, nicht direkt getestet
+- **Infrastruktur-Services** (CliRunner, WindowsCredentialStore, SystemShutdownService) — Hard-Dependencies auf System-Ressourcen

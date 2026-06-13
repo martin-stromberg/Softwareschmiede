@@ -10,26 +10,28 @@ Ein Projekt hat einen Namen, eine optionale Beschreibung und einen Status (`Akti
 
 ### Projektdetailansicht
 
-Die Projektdetailansicht zeigt ein Ribbon-Menü mit Aktionen, gruppiert nach Funktionsbereichen:
+Die Projektdetailansicht ist das zentrale Bearbeitungswerkzeug für Projekte und ist in ein Office-ähnliches Ribbon-Menü und zwei Inhalts-Kacheln unterteilt.
+
+**Ribbon-Menü** mit vier Aktionsgruppen:
 
 **Navigation**
-- **Zurück**: Kehrt zur Projektübersicht zurück.
+- **Zurück** (←): Kehrt zur Projektübersicht zurück.
 
 **Projekt**
-- **Speichern**: Speichert Änderungen am Projektnamen und der Beschreibung. Beim Anlegen eines neuen Projekts wird es hier erstmalig erstellt.
-- **Löschen**: Löscht das Projekt nach Bestätigungsabfrage.
+- **Speichern** (💾): Speichert Änderungen am Projektnamen und der Beschreibung. Beim Anlegen eines neuen Projekts wird es hier erstmalig in der Datenbank erstellt und die Ansicht schaltet in den Bearbeitungsmodus.
+- **Löschen** (🗑): Löscht das Projekt nach Bestätigungsabfrage. Diese Aktion kann nicht rückgängig gemacht werden und löscht auch alle zugeordneten Aufgaben.
 
 **Aufgaben**
-- **Neu**: Erstellt eine neue Aufgabe für das Projekt und öffnet deren Detailansicht.
-- **Filter**: Zeigt ein Overlay-Panel zum Filtern der Aufgabenliste nach Status (Alle, Aktiv, Archiviert).
+- **Neue Aufgabe** (➕): Erstellt sofort eine neue Aufgabe für das Projekt mit dem Standardtitel "Neue Aufgabe" und öffnet ihre Detailansicht.
+- **Filter** (🔽): Zeigt/verbirgt ein Overlay-Panel zum Filtern der Aufgabenliste nach Status (Alle, Aktiv, Archiviert) über Radio-Buttons.
 
 **Repository**
-- **Zuweisen**: Öffnet einen Dialog zur Auswahl und Zuweisung eines Git-Repository zum Projekt.
-- **Öffnen**: Öffnet das ausgewählte Repository im Standard-Webbrowser.
+- **Zuweisen** (🔗): Öffnet einen Dialog zur Auswahl und Zuweisung eines vorhandenen Git-Repository zum Projekt.
+- **Öffnen** (🌐): Öffnet das aktuell ausgewählte Repository im Standard-Webbrowser (Funktion deaktiviert ohne Auswahl).
 
-Die Ansicht ist in zwei Kacheln organisiert:
-- **Projekt-Kachel**: Zeigt und ermöglicht Bearbeitung von Projektsymbol (📁), Name und Beschreibung. Der Name ist Pflichtfeld für das Speichern.
-- **Aufgaben-Kachel**: Listet alle Aufgaben des Projekts mit Status auf. Doppelklick auf eine Aufgabe öffnet deren Detailansicht.
+**Inhalts-Kacheln:**
+- **Projekt-Kachel** (oben, immer sichtbar): Zeigt das Projektsymbol (📁), einen bearbeitbaren Projektnamen und eine bearbeitbare Projektbeschreibung. Der Name ist Pflichtfeld und das „Speichern"-Button wird deaktiviert, solange das Feld leer ist.
+- **Aufgaben-Kachel** (unten, nur bei bestehendem Projekt): Listet alle Aufgaben des Projekts mit Titel und Status auf. Doppelklick öffnet die Aufgabendetailansicht inline; das Filter-Overlay ermöglicht die Einschränkung auf aktive oder archivierte Aufgaben.
 
 ### Repositories
 

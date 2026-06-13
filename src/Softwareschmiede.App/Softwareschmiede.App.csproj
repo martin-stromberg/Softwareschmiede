@@ -25,6 +25,8 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj"
                       ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.KiSimulator\Softwareschmiede.Plugin.KiSimulator.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,6 +46,7 @@
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\net10.0\*.dll" />
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\net10.0\*.dll" />
       <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\net10.0\*.dll" />
+      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.KiSimulator\bin\$(Configuration)\net10.0\*.dll" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins" />
     <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(OutDir)plugins" SkipUnchangedFiles="true" />

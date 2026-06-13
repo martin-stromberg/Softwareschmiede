@@ -27,7 +27,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    private ProjectDetailViewModel CreateSut(Action? zurueckAction = null, Action? projektHinzugefuegtCallback = null)
+    private ProjectDetailViewModel CreateSut(Action? zurueckAction = null, Func<Task>? projektHinzugefuegtCallback = null)
     {
         var vm = new ProjectDetailViewModel(
             _projektService,
@@ -39,24 +39,24 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         return vm;
     }
 
-    /// <summary>ProjektSpeichernAsync ruft CreateAsync auf, wenn die ID leer ist.</summary>
+    /// <summary>ProjektSpeichernAsync ruft CreateAsync auf und navigiert zurück, wenn die ID leer ist.</summary>
     [Fact]
     public async Task ProjektSpeichernAsync_ErstelltNeuesProjekt_WennIdLeer()
     {
         // Arrange
-        var sut = CreateSut();
+        var zurueckAufgerufen = false;
+        var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.ProjektName = "Neues Projekt";
         sut.ProjektBeschreibung = "Eine Beschreibung";
 
         // Act
-        sut.SpeichernCommand.Execute(null);
-        await Task.Delay(200);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
-        // Assert
-        sut.ProjektId.Should().NotBeEmpty();
-        var projekt = await _projektService.GetByIdAsync(sut.ProjektId);
-        projekt.Should().NotBeNull();
-        projekt!.Name.Should().Be("Neues Projekt");
+        // Assert: ZurueckAction wird nach Erstellung aufgerufen
+        zurueckAufgerufen.Should().BeTrue();
+        // Projekt ist in der DB vorhanden
+        var projekte = await _projektService.GetAllAsync();
+        projekte.Should().Contain(p => p.Name == "Neues Projekt");
     }
 
     /// <summary>ProjektSpeichernAsync ruft UpdateAsync auf, wenn eine ID gesetzt ist.</summary>
@@ -67,14 +67,13 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var projekt = await _projektService.CreateAsync("Alter Name", null);
         var sut = CreateSut();
         sut.ProjektId = projekt.Id;
-        await Task.Delay(100);
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.ProjektName = "Neuer Name";
         sut.ProjektBeschreibung = "Neue Beschreibung";
 
         // Act
-        sut.SpeichernCommand.Execute(null);
-        await Task.Delay(200);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         // Assert
         var aktualisiert = await _projektService.GetByIdAsync(projekt.Id);
@@ -92,11 +91,10 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.ProjektId = projekt.Id;
         sut.LoeschenBestaetigenFunc = () => true;
-        await Task.Delay(100);
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // Act
-        sut.LoeschenCommand.Execute(null);
-        await Task.Delay(200);
+        await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
 
         // Assert
         zurueckAufgerufen.Should().BeTrue();
@@ -114,11 +112,10 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.ProjektId = projekt.Id;
         sut.LoeschenBestaetigenFunc = () => false;
-        await Task.Delay(100);
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // Act
-        sut.LoeschenCommand.Execute(null);
-        await Task.Delay(200);
+        await ((AsyncRelayCommand)sut.LoeschenCommand).ExecuteAsync();
 
         // Assert
         zurueckAufgerufen.Should().BeFalse();
@@ -156,29 +153,23 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         // Arrange
         var callbackAufgerufen = false;
-        var sut = CreateSut(projektHinzugefuegtCallback: () => callbackAufgerufen = true);
+        var sut = CreateSut(projektHinzugefuegtCallback: () => { callbackAufgerufen = true; return Task.CompletedTask; });
         sut.ProjektName = "Callback-Test-Projekt";
 
         // Act
-        sut.SpeichernCommand.Execute(null);
-        await Task.Delay(200);
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         // Assert
         callbackAufgerufen.Should().BeTrue();
     }
 
-    /// <summary>RepositoryZuweisenAsync ruft AddRepositoryAsync auf, wenn ein Repository ausgewählt wurde (per Callback-Simulation).</summary>
+    /// <summary>RepositoryZuweisenAsync ruft AddRepositoryAsync auf und aktualisiert SelectedRepository, wenn der Dialog bestätigt wird.</summary>
     [Fact]
-    public async Task RepositoryZuweisenAsync_Success_RuftAddRepositoryAsyncAuf()
+    public async Task RepositoryZuweisenAsync_Success_RuftAddRepositoryAsyncAufUndAktualisiertViewModel()
     {
         // Arrange
         var projekt = await _projektService.CreateAsync("Repository-Test-Projekt", null);
-        var addRepositoryAufgerufen = false;
 
-        // Wir simulieren RepositoryZuweisenAsync direkt über den ProjektService-Aufruf,
-        // indem wir das ViewModel nach dem Speichern des Projekts prüfen.
-        // Der Dialog kann in Unit-Tests nicht geöffnet werden (kein GUI-Thread),
-        // deshalb testen wir den Service-Aufruf direkt.
         var testRepo = new GitRepository
         {
             Id = Guid.NewGuid(),
@@ -188,30 +179,50 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             RepositoryName = "test-repo"
         };
 
-        // Simuliere was nach Dialog-Bestätigung passiert:
-        await _projektService.AddRepositoryAsync(
-            projekt.Id,
-            testRepo.PluginTyp,
-            testRepo.RepositoryUrl,
-            testRepo.RepositoryName);
-        addRepositoryAufgerufen = true;
+        var repositoryAssignVm = new RepositoryAssignViewModel(
+            _projektService,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<RepositoryAssignViewModel>.Instance);
+        repositoryAssignVm.SelectedRepository = testRepo;
 
-        // Assert
-        addRepositoryAufgerufen.Should().BeTrue();
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(RepositoryAssignViewModel)))
+            .Returns(repositoryAssignVm);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Simuliere Dialog-Bestätigung über austauschbare Func
+        sut.RepositoryDialogOeffnenFunc = _ => true;
+
+        // Act
+        await ((AsyncRelayCommand)sut.RepositoryZuweisenCommand).ExecuteAsync();
+
+        // Assert: Service hat AddRepositoryAsync aufgerufen
         var detail = await _projektService.GetDetailAsync(projekt.Id);
         detail!.Repositories.Should().HaveCount(1);
         detail.Repositories[0].RepositoryUrl.Should().Be("https://github.com/test/repo");
+
+        // Assert: ViewModel hat SelectedRepository aktualisiert
+        sut.SelectedRepository.Should().NotBeNull();
     }
 
-    /// <summary>RepositoryOeffnenAsync öffnet die URL des ausgewählten Repositories.</summary>
+    /// <summary>RepositoryOeffnenCommand hat CanExecute false, wenn kein Repository geladen ist.</summary>
     [Fact]
-    public async Task RepositoryOeffnenAsync_Success_OeffnetRepositoryUrl()
+    public void RepositoryOeffnenCommand_CanExecuteFalse_OhneRepository()
     {
         // Arrange
         var sut = CreateSut();
 
-        // Wir setzen SelectedRepository direkt über Reflection (da kein öffentlicher Setter),
-        // und prüfen dass RepositoryOeffnenCommand.CanExecute true zurückgibt wenn ein Repo gesetzt ist.
+        // Assert
+        sut.RepositoryOeffnenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>RepositoryOeffnenCommand hat CanExecute true, nachdem ein Projekt mit Repository geladen wurde.</summary>
+    [Fact]
+    public async Task RepositoryOeffnenCommand_CanExecuteTrue_WennRepositoryGeladen()
+    {
+        // Arrange
         var repo = new GitRepository
         {
             Id = Guid.NewGuid(),
@@ -220,11 +231,6 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             RepositoryName = "test-repo"
         };
 
-        // SelectedRepository hat keinen öffentlichen Setter - wir testen CanExecute-Logik:
-        // Ohne Repository muss CanExecute false sein.
-        sut.RepositoryOeffnenCommand.CanExecute(null).Should().BeFalse();
-
-        // Wir laden ein echtes Projekt mit Repository, um den vollen Pfad zu testen.
         var projekt = await _projektService.CreateAsync("URL-Test-Projekt", null);
         await _projektService.AddRepositoryAsync(
             projekt.Id,
@@ -232,10 +238,11 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             repo.RepositoryUrl,
             repo.RepositoryName);
 
+        var sut = CreateSut();
         sut.ProjektId = projekt.Id;
-        await Task.Delay(300);
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        // Nach dem Laden sollte SelectedRepository gesetzt sein und CanExecute true.
+        // Assert: Nach dem Laden ist CanExecute true
         sut.RepositoryOeffnenCommand.CanExecute(null).Should().BeTrue();
     }
 }

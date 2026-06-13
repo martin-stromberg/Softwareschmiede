@@ -110,68 +110,12 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <!-- Projektdetail (Overlay) -->
-        <Border Grid.Row="0"
-                Grid.RowSpan="2"
-                Background="{DynamicResource SurfaceBrush}"
-                Panel.ZIndex="12"
-                Visibility="{Binding DetailViewModel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-            <Border Background="Black"
-                    Opacity="0.5" />
-        </Border>
-
-        <Border Grid.Row="0"
-                Grid.RowSpan="2"
-                Background="{DynamicResource SurfaceBrush}"
-                Panel.ZIndex="13"
-                CornerRadius="12"
-                MaxWidth="900"
-                MaxHeight="600"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Padding="0"
-                Visibility="{Binding DetailViewModel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="1">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <!-- Header mit Schließen-Button -->
-                <Border Grid.Row="0"
-                        Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="0,0,0,1"
-                        Padding="16,12">
-                    <Grid>
-                        <TextBlock Text="Projektdetails"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   VerticalAlignment="Center" />
-                        <Button Content="✕"
-                                Command="{Binding SchliesseDetailCommand}"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                Width="32"
-                                Height="32"
-                                Padding="0"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                Foreground="{DynamicResource SecondaryTextBrush}"
-                                FontSize="16"
-                                Cursor="Hand" />
-                    </Grid>
-                </Border>
-
-                <!-- Detail-Inhalt -->
-                <ContentControl Grid.Row="1"
-                                Content="{Binding DetailViewModel}"
-                                Margin="16" />
-            </Grid>
-        </Border>
+        <!-- Projektdetail (Vollbild-Overlay) -->
+        <ContentControl Grid.Row="0"
+                        Grid.RowSpan="2"
+                        Content="{Binding DetailViewModel}"
+                        Panel.ZIndex="13"
+                        Visibility="{Binding DetailViewModel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
 
         <!-- Fehlermeldung (ZIndex über Modal-Overlays, damit sie auch bei offenem Dialog sichtbar ist) -->
         <Border Grid.Row="0"
