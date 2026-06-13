@@ -4,6 +4,22 @@ using System.Windows.Data;
 
 namespace Softwareschmiede.App.Converters;
 
+/// <summary>Konvertiert einen Enum-Wert auf <see cref="bool"/> für RadioButton-Bindungen.</summary>
+/// <remarks>ConverterParameter enthält den Enum-Wert, gegen den verglichen wird.</remarks>
+[ValueConversion(typeof(object), typeof(bool))]
+public sealed class EnumToBoolConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value?.ToString() == parameter?.ToString();
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is true && parameter is not null
+            ? Enum.Parse(targetType, parameter.ToString()!)
+            : Binding.DoNothing;
+}
+
 /// <summary>Konvertiert einen Boolean-Wert in <see cref="Visibility"/>.</summary>
 [ValueConversion(typeof(bool), typeof(Visibility))]
 public sealed class BoolToVisibilityConverter : IValueConverter

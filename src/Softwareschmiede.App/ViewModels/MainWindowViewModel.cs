@@ -85,9 +85,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         Title = "Softwareschmiede – Dashboard";
     }
 
+    private ProjectListViewModel? _projectListViewModel;
+
     private void NavigateToProjectList()
     {
-        CurrentView = _serviceProvider.GetRequiredService<ProjectListViewModel>();
+        _projectListViewModel ??= _serviceProvider.GetRequiredService<ProjectListViewModel>();
+        CurrentView = _projectListViewModel;
         Title = "Softwareschmiede – Projekte";
     }
 

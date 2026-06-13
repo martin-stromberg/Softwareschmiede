@@ -14,6 +14,7 @@
             <converters:BoolToWidthConverter x:Key="BoolToWidthConverter" />
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
             <converters:NullOrEmptyToVisibilityConverter x:Key="NullOrEmptyToVisibilityConverter" />
+            <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

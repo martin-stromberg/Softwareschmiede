@@ -58,6 +58,9 @@ public sealed class DashboardViewModel : ViewModelBase
     /// <summary>Liste von Recovery-Kandidaten.</summary>
     public ObservableCollection<Guid> RecoveryKandidaten { get; } = new();
 
+    /// <summary>Gibt an, ob es Recovery-Kandidaten gibt.</summary>
+    public bool HatRecoveryKandidaten => RecoveryKandidaten.Count > 0;
+
     /// <summary>Liste der zuletzt aktiven Projekte.</summary>
     public ObservableCollection<Projekt> LetzteProjects { get; } = new();
 
@@ -77,6 +80,7 @@ public sealed class DashboardViewModel : ViewModelBase
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
+        RecoveryKandidaten.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HatRecoveryKandidaten));
     }
 
     private async Task LadenAsync(CancellationToken ct)

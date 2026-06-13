@@ -17,9 +17,6 @@ public sealed class ProjectListViewModel : ViewModelBase
     private Projekt? _selectedProjekt;
     private bool _isLoading;
     private string? _fehlerMeldung;
-    private string _neuerProjektName = string.Empty;
-    private string _neuerProjektBeschreibung = string.Empty;
-    private bool _isCreateFormVisible;
     private ViewModelBase? _detailViewModel;
 
     /// <summary>Liste aller Projekte.</summary>
@@ -42,7 +39,12 @@ public sealed class ProjectListViewModel : ViewModelBase
     public ViewModelBase? DetailViewModel
     {
         get => _detailViewModel;
-        private set => SetProperty(ref _detailViewModel, value);
+        private set
+        {
+            var old = _detailViewModel;
+            SetProperty(ref _detailViewModel, value);
+            if (old is IDisposable d) d.Dispose();
+        }
     }
 
     /// <summary>Gibt an, ob Daten geladen werden.</summary>
@@ -59,38 +61,20 @@ public sealed class ProjectListViewModel : ViewModelBase
         private set => SetProperty(ref _fehlerMeldung, value);
     }
 
-    /// <summary>Name für das neue Projekt.</summary>
-    public string NeuerProjektName
-    {
-        get => _neuerProjektName;
-        set => SetProperty(ref _neuerProjektName, value);
-    }
-
-    /// <summary>Beschreibung für das neue Projekt.</summary>
-    public string NeuerProjektBeschreibung
-    {
-        get => _neuerProjektBeschreibung;
-        set => SetProperty(ref _neuerProjektBeschreibung, value);
-    }
-
-    /// <summary>Gibt an, ob das Erstellungsformular sichtbar ist.</summary>
-    public bool IsCreateFormVisible
-    {
-        get => _isCreateFormVisible;
-        set => SetProperty(ref _isCreateFormVisible, value);
-    }
-
     /// <summary>Lädt die Projektliste.</summary>
     public ICommand LadenCommand { get; }
 
-    /// <summary>Zeigt das Erstellungsformular an.</summary>
+    /// <summary>Öffnet die Detailansicht im Anlage-Modus.</summary>
     public ICommand ZeigeErstellungsFormularCommand { get; }
-
-    /// <summary>Erstellt ein neues Projekt.</summary>
-    public ICommand ProjektErstellenCommand { get; }
 
     /// <summary>Archiviert das ausgewählte Projekt.</summary>
     public ICommand ProjektArchivierenCommand { get; }
+
+    /// <summary>Schließt die Detailansicht.</summary>
+    public ICommand SchliesseDetailCommand { get; }
+
+    /// <summary>Wählt ein Projekt aus und zeigt die Details.</summary>
+    public ICommand WaehleProjektCommand { get; }
 
     /// <inheritdoc cref="ProjectListViewModel"/>
     public ProjectListViewModel(
@@ -103,13 +87,18 @@ public sealed class ProjectListViewModel : ViewModelBase
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
-        ZeigeErstellungsFormularCommand = new RelayCommand(() => IsCreateFormVisible = true);
-        ProjektErstellenCommand = new AsyncRelayCommand(
-            ProjektErstellenAsync,
-            () => !string.IsNullOrWhiteSpace(NeuerProjektName));
+        ZeigeErstellungsFormularCommand = new RelayCommand(ZeigeDetailErstellungsFormularAsync);
         ProjektArchivierenCommand = new AsyncRelayCommand(
             ProjektArchivierenAsync,
             () => SelectedProjekt is not null);
+        SchliesseDetailCommand = new RelayCommand(() => DetailViewModel = null);
+        WaehleProjektCommand = new RelayCommand<Projekt>(projekt =>
+        {
+            if (projekt is not null)
+            {
+                SelectedProjekt = projekt;
+            }
+        });
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -139,35 +128,6 @@ public sealed class ProjectListViewModel : ViewModelBase
         }
     }
 
-    private async Task ProjektErstellenAsync(CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(NeuerProjektName))
-            return;
-
-        try
-        {
-            var projekt = await _projektService.CreateAsync(
-                NeuerProjektName.Trim(),
-                string.IsNullOrWhiteSpace(NeuerProjektBeschreibung) ? null : NeuerProjektBeschreibung.Trim(),
-                ct);
-
-            Projekte.Add(projekt);
-            SelectedProjekt = projekt;
-            NeuerProjektName = string.Empty;
-            NeuerProjektBeschreibung = string.Empty;
-            IsCreateFormVisible = false;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Erstellen des Projekts.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
-        }
-    }
-
     private async Task ProjektArchivierenAsync(CancellationToken ct)
     {
         if (SelectedProjekt is null)
@@ -194,7 +154,36 @@ public sealed class ProjectListViewModel : ViewModelBase
     private void ZeigeDetailAsync(Guid projektId)
     {
         var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
+        viewModel.ZurueckAction = () => DetailViewModel = null;
+        viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
         viewModel.ProjektId = projektId;
         DetailViewModel = viewModel;
+    }
+
+    private void ZeigeDetailErstellungsFormularAsync()
+    {
+        var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
+        viewModel.ZurueckAction = () => DetailViewModel = null;
+        viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
+        viewModel.ProjektId = Guid.Empty;
+        viewModel.ProjektName = string.Empty;
+        viewModel.ProjektBeschreibung = string.Empty;
+        DetailViewModel = viewModel;
+    }
+
+    private async void NeuesProjektHinzufuegen()
+    {
+        try
+        {
+            var projekte = await _projektService.GetAllAsync();
+            Projekte.Clear();
+            foreach (var projekt in projekte)
+                Projekte.Add(projekt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Nachladen der Projektliste.");
+            FehlerMeldung = $"Fehler: {ex.Message}";
+        }
     }
 }

@@ -2,82 +2,236 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource BackgroundBrush}">
-    <Grid Margin="24">
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Ladesymbol -->
-        <TextBlock Grid.Row="0"
-                   Text="Wird geladen…"
-                   Foreground="{DynamicResource SecondaryTextBrush}"
-                   Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+        <!-- Ribbon-Menü -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,12">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Projektdetails"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,24,0" />
 
-        <!-- Projekttitel -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8"
-                    Visibility="{Binding Projekt, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-            <TextBlock Text="{Binding Projekt.Name}"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource PrimaryTextBrush}" />
-        </StackPanel>
+                <!-- Gruppe: Navigation -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                    <Button Content="Zurück"
+                            Command="{Binding ZurueckCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource SurfaceBrush}"
+                            Foreground="{DynamicResource PrimaryTextBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            Margin="0,0,8,0" />
+                </StackPanel>
 
-        <!-- Aktionen -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,16">
-            <Button Content="+ Neue Aufgabe"
-                    Command="{Binding AufgabeErstellenCommand}"
-                    Padding="12,6"
-                    Background="{DynamicResource AccentBrush}"
-                    Foreground="White"
-                    BorderThickness="0"
-                    Margin="0,0,8,0" />
-        </StackPanel>
+                <!-- Gruppe: Projekt -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                    <Button Content="Speichern"
+                            Command="{Binding SpeichernCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource AccentBrush}"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Margin="0,0,8,0" />
+                    <Button Content="Löschen"
+                            Command="{Binding LoeschenCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource SurfaceBrush}"
+                            Foreground="{DynamicResource PrimaryTextBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1" />
+                </StackPanel>
 
-        <!-- Aufgabenliste -->
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+                <!-- Gruppe: Aufgaben -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                    <Button Content="Neu"
+                            Command="{Binding AufgabeErstellenCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource AccentBrush}"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Margin="0,0,8,0" />
+                    <Button Content="Filter"
+                            Command="{Binding FilterCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource SurfaceBrush}"
+                            Foreground="{DynamicResource PrimaryTextBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1" />
+                </StackPanel>
 
-            <ListBox Grid.Column="0"
-                     ItemsSource="{Binding Aufgaben}"
-                     Background="Transparent"
-                     BorderBrush="{DynamicResource BorderBrush}"
-                     BorderThickness="1"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <Grid Margin="8,4">
-                            <Grid.RowDefinitions>
-                                <RowDefinition />
-                                <RowDefinition />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0"
-                                       Text="{Binding Titel}"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource PrimaryTextBrush}"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="1"
-                                       Text="{Binding Status}"
-                                       FontSize="11"
-                                       Foreground="{DynamicResource SecondaryTextBrush}" />
-                        </Grid>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
-                    </Style>
-                </ListBox.ItemContainerStyle>
-            </ListBox>
+                <!-- Gruppe: Repository -->
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Zuweisen"
+                            Command="{Binding RepositoryZuweisenCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource SurfaceBrush}"
+                            Foreground="{DynamicResource PrimaryTextBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            Margin="0,0,8,0" />
+                    <Button Content="Öffnen"
+                            Command="{Binding RepositoryOeffnenCommand}"
+                            Padding="12,6"
+                            Background="{DynamicResource SurfaceBrush}"
+                            Foreground="{DynamicResource PrimaryTextBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
 
-            <ContentControl Grid.Column="1"
-                            Content="{Binding SelectedTaskViewModel}"
-                            Margin="16,0,0,0" />
-        </Grid>
+        <!-- Inhalt -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="24">
+
+                <!-- Ladesymbol -->
+                <TextBlock Text="Wird geladen…"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                <!-- Filter-Overlay -->
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20"
+                        Visibility="{Binding IsFilterOverlayVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Text="Aufgaben filtern"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,12" />
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Content="Alle"
+                                         GroupName="AufgabenFilter"
+                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Alle}"
+                                         Margin="0,0,16,0" />
+                            <RadioButton Content="Aktiv"
+                                         GroupName="AufgabenFilter"
+                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Aktiv}"
+                                         Margin="0,0,16,0" />
+                            <RadioButton Content="Archiviert"
+                                         GroupName="AufgabenFilter"
+                                         IsChecked="{Binding AufgabenFilter, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Archiviert}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Projekt-Kachel (immer sichtbar, auch im Anlage-Modus) -->
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Symbol und Titel -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                            <TextBlock Text="📁"
+                                       FontSize="32"
+                                       Margin="0,0,12,0"
+                                       VerticalAlignment="Center" />
+                            <TextBox Text="{Binding ProjektName, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="20"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="0"
+                                     VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- Beschreibung -->
+                        <TextBox Grid.Row="1"
+                                 Text="{Binding ProjektBeschreibung, UpdateSourceTrigger=PropertyChanged}"
+                                 FontSize="14"
+                                 Foreground="{DynamicResource SecondaryTextBrush}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True" />
+                    </Grid>
+                </Border>
+
+                <!-- Aufgaben-Kachel -->
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Titel -->
+                        <TextBlock Grid.Row="0"
+                                   Text="Aufgaben"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,12" />
+
+                        <!-- Aufgabenliste -->
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding Aufgaben}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 MaxHeight="400">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="8,4">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition />
+                                            <RowDefinition />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding Titel}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Status}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </Grid>
+                </Border>
+
+                <!-- Aufgabendetail -->
+                <ContentControl Content="{Binding SelectedTaskViewModel}"
+                                Visibility="{Binding SelectedTaskViewModel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

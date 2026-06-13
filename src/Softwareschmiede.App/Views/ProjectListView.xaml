@@ -3,115 +3,191 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource BackgroundBrush}">
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <!-- Projektliste links -->
-        <Border Grid.Column="0"
+        <!-- Ribbon-Menü -->
+        <Border Grid.Row="0"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,0,1,0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0"
-                           Text="Projekte"
-                           FontSize="18"
+                BorderThickness="0,0,0,1"
+                Padding="16,12">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Projekte"
+                           FontSize="24"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource PrimaryTextBrush}"
-                           Margin="16,16,16,8" />
+                           VerticalAlignment="Center"
+                           Margin="0,0,24,0" />
 
-                <Button Grid.Row="1"
-                        Content="+ Neues Projekt"
+                <Button Content="Neu"
                         Command="{Binding ZeigeErstellungsFormularCommand}"
-                        Margin="8,0,8,8"
-                        Padding="8,6"
+                        Padding="16,8"
                         Background="{DynamicResource AccentBrush}"
                         Foreground="White"
                         BorderThickness="0"
-                        HorizontalAlignment="Stretch" />
-
-                <ListBox Grid.Row="2"
-                         ItemsSource="{Binding Projekte}"
-                         SelectedItem="{Binding SelectedProjekt}"
-                         Background="Transparent"
-                         BorderThickness="0">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="8,4">
-                                <TextBlock Text="{Binding Name}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <TextBlock Text="{Binding Beschreibung}"
-                                           Foreground="{DynamicResource SecondaryTextBrush}"
-                                           FontSize="12"
-                                           TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-
-                <!-- Fehler -->
-                <TextBlock Grid.Row="3"
-                           Text="{Binding FehlerMeldung}"
-                           Foreground="{DynamicResource ErrorBrush}"
-                           Margin="8"
-                           TextWrapping="Wrap"
-                           Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
-            </Grid>
-        </Border>
-
-        <!-- Erstellungsformular -->
-        <Border Grid.Column="0"
-                Grid.ColumnSpan="2"
-                Background="{DynamicResource SurfaceBrush}"
-                Panel.ZIndex="10"
-                Visibility="{Binding IsCreateFormVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-            <StackPanel Margin="32" MaxWidth="400" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="Neues Projekt" FontSize="20" FontWeight="SemiBold"
-                           Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,0,16" />
-
-                <TextBlock Text="Name" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,0,4" />
-                <TextBox Text="{Binding NeuerProjektName, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,0,12"
-                         Padding="8,6"
-                         BorderBrush="{DynamicResource BorderBrush}" />
-
-                <TextBlock Text="Beschreibung (optional)" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,0,4" />
-                <TextBox Text="{Binding NeuerProjektBeschreibung, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,0,20"
-                         Padding="8,6"
-                         Height="80"
-                         AcceptsReturn="True"
-                         BorderBrush="{DynamicResource BorderBrush}" />
-
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="Abbrechen"
-                            Command="{Binding ZeigeErstellungsFormularCommand}"
-                            Margin="0,0,8,0"
-                            Padding="12,6"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            Foreground="{DynamicResource PrimaryTextBrush}" />
-                    <Button Content="Erstellen"
-                            Command="{Binding ProjektErstellenCommand}"
-                            Padding="12,6"
-                            Background="{DynamicResource AccentBrush}"
-                            Foreground="White"
-                            BorderThickness="0" />
-                </StackPanel>
+                        FontWeight="SemiBold"
+                        VerticalAlignment="Center" />
             </StackPanel>
         </Border>
 
-        <!-- Projektdetail rechts -->
-        <ContentControl Grid.Column="1"
-                        Content="{Binding DetailViewModel}" />
+        <!-- Projekt-Dashboard -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Projekte}"
+                          Margin="24">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Width="280"
+                                Height="180"
+                                Margin="0,0,16,16"
+                                Padding="20"
+                                Cursor="Hand"
+                                Focusable="True"
+                                KeyboardNavigation.IsTabStop="True">
+                            <Border.InputBindings>
+                                <MouseBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                             CommandParameter="{Binding}"
+                                             MouseAction="LeftClick" />
+                                <KeyBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Key="Return" />
+                            </Border.InputBindings>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Projektsymbol -->
+                                <Border Grid.Row="0"
+                                        Background="{DynamicResource AccentBrush}"
+                                        Width="48"
+                                        Height="48"
+                                        CornerRadius="12"
+                                        Margin="0,0,0,12"
+                                        HorizontalAlignment="Left">
+                                    <TextBlock Text="📁"
+                                               FontSize="24"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Border>
+
+                                <!-- Projekttitel -->
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding Name}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,0,0,8" />
+
+                                <!-- Kurzbeschreibung -->
+                                <TextBlock Grid.Row="2"
+                                           Text="{Binding Beschreibung}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="13"
+                                           TextWrapping="Wrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Top" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Projektdetail (Overlay) -->
+        <Border Grid.Row="0"
+                Grid.RowSpan="2"
+                Background="{DynamicResource SurfaceBrush}"
+                Panel.ZIndex="12"
+                Visibility="{Binding DetailViewModel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <Border Background="Black"
+                    Opacity="0.5" />
+        </Border>
+
+        <Border Grid.Row="0"
+                Grid.RowSpan="2"
+                Background="{DynamicResource SurfaceBrush}"
+                Panel.ZIndex="13"
+                CornerRadius="12"
+                MaxWidth="900"
+                MaxHeight="600"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Padding="0"
+                Visibility="{Binding DetailViewModel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Header mit Schließen-Button -->
+                <Border Grid.Row="0"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="16,12">
+                    <Grid>
+                        <TextBlock Text="Projektdetails"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   VerticalAlignment="Center" />
+                        <Button Content="✕"
+                                Command="{Binding SchliesseDetailCommand}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="{DynamicResource SecondaryTextBrush}"
+                                FontSize="16"
+                                Cursor="Hand" />
+                    </Grid>
+                </Border>
+
+                <!-- Detail-Inhalt -->
+                <ContentControl Grid.Row="1"
+                                Content="{Binding DetailViewModel}"
+                                Margin="16" />
+            </Grid>
+        </Border>
+
+        <!-- Fehlermeldung (ZIndex über Modal-Overlays, damit sie auch bei offenem Dialog sichtbar ist) -->
+        <Border Grid.Row="0"
+                Grid.RowSpan="2"
+                Background="{DynamicResource ErrorBrush}"
+                CornerRadius="8"
+                Padding="16,12"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,24"
+                Panel.ZIndex="20"
+                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding FehlerMeldung}"
+                       Foreground="White"
+                       FontSize="14"
+                       TextWrapping="Wrap" />
+        </Border>
     </Grid>
 </UserControl>
