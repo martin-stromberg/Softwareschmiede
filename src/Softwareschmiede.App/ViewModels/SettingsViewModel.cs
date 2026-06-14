@@ -1,8 +1,9 @@
-using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
+using System.Windows.Input;
+using Windows.ApplicationModel;
 
 namespace Softwareschmiede.App.ViewModels;
 
@@ -15,7 +16,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private readonly ILogger<SettingsViewModel> _logger;
 
     private string? _arbeitsverzeichnis;
-    private bool _isDarkMode;
+    private string _designMode;
     private string? _defaultKiPlugin;
     private BenachrichtigungsModus _benachrichtigungsModus;
     private bool _isLoading;
@@ -29,12 +30,12 @@ public sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _arbeitsverzeichnis, value);
     }
 
-    /// <summary>Gibt an, ob Dark Mode aktiviert ist (read-only; Toggle über MainWindowViewModel.ToggleDarkModeCommand).</summary>
-    public bool IsDarkMode
+    public string DesignMode
     {
-        get => _isDarkMode;
-        private set => SetProperty(ref _isDarkMode, value);
+        get => _designMode;
+        set => SetProperty(ref _designMode, value);
     }
+    public IEnumerable<string> DesignModes => _darkModeService.GetAvailableModes();
 
     /// <summary>Standard-KI-Plugin-Prefix.</summary>
     public string? DefaultKiPlugin
@@ -76,6 +77,9 @@ public sealed class SettingsViewModel : ViewModelBase
 
     /// <summary>Speichert alle Einstellungen.</summary>
     public ICommand SpeichernCommand { get; }
+    
+    /// <summary>Verwirft alle nicht gespeicherten Einstellungen.</summary>
+    public ICommand VerwerfenCommand { get; }
 
     /// <inheritdoc cref="SettingsViewModel"/>
     public SettingsViewModel(
@@ -89,11 +93,12 @@ public sealed class SettingsViewModel : ViewModelBase
         _darkModeService = darkModeService;
         _logger = logger;
 
-        _isDarkMode = _darkModeService.IsDarkMode;
-        _darkModeService.DarkModeChanged += enabled => IsDarkMode = enabled;
+        _designMode = darkModeService.Current;
+        _darkModeService.ModeChanged += mode => DesignMode = mode;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync);
+        VerwerfenCommand = new AsyncRelayCommand(VerwerfenAsync);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -133,6 +138,7 @@ public sealed class SettingsViewModel : ViewModelBase
         {
             await _arbeitsverzeichnisService.SaveArbeitsverzeichnisAsync(_arbeitsverzeichnis, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
+            await _darkModeService.SetModeAsync(DesignMode, ct);
             ErfolgsMeldung = "Einstellungen gespeichert.";
         }
         catch (OperationCanceledException)
@@ -144,5 +150,10 @@ public sealed class SettingsViewModel : ViewModelBase
             _logger.LogError(ex, "Fehler beim Speichern der Einstellungen.");
             FehlerMeldung = $"Fehler beim Speichern: {ex.Message}";
         }
+    }
+
+    private async Task VerwerfenAsync(CancellationToken ct)
+    {
+        await LadenAsync(ct);
     }
 }

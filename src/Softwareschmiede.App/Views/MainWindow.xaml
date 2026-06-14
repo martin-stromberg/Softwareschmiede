@@ -85,22 +85,6 @@
                 <!-- Spacer -->
                 <Grid Height="Auto" />
 
-                <!-- Dark Mode Toggle -->
-                <Button Command="{Binding ToggleDarkModeCommand}"
-                        AutomationProperties.Name=" Dark Mode"
-                        Margin="4,2"
-                        Padding="8,8"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Foreground="{DynamicResource PrimaryTextBrush}"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🌙" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text=" Dark Mode" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-
                 <Button Command="{Binding NavigateToSettingsCommand}"
                         AutomationProperties.Name=" Einstellungen"
                         Margin="4,2"

@@ -81,6 +81,20 @@ Stand: **2026-06-11**
 
 ## 🚀 Features
 
+#### Feature 72: WPF-Plugin-Verfügbarkeit & Dialog-Erweiterung (aktuell in Arbeit)
+
+Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl eines SCM-Plugins erweitert:
+
+- **Plugin-Auswahl:** ComboBox zur expliziten Auswahl des SCM-Plugins vor der Repository-Zuordnung
+- **Plugin-gefilterte Repositories:** Nach Plugin-Auswahl werden nur die Repositories für dieses Plugin angezeigt
+- **Hilfe-Panel bei fehlenden Plugins:** Falls keine SCM-Plugins vorhanden sind, wird statt der Eingabekomponenten ein Hilfe-Panel mit Instruktionen angezeigt
+- **Dark-Mode Button-Fix:** Sichtbarkeitsproblem des „Zuweisen"-Buttons im Dark-Mode behoben (`Foreground`-Binding statt hardcodiertes Weiß)
+
+**Betroffene Komponenten:**
+- `RepositoryAssignViewModel` – neue Properties: `AvailableScmPlugins`, `SelectedScmPlugin`, `HasScmPlugins`
+- `RepositoryAssignDialog.xaml` – ComboBox für Plugin-Auswahl, Hilfe-Panel, Grid-Struktur erweitert
+- `RepositoryAssignViewModelTests` – neue Unit-Tests für Plugin-Laden und Repository-Filterung
+
 ### 📁 Projektmanagement
 - Beliebig viele Softwareprojekte anlegen, bearbeiten, archivieren und löschen
 - Repositories plugin-gesteuert verknüpfen (dynamische Felder je SCM-Plugin) und Issues automatisch laden

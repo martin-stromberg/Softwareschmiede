@@ -5,14 +5,13 @@ using Softwareschmiede.App.Services;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für das Hauptfenster: Navigation und Dark-Mode-Toggle.</summary>
-public sealed class MainWindowViewModel : ViewModelBase, IDisposable
+public sealed class MainWindowViewModel : ViewModelBase
 {
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
 
     private ViewModelBase? _currentView;
     private bool _isNavigationExpanded = true;
-    private bool _isDarkMode;
     private string _title = "Softwareschmiede";
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
@@ -36,13 +35,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _isNavigationExpanded, value);
     }
 
-    /// <summary>Gibt an, ob der Dark-Mode aktiv ist.</summary>
-    public bool IsDarkMode
-    {
-        get => _isDarkMode;
-        private set => SetProperty(ref _isDarkMode, value);
-    }
-
     /// <summary>Navigiert zum Dashboard.</summary>
     public ICommand NavigateToDashboardCommand { get; }
 
@@ -64,13 +56,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
 
-        _isDarkMode = _darkModeService.IsDarkMode;
-        _darkModeService.DarkModeChanged += OnDarkModeChanged;
-
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
         NavigateToProjectListCommand = new RelayCommand(NavigateToProjectList);
         NavigateToSettingsCommand = new RelayCommand(NavigateToSettings);
-        ToggleDarkModeCommand = new AsyncRelayCommand(ct => _darkModeService.ToggleAsync(ct));
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
 
         NavigateToDashboard();
@@ -110,16 +98,5 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _settingsViewModel ??= _serviceProvider.GetRequiredService<SettingsViewModel>();
         CurrentView = _settingsViewModel;
         Title = "Softwareschmiede – Einstellungen";
-    }
-
-    private void OnDarkModeChanged(bool enabled)
-    {
-        IsDarkMode = enabled;
-    }
-
-    /// <inheritdoc/>
-    public void Dispose()
-    {
-        _darkModeService.DarkModeChanged -= OnDarkModeChanged;
     }
 }

@@ -23,7 +23,7 @@ public sealed class AppEinstellungService
     public const string WindowHeightKey = "window.size.height";
 
     /// <summary>Schlüssel für den Dark-Mode-Status.</summary>
-    public const string DarkModeEnabledKey = "ui.darkmode.enabled";
+    public const string DesignModeKey = "ui.designmode.name";
 
     /// <summary>Schlüssel für das Standard-KI-Plugin.</summary>
     public const string DefaultKiPluginKey = "ki.plugin.default";
