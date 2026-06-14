@@ -88,7 +88,9 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
             };
 
             process.Start();
-            await process.WaitForExitAsync(ct);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
+            await process.WaitForExitAsync(cts.Token);
             return process.ExitCode == 0;
         }
         catch (Win32Exception)
@@ -125,6 +127,10 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
             psi.Arguments = parameters;
         }
 
+        // Umgebungsisolation (USERPROFILE, HOME, APPDATA etc.) wurde bewusst entfernt.
+        // Das copilot-CLI benötigt die Standard-Umgebungsvariablen des Benutzerprofils,
+        // um seine eigene Konfiguration (Token, OAuth-Cache, Proxy-Einstellungen) zu laden.
+        // Eine vollständige Isolation würde dazu führen, dass das CLI keine Authentifizierung findet.
         var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
         if (!string.IsNullOrEmpty(token))
         {

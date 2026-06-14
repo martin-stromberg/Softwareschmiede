@@ -40,19 +40,6 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// <inheritdoc/>
     public abstract Task<bool> CheckHealthAsync(CancellationToken ct = default);
 
-    /// <summary>Gibt den Fenstertitel aus dem Prozess zurück (Hilfsmethode).</summary>
-    protected static string ExtractWindowTitleFromProcess(Process process)
-    {
-        try
-        {
-            return process.MainWindowTitle ?? string.Empty;
-        }
-        catch (Exception)
-        {
-            return string.Empty;
-        }
-    }
-
     /// <summary>
     /// Liest alle Agenten aus dem angegebenen Unterverzeichnis eines Agentenpakets.
     /// </summary>

@@ -22,36 +22,36 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
     [Fact]
     public async Task DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt()
     {
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, true);
+        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DesignModeKey, true);
 
-        var geladen = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey);
+        var geladen = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.DesignModeKey);
         geladen.Should().Be(true);
     }
 
     [Fact]
     public async Task DarkMode_KannDeaktiviert_Werden()
     {
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, true);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, false);
+        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DesignModeKey, true);
+        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DesignModeKey, false);
 
-        var geladen = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey);
+        var geladen = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.DesignModeKey);
         geladen.Should().Be(false);
     }
 
     [Fact]
     public async Task DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung()
     {
-        var geladen = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey);
+        var geladen = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.DesignModeKey);
         geladen.Should().BeNull();
     }
 
     [Fact]
     public async Task DarkMode_WirdBeimNeustart_Wiederhergestellt()
     {
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, true);
+        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.DesignModeKey, true);
 
         var neuerService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
-        var geladen = await neuerService.GetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey);
+        var geladen = await neuerService.GetBoolSettingAsync(AppEinstellungService.DesignModeKey);
         geladen.Should().Be(true);
     }
 }

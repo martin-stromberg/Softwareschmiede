@@ -15,16 +15,21 @@ public sealed class DarkModeService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<DarkModeService> _logger;
 
-    private static readonly Uri LightThemeUri = new("pack://application:,,,/Softwareschmiede.App;component/Themes/LightTheme.xaml");
-    private static readonly Uri DarkThemeUri = new("pack://application:,,,/Softwareschmiede.App;component/Themes/DarkTheme.xaml");
+    private static Dictionary<string, Uri> _themeUris = new()
+    {
+        { "Light", new Uri("pack://application:,,,/Softwareschmiede.App;component/Themes/LightTheme.xaml") },
+        { "Dark", new Uri("pack://application:,,,/Softwareschmiede.App;component/Themes/DarkTheme.xaml") }
+    };
 
-    private bool _isDarkMode;
+    private string _currentMode;
 
-    /// <summary>Gibt an, ob der Dark-Mode derzeit aktiv ist.</summary>
-    public bool IsDarkMode => _isDarkMode;
+    /// <summary>
+    /// Gibt den aktuellen Design-Modus zurück ("Dark" oder "Light").
+    /// </summary>
+    public string Current => _currentMode;
 
     /// <summary>Wird ausgelöst, wenn der Dark-Mode-Zustand geändert wird.</summary>
-    public event Action<bool>? DarkModeChanged;
+    public event Action<string>? ModeChanged;
 
     /// <inheritdoc cref="DarkModeService"/>
     public DarkModeService(IServiceScopeFactory scopeFactory, ILogger<DarkModeService> logger)
@@ -41,48 +46,20 @@ public sealed class DarkModeService
     {
         using var scope = _scopeFactory.CreateScope();
         var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        var darkModeEnabled = await einstellungService.GetBoolSettingAsync(
-            AppEinstellungService.DarkModeEnabledKey, ct);
-        _isDarkMode = darkModeEnabled ?? false;
-        ApplyTheme(_isDarkMode);
+        var mode = await einstellungService.GetSettingAsync(
+            AppEinstellungService.DesignModeKey, ct);
+        _currentMode = mode ?? "Dark";
+        ApplyTheme(_currentMode);
     }
 
-    /// <summary>
-    /// Schaltet den Dark-Mode um und persistiert die Einstellung.
-    /// Muss auf dem UI-Thread aufgerufen werden.
-    /// </summary>
-    public async Task ToggleAsync(CancellationToken ct = default)
+    private static void ApplyTheme(string mode)
     {
-        await SetDarkModeAsync(!_isDarkMode, ct);
-    }
-
-    /// <summary>
-    /// Setzt den Dark-Mode-Zustand und persistiert die Einstellung.
-    /// Muss auf dem UI-Thread aufgerufen werden.
-    /// </summary>
-    public async Task SetDarkModeAsync(bool enabled, CancellationToken ct = default)
-    {
-        if (_isDarkMode == enabled)
-            return;
-
-        using var scope = _scopeFactory.CreateScope();
-        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
-        await einstellungService.SetBoolSettingAsync(AppEinstellungService.DarkModeEnabledKey, enabled, ct);
-
-        _isDarkMode = enabled;
-        ApplyTheme(enabled);
-        DarkModeChanged?.Invoke(enabled);
-        _logger.LogInformation("Dark Mode {Status}.", enabled ? "aktiviert" : "deaktiviert");
-    }
-
-    private static void ApplyTheme(bool darkMode)
-    {
-        var targetUri = darkMode ? DarkThemeUri : LightThemeUri;
+        var targetUri = _themeUris[mode];
         var resources = System.Windows.Application.Current.Resources;
         var mergedDictionaries = resources.MergedDictionaries;
 
         var existing = mergedDictionaries.FirstOrDefault(d =>
-            d.Source == LightThemeUri || d.Source == DarkThemeUri);
+            d.Source == _themeUris["Light"] || d.Source == _themeUris["Dark"]);
 
         if (existing is not null)
         {
@@ -94,5 +71,28 @@ public sealed class DarkModeService
         {
             mergedDictionaries.Add(new ResourceDictionary { Source = targetUri });
         }
+    }
+    /// <summary>
+    /// Gibt die verfügbaren Design-Modi zurück (derzeit "Dark" und "Light").
+    /// </summary>
+    /// <returns>Ein Array von Strings, das die verfügbaren Design-Modi enthält.</returns>
+    public string[] GetAvailableModes() => new string[] { "Dark", "Light" };
+
+    /// <summary>
+    /// Setzt den Design-Modus der Anwendung und speichert die Einstellung.
+    /// </summary>
+    /// <param name="designMode">Der gewünschte Design-Modus ("Dark" oder "Light").</param>
+    /// <param name="ct">Ein optionaler Abbruch-Token.</param>
+    /// <returns>Ein Task, der die asynchrone Operation darstellt.</returns>
+    public async Task SetModeAsync(string designMode, CancellationToken ct)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var einstellungService = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        await einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, designMode, ct);
+
+        _currentMode = designMode;
+        ApplyTheme(designMode);
+        ModeChanged?.Invoke(designMode);
+        _logger.LogInformation("Design Mode auf '{Mode}' gesetzt.", designMode);
     }
 }

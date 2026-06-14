@@ -153,13 +153,15 @@ public sealed class PluginSettingsViewModel : ViewModelBase
 
         try
         {
-            Plugins.Clear();
+            var staging = new List<PluginWithSettingsEntry>();
 
             var gitPlugins = _pluginManager.GetSourceCodeManagementPlugins().Cast<IPlugin>();
             var kiPlugins = _pluginManager.GetDevelopmentAutomationPlugins().Cast<IPlugin>();
 
             foreach (var plugin in gitPlugins.Concat(kiPlugins))
             {
+                ct.ThrowIfCancellationRequested();
+
                 var groups = plugin.GetSettingGroups()
                     .Select(group => new PluginSettingGroupEntry(
                         group.GroupName,
@@ -169,11 +171,18 @@ public sealed class PluginSettingsViewModel : ViewModelBase
                         .ToList()))
                     .ToList();
 
-                Plugins.Add(new PluginWithSettingsEntry(plugin, groups));
+                staging.Add(new PluginWithSettingsEntry(plugin, groups));
+            }
+
+            Plugins.Clear();
+            foreach (var entry in staging)
+            {
+                Plugins.Add(entry);
             }
         }
         catch (Exception ex)
         {
+            Plugins.Clear();
             _logger.LogError(ex, "Fehler beim Laden der Plugin-Einstellungen.");
             FehlerMeldung = $"Fehler: {ex.Message}";
         }

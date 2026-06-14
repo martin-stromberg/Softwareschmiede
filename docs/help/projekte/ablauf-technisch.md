@@ -107,32 +107,59 @@ Beteiligte Komponenten:
 Beteiligte Komponenten:
 - `ProjectDetailViewModel.RepositoryZuweisenCommand` — Command wird ausgelöst
 - `ProjectDetailViewModel.RepositoryZuweisenAsync` — Dialog-Logik
-- `RepositoryAssignViewModel` — Dialog-ViewModel
-- `RepositoryAssignDialog.xaml` — Dialog-Window
+- `RepositoryAssignViewModel` — Dialog-ViewModel mit Plugin-Management
+- `RepositoryAssignDialog.xaml` — Dialog-Window mit ComboBox und Hilfe-Panel
+- `IPluginManager` — lädt verfügbare SCM-Plugins
 - `ProjektService.AddRepositoryAsync` — Datenbankoperation
 - `ProjektService.GetAllRepositoriesAsync` — lädt verfügbare Repositories
 
-**Flow:**
-1. `RepositoryAssignViewModel` wird instantiiert
+**Flow (Dialog-Öffnung und Plugin-Laden):**
+1. `RepositoryAssignViewModel` wird instantiiert mit `IPluginManager` injiziert
 2. `RepositoryAssignViewModel.LadenAsync` wird aufgerufen
-   - `ProjektService.GetAllRepositoriesAsync(ct)` wird aufgerufen
-   - Alle verfügbaren Repositories werden in `VerfuegbareRepositories`-Collection geladen
+   - `IPluginManager.GetSourceCodeManagementPlugins()` wird aufgerufen
+   - Verfügbare SCM-Plugins werden in `AvailableScmPlugins`-Collection geladen
+   - `HasScmPlugins = (AvailableScmPlugins.Count > 0)` wird gesetzt
 3. `RepositoryAssignDialog` (Window) wird erstellt und mit ViewModel gebunden
 4. Dialog wird modal angezeigt mit `ShowDialog()`
+5. **Szenario A — Plugins vorhanden** (`HasScmPlugins == true`):
+   - ComboBox zeigt verfügbare Plugins (Namen via `DisplayMemberPath="PluginName"`)
+   - ListBox ist initially leer (wartet auf Plugin-Auswahl)
+   - Hilfe-Panel ist ausgeblendet
+6. **Szenario B — Keine Plugins** (`HasScmPlugins == false`):
+   - ComboBox ist ausgeblendet
+   - ListBox ist ausgeblendet
+   - Hilfe-Panel wird angezeigt mit Text „Keine SCM-Plugins installiert…"
+   - Dialog-Eingaben sind deaktiviert; Benutzer kann nur abbrechen
+
+**Flow (Plugin-Auswahl und Repository-Filterung):**
+1. Benutzer wählt Plugin aus ComboBox aus → `SelectedScmPlugin` wird gesetzt
+2. PropertyChanged-Handler triggert `ReloadRepositoriesForSelectedPlugin()` (Fire-and-Forget)
+3. `ReloadRepositoriesForSelectedPlugin()` wird asynchron ausgeführt:
+   - `IsLoading = true` wird gesetzt
+   - `ProjektService.GetAllRepositoriesAsync(ct)` wird aufgerufen (lädt alle Repositories)
+   - Repositories werden gefiltert: `.Where(r => r.PluginTyp == SelectedScmPlugin.PluginType.ToString())`
+   - Gefilterte Repositories werden sortiert: `.OrderBy(r => r.RepositoryName)`
+   - `VerfuegbareRepositories` wird mit gefilterten Repositories gefüllt
+   - `SelectedRepository` wird auf `null` zurückgesetzt
+   - `IsLoading = false` wird gesetzt
+4. ListBox wird mit gefilterten Repositories aktualisiert (ObservableCollection triggert UI-Update)
 5. Benutzer wählt ein Repository aus (`SelectedRepository` wird gesetzt)
-6. Benutzer klickt „Zuweisen"-Button oder „Abbrechen"
-7. Dialog schließt sich:
+
+**Flow (Bestätigung und Speicherung):**
+1. Benutzer klickt „Zuweisen"-Button oder „Abbrechen"
+2. Dialog schließt sich:
    - Bei „Zuweisen": `ShowDialog()` gibt `true` zurück
    - Bei „Abbrechen": `ShowDialog()` gibt `null` oder `false` zurück
-8. Bei erfolgreichem „Zuweisen":
+3. Bei erfolgreichem „Zuweisen":
    - `ProjektService.AddRepositoryAsync(_projektId, repo.PluginTyp, repo.RepositoryUrl, repo.RepositoryName, ct)` wird aufgerufen
    - Repository wird dem Projekt zugeordnet
    - `LadenAsync` wird aufgerufen → Projekt wird neu geladen mit neuen Repositories
-9. Bei „Abbrechen": Dialog schließt sich, nichts wird geändert
+4. Bei „Abbrechen": Dialog schließt sich, nichts wird geändert
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei `Exception`: `FehlerMeldung` wird gesetzt
+- Bei Exception in `ReloadRepositoriesForSelectedPlugin()`: `Logger.LogError()` wird aufgerufen, `VerfuegbareRepositories` wird geleert, UI bleibt responsive
+- Bei Exception in `LadenAsync()` (Plugin-Laden): `Logger.LogError()` wird aufgerufen, `AvailableScmPlugins` bleibt leer, `HasScmPlugins = false`
 
 ### 6. Repository öffnen
 
@@ -252,10 +279,17 @@ flowchart TD
     
     UserAction -->|Repository zuweisen| RepoCmd["RepositoryZuweisenCommand"]
     RepoCmd --> Dialog["RepositoryAssignDialog öffnen"]
-    Dialog --> LoadRepos["ProjektService.GetAllRepositoriesAsync()"]
-    LoadRepos --> Select["Benutzer wählt aus"]
+    Dialog --> LoadPlugins["IPluginManager.GetSourceCodeManagementPlugins()"]
+    LoadPlugins --> CheckPlugins{Plugins vorhanden?}
+    CheckPlugins -->|Ja| ShowCombo["ComboBox zeigt Plugins"]
+    CheckPlugins -->|Nein| ShowHelp["Hilfe-Panel anzeigen"]
+    ShowCombo --> SelectPlugin["Benutzer wählt Plugin"]
+    SelectPlugin --> ReloadRepos["ReloadRepositoriesForSelectedPlugin()"]
+    ReloadRepos --> FilterRepos["Repositories filtern nach PluginTyp"]
+    FilterRepos --> Select["Benutzer wählt Repository"]
     Select --> AssignRepo["ProjektService.AddRepositoryAsync()"]
     AssignRepo --> Load
+    ShowHelp --> BackDialog["Dialog schließen"]
     
     UserAction -->|Repository öffnen| OpenCmd["RepositoryOeffnenCommand"]
     OpenCmd --> OpenBrowser["Process.Start(URL)"]

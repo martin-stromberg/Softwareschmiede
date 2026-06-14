@@ -18,11 +18,12 @@ Mit dem Kompilieren des Anwendungsprojekts werden die im Projekt enthaltenenen P
 
 ## Plugin-Einstellungen konfigurieren
 
-Plugin-Einstellungen werden in der Seite **Einstellungen** (`/einstellungen`) verwaltet.
+Plugin-Einstellungen werden in der **Einstellungsseite** verwaltet:
 
-1. Plugin in der Liste wählen.
-2. Felder ausfüllen (z.B. Token, URL).
-3. Speichern — Werte werden im Windows Credential Store abgelegt.
+1. In der Seitenleiste auf **Einstellungen** klicken.
+2. Plugin in der Liste wählen.
+3. Felder ausfüllen (z.B. Token, URL).
+4. Auf **Speichern** klicken — Werte werden im Windows Credential Store abgelegt.
 
 ### Einstellungsfelder je Plugin
 
@@ -40,7 +41,12 @@ Plugin-Einstellungen werden in der Seite **Einstellungen** (`/einstellungen`) ve
 
 ## Standard-Plugin festlegen
 
-In **Einstellungen** lässt sich das Standard-SCM-Plugin und das Standard-KI-Plugin auswählen. Diese Auswahl gilt als Fallback, wenn eine Aufgabe kein explizites Plugin vorgibt.
+In den **Einstellungen** lässt sich das Standard-SCM-Plugin und das Standard-KI-Plugin auswählen:
+
+- Registerkarte **Quellcodeverwaltung** → Abschnitt „Standard SCM-Plugin"
+- Registerkarte **KI** → Abschnitt „Standard KI-Plugin"
+
+Diese Auswahl gilt als Fallback, wenn eine Aufgabe kein explizites Plugin vorgibt.
 
 ## Überprüfung
 

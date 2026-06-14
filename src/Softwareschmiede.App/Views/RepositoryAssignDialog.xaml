@@ -10,6 +10,7 @@
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -22,8 +23,28 @@
                    Foreground="{DynamicResource PrimaryTextBrush}"
                    Margin="0,0,0,16" />
 
+        <!-- Plugin-Auswahl -->
+        <ComboBox Grid.Row="1"
+                  ItemsSource="{Binding AvailableScmPlugins}"
+                  SelectedItem="{Binding SelectedScmPlugin, Mode=TwoWay}"
+                  DisplayMemberPath="PluginName"
+                  Background="{DynamicResource BackgroundBrush}"
+                  Foreground="{DynamicResource PrimaryTextBrush}"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1"
+                  Padding="8,6"
+                  Margin="0,0,0,12">
+            <ComboBox.ItemContainerStyle>
+                <Style TargetType="ComboBoxItem">
+                    <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+                    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+                </Style>
+            </ComboBox.ItemContainerStyle>
+        </ComboBox>
+
         <!-- Repository-Liste -->
-        <ListBox Grid.Row="1"
+        <ListBox Grid.Row="2"
+                 Visibility="{Binding HasScmPlugins, Converter={StaticResource BoolToVisibilityConverter}}"
                  ItemsSource="{Binding VerfuegbareRepositories}"
                  SelectedItem="{Binding SelectedRepository}"
                  Background="{DynamicResource BackgroundBrush}"
@@ -52,8 +73,29 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
+        <!-- Hilfe-Panel (bei fehlenden Plugins) -->
+        <Border Grid.Row="2"
+                Visibility="{Binding HasScmPlugins, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                Background="{DynamicResource BackgroundBrush}"
+                Padding="16"
+                VerticalAlignment="Center"
+                HorizontalAlignment="Stretch">
+            <StackPanel>
+                <TextBlock Text="Keine SCM-Plugins installiert"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           Margin="0,0,0,8" />
+                <TextBlock Text="Um Repositories zuzuweisen, installieren Sie bitte ein SCM-Plugin (z.B. GitHub Plugin). Weitere Informationen finden Sie in der Dokumentation."
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextWrapping="Wrap"
+                           LineHeight="18" />
+            </StackPanel>
+        </Border>
+
         <!-- Buttons -->
-        <StackPanel Grid.Row="2"
+        <StackPanel Grid.Row="3"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">
@@ -67,9 +109,10 @@
                     Margin="0,0,8,0" />
             <Button Content="Zuweisen"
                     Command="{Binding BestaetigenCommand}"
+                    IsEnabled="{Binding HasScmPlugins}"
                     Padding="12,6"
                     Background="{DynamicResource AccentBrush}"
-                    Foreground="White"
+                    Foreground="{DynamicResource PrimaryTextBrush}"
                     BorderThickness="0" />
         </StackPanel>
     </Grid>

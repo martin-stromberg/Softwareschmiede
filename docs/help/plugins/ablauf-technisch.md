@@ -8,7 +8,7 @@ Plugins werden beim Anwendungsstart durch den `PluginManager` registriert und pe
 
 ### 1. Plugin-Registrierung
 
-Beim Anwendungsstart registriert `Program.cs` alle Plugin-Instanzen im DI-Container und übergibt sie dem `PluginManager`.
+Beim Anwendungsstart registriert `App.xaml.cs` alle Plugin-Instanzen im DI-Container und übergibt sie dem `PluginManager`.
 
 Beteiligte Komponenten:
 - `PluginManager` — Hält alle Plugins, liefert Defaults

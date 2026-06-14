@@ -22,9 +22,9 @@ Der `KiAufgabenBenachrichtigungsHub` publiziert `KiAufgabenAbschlussEreignis` na
 
 ### Dark Mode
 
-Der `DarkModeService` wechselt das WPF-`ResourceDictionary` zwischen `LightTheme.xaml` und `DarkTheme.xaml`. Der Wechsel erfolgt sofort ohne Neustart. Die Einstellung (`DarkModeEnabled`) wird in der `AppEinstellung`-Tabelle gespeichert und beim nächsten Start automatisch angewendet.
+Der `DarkModeService` wechselt das WPF-`ResourceDictionary` zwischen `LightTheme.xaml` und `DarkTheme.xaml`. Der Wechsel erfolgt sofort ohne Neustart. Die Einstellung wird in der `AppEinstellung`-Tabelle gespeichert und beim nächsten Start automatisch angewendet.
 
-Der Dark-Mode-Toggle ist zusätzlich direkt in der Seitenleiste des Hauptfensters erreichbar (Schaltfläche „Dark Mode").
+Das Design wird in den Einstellungen über die Dropdown-Liste **Design** (Registerkarte „Allgemein") gesteuert. Verfügbare Optionen sind „Hell" und „Dunkel".
 
 ### Fenstergeometrie
 

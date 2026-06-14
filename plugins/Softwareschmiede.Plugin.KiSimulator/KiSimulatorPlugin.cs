@@ -58,7 +58,7 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase
             Arguments = "/c echo KI-Simulator läuft... && timeout /t 30 /nobreak",
             WorkingDirectory = localRepoPath,
             UseShellExecute = true,
-            CreateNoWindow = false,
+            CreateNoWindow = true,
         };
     }
 }

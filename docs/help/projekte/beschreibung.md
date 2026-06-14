@@ -35,7 +35,13 @@ Die Projektdetailansicht ist das zentrale Bearbeitungswerkzeug für Projekte und
 
 ### Repositories
 
-Einem Projekt lassen sich ein oder mehrere Git-Repositories zuordnen. Jedes Repository verweist auf einen Plugin-Typ (z.B. `GitHub` oder `LocalDirectoryPlugin`) sowie die Repository-URL. Beim Starten einer Aufgabe wird das passende Repository automatisch ermittelt.
+Einem Projekt lassen sich ein oder mehrere Git-Repositories zuordnen. Die Repository-Zuweisung erfolgt über einen Dialog, der eine explizite Auswahl des SCM-Plugins (Source Code Management) ermöglicht:
+
+1. **SCM-Plugin-Auswahl:** Nach Öffnen des Dialogs wählt der Benutzer das gewünschte SCM-Plugin aus einer Dropdown-Liste (z.B. „GitHub", „LocalDirectory Plugin").
+2. **Repository-Filterung:** Nach Plugin-Auswahl werden nur Repositories dieser Quelle angezeigt. Die Liste wird automatisch gefiltert nach dem Plugin-Typ und alphabetisch sortiert.
+3. **Fehlerbehandlung:** Falls keine SCM-Plugins installiert sind, zeigt der Dialog ein Hilfe-Panel statt der Eingabekomponenten. Der Dialog ist dann nicht funktional.
+
+Jedes Repository verweist auf einen Plugin-Typ (z.B. `SourceCodeManagement` oder `DevelopmentAutomation`) sowie die Repository-URL. Beim Starten einer Aufgabe wird das passende Repository automatisch ermittelt.
 
 Repositories können eine `RepositoryStartKonfiguration` enthalten, die beim Starten einer Aufgabe ein Startskript ausführt (z.B. `npm install`). Das Skript kann auch nachträglich manuell ausgelöst werden.
 

@@ -54,19 +54,36 @@ Das Projekt wird gelöscht, die Ansicht kehrt zur Projektübersicht zurück, und
 
 ### Voraussetzungen
 - Sie haben ein Projekt geöffnet (Projektdetailansicht sichtbar).
-- Es existiert mindestens ein Git-Repository im System (z.B. aus einer früheren Zuweisung).
+- Mindestens ein SCM-Plugin ist installiert (z.B. GitHub Plugin, LocalDirectory Plugin).
+- Im System sind Repositories vorhanden, die dem gewählten SCM-Plugin entsprechen.
 
 ### Schritte
 
 1. Klicken Sie auf den „Zuweisen"-Button im Ribbon-Menü (Gruppe „Repository").
-2. Der Repository-Zuweisungs-Dialog öffnet sich und zeigt alle verfügbaren Repositories.
-3. Wählen Sie ein Repository aus der Liste durch Anklicken.
-4. Klicken Sie auf den „Zuweisen"-Button im Dialog.
+2. Der Repository-Zuweisungs-Dialog öffnet sich:
+   - **Mit verfügbaren Plugins:** Die Dropdown-Liste zur Plugin-Auswahl ist sichtbar und aktiv.
+   - **Ohne Plugins:** Ein Hilfe-Panel wird angezeigt, das Sie zur Installation eines SCM-Plugins anleitet. Der Dialog ist deaktiviert.
+3. Wählen Sie das gewünschte SCM-Plugin aus der Dropdown-Liste (z.B. „GitHub"). Die Liste wird geladen und zeigt den Plugin-Namen.
+4. Die Liste der verfügbaren Repositories für dieses Plugin wird automatisch gefiltert und angezeigt. Jedes Repository zeigt seinen Namen und seine URL.
+5. Wählen Sie ein Repository aus der Liste durch Anklicken (einfaches Klicken, nicht Doppelklick).
+6. Klicken Sie auf den „Zuweisen"-Button im Dialog. Der Button ist nur aktiviert, wenn ein Repository ausgewählt ist.
 
 ### Ergebnis
 Das Repository wird dem Projekt zugeordnet. Der Dialog schließt sich, und das Repository steht für Aufgabenstart zur Verfügung.
 
-> **Hinweis:** Sie können mehrere Repositories einem Projekt zuordnen. Der „Zuweisen"-Button ist deaktiviert, solange kein Repository ausgewählt ist.
+### Fehlerfälle
+
+**Fall 1: Keine SCM-Plugins installiert**
+Der Dialog zeigt ein Hilfe-Panel mit Text: „Keine SCM-Plugins installiert. Um Repositories zuzuweisen, installieren Sie bitte ein SCM-Plugin (z.B. GitHub Plugin). Weitere Informationen finden Sie in der Dokumentation."
+- Die Zuweisung ist nicht möglich.
+- Der „Zuweisen"-Button ist deaktiviert.
+
+**Fall 2: Plugin gewählt, aber keine Repositories für diesen Typ vorhanden**
+- Die Repository-Liste ist leer.
+- Der „Zuweisen"-Button ist deaktiviert.
+- Wählen Sie ein anderes Plugin oder erstellen Sie ein Repository für den gewählten Plugin-Typ.
+
+> **Hinweis:** Die Repository-Liste wird sofort aktualisiert, wenn Sie das Plugin wechseln. Sie müssen nicht auf einen Ladesymbol oder Nachricht warten — die Filterung erfolgt im Hintergrund.
 
 ## Repository öffnen
 

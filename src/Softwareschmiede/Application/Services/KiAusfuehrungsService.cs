@@ -63,10 +63,17 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         await _startLock.WaitAsync(ct);
         try
         {
-            if (_handles.TryGetValue(aufgabeId, out var existing) && !existing.Process.HasExited)
+            if (_handles.TryGetValue(aufgabeId, out var existing))
             {
-                _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
-                return existing;
+                bool istNochAktiv;
+                try { istNochAktiv = !existing.Process.HasExited; }
+                catch { istNochAktiv = false; }
+
+                if (istNochAktiv)
+                {
+                    _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
+                    return existing;
+                }
             }
 
             var psi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct);
@@ -83,22 +90,38 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                     "CLI-Prozess für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
                     aufgabeId,
                     exitCode);
-                RaiseRunningCountChanged();
-                var status = exitCode.HasValue && exitCode.Value != 0
-                    ? CliProcessStatus.Fehler
-                    : CliProcessStatus.Gestoppt;
 
-                if (status == CliProcessStatus.Fehler)
+                _handles.TryRemove(aufgabeId, out _);
+
+                RaiseRunningCountChanged();
+
+                CliProcessStatus status;
+                if (handle.AbsichtlichGestoppt)
                 {
+                    status = CliProcessStatus.Gestoppt;
+                }
+                else if (exitCode.HasValue && exitCode.Value != 0)
+                {
+                    status = CliProcessStatus.Fehler;
                     _ = PersistFehlgeschlagenAsync(aufgabeId);
+                }
+                else
+                {
+                    status = CliProcessStatus.Gestoppt;
                 }
 
                 CliProcessStatusChanged?.Invoke(aufgabeId, status);
             };
 
-            process.Start();
-
+            // Handle VOR process.Start() eintragen, damit der Exited-Handler
+            // das Handle immer vorfindet (Befund #3).
             _handles[aufgabeId] = handle;
+
+            if (!process.Start())
+            {
+                _handles.TryRemove(aufgabeId, out _);
+                throw new InvalidOperationException("Prozess konnte nicht gestartet werden.");
+            }
 
             _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
             RaiseRunningCountChanged();
@@ -125,6 +148,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         {
             return;
         }
+
+        handle.AbsichtlichGestoppt = true;
 
         _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} beenden.", aufgabeId);
 
@@ -258,6 +283,9 @@ public sealed class CliProcessHandle
 
     /// <summary>Zeitstempel des letzten Heartbeats.</summary>
     public DateTimeOffset LastHeartbeat { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>Gibt an, ob der Prozess absichtlich durch <see cref="KiAusfuehrungsService.StopCliAsync"/> beendet wurde.</summary>
+    public bool AbsichtlichGestoppt { get; set; }
 
     /// <summary>Erstellt ein neues Handle.</summary>
     public CliProcessHandle(Guid aufgabeId, Process process)

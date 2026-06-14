@@ -72,7 +72,9 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
             };
 
             process.Start();
-            await process.WaitForExitAsync(ct);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
+            await process.WaitForExitAsync(cts.Token);
             return process.ExitCode == 0;
         }
         catch (Exception ex)

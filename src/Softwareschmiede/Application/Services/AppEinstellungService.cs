@@ -128,13 +128,44 @@ public sealed class AppEinstellungService
             ParseInt(werte, WindowHeightKey));
     }
 
-    /// <summary>Speichert alle Fenstergeometrie-Einstellungen auf einmal.</summary>
+    /// <summary>Speichert alle Fenstergeometrie-Einstellungen in einer einzigen Transaktion.</summary>
     public async Task SetWindowGeometryAsync(WindowGeometrySettings geometry, CancellationToken ct = default)
     {
-        await SetIntSettingAsync(WindowPositionXKey, geometry.X ?? 0, ct);
-        await SetIntSettingAsync(WindowPositionYKey, geometry.Y ?? 0, ct);
-        await SetIntSettingAsync(WindowWidthKey, geometry.Width ?? 1280, ct);
-        await SetIntSettingAsync(WindowHeightKey, geometry.Height ?? 800, ct);
+        var updates = new[]
+        {
+            (WindowPositionXKey, (geometry.X ?? 0).ToString()),
+            (WindowPositionYKey, (geometry.Y ?? 0).ToString()),
+            (WindowWidthKey,     (geometry.Width ?? 1280).ToString()),
+            (WindowHeightKey,    (geometry.Height ?? 800).ToString()),
+        };
+
+        var keys = updates.Select(u => u.Item1).ToArray();
+
+        var bestehende = await _db.AppEinstellungen
+            .Where(s => keys.Contains(s.Schluessel))
+            .ToDictionaryAsync(s => s.Schluessel, ct);
+
+        foreach (var (schluessel, wert) in updates)
+        {
+            if (bestehende.TryGetValue(schluessel, out var einstellung))
+            {
+                einstellung.Wert = wert;
+                einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
+            }
+            else
+            {
+                _db.AppEinstellungen.Add(new AppEinstellung
+                {
+                    Id = Guid.NewGuid(),
+                    Schluessel = schluessel,
+                    Wert = wert,
+                    AktualisiertAm = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+        _logger.LogDebug("Fenstergeometrie gespeichert.");
     }
 }
 

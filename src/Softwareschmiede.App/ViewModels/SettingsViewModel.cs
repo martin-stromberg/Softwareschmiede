@@ -2,22 +2,24 @@ using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using System.Windows.Input;
-using Windows.ApplicationModel;
 
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für die Einstellungsseite.</summary>
-public sealed class SettingsViewModel : ViewModelBase
+public sealed class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
+    private readonly IPluginManager _pluginManager;
     private readonly ILogger<SettingsViewModel> _logger;
 
     private string? _arbeitsverzeichnis;
     private string _designMode;
     private string? _defaultKiPlugin;
+    private IGitPlugin? _defaultScmPlugin;
     private BenachrichtigungsModus _benachrichtigungsModus;
     private bool _isLoading;
     private string? _fehlerMeldung;
@@ -42,6 +44,19 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         get => _defaultKiPlugin;
         set => SetProperty(ref _defaultKiPlugin, value);
+    }
+
+    /// <summary>Alle verfügbaren SCM-Plugins.</summary>
+    public IReadOnlyList<IGitPlugin> ScmPlugins { get; private set; } = [];
+
+    /// <summary>Alle verfügbaren KI-Plugins.</summary>
+    public IReadOnlyList<IKiPlugin> KiPlugins { get; private set; } = [];
+
+    /// <summary>Aktuell gewähltes Standard-SCM-Plugin.</summary>
+    public IGitPlugin? DefaultScmPlugin
+    {
+        get => _defaultScmPlugin;
+        set => SetProperty(ref _defaultScmPlugin, value);
     }
 
     /// <summary>Benachrichtigungsmodus.</summary>
@@ -86,15 +101,17 @@ public sealed class SettingsViewModel : ViewModelBase
         AppEinstellungService einstellungService,
         ArbeitsverzeichnisSettingsService arbeitsverzeichnisService,
         DarkModeService darkModeService,
+        IPluginManager pluginManager,
         ILogger<SettingsViewModel> logger)
     {
         _einstellungService = einstellungService;
         _arbeitsverzeichnisService = arbeitsverzeichnisService;
         _darkModeService = darkModeService;
+        _pluginManager = pluginManager;
         _logger = logger;
 
         _designMode = darkModeService.Current;
-        _darkModeService.ModeChanged += mode => DesignMode = mode;
+        _darkModeService.ModeChanged += OnDarkModeChanged;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync);
@@ -113,6 +130,12 @@ public sealed class SettingsViewModel : ViewModelBase
 
             _defaultKiPlugin = await _einstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
             OnPropertyChanged(nameof(DefaultKiPlugin));
+
+            ScmPlugins = _pluginManager.GetSourceCodeManagementPlugins();
+            OnPropertyChanged(nameof(ScmPlugins));
+
+            KiPlugins = _pluginManager.GetDevelopmentAutomationPlugins();
+            OnPropertyChanged(nameof(KiPlugins));
         }
         catch (OperationCanceledException)
         {
@@ -155,5 +178,13 @@ public sealed class SettingsViewModel : ViewModelBase
     private async Task VerwerfenAsync(CancellationToken ct)
     {
         await LadenAsync(ct);
+    }
+
+    private void OnDarkModeChanged(string mode) => DesignMode = mode;
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _darkModeService.ModeChanged -= OnDarkModeChanged;
     }
 }
