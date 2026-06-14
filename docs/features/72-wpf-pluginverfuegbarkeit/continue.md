@@ -6,9 +6,30 @@ Abbruchgrund: Kein Fortschritt zwischen Iteration 1 (14 offene Punkte) und Itera
 Die folgenden Aufgaben konnten im automatisierten Zyklus nicht abgeschlossen werden
 und müssen manuell oder in einem erneuten Lauf bearbeitet werden.
 
+## Korrigierte Fehlannahmen der Unteragenten
+
+Die folgenden Punkte wurden von Unteragenten fälschlicherweise als erledigt gemeldet:
+
+### 1. Blazor-Projekt nicht entfernt — Razor-Dateien existieren weiterhin
+
+Die Unteragenten haben berichtet, Razor-Komponenten seien per `<Compile Remove="...">` aus der Kompilierung ausgeschlossen worden. Das ist unvollständig oder falsch. Im Projekt `Softwareschmiede` existieren weiterhin Razor-Dateien (`Components/`) und `wwwroot/`. 
+
+- [ ] Klären, was mit dem Blazor-Anteil des Projekts passiert: Sollen die Razor-Dateien und `wwwroot/` vollständig entfernt werden? Oder sollen sie bestehen bleiben aber aus der Kompilierung ausgeschlossen sein? Die Entscheidung erfordert eine klare Vorgabe des Anwenders.
+
+### 2. Repository-Auswahl liest weiterhin aus der lokalen Datenbank — externe Quelle fehlt
+
+Die Unteragenten haben berichtet, die Repository-Logik sei bereits korrekt implementiert. Das ist **falsch**. `ReloadRepositoriesForSelectedPlugin()` in `RepositoryAssignViewModel` ruft `ProjektService.GetAllRepositoriesAsync()` auf und filtert lokal nach `PluginTyp`. 
+
+Die tatsächliche Anforderung ist: Repositories müssen aus der **externen Quelle des jeweiligen SCM-Plugins** abgerufen werden:
+
+- [ ] **GitHub-Plugin**: Repositories aus GitHub abrufen (z. B. via GitHub API — die Repositories des authentifizierten Nutzers oder einer Organisation).
+- [ ] **LocalDirectory-Plugin**: Verzeichnisse aus dem konfigurierten Quellverzeichnis der Plugin-Einstellungen anbieten (kein DB-Lookup, sondern Dateisystem-Zugriff).
+
+Dafür muss das `IGitPlugin`-Interface eine Methode erhalten, die die verfügbaren Repositories liefert (z. B. `GetAvailableRepositoriesAsync(CancellationToken)`). Jedes SCM-Plugin implementiert diese Methode entsprechend seiner externen Quelle. `RepositoryAssignViewModel.ReloadRepositoriesForSelectedPlugin()` ruft dann `SelectedScmPlugin.GetAvailableRepositoriesAsync()` auf statt `ProjektService.GetAllRepositoriesAsync()`.
+
 ## Offene Planelemente
 
-(Keine — Plan-Review: Vollständig umgesetzt)
+(Keine weiteren — die oben genannten Korrekturpunkte sind die wesentlichen Abweichungen vom Soll-Zustand)
 
 ## Code-Review-Befunde
 
