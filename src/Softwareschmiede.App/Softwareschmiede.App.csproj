@@ -17,22 +17,18 @@
     <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
     <!-- Plugin-Projekte als Build-Abhängigkeit ohne Assembly-Referenz, damit ihre DLLs vor dem CopyPluginsToOutput-Target vorliegen -->
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj"
-                      ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj"
-                      ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj"
-                      ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj"
-                      ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.KiSimulator\Softwareschmiede.Plugin.KiSimulator.csproj"
-                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.KiSimulator\Softwareschmiede.Plugin.KiSimulator.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.*" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.*" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.*" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.*" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.*" />
@@ -41,15 +37,40 @@
   </ItemGroup>
 
   <Target Name="CopyPluginsToOutput" AfterTargets="Build">
+    <!-- GitHub Plugin -->
     <ItemGroup>
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\net10.0\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\net10.0\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\net10.0\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\net10.0\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.KiSimulator\bin\$(Configuration)\net10.0\*.dll" />
+      <GitHubPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\net10.0\*.dll" />
     </ItemGroup>
-    <MakeDir Directories="$(OutDir)plugins" />
-    <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(OutDir)plugins" SkipUnchangedFiles="true" />
+    <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.GitHub" />
+    <Copy SourceFiles="@(GitHubPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.GitHub" SkipUnchangedFiles="true" />
+
+    <!-- LocalDirectory Plugin -->
+    <ItemGroup>
+      <LocalDirectoryPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\net10.0\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.LocalDirectory" />
+    <Copy SourceFiles="@(LocalDirectoryPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.LocalDirectory" SkipUnchangedFiles="true" />
+
+    <!-- GitHubCopilot Plugin -->
+    <ItemGroup>
+      <GitHubCopilotPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\net10.0\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.GitHubCopilot" />
+    <Copy SourceFiles="@(GitHubCopilotPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.GitHubCopilot" SkipUnchangedFiles="true" />
+
+    <!-- ClaudeCli Plugin -->
+    <ItemGroup>
+      <ClaudeCliPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\net10.0\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.ClaudeCli" />
+    <Copy SourceFiles="@(ClaudeCliPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.ClaudeCli" SkipUnchangedFiles="true" />
+
+    <!-- KiSimulator Plugin -->
+    <ItemGroup>
+      <KiSimulatorPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.KiSimulator\bin\$(Configuration)\net10.0\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.KiSimulator" />
+    <Copy SourceFiles="@(KiSimulatorPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.KiSimulator" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

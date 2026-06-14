@@ -10,6 +10,12 @@
 | `GitHubCopilotPlugin` | GitHub Copilot CLI (`copilot`) installiert und eingeloggt |
 | `KiSimulatorPlugin` | Keine — nur für Tests |
 
+## Plugin-Verzeichnis
+
+Jedes Plugin muss im "plugin"-Verzeichnis der Anwendung abgelegt sein. Der `PluginManager` sucht sowohl nach DLLsdirekt im Verzeichnis als auch in den Unterordnern der ersten Ebene.
+
+Mit dem Kompilieren des Anwendungsprojekts werden die im Projekt enthaltenenen Plugins in das Buildverzeichnis kopiert, so dass sie auch ind er ENtwicklungsumgebung autmatisch verfügbar sind.
+
 ## Plugin-Einstellungen konfigurieren
 
 Plugin-Einstellungen werden in der Seite **Einstellungen** (`/einstellungen`) verwaltet.

@@ -138,6 +138,10 @@ public sealed partial class App : System.Windows.Application
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();
         services.AddSingleton<IPluginManager>(sp => sp.GetRequiredService<PluginManager>());
+        services.AddSingleton<WindowsCredentialStore>();
+        services.AddSingleton<ICredentialStore>(sp => sp.GetRequiredService<WindowsCredentialStore>());
+        services.AddSingleton<CliRunner>();
+        services.AddSingleton<ICliRunner>(sp => sp.GetRequiredService<CliRunner>());
 
         // Infrastructure implementations for domain interfaces
         services.AddScoped<IBenutzerkontextService, BenutzerkontextService>();

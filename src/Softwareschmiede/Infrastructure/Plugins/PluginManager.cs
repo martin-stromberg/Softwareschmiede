@@ -108,7 +108,9 @@ public sealed class PluginManager : IPluginManager
         }
 
         var testMode = IsTestMode();
-        foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly))
+        foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.GetDirectories(_pluginDirectory, "*", SearchOption.TopDirectoryOnly)
+                .SelectMany(folder => Directory.GetFiles(folder, "*.dll", SearchOption.TopDirectoryOnly))))
         {
             if (testMode && !IsAllowedInTestMode(Path.GetFileName(dllPath)))
             {
