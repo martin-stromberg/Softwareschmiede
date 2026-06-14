@@ -83,6 +83,19 @@ public sealed class PluginManager : IPluginManager
         }
     }
 
+    private static bool IsTestMode()
+        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH"));
+
+    private static bool IsAllowedInTestMode(string dllFileName)
+    {
+        var name = Path.GetFileNameWithoutExtension(dllFileName);
+        return name.Equals("Softwareschmiede.Plugin.LocalDirectory", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.KiSimulator", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.ClaudeCli", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.GitHubCopilot", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.GitHub", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void DiscoverPlugins()
     {
         _gitPlugins.Clear();
@@ -94,8 +107,14 @@ public sealed class PluginManager : IPluginManager
             return;
         }
 
+        var testMode = IsTestMode();
         foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly))
         {
+            if (testMode && !IsAllowedInTestMode(Path.GetFileName(dllPath)))
+            {
+                _logger.LogInformation("Test-Modus: Plugin übersprungen: {DllPath}", dllPath);
+                continue;
+            }
             LoadPluginsFromDll(dllPath);
         }
 

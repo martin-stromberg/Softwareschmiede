@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -8,18 +9,16 @@ using Softwareschmiede.Domain.Entities;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für die Projektliste.</summary>
-public sealed class ProjectListViewModel : ViewModelBase
+public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 {
     private readonly ProjektService _projektService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ProjectListViewModel> _logger;
+    private readonly SemaphoreSlim _ladenSemaphore = new(1, 1);
 
     private Projekt? _selectedProjekt;
     private bool _isLoading;
     private string? _fehlerMeldung;
-    private string _neuerProjektName = string.Empty;
-    private string _neuerProjektBeschreibung = string.Empty;
-    private bool _isCreateFormVisible;
     private ViewModelBase? _detailViewModel;
 
     /// <summary>Liste aller Projekte.</summary>
@@ -33,7 +32,7 @@ public sealed class ProjectListViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedProjekt, value) && value is not null)
             {
-                ZeigeDetailAsync(value.Id);
+                ZeigeDetail(value.Id);
             }
         }
     }
@@ -42,7 +41,12 @@ public sealed class ProjectListViewModel : ViewModelBase
     public ViewModelBase? DetailViewModel
     {
         get => _detailViewModel;
-        private set => SetProperty(ref _detailViewModel, value);
+        private set
+        {
+            var old = _detailViewModel;
+            SetProperty(ref _detailViewModel, value);
+            if (old is IDisposable d) d.Dispose();
+        }
     }
 
     /// <summary>Gibt an, ob Daten geladen werden.</summary>
@@ -59,38 +63,23 @@ public sealed class ProjectListViewModel : ViewModelBase
         private set => SetProperty(ref _fehlerMeldung, value);
     }
 
-    /// <summary>Name für das neue Projekt.</summary>
-    public string NeuerProjektName
-    {
-        get => _neuerProjektName;
-        set => SetProperty(ref _neuerProjektName, value);
-    }
-
-    /// <summary>Beschreibung für das neue Projekt.</summary>
-    public string NeuerProjektBeschreibung
-    {
-        get => _neuerProjektBeschreibung;
-        set => SetProperty(ref _neuerProjektBeschreibung, value);
-    }
-
-    /// <summary>Gibt an, ob das Erstellungsformular sichtbar ist.</summary>
-    public bool IsCreateFormVisible
-    {
-        get => _isCreateFormVisible;
-        set => SetProperty(ref _isCreateFormVisible, value);
-    }
-
     /// <summary>Lädt die Projektliste.</summary>
     public ICommand LadenCommand { get; }
 
-    /// <summary>Zeigt das Erstellungsformular an.</summary>
+    /// <summary>Öffnet die Detailansicht im Anlage-Modus.</summary>
     public ICommand ZeigeErstellungsFormularCommand { get; }
-
-    /// <summary>Erstellt ein neues Projekt.</summary>
-    public ICommand ProjektErstellenCommand { get; }
 
     /// <summary>Archiviert das ausgewählte Projekt.</summary>
     public ICommand ProjektArchivierenCommand { get; }
+
+    /// <summary>Schließt die Detailansicht.</summary>
+    public ICommand SchliesseDetailCommand { get; }
+
+    /// <summary>Wählt ein Projekt aus und zeigt die Details.</summary>
+    public ICommand WaehleProjektCommand { get; }
+
+    /// <summary>Wird aufgerufen, wenn sich der Titel des Detailbereichs ändert (z. B. Projektname). Null bedeutet, kein Detailtitel aktiv.</summary>
+    public Action<string?>? DetailTitelAenderungAction { get; set; }
 
     /// <inheritdoc cref="ProjectListViewModel"/>
     public ProjectListViewModel(
@@ -103,22 +92,28 @@ public sealed class ProjectListViewModel : ViewModelBase
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
-        ZeigeErstellungsFormularCommand = new RelayCommand(() => IsCreateFormVisible = true);
-        ProjektErstellenCommand = new AsyncRelayCommand(
-            ProjektErstellenAsync,
-            () => !string.IsNullOrWhiteSpace(NeuerProjektName));
+        ZeigeErstellungsFormularCommand = new RelayCommand(ZeigeDetailErstellungsFormular);
         ProjektArchivierenCommand = new AsyncRelayCommand(
             ProjektArchivierenAsync,
             () => SelectedProjekt is not null);
+        SchliesseDetailCommand = new RelayCommand(() => DetailViewModel = null);
+        WaehleProjektCommand = new RelayCommand<Projekt>(projekt =>
+        {
+            if (projekt is not null)
+            {
+                SelectedProjekt = projekt;
+            }
+        });
     }
 
     private async Task LadenAsync(CancellationToken ct)
     {
-        IsLoading = true;
-        FehlerMeldung = null;
-
+        await _ladenSemaphore.WaitAsync(ct);
         try
         {
+            IsLoading = true;
+            FehlerMeldung = null;
+
             var projekte = await _projektService.GetAllAsync(ct);
             Projekte.Clear();
             foreach (var projekt in projekte)
@@ -131,40 +126,12 @@ public sealed class ProjectListViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Projekte.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
         }
         finally
         {
             IsLoading = false;
-        }
-    }
-
-    private async Task ProjektErstellenAsync(CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(NeuerProjektName))
-            return;
-
-        try
-        {
-            var projekt = await _projektService.CreateAsync(
-                NeuerProjektName.Trim(),
-                string.IsNullOrWhiteSpace(NeuerProjektBeschreibung) ? null : NeuerProjektBeschreibung.Trim(),
-                ct);
-
-            Projekte.Add(projekt);
-            SelectedProjekt = projekt;
-            NeuerProjektName = string.Empty;
-            NeuerProjektBeschreibung = string.Empty;
-            IsCreateFormVisible = false;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Erstellen des Projekts.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            _ladenSemaphore.Release();
         }
     }
 
@@ -187,14 +154,53 @@ public sealed class ProjectListViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Archivieren des Projekts.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
         }
     }
 
-    private void ZeigeDetailAsync(Guid projektId)
+    private void InitDetailViewModel(ProjectDetailViewModel viewModel)
+    {
+        PropertyChangedEventHandler propertyChangedHandler = (_, e) =>
+        {
+            if (e.PropertyName == nameof(ProjectDetailViewModel.ProjektName))
+                DetailTitelAenderungAction?.Invoke(viewModel.ProjektName);
+        };
+        viewModel.PropertyChanged += propertyChangedHandler;
+
+        viewModel.ZurueckAction = () =>
+        {
+            viewModel.PropertyChanged -= propertyChangedHandler;
+            DetailViewModel = null;
+            DetailTitelAenderungAction?.Invoke(null);
+        };
+        viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
+    }
+
+    private void ZeigeDetail(Guid projektId)
     {
         var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
+        InitDetailViewModel(viewModel);
         viewModel.ProjektId = projektId;
         DetailViewModel = viewModel;
+    }
+
+    private void ZeigeDetailErstellungsFormular()
+    {
+        var viewModel = _serviceProvider.GetRequiredService<ProjectDetailViewModel>();
+        InitDetailViewModel(viewModel);
+        viewModel.ProjektId = Guid.Empty;
+        viewModel.ProjektName = string.Empty;
+        DetailViewModel = viewModel;
+    }
+
+    private async Task NeuesProjektHinzufuegen()
+    {
+        await LadenAsync(CancellationToken.None);
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _ladenSemaphore.Dispose();
     }
 }

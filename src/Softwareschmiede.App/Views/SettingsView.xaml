@@ -36,7 +36,7 @@
 
         <!-- Dark Mode -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,16">
-            <CheckBox IsChecked="{Binding IsDarkMode}"
+            <CheckBox IsChecked="{Binding IsDarkMode, Mode=OneWay}"
                       Content="Dark Mode aktivieren"
                       Foreground="{DynamicResource PrimaryTextBrush}"
                       VerticalAlignment="Center" />

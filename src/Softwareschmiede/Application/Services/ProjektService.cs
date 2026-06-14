@@ -180,6 +180,16 @@ public sealed class ProjektService
         return repository;
     }
 
+    /// <summary>Gibt alle bekannten Git-Repositories zurück.</summary>
+    public async Task<IReadOnlyList<GitRepository>> GetAllRepositoriesAsync(CancellationToken ct = default)
+    {
+        _logger.LogInformation("Alle Repositories abrufen.");
+        return await _db.GitRepositories
+            .AsNoTracking()
+            .OrderBy(r => r.RepositoryName)
+            .ToListAsync(ct);
+    }
+
     /// <summary>Entfernt ein Git-Repository aus einem Projekt.</summary>
     public async Task RemoveRepositoryAsync(Guid repositoryId, CancellationToken ct = default)
     {

@@ -133,6 +133,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
+        services.AddSingleton<IDialogService, WpfDialogService>();
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();
@@ -150,6 +151,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<ProjectListViewModel>();
         services.AddTransient<ProjectDetailViewModel>();
+        services.AddTransient<RepositoryAssignViewModel>();
         services.AddTransient<TaskListViewModel>();
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();

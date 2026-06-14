@@ -12,6 +12,7 @@ public sealed partial class ProjectDetailView : UserControl
     public ProjectDetailView()
     {
         InitializeComponent();
+        Loaded += (_, _) => ProjektNameTextBox.Focus();
     }
 
     private void AufgabeDoubleClick(object sender, MouseButtonEventArgs e)

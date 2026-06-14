@@ -1,67 +1,49 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Input;
 
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
 /// WPF End-to-End-Tests mit FlaUI. Die Anwendung wird als separater Prozess gestartet.
 ///
-/// Voraussetzungen für die lokale Ausführung:
+/// Voraussetzungen:
 /// - Windows-Desktop-Session (kein Headless-CI)
-/// - Das Projekt Softwareschmiede.App muss im Debug-Modus gebaut sein
+/// - Softwareschmiede.App muss im Debug-Modus gebaut sein (dotnet build src/Softwareschmiede.App)
 ///
 /// Ausführung (lokal): dotnet test --filter Category=E2E
+/// CI-Ausschluss:      dotnet test --filter "Category!=E2E"
 /// </summary>
 [Trait("Category", "E2E")]
+[Collection("E2E")]
 public sealed class WpfE2ETests : WpfTestBase
 {
-    private const string SkipReason =
-        "Erfordert eine Windows-Desktop-Session und ein vorab gebautes Softwareschmiede.App.exe. " +
-        "Nicht in Headless-CI ausführbar.";
-
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void ProjektErstellen_ZeigtAufgabenListe_E2E()
     {
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
-        var projekteButton = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
-        projekteButton.AsButton().Click();
+        NavigateToProjecten(mainWindow);
 
-        var neuesProjektButton = WaitForElement(mainWindow, cf => cf.ByName("+ Neues Projekt"), TimeSpan.FromSeconds(10));
-        neuesProjektButton.AsButton().Click();
-
-        var nameTextBox = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.Edit), TimeSpan.FromSeconds(5));
-        nameTextBox.AsTextBox().Enter("E2E-Testprojekt");
-
-        var erstellenButton = WaitForElement(mainWindow, cf => cf.ByName("Erstellen"), TimeSpan.FromSeconds(5));
-        erstellenButton.AsButton().Click();
+        CreateProject(mainWindow, "E2E-Testprojekt");
+        OpenProject(mainWindow, "E2E-Testprojekt");
 
         var aufgabeListe = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(10));
         Assert.NotNull(aufgabeListe);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void ProjektErstellen_UndNeueAufgabeAnlegen_E2E()
     {
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
-        var projekteButton = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
-        projekteButton.AsButton().Click();
+        NavigateToProjecten(mainWindow);
+        CreateAndOpenProject(mainWindow, "E2E-Startprojekt");
 
-        var neuesProjektButton = WaitForElement(mainWindow, cf => cf.ByName("+ Neues Projekt"), TimeSpan.FromSeconds(10));
-        neuesProjektButton.AsButton().Click();
-
-        var nameTextBox = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.Edit), TimeSpan.FromSeconds(5));
-        nameTextBox.AsTextBox().Enter("E2E-Startprojekt");
-
-        var erstellenButton = WaitForElement(mainWindow, cf => cf.ByName("Erstellen"), TimeSpan.FromSeconds(5));
-        erstellenButton.AsButton().Click();
-
-        var neueAufgabe = WaitForElement(mainWindow, cf => cf.ByName("+ Neue Aufgabe"), TimeSpan.FromSeconds(10));
-        neueAufgabe.AsButton().Click();
+        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
+        aufgabeNeuButton.AsButton().Click();
 
         var aufgabeListe = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(5));
         Assert.NotNull(aufgabeListe);
@@ -71,26 +53,17 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.Null(statusGestartetText);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void AufgabeAnlegen_ZeigtCliStartenButton_E2E()
     {
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
-        var projekteButton = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
-        projekteButton.AsButton().Click();
+        NavigateToProjecten(mainWindow);
+        CreateAndOpenProject(mainWindow, "E2E-CLI-Projekt");
 
-        var neuesProjektButton = WaitForElement(mainWindow, cf => cf.ByName("+ Neues Projekt"), TimeSpan.FromSeconds(10));
-        neuesProjektButton.AsButton().Click();
-
-        var nameTextBox = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.Edit), TimeSpan.FromSeconds(5));
-        nameTextBox.AsTextBox().Enter("E2E-CLI-Projekt");
-
-        var erstellenButton = WaitForElement(mainWindow, cf => cf.ByName("Erstellen"), TimeSpan.FromSeconds(5));
-        erstellenButton.AsButton().Click();
-
-        var neueAufgabe = WaitForElement(mainWindow, cf => cf.ByName("+ Neue Aufgabe"), TimeSpan.FromSeconds(10));
-        neueAufgabe.AsButton().Click();
+        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
+        aufgabeNeuButton.AsButton().Click();
 
         var cliStartenButton = WaitForElement(mainWindow, cf => cf.ByName("▶ CLI Starten"), TimeSpan.FromSeconds(10));
         Assert.NotNull(cliStartenButton);
@@ -99,7 +72,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.NotEqual(IntPtr.Zero, windowHandle);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void DarkModeAktivierenUndPersistieren_E2E()
     {
         var app = LaunchApp();
@@ -117,7 +90,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.True(darkModeCheckBox.AsCheckBox().IsChecked);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void Dashboard_KeineRecoveryBanner_BeiSauberemStart_E2E()
     {
         var app = LaunchApp();
@@ -131,7 +104,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.Null(recoveryBanner);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void EinstellungenOeffnen_ZeigtEinstellungsSeite_E2E()
     {
         var app = LaunchApp();
@@ -147,7 +120,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.NotNull(speichernButton);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E()
     {
         var app = LaunchApp();
@@ -160,7 +133,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.True(textBoxen.Length > 0, "Kein Textfeld auf der Einstellungsseite gefunden.");
 
         var arbeitsverzeichnisBox = textBoxen[0].AsTextBox();
-        arbeitsverzeichnisBox.Enter(@"C:\TestArbeitsverzeichnis");
+        arbeitsverzeichnisBox.Text = @"C:\TestArbeitsverzeichnis";
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Einstellungen speichern"), TimeSpan.FromSeconds(5));
         speichernButton.AsButton().Click();
@@ -172,7 +145,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.NotNull(erfolgsMeldung);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public void EinstellungenNavigation_BleibtNachMehrerenKlicks_Stabil_E2E()
     {
         var app = LaunchApp();
@@ -194,26 +167,5 @@ public sealed class WpfE2ETests : WpfTestBase
 
         var speichernButton2 = WaitForElement(mainWindow, cf => cf.ByName("Einstellungen speichern"), TimeSpan.FromSeconds(5));
         Assert.NotNull(speichernButton2);
-    }
-
-    private static AutomationElement WaitForElement(
-        AutomationElement parent,
-        Func<ConditionFactory, ConditionBase> conditionFunc,
-        TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        AutomationElement? element = null;
-
-        while (DateTime.UtcNow < deadline)
-        {
-            element = parent.FindFirstDescendant(conditionFunc);
-            if (element is not null)
-                return element;
-
-            Thread.Sleep(200);
-        }
-
-        throw new TimeoutException(
-            $"Element wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
     }
 }

@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.App.ViewModels;
 
@@ -13,7 +16,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IDialogService _dialogService;
     private readonly ILogger<ProjectDetailViewModel> _logger;
+
+    /// <summary>Wird aufgerufen, wenn der Nutzer zur Listenansicht zurückkehren möchte.</summary>
+    public Action? ZurueckAction { get; set; }
+
+    /// <summary>Wird nach dem Erstellen oder Löschen eines Projekts aufgerufen, damit die Listenansicht die Liste aktualisiert.</summary>
+    public Func<Task>? ProjektListeAktualisierenCallback { get; set; }
 
     private Guid _projektId;
     private Projekt? _projekt;
@@ -21,6 +31,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private string? _fehlerMeldung;
     private ViewModelBase? _selectedTaskViewModel;
     private CancellationTokenSource? _ladenCts;
+    private string _projektName = string.Empty;
+    private string? _projektBeschreibung;
+    private GitRepository? _selectedRepository;
+    private AufgabenFilterTyp _aufgabenFilter = AufgabenFilterTyp.Alle;
+    private bool _isFilterOverlayVisible;
+    private bool _disposed;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -30,6 +46,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref _projektId, value))
             {
+                OnPropertyChanged(nameof(IsNeuanlage));
                 _ladenCts?.Cancel();
                 _ladenCts?.Dispose();
                 _ladenCts = new CancellationTokenSource();
@@ -65,14 +82,53 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         get => _selectedTaskViewModel;
         private set
         {
-            if (_selectedTaskViewModel is IDisposable disposable)
-                disposable.Dispose();
+            var old = _selectedTaskViewModel;
             SetProperty(ref _selectedTaskViewModel, value);
+            if (old is IDisposable disposable)
+                disposable.Dispose();
         }
     }
 
     /// <summary>Liste der Aufgaben des Projekts.</summary>
     public ObservableCollection<Aufgabe> Aufgaben { get; } = new();
+
+    /// <summary>Bearbeitbarer Projektname.</summary>
+    public string ProjektName
+    {
+        get => _projektName;
+        set => SetProperty(ref _projektName, value);
+    }
+
+    /// <summary>Bearbeitbare Projektbeschreibung.</summary>
+    public string? ProjektBeschreibung
+    {
+        get => _projektBeschreibung;
+        set => SetProperty(ref _projektBeschreibung, value);
+    }
+
+    /// <summary>Ausgewähltes Repository.</summary>
+    public GitRepository? SelectedRepository
+    {
+        get => _selectedRepository;
+        set => SetProperty(ref _selectedRepository, value);
+    }
+
+    /// <summary>Aktueller Aufgabenfilter.</summary>
+    public AufgabenFilterTyp AufgabenFilter
+    {
+        get => _aufgabenFilter;
+        set => SetProperty(ref _aufgabenFilter, value);
+    }
+
+    /// <summary>Gibt an, ob das Filter-Overlay sichtbar ist.</summary>
+    public bool IsFilterOverlayVisible
+    {
+        get => _isFilterOverlayVisible;
+        set => SetProperty(ref _isFilterOverlayVisible, value);
+    }
+
+    /// <summary>Gibt an, ob die Ansicht im Neuanlage-Modus ist (noch kein persistiertes Projekt).</summary>
+    public bool IsNeuanlage => _projektId == Guid.Empty;
 
     /// <summary>Lädt das Projekt neu.</summary>
     public ICommand LadenCommand { get; }
@@ -83,19 +139,39 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet eine Aufgabe im Detail.</summary>
     public ICommand AufgabeOeffnenCommand { get; }
 
+    /// <summary>Navigiert zurück zur Projektübersicht.</summary>
+    public ICommand ZurueckCommand { get; }
+
+    /// <summary>Speichert Projektänderungen.</summary>
+    public ICommand SpeichernCommand { get; }
+
+    /// <summary>Löscht das Projekt.</summary>
+    public ICommand LoeschenCommand { get; }
+
+    /// <summary>Öffnet das Filter-Overlay.</summary>
+    public ICommand FilterCommand { get; }
+
+    /// <summary>Öffnet den Repository-Zuweisungs-Dialog.</summary>
+    public ICommand RepositoryZuweisenCommand { get; }
+
+    /// <summary>Öffnet das Repository im Browser.</summary>
+    public ICommand RepositoryOeffnenCommand { get; }
+
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
         ProjektService projektService,
         AufgabeService aufgabeService,
         IServiceProvider serviceProvider,
+        IDialogService dialogService,
         ILogger<ProjectDetailViewModel> logger)
     {
         _projektService = projektService;
         _aufgabeService = aufgabeService;
         _serviceProvider = serviceProvider;
+        _dialogService = dialogService;
         _logger = logger;
 
-        LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
+        LadenCommand = new AsyncRelayCommand(LadenAsync);
         AufgabeErstellenCommand = new AsyncRelayCommand(
             AufgabeErstellenAsync,
             () => _projektId != Guid.Empty);
@@ -105,6 +181,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             vm.AufgabeId = id;
             SelectedTaskViewModel = vm;
         });
+        ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
+        SpeichernCommand = new AsyncRelayCommand(ProjektSpeichernAsync, () => !string.IsNullOrWhiteSpace(_projektName));
+        LoeschenCommand = new AsyncRelayCommand(ProjektLoeschenAsync, () => _projektId != Guid.Empty);
+        FilterCommand = new RelayCommand(() => IsFilterOverlayVisible = !IsFilterOverlayVisible);
+        RepositoryZuweisenCommand = new AsyncRelayCommand(RepositoryZuweisenAsync, () => _projektId != Guid.Empty);
+        RepositoryOeffnenCommand = new RelayCommand(RepositoryOeffnen, () => _selectedRepository != null);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -122,6 +204,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             Aufgaben.Clear();
             foreach (var aufgabe in aufgaben)
                 Aufgaben.Add(aufgabe);
+
+            if (Projekt != null)
+            {
+                ProjektName = Projekt.Name;
+                ProjektBeschreibung = Projekt.Beschreibung;
+                SelectedRepository = Projekt.Repositories.FirstOrDefault();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -130,7 +219,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden des Projekts {ProjektId}.", _projektId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
         finally
         {
@@ -165,16 +254,161 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
     }
+
+    private async Task ProjektSpeichernAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (_projektId == Guid.Empty)
+            {
+                await _projektService.CreateAsync(ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
+                try
+                {
+                    await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+                }
+                catch (Exception callbackEx)
+                {
+                    _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projekterstellung.");
+                }
+                ZurueckAction?.Invoke();
+            }
+            else
+            {
+                await _projektService.UpdateAsync(_projektId, ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
+                try
+                {
+                    await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+                }
+                catch (Exception callbackEx)
+                {
+                    _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projektaktualisierung.");
+                }
+                await LadenAsync(ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern des Projekts {ProjektId}.", _projektId);
+            SetFehler(ex);
+        }
+    }
+
+    private async Task ProjektLoeschenAsync(CancellationToken ct)
+    {
+        if (_projektId == Guid.Empty)
+            return;
+
+        if (!_dialogService.BestaetigenDialog("Soll das Projekt wirklich gelöscht werden?", "Löschen bestätigen"))
+            return;
+
+        try
+        {
+            await _projektService.DeleteAsync(_projektId, ct);
+            try
+            {
+                await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+            }
+            catch (Exception callbackEx)
+            {
+                _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projektlöschung.");
+            }
+            ZurueckAction?.Invoke();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Löschen des Projekts {ProjektId}.", _projektId);
+            SetFehler(ex);
+        }
+    }
+
+    private async Task RepositoryZuweisenAsync(CancellationToken ct)
+    {
+        if (_projektId == Guid.Empty)
+            return;
+
+        try
+        {
+            var vm = _serviceProvider.GetRequiredService<RepositoryAssignViewModel>();
+            await vm.LadenAsync(ct);
+            var confirmed = _dialogService.RepositoryZuweisenDialog(vm);
+
+            if (_disposed || ct.IsCancellationRequested)
+                return;
+
+            if (confirmed && vm.SelectedRepository is { } repo)
+            {
+                await _projektService.AddRepositoryAsync(
+                    _projektId,
+                    repo.PluginTyp,
+                    repo.RepositoryUrl,
+                    repo.RepositoryName,
+                    ct);
+
+                if (!_disposed && !ct.IsCancellationRequested)
+                    await LadenAsync(ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Zuweisen des Repositories.");
+            SetFehler(ex);
+        }
+    }
+
+    private void RepositoryOeffnen()
+    {
+        if (_selectedRepository == null)
+            return;
+
+        try
+        {
+            var url = _selectedRepository.RepositoryUrl;
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Öffnen der Repository-URL.");
+            SetFehler(ex);
+        }
+    }
+
+    private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
 
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (_disposed)
+            return;
+        _disposed = true;
+
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
+        _ladenCts = null;
+
         if (_selectedTaskViewModel is IDisposable disposable)
             disposable.Dispose();
+        _selectedTaskViewModel = null;
     }
 }
