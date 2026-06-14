@@ -14,7 +14,7 @@
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1"
-                Padding="8,8,8,0">
+                Padding="8,8,8,8">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
 
                 <!-- Gruppe: Projekt -->
