@@ -1,5 +1,4 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 
@@ -25,18 +24,10 @@ public sealed class WpfE2ETests : WpfTestBase
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
-        var projekteButton = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
-        projekteButton.AsButton().Click();
+        NavigateToProjecten(mainWindow);
 
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), TimeSpan.FromSeconds(10));
-        neuButton.AsButton().Click();
-
-        var nameTextBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
-        nameTextBox.Click();
-        Keyboard.Type("E2E-Testprojekt");
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
-        speichernButton.AsButton().Click();
+        CreateProject(mainWindow, "E2E-Testprojekt");
+        OpenProject(mainWindow, "E2E-Testprojekt");
 
         var aufgabeListe = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(10));
         Assert.NotNull(aufgabeListe);
@@ -48,24 +39,8 @@ public sealed class WpfE2ETests : WpfTestBase
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
-        var projekteButton = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
-        projekteButton.AsButton().Click();
-
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), TimeSpan.FromSeconds(10));
-        neuButton.AsButton().Click();
-
-        var nameTextBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
-        nameTextBox.Click();
-        Keyboard.Type("E2E-Startprojekt");
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
-        speichernButton.AsButton().Click();
-        Thread.Sleep(1000); // CreateAsync + Callback + ZurueckAction abwarten
-
-        // Nach dem Speichern navigiert das ViewModel zurück zur Liste — Projekt erneut öffnen
-        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName("E2E-Startprojekt"), TimeSpan.FromSeconds(5));
-        projektKachel.Click();
-        Thread.Sleep(500);
+        NavigateToProjecten(mainWindow);
+        CreateAndOpenProject(mainWindow, "E2E-Startprojekt");
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();
@@ -84,24 +59,8 @@ public sealed class WpfE2ETests : WpfTestBase
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
-        var projekteButton = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
-        projekteButton.AsButton().Click();
-
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), TimeSpan.FromSeconds(10));
-        neuButton.AsButton().Click();
-
-        var nameTextBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
-        nameTextBox.Click();
-        Keyboard.Type("E2E-CLI-Projekt");
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
-        speichernButton.AsButton().Click();
-        Thread.Sleep(1000); // CreateAsync + Callback + ZurueckAction abwarten
-
-        // Nach dem Speichern navigiert das ViewModel zurück zur Liste — Projekt erneut öffnen
-        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName("E2E-CLI-Projekt"), TimeSpan.FromSeconds(5));
-        projektKachel.Click();
-        Thread.Sleep(500);
+        NavigateToProjecten(mainWindow);
+        CreateAndOpenProject(mainWindow, "E2E-CLI-Projekt");
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();

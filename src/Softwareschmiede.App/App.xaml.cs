@@ -133,6 +133,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IRunningAutomationStatusSource>(sp =>
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
+        services.AddSingleton<IDialogService, WpfDialogService>();
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();

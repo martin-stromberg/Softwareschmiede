@@ -21,7 +21,6 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     private static readonly TimeSpan Medium = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan Long   = TimeSpan.FromSeconds(20);
 
-    // Startet die Anwendung, holt das Hauptfenster und navigiert zur Projektliste.
     private AutomationElement StartAndNavigateToProjects()
     {
         var app = LaunchApp();
@@ -30,48 +29,38 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         return mainWindow;
     }
 
-    // Navigiert zur Projektliste.
-    private void NavigateToProjecten(AutomationElement mainWindow)
-    {
-        var button = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), Medium);
-        button.AsButton().Click();
-    }
+    // -------------------------------------------------------------------------
 
-    // Legt ein neues Projekt an, speichert es und schließt das Overlay.
-    // Nach dem Speichern navigiert das ViewModel automatisch zurück (ZurueckAction).
-    private void CreateProject(AutomationElement mainWindow, string name)
+    /// <summary>
+    /// Szenario: Projekt anlegen, Neuanlage starten und mit Zurück abbrechen, erstes Projekt öffnen.
+    /// Prüft: Nach Abbrechen der Neuanlage ist das erste Projekt noch in der Liste aufrufbar.
+    /// </summary>
+    [Fact]
+    public void NeuanlageAbbrechen_ErstesProjektNochAufrufbar_E2E()
     {
+        var mainWindow = StartAndNavigateToProjects();
+
+        // Erstes Projekt anlegen
+        CreateProject(mainWindow, "Bestehendes-Projekt");
+
+        // Neuanlage starten
         var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
         neuButton.AsButton().Click();
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
-        // Fokus setzen und Text per Tastatur eingeben, damit die WPF-Bindung (UpdateSourceTrigger=PropertyChanged)
-        // zuverlässig ausgelöst wird. AsTextBox().Text verwendet IValueProvider.SetValue(),
-        // das den TextChanged-Event in WPF nicht immer auslöst.
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        nameBox.Click();
-        Keyboard.Type(name);
+        // Neuanlage über Zurück abbrechen
+        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        zurueckButton.AsButton().Click();
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-        Thread.Sleep(1000); // CreateAsync + Callback-Ausführung abwarten
+        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
+
+        // Erstes Projekt ist noch in der Liste und aufrufbar
+        OpenProject(mainWindow, "Bestehendes-Projekt");
+
+        var speichernInDetail = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        Assert.NotNull(speichernInDetail);
     }
-
-    // Öffnet ein Projekt aus der Liste anhand seines Namens.
-    private void OpenProject(AutomationElement mainWindow, string name)
-    {
-        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), Short);
-        projektKachel.Click();
-        Thread.Sleep(500); // Overlay-Animation abwarten
-    }
-
-    // Legt ein neues Projekt an, speichert es und öffnet es wieder.
-    private void CreateAndOpenProject(AutomationElement mainWindow, string name)
-    {
-        CreateProject(mainWindow, name);
-        OpenProject(mainWindow, name);
-    }
-
-    // -------------------------------------------------------------------------
 
     /// <summary>
     /// Szenario: Projektnamen ändern, zurücknavigieren, erneut öffnen.
@@ -91,12 +80,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
-        Thread.Sleep(1000);
 
         // Zurück zur Übersicht navigieren
         var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         zurueckButton.AsButton().Click();
-        Thread.Sleep(500);
 
         // Projektkachel zeigt jetzt den neuen Namen
         var aktualisierteKachel = WaitForElement(mainWindow, cf => cf.ByName("Umbenennen-Aktualisiert"), Short);
@@ -104,7 +91,6 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Kachel erneut anklicken → Detailansicht öffnet sich
         aktualisierteKachel.Click();
-        Thread.Sleep(500);
 
         // Speichern-Button bestätigt, dass die Detailansicht geöffnet ist
         var speichernNachWiederoeffnen = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
@@ -129,7 +115,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
-        Thread.Sleep(500);
+
+        // Warten bis Speichern abgeschlossen (LadenAsync lädt Daten neu)
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
         // Feld zeigt aktualisierten Namen
         Assert.Equal("Edit-Test-Aktualisiert", nameBox.AsTextBox().Text);
@@ -152,11 +140,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         var msgBox = WaitForWindow("Löschen bestätigen", Short);
         var jaButton = WaitForElement(msgBox, cf => cf.ByName("Ja"), Short);
         jaButton.AsButton().Click();
-        Thread.Sleep(500);
 
         // Overlay geschlossen — "Speichern" nicht mehr sichtbar
-        var speichernNachLoeschen = mainWindow.FindFirstDescendant(cf => cf.ByName("Speichern"));
-        Assert.Null(speichernNachLoeschen);
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
     }
 
     /// <summary>
@@ -172,10 +158,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // Neue Aufgabe erstellen (AutomationProperties.Name="AufgabeNeu")
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
         aufgabeNeuButton.AsButton().Click();
-        Thread.Sleep(1000); // Aufgabe anlegen + LadenAsync abwarten
 
         // Aufgabenliste enthält jetzt mindestens eine Aufgabe
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Short);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
     }
@@ -193,7 +178,6 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // Filter-Overlay öffnen
         var filterButton = WaitForElement(mainWindow, cf => cf.ByName("Filter"), Short);
         filterButton.AsButton().Click();
-        Thread.Sleep(300);
 
         // Überschrift "Aufgaben filtern" erscheint
         var overlayTitel = WaitForElement(mainWindow, cf => cf.ByName("Aufgaben filtern"), Short);
@@ -208,11 +192,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Filter-Overlay wieder schließen
         filterButton.Click();
-        Thread.Sleep(300);
 
         // Overlay weg
-        var overlayNachSchliessen = mainWindow.FindFirstDescendant(cf => cf.ByName("Aufgaben filtern"));
-        Assert.Null(overlayNachSchliessen);
+        WaitUntilGone(mainWindow, cf => cf.ByName("Aufgaben filtern"), Short);
     }
 
     /// <summary>
@@ -236,10 +218,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // Dialog über "Abbrechen" schließen
         var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
         abbrechenButton.AsButton().Click();
-        Thread.Sleep(300);
 
         // Hauptfenster-Overlay noch offen (Speichern-Button sichtbar)
-        var speichernNachAbbrechen = mainWindow.FindFirstDescendant(cf => cf.ByName("Speichern"));
+        var speichernNachAbbrechen = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         Assert.NotNull(speichernNachAbbrechen);
     }
 
@@ -271,11 +252,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // Zurück klicken
         var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         zurueckButton.AsButton().Click();
-        Thread.Sleep(1000);
 
         // Overlay geschlossen — "Speichern" nicht mehr sichtbar
-        var speichernNachZurueck = mainWindow.FindFirstDescendant(cf => cf.ByName("Speichern"));
-        Assert.Null(speichernNachZurueck);
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
 
         // Das eben erstellte Projekt erscheint als Kachel in der Liste
         var projektTile = WaitForElement(mainWindow, cf => cf.ByName("Zurueck-Test"), Short);

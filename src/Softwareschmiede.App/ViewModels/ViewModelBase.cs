@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
@@ -34,6 +35,13 @@ public abstract class ViewModelBase : INotifyPropertyChanged
 
         onChanged();
         return true;
+    }
+
+    /// <summary>Setzt das übergebene Feld auf den Fehlertext der Exception und löst PropertyChanged für den angegebenen Eigenschaftsnamen aus.</summary>
+    protected void SetFehler(ref string? fehlerMeldungField, string propertyName, Exception ex)
+    {
+        fehlerMeldungField = $"Fehler: {ex.Message}";
+        OnPropertyChanged(propertyName);
     }
 }
 
@@ -148,7 +156,10 @@ public sealed class AsyncRelayCommand : ICommand
         }
         catch (Exception ex)
         {
-            OnError?.Invoke(ex);
+            if (OnError is not null)
+                OnError(ex);
+            else
+                Debug.WriteLine($"[AsyncRelayCommand] Unbehandelte Ausnahme: {ex}");
         }
         finally
         {

@@ -1,10 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Windows;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Softwareschmiede.App.Views;
+using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -17,6 +16,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IDialogService _dialogService;
     private readonly ILogger<ProjectDetailViewModel> _logger;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur Listenansicht zurückkehren möchte.</summary>
@@ -157,34 +157,18 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet das Repository im Browser.</summary>
     public ICommand RepositoryOeffnenCommand { get; }
 
-    /// <summary>Bestätigungsfunktion für das Löschen. Kann in Tests überschrieben werden.</summary>
-    public Func<bool> LoeschenBestaetigenFunc { get; set; } = () =>
-        MessageBox.Show(
-            "Soll das Projekt wirklich gelöscht werden?",
-            "Löschen bestätigen",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning) == MessageBoxResult.Yes;
-
-    /// <summary>Öffnet den Repository-Zuweisungs-Dialog und gibt zurück, ob der Nutzer bestätigt hat. Kann in Tests überschrieben werden.</summary>
-    public Func<RepositoryAssignViewModel, bool> RepositoryDialogOeffnenFunc { get; set; } = vm =>
-    {
-        var dialog = new RepositoryAssignDialog(vm)
-        {
-            Owner = System.Windows.Application.Current.MainWindow
-        };
-        return dialog.ShowDialog() == true;
-    };
-
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
         ProjektService projektService,
         AufgabeService aufgabeService,
         IServiceProvider serviceProvider,
+        IDialogService dialogService,
         ILogger<ProjectDetailViewModel> logger)
     {
         _projektService = projektService;
         _aufgabeService = aufgabeService;
         _serviceProvider = serviceProvider;
+        _dialogService = dialogService;
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
@@ -274,12 +258,6 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task AktualisierenCallbackAusfuehrenAsync()
-    {
-        if (ProjektListeAktualisierenCallback != null)
-            await ProjektListeAktualisierenCallback();
-    }
-
     private async Task ProjektSpeichernAsync(CancellationToken ct)
     {
         try
@@ -287,13 +265,27 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             if (_projektId == Guid.Empty)
             {
                 await _projektService.CreateAsync(ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
-                await AktualisierenCallbackAusfuehrenAsync();
+                try
+                {
+                    await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+                }
+                catch (Exception callbackEx)
+                {
+                    _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projekterstellung.");
+                }
                 ZurueckAction?.Invoke();
             }
             else
             {
                 await _projektService.UpdateAsync(_projektId, ProjektName.Trim(), ProjektBeschreibung?.Trim(), ct);
-                await AktualisierenCallbackAusfuehrenAsync();
+                try
+                {
+                    await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+                }
+                catch (Exception callbackEx)
+                {
+                    _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projektaktualisierung.");
+                }
                 await LadenAsync(ct);
             }
         }
@@ -313,13 +305,20 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         if (_projektId == Guid.Empty)
             return;
 
-        if (!LoeschenBestaetigenFunc())
+        if (!_dialogService.BestaetigenDialog("Soll das Projekt wirklich gelöscht werden?", "Löschen bestätigen"))
             return;
 
         try
         {
             await _projektService.DeleteAsync(_projektId, ct);
-            await AktualisierenCallbackAusfuehrenAsync();
+            try
+            {
+                await (ProjektListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+            }
+            catch (Exception callbackEx)
+            {
+                _logger.LogError(callbackEx, "Fehler im ProjektListeAktualisierenCallback nach Projektlöschung.");
+            }
             ZurueckAction?.Invoke();
         }
         catch (OperationCanceledException)
@@ -342,9 +341,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         {
             var vm = _serviceProvider.GetRequiredService<RepositoryAssignViewModel>();
             await vm.LadenAsync(ct);
-            var confirmed = RepositoryDialogOeffnenFunc(vm);
+            var confirmed = _dialogService.RepositoryZuweisenDialog(vm);
 
-            if (_disposed)
+            if (_disposed || ct.IsCancellationRequested)
                 return;
 
             if (confirmed && vm.SelectedRepository is { } repo)
@@ -356,7 +355,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                     repo.RepositoryName,
                     ct);
 
-                if (!_disposed)
+                if (!_disposed && !ct.IsCancellationRequested)
                     await LadenAsync(ct);
             }
         }
@@ -395,7 +394,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void SetFehler(Exception ex) => FehlerMeldung = $"Fehler: {ex.Message}";
+    private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
 
     /// <inheritdoc/>
     public void Dispose()

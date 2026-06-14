@@ -1,6 +1,7 @@
 using System.IO;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
+using FlaUI.Core.Input;
 using FlaUI.UIA3;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -11,6 +12,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public abstract class WpfTestBase : IDisposable
 {
+    private const string BuildConfigDebug = "Debug";
+    private const string BuildConfigRelease = "Release";
+    private const string TargetFramework = "net10.0-windows10.0.17763.0";
+
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
     private readonly string _testDbPath;
@@ -30,6 +35,7 @@ public abstract class WpfTestBase : IDisposable
             Path.GetTempPath(),
             $"softwareschmiede_e2e_{Guid.NewGuid():N}.db");
     }
+
     /// <summary>
     /// Löscht die temporäre Testdatenbank, falls sie existiert. Sollte nach jedem Test aufgerufen werden, um sicherzustellen, dass keine Testdaten zurückbleiben.
     /// </summary>
@@ -71,36 +77,13 @@ public abstract class WpfTestBase : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        try
-        {
-            _application?.Close();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"WpfTestBase.Dispose: Fehler beim Schließen der Anwendung: {ex.Message}");
-        }
+        try { _application?.Close(); } catch { }
 
-        // Warten, bis der Prozess vollständig beendet ist, damit der nächste Test
-        // nicht mit einem noch laufenden Prozess konkurriert.
-        try
-        {
-            _application?.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(5));
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"WpfTestBase.Dispose: Warten auf Prozessende fehlgeschlagen: {ex.Message}");
-        }
+        try { _application?.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(5)); } catch { }
 
         _automation?.Dispose();
 
-        try
-        {
-            DeleteTestDatabase();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Testdatenbank: {ex.Message}");
-        }
+        try { DeleteTestDatabase(); } catch { }
     }
 
     /// <summary>
@@ -130,6 +113,69 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
         => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title), timeout);
 
+    /// <summary>Navigiert zur Projektliste.</summary>
+    protected void NavigateToProjecten(AutomationElement mainWindow)
+    {
+        var button = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
+        button.AsButton().Click();
+    }
+
+    /// <summary>
+    /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> verschwunden ist.
+    /// Assertiert anschließend, dass das Element nicht mehr vorhanden ist.
+    /// </summary>
+    protected static void WaitUntilGone(
+        AutomationElement parent,
+        Func<ConditionFactory, ConditionBase> conditionFunc,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        AutomationElement? element = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            element = parent.FindFirstDescendant(conditionFunc);
+            if (element is null)
+                break;
+            Thread.Sleep(200);
+        }
+        Assert.Null(element);
+    }
+
+    /// <summary>Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch zurück.</summary>
+    protected void CreateProject(AutomationElement mainWindow, string name)
+    {
+        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), TimeSpan.FromSeconds(5));
+        neuButton.AsButton().Click();
+
+        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
+        nameBox.Click();
+        Keyboard.Type(name);
+
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        speichernButton.AsButton().Click();
+
+        // Warten bis Overlay geschlossen (Speichern-Button verschwunden)
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+
+        // CreateAsync + Callback-Ausführung abwarten
+        WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(10));
+    }
+
+    /// <summary>Öffnet ein Projekt aus der Liste anhand seines Namens.</summary>
+    protected void OpenProject(AutomationElement mainWindow, string name)
+    {
+        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(5));
+        projektKachel.Click();
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+    }
+
+    /// <summary>Legt ein neues Projekt an, speichert es und öffnet es wieder.</summary>
+    protected void CreateAndOpenProject(AutomationElement mainWindow, string name)
+    {
+        CreateProject(mainWindow, name);
+        OpenProject(mainWindow, name);
+    }
+
     private static string ResolveAppExePath()
     {
         var baseDir = AppContext.BaseDirectory;
@@ -141,14 +187,14 @@ public abstract class WpfTestBase : IDisposable
             Path.GetFullPath(Path.Combine(
                 baseDir,
                 "..", "..", "..", "..",
-                "Softwareschmiede.App", "bin", "Debug",
-                "net10.0-windows10.0.17763.0",
+                "Softwareschmiede.App", "bin", BuildConfigDebug,
+                TargetFramework,
                 "Softwareschmiede.App.exe")),
             Path.GetFullPath(Path.Combine(
                 baseDir,
                 "..", "..", "..", "..",
-                "Softwareschmiede.App", "bin", "Release",
-                "net10.0-windows10.0.17763.0",
+                "Softwareschmiede.App", "bin", BuildConfigRelease,
+                TargetFramework,
                 "Softwareschmiede.App.exe")),
         };
 

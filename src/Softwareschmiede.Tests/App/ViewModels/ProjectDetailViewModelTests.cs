@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -16,6 +17,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
+    private readonly Mock<IDialogService> _dialogServiceMock;
 
     public ProjectDetailViewModelTests()
     {
@@ -23,6 +25,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
+        _dialogServiceMock = new Mock<IDialogService>();
     }
 
     public void Dispose() => _db.Dispose();
@@ -33,6 +36,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             _projektService,
             _aufgabeService,
             _serviceProviderMock.Object,
+            _dialogServiceMock.Object,
             NullLogger<ProjectDetailViewModel>.Instance);
         vm.ZurueckAction = zurueckAction;
         vm.ProjektListeAktualisierenCallback = projektHinzugefuegtCallback;
@@ -90,7 +94,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var zurueckAufgerufen = false;
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.ProjektId = projekt.Id;
-        sut.LoeschenBestaetigenFunc = () => true;
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // Act
@@ -111,7 +115,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var zurueckAufgerufen = false;
         var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
         sut.ProjektId = projekt.Id;
-        sut.LoeschenBestaetigenFunc = () => false;
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         // Act
@@ -188,12 +192,13 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             .Setup(sp => sp.GetService(typeof(RepositoryAssignViewModel)))
             .Returns(repositoryAssignVm);
 
+        _dialogServiceMock
+            .Setup(d => d.RepositoryZuweisenDialog(It.IsAny<RepositoryAssignViewModel>()))
+            .Returns(true);
+
         var sut = CreateSut();
         sut.ProjektId = projekt.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        // Simuliere Dialog-Bestätigung über austauschbare Func
-        sut.RepositoryDialogOeffnenFunc = _ => true;
 
         // Act
         await ((AsyncRelayCommand)sut.RepositoryZuweisenCommand).ExecuteAsync();

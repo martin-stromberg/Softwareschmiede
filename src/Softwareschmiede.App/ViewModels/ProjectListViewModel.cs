@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -8,11 +9,12 @@ using Softwareschmiede.Domain.Entities;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für die Projektliste.</summary>
-public sealed class ProjectListViewModel : ViewModelBase
+public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 {
     private readonly ProjektService _projektService;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ProjectListViewModel> _logger;
+    private readonly SemaphoreSlim _ladenSemaphore = new(1, 1);
 
     private Projekt? _selectedProjekt;
     private bool _isLoading;
@@ -76,6 +78,9 @@ public sealed class ProjectListViewModel : ViewModelBase
     /// <summary>Wählt ein Projekt aus und zeigt die Details.</summary>
     public ICommand WaehleProjektCommand { get; }
 
+    /// <summary>Wird aufgerufen, wenn sich der Titel des Detailbereichs ändert (z. B. Projektname). Null bedeutet, kein Detailtitel aktiv.</summary>
+    public Action<string?>? DetailTitelAenderungAction { get; set; }
+
     /// <inheritdoc cref="ProjectListViewModel"/>
     public ProjectListViewModel(
         ProjektService projektService,
@@ -101,22 +106,18 @@ public sealed class ProjectListViewModel : ViewModelBase
         });
     }
 
-    private async Task LadenProjekteInternAsync(CancellationToken ct = default)
-    {
-        var projekte = await _projektService.GetAllAsync(ct);
-        Projekte.Clear();
-        foreach (var projekt in projekte)
-            Projekte.Add(projekt);
-    }
-
     private async Task LadenAsync(CancellationToken ct)
     {
-        IsLoading = true;
-        FehlerMeldung = null;
-
+        await _ladenSemaphore.WaitAsync(ct);
         try
         {
-            await LadenProjekteInternAsync(ct);
+            IsLoading = true;
+            FehlerMeldung = null;
+
+            var projekte = await _projektService.GetAllAsync(ct);
+            Projekte.Clear();
+            foreach (var projekt in projekte)
+                Projekte.Add(projekt);
         }
         catch (OperationCanceledException)
         {
@@ -125,11 +126,12 @@ public sealed class ProjectListViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Projekte.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
         }
         finally
         {
             IsLoading = false;
+            _ladenSemaphore.Release();
         }
     }
 
@@ -152,13 +154,25 @@ public sealed class ProjectListViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Archivieren des Projekts.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
         }
     }
 
     private void InitDetailViewModel(ProjectDetailViewModel viewModel)
     {
-        viewModel.ZurueckAction = () => DetailViewModel = null;
+        PropertyChangedEventHandler propertyChangedHandler = (_, e) =>
+        {
+            if (e.PropertyName == nameof(ProjectDetailViewModel.ProjektName))
+                DetailTitelAenderungAction?.Invoke(viewModel.ProjektName);
+        };
+        viewModel.PropertyChanged += propertyChangedHandler;
+
+        viewModel.ZurueckAction = () =>
+        {
+            viewModel.PropertyChanged -= propertyChangedHandler;
+            DetailViewModel = null;
+            DetailTitelAenderungAction?.Invoke(null);
+        };
         viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
     }
 
@@ -181,14 +195,12 @@ public sealed class ProjectListViewModel : ViewModelBase
 
     private async Task NeuesProjektHinzufuegen()
     {
-        try
-        {
-            await LadenProjekteInternAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Nachladen der Projektliste.");
-            FehlerMeldung = $"Fehler: {ex.Message}";
-        }
+        await LadenAsync(CancellationToken.None);
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _ladenSemaphore.Dispose();
     }
 }

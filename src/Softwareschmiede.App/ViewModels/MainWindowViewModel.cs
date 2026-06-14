@@ -89,7 +89,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void NavigateToProjectList()
     {
-        _projectListViewModel ??= _serviceProvider.GetRequiredService<ProjectListViewModel>();
+        if (_projectListViewModel is null)
+        {
+            _projectListViewModel = _serviceProvider.GetRequiredService<ProjectListViewModel>();
+            _projectListViewModel.DetailTitelAenderungAction = detailTitel =>
+            {
+                Title = string.IsNullOrWhiteSpace(detailTitel)
+                    ? "Softwareschmiede – Projekte"
+                    : $"Softwareschmiede – {detailTitel}";
+            };
+        }
         CurrentView = _projectListViewModel;
         Title = "Softwareschmiede – Projekte";
     }
