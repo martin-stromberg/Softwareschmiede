@@ -180,6 +180,10 @@ public sealed class PluginSettingsViewModel : ViewModelBase
                 Plugins.Add(entry);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // normale Abbruchoperation, kein Fehler
+        }
         catch (Exception ex)
         {
             Plugins.Clear();

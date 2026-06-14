@@ -90,7 +90,14 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
             process.Start();
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(10));
-            await process.WaitForExitAsync(cts.Token);
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* ignorieren */ }
+            }
             return process.ExitCode == 0;
         }
         catch (Win32Exception)

@@ -11,5 +11,6 @@ public sealed record FilePreview(
     string? OriginalContent,
     string? Hint)
 {
+    /// <summary>Gibt an, ob ein Vergleich der Dateiinhalte möglich ist.</summary>
     public bool HasComparison => !IsBinary && !IsTooBig;
 }

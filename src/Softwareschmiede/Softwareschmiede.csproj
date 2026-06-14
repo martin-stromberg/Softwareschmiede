@@ -5,16 +5,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
-  </ItemGroup>
-
-  <!-- Blazor-Komponenten werden in der WPF-Version nicht kompiliert -->
-  <ItemGroup>
-    <Compile Remove="Components\**\*.cs" />
-    <None Include="Components\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,6 +6,9 @@ using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
@@ -174,19 +177,14 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         // Arrange
         var projekt = await _projektService.CreateAsync("Repository-Test-Projekt", null);
 
-        var testRepo = new GitRepository
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = projekt.Id,
-            PluginTyp = "LocalDirectoryPlugin",
-            RepositoryUrl = "https://github.com/test/repo",
-            RepositoryName = "test-repo"
-        };
+        var testRepo = new AvailableRepository("test-repo", "https://github.com/test/repo");
 
-        var repositoryAssignVm = new RepositoryAssignViewModel(
-            _projektService,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<RepositoryAssignViewModel>.Instance);
+        var pluginMock = new Mock<IGitPlugin>();
+        pluginMock.Setup(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+
+        var repositoryAssignVm = new RepositoryAssignViewModel(NullLogger<RepositoryAssignViewModel>.Instance);
         repositoryAssignVm.SelectedRepository = testRepo;
+        repositoryAssignVm.SelectedScmPlugin = pluginMock.Object;
 
         _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(RepositoryAssignViewModel)))

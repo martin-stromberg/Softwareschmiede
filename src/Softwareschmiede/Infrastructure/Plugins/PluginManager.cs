@@ -19,6 +19,7 @@ public sealed class PluginManager : IPluginManager
     private readonly List<IKiPlugin> _kiPlugins = [];
     private bool _initialized;
 
+    /// <summary>Erstellt eine neue Instanz von <see cref="PluginManager"/>.</summary>
     public PluginManager(
         IServiceProvider serviceProvider,
         ILogger<PluginManager> logger,
@@ -29,18 +30,21 @@ public sealed class PluginManager : IPluginManager
         _pluginDirectory = pluginDirectory ?? Path.Combine(AppContext.BaseDirectory, "plugins");
     }
 
+    /// <inheritdoc/>
     public IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins()
     {
         EnsureInitialized();
         return _gitPlugins;
     }
 
+    /// <inheritdoc/>
     public IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins()
     {
         EnsureInitialized();
         return _kiPlugins;
     }
 
+    /// <inheritdoc/>
     public IGitPlugin GetDefaultSourceCodeManagementPlugin()
     {
         EnsureInitialized();
@@ -48,6 +52,7 @@ public sealed class PluginManager : IPluginManager
                ?? throw new InvalidOperationException("Kein Source-Code-Management-Plugin verfügbar.");
     }
 
+    /// <inheritdoc/>
     public IKiPlugin GetDefaultDevelopmentAutomationPlugin()
     {
         EnsureInitialized();

@@ -131,6 +131,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             _defaultKiPlugin = await _einstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
             OnPropertyChanged(nameof(DefaultKiPlugin));
 
+            var savedMode = await _einstellungService.GetSettingAsync(AppEinstellungService.DesignModeKey, ct);
+            _designMode = savedMode ?? _darkModeService.Current;
+            OnPropertyChanged(nameof(DesignMode));
+
             ScmPlugins = _pluginManager.GetSourceCodeManagementPlugins();
             OnPropertyChanged(nameof(ScmPlugins));
 

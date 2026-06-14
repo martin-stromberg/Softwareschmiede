@@ -265,6 +265,24 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         await ApplyDeletedFilesToSourceAsync(workspacePath, sourcePath, ct);
     }
 
+    /// <inheritdoc/>
+    public Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
+    {
+        var sourceDir = _credentialStore.GetCredential($"{PluginPrefix}.{SourceDirectoryKey}");
+        if (string.IsNullOrWhiteSpace(sourceDir) || !Directory.Exists(sourceDir))
+        {
+            _logger.LogWarning("LocalDirectoryPlugin: Kein gültiges SourceDirectory konfiguriert.");
+            return Task.FromResult(Enumerable.Empty<AvailableRepository>());
+        }
+
+        var dirs = Directory.EnumerateDirectories(sourceDir)
+            .Select(d => new AvailableRepository(Path.GetFileName(d), d))
+            .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Task.FromResult<IEnumerable<AvailableRepository>>(dirs);
+    }
+
     private NotSupportedException BuildNotSupported(string methodName)
         => new($"LocalDirectoryPlugin unterstützt '{methodName}' nicht, da keine Remote-Provider-Funktionen verfügbar sind.");
 

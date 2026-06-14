@@ -531,6 +531,39 @@ password {token}
     }
 
     /// <inheritdoc/>
+    public async Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
+    {
+        _logger.LogInformation("Lade verfügbare GitHub-Repositories.");
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            ["repo", "list", "--json", "nameWithOwner,url", "--limit", "100"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("gh repo list fehlgeschlagen: {StdErr}", result.StdErr);
+            return [];
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(result.StdOut);
+            return doc.RootElement.EnumerateArray()
+                .Select(e => new AvailableRepository(
+                    e.GetProperty("nameWithOwner").GetString() ?? string.Empty,
+                    e.GetProperty("url").GetString() ?? string.Empty))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Parsen der GitHub-Repository-Liste.");
+            return [];
+        }
+    }
+
+    /// <inheritdoc/>
     public override async Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default)
     {
         _logger.LogInformation("Ermittle Standard-Branch für {RepositoryUrl}.", repositoryUrl);

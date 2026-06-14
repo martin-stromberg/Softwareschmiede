@@ -7,6 +7,7 @@ using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.ViewModels;
 
@@ -346,13 +347,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             if (_disposed || ct.IsCancellationRequested)
                 return;
 
-            if (confirmed && vm.SelectedRepository is { } repo)
+            if (confirmed && vm.SelectedRepository is { } repo && vm.SelectedScmPlugin is { } scmPlugin)
             {
                 await _projektService.AddRepositoryAsync(
                     _projektId,
-                    repo.PluginTyp,
-                    repo.RepositoryUrl,
-                    repo.RepositoryName,
+                    scmPlugin.PluginType.ToString(),
+                    repo.Url,
+                    repo.Name,
                     ct);
 
                 if (!_disposed && !ct.IsCancellationRequested)

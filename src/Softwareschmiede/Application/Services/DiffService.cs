@@ -362,12 +362,20 @@ public sealed record DiffStatistics(
 /// </summary>
 public class DiffStatisticsDto
 {
+    /// <summary>Gesamtanzahl der Diffs.</summary>
     public int TotalDiffCount { get; set; }
+    /// <summary>Gesamtanzahl hinzugefügter Zeilen.</summary>
     public int TotalAddedLines { get; set; }
+    /// <summary>Gesamtanzahl entfernter Zeilen.</summary>
     public int TotalRemovedLines { get; set; }
+    /// <summary>Gesamtanzahl geänderter Zeilen.</summary>
     public int TotalModifiedLines { get; set; }
+    /// <summary>Durchschnittliche Zeilenanzahl pro Diff.</summary>
     public double AverageLinesPerDiff { get; set; }
+    /// <summary>Zeitstempel des ältesten Diffs.</summary>
     public DateTimeOffset? OldestDiff { get; set; }
+    /// <summary>Zeitstempel des neuesten Diffs.</summary>
     public DateTimeOffset? NewestDiff { get; set; }
+    /// <summary>Anzahl der Diffs pro Status.</summary>
     public Dictionary<DiffResultStatus, int> StatusBreakdown { get; set; } = [];
 }

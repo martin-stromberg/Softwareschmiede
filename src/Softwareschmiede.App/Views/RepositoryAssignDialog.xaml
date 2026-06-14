@@ -29,18 +29,8 @@
                   SelectedItem="{Binding SelectedScmPlugin, Mode=TwoWay}"
                   DisplayMemberPath="PluginName"
                   Background="{DynamicResource BackgroundBrush}"
-                  Foreground="{DynamicResource PrimaryTextBrush}"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1"
                   Padding="8,6"
-                  Margin="0,0,0,12">
-            <ComboBox.ItemContainerStyle>
-                <Style TargetType="ComboBoxItem">
-                    <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
-                    <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
-                </Style>
-            </ComboBox.ItemContainerStyle>
-        </ComboBox>
+                  Margin="0,0,0,12" />
 
         <!-- Repository-Liste -->
         <ListBox Grid.Row="2"
@@ -59,12 +49,12 @@
                             <RowDefinition />
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0"
-                                   Text="{Binding RepositoryName}"
+                                   Text="{Binding Name}"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource PrimaryTextBrush}"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Row="1"
-                                   Text="{Binding RepositoryUrl}"
+                                   Text="{Binding Url}"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    TextTrimming="CharacterEllipsis" />
@@ -102,17 +92,12 @@
             <Button Content="Abbrechen"
                     Command="{Binding AbbrechenCommand}"
                     Padding="12,6"
-                    Background="{DynamicResource SurfaceBrush}"
-                    Foreground="{DynamicResource PrimaryTextBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
                     Margin="0,0,8,0" />
             <Button Content="Zuweisen"
                     Command="{Binding BestaetigenCommand}"
-                    IsEnabled="{Binding HasScmPlugins}"
                     Padding="12,6"
                     Background="{DynamicResource AccentBrush}"
-                    Foreground="{DynamicResource PrimaryTextBrush}"
+                    Foreground="White"
                     BorderThickness="0" />
         </StackPanel>
     </Grid>

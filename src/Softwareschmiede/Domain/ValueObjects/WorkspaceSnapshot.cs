@@ -33,6 +33,7 @@ public sealed class WorkspaceSnapshot
     /// <summary>Gibt an, ob die Snapshot-Ermittlung fehlgeschlagen ist.</summary>
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    /// <summary>Erstellt einen Snapshot, der einen Fehler repräsentiert.</summary>
     public static WorkspaceSnapshot FromError(string message) => new()
     {
         ErrorMessage = message,

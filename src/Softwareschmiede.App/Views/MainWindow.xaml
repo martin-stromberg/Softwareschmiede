@@ -47,7 +47,6 @@
                         Padding="8,4"
                         Background="Transparent"
                         BorderThickness="0"
-                        Foreground="{DynamicResource PrimaryTextBrush}"
                         HorizontalAlignment="Left"
                         FontSize="16" />
 
@@ -58,7 +57,6 @@
                         Padding="8,8"
                         Background="Transparent"
                         BorderThickness="0"
-                        Foreground="{DynamicResource PrimaryTextBrush}"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left">
                     <StackPanel Orientation="Horizontal">
@@ -73,7 +71,6 @@
                         Padding="8,8"
                         Background="Transparent"
                         BorderThickness="0"
-                        Foreground="{DynamicResource PrimaryTextBrush}"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left">
                     <StackPanel Orientation="Horizontal">
@@ -91,7 +88,6 @@
                         Padding="8,8"
                         Background="Transparent"
                         BorderThickness="0"
-                        Foreground="{DynamicResource PrimaryTextBrush}"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Left">
                     <StackPanel Orientation="Horizontal">

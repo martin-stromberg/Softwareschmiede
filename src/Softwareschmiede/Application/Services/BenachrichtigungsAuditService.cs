@@ -21,6 +21,7 @@ public sealed class BenachrichtigungsAuditService
         _logger = logger;
     }
 
+    /// <summary>Persistiert eine Benachrichtigungsentscheidung als Audit-Eintrag.</summary>
     public async Task LogAsync(
         Guid ereignisId,
         Guid aufgabeId,

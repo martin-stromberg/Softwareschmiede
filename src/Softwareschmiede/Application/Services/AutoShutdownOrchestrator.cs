@@ -17,6 +17,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
     private bool _autoShutdownEnabled;
     private bool _shutdownRequestedForCurrentZeroTransition;
 
+    /// <summary>Erstellt eine neue Instanz von <see cref="AutoShutdownOrchestrator"/>.</summary>
     public AutoShutdownOrchestrator(
         IRunningAutomationStatusSource runningAutomationStatusSource,
         ISystemShutdownService systemShutdownService,
@@ -105,6 +106,7 @@ public sealed class AutoShutdownOrchestrator : IAutoShutdownOrchestrator, IDispo
         }
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         _runningAutomationStatusSource.RunningCountChanged -= OnRunningCountChanged;

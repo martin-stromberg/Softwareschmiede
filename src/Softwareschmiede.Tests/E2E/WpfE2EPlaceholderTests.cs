@@ -90,7 +90,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.True(designComboBoxen.Length > 0, "Keine ComboBox auf der Einstellungsseite gefunden.");
 
         var designComboBox = designComboBoxen[0].AsComboBox();
-        var originalValue = designComboBox.Value;
+        var originalValue = designComboBox.SelectedItem?.Name ?? string.Empty;
 
         // Dropdown öffnen und einen anderen Eintrag wählen
         designComboBox.Click();
@@ -100,10 +100,10 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.True(items.Length > 1, "Design-ComboBox sollte mehrere Optionen enthalten.");
 
         // Wähle einen anderen Eintrag als den aktuellen
-        var andererEintrag = items.FirstOrDefault(i => i.Text != originalValue);
+        var andererEintrag = items.FirstOrDefault(i => i.Name != originalValue);
         if (andererEintrag is not null)
         {
-            andererEintrag.Select();
+            andererEintrag.Click();
         }
 
         Thread.Sleep(300);
@@ -128,7 +128,7 @@ public sealed class WpfE2ETests : WpfTestBase
 
         if (andererEintrag is not null)
         {
-            Assert.Equal(andererEintrag.Text, designComboBoxNachRueckkehr.Value);
+            Assert.Equal(andererEintrag.Name, designComboBoxNachRueckkehr.SelectedItem?.Name);
         }
     }
 

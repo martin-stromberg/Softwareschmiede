@@ -24,9 +24,7 @@
                        Margin="0,0,8,0"
                        Foreground="{DynamicResource SecondaryTextBrush}" />
             <ComboBox Width="160"
-                      SelectedItem="{Binding StatusFilter}"
-                      Background="{DynamicResource SurfaceBrush}"
-                      Foreground="{DynamicResource PrimaryTextBrush}">
+                      SelectedItem="{Binding StatusFilter}">
                 <ComboBox.Items>
                     <x:Null />
                 </ComboBox.Items>
@@ -34,11 +32,7 @@
             <Button Content="Alle"
                     Command="{Binding FilterZuruecksetzenCommand}"
                     Padding="8,4"
-                    Margin="8,0,0,0"
-                    Background="{DynamicResource SurfaceBrush}"
-                    Foreground="{DynamicResource PrimaryTextBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1" />
+                    Margin="8,0,0,0" />
         </StackPanel>
 
         <!-- Aufgabenliste -->

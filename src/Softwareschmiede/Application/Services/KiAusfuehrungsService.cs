@@ -298,7 +298,10 @@ public sealed class CliProcessHandle
 /// <summary>Status eines CLI-Prozesses.</summary>
 public enum CliProcessStatus
 {
+    /// <summary>Prozess läuft.</summary>
     Gestartet,
+    /// <summary>Prozess wurde gestoppt.</summary>
     Gestoppt,
+    /// <summary>Prozess ist mit einem Fehler beendet.</summary>
     Fehler
 }

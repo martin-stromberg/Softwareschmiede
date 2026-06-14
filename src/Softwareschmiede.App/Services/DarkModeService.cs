@@ -21,7 +21,7 @@ public sealed class DarkModeService
         { "Dark", new Uri("pack://application:,,,/Softwareschmiede.App;component/Themes/DarkTheme.xaml") }
     };
 
-    private string _currentMode;
+    private string _currentMode = "Dark";
 
     /// <summary>
     /// Gibt den aktuellen Design-Modus zurück ("Dark" oder "Light").

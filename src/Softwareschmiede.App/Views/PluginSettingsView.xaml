@@ -10,11 +10,7 @@
                 <DataTemplate>
                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                              Width="320"
-                             HorizontalAlignment="Left"
-                             Background="{DynamicResource SurfaceBrush}"
-                             Foreground="{DynamicResource PrimaryTextBrush}"
-                             BorderBrush="{DynamicResource BorderBrush}"
-                             Padding="4,2" />
+                             HorizontalAlignment="Left" />
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.TextTemplate>
             <!-- Secret -->
@@ -22,11 +18,7 @@
                 <DataTemplate>
                     <PasswordBox x:Name="SecretBox"
                                  Width="320"
-                                 HorizontalAlignment="Left"
-                                 Background="{DynamicResource SurfaceBrush}"
-                                 Foreground="{DynamicResource PrimaryTextBrush}"
-                                 BorderBrush="{DynamicResource BorderBrush}"
-                                 Padding="4,2" />
+                                 HorizontalAlignment="Left" />
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.SecretTemplate>
             <!-- URL -->
@@ -34,11 +26,7 @@
                 <DataTemplate>
                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                              Width="320"
-                             HorizontalAlignment="Left"
-                             Background="{DynamicResource SurfaceBrush}"
-                             Foreground="{DynamicResource PrimaryTextBrush}"
-                             BorderBrush="{DynamicResource BorderBrush}"
-                             Padding="4,2" />
+                             HorizontalAlignment="Left" />
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.UrlTemplate>
             <!-- Integer -->
@@ -46,11 +34,7 @@
                 <DataTemplate>
                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                              Width="120"
-                             HorizontalAlignment="Left"
-                             Background="{DynamicResource SurfaceBrush}"
-                             Foreground="{DynamicResource PrimaryTextBrush}"
-                             BorderBrush="{DynamicResource BorderBrush}"
-                             Padding="4,2" />
+                             HorizontalAlignment="Left" />
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.IntegerTemplate>
             <!-- Boolean -->
@@ -66,10 +50,7 @@
                     <ComboBox SelectedValue="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                               ItemsSource="{Binding Field.EnumOptions}"
                               Width="220"
-                              HorizontalAlignment="Left"
-                              Background="{DynamicResource SurfaceBrush}"
-                              Foreground="{DynamicResource PrimaryTextBrush}"
-                              BorderBrush="{DynamicResource BorderBrush}" />
+                              HorizontalAlignment="Left" />
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.EnumTemplate>
             <!-- FilePath -->
@@ -78,17 +59,11 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                                  Width="280"
-                                 Background="{DynamicResource SurfaceBrush}"
-                                 Foreground="{DynamicResource PrimaryTextBrush}"
-                                 BorderBrush="{DynamicResource BorderBrush}"
-                                 Padding="4,2"
                                  VerticalAlignment="Center" />
                         <Button Content="…"
                                 Width="28"
                                 Margin="4,0,0,0"
                                 VerticalAlignment="Center"
-                                Background="{DynamicResource SurfaceBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
                                 Click="OnDateiAuswaehlenClick" />
                     </StackPanel>
                 </DataTemplate>

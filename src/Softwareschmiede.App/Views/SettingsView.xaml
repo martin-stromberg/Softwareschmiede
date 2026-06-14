@@ -27,8 +27,8 @@
                                                 AutomationName="Speichern"
                                                 ButtonCommand="{Binding SpeichernCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="↺"
-                                                ButtonText="Löschen"
-                                                AutomationName="Löschen"
+                                                ButtonText="Verwerfen"
+                                                AutomationName="Verwerfen"
                                                 ButtonCommand="{Binding VerwerfenCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
@@ -104,11 +104,10 @@
                         <ComboBox SelectedValue="{Binding DesignMode, UpdateSourceTrigger=PropertyChanged}"
                                   ItemsSource="{Binding DesignModes}"
                                   Margin="0,0,0,12"
-                                  Padding="8,6"
-                                  BorderBrush="{DynamicResource BorderBrush}">
+                                  Padding="8,6">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    <TextBlock Text="{Binding}" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -151,11 +150,10 @@
                         <ComboBox SelectedValue="{Binding DefaultScmPlugin, UpdateSourceTrigger=PropertyChanged}"
                                   ItemsSource="{Binding ScmPlugins}"
                                   Margin="0,0,0,12"
-                                  Padding="8,6"
-                                  BorderBrush="{DynamicResource BorderBrush}">
+                                  Padding="8,6">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding PluginName}" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    <TextBlock Text="{Binding PluginName}" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -183,11 +181,10 @@
                         <ComboBox SelectedValue="{Binding DefaultKiPlugin, UpdateSourceTrigger=PropertyChanged}"
                                   ItemsSource="{Binding KiPlugins}"
                                   Margin="0,0,0,12"
-                                  Padding="8,6"
-                                  BorderBrush="{DynamicResource BorderBrush}">
+                                  Padding="8,6">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding PluginName}" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    <TextBlock Text="{Binding PluginName}" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
