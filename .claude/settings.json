@@ -1,0 +1,149 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "MultiEdit",
+      "Write",
+      "Glob",
+      "Grep",
+      "LS",
+
+      "Bash(dotnet build *)",
+      "Bash(dotnet run *)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet restore *)",
+      "Bash(dotnet publish *)",
+      "Bash(dotnet clean *)",
+      "Bash(dotnet watch *)",
+      "Bash(dotnet add *)",
+      "Bash(dotnet remove *)",
+      "Bash(dotnet list *)",
+      "Bash(dotnet new *)",
+      "Bash(dotnet sln *)",
+      "Bash(dotnet format *)",
+      "Bash(dotnet tool *)",
+      "Bash(dotnet user-secrets *)",
+      "Bash(dotnet ef *)",
+      "Bash(cd * && dotnet *)",
+      "Bash(cd * && dotnet * | Select-String *)",
+      "Bash(cd * && dotnet * 2>&1 | Select-String *)",
+
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git merge-base *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git reset *)",
+      "Bash(git show *)",
+
+      "Bash(gh *)",
+      "Bash(cd * && gh *)",
+
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(ls * 2>$null || echo *)",
+      "Bash(find *)",
+      "Bash(find * 2>$null | head *)",
+      "Bash(grep *)",
+      "Bash(echo *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(pwd)",
+      "Bash(which *)",
+      "Bash(env)",
+      "Bash(Get-ChildItem *)",
+      "Bash(Get-ChildItem * | Where-Object *)",
+      "Bash(Get-ChildItem * | Select-Object *)",
+      "Bash(Get-ChildItem * | Where-Object * | Select-Object *)",
+
+      "Bash(New-Item -ItemType Directory -Force \"docs/*\")",
+      "Bash(New-Item -ItemType Directory -Force \"src/*\")",
+
+      "WebFetch"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(chmod *)",
+      "Bash(chown *)",
+      "Bash(curl *)",      
+      "Bash(wget *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Checking C# projects to start...",
+            "command": "pwsh -NoProfile -File .claude/hooks/test-csharp-startup.ps1"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Checking AL labels...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_al_labels.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking AL XML comments...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_al_xml_comments.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking .csproj XML doc configuration...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_csproj_xmldoc.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking Razor component usage...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_razor_usage.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking bUnit tests for Razor files...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_bunit_tests.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking EF EntityState assignments...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_ef_entitystate.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking sz-* CSS class definitions...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_css_classes.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking Razor localization...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_razor_l10n.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
