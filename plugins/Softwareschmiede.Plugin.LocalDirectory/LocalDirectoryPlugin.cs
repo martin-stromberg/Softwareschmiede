@@ -276,8 +276,9 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         }
 
         var dirs = Directory.EnumerateDirectories(sourceDir)
-            .Select(d => new AvailableRepository(Path.GetFileName(d), d))
-            .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(d => new AvailableRepository(Path.GetFileName(d), File.GetLastAccessTime(d), Path.GetFileName(d), d))
+            .OrderByDescending(r => r.UpdatedAt)
+            .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return Task.FromResult<IEnumerable<AvailableRepository>>(dirs);

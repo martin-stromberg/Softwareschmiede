@@ -105,6 +105,5 @@ public interface IGitPlugin : IPlugin
 
     /// <summary>Liefert die für dieses Plugin verfügbaren Repositories aus der externen Quelle.</summary>
     /// <param name="ct">Cancellation Token.</param>
-    Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
-        => Task.FromResult(Enumerable.Empty<AvailableRepository>());
+    Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default);
 }

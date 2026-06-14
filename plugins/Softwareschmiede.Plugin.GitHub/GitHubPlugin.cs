@@ -531,12 +531,12 @@ password {token}
     }
 
     /// <inheritdoc/>
-    public async Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
+    public override async Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Lade verfügbare GitHub-Repositories.");
         var result = await _cliRunner.RunAsync(
             "gh",
-            ["repo", "list", "--json", "nameWithOwner,url", "--limit", "100"],
+            ["repo", "list", "--json", "name,nameWithOwner,url,createdAt,updatedAt,owner", "--limit", "100"],
             null,
             GetGhEnvironment(),
             ct);
@@ -552,6 +552,9 @@ password {token}
             using var doc = JsonDocument.Parse(result.StdOut);
             return doc.RootElement.EnumerateArray()
                 .Select(e => new AvailableRepository(
+                    e.GetProperty("name").GetString() ?? string.Empty,
+                    e.TryGetProperty("updatedAt", out var updatedAt) ? updatedAt.GetDateTime() :
+                        e.TryGetProperty("createdAt", out var createdAt) ? createdAt.GetDateTime() : DateTime.MinValue,
                     e.GetProperty("nameWithOwner").GetString() ?? string.Empty,
                     e.GetProperty("url").GetString() ?? string.Empty))
                 .ToList();
