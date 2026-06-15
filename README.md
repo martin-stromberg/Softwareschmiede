@@ -73,7 +73,7 @@ Stand: **2026-06-11**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; **Einstellungsansicht mit Plugin-Registerkarten erweitert (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles** |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht in Arbeit: Ribbon-Menü, Status-abhängiges Content-Switching (Edit/CLI/Diff), neue Commands (Speichern/Löschen/Toggle), CanExecute-Validierung** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -81,9 +81,41 @@ Stand: **2026-06-11**
 
 ## 🚀 Features
 
-#### Feature 72: WPF Plugin-Einstellungen & Styling (aktuell in Arbeit)
+#### Feature 72: WPF-Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (in Arbeit)
 
-**Neue Einstellungsregisterkarten für Quellcodeverwaltung und KI-Plugins mit dynamischen Plugin-Einstellungspanels:**
+**Ribbon-basierte Aktionsleiste und Status-abhängiges Content-Switching in der Aufgabendetailansicht:**
+
+- **Ribbon-Menü mit drei Gruppen:**
+  - **Navigation:** Zurück-Button zur Aufgabenliste
+  - **Aufgabe:** Speichern, Löschen, Starten (sichtbar wenn Status=Neu), Beenden (sichtbar wenn Status=Gestartet/InArbeit/Wartend)
+  - **CLI:** KI-Plugin-Auswahl (ComboBox), CLI-Starten- und Stoppen-Buttons
+
+- **Status-abhängiges Content-Switching:** Drei verschiedene Panels je nach Aufgabenstatus:
+  - **Status=Neu (Edit-Panel):** Bearbeitbare TextBox-Felder für Titel und Anforderungsbeschreibung mit Speichern-Button im Ribbon
+  - **Status=Gestartet/InArbeit/Wartend (CLI-Panel):** Eingebettetes CLI-Fenster mit optionalem Toggle-Button zur Info-Ansicht (zeigt Aufgabeeigenschaften + Protokoll)
+  - **Status=Beendet (Diff-Panel):** Platzhalter für Diff-Ansicht der Arbeitsverzeichnisänderungen
+
+- **Neue ViewModel-Eigenschaften und Commands:**
+  - `ShowEditPanel`, `ShowCliPanel`, `ShowDiffPanel` (computed Properties je nach Status)
+  - `IsInfoViewVisible` (Toggle zwischen CLI-Fenster und Info-Panel bei laufender Aufgabe)
+  - `EditTitel`, `EditAnforderungsBeschreibung` (bearbeitbare Kopien für Edit-Modus)
+  - `KannSpeichern`, `KannLoeschen` (CanExecute-Logik je nach Status und CLI-Zustand)
+  - `SpeichernCommand`, `LoeschenCommand`, `InfoCliToggleCommand` (neue Commands mit CanExecute-Validierung)
+
+- **Validierung und Fehlerbehandlung:**
+  - Speichern nur möglich wenn Status ∈ {Neu, Gestartet} und CLI läuft nicht und Titel ≠ leer
+  - Löschen nur möglich wenn Status ∉ {Beendet, Archiviert} und CLI läuft nicht
+  - Bestätigungsdialog vor dem Löschen einer Aufgabe
+  - Fehlerbehandlung mit Fehlermeldungs-Banner
+
+- **Betroffene Komponenten:**
+  - `TaskDetailViewModel` – erweitert um neue Properties und Commands
+  - `TaskDetailView.xaml` – neuer Aufbau mit Ribbon (Grid.Row="0"), Content-Switching-Grid (Grid.Row="2")
+  - `AufgabeStatusToVisibilityConverter` – neuer Converter für Sichtbarkeitsbindung nach Status
+
+#### Feature 72: WPF Plugin-Einstellungen & Styling (implementiert ✅)
+
+**Einstellungsregisterkarten für Quellcodeverwaltung und KI-Plugins mit dynamischen Plugin-Einstellungspanels:**
 
 - **Plugin-Auswahl pro Kategorie:** Getrennte Register für **Quellcodeverwaltung** (SCM) und **KI** mit ComboBox zur Auswahl eines Standard-Plugins pro Kategorie
 - **Dynamische Plugin-Einstellungspanels:** Nach Plugin-Auswahl werden die vom Plugin bereitgestellten Einstellungsgruppen (via `GetSettingGroups()`) dynamisch geladen und als Eingabefelder in der UI angezeigt
@@ -96,13 +128,6 @@ Stand: **2026-06-11**
   - `FilePath` → TextBox mit Browse-Button
 - **Globale Dark-Mode-kompatible Styles:** Einheitliche Styles für Label, CheckBox, TextBox und weitere Eingabekomponenten in den Theme-Dictionaries (`DarkTheme.xaml`, `LightTheme.xaml`) mit konsistenten Farben und Hover-/Checked-Zuständen
 - **Plugin-spezifische Einstellungspersistierung:** Alle Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert; Standard-Plugins werden als String-Namen in `AppEinstellung` gespeichert
-
-**Betroffene Komponenten:**
-- `SettingsViewModel` – neue Properties: `SelectedScmPluginSettings`, `SelectedKiPluginSettings` (vom Typ `IReadOnlyList<PluginSettingGroupEntry>`)
-- `SettingsViewModel` – neue Commands: `ScmPluginSelectedCommand`, `KiPluginSelectedCommand` (laden Einstellungsgruppen beim Plugin-Wechsel)
-- `SettingsView.xaml` – zwei neue Register mit ComboBox und dynamischem ItemsControl für Plugin-Einstellungen
-- `AppEinstellungService` – neue Konstante: `DefaultScmPluginKey = "scm.plugin.default"`
-- `DarkTheme.xaml`, `LightTheme.xaml` – neue Styles für `Label` und `CheckBox` mit `DynamicResource` Farben
 
 #### Feature 72: WPF-Plugin-Verfügbarkeit & Dialog-Erweiterung (implementiert ✅)
 
