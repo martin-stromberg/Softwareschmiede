@@ -7,7 +7,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für den Repository-Zuweisungs-Dialog.</summary>
-public sealed class RepositoryAssignViewModel : ViewModelBase
+public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
 {
     private readonly ILogger<RepositoryAssignViewModel> _logger;
     private readonly IPluginManager? _pluginManager;
@@ -95,7 +95,11 @@ public sealed class RepositoryAssignViewModel : ViewModelBase
                 HasScmPlugins = AvailableScmPlugins.Count > 0;
 
                 if (HasScmPlugins)
+                {
                     SelectedScmPlugin = AvailableScmPlugins[0];
+                    if (CurrentReloadTask != null)
+                        await CurrentReloadTask;
+                }
             }
         }
         catch (Exception ex)
@@ -116,6 +120,13 @@ public sealed class RepositoryAssignViewModel : ViewModelBase
         CurrentReloadTask = ReloadRepositoriesForSelectedPlugin(_reloadCts.Token);
     }
 
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _reloadCts?.Cancel();
+        _reloadCts?.Dispose();
+    }
+
     private async Task ReloadRepositoriesForSelectedPlugin(CancellationToken ct)
     {
         if (_pluginManager == null || SelectedScmPlugin == null)
@@ -129,7 +140,7 @@ public sealed class RepositoryAssignViewModel : ViewModelBase
             IsLoading = true;
             var repos = await SelectedScmPlugin.GetAvailableRepositoriesAsync(ct);
             ct.ThrowIfCancellationRequested();
-            var sorted = repos.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
+            var sorted = repos.OrderByDescending(r => r.UpdatedAt).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
             VerfuegbareRepositories.Clear();
             foreach (var repo in sorted)
                 VerfuegbareRepositories.Add(repo);

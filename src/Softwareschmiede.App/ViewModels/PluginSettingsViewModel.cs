@@ -145,7 +145,7 @@ public sealed class PluginSettingsViewModel : ViewModelBase
         SpeichernCommand = new AsyncRelayCommand(ct => SpeichernAsync(ct));
     }
 
-    private Task LadenAsync(CancellationToken ct)
+    private async Task LadenAsync(CancellationToken ct)
     {
         IsLoading = true;
         FehlerMeldung = null;
@@ -153,26 +153,31 @@ public sealed class PluginSettingsViewModel : ViewModelBase
 
         try
         {
-            var staging = new List<PluginWithSettingsEntry>();
-
-            var gitPlugins = _pluginManager.GetSourceCodeManagementPlugins().Cast<IPlugin>();
-            var kiPlugins = _pluginManager.GetDevelopmentAutomationPlugins().Cast<IPlugin>();
-
-            foreach (var plugin in gitPlugins.Concat(kiPlugins))
+            var staging = await Task.Run(() =>
             {
-                ct.ThrowIfCancellationRequested();
+                var result = new List<PluginWithSettingsEntry>();
 
-                var groups = plugin.GetSettingGroups()
-                    .Select(group => new PluginSettingGroupEntry(
-                        group.GroupName,
-                        group.Fields.Select(field => new PluginSettingEntry(
-                            field,
-                            _pluginSettingsService.GetValue(plugin, field)))
-                        .ToList()))
-                    .ToList();
+                var gitPlugins = _pluginManager.GetSourceCodeManagementPlugins().Cast<IPlugin>();
+                var kiPlugins = _pluginManager.GetDevelopmentAutomationPlugins().Cast<IPlugin>();
 
-                staging.Add(new PluginWithSettingsEntry(plugin, groups));
-            }
+                foreach (var plugin in gitPlugins.Concat(kiPlugins))
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var groups = plugin.GetSettingGroups()
+                        .Select(group => new PluginSettingGroupEntry(
+                            group.GroupName,
+                            group.Fields.Select(field => new PluginSettingEntry(
+                                field,
+                                _pluginSettingsService.GetValue(plugin, field)))
+                            .ToList()))
+                        .ToList();
+
+                    result.Add(new PluginWithSettingsEntry(plugin, groups));
+                }
+
+                return result;
+            }, ct);
 
             Plugins.Clear();
             foreach (var entry in staging)
@@ -194,8 +199,6 @@ public sealed class PluginSettingsViewModel : ViewModelBase
         {
             IsLoading = false;
         }
-
-        return Task.CompletedTask;
     }
 
     private Task SpeichernAsync(CancellationToken ct)

@@ -28,6 +28,9 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für das Standard-KI-Plugin.</summary>
     public const string DefaultKiPluginKey = "ki.plugin.default";
 
+    /// <summary>Schlüssel für das Standard-SCM-Plugin.</summary>
+    public const string DefaultScmPluginKey = "scm.plugin.default";
+
     /// <summary>Schlüssel für das Log-Level.</summary>
     public const string LogLevelKey = "logging.level";
 

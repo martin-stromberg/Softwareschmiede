@@ -20,6 +20,18 @@ public sealed partial class PluginSettingsView : UserControl
         };
     }
 
+    private void OnPasswordBoxLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox pb && pb.Tag is PluginSettingEntry entry)
+            pb.Password = entry.Value ?? string.Empty;
+    }
+
+    private void OnPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox pb && pb.Tag is PluginSettingEntry entry)
+            entry.Value = pb.Password;
+    }
+
     private void OnDateiAuswaehlenClick(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement element || element.DataContext is not PluginSettingEntry entry)
@@ -28,7 +40,7 @@ public sealed partial class PluginSettingsView : UserControl
         var dialog = new OpenFileDialog
         {
             Title = entry.Field.Label,
-            Filter = "Audiodateien (*.mp3;*.wav;*.ogg)|*.mp3;*.wav;*.ogg|Alle Dateien (*.*)|*.*"
+            Filter = "Alle Dateien (*.*)|*.*"
         };
 
         if (!string.IsNullOrEmpty(entry.Value) && System.IO.File.Exists(entry.Value))

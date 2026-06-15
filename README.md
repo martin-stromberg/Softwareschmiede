@@ -73,7 +73,7 @@ Stand: **2026-06-11**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Blazor-Ablösung noch ausstehend |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; **Einstellungsansicht mit Plugin-Registerkarten erweitert (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -81,7 +81,30 @@ Stand: **2026-06-11**
 
 ## 🚀 Features
 
-#### Feature 72: WPF-Plugin-Verfügbarkeit & Dialog-Erweiterung (aktuell in Arbeit)
+#### Feature 72: WPF Plugin-Einstellungen & Styling (aktuell in Arbeit)
+
+**Neue Einstellungsregisterkarten für Quellcodeverwaltung und KI-Plugins mit dynamischen Plugin-Einstellungspanels:**
+
+- **Plugin-Auswahl pro Kategorie:** Getrennte Register für **Quellcodeverwaltung** (SCM) und **KI** mit ComboBox zur Auswahl eines Standard-Plugins pro Kategorie
+- **Dynamische Plugin-Einstellungspanels:** Nach Plugin-Auswahl werden die vom Plugin bereitgestellten Einstellungsgruppen (via `GetSettingGroups()`) dynamisch geladen und als Eingabefelder in der UI angezeigt
+- **Feldtyp-spezifische Eingabekomponenten:** Automatisches Rendering verschiedener Feldtypen:
+  - `Text` → TextBox
+  - `Secret` → PasswordBox
+  - `Integer` → numerisches TextBox-Feld
+  - `Boolean` → CheckBox
+  - `Enum` → ComboBox mit Optionsauswahl
+  - `FilePath` → TextBox mit Browse-Button
+- **Globale Dark-Mode-kompatible Styles:** Einheitliche Styles für Label, CheckBox, TextBox und weitere Eingabekomponenten in den Theme-Dictionaries (`DarkTheme.xaml`, `LightTheme.xaml`) mit konsistenten Farben und Hover-/Checked-Zuständen
+- **Plugin-spezifische Einstellungspersistierung:** Alle Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert; Standard-Plugins werden als String-Namen in `AppEinstellung` gespeichert
+
+**Betroffene Komponenten:**
+- `SettingsViewModel` – neue Properties: `SelectedScmPluginSettings`, `SelectedKiPluginSettings` (vom Typ `IReadOnlyList<PluginSettingGroupEntry>`)
+- `SettingsViewModel` – neue Commands: `ScmPluginSelectedCommand`, `KiPluginSelectedCommand` (laden Einstellungsgruppen beim Plugin-Wechsel)
+- `SettingsView.xaml` – zwei neue Register mit ComboBox und dynamischem ItemsControl für Plugin-Einstellungen
+- `AppEinstellungService` – neue Konstante: `DefaultScmPluginKey = "scm.plugin.default"`
+- `DarkTheme.xaml`, `LightTheme.xaml` – neue Styles für `Label` und `CheckBox` mit `DynamicResource` Farben
+
+#### Feature 72: WPF-Plugin-Verfügbarkeit & Dialog-Erweiterung (implementiert ✅)
 
 Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl eines SCM-Plugins erweitert:
 
@@ -501,12 +524,16 @@ cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANT
 
 ### Standardplugin je Pluginart konfigurieren
 
-- In **Einstellungen** kann pro Pluginart genau ein Standardplugin gespeichert werden:
-  - `SourceCodeManagement` (z. B. GitHub)
-  - `DevelopmentAutomation` (z. B. GitHub Copilot oder Claude CLI)
-- Die Auswahl wird persistent in den App-Einstellungen gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt.
-- Für Git-Aktionen gilt: eine projektspezifische Repository-Auswahl (Aufgabe/Projekt) hat Vorrang; das Standardplugin dient als Fallback.
-- Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin.
+- In **Einstellungen → Quellcodeverwaltung** und **Einstellungen → KI** können Standard-Plugins pro Pluginart gewählt und konfiguriert werden:
+  - **Quellcodeverwaltung** (SourceCodeManagement): z. B. GitHub oder Local Directory
+  - **KI** (DevelopmentAutomation): z. B. GitHub Copilot oder Claude CLI
+- Die Auswahl wird persistent in den App-Einstellungen (`DefaultScmPluginKey`, `DefaultKiPluginKey`) gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt
+- Nach Plugin-Auswahl können plugin-spezifische Einstellungen konfiguriert werden:
+  - Die verfügbaren Felder werden vom Plugin via `GetSettingGroups()` definiert
+  - Feldtypen (Text, Secret, Integer, Boolean, Enum, FilePath) werden entsprechend gerendert
+  - Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert
+- Für Git-Aktionen gilt: eine projektspezifische Repository-Auswahl (Aufgabe/Projekt) hat Vorrang; das Standardplugin dient als Fallback
+- Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin
 
 ### Arbeitsverzeichnis für lokale Klone
 
@@ -846,6 +873,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **WPF Plugin-Einstellungen & Styling (Feature #72):** Einstellungsansicht um zwei neue Register (Quellcodeverwaltung, KI) mit Plugin-Auswahl und dynamisch geladenen Einstellungspanels erweitert; feldtyp-spezifische Eingabekomponenten (TextBox, PasswordBox, CheckBox, ComboBox, FilePath); globale Dark-Mode-kompatible Styles in Theme-Dictionaries; StandardPlugin-Persistierung in AppEinstellung (**2026-06-15**)
 - **WPF-Projektdetailansicht (Feature #72):** Projektdetailansicht mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (Symbol, Titel, Beschreibung — bearbeitbar), Aufgaben-Kachel (filterbar nach Status), Repository-Zuweisungs-Dialog und E2E-Tests vollständig implementiert; README und Roadmap aktualisiert (**2026-06-13**)
 - **WPF-Migration (Feature #72):** `src/Softwareschmiede.App` als neues WPF-Projekt ergänzt — MVVM-Gerüst, Views, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Service, neues Aufgaben-Statusmodell (`Neu` → `ArbeitsverzeichnisEingerichtet` → `Gestartet` → `InArbeit` → `Wartend` → `Beendet`) in README dokumentiert (**2026-06-11**)
 - Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview”** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
@@ -895,6 +923,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] Plugin-DLL-Kopie via MSBuild-Target
 - [x] Projektdetailansicht mit Ribbon-Menü, Projekt-/Aufgaben-Kacheln und Repository-Verwaltung
 - [x] E2E-Tests für Projektdetailansicht (Bearbeitung, Löschen, Aufgaben, Repository-Verwaltung, Navigation)
+- [x] Einstellungsansicht mit Registerkarten für Plugin-Konfiguration (SCM/KI) mit dynamischen Einstellungspanels
+- [x] Globale Dark-Mode-kompatible Styles für UI-Komponenten (Label, CheckBox, TextBox, etc.)
 - [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
 - [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
 - [ ] Blazor-Code vollständig entfernt
@@ -943,7 +973,9 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
 | [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der plugin-spezifischen Auswahl mit **KI-Plugin als Pflichtfeld** sowie optionalem Agentenpaket/Agent inkl. Persistenz je Aufgabe |
 | [Feature F027: KI-Protokoll Auto-Scroll](docs/business/features/F027-ki-protokoll-auto-scroll.md) | Fachliche Beschreibung des Scroll-Verhaltens im KI-Protokoll (Initial-Scroll, bedingtes Follow-Scrolling, manueller Scroll-Lock) |
-| [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll“ (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll“ – 2026-05-25“ |
+| [Feature F072: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/requirement.md) | Anforderungsanalyse für Einstellungsansicht mit Plugin-Registerkarten, dynamischen Einstellungspanels und globalen Dark-Mode-Styles |
+| [Plan: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen, neuen Klassen und Validierungsregeln |
+| [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll” (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll” – 2026-05-25” |
 | [API: Issue 58 Agenten-Discovery/Auswahl](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für plugin-spezifische Discovery, Prefix-Auflösung und Persistenz (`KiPluginPrefix`) |
 | [Flow: Issue 58 Agenten-Discovery/Auswahl](docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | Ablaufdiagramm für UI-Reihenfolge, Kompatibilitätsprüfung und Start-/Folgeprompt-Dispatch |
 | [Requirements: Issue 58](docs/requirements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für plugin-spezifische Discovery/Auswahl |

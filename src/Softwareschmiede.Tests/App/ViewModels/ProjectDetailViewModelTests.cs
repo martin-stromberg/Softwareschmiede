@@ -177,7 +177,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         // Arrange
         var projekt = await _projektService.CreateAsync("Repository-Test-Projekt", null);
 
-        var testRepo = new AvailableRepository("test-repo", "https://github.com/test/repo");
+        var testRepo = new AvailableRepository("test-repo", DateTime.UtcNow, "test/repo", "https://github.com/test/repo");
 
         var pluginMock = new Mock<IGitPlugin>();
         pluginMock.Setup(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
