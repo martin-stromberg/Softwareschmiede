@@ -22,6 +22,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly IDialogService _dialogService;
     private readonly ILogger<TaskDetailViewModel> _logger;
+    private readonly Action<Action> _dispatcherInvoke;
 
     private Guid _aufgabeId;
     private Aufgabe? _aufgabe;
@@ -35,6 +36,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _isInfoViewVisible;
     private string? _editTitel;
     private string? _editAnforderungsBeschreibung;
+    private bool _disposed;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -234,7 +236,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         EntwicklungsprozessService entwicklungsprozessService,
         PluginSelectionService pluginSelectionService,
         IDialogService dialogService,
-        ILogger<TaskDetailViewModel> logger)
+        ILogger<TaskDetailViewModel> logger,
+        Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
         _protokollService = protokollService;
@@ -243,6 +246,19 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _pluginSelectionService = pluginSelectionService;
         _dialogService = dialogService;
         _logger = logger;
+        // Dispatcher einmalig bei der Konstruktion erfassen, damit kein späterer Zugriff auf
+        // Application.Current nötig ist (kann beim Shutdown null sein).
+        if (dispatcherInvoke != null)
+        {
+            _dispatcherInvoke = dispatcherInvoke;
+        }
+        else
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            _dispatcherInvoke = dispatcher != null
+                ? (Action<Action>)(action => dispatcher.Invoke(action))
+                : (Action<Action>)(action => action());
+        }
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
 
@@ -287,7 +303,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Aufgabe {AufgabeId}.", _aufgabeId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
         finally
         {
@@ -340,7 +356,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 await _aufgabeService.SetStatusAsync(_aufgabeId, Domain.Enums.AufgabeStatus.InArbeit, ct);
                 try
                 {
-                    Aufgabe = await _aufgabeService.GetByIdAsync(_aufgabeId, ct);
+                    Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
                 }
                 catch (Exception reloadEx)
                 {
@@ -402,7 +418,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Setzen des Status für Aufgabe {AufgabeId}.", _aufgabeId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
     }
 
@@ -423,7 +439,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Abschließen der Aufgabe {AufgabeId}.", _aufgabeId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
     }
 
@@ -447,7 +463,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Speichern der Aufgabe {AufgabeId}.", _aufgabeId);
-            FehlerMeldung = $"Fehler: {ex.Message}";
+            SetFehler(ex);
         }
         finally
         {
@@ -497,6 +513,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
+
     private void InfoCliToggle()
     {
         IsInfoViewVisible = !IsInfoViewVisible;
@@ -507,15 +525,21 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (aufgabeId != _aufgabeId)
             return;
 
-        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        _dispatcherInvoke(() =>
         {
             IsCliRunning = status == CliProcessStatus.Gestartet;
+            if (status != CliProcessStatus.Gestartet)
+                EmbeddedWindowHandle = IntPtr.Zero;
         });
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (_disposed)
+            return;
+        _disposed = true;
+
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();

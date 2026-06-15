@@ -176,20 +176,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         AufgabeErstellenCommand = new AsyncRelayCommand(
             AufgabeErstellenAsync,
             () => _projektId != Guid.Empty);
-        AufgabeOeffnenCommand = new RelayCommand<Guid>(id =>
-        {
-            var vm = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
-            vm.ZurueckAction = () => SelectedTaskViewModel = null;
-            vm.AufgabeListeAktualisierenCallback = async () =>
-            {
-                var aufgaben = await _aufgabeService.GetByProjektAsync(_projektId);
-                Aufgaben.Clear();
-                foreach (var aufgabe in aufgaben)
-                    Aufgaben.Add(aufgabe);
-            };
-            vm.AufgabeId = id;
-            SelectedTaskViewModel = vm;
-        });
+        AufgabeOeffnenCommand = new RelayCommand<Guid>(id => OeffneAufgabe(id));
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         SpeichernCommand = new AsyncRelayCommand(ProjektSpeichernAsync, () => !string.IsNullOrWhiteSpace(_projektName));
         LoeschenCommand = new AsyncRelayCommand(ProjektLoeschenAsync, () => _projektId != Guid.Empty);
@@ -252,17 +239,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
             Aufgaben.Add(aufgabe);
 
-            var vm = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
-            vm.ZurueckAction = () => SelectedTaskViewModel = null;
-            vm.AufgabeListeAktualisierenCallback = async () =>
-            {
-                var aufgaben = await _aufgabeService.GetByProjektAsync(_projektId);
-                Aufgaben.Clear();
-                foreach (var aufgabe2 in aufgaben)
-                    Aufgaben.Add(aufgabe2);
-            };
-            vm.AufgabeId = aufgabe.Id;
-            SelectedTaskViewModel = vm;
+            OeffneAufgabe(aufgabe.Id);
         }
         catch (OperationCanceledException)
         {
@@ -409,6 +386,21 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             _logger.LogError(ex, "Fehler beim Öffnen der Repository-URL.");
             SetFehler(ex);
         }
+    }
+
+    private void OeffneAufgabe(Guid id)
+    {
+        var vm = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
+        vm.ZurueckAction = () => SelectedTaskViewModel = null;
+        vm.AufgabeListeAktualisierenCallback = async () =>
+        {
+            var aufgaben = await _aufgabeService.GetByProjektAsync(_projektId);
+            Aufgaben.Clear();
+            foreach (var aufgabe in aufgaben)
+                Aufgaben.Add(aufgabe);
+        };
+        vm.AufgabeId = id;
+        SelectedTaskViewModel = vm;
     }
 
     private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);

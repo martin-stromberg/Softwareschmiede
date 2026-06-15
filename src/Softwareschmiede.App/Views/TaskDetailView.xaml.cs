@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows.Controls;
 using Softwareschmiede.App.ViewModels;
 
@@ -6,6 +7,8 @@ namespace Softwareschmiede.App.Views;
 /// <summary>Code-behind für TaskDetailView.</summary>
 public sealed partial class TaskDetailView : UserControl
 {
+    private CancellationTokenSource? _pollCts;
+
     /// <inheritdoc cref="TaskDetailView"/>
     public TaskDetailView()
     {
@@ -19,6 +22,10 @@ public sealed partial class TaskDetailView : UserControl
         };
         Unloaded += (_, _) =>
         {
+            _pollCts?.Cancel();
+            _pollCts?.Dispose();
+            _pollCts = null;
+
             if (DataContext is TaskDetailViewModel vm)
             {
                 vm.CliProzessGestartet -= OnCliProzessGestartet;
@@ -29,30 +36,44 @@ public sealed partial class TaskDetailView : UserControl
 
     private void OnCliProzessGestartet(System.Diagnostics.Process process)
     {
-        _ = WaitForWindowHandleAsync(process);
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
+        _pollCts = new CancellationTokenSource();
+        _ = WaitForWindowHandleAsync(process, _pollCts.Token);
     }
 
-    private async Task WaitForWindowHandleAsync(System.Diagnostics.Process process)
+    private async Task WaitForWindowHandleAsync(System.Diagnostics.Process process, CancellationToken ct)
     {
         var capturedViewModel = DataContext as TaskDetailViewModel;
         try
         {
             var deadline = DateTime.UtcNow.AddSeconds(15);
-            while (DateTime.UtcNow < deadline && !process.HasExited)
+            while (DateTime.UtcNow < deadline && !process.HasExited && !ct.IsCancellationRequested)
             {
                 process.Refresh();
                 if (process.MainWindowHandle != IntPtr.Zero)
                     break;
-                await Task.Delay(200);
+                await Task.Delay(200, ct);
             }
+
+            if (ct.IsCancellationRequested)
+                return;
 
             var handle = process.MainWindowHandle;
             if (handle != IntPtr.Zero && DataContext is TaskDetailViewModel vm && ReferenceEquals(vm, capturedViewModel))
                 vm.EmbeddedWindowHandle = handle;
         }
-        catch (Exception)
+        catch (OperationCanceledException)
+        {
+            // Ansicht wurde entladen – kein Einbetten mehr nötig
+        }
+        catch (Win32Exception)
         {
             // Prozess ist bereits beendet oder nicht zugänglich – kein Einbetten möglich
+        }
+        catch (InvalidOperationException)
+        {
+            // Prozess wurde disposed – kein Einbetten möglich
         }
     }
 }

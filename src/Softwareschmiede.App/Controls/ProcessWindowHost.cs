@@ -17,6 +17,7 @@ public sealed class ProcessWindowHost : HwndHost
 
     private IntPtr _embeddedHandle = IntPtr.Zero;
     private IntPtr _hostHandle = IntPtr.Zero;
+    private int _originalWindowStyle = 0;
 
     private ILogger? _logger;
 
@@ -74,6 +75,13 @@ public sealed class ProcessWindowHost : HwndHost
     {
         if (_embeddedHandle != IntPtr.Zero)
         {
+            // Originalstil vor dem Trennen wiederherstellen
+            if (_originalWindowStyle != 0)
+            {
+                NativeMethods.SetWindowLong(_embeddedHandle, GWL_STYLE, _originalWindowStyle);
+                _originalWindowStyle = 0;
+            }
+
             var result = NativeMethods.SetParent(_embeddedHandle, IntPtr.Zero);
             if (result == IntPtr.Zero)
             {
@@ -110,6 +118,9 @@ public sealed class ProcessWindowHost : HwndHost
                 "GetWindowLong fehlgeschlagen (Win32-Fehler: {ErrorCode}).",
                 Marshal.GetLastWin32Error());
         }
+
+        // Originalstil für spätere Wiederherstellung sichern
+        _originalWindowStyle = style;
 
         style = (style | WS_CHILD) & ~0x00C00000; // Entfernt WS_CAPTION und WS_THICKFRAME
         var setLongResult = NativeMethods.SetWindowLong(handle, GWL_STYLE, style);

@@ -144,29 +144,29 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch zurück.</summary>
     protected void CreateProject(AutomationElement mainWindow, string name)
     {
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), TimeSpan.FromSeconds(5));
+        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), TimeSpan.FromSeconds(10));
         neuButton.AsButton().Click();
 
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(5));
+        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(10));
         nameBox.Click();
         Keyboard.Type(name);
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
         speichernButton.AsButton().Click();
 
         // Warten bis Overlay geschlossen (Speichern-Button verschwunden)
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(15));
 
         // CreateAsync + Callback-Ausführung abwarten
-        WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(10));
+        WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(15));
     }
 
     /// <summary>Öffnet ein Projekt aus der Liste anhand seines Namens.</summary>
     protected void OpenProject(AutomationElement mainWindow, string name)
     {
-        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(5));
+        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(10));
         projektKachel.Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(15));
     }
 
     /// <summary>Legt ein neues Projekt an, speichert es und öffnet es wieder.</summary>

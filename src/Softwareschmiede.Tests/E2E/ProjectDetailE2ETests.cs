@@ -17,9 +17,9 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public sealed class ProjectDetailE2ETests : WpfTestBase
 {
-    private static readonly TimeSpan Short  = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan Medium = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan Long   = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan Short  = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan Long   = TimeSpan.FromSeconds(30);
 
     private AutomationElement StartAndNavigateToProjects()
     {

@@ -33,6 +33,5 @@ public sealed class NavigationViewModel : ViewModelBase
     private void Toggle()
     {
         IsExpanded = !IsExpanded;
-        OnPropertyChanged(nameof(NavigationWidth));
     }
 }
