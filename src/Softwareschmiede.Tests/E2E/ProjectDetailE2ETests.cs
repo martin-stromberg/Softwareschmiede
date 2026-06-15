@@ -62,6 +62,34 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         Assert.NotNull(speichernInDetail);
     }
 
+
+    /// <summary>
+    /// Szenario: Projekt anlegen, Projekt öffnen und zurück, Projekt erneut öffnen.
+    /// Prüft: Das hin und her zwischen Detailansicht und Übersicht funktioniert.
+    /// </summary>
+    [Fact]
+    public void ProjektOeffnenUndZurueck_ErneutOeffnen_E2E()
+    {
+        var mainWindow = StartAndNavigateToProjects();
+
+        // Erstes Projekt anlegen
+        CreateProject(mainWindow, "Bestehendes-Projekt");
+        // Projektdetailansicht öffnen
+        OpenProject(mainWindow, "Bestehendes-Projekt");
+
+        // Neuanlage über Zurück abbrechen
+        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        zurueckButton.AsButton().Click();
+
+        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
+
+        // Projektdetailansicht erneut öffnen
+        OpenProject(mainWindow, "Bestehendes-Projekt");
+
+        zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+    }
+
     /// <summary>
     /// Szenario: Projektnamen ändern, zurücknavigieren, erneut öffnen.
     /// Prüft: Projektkachel zeigt aktualisierten Namen und lässt sich erneut öffnen.

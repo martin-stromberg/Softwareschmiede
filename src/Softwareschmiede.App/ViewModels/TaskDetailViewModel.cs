@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -19,6 +20,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly KiAusfuehrungsService _kiService;
     private readonly EntwicklungsprozessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
+    private readonly IDialogService _dialogService;
     private readonly ILogger<TaskDetailViewModel> _logger;
 
     private Guid _aufgabeId;
@@ -30,6 +32,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _optionalCliParameters;
     private IntPtr _embeddedWindowHandle = IntPtr.Zero;
     private CancellationTokenSource? _ladenCts;
+    private bool _isInfoViewVisible;
+    private string? _editTitel;
+    private string? _editAnforderungsBeschreibung;
+
+    /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
+    public Action? ZurueckAction { get; set; }
+
+    /// <summary>Wird nach dem Löschen einer Aufgabe aufgerufen, damit die übergeordnete Ansicht die Liste aktualisiert.</summary>
+    public Func<Task>? AufgabeListeAktualisierenCallback { get; set; }
 
     /// <summary>Die ID der angezeigten Aufgabe.</summary>
     public Guid AufgabeId
@@ -58,6 +69,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(AufgabeStatus));
             OnPropertyChanged(nameof(KannCliStarten));
             OnPropertyChanged(nameof(KannCliStoppen));
+            OnPropertyChanged(nameof(ShowEditPanel));
+            OnPropertyChanged(nameof(ShowCliPanel));
+            OnPropertyChanged(nameof(ShowDiffPanel));
+            OnPropertyChanged(nameof(KannSpeichern));
+            OnPropertyChanged(nameof(KannLoeschen));
         }
     }
 
@@ -90,6 +106,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             SetProperty(ref _isCliRunning, value);
             OnPropertyChanged(nameof(KannCliStarten));
             OnPropertyChanged(nameof(KannCliStoppen));
+            OnPropertyChanged(nameof(KannSpeichern));
+            OnPropertyChanged(nameof(KannLoeschen));
         }
     }
 
@@ -132,6 +150,52 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Verfügbare KI-Plugin-Prefixe.</summary>
     public ObservableCollection<string> VerfuegbareKiPlugins { get; } = new();
 
+    /// <summary>Steuert Sichtbarkeit zwischen Info-Panel und CLI-Fenster; Initial = false (CLI sichtbar).</summary>
+    public bool IsInfoViewVisible
+    {
+        get => _isInfoViewVisible;
+        set => SetProperty(ref _isInfoViewVisible, value);
+    }
+
+    /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
+    public string? EditTitel
+    {
+        get => _editTitel;
+        set
+        {
+            SetProperty(ref _editTitel, value);
+            OnPropertyChanged(nameof(KannSpeichern));
+        }
+    }
+
+    /// <summary>Editable Kopie von Aufgabe.AnforderungsBeschreibung für den Edit-Modus.</summary>
+    public string? EditAnforderungsBeschreibung
+    {
+        get => _editAnforderungsBeschreibung;
+        set => SetProperty(ref _editAnforderungsBeschreibung, value);
+    }
+
+    /// <summary>True wenn Status == Neu, sonst false.</summary>
+    public bool ShowEditPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Neu;
+
+    /// <summary>True wenn Status ∈ {Gestartet, InArbeit, Wartend}, sonst false.</summary>
+    public bool ShowCliPanel => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Gestartet
+        or Domain.Enums.AufgabeStatus.InArbeit
+        or Domain.Enums.AufgabeStatus.Wartend;
+
+    /// <summary>True wenn Status == Beendet, sonst false.</summary>
+    public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
+
+    /// <summary>CanExecute für SpeichernCommand: Status ∈ {Neu, Gestartet} &amp;&amp; !IsCliRunning &amp;&amp; Titel.Length > 0.</summary>
+    public bool KannSpeichern => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Neu or Domain.Enums.AufgabeStatus.Gestartet
+        && !_isCliRunning
+        && !string.IsNullOrEmpty(_editTitel);
+
+    /// <summary>CanExecute für LoeschenCommand: Status ∉ {Beendet, Archiviert} &amp;&amp; !IsCliRunning.</summary>
+    public bool KannLoeschen => _aufgabe?.Status is not (Domain.Enums.AufgabeStatus.Beendet or Domain.Enums.AufgabeStatus.Archiviert)
+        && _aufgabe != null
+        && !_isCliRunning;
+
     /// <summary>Lädt die Aufgabe.</summary>
     public ICommand LadenCommand { get; }
 
@@ -147,6 +211,18 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Schließt die Aufgabe ab (Status: Beendet).</summary>
     public ICommand AufgabeAbschliessenCommand { get; }
 
+    /// <summary>Speichert Titel und AnforderungsBeschreibung der Aufgabe.</summary>
+    public ICommand SpeichernCommand { get; }
+
+    /// <summary>Löscht die Aufgabe nach Bestätigungsdialog.</summary>
+    public ICommand LoeschenCommand { get; }
+
+    /// <summary>Toggled IsInfoViewVisible zwischen Info-Panel und CLI-Fenster.</summary>
+    public ICommand InfoCliToggleCommand { get; }
+
+    /// <summary>Navigiert zurück zur vorherigen Ansicht.</summary>
+    public ICommand ZurueckCommand { get; }
+
     /// <summary>Event: Ein CLI-Prozess wurde gestartet, Handle ist verfügbar.</summary>
     public event Action<System.Diagnostics.Process>? CliProzessGestartet;
 
@@ -157,6 +233,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         KiAusfuehrungsService kiService,
         EntwicklungsprozessService entwicklungsprozessService,
         PluginSelectionService pluginSelectionService,
+        IDialogService dialogService,
         ILogger<TaskDetailViewModel> logger)
     {
         _aufgabeService = aufgabeService;
@@ -164,6 +241,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _kiService = kiService;
         _entwicklungsprozessService = entwicklungsprozessService;
         _pluginSelectionService = pluginSelectionService;
+        _dialogService = dialogService;
         _logger = logger;
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
@@ -171,8 +249,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
         CliStartenCommand = new AsyncRelayCommand(CliStartenAsync, () => KannCliStarten);
         CliStoppenCommand = new AsyncRelayCommand(CliStoppenAsync, () => KannCliStoppen);
-        StatusGestartetSetzenCommand = new AsyncRelayCommand(StatusGestartetSetzenAsync);
-        AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync);
+        StatusGestartetSetzenCommand = new AsyncRelayCommand(StatusGestartetSetzenAsync, () => AufgabeStatus == Domain.Enums.AufgabeStatus.Neu && !_isCliRunning);
+        AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => ShowCliPanel && !_isCliRunning);
+        SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
+        LoeschenCommand = new AsyncRelayCommand(LoeschenAsync, () => KannLoeschen);
+        InfoCliToggleCommand = new RelayCommand(InfoCliToggle);
+        ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -187,6 +269,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
             IsCliRunning = _kiService.IsRunning(_aufgabeId);
+
+            EditTitel = Aufgabe?.Titel;
+            EditAnforderungsBeschreibung = Aufgabe?.AnforderungsBeschreibung;
 
             var protokolleintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, ct);
             Protokolleintraege.Clear();
@@ -253,7 +338,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             if (_aufgabe?.Status == Domain.Enums.AufgabeStatus.Gestartet)
             {
                 await _aufgabeService.SetStatusAsync(_aufgabeId, Domain.Enums.AufgabeStatus.InArbeit, ct);
-                Aufgabe = await _aufgabeService.GetByIdAsync(_aufgabeId, ct);
+                try
+                {
+                    Aufgabe = await _aufgabeService.GetByIdAsync(_aufgabeId, ct);
+                }
+                catch (Exception reloadEx)
+                {
+                    _logger.LogWarning(reloadEx, "Aufgabe {AufgabeId} konnte nach Status-Update nicht neu geladen werden.", _aufgabeId);
+                }
             }
 
             _logger.LogInformation("CLI für Aufgabe {AufgabeId} gestartet.", _aufgabeId);
@@ -301,7 +393,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             await _aufgabeService.SetStatusAsync(_aufgabeId, Domain.Enums.AufgabeStatus.Gestartet, ct);
-            Aufgabe = await _aufgabeService.GetByIdAsync(_aufgabeId, ct);
+            await LadenAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -322,7 +414,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             await _entwicklungsprozessService.AbschliessenAsync(_aufgabeId, ct);
-            Aufgabe = await _aufgabeService.GetByIdAsync(_aufgabeId, ct);
+            await LadenAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -335,12 +427,90 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async Task SpeichernAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty)
+            return;
+
+        IsLoading = true;
+        FehlerMeldung = null;
+
+        try
+        {
+            await _aufgabeService.UpdateAsync(_aufgabeId, _editTitel ?? string.Empty, _editAnforderungsBeschreibung, null, ct);
+            await LadenAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern der Aufgabe {AufgabeId}.", _aufgabeId);
+            FehlerMeldung = $"Fehler: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoeschenAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty)
+            return;
+
+        var dialogNachricht = $"Aufgabe '{AufgabeTitel}' wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.";
+        if (!_dialogService.BestaetigenDialog(dialogNachricht, "Löschen bestätigen"))
+            return;
+
+        IsLoading = true;
+        FehlerMeldung = null;
+
+        try
+        {
+            await _aufgabeService.DeleteAsync(_aufgabeId, ct);
+
+            try
+            {
+                await (AufgabeListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+            }
+            catch (Exception callbackEx)
+            {
+                _logger.LogError(callbackEx, "Fehler im AufgabeListeAktualisierenCallback nach Aufgabenlöschung.");
+            }
+
+            ZurueckAction?.Invoke();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Löschen der Aufgabe {AufgabeId}.", _aufgabeId);
+            FehlerMeldung = $"Aufgabe konnte nicht gelöscht werden: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void InfoCliToggle()
+    {
+        IsInfoViewVisible = !IsInfoViewVisible;
+    }
+
     private void OnCliProcessStatusChanged(Guid aufgabeId, CliProcessStatus status)
     {
         if (aufgabeId != _aufgabeId)
             return;
 
-        IsCliRunning = status == CliProcessStatus.Gestartet;
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            IsCliRunning = status == CliProcessStatus.Gestartet;
+        });
     }
 
     /// <inheritdoc/>

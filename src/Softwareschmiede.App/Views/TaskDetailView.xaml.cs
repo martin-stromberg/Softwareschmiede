@@ -15,7 +15,6 @@ public sealed partial class TaskDetailView : UserControl
             if (DataContext is TaskDetailViewModel vm)
             {
                 vm.CliProzessGestartet += OnCliProzessGestartet;
-                vm.LadenCommand.Execute(null);
             }
         };
         Unloaded += (_, _) =>
@@ -30,8 +29,30 @@ public sealed partial class TaskDetailView : UserControl
 
     private void OnCliProzessGestartet(System.Diagnostics.Process process)
     {
-        // Das Handle wird vom ViewModel gesetzt; ProcessWindowHost reagiert über Binding
-        // Kein direkter Eingriff notwendig - EmbeddedWindowHandle im ViewModel wird aktualisiert
-        _ = process;
+        _ = WaitForWindowHandleAsync(process);
+    }
+
+    private async Task WaitForWindowHandleAsync(System.Diagnostics.Process process)
+    {
+        var capturedViewModel = DataContext as TaskDetailViewModel;
+        try
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline && !process.HasExited)
+            {
+                process.Refresh();
+                if (process.MainWindowHandle != IntPtr.Zero)
+                    break;
+                await Task.Delay(200);
+            }
+
+            var handle = process.MainWindowHandle;
+            if (handle != IntPtr.Zero && DataContext is TaskDetailViewModel vm && ReferenceEquals(vm, capturedViewModel))
+                vm.EmbeddedWindowHandle = handle;
+        }
+        catch (Exception)
+        {
+            // Prozess ist bereits beendet oder nicht zugänglich – kein Einbetten möglich
+        }
     }
 }

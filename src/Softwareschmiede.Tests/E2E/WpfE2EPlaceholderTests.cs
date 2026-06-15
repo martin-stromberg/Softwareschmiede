@@ -65,7 +65,7 @@ public sealed class WpfE2ETests : WpfTestBase
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();
 
-        var cliStartenButton = WaitForElement(mainWindow, cf => cf.ByName("▶ CLI Starten"), TimeSpan.FromSeconds(10));
+        var cliStartenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStarten"), TimeSpan.FromSeconds(10));
         Assert.NotNull(cliStartenButton);
 
         var windowHandle = mainWindow.FrameworkAutomationElement.NativeWindowHandle;

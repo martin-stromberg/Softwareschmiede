@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.App.Converters;
 
@@ -63,6 +64,32 @@ public sealed class InverseBoolToVisibilityConverter : IValueConverter
     /// <inheritdoc/>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => value is not Visibility.Visible;
+}
+
+/// <summary>Konvertiert <see cref="AufgabeStatus"/> in <see cref="Visibility"/> basierend auf einem Vergleich mit dem ConverterParameter.</summary>
+/// <remarks>ConverterParameter enthält einen oder mehrere kommagetrennte <see cref="AufgabeStatus"/>-Werte. Stimmt der Wert mit einem der Parameter überein, wird <see cref="Visibility.Visible"/> zurückgegeben, sonst <see cref="Visibility.Collapsed"/>.</remarks>
+[ValueConversion(typeof(AufgabeStatus), typeof(Visibility))]
+public sealed class AufgabeStatusToVisibilityConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not AufgabeStatus status || parameter is not string paramStr)
+            return Visibility.Collapsed;
+
+        var statusWerte = paramStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var statusWert in statusWerte)
+        {
+            if (Enum.TryParse<AufgabeStatus>(statusWert, out var verglichenerStatus) && status == verglichenerStatus)
+                return Visibility.Visible;
+        }
+
+        return Visibility.Collapsed;
+    }
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
 }
 
 /// <summary>Konvertiert einen Wert in <see cref="Visibility"/> (Collapsed wenn null, leer oder Leerstring).</summary>

@@ -179,6 +179,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         AufgabeOeffnenCommand = new RelayCommand<Guid>(id =>
         {
             var vm = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
+            vm.ZurueckAction = () => SelectedTaskViewModel = null;
+            vm.AufgabeListeAktualisierenCallback = async () =>
+            {
+                var aufgaben = await _aufgabeService.GetByProjektAsync(_projektId);
+                Aufgaben.Clear();
+                foreach (var aufgabe in aufgaben)
+                    Aufgaben.Add(aufgabe);
+            };
             vm.AufgabeId = id;
             SelectedTaskViewModel = vm;
         });
@@ -245,6 +253,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             Aufgaben.Add(aufgabe);
 
             var vm = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
+            vm.ZurueckAction = () => SelectedTaskViewModel = null;
+            vm.AufgabeListeAktualisierenCallback = async () =>
+            {
+                var aufgaben = await _aufgabeService.GetByProjektAsync(_projektId);
+                Aufgaben.Clear();
+                foreach (var aufgabe2 in aufgaben)
+                    Aufgaben.Add(aufgabe2);
+            };
             vm.AufgabeId = aufgabe.Id;
             SelectedTaskViewModel = vm;
         }
