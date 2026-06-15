@@ -10,37 +10,69 @@
 
 ### 1. Neue Aufgabe anlegen
 
-Navigiere über die Seitenleiste zu **Projekte**, öffne das gewünschte Projekt und lege eine neue Aufgabe an. Vergib einen Titel und optional eine Anforderungsbeschreibung. Bestätige mit „Anlegen".
+Navigiere über die Seitenleiste zu **Projekte**, öffne das gewünschte Projekt und lege eine neue Aufgabe an. Die Aufgabendetailansicht öffnet sich mit dem **Edit-Panel**:
 
-### 2. Repository einrichten
+1. Gib einen **Titel** ein (Pflichtfeld).
+2. Optional: Füge eine **Anforderungsbeschreibung** hinzu.
+3. Klicke im Ribbon (Gruppe „Aufgabe") auf **Speichern**.
 
-Öffne die Aufgabe in der Aufgabendetailansicht. Klicke **Gestartet setzen**:
+Die Aufgabe wird in der Datenbank gespeichert, bleibt aber im Status **Neu**.
+
+> **Hinweis:** Der Titel ist erforderlich, um speichern zu können. Der „Speichern"-Button ist ausgegraut, wenn das Feld leer ist.
+
+### 2. Aufgabe bearbeiten (optional)
+
+Befindest du dich im Status **Neu** oder **Gestartet**, kannst du das Edit-Panel erneut öffnen und Titel oder Anforderungsbeschreibung ändern. Klicke auf **Speichern** im Ribbon, um die Änderungen zu übernehmen.
+
+### 3. Aufgabe starten (Repository einrichten)
+
+Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 
 - Die Anwendung klont das Repository in das konfigurierte Arbeitsverzeichnis.
 - Ein `task/`-Branch wird angelegt.
 - Der Status wechselt auf **Gestartet**.
+- Das **CLI-Panel** wird angezeigt.
 
 > **Hinweis:** Das Arbeitsverzeichnis muss in den Einstellungen konfiguriert sein.
 
-### 3. CLI starten
+### 4. CLI starten
 
-1. Im Dropdown **KI-Plugin** das gewünschte Plugin auswählen (z.B. „Claude CLI").
-2. Optional: Zusätzliche CLI-Parameter eingeben.
-3. **CLI starten** klicken.
+Im CLI-Panel (Status **Gestartet** oder höher):
+
+1. Im Dropdown (Gruppe „CLI") das gewünschte **KI-Plugin** auswählen (z.B. „Claude CLI").
+2. Optional: **CLI-Parameter** eingeben.
+3. Klicke auf **CLI starten**.
 
 Das CLI-Fenster erscheint eingebettet in die Aufgabenansicht. Der Status wechselt auf **In Arbeit**. Die KI ist nun interaktiv bedienbar.
 
-### 4. Mit der KI arbeiten
+### 5. Zwischen CLI-Fenster und Info-Ansicht umschalten
 
-Das eingebettete CLI-Fenster verhält sich wie ein natives Terminalfenster. Prompts können direkt eingegeben werden. Das Protokoll der Sitzung wird laufend in der Aufgabe gespeichert.
+Im CLI-Panel findest du ein Toggle-Button „Info"/"CLI" in der Leiste über dem Fenster:
 
-### 5. CLI beenden
+- **CLI:** Zeigt das Terminalfenster des KI-Tools.
+- **Info:** Zeigt Aufgabeeigenschaften (Titel, Status, Beschreibung) und das Protokoll aller bisherigen Einträge.
 
-Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch den Status. Alternativ kann der Anwender **CLI stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).
+Du kannst jederzeit zwischen beiden Ansichten wechseln, ohne den CLI-Prozess zu unterbrechen.
 
-### 6. Aufgabe abschließen
+### 6. Mit der KI arbeiten
 
-**Aufgabe abschließen** klicken. Der Status wechselt auf **Beendet**.
+Das eingebettete CLI-Fenster verhält sich wie ein natives Terminalfenster. Prompts können direkt eingegeben werden. Das Protokoll der Sitzung wird laufend in der Aufgabe gespeichert und ist über die Info-Ansicht einsehbar.
+
+### 7. CLI beenden
+
+Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alternativ kannst du im Ribbon (Gruppe „CLI") auf **Stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).
+
+### 8. Aufgabe abschließen
+
+Im Status **Gestartet**, **In Arbeit** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") auf **Beenden**. Der Status wechselt auf **Beendet**. Das **Diff-Panel** wird angezeigt, das die Änderungen im Repository zeigt.
+
+### 9. Aufgabe löschen
+
+Im Status **Neu** oder **Gestartet** (nicht **Beendet** oder **Archiviert**), klicke im Ribbon (Gruppe „Aufgabe") auf **Löschen**:
+
+1. Ein Bestätigungsdialog fragt: „Aufgabe '{Titel}' wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+2. Bestätige mit **Löschen** oder breche mit **Abbrechen** ab.
+3. Bei Bestätigung wird die Aufgabe gelöscht und du wirst zur Projektdetailansicht zurücknavigiert.
 
 ## Ergebnis
 

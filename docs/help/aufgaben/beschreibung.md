@@ -22,13 +22,26 @@ Eine Aufgabe durchläuft folgende Status:
 
 ### Ausführungsansicht (WPF)
 
-Die WPF-Aufgabendetailansicht (`TaskDetailView`) zeigt:
+Die WPF-Aufgabendetailansicht (`TaskDetailView`) zeigt unterschiedliche Inhalte je nach Aufgabenstatus:
 
-- **Aufgabentitel und Status** — mit farbigem `StatusIndicatorControl`
-- **CLI-Steuerung** — KI-Plugin auswählen, optionale Parameter eingeben, „CLI starten" / „CLI stoppen"
-- **Eingebettetes CLI-Fenster** — das Terminalfenster des KI-Tools wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`)
-- **Protokoll** — alle gespeicherten `Protokolleintrag`-Einträge der Aufgabe
-- **Status-Übergänge** — Buttons „Gestartet setzen" und „Aufgabe abschließen"
+#### Edit-Panel (Status: Neu)
+Bearbeitbare Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Wird verwendet, um neue Aufgaben zu erstellen oder bereits erstellte Aufgaben nachträglich anzupassen, bevor sie gestartet werden.
+
+#### CLI-Panel (Status: Gestartet, InArbeit, Wartend)
+Das Hauptpanel für die aktive Aufgabenbearbeitung. Zwei Anzeigemodi:
+- **CLI-Fenster (Standard):** Das Terminalfenster des KI-Tools wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`).
+- **Info-Ansicht:** Zeigt Aufgabeeigenschaften (Titel, Status, Beschreibung) und das Protokoll mit allen bisherigen Einträgen. Umschaltung via Toggle-Button „Info"/"CLI".
+
+Das Ribbon enthält KI-Plugin-Auswahl, optionale Parameter und „CLI starten" / „CLI stoppen" Buttons.
+
+#### Diff-Panel (Status: Beendet)
+Zeigt die Änderungen im Git-Arbeitsverzeichnis nach Abschluss der Aufgabe. Aktuell ein Platzhalter; zukünftig wird hier eine visuelle Diff-Darstellung implementiert.
+
+#### Ribbon-Menü
+Vier Aktionsgruppen:
+- **Navigation:** „Zurück"-Button zur Rückkehr zur Projektdetailansicht
+- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet), Beenden (Status=Gestartet/InArbeit/Wartend→Beendet)
+- **CLI:** KI-Plugin-Auswahl, optionale Parameter, „CLI starten" und „CLI stoppen" (nur sichtbar wenn aktiv)
 
 ### CLI-Prozess-Management
 

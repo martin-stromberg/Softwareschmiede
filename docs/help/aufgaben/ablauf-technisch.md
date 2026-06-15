@@ -6,6 +6,24 @@ Der Entwicklungsprozess wird durch `EntwicklungsprozessService.ProzessStartenAsy
 
 ## Ablauf
 
+### 0. Aufgabe anlegen und bearbeiten (Status: Neu)
+
+Ausgelöst durch den „Speichern"-Button in der Edit-Panel-Ansicht.
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.SpeichernCommand` — Prüft, ob Titel nicht leer und Status ∈ {Neu, Gestartet}
+- `AufgabeService.UpdateAsync` — Speichert `Titel` und `AnforderungsBeschreibung` in der Datenbank
+- `IDialogService` — Zeigt Fehler-Toast bei Validierungsfehlern
+- `TaskDetailView.xaml` — Edit-Panel mit TextBox-Bindungen zu `EditTitel` und `EditAnforderungsBeschreibung`
+
+Ablauf:
+1. Anwender gibt Titel und optional Anforderungsbeschreibung ein
+2. Two-Way-Binding aktualisiert `EditTitel` und `EditAnforderungsBeschreibung` in ViewModel
+3. ViewModel berechnet `KannSpeichern` basierend auf nicht-leerem Titel
+4. Anwender klickt „Speichern" → `SpeichernCommand.Execute()`
+5. `AufgabeService.UpdateAsync()` wird aufgerufen
+6. Bei Erfolg: `LadenAsync()` neu laden, Toast anzeigen; bei Fehler: `FehlerMeldung` anzeigen
+
 ### 1. Repository einrichten (`ProzessStartenAsync`)
 
 Ausgelöst durch den „Gestartet setzen"-Button in `TaskDetailView`.
@@ -40,41 +58,98 @@ Beteiligte Komponenten:
 - `NativeMethods.SetParent(handle, _hostHandle)` — bindet das CLI-Fenster an den WPF-Container
 - `NativeMethods.SetWindowLong` — entfernt `WS_CAPTION` und `WS_THICKFRAME` aus dem eingebetteten Fenster
 
-### 4. Prozess beendet sich
+### 4. Info/CLI-Ansicht umschalten
+
+Ausgelöst durch Toggle-Button im CLI-Panel.
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.InfoCliToggleCommand` — Einfacher Toggle-Command
+- `IsInfoViewVisible` Property — Boolean, steuert Sichtbarkeit beider Panels
+- `TaskDetailView.xaml` — Zwei überlagerte Panels mit Visibility-Bindings zu `IsInfoViewVisible`
+
+Ablauf:
+1. Anwender klickt Toggle-Button „Info"/"CLI"
+2. `InfoCliToggleCommand.Execute()` → `IsInfoViewVisible = !IsInfoViewVisible`
+3. ProcessWindowHost und Info-Panel wechseln ihre Sichtbarkeit (nur UI-Zustand, kein Service-Aufruf)
+
+### 5. Prozess beendet sich
 
 - `Process.Exited`-Event wird ausgelöst
 - `KiAusfuehrungsService.CliProcessStatusChanged` → `CliProcessStatus.Gestoppt`
 - `TaskDetailViewModel.OnCliProcessStatusChanged` → `IsCliRunning = false`
 - Anwender kann Status manuell auf `Beendet` setzen oder via `AufgabeAbschliessenCommand`
 
-### 5. Aufgabe abschließen (`AbschliessenAsync`)
+### 6. Aufgabe abschließen (`AbschliessenAsync`)
 
 - `EntwicklungsprozessService.AbschliessenAsync` — Setzt Status auf `Beendet`, löscht optional Klonverzeichnis
+
+### 7. Aufgabe löschen (`LoeschenAsync`)
+
+Ausgelöst durch den „Löschen"-Button im Ribbon.
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.LoeschenCommand` — Prüft `KannLoeschen` (Status ∉ {Beendet, Archiviert} && !IsCliRunning)
+- `IDialogService.BestaetigenDialog` — Zeigt Bestätigungsdialog
+- `AufgabeService.DeleteAsync` — Löscht die Aufgabe aus der Datenbank
+- `AufgabeListeAktualisierenCallback` — Optional: aktualisiert übergeordnete Listenansicht
+- `ZurueckAction` — Navigationscallback zur Rückkehr zur Projektdetailansicht
+
+Ablauf:
+1. Anwender klickt „Löschen" im Ribbon
+2. `LoeschenCommand.Execute()` wird aufgerufen
+3. `IDialogService.BestaetigenDialog("Aufgabe '{Titel}' wirklich löschen?...")` wird angezeigt
+4. Anwender wählt „Löschen" oder „Abbrechen"
+5. Bei „Löschen": `AufgabeService.DeleteAsync()` wird aufgerufen
+6. Bei Erfolg: Callback aufgerufen, `ZurueckAction` navigiert zur Projektansicht
+7. Bei Fehler (z.B. Status=Beendet): `FehlerMeldung` zeigt Exception-Message
 
 ## Diagramm
 
 ```mermaid
 flowchart TD
-    A[Gestartet setzen] --> B[Repository klonen\nEntwicklungsprozessService]
-    B --> C[Branch anlegen / auschecken\nIGitPlugin]
-    C --> D[Status → Gestartet]
-    D --> E[CLI starten\nTaskDetailViewModel]
-    E --> F[KiPlugin.StartCliAsync\n→ ProcessStartInfo]
-    F --> G[Process.Start]
-    G --> H[CLI-Prozess läuft\nStatus → InArbeit]
-    H --> I[ProcessWindowHost.SetParent\nFenster eingebettet]
-    H --> J{Prozess beendet}
-    J -- Rate-Limit-Marker --> K[Status → Wartend\nVorschlag gespeichert]
-    J -- Normal --> L[IsCliRunning = false]
-    K --> M[Recovery: Status → Gestartet]
-    M --> E
-    L --> N[Aufgabe abschließen\nStatus → Beendet]
+    A[Aufgabe im Status Neu] --> B[Edit-Panel anzeigen\nTaskDetailView]
+    B --> C[Titel und Anforderung eingeben]
+    C --> D{Speichern klicken}
+    D -- Gespeichert --> E[Status bleibt Neu]
+    E --> F[Starten klicken\nStatus=Neu]
+    F --> G[Repository klonen\nEntwicklungsprozessService]
+    G --> H[Branch anlegen / auschecken\nIGitPlugin]
+    H --> I[Status → Gestartet\nCLI-Panel anzeigen]
+    I --> J[CLI starten\nTaskDetailViewModel]
+    J --> K[KiPlugin.StartCliAsync\n→ ProcessStartInfo]
+    K --> L[Process.Start]
+    L --> M[CLI-Prozess läuft\nStatus → InArbeit]
+    M --> N[ProcessWindowHost.SetParent\nFenster eingebettet]
+    M --> O{Info/CLI Toggle}
+    O -- CLI --> P[Terminalfenster anzeigen]
+    O -- Info --> Q[Aufgabeeigenschaften + Protokoll anzeigen]
+    P --> O
+    Q --> O
+    M --> R{Prozess beendet}
+    R -- Rate-Limit-Marker --> S[Status → Wartend\nVorschlag gespeichert]
+    R -- Normal --> T[IsCliRunning = false]
+    S --> U[Recovery: Status → Gestartet]
+    U --> J
+    T --> V{Beenden klicken}
+    V -- Ja --> W[Status → Beendet\nDiff-Panel anzeigen]
+    V -- Nein --> T
+    W --> X{Löschen klicken}
+    X -- Ja --> Y[Bestätigungsdialog anzeigen]
+    Y --> Z{Bestätigen}
+    Z -- Ja --> AA[Aufgabe löschen\nNavigiere zurück]
+    Z -- Nein --> W
 ```
 
 ## Fehlerbehandlung
 
 | Situation | Verhalten |
 |-----------|-----------|
+| Speichern mit leerem Titel | „Speichern"-Button ist disabled; kein Service-Aufruf |
+| Speichern während CLI läuft | „Speichern"-Button ist disabled (`KannSpeichern` prüft `!IsCliRunning`) |
+| Löschen im Status Beendet/Archiviert | „Löschen"-Button ist disabled (`KannLoeschen` prüft Status) |
+| Löschen während CLI läuft | „Löschen"-Button ist disabled (`KannLoeschen` prüft `!IsCliRunning`) |
+| Dialog-Bestätigung abgebrochen | Aufgabe bleibt unverändert; Dialog wird geschlossen |
+| Delete-Service wirft Exception | `FehlerMeldung` zeigt Exception-Message; Aufgabe bleibt erhalten |
 | CLI-Prozess startet nicht | Exception in `CliStartenAsync`; `FehlerMeldung` in ViewModel gesetzt |
 | `SetParent` schlägt fehl | CLI-Fenster bleibt eigenständig; kein Absturz der Anwendung |
 | Prozess beendet sich unerwartet | `Process.Exited`-Event; `IsCliRunning = false`; Heartbeat bleibt als letzter Wert |
