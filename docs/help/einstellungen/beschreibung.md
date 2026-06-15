@@ -12,6 +12,25 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 
 ## Funktionsweise
 
+### Plugin-Einstellungen (SCM und KI)
+
+Die Einstellungsseite bietet zwei dedizierte Registerkarten für die Konfiguration von Plugin-Einstellungen:
+
+**Register „Quellcodeverwaltung":** Hier wählen Sie das Standard-SCM-Plugin (z. B. GitHub, GitLab) und konfigurieren dessen Einstellungen. Die Einstellungen werden vom Plugin definiert — typischerweise sind das Authentifizierungs-Tokens, API-Keys oder Konfigurationsparameter für die Versionskontrolle.
+
+**Register „KI":** Analog zur Quellcodeverwaltung können Sie hier das Standard-KI-Plugin (z. B. Claude, GitHub Copilot) auswählen und dessen Einstellungen konfigurieren. Dies sind meist API-Tokens, Modell-Parameter oder Verhaltenseinstellungen für die KI-Integration.
+
+Jedes Register zeigt dynamisch die Einstellungsfelder des gewählten Plugins an. Die Feldtypen werden automatisch erkannt und mit dem passenden Eingabeelement gerendert:
+- **Text:** Einfaches Textfeld
+- **Geheim:** Passwort-Feld (maskiert)
+- **URL:** Textfeld für URLs
+- **Ganzzahl:** Textfeld mit Validierung auf Ganzzahlen
+- **Ja/Nein:** Kontrollkästchen (CheckBox)
+- **Auswahl:** Dropdown-Liste mit vordefinierten Optionen
+- **Dateipfad:** Textfeld mit Browse-Button zum Auswählen einer Datei
+
+Bei jedem Feldtyp wird die Beschreibung des Feldes (falls vom Plugin angegeben) unterhalb des Eingabeelements angezeigt.
+
 ### Arbeitsverzeichnis
 
 Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons anlegt. Der Pfad wird als `AppEinstellung` in der SQLite-Datenbank gespeichert. Ist kein Verzeichnis konfiguriert oder ist der Pfad ungültig, greift ein Fallback auf das Temp-Verzeichnis. Der Fallback wird im Aufgabenprotokoll protokolliert.
