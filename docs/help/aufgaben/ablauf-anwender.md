@@ -8,17 +8,37 @@
 
 ## Schritt-für-Schritt-Anleitung
 
+### 0. Navigation zwischen Projekt und Aufgabe
+
+Die Aufgabendetailansicht ist vollständig vom Projekt getrennt dargestellt:
+
+**Aufgabe öffnen:**
+1. Öffne ein Projekt über die Projektliste.
+2. In der Projektdetailansicht siehst du die Aufgabenliste.
+3. Doppelklick auf eine Aufgabe öffnet die Aufgabendetailansicht als vollständige View.
+4. Die Projektdetailansicht wird ausgeblendet.
+
+**Zurück zur Projektansicht:**
+1. Klicke im Ribbon der Aufgabendetailansicht (Gruppe „Navigation") auf **Zurück**.
+2. Du kehst zur Projektdetailansicht zurück.
+3. Alle deine Änderungen an der Aufgabe bleiben erhalten.
+
+> **Hinweis:** Die Navigation erfolgt fensterumfassend — du siehst entweder die Projektdetailansicht oder die Aufgabendetailansicht, nicht beide gleichzeitig.
+
 ### 1. Neue Aufgabe anlegen
 
-Navigiere über die Seitenleiste zu **Projekte**, öffne das gewünschte Projekt und lege eine neue Aufgabe an. Die Aufgabendetailansicht öffnet sich mit dem **Edit-Panel**:
+Navigiere über die Seitenleiste zu **Projekte**, öffne das gewünschte Projekt. Im Ribbon der Projektdetailansicht (Gruppe „Aufgaben") klickst du auf **Neue Aufgabe**:
 
-1. Gib einen **Titel** ein (Pflichtfeld).
-2. Optional: Füge eine **Anforderungsbeschreibung** hinzu.
-3. Klicke im Ribbon (Gruppe „Aufgabe") auf **Speichern**.
+1. Die Aufgabendetailansicht öffnet sich sofort mit dem **Edit-Panel**.
+2. Gib einen **Titel** ein (Pflichtfeld).
+3. Optional: Füge eine **Anforderungsbeschreibung** hinzu.
+4. Klicke im Ribbon (Gruppe „Aufgabe") auf **Speichern**.
 
 Die Aufgabe wird in der Datenbank gespeichert, bleibt aber im Status **Neu**.
 
 > **Hinweis:** Der Titel ist erforderlich, um speichern zu können. Der „Speichern"-Button ist ausgegraut, wenn das Feld leer ist.
+
+Nach dem Speichern können Sie bleiben, um die Aufgabe weiterzubearbeiten, oder mit **Zurück** zur Projektdetailansicht navigieren. Die neue Aufgabe erscheint sofort in der Aufgabenliste.
 
 ### 2. Aufgabe bearbeiten (optional)
 

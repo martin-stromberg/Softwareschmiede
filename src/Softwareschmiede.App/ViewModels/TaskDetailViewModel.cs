@@ -455,6 +455,17 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             await _aufgabeService.UpdateAsync(_aufgabeId, _editTitel ?? string.Empty, _editAnforderungsBeschreibung, null, ct);
             await LadenAsync(ct);
+
+            try
+            {
+                await (AufgabeListeAktualisierenCallback?.Invoke() ?? Task.CompletedTask);
+            }
+            catch (Exception callbackEx)
+            {
+                _logger.LogError(callbackEx, "Fehler im AufgabeListeAktualisierenCallback nach Aufgabenspeicherung.");
+            }
+
+            ZurueckAction?.Invoke();
         }
         catch (OperationCanceledException)
         {
@@ -463,7 +474,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Speichern der Aufgabe {AufgabeId}.", _aufgabeId);
-            SetFehler(ex);
+            FehlerMeldung = $"Aufgabe konnte nicht gespeichert werden: {ex.Message}";
         }
         finally
         {

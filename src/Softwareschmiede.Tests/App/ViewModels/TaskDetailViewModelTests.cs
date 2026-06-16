@@ -522,4 +522,45 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         zurueckAufgerufen.Should().BeTrue();
     }
+
+    /// <summary>SpeichernAsync zeigt eine Fehlermeldung an und die View bleibt offen, wenn das Speichern fehlschlägt.</summary>
+    [Fact]
+    public async Task SpeichernAsync_ShowsErrorMessage_WhenSaveFails()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.EditTitel = "Titel";
+
+        // Aufgabe wird zwischen Laden und Speichern entfernt, damit UpdateAsync fehlschlägt
+        var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        _db.Aufgaben.Remove(entity!);
+        await _db.SaveChangesAsync();
+
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+    }
+
+    /// <summary>SpeichernAsync ruft ZurueckAction nicht auf, wenn das Speichern fehlschlägt.</summary>
+    [Fact]
+    public async Task SpeichernAsync_DoesNotNavigateBack_WhenSaveFails()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var zurueckAufgerufen = false;
+        var sut = CreateSut(zurueckAction: () => zurueckAufgerufen = true);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.EditTitel = "Titel";
+
+        // Aufgabe wird zwischen Laden und Speichern entfernt, damit UpdateAsync fehlschlägt
+        var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        _db.Aufgaben.Remove(entity!);
+        await _db.SaveChangesAsync();
+
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        zurueckAufgerufen.Should().BeFalse();
+    }
 }

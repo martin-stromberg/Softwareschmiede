@@ -193,7 +193,7 @@
                         <!-- Aufgabenliste -->
                         <ListBox Grid.Row="1"
                                  AutomationProperties.Name="AufgabenListe"
-                                 ItemsSource="{Binding Aufgaben}"
+                                 ItemsSource="{Binding GefilterteAufgaben}"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -225,10 +225,6 @@
                         </ListBox>
                     </Grid>
                 </Border>
-
-                <!-- Aufgabendetail -->
-                <views:TaskDetailView DataContext="{Binding SelectedTaskViewModel}"
-                                      Visibility="{Binding SelectedTaskViewModel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
 
             </StackPanel>
         </ScrollViewer>

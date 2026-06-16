@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -26,11 +27,16 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wird nach dem Erstellen oder Löschen eines Projekts aufgerufen, damit die Listenansicht die Liste aktualisiert.</summary>
     public Func<Task>? ProjektListeAktualisierenCallback { get; set; }
 
+    /// <summary>Wird aufgerufen, um zur separaten Aufgabendetailansicht zu navigieren.</summary>
+    public Action<TaskDetailViewModel>? NavigateToTaskViewCallback { get; set; }
+
+    /// <summary>Wird aufgerufen, um von der Aufgabendetailansicht zurück zur Projektdetailansicht zu navigieren.</summary>
+    public Action? NavigateBackToProjectCallback { get; set; }
+
     private Guid _projektId;
     private Projekt? _projekt;
     private bool _isLoading;
     private string? _fehlerMeldung;
-    private ViewModelBase? _selectedTaskViewModel;
     private CancellationTokenSource? _ladenCts;
     private string _projektName = string.Empty;
     private string? _projektBeschreibung;
@@ -38,6 +44,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private AufgabenFilterTyp _aufgabenFilter = AufgabenFilterTyp.Alle;
     private bool _isFilterOverlayVisible;
     private bool _disposed;
+    private Guid _aktuelleAufgabeId;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -77,21 +84,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _fehlerMeldung, value);
     }
 
-    /// <summary>Das aktuell angezeigte Aufgaben-ViewModel.</summary>
-    public ViewModelBase? SelectedTaskViewModel
-    {
-        get => _selectedTaskViewModel;
-        private set
-        {
-            var old = _selectedTaskViewModel;
-            SetProperty(ref _selectedTaskViewModel, value);
-            if (old is IDisposable disposable)
-                disposable.Dispose();
-        }
-    }
-
     /// <summary>Liste der Aufgaben des Projekts.</summary>
     public ObservableCollection<Aufgabe> Aufgaben { get; } = new();
+
+    /// <summary>Gefilterte Aufgaben (entsprechend AufgabenFilter).</summary>
+    public ObservableCollection<Aufgabe> GefilterteAufgaben { get; } = new();
 
     /// <summary>Bearbeitbarer Projektname.</summary>
     public string ProjektName
@@ -118,7 +115,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     public AufgabenFilterTyp AufgabenFilter
     {
         get => _aufgabenFilter;
-        set => SetProperty(ref _aufgabenFilter, value);
+        set
+        {
+            if (SetProperty(ref _aufgabenFilter, value))
+                AktualisiereGefilterteAufgaben();
+        }
     }
 
     /// <summary>Gibt an, ob das Filter-Overlay sichtbar ist.</summary>
@@ -200,6 +201,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             Aufgaben.Clear();
             foreach (var aufgabe in aufgaben)
                 Aufgaben.Add(aufgabe);
+            AktualisiereGefilterteAufgaben();
 
             if (Projekt != null)
             {
@@ -238,6 +240,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 ct);
 
             Aufgaben.Add(aufgabe);
+            AktualisiereGefilterteAufgaben();
 
             OeffneAufgabe(aufgabe.Id);
         }
@@ -391,16 +394,43 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private void OeffneAufgabe(Guid id)
     {
         var vm = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
-        vm.ZurueckAction = () => SelectedTaskViewModel = null;
-        vm.AufgabeListeAktualisierenCallback = async () =>
-        {
-            var aufgaben = await _aufgabeService.GetByProjektAsync(_projektId);
-            Aufgaben.Clear();
-            foreach (var aufgabe in aufgaben)
-                Aufgaben.Add(aufgabe);
-        };
+        vm.ZurueckAction = () => NavigateBackToProjectCallback?.Invoke();
+        _aktuelleAufgabeId = id;
+        vm.AufgabeListeAktualisierenCallback = ReloadAufgabenListAsync;
         vm.AufgabeId = id;
-        SelectedTaskViewModel = vm;
+        NavigateToTaskViewCallback?.Invoke(vm);
+    }
+
+    private async Task ReloadAufgabenListAsync()
+    {
+        var aktualisiert = await _aufgabeService.GetByIdAsync(_aktuelleAufgabeId);
+        if (aktualisiert is null)
+            return;
+
+        ReplaceOrAddAufgabe(aktualisiert);
+        AktualisiereGefilterteAufgaben();
+    }
+
+    private void ReplaceOrAddAufgabe(Aufgabe aufgabe)
+    {
+        var index = Aufgaben.ToList().FindIndex(a => a.Id == aufgabe.Id);
+        if (index >= 0)
+            Aufgaben[index] = aufgabe;
+        else
+            Aufgaben.Add(aufgabe);
+    }
+
+    private void AktualisiereGefilterteAufgaben()
+    {
+        GefilterteAufgaben.Clear();
+        var quelle = _aufgabenFilter switch
+        {
+            AufgabenFilterTyp.Aktiv => Aufgaben.Where(a => a.Status != AufgabeStatus.Archiviert),
+            AufgabenFilterTyp.Archiviert => Aufgaben.Where(a => a.Status == AufgabeStatus.Archiviert),
+            _ => Aufgaben
+        };
+        foreach (var aufgabe in quelle)
+            GefilterteAufgaben.Add(aufgabe);
     }
 
     private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
@@ -415,9 +445,5 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
         _ladenCts = null;
-
-        if (_selectedTaskViewModel is IDisposable disposable)
-            disposable.Dispose();
-        _selectedTaskViewModel = null;
     }
 }

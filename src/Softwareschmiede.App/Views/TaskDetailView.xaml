@@ -297,10 +297,7 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="12,4">
-            <TextBlock Foreground="{DynamicResource SecondaryTextBrush}" FontSize="11">
-                <Run Text="Status: " />
-                <Run Text="{Binding AufgabeStatus, Mode=OneWay}" />
-            </TextBlock>
+            <controls:StatusIndicatorControl Status="{Binding AufgabeStatus, Mode=OneWay}" />
         </Border>
     </Grid>
 </UserControl>

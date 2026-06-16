@@ -33,7 +33,11 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    private ProjectDetailViewModel CreateSut(Action? zurueckAction = null, Func<Task>? projektHinzugefuegtCallback = null)
+    private ProjectDetailViewModel CreateSut(
+        Action? zurueckAction = null,
+        Func<Task>? projektHinzugefuegtCallback = null,
+        Action<TaskDetailViewModel>? navigateToTaskViewCallback = null,
+        Action? navigateBackToProjectCallback = null)
     {
         var vm = new ProjectDetailViewModel(
             _projektService,
@@ -43,8 +47,13 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             NullLogger<ProjectDetailViewModel>.Instance);
         vm.ZurueckAction = zurueckAction;
         vm.ProjektListeAktualisierenCallback = projektHinzugefuegtCallback;
+        vm.NavigateToTaskViewCallback = navigateToTaskViewCallback;
+        vm.NavigateBackToProjectCallback = navigateBackToProjectCallback;
         return vm;
     }
+
+    private TaskDetailViewModel CreateTaskDetailViewModel() =>
+        TaskDetailViewModelTestFactory.Create(_db, _aufgabeService);
 
     /// <summary>ProjektSpeichernAsync ruft CreateAsync auf und navigiert zurück, wenn die ID leer ist.</summary>
     [Fact]
@@ -247,5 +256,112 @@ public sealed class ProjectDetailViewModelTests : IDisposable
 
         // Assert: Nach dem Laden ist CanExecute true
         sut.RepositoryOeffnenCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    /// <summary>AufgabeOeffnenCommand ruft NavigateToTaskViewCallback auf, wenn eine Aufgabe ausgewählt wird.</summary>
+    [Fact]
+    public async Task AufgabeOeffnen_CallsNavigateToTaskViewCallback_WhenAufgabeSelected()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Navigations-Test-Projekt", null);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Testaufgabe", "Beschreibung");
+
+        TaskDetailViewModel? navigiertesViewModel = null;
+        var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
+            .Returns(() => CreateTaskDetailViewModel());
+
+        // Act
+        sut.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+
+        // Assert
+        navigiertesViewModel.Should().NotBeNull();
+    }
+
+    /// <summary>Beim Öffnen einer Aufgabe werden ZurueckAction und AufgabeListeAktualisierenCallback auf dem neuen TaskDetailViewModel gesetzt.</summary>
+    [Fact]
+    public async Task NavigateToTaskViewCallback_SetsZurueckActionAndCallbackOnTaskVM()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Navigations-Test-Projekt-2", null);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Testaufgabe", "Beschreibung");
+
+        TaskDetailViewModel? navigiertesViewModel = null;
+        var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
+            .Returns(() => CreateTaskDetailViewModel());
+
+        // Act
+        sut.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+
+        // Assert
+        navigiertesViewModel.Should().NotBeNull();
+        navigiertesViewModel!.ZurueckAction.Should().NotBeNull();
+        navigiertesViewModel.AufgabeListeAktualisierenCallback.Should().NotBeNull();
+    }
+
+    /// <summary>AufgabeErstellenCommand erstellt eine Aufgabe mit Status Neu und navigiert zur TaskDetailView.</summary>
+    [Fact]
+    public async Task AufgabeErstellen_CreatesTaskWithStatusNeuAndNavigates()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Erstellungs-Test-Projekt", null);
+
+        TaskDetailViewModel? navigiertesViewModel = null;
+        var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
+            .Returns(() => CreateTaskDetailViewModel());
+
+        // Act
+        await ((AsyncRelayCommand)sut.AufgabeErstellenCommand).ExecuteAsync();
+
+        // Assert
+        navigiertesViewModel.Should().NotBeNull();
+        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        aufgaben.Should().ContainSingle(a => a.Status == AufgabeStatus.Neu);
+    }
+
+    /// <summary>ReloadAufgabenListAsync (über AufgabeListeAktualisierenCallback) aktualisiert nur das geänderte Element in der Aufgabenliste.</summary>
+    [Fact]
+    public async Task ReloadAufgabenList_UpdatesSingleItemAsync_WhenCallbackInvoked()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Reload-Test-Projekt", null);
+        var aufgabe1 = await _aufgabeService.CreateAsync(projekt.Id, "Aufgabe 1", "Beschreibung 1");
+        var aufgabe2 = await _aufgabeService.CreateAsync(projekt.Id, "Aufgabe 2", "Beschreibung 2");
+
+        TaskDetailViewModel? navigiertesViewModel = null;
+        var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
+            .Returns(() => CreateTaskDetailViewModel());
+
+        sut.AufgabeOeffnenCommand.Execute(aufgabe1.Id);
+
+        // Aufgabe 1 wird extern geändert (z. B. durch Speichern in TaskDetailView)
+        await _aufgabeService.UpdateAsync(aufgabe1.Id, "Aufgabe 1 - Geändert", "Beschreibung 1");
+
+        // Act: Callback ausführen wie es TaskDetailViewModel nach dem Speichern tut
+        await navigiertesViewModel!.AufgabeListeAktualisierenCallback!.Invoke();
+
+        // Assert: nur Aufgabe 1 wurde aktualisiert, Aufgabe 2 unverändert, keine Duplikate
+        sut.Aufgaben.Should().HaveCount(2);
+        sut.Aufgaben.Should().ContainSingle(a => a.Id == aufgabe1.Id && a.Titel == "Aufgabe 1 - Geändert");
+        sut.Aufgaben.Should().ContainSingle(a => a.Id == aufgabe2.Id && a.Titel == "Aufgabe 2");
     }
 }

@@ -6,6 +6,49 @@ Der Entwicklungsprozess wird durch `EntwicklungsprozessService.ProzessStartenAsy
 
 ## Ablauf
 
+### Navigieren zu Aufgabendetail aus Projektdetail
+
+Ausgelöst durch Doppelklick auf Aufgabe in der Aufgabenliste oder durch Klick auf „Neue Aufgabe".
+
+Beteiligte Komponenten:
+- `ProjectDetailView.xaml.cs` — Code-Behind mit `MouseDoubleClick` Event-Handler auf Aufgabenliste
+- `ProjectDetailViewModel.AufgabeOeffnenCommand` — RelayCommand<Guid> mit `OeffneAufgabe(id)` Methode
+- `ProjectDetailViewModel.NavigateToTaskViewCallback` — Action<TaskDetailViewModel>, gesetzt durch `ProjectListViewModel`
+- `ProjectListViewModel.ZeigeTaskDetailView` — Private Methode, setzt `DetailViewModel = vm`
+- `MainWindow.xaml` — DataTemplate für `TaskDetailViewModel` rendert `TaskDetailView`
+
+Ablauf:
+1. Nutzer doppelklickt auf Aufgabe in `ProjectDetailView.Aufgabenliste`
+2. `AufgabeDoubleClick()` in Code-Behind wird ausgelöst
+3. `ProjectDetailViewModel.AufgabeOeffnenCommand.Execute(aufgabeId)` wird aufgerufen
+4. `OeffneAufgabe(id)` wird ausgeführt:
+   - Neues `TaskDetailViewModel` wird aus DI-Container erstellt
+   - `TaskDetailViewModel.ZurueckAction = () => NavigateBackToProjectCallback?.Invoke()` wird gesetzt
+   - `TaskDetailViewModel.AufgabeListeAktualisierenCallback = ReloadAufgabenListAsync` wird gesetzt
+   - `TaskDetailViewModel.AufgabeId = id` wird gesetzt (triggert Laden)
+5. `NavigateToTaskViewCallback?.Invoke(vm)` wird aufgerufen → `ProjectListViewModel.ZeigeTaskDetailView(vm)`
+6. `ProjectListViewModel.DetailViewModel = vm` wird gesetzt
+7. MainWindow wechselt DataTemplate: `TaskDetailViewModel` → `TaskDetailView` wird gerendert
+8. `ProjectDetailView` wird nicht mehr angezeigt
+
+### Navigieren zurück zur Projektdetailansicht
+
+Ausgelöst durch Klick auf „Zurück"-Button im Ribbon der `TaskDetailView`.
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.ZurueckCommand` — RelayCommand mit `ZurueckAction?.Invoke()`
+- `ProjectDetailViewModel.NavigateBackToProjectCallback` — Action, gesetzt durch `ProjectListViewModel`
+- `ProjectListViewModel.KehreZuProjectZurueck` — Private Methode, setzt `DetailViewModel = _currentProjectDetailViewModel`
+
+Ablauf:
+1. Nutzer klickt „Zurück" Button im Ribbon von `TaskDetailView`
+2. `TaskDetailViewModel.ZurueckCommand.Execute()` wird aufgerufen
+3. `ZurueckAction?.Invoke()` wird aufgerufen → `NavigateBackToProjectCallback?.Invoke()`
+4. `ProjectListViewModel.KehreZuProjectZurueck()` wird aufgerufen
+5. `DetailViewModel = _currentProjectDetailViewModel` wird gesetzt
+6. MainWindow wechselt DataTemplate: `ProjectDetailViewModel` → `ProjectDetailView` wird gerendert
+7. `TaskDetailView` wird nicht mehr angezeigt
+
 ### 0. Aufgabe anlegen und bearbeiten (Status: Neu)
 
 Ausgelöst durch den „Speichern"-Button in der Edit-Panel-Ansicht.
@@ -107,37 +150,46 @@ Ablauf:
 
 ```mermaid
 flowchart TD
-    A[Aufgabe im Status Neu] --> B[Edit-Panel anzeigen\nTaskDetailView]
-    B --> C[Titel und Anforderung eingeben]
+    START[Projektdetailansicht\nAufgabenliste sichtbar] --> DBLCLICK{Doppelklick\nauf Aufgabe?}
+    DBLCLICK -- Ja --> OEFFNE[OeffneAufgabe aufgerufen\nTaskDetailViewModel erstellt]
+    OEFFNE --> NAVIGATE1[ProjectListViewModel.ZeigeTaskDetailView\nDetailViewModel = TaskDetailVM]
+    NAVIGATE1 --> SHOW_TASK[TaskDetailView wird angezeigt\nProjectDetailView ausgeblendet]
+    
+    SHOW_TASK --> LOAD[Aufgabe wird geladen\nAufgabeId triggert LadenAsync]
+    LOAD --> STATUS_CHECK{Status?}
+    
+    STATUS_CHECK -- Neu --> EDIT_PANEL[Edit-Panel anzeigen\nTitel und Anforderung editierbar]
+    EDIT_PANEL --> C[Titel und Anforderung eingeben]
     C --> D{Speichern klicken}
-    D -- Gespeichert --> E[Status bleibt Neu]
-    E --> F[Starten klicken\nStatus=Neu]
-    F --> G[Repository klonen\nEntwicklungsprozessService]
-    G --> H[Branch anlegen / auschecken\nIGitPlugin]
-    H --> I[Status → Gestartet\nCLI-Panel anzeigen]
-    I --> J[CLI starten\nTaskDetailViewModel]
-    J --> K[KiPlugin.StartCliAsync\n→ ProcessStartInfo]
-    K --> L[Process.Start]
-    L --> M[CLI-Prozess läuft\nStatus → InArbeit]
-    M --> N[ProcessWindowHost.SetParent\nFenster eingebettet]
-    M --> O{Info/CLI Toggle}
-    O -- CLI --> P[Terminalfenster anzeigen]
-    O -- Info --> Q[Aufgabeeigenschaften + Protokoll anzeigen]
-    P --> O
-    Q --> O
-    M --> R{Prozess beendet}
-    R -- Rate-Limit-Marker --> S[Status → Wartend\nVorschlag gespeichert]
-    R -- Normal --> T[IsCliRunning = false]
-    S --> U[Recovery: Status → Gestartet]
-    U --> J
-    T --> V{Beenden klicken}
-    V -- Ja --> W[Status → Beendet\nDiff-Panel anzeigen]
-    V -- Nein --> T
-    W --> X{Löschen klicken}
-    X -- Ja --> Y[Bestätigungsdialog anzeigen]
-    Y --> Z{Bestätigen}
-    Z -- Ja --> AA[Aufgabe löschen\nNavigiere zurück]
-    Z -- Nein --> W
+    D -- Gespeichert --> E[Status bleibt Neu\nAufgabenliste aktualisiert]
+    E --> F{Zurück klicken?}
+    F -- Ja --> NAVIGATE_BACK[KehreZuProjectZurueck\nDetailViewModel = ProjectDetailVM]
+    NAVIGATE_BACK --> SHOW_PROJECT[ProjectDetailView wird angezeigt\nTaskDetailView ausgeblendet]
+    F -- Nein --> F
+    
+    STATUS_CHECK -- Gestartet/InArbeit/Wartend --> CLI_PANEL[CLI-Panel anzeigen\nTerminalfenster eingebettet]
+    CLI_PANEL --> STARTEN{CLI starten klicken?}
+    STARTEN -- Ja --> START_CLI[KiPlugin.StartCliAsync\nProcess.Start]
+    START_CLI --> RUNNING[CLI-Prozess läuft\nStatus → InArbeit]
+    RUNNING --> TOGGLE{Info/CLI Toggle?}
+    TOGGLE -- Info --> INFO[Info-Ansicht anzeigen\nAufgabeeigenschaften + Protokoll]
+    TOGGLE -- CLI --> CLI_VIEW[CLI-Fenster anzeigen]
+    INFO --> TOGGLE
+    CLI_VIEW --> TOGGLE
+    RUNNING --> BEENDEN{Beenden klicken?}
+    BEENDEN -- Ja --> BEENDET[Status → Beendet]
+    BEENDEN -- Nein --> BEENDEN
+    
+    STATUS_CHECK -- Beendet --> DIFF_PANEL[Diff-Panel anzeigen\nÄnderungen sichtbar]
+    DIFF_PANEL --> BACK_END{Zurück klicken?}
+    BACK_END -- Ja --> NAVIGATE_BACK
+    BACK_END -- Nein --> BACK_END
+    
+    BEENDET --> BACK_TO_PROJ{Zurück klicken?}
+    BACK_TO_PROJ -- Ja --> NAVIGATE_BACK
+    BACK_TO_PROJ -- Nein --> BACK_TO_PROJ
+    
+    SHOW_PROJECT --> END[Projektdetailansicht aktiv]
 ```
 
 ## Fehlerbehandlung

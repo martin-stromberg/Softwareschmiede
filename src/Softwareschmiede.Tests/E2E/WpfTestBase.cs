@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
@@ -77,13 +78,16 @@ public abstract class WpfTestBase : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        try { _application?.Close(); } catch { }
+        try { _application?.Close(); }
+        catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Schließen der Anwendung: {ex}"); }
 
-        try { _application?.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(5)); } catch { }
+        try { _application?.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(5)); }
+        catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Warten auf das Schließen des Hauptfensters: {ex}"); }
 
         _automation?.Dispose();
 
-        try { DeleteTestDatabase(); } catch { }
+        try { DeleteTestDatabase(); }
+        catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Testdatenbank: {ex}"); }
     }
 
     /// <summary>

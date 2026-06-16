@@ -151,15 +151,12 @@ public sealed partial class App : System.Windows.Application
 
         // ViewModels
         services.AddTransient<MainWindowViewModel>();
-        services.AddTransient<NavigationViewModel>();
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<ProjectListViewModel>();
         services.AddTransient<ProjectDetailViewModel>();
         services.AddTransient<RepositoryAssignViewModel>();
-        services.AddTransient<TaskListViewModel>();
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();
-        services.AddTransient<PluginSettingsViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

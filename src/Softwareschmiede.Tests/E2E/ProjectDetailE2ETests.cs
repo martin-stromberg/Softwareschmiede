@@ -175,7 +175,8 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
     /// <summary>
     /// Szenario: Aufgabe neu anlegen.
-    /// Prüft: "AufgabeNeu"-Button erstellt eine Aufgabe, die in der Liste erscheint.
+    /// Prüft: "AufgabeNeu"-Button erstellt eine Aufgabe und navigiert zur separaten TaskDetailView;
+    /// nach Zurück-Navigation erscheint die neue Aufgabe in der Aufgabenliste der Projektdetailansicht.
     /// </summary>
     [Fact]
     public void AufgabeNeuAnlegen_ErscheintInAufgabenliste_E2E()
@@ -186,6 +187,14 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // Neue Aufgabe erstellen (AutomationProperties.Name="AufgabeNeu")
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
         aufgabeNeuButton.AsButton().Click();
+
+        // Navigation zur separaten TaskDetailView (Edit-Panel, da Status == Neu)
+        var editTitelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Medium);
+        Assert.NotNull(editTitelBox);
+
+        // Zurück zur Projektdetailansicht navigieren
+        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        zurueckButton.AsButton().Click();
 
         // Aufgabenliste enthält jetzt mindestens eine Aufgabe
         var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);

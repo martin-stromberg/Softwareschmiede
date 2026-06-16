@@ -1,6 +1,7 @@
-<UserControl x:Class="Softwareschmiede.App.Controls.RibbonSmallButton"
+<local:RibbonButtonBase x:Class="Softwareschmiede.App.Controls.RibbonSmallButton"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Softwareschmiede.App.Controls"
              x:Name="Root">
     <Button Command="{Binding ButtonCommand, ElementName=Root}"
             AutomationProperties.Name="{Binding AutomationName, ElementName=Root}"
@@ -52,4 +53,4 @@
                        VerticalAlignment="Center" />
         </StackPanel>
     </Button>
-</UserControl>
+</local:RibbonButtonBase>

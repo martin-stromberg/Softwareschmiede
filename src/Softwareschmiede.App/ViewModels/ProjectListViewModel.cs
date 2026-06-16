@@ -20,6 +20,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     private bool _isLoading;
     private string? _fehlerMeldung;
     private ViewModelBase? _detailViewModel;
+    private ProjectDetailViewModel? _currentProjectDetailViewModel;
 
     /// <summary>Liste aller Projekte.</summary>
     public ObservableCollection<Projekt> Projekte { get; } = new();
@@ -30,7 +31,8 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         get => _selectedProjekt;
         set
         {
-            if (SetProperty(ref _selectedProjekt, value) && value is not null)
+            var changed = SetProperty(ref _selectedProjekt, value);
+            if (value is not null && (changed || DetailViewModel is null))
             {
                 ZeigeDetail(value.Id);
             }
@@ -45,7 +47,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         {
             var old = _detailViewModel;
             SetProperty(ref _detailViewModel, value);
-            if (old is IDisposable d) d.Dispose();
+            if (!ReferenceEquals(old, value) && !ReferenceEquals(old, _currentProjectDetailViewModel) && old is IDisposable d) d.Dispose();
         }
     }
 
@@ -174,6 +176,9 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
             DetailTitelAenderungAction?.Invoke(null);
         };
         viewModel.ProjektListeAktualisierenCallback = NeuesProjektHinzufuegen;
+        viewModel.NavigateToTaskViewCallback = ZeigeTaskDetailView;
+        viewModel.NavigateBackToProjectCallback = KehreZuProjectZurueck;
+        _currentProjectDetailViewModel = viewModel;
     }
 
     private void ZeigeDetail(Guid projektId)
@@ -196,6 +201,16 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     private async Task NeuesProjektHinzufuegen()
     {
         await LadenAsync(CancellationToken.None);
+    }
+
+    private void ZeigeTaskDetailView(TaskDetailViewModel vm)
+    {
+        DetailViewModel = vm;
+    }
+
+    private void KehreZuProjectZurueck()
+    {
+        DetailViewModel = _currentProjectDetailViewModel;
     }
 
     /// <inheritdoc/>

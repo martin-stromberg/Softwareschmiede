@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows.Controls;
 using Softwareschmiede.App.ViewModels;
 
@@ -7,6 +8,9 @@ namespace Softwareschmiede.App.Views;
 /// <summary>Code-behind für TaskDetailView.</summary>
 public sealed partial class TaskDetailView : UserControl
 {
+    private static readonly TimeSpan WindowHandlePollTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan WindowHandlePollInterval = TimeSpan.FromMilliseconds(200);
+
     private CancellationTokenSource? _pollCts;
 
     /// <inheritdoc cref="TaskDetailView"/>
@@ -47,13 +51,13 @@ public sealed partial class TaskDetailView : UserControl
         var capturedViewModel = DataContext as TaskDetailViewModel;
         try
         {
-            var deadline = DateTime.UtcNow.AddSeconds(15);
+            var deadline = DateTime.UtcNow.Add(WindowHandlePollTimeout);
             while (DateTime.UtcNow < deadline && !process.HasExited && !ct.IsCancellationRequested)
             {
                 process.Refresh();
                 if (process.MainWindowHandle != IntPtr.Zero)
                     break;
-                await Task.Delay(200, ct);
+                await Task.Delay(WindowHandlePollInterval, ct);
             }
 
             if (ct.IsCancellationRequested)
@@ -67,13 +71,13 @@ public sealed partial class TaskDetailView : UserControl
         {
             // Ansicht wurde entladen – kein Einbetten mehr nötig
         }
-        catch (Win32Exception)
+        catch (Win32Exception ex)
         {
-            // Prozess ist bereits beendet oder nicht zugänglich – kein Einbetten möglich
+            Debug.WriteLine($"[TaskDetailView] Prozess ist bereits beendet oder nicht zugänglich – kein Einbetten möglich: {ex}");
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            // Prozess wurde disposed – kein Einbetten möglich
+            Debug.WriteLine($"[TaskDetailView] Prozess wurde disposed – kein Einbetten möglich: {ex}");
         }
     }
 }

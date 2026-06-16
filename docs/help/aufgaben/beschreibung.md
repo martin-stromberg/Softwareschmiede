@@ -6,6 +6,15 @@ Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optio
 
 ## Funktionsweise
 
+### Navigation zwischen Projekt und Aufgabe
+
+Die Aufgabendetailansicht ist eine vollständige, fensterumfassende Ansicht, nicht mehr inline in die Projektdetailansicht eingebettet:
+
+- **Aufgabe öffnen:** Doppelklick auf eine Aufgabe in der Aufgabenliste der Projektdetailansicht öffnet die Aufgabendetailansicht. Die Projektdetailansicht wird ausgeblendet.
+- **Zurück zur Projektansicht:** Der „Zurück"-Button im Ribbon navigiert zurück zur Projektdetailansicht. Alle Aufgabenänderungen bleiben erhalten.
+- **Neue Aufgabe:** Klick auf „Neue Aufgabe" im Ribbon der Projektdetailansicht erstellt eine neue Aufgabe mit Status „Neu" und öffnet sofort die Aufgabendetailansicht mit dem Edit-Panel.
+- **Aufgabenlisten-Update:** Nach dem Speichern einer Aufgabe wird die Aufgabenliste in der Projektdetailansicht aktualisiert (nur das geänderte Element wird neu geladen, nicht die gesamte Liste).
+
 ### Lebenszyklus
 
 Eine Aufgabe durchläuft folgende Status:
