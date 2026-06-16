@@ -73,7 +73,7 @@ Stand: **2026-06-11**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht in Arbeit: Ribbon-Menü, Status-abhängiges Content-Switching (Edit/CLI/Diff), neue Commands (Speichern/Löschen/Toggle), CanExecute-Validierung** |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung**; **Separate Aufgabendetailansicht in Arbeit: Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -81,7 +81,25 @@ Stand: **2026-06-11**
 
 ## 🚀 Features
 
-#### Feature 72: WPF-Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (in Arbeit)
+#### Feature 72: WPF separate Aufgabendetailansicht (in Arbeit)
+
+**Aufgabendetailansicht aus der Inline-Position ausgelagert in eine fensterumfassende, separate View:**
+
+- **Navigation zwischen Projekt- und Aufgabendetail:** Nach Doppelklick auf eine Aufgabe in der Aufgabenliste navigiert die Anwendung zur separaten `TaskDetailView`. Die `ProjectDetailView` wird nicht mehr angezeigt.
+- **Zurück-Navigation:** Ein Zurück-Button in der Aufgabendetail führt zurück zur Projektdetailansicht.
+- **Neuanlage von Aufgaben:** "Neue Aufgabe"-Button in der `ProjectDetailView` öffnet die `TaskDetailView` mit leerem Bearbeitungsformular. Nach dem Speichern wird die neue Aufgabe mit Status "Neu" persistiert und die Navigation kehrt zur `ProjectDetailView` zurück.
+- **Callback-basierte Navigation:** Navigationsmechanismus nutzt Callbacks (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) für konsistente Architektur. Keine zentrale Service-Klasse erforderlich.
+- **Fehlerbehandlung:** Bei Speicherfehlern wird eine Fehlermeldung angezeigt und die `TaskDetailView` bleibt offen zur Korrektur. Keine automatische Navigation.
+
+**Betroffene Komponenten und Änderungen:**
+
+- `ProjectDetailViewModel` – neue Callbacks und Methoden für Task-Navigation
+- `TaskDetailViewModel` – unverändert; erhält Callbacks für Rücknavigation
+- `ProjectListViewModel` – neue Methoden `ZeigeTaskDetailView()` und `KehreZuProjectZurueck()` zum Content-Switching
+- `ProjectDetailView.xaml` – Entfernung der inline `<views:TaskDetailView>`-Bindung
+- MainWindow (XAML) – Content-Switching zwischen `ProjectDetailView` und `TaskDetailView` via DataTemplate-Matching
+
+#### Feature 72: WPF-Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (implementiert ✅)
 
 **Ribbon-basierte Aktionsleiste und Status-abhängiges Content-Switching in der Aufgabendetailansicht:**
 
@@ -898,6 +916,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **WPF separate Aufgabendetailansicht (Feature #72):** Aufgabendetailansicht aus der Inline-Position in `ProjectDetailView` ausgelagert in eine fensterumfassende, separate View; Callback-basierte Navigation (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) zwischen `ProjectDetailView` und `TaskDetailView` implementiert; Neuanlage von Aufgaben öffnet `TaskDetailView` mit leerem Formular und persistiert neue Aufgabe mit Status "Neu"; Fehlerbehandlung mit lokaler Fehlermeldung; Dokumentation in requirement.md und plan.md aktualisiert (**2026-06-16**)
 - **WPF Plugin-Einstellungen & Styling (Feature #72):** Einstellungsansicht um zwei neue Register (Quellcodeverwaltung, KI) mit Plugin-Auswahl und dynamisch geladenen Einstellungspanels erweitert; feldtyp-spezifische Eingabekomponenten (TextBox, PasswordBox, CheckBox, ComboBox, FilePath); globale Dark-Mode-kompatible Styles in Theme-Dictionaries; StandardPlugin-Persistierung in AppEinstellung (**2026-06-15**)
 - **WPF-Projektdetailansicht (Feature #72):** Projektdetailansicht mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (Symbol, Titel, Beschreibung — bearbeitbar), Aufgaben-Kachel (filterbar nach Status), Repository-Zuweisungs-Dialog und E2E-Tests vollständig implementiert; README und Roadmap aktualisiert (**2026-06-13**)
 - **WPF-Migration (Feature #72):** `src/Softwareschmiede.App` als neues WPF-Projekt ergänzt — MVVM-Gerüst, Views, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Service, neues Aufgaben-Statusmodell (`Neu` → `ArbeitsverzeichnisEingerichtet` → `Gestartet` → `InArbeit` → `Wartend` → `Beendet`) in README dokumentiert (**2026-06-11**)
@@ -950,6 +969,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] E2E-Tests für Projektdetailansicht (Bearbeitung, Löschen, Aufgaben, Repository-Verwaltung, Navigation)
 - [x] Einstellungsansicht mit Registerkarten für Plugin-Konfiguration (SCM/KI) mit dynamischen Einstellungspanels
 - [x] Globale Dark-Mode-kompatible Styles für UI-Komponenten (Label, CheckBox, TextBox, etc.)
+- [x] Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff)
+- [ ] Separate Aufgabendetailansicht (fensterumfassende View statt inline) – Feature 72 (in Entwicklung)
 - [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
 - [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
 - [ ] Blazor-Code vollständig entfernt
@@ -998,6 +1019,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
 | [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der plugin-spezifischen Auswahl mit **KI-Plugin als Pflichtfeld** sowie optionalem Agentenpaket/Agent inkl. Persistenz je Aufgabe |
 | [Feature F027: KI-Protokoll Auto-Scroll](docs/business/features/F027-ki-protokoll-auto-scroll.md) | Fachliche Beschreibung des Scroll-Verhaltens im KI-Protokoll (Initial-Scroll, bedingtes Follow-Scrolling, manueller Scroll-Lock) |
+| [Feature F072: WPF separate Aufgabendetailansicht](docs/features/72-wpf-separate-aufgabenansicht/requirement.md) | Anforderungsanalyse für die Auslagerung der Aufgabendetailansicht aus der Inline-Position in eine fensterumfassende, separate View mit Callback-basierter Navigation |
+| [Plan: WPF separate Aufgabendetailansicht](docs/features/72-wpf-separate-aufgabenansicht/plan.md) | Umsetzungsplan mit Designentscheidungen (Callback-basierte Navigation, sofortiger Wechsel ohne Animation, Fehlerbehandlung), Programmabläufen (Aufgabe öffnen, neue Aufgabe erstellen, zurück navigieren, speichern und navigieren), Änderungen an bestehenden Klassen und Validierungsregeln |
 | [Feature F072: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/requirement.md) | Anforderungsanalyse für Einstellungsansicht mit Plugin-Registerkarten, dynamischen Einstellungspanels und globalen Dark-Mode-Styles |
 | [Plan: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen, neuen Klassen und Validierungsregeln |
 | [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll” (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll” – 2026-05-25” |
