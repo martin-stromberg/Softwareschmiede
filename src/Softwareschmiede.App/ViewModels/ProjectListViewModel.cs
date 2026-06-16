@@ -47,7 +47,22 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         {
             var old = _detailViewModel;
             SetProperty(ref _detailViewModel, value);
-            if (!ReferenceEquals(old, value) && !ReferenceEquals(old, _currentProjectDetailViewModel) && old is IDisposable d) d.Dispose();
+            if (ReferenceEquals(old, value))
+                return;
+
+            if (!ReferenceEquals(old, _currentProjectDetailViewModel) && old is IDisposable d)
+                d.Dispose();
+
+            // Wenn weder die alte noch die neue Anzeige dem zurückgehaltenen ProjectDetailViewModel
+            // entspricht, wurde von der Aufgabenansicht direkt weg navigiert (z. B. SchliesseDetailCommand)
+            // statt über KehreZuProjectZurueck() — das zurückgehaltene ViewModel ist dann verwaist.
+            if (_currentProjectDetailViewModel is not null
+                && !ReferenceEquals(old, _currentProjectDetailViewModel)
+                && !ReferenceEquals(value, _currentProjectDetailViewModel))
+            {
+                _currentProjectDetailViewModel.Dispose();
+                _currentProjectDetailViewModel = null;
+            }
         }
     }
 
@@ -162,6 +177,11 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 
     private void InitDetailViewModel(ProjectDetailViewModel viewModel)
     {
+        // Falls noch ein zurückgehaltenes ProjectDetailViewModel existiert, das nicht mehr angezeigt wird
+        // (z. B. weil zwischenzeitlich ein anderes Projekt direkt angewählt wurde), muss es jetzt disposed werden.
+        if (_currentProjectDetailViewModel is not null && !ReferenceEquals(_currentProjectDetailViewModel, DetailViewModel))
+            _currentProjectDetailViewModel.Dispose();
+
         PropertyChangedEventHandler propertyChangedHandler = (_, e) =>
         {
             if (e.PropertyName == nameof(ProjectDetailViewModel.ProjektName))
