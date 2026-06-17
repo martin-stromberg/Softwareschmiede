@@ -223,6 +223,18 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// </summary>
     public System.Diagnostics.Process? GetRunningProcess() => _kiService.GetRunningProcess(_aufgabeId);
 
+    /// <summary>
+    /// Speichert das bekannte HWND des CLI-Fensters. SetParent ändert das HWND nicht,
+    /// daher kann dasselbe Handle nach Navigation-Zurück zum Wieder-Einbetten genutzt werden.
+    /// </summary>
+    public void SetCliWindowHandle(IntPtr handle) => _kiService.SetFensterHandle(_aufgabeId, handle);
+
+    /// <summary>
+    /// Gibt das gespeicherte HWND des CLI-Fensters zurück, oder <see cref="IntPtr.Zero"/>
+    /// wenn noch kein Handle bekannt ist.
+    /// </summary>
+    public IntPtr GetCliWindowHandle() => _kiService.GetFensterHandle(_aufgabeId);
+
     /// <inheritdoc cref="TaskDetailViewModel"/>
     public TaskDetailViewModel(
         AufgabeService aufgabeService,

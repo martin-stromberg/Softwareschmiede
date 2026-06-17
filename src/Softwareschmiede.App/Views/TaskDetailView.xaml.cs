@@ -23,9 +23,18 @@ public sealed partial class TaskDetailView : UserControl
             {
                 vm.CliProzessGestartet += OnCliProzessGestartet;
 
-                // CliProzessGestartet kann bereits gefeuert haben bevor Loaded ausgelöst wurde
-                // (Auto-Restart beim Öffnen einer laufenden Aufgabe, Navigation zurück, etc.).
-                // In diesem Fall den laufenden Prozess direkt einbetten.
+                // Gespeichertes HWND prüfen: Nach Navigation-Zurück ist das Fenster noch am Leben,
+                // aber process.MainWindowHandle kann es ggf. nicht mehr finden (z.B. conhost-PID,
+                // fehlender Titel, o.ä.). Das HWND bleibt durch SetParent unverändert → direkt nutzen.
+                var storedHandle = vm.GetCliWindowHandle();
+                if (storedHandle != IntPtr.Zero)
+                {
+                    vm.EmbeddedWindowHandle = storedHandle;
+                    return;
+                }
+
+                // Fallback: CliProzessGestartet kann bereits gefeuert haben bevor Loaded ausgelöst
+                // wurde (Auto-Restart, o.ä.). In diesem Fall via Polling einbetten.
                 var runningProcess = vm.GetRunningProcess();
                 if (runningProcess != null)
                     OnCliProzessGestartet(runningProcess);
@@ -72,7 +81,12 @@ public sealed partial class TaskDetailView : UserControl
 
             var handle = process.MainWindowHandle;
             if (handle != IntPtr.Zero && DataContext is TaskDetailViewModel vm && ReferenceEquals(vm, capturedViewModel))
+            {
+                // Handle persistent speichern damit Navigation-Zurück + Wiederoeffnen das
+                // Fenster direkt einbetten kann ohne erneutes Polling über process.MainWindowHandle.
+                capturedViewModel.SetCliWindowHandle(handle);
                 vm.EmbeddedWindowHandle = handle;
+            }
         }
         catch (OperationCanceledException)
         {

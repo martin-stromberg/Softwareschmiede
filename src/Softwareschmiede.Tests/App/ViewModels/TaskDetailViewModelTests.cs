@@ -745,6 +745,79 @@ public sealed class TaskDetailViewModelTests : IDisposable
             "setzen kann wenn Loaded nach CliProzessGestartet feuert");
     }
 
+    /// <summary>
+    /// Navigiert der Anwender zurück (Dispose des alten VM), läuft die CLI weiter.
+    /// Öffnet er die Aufgabe erneut, muss das neue VM IsCliRunning=true melden
+    /// und GetRunningProcess() den Prozess zurückgeben, damit der Loaded-Handler
+    /// das Fenster wieder einbetten kann.
+    /// </summary>
+    [Fact]
+    public async Task NachNavigateBack_WiederoeffnenFindetLaufendenProzessUndSetzIsCliRunning()
+    {
+        // Aufgabe starten
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var ersteVm = CreateSut();
+        ersteVm.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)ersteVm.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(
+                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)ersteVm.StartenCommand).ExecuteAsync();
+        ersteVm.IsCliRunning.Should().BeTrue();
+
+        // "Zurück" navigieren: View-Unloaded ruft Dispose auf – Prozess bleibt aktiv
+        ersteVm.Dispose();
+
+        // Aufgabe erneut öffnen: neues VM (wie OeffneAufgabe in ProjectDetailViewModel)
+        var zweiteVm = CreateSut();
+        zweiteVm.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
+
+        // CLI muss noch laufen und GetRunningProcess muss den Prozess liefern
+        zweiteVm.IsCliRunning.Should().BeTrue(
+            "CLI soll nach Navigation-Zurück weiterlaufen");
+        zweiteVm.GetRunningProcess().Should().NotBeNull(
+            "GetRunningProcess muss den Prozess zurückgeben damit der Loaded-Handler das Fenster wieder einbetten kann");
+    }
+
+    /// <summary>
+    /// Nach dem ersten Einbetten (View ruft SetCliWindowHandle auf) wird das HWND in
+    /// KiAusfuehrungsService gespeichert. Ein neues VM nach Navigation-Zurück findet
+    /// dasselbe Handle via GetCliWindowHandle – ohne erneutes process.MainWindowHandle-Polling.
+    /// </summary>
+    [Fact]
+    public async Task SetUndGetCliWindowHandle_SpeichertHandleAufgabenbezogen()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(
+                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        // View simuliert: Handle nach erstem Einbetten speichern
+        var fakeHwnd = new IntPtr(0x1234ABCD);
+        sut.SetCliWindowHandle(fakeHwnd);
+
+        sut.GetCliWindowHandle().Should().Be(fakeHwnd,
+            "GetCliWindowHandle muss dasselbe Handle zurückgeben das via SetCliWindowHandle gespeichert wurde");
+
+        // Nach Navigation-Zurück (Dispose) muss neues VM dasselbe Handle finden
+        sut.Dispose();
+        var zweiteVm = CreateSut();
+        zweiteVm.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
+
+        zweiteVm.GetCliWindowHandle().Should().Be(fakeHwnd,
+            "Neues VM muss das gespeicherte HWND finden damit der Loaded-Handler das Fenster direkt einbetten kann");
+    }
+
     // --- PluginAendernCommand ---
 
     /// <summary>PluginAendernCommand.CanExecute ist true wenn CLI läuft.</summary>

@@ -52,6 +52,27 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         catch { return null; }
     }
 
+    /// <summary>
+    /// Speichert das bekannte Fenster-Handle (HWND) des CLI-Prozesses für späteres Wieder-Einbetten.
+    /// Wird vom View aufgerufen sobald das Fenster erstmalig eingebettet wurde.
+    /// </summary>
+    public void SetFensterHandle(Guid aufgabeId, IntPtr handle)
+    {
+        if (_handles.TryGetValue(aufgabeId, out var h))
+            h.FensterHandle = handle;
+    }
+
+    /// <summary>
+    /// Gibt das gespeicherte Fenster-Handle des CLI-Prozesses zurück, oder <see cref="IntPtr.Zero"/>
+    /// wenn kein Handle gespeichert oder der Prozess nicht mehr aktiv ist.
+    /// </summary>
+    public IntPtr GetFensterHandle(Guid aufgabeId)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var h))
+            return IntPtr.Zero;
+        return h.FensterHandle;
+    }
+
     /// <inheritdoc/>
     public int GetRunningCount()
         => _handles.Values.Count(h =>
@@ -347,12 +368,24 @@ public sealed class CliProcessHandle
     public DateTimeOffset LastHeartbeat { get; set; } = DateTimeOffset.UtcNow;
 
     private volatile bool _absichtlichGestoppt;
+    private IntPtr _fensterHandle = IntPtr.Zero;
 
     /// <summary>Gibt an, ob der Prozess absichtlich durch <see cref="KiAusfuehrungsService.StopCliAsync"/> beendet wurde.</summary>
     public bool AbsichtlichGestoppt
     {
         get => _absichtlichGestoppt;
         set => _absichtlichGestoppt = value;
+    }
+
+    /// <summary>
+    /// Das bekannte HWND des CLI-Fensters. Wird beim ersten Einbetten gesetzt und
+    /// für erneutes Einbetten nach Navigation-Zurück wiederverwendet, da SetParent
+    /// das HWND nicht verändert.
+    /// </summary>
+    public IntPtr FensterHandle
+    {
+        get => _fensterHandle;
+        set => _fensterHandle = value;
     }
 
     /// <summary>Erstellt ein neues Handle.</summary>
