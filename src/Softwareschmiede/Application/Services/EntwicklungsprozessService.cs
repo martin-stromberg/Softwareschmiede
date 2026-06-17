@@ -108,6 +108,12 @@ public sealed class EntwicklungsprozessService
         var resolvedPluginPrefix = !string.IsNullOrWhiteSpace(repository.PluginTyp)
             ? repository.PluginTyp
             : selectedScmPluginPrefix;
+        if (string.IsNullOrWhiteSpace(resolvedPluginPrefix))
+        {
+            _logger.LogWarning(
+                "Aufgabe {AufgabeId}: Kein SCM-Plugin-Typ am Repository konfiguriert und kein SCM-Plugin-Prefix übergeben — erster verfügbarer SCM-Plugin wird verwendet.",
+                aufgabeId);
+        }
         var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(resolvedPluginPrefix, ct);
 
         var workdirResult = await _arbeitsverzeichnisResolver.ResolveAsync(ct);

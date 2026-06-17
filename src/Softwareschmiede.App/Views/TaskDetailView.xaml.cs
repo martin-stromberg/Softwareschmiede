@@ -22,6 +22,13 @@ public sealed partial class TaskDetailView : UserControl
             if (DataContext is TaskDetailViewModel vm)
             {
                 vm.CliProzessGestartet += OnCliProzessGestartet;
+
+                // CliProzessGestartet kann bereits gefeuert haben bevor Loaded ausgelöst wurde
+                // (Auto-Restart beim Öffnen einer laufenden Aufgabe, Navigation zurück, etc.).
+                // In diesem Fall den laufenden Prozess direkt einbetten.
+                var runningProcess = vm.GetRunningProcess();
+                if (runningProcess != null)
+                    OnCliProzessGestartet(runningProcess);
             }
         };
         Unloaded += (_, _) =>

@@ -216,6 +216,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Event: Ein CLI-Prozess wurde gestartet, Handle ist verfügbar.</summary>
     public event Action<System.Diagnostics.Process>? CliProzessGestartet;
 
+    /// <summary>
+    /// Gibt den laufenden CLI-Prozess zurück, oder null wenn kein Prozess läuft.
+    /// Wird vom View-Loaded-Handler verwendet, um das Fenster einzubetten wenn
+    /// CliProzessGestartet bereits gefeuert hat bevor der Handler registriert wurde.
+    /// </summary>
+    public System.Diagnostics.Process? GetRunningProcess() => _kiService.GetRunningProcess(_aufgabeId);
+
     /// <inheritdoc cref="TaskDetailViewModel"/>
     public TaskDetailViewModel(
         AufgabeService aufgabeService,
@@ -335,8 +342,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             await _kiService.StopCliAsync(_aufgabeId, ct);
-            IsCliRunning = false;
-            EmbeddedWindowHandle = IntPtr.Zero;
+            _dispatcherInvoke(() =>
+            {
+                IsCliRunning = false;
+                EmbeddedWindowHandle = IntPtr.Zero;
+            });
         }
         catch (OperationCanceledException)
         {
@@ -515,6 +525,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 ct);
 
             await LadenAsync(ct);
+
+            // ProzessStartenUndCliStartenAsync startet die CLI intern ohne CliProzessGestartet zu feuern.
+            // Das Event ist aber nötig, damit TaskDetailView.WaitForWindowHandleAsync den Prozess
+            // überwacht und EmbeddedWindowHandle setzt.
+            var runningProcess = _kiService.GetRunningProcess(_aufgabeId);
+            if (runningProcess != null)
+                CliProzessGestartet?.Invoke(runningProcess);
         }
         catch (OperationCanceledException)
         {
@@ -555,8 +572,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            IsCliRunning = false;
-            EmbeddedWindowHandle = IntPtr.Zero;
+            _dispatcherInvoke(() =>
+            {
+                IsCliRunning = false;
+                EmbeddedWindowHandle = IntPtr.Zero;
+            });
 
             var lokalerKlonPfad = _aufgabe.LokalerKlonPfad ?? string.Empty;
             await StartCliAndUpdateStateAsync(pluginPrefix, lokalerKlonPfad, _optionalCliParameters, ct);
@@ -604,16 +624,24 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(pluginPrefix, ct);
         IsCliRunning = true;
-        var handle = await _kiService.StartCliAsync(_aufgabeId, kiPlugin, lokalerKlonPfad, optionalParameters, ct);
+        try
+        {
+            var handle = await _kiService.StartCliAsync(_aufgabeId, kiPlugin, lokalerKlonPfad, optionalParameters, ct);
 
-        SelectedKiPluginPrefix = pluginPrefix;
-        if (!_kiService.IsRunning(_aufgabeId))
+            SelectedKiPluginPrefix = pluginPrefix;
+            if (!_kiService.IsRunning(_aufgabeId))
+            {
+                IsCliRunning = false;
+                return;
+            }
+
+            CliProzessGestartet?.Invoke(handle.Process);
+        }
+        catch
         {
             IsCliRunning = false;
-            return;
+            throw;
         }
-
-        CliProzessGestartet?.Invoke(handle.Process);
     }
 
     private async Task<string?> ResolvePluginViaDialogAsync(Aufgabe aufgabe, CancellationToken ct)

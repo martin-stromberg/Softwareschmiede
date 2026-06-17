@@ -37,13 +37,13 @@ public sealed class ClaudeCliPluginTests
         _sut.SupportsSessionContinuation().Should().BeTrue();
     }
 
-    /// <summary>StartCliAsync returns ProcessStartInfo with claude as filename.</summary>
+    /// <summary>StartCliAsync returns ProcessStartInfo with claude as filename (absolute path from PATH or fallback).</summary>
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfo_WithClaudeCommand()
     {
         var psi = await _sut.StartCliAsync("/repo/path");
 
-        psi.FileName.Should().Be("claude");
+        Path.GetFileNameWithoutExtension(psi.FileName).Should().BeEquivalentTo("claude");
         psi.WorkingDirectory.Should().Be("/repo/path");
     }
 

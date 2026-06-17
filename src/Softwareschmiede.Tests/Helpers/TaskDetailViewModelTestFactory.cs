@@ -29,9 +29,12 @@ public static class TaskDetailViewModelTestFactory
         var entwicklungsprozessService = new EntwicklungsprozessService(
             aufgabeService,
             protokollService,
+            null,
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
+            null,
+            kiService,
             NullLogger<EntwicklungsprozessService>.Instance);
 
         return new TaskDetailViewModel(

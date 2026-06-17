@@ -43,6 +43,15 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         catch { return false; }
     }
 
+    /// <summary>Gibt den laufenden Prozess für eine Aufgabe zurück, oder null wenn kein Prozess läuft.</summary>
+    public System.Diagnostics.Process? GetRunningProcess(Guid aufgabeId)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var handle))
+            return null;
+        try { return !handle.Process.HasExited ? handle.Process : null; }
+        catch { return null; }
+    }
+
     /// <inheritdoc/>
     public int GetRunningCount()
         => _handles.Values.Count(h =>
@@ -337,8 +346,14 @@ public sealed class CliProcessHandle
     /// <summary>Zeitstempel des letzten Heartbeats.</summary>
     public DateTimeOffset LastHeartbeat { get; set; } = DateTimeOffset.UtcNow;
 
+    private volatile bool _absichtlichGestoppt;
+
     /// <summary>Gibt an, ob der Prozess absichtlich durch <see cref="KiAusfuehrungsService.StopCliAsync"/> beendet wurde.</summary>
-    public bool AbsichtlichGestoppt { get; set; }
+    public bool AbsichtlichGestoppt
+    {
+        get => _absichtlichGestoppt;
+        set => _absichtlichGestoppt = value;
+    }
 
     /// <summary>Erstellt ein neues Handle.</summary>
     public CliProcessHandle(Guid aufgabeId, Process process)

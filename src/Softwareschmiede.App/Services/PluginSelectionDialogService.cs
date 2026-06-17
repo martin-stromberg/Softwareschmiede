@@ -7,15 +7,16 @@ namespace Softwareschmiede.App.Services;
 public sealed class PluginSelectionDialogService
 {
     /// <summary>Zeigt den Plugin-Auswahl-Dialog und gibt das Ergebnis der Benutzerauswahl zurück.</summary>
-    public Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
+    public async Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
         IEnumerable<string> availablePlugins,
         string? currentSelection,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
-        var result = System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        var dispatcherOperation = System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
+            ct.ThrowIfCancellationRequested();
             var viewModel = new PluginSelectionDialogViewModel(availablePlugins, currentSelection);
             var dialog = new PluginSelectionDialog(viewModel)
             {
@@ -28,6 +29,6 @@ public sealed class PluginSelectionDialogService
                 : new PluginSelectionResult(null, false);
         });
 
-        return Task.FromResult(result);
+        return await dispatcherOperation.Task.WaitAsync(ct);
     }
 }

@@ -40,6 +40,8 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
         ])
     ];
 
+    private static readonly Lazy<string> _claudeExecutablePath = new(FindClaudeExecutable);
+
     /// <summary>Erstellt eine neue Instanz von <see cref="ClaudeCliPlugin"/>.</summary>
     public ClaudeCliPlugin(
         ICredentialStore credentialStore,
@@ -47,6 +49,23 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     {
         _credentialStore = credentialStore;
         _logger = logger;
+    }
+
+    private static string FindClaudeExecutable()
+    {
+        var pathVar = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var dir in pathVar.Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrWhiteSpace(dir))
+                continue;
+            foreach (var ext in new[] { ".exe", ".cmd", ".bat", string.Empty })
+            {
+                var candidate = Path.Combine(dir.Trim(), $"claude{ext}");
+                if (File.Exists(candidate))
+                    return candidate;
+            }
+        }
+        return "claude";
     }
 
     /// <inheritdoc/>
@@ -62,7 +81,7 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "claude",
+                    FileName = _claudeExecutablePath.Value,
                     Arguments = "--version",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -101,7 +120,7 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
 
         var psi = new ProcessStartInfo
         {
-            FileName = "claude",
+            FileName = _claudeExecutablePath.Value,
             WorkingDirectory = localRepoPath,
             UseShellExecute = false,
             CreateNoWindow = false,

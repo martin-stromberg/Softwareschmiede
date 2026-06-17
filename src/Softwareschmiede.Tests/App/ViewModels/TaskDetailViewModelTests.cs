@@ -693,6 +693,58 @@ public sealed class TaskDetailViewModelTests : IDisposable
         aktualisiert!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
+    /// <summary>
+    /// StartenAsync muss CliProzessGestartet feuern, damit TaskDetailView.WaitForWindowHandleAsync
+    /// aufgerufen wird und EmbeddedWindowHandle gesetzt werden kann.
+    /// Schlägt fehl solange ProzessStartenUndCliStartenAsync das Event nicht auslöst.
+    /// </summary>
+    [Fact]
+    public async Task StartenAsync_FiresCliProzessGestartet_NachErfolgreichemStart()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        System.Diagnostics.Process? gemeldetProzess = null;
+        sut.CliProzessGestartet += p => gemeldetProzess = p;
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(
+                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        gemeldetProzess.Should().NotBeNull(
+            "CliProzessGestartet muss nach StartenCommand feuern, damit EmbeddedWindowHandle gesetzt werden kann");
+    }
+
+    /// <summary>
+    /// GetRunningProcess gibt nach dem Auto-Restart den laufenden Prozess zurück.
+    /// Das erlaubt TaskDetailView.xaml.cs im Loaded-Handler das Fenster auch dann einzubetten,
+    /// wenn CliProzessGestartet schon gefeuert hat bevor der Handler registriert wurde.
+    /// </summary>
+    [Fact]
+    public async Task GetRunningProcess_ReturnsProcess_AfterAutoRestartInLadenAsync()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Auto-Restart-Aufgabe", "Beschreibung");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", Path.GetTempPath());
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi");
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Simuliert: Loaded feuert NACH LadenAsync/CliProzessGestartet.
+        // Der View ruft GetRunningProcess() im Loaded-Handler auf und startet WaitForWindowHandleAsync manuell.
+        var process = sut.GetRunningProcess();
+
+        process.Should().NotBeNull(
+            "GetRunningProcess muss den laufenden Prozess liefern damit der View EmbeddedWindowHandle " +
+            "setzen kann wenn Loaded nach CliProzessGestartet feuert");
+    }
+
     // --- PluginAendernCommand ---
 
     /// <summary>PluginAendernCommand.CanExecute ist true wenn CLI läuft.</summary>
