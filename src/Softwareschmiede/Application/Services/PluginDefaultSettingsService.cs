@@ -64,5 +64,49 @@ public sealed class PluginDefaultSettingsService
             normalizedPrefix ?? "<none>");
     }
 
+    /// <summary>Liest den gespeicherten Projekt-Standard-Plugin-Prefix für den angegebenen Typ.</summary>
+    public async Task<string?> GetProjectDefaultPluginPrefixAsync(Guid projektId, PluginType pluginType, CancellationToken ct = default)
+    {
+        var key = BuildProjectKey(projektId, pluginType);
+        var setting = await _db.AppEinstellungen
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Schluessel == key, ct);
+
+        return string.IsNullOrWhiteSpace(setting?.Wert)
+            ? null
+            : setting.Wert.Trim();
+    }
+
+    /// <summary>Speichert (oder entfernt) den Projekt-Standard-Plugin-Prefix für den angegebenen Typ.</summary>
+    public async Task SaveProjectDefaultPluginPrefixAsync(Guid projektId, PluginType pluginType, string? pluginPrefix, CancellationToken ct = default)
+    {
+        var key = BuildProjectKey(projektId, pluginType);
+        var normalizedPrefix = string.IsNullOrWhiteSpace(pluginPrefix) ? null : pluginPrefix.Trim();
+        var setting = await _db.AppEinstellungen
+            .FirstOrDefaultAsync(s => s.Schluessel == key, ct);
+
+        if (setting is null)
+        {
+            setting = new AppEinstellung
+            {
+                Id = Guid.NewGuid(),
+                Schluessel = key
+            };
+            _db.AppEinstellungen.Add(setting);
+        }
+
+        setting.Wert = normalizedPrefix;
+        setting.AktualisiertAm = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Projekt-Standard-Plugin gespeichert: Projekt {ProjektId}, {PluginType} => {PluginPrefix}",
+            projektId,
+            pluginType,
+            normalizedPrefix ?? "<none>");
+    }
+
     private static string BuildKey(PluginType pluginType) => $"{DefaultKeyPrefix}{pluginType}";
+
+    private static string BuildProjectKey(Guid projektId, PluginType pluginType) => $"{DefaultKeyPrefix}project.{projektId}.{pluginType}";
 }

@@ -42,17 +42,17 @@ public sealed class AufgabeService
             .ToListAsync(ct);
     }
 
-    /// <summary>Gibt die Anzahl aktiver (InArbeit) und wartender (Wartend) Aufgaben als Tupel zurück — eine einzige Abfrage.</summary>
+    /// <summary>Gibt die Anzahl aktiver (Gestartet) und wartender (Wartend) Aufgaben als Tupel zurück — eine einzige Abfrage.</summary>
     public async Task<(int Aktiv, int Wartend)> GetAktiveUndWartendeCountAsync(CancellationToken ct = default)
     {
         var counts = await _db.Aufgaben
             .AsNoTracking()
-            .Where(a => a.Status == AufgabeStatus.InArbeit || a.Status == AufgabeStatus.Wartend)
+            .Where(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
             .GroupBy(a => a.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
-        var aktiv = counts.FirstOrDefault(c => c.Status == AufgabeStatus.InArbeit)?.Count ?? 0;
+        var aktiv = counts.FirstOrDefault(c => c.Status == AufgabeStatus.Gestartet)?.Count ?? 0;
         var wartend = counts.FirstOrDefault(c => c.Status == AufgabeStatus.Wartend)?.Count ?? 0;
         return (aktiv, wartend);
     }
@@ -224,7 +224,7 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.InArbeit or AufgabeStatus.Wartend)
+        if (aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.Wartend)
         {
             throw new InvalidOperationException(
                 $"Aufgabe {id} kann nicht gelöscht werden, da sie aktiv ist (Status: {aufgabe.Status}). Bitte zuerst abbrechen oder abschließen.");
@@ -280,7 +280,7 @@ public sealed class AufgabeService
         _logger.LogInformation("Aufgabe {AufgabeId} archiviert.", id);
     }
 
-    /// <summary>Startet eine Aufgabe: Status → ArbeitsverzeichnisEingerichtet, Branch und Arbeitsverzeichnis setzen.</summary>
+    /// <summary>Startet eine Aufgabe: Status → Gestartet, Branch und Arbeitsverzeichnis setzen.</summary>
     public async Task StartenAsync(Guid id, string branchName, string lokalerKlonPfad, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} starten (Branch: {BranchName}).", id, branchName);
@@ -288,12 +288,12 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.Status = AufgabeStatus.ArbeitsverzeichnisEingerichtet;
+        aufgabe.Status = AufgabeStatus.Gestartet;
         aufgabe.BranchName = branchName;
         aufgabe.LokalerKlonPfad = lokalerKlonPfad;
 
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Aufgabe {AufgabeId} gestartet (Status: ArbeitsverzeichnisEingerichtet).", id);
+        _logger.LogInformation("Aufgabe {AufgabeId} gestartet (Status: Gestartet).", id);
     }
 
     /// <summary>Speichert einen Vorschlagsprompt und optionalen Ausführungszeitpunkt für die Aufgabe.</summary>
@@ -413,11 +413,9 @@ public sealed class AufgabeService
 
         var allowed = current switch
         {
-            AufgabeStatus.Neu => new[] { AufgabeStatus.ArbeitsverzeichnisEingerichtet },
-            AufgabeStatus.ArbeitsverzeichnisEingerichtet => new[] { AufgabeStatus.Gestartet },
-            AufgabeStatus.Gestartet => new[] { AufgabeStatus.InArbeit },
-            AufgabeStatus.InArbeit => new[] { AufgabeStatus.Beendet, AufgabeStatus.Wartend },
-            AufgabeStatus.Wartend => new[] { AufgabeStatus.InArbeit, AufgabeStatus.Beendet },
+            AufgabeStatus.Neu => new[] { AufgabeStatus.Gestartet },
+            AufgabeStatus.Gestartet => new[] { AufgabeStatus.Wartend, AufgabeStatus.Beendet },
+            AufgabeStatus.Wartend => new[] { AufgabeStatus.Gestartet, AufgabeStatus.Beendet },
             AufgabeStatus.Beendet => Array.Empty<AufgabeStatus>(),
             AufgabeStatus.Archiviert => Array.Empty<AufgabeStatus>(),
             _ => Array.Empty<AufgabeStatus>()

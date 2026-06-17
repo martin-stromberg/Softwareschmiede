@@ -63,7 +63,7 @@ public sealed class AufgabeServiceTests
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
 
-        loaded!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.BranchName.Should().Be("task/feature-branch");
         loaded.LokalerKlonPfad.Should().Be(@"C:\klone\aufgabe");
     }
@@ -294,14 +294,14 @@ public sealed class AufgabeServiceTests
     /// Testet, dass SetStatusAsync den Status auf Beendet setzt.
     /// </summary>
     [Fact]
-    public async Task SetStatusAsync_ShouldSetStatusBeendet_WhenAufgabeIsInArbeit()
+    public async Task SetStatusAsync_ShouldSetStatusBeendet_WhenAufgabeIsGestartet()
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
         var aufgabe = await service.CreateAsync(projektId, "Aufgabe für Statuswechsel", null);
-        await service.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.InArbeit);
+        await service.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet);
 
         // Act
         await service.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);

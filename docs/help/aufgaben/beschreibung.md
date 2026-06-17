@@ -22,9 +22,7 @@ Eine Aufgabe durchläuft folgende Status:
 | Status | Bedeutung |
 |--------|-----------|
 | `Neu` | Angelegt, noch nicht gestartet |
-| `ArbeitsverzeichnisEingerichtet` | Lokaler Git-Klon wurde angelegt |
-| `Gestartet` | Branch erstellt, bereit für CLI-Start |
-| `InArbeit` | CLI-Prozess läuft aktiv |
+| `Gestartet` | Repository geklont, Branch erstellt, CLI läuft oder sollte laufen |
 | `Wartend` | CLI hat Rate-Limit erreicht; wartet auf Wiederaufnahme |
 | `Beendet` | Abgeschlossen (erfolgreich oder mit Fehler) |
 | `Archiviert` | Dauerhaft archiviert |
@@ -36,21 +34,21 @@ Die WPF-Aufgabendetailansicht (`TaskDetailView`) zeigt unterschiedliche Inhalte 
 #### Edit-Panel (Status: Neu)
 Bearbeitbare Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Wird verwendet, um neue Aufgaben zu erstellen oder bereits erstellte Aufgaben nachträglich anzupassen, bevor sie gestartet werden.
 
-#### CLI-Panel (Status: Gestartet, InArbeit, Wartend)
+#### CLI-Panel (Status: Gestartet, Wartend)
 Das Hauptpanel für die aktive Aufgabenbearbeitung. Zwei Anzeigemodi:
 - **CLI-Fenster (Standard):** Das Terminalfenster des KI-Tools wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`).
 - **Info-Ansicht:** Zeigt Aufgabeeigenschaften (Titel, Status, Beschreibung) und das Protokoll mit allen bisherigen Einträgen. Umschaltung via Toggle-Button „Info"/"CLI".
 
-Das Ribbon enthält KI-Plugin-Auswahl, optionale Parameter und „CLI starten" / „CLI stoppen" Buttons.
+Das Ribbon enthält KI-Plugin-Auswahl, optionale Parameter und „CLI stoppen" Button. Der „Starten"-Button initiiert einen kombinierten Ablauf (Klone + CLI-Start).
 
 #### Diff-Panel (Status: Beendet)
 Zeigt die Änderungen im Git-Arbeitsverzeichnis nach Abschluss der Aufgabe. Aktuell ein Platzhalter; zukünftig wird hier eine visuelle Diff-Darstellung implementiert.
 
 #### Ribbon-Menü
-Vier Aktionsgruppen:
+Aktionsgruppen:
 - **Navigation:** „Zurück"-Button zur Rückkehr zur Projektdetailansicht
-- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet), Beenden (Status=Gestartet/InArbeit/Wartend→Beendet)
-- **CLI:** KI-Plugin-Auswahl, optionale Parameter, „CLI starten" und „CLI stoppen" (nur sichtbar wenn aktiv)
+- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Plugin ändern (nur bei laufender CLI)
+- **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv)
 
 ### CLI-Prozess-Management
 
@@ -67,13 +65,16 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `InA
 ## Beispiele
 
 1. Aufgabe „Login-Bug beheben" im Projekt „Backend-API" anlegen.
-2. In der Aufgabendetailansicht „Gestartet setzen" klicken.
-3. KI-Plugin auswählen (z.B. Claude CLI), „CLI starten" klicken.
-4. Das CLI-Fenster erscheint eingebettet in der Ansicht — Aufgabe wechselt auf `InArbeit`.
-5. KI bearbeitet den Branch; nach Abschluss „Aufgabe abschließen" klicken.
+2. In der Aufgabendetailansicht „Starten" klicken.
+3. Falls kein KI-Plugin für das Projekt gespeichert: Dialog zur Plugin-Auswahl wird angezeigt (z.B. Claude CLI).
+4. Optional: Checkbox „Für dieses Projekt verwenden" aktivieren, um das Plugin als Projekt-Standard zu speichern.
+5. Das CLI-Fenster klont automatisch das Repository und erscheint eingebettet in der Ansicht — Aufgabe hat Status `Gestartet`.
+6. KI bearbeitet den Branch; während der Laufzeit kann das Plugin via „Plugin ändern" gewechselt werden.
+7. Nach Abschluss „Aufgabe abschließen" klicken.
 
 ## Einschränkungen
 
 - Für eine Aufgabe kann immer nur ein CLI-Prozess gleichzeitig aktiv sein.
 - Das CLI-Fenster-Einbetten via `SetParent` funktioniert nur auf Windows; bei Scheitern erscheint das Fenster separat.
 - Die Aufgabenwiederherstellung (Recovery) steht nur zur Verfügung, wenn der letzte Heartbeat älter als 5 Minuten ist.
+- Der Status `Gestartet` bedeutet: Repository geklont und CLI läuft (oder sollte laufen). Wenn die Ansicht eines Status-`Gestartet`-Tasks ohne laufende CLI geöffnet wird, wird die CLI automatisch neu gestartet.

@@ -6,14 +6,8 @@ public enum AufgabeStatus
     /// <summary>Aufgabe wurde erstellt und wartet auf Bearbeitung.</summary>
     Neu,
 
-    /// <summary>Arbeitsverzeichnis (lokaler Klon) wurde eingerichtet.</summary>
-    ArbeitsverzeichnisEingerichtet,
-
-    /// <summary>Aufgabe wurde gestartet (Branch erstellt, bereit für CLI).</summary>
+    /// <summary>Aufgabe wurde gestartet (Branch erstellt, CLI läuft oder sollte laufen).</summary>
     Gestartet,
-
-    /// <summary>CLI-Prozess läuft aktiv.</summary>
-    InArbeit,
 
     /// <summary>CLI hat Rate-Limit erreicht; wartet auf Wiederaufnahme.</summary>
     Wartend,

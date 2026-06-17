@@ -69,7 +69,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             SetProperty(ref _aufgabe, value);
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
-            OnPropertyChanged(nameof(KannCliStarten));
             OnPropertyChanged(nameof(KannCliStoppen));
             OnPropertyChanged(nameof(ShowEditPanel));
             OnPropertyChanged(nameof(ShowCliPanel));
@@ -106,17 +105,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         private set
         {
             SetProperty(ref _isCliRunning, value);
-            OnPropertyChanged(nameof(KannCliStarten));
             OnPropertyChanged(nameof(KannCliStoppen));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
         }
     }
-
-    /// <summary>Gibt an, ob ein CLI-Prozess gestartet werden kann.</summary>
-    public bool KannCliStarten => !_isCliRunning
-        && _aufgabe?.Status is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend
-        && !string.IsNullOrEmpty(_selectedKiPluginPrefix);
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
     public bool KannCliStoppen => _isCliRunning;
@@ -125,11 +118,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public string? SelectedKiPluginPrefix
     {
         get => _selectedKiPluginPrefix;
-        set
-        {
-            SetProperty(ref _selectedKiPluginPrefix, value);
-            OnPropertyChanged(nameof(KannCliStarten));
-        }
+        set => SetProperty(ref _selectedKiPluginPrefix, value);
     }
 
     /// <summary>Optionale Parameter für den CLI-Start.</summary>
@@ -180,9 +169,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Status == Neu, sonst false.</summary>
     public bool ShowEditPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Neu;
 
-    /// <summary>True wenn Status ∈ {Gestartet, InArbeit, Wartend}, sonst false.</summary>
+    /// <summary>True wenn Status ∈ {Gestartet, Wartend}, sonst false.</summary>
     public bool ShowCliPanel => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Gestartet
-        or Domain.Enums.AufgabeStatus.InArbeit
         or Domain.Enums.AufgabeStatus.Wartend;
 
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
@@ -201,14 +189,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Lädt die Aufgabe.</summary>
     public ICommand LadenCommand { get; }
 
-    /// <summary>Startet den CLI-Prozess.</summary>
-    public ICommand CliStartenCommand { get; }
-
     /// <summary>Stoppt den CLI-Prozess.</summary>
     public ICommand CliStoppenCommand { get; }
 
-    /// <summary>Setzt den Status auf "Gestartet".</summary>
-    public ICommand StatusGestartetSetzenCommand { get; }
+    /// <summary>Startet die Aufgabe: kombiniertes Klonen, Plugin-Auflösung und CLI-Start.</summary>
+    public ICommand StartenCommand { get; }
+
+    /// <summary>Wechselt das KI-Plugin bei laufender CLI: Dialog, Stop, Restart.</summary>
+    public ICommand PluginAendernCommand { get; }
 
     /// <summary>Schließt die Aufgabe ab (Status: Beendet).</summary>
     public ICommand AufgabeAbschliessenCommand { get; }
@@ -263,9 +251,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
 
         LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
-        CliStartenCommand = new AsyncRelayCommand(CliStartenAsync, () => KannCliStarten);
         CliStoppenCommand = new AsyncRelayCommand(CliStoppenAsync, () => KannCliStoppen);
-        StatusGestartetSetzenCommand = new AsyncRelayCommand(StatusGestartetSetzenAsync, () => AufgabeStatus == Domain.Enums.AufgabeStatus.Neu && !_isCliRunning);
+        StartenCommand = new AsyncRelayCommand(StartenAsync, () => AufgabeStatus == Domain.Enums.AufgabeStatus.Neu && !_isCliRunning);
+        PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => ShowCliPanel && !_isCliRunning);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
         LoeschenCommand = new AsyncRelayCommand(LoeschenAsync, () => KannLoeschen);
@@ -295,6 +283,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 Protokolleintraege.Add(eintrag);
 
             await LadeVerfuegbarePluginsAsync(ct);
+
+            if (Aufgabe?.Status == Domain.Enums.AufgabeStatus.Gestartet && !_isCliRunning)
+            {
+                await CliAutomatischNeustartenAsync(ct);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -329,54 +322,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task CliStartenAsync(CancellationToken ct)
-    {
-        if (_aufgabeId == Guid.Empty || string.IsNullOrEmpty(_selectedKiPluginPrefix))
-            return;
-
-        FehlerMeldung = null;
-
-        try
-        {
-            var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(_selectedKiPluginPrefix, ct);
-            var lokalerKlonPfad = _aufgabe?.LokalerKlonPfad ?? string.Empty;
-
-            var handle = await _kiService.StartCliAsync(
-                _aufgabeId,
-                kiPlugin,
-                lokalerKlonPfad,
-                _optionalCliParameters,
-                ct);
-
-            IsCliRunning = true;
-            CliProzessGestartet?.Invoke(handle.Process);
-
-            if (_aufgabe?.Status == Domain.Enums.AufgabeStatus.Gestartet)
-            {
-                await _aufgabeService.SetStatusAsync(_aufgabeId, Domain.Enums.AufgabeStatus.InArbeit, ct);
-                try
-                {
-                    Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
-                }
-                catch (Exception reloadEx)
-                {
-                    _logger.LogWarning(reloadEx, "Aufgabe {AufgabeId} konnte nach Status-Update nicht neu geladen werden.", _aufgabeId);
-                }
-            }
-
-            _logger.LogInformation("CLI für Aufgabe {AufgabeId} gestartet.", _aufgabeId);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Starten des CLI für Aufgabe {AufgabeId}.", _aufgabeId);
-            FehlerMeldung = $"CLI-Startfehler: {ex.Message}";
-        }
-    }
-
     private async Task CliStoppenAsync(CancellationToken ct)
     {
         if (_aufgabeId == Guid.Empty)
@@ -398,27 +343,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "Fehler beim Stoppen des CLI für Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"CLI-Stoppfehler: {ex.Message}";
-        }
-    }
-
-    private async Task StatusGestartetSetzenAsync(CancellationToken ct)
-    {
-        if (_aufgabeId == Guid.Empty)
-            return;
-
-        try
-        {
-            await _aufgabeService.SetStatusAsync(_aufgabeId, Domain.Enums.AufgabeStatus.Gestartet, ct);
-            await LadenAsync(ct);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Setzen des Status für Aufgabe {AufgabeId}.", _aufgabeId);
-            SetFehler(ex);
         }
     }
 
@@ -555,5 +479,154 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
         _ladenCts = null;
+    }
+
+    private async Task StartenAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty || _aufgabe is null)
+            return;
+
+        FehlerMeldung = null;
+
+        try
+        {
+            var pluginPrefix = await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
+                _aufgabe.KiPluginPrefix,
+                _aufgabe.ProjektId,
+                ct);
+
+            if (string.IsNullOrEmpty(pluginPrefix))
+            {
+                pluginPrefix = await ResolvePluginViaDialogAsync(_aufgabe, ct);
+                if (string.IsNullOrEmpty(pluginPrefix))
+                    return;
+            }
+
+            var repositoryUrl = _aufgabe.GitRepository?.RepositoryUrl ?? string.Empty;
+
+            await _entwicklungsprozessService.ProzessStartenUndCliStartenAsync(
+                _aufgabeId,
+                repositoryUrl,
+                null,
+                pluginPrefix,
+                ct);
+
+            await LadenAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Starten der Aufgabe {AufgabeId}.", _aufgabeId);
+            FehlerMeldung = $"Aufgabe konnte nicht gestartet werden: {ex.Message}";
+        }
+    }
+
+    private async Task PluginWechselAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty || _aufgabe is null)
+            return;
+
+        FehlerMeldung = null;
+
+        var pluginPrefix = await ResolvePluginViaDialogAsync(_aufgabe, ct);
+        if (string.IsNullOrEmpty(pluginPrefix))
+            return;
+
+        try
+        {
+            await _kiService.StopCliAsync(_aufgabeId, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Stoppen des CLI für Aufgabe {AufgabeId} während Plugin-Wechsel.", _aufgabeId);
+            FehlerMeldung = $"CLI konnte nicht gestoppt werden: {ex.Message}";
+            return;
+        }
+
+        try
+        {
+            IsCliRunning = false;
+            EmbeddedWindowHandle = IntPtr.Zero;
+
+            var lokalerKlonPfad = _aufgabe.LokalerKlonPfad ?? string.Empty;
+            await StartCliAndUpdateStateAsync(pluginPrefix, lokalerKlonPfad, _optionalCliParameters, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Neustarten des CLI für Aufgabe {AufgabeId} nach Plugin-Wechsel.", _aufgabeId);
+            FehlerMeldung = $"CLI konnte nicht neu gestartet werden: {ex.Message}";
+        }
+    }
+
+    private async Task CliAutomatischNeustartenAsync(CancellationToken ct)
+    {
+        if (_aufgabe is null || string.IsNullOrEmpty(_aufgabe.LokalerKlonPfad))
+            return;
+
+        try
+        {
+            var pluginPrefix = await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
+                _aufgabe.KiPluginPrefix,
+                _aufgabe.ProjektId,
+                ct);
+
+            if (string.IsNullOrEmpty(pluginPrefix))
+                return;
+
+            await StartCliAndUpdateStateAsync(pluginPrefix, _aufgabe.LokalerKlonPfad, null, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Automatischer CLI-Neustart für Aufgabe {AufgabeId} fehlgeschlagen.", _aufgabeId);
+            FehlerMeldung = $"CLI konnte nicht automatisch neu gestartet werden: {ex.Message}";
+        }
+    }
+
+    private async Task StartCliAndUpdateStateAsync(string pluginPrefix, string lokalerKlonPfad, string? optionalParameters, CancellationToken ct)
+    {
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(pluginPrefix, ct);
+        var handle = await _kiService.StartCliAsync(_aufgabeId, kiPlugin, lokalerKlonPfad, optionalParameters, ct);
+
+        SelectedKiPluginPrefix = pluginPrefix;
+        IsCliRunning = true;
+        CliProzessGestartet?.Invoke(handle.Process);
+    }
+
+    private async Task<string?> ResolvePluginViaDialogAsync(Aufgabe aufgabe, CancellationToken ct)
+    {
+        var dialogResult = await _dialogService.ShowPluginSelectionDialogAsync(
+            VerfuegbareKiPlugins,
+            _selectedKiPluginPrefix,
+            aufgabe.ProjektId,
+            ct);
+
+        if (string.IsNullOrEmpty(dialogResult.SelectedPluginPrefix))
+            return null;
+
+        if (dialogResult.SaveAsProjectDefault)
+        {
+            await _pluginSelectionService.SaveProjectDefaultPluginPrefixAsync(aufgabe.ProjektId, PluginType.DevelopmentAutomation, dialogResult.SelectedPluginPrefix, ct);
+        }
+        else
+        {
+            await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, dialogResult.SelectedPluginPrefix, ct);
+        }
+
+        return dialogResult.SelectedPluginPrefix;
     }
 }

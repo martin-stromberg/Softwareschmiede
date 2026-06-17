@@ -23,7 +23,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task StartenAsync_Setzt_Status_AufArbeitsverzeichnisEingerichtet()
+    public async Task StartenAsync_Setzt_Status_AufGestartet()
     {
         var projekt = await _projektService.CreateAsync("Startup-Projekt", null);
         var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Startup-Aufgabe", null);
@@ -33,35 +33,35 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test-branch", "/tmp/repo");
 
         var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
-        geladen!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        geladen!.Status.Should().Be(AufgabeStatus.Gestartet);
         geladen.BranchName.Should().Be("feature/test-branch");
         geladen.LokalerKlonPfad.Should().Be("/tmp/repo");
     }
 
     [Fact]
-    public async Task StatusUebergang_ArbeitsverzeichnisEingerichtet_NachGestartet_IstErlaubt()
+    public async Task StatusUebergang_Gestartet_NachWartend_IstErlaubt()
     {
         var projekt = await _projektService.CreateAsync("Uebergang-Projekt", null);
         var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Uebergang-Aufgabe", null);
 
         await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo");
+        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
+
+        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        geladen!.Status.Should().Be(AufgabeStatus.Wartend);
+    }
+
+    [Fact]
+    public async Task StatusUebergang_Wartend_NachGestartet_IstErlaubt()
+    {
+        var projekt = await _projektService.CreateAsync("Resume-Projekt", null);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Resume-Aufgabe", null);
+
+        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo");
+        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
         await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
 
         var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         geladen!.Status.Should().Be(AufgabeStatus.Gestartet);
-    }
-
-    [Fact]
-    public async Task StatusUebergang_Gestartet_NachInArbeit_IstErlaubt()
-    {
-        var projekt = await _projektService.CreateAsync("InArbeit-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "InArbeit-Aufgabe", null);
-
-        await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo");
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.InArbeit);
-
-        var geladen = await _aufgabeService.GetByIdAsync(aufgabe.Id);
-        geladen!.Status.Should().Be(AufgabeStatus.InArbeit);
     }
 }

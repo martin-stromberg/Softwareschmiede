@@ -10,4 +10,11 @@ public interface IDialogService
 
     /// <summary>Öffnet den Repository-Zuweisungs-Dialog und gibt zurück, ob der Benutzer bestätigt hat.</summary>
     bool RepositoryZuweisenDialog(RepositoryAssignViewModel viewModel);
+
+    /// <summary>Zeigt den Plugin-Auswahl-Dialog und gibt das Ergebnis der Benutzerauswahl zurück.</summary>
+    Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
+        IEnumerable<string> availablePlugins,
+        string? currentSelection,
+        Guid projektId,
+        CancellationToken ct = default);
 }

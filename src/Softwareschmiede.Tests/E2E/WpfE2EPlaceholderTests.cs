@@ -54,7 +54,7 @@ public sealed class WpfE2ETests : WpfTestBase
     }
 
     [Fact]
-    public void AufgabeAnlegen_ZeigtCliStartenButton_E2E()
+    public void AufgabeAnlegen_ZeigtStartenButton_E2E()
     {
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
@@ -65,8 +65,8 @@ public sealed class WpfE2ETests : WpfTestBase
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();
 
-        var cliStartenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStarten"), TimeSpan.FromSeconds(10));
-        Assert.NotNull(cliStartenButton);
+        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), TimeSpan.FromSeconds(10));
+        Assert.NotNull(startenButton);
 
         var windowHandle = mainWindow.FrameworkAutomationElement.NativeWindowHandle;
         Assert.NotEqual(IntPtr.Zero, windowHandle);

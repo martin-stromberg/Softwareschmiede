@@ -32,29 +32,60 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    /// <summary>Erlaubte Übergänge: Neu → ArbeitsverzeichnisEingerichtet → Gestartet → InArbeit → Beendet.</summary>
+    /// <summary>Direkter Übergang Neu → Gestartet ist erlaubt.</summary>
     [Fact]
-    public async Task TestStatusTransitions_AllowedSequence_Succeeds()
+    public async Task TestStatusTransitions_NeuToGestartet_Direct_Succeeds()
     {
         var aufgabe = await _sut.CreateAsync(_projektId, "Transition-Test", null);
 
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.ArbeitsverzeichnisEingerichtet);
         await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.InArbeit);
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
 
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.Beendet);
+        result!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
-    /// <summary>Erlaubter Übergang: InArbeit → Wartend → InArbeit → Beendet.</summary>
+    /// <summary>ArbeitsverzeichnisEingerichtet existiert nicht mehr im Enum.</summary>
+    [Fact]
+    public void TestStatusTransitions_OldArbeitsverzeichnisStatus_Removed()
+    {
+        Enum.GetNames<AufgabeStatus>().Should().NotContain("ArbeitsverzeichnisEingerichtet");
+    }
+
+    /// <summary>InArbeit existiert nicht mehr im Enum.</summary>
+    [Fact]
+    public void TestStatusTransitions_OldInArbeitStatus_Removed()
+    {
+        Enum.GetNames<AufgabeStatus>().Should().NotContain("InArbeit");
+    }
+
+    /// <summary>Übergang Gestartet → Wartend ist erlaubt.</summary>
+    [Fact]
+    public async Task TestStatusValidation_GestartetToWartend_IsAllowed()
+    {
+        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Gestartet);
+
+        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
+        await act.Should().NotThrowAsync();
+    }
+
+    /// <summary>Übergang Gestartet → Beendet ist erlaubt.</summary>
+    [Fact]
+    public async Task TestStatusValidation_GestartetToBeendet_IsAllowed()
+    {
+        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Gestartet);
+
+        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
+        await act.Should().NotThrowAsync();
+    }
+
+    /// <summary>Erlaubter Übergang: Gestartet → Wartend → Gestartet → Beendet.</summary>
     [Fact]
     public async Task TestStatusTransitions_WartendSequence_Succeeds()
     {
-        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Gestartet);
 
         await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Wartend);
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.InArbeit);
+        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
         await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
 
         var result = await _sut.GetByIdAsync(aufgabe.Id);
@@ -64,9 +95,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     /// <summary>Übergang von jedem Status nach Archiviert ist erlaubt.</summary>
     [Theory]
     [InlineData(AufgabeStatus.Neu)]
-    [InlineData(AufgabeStatus.ArbeitsverzeichnisEingerichtet)]
     [InlineData(AufgabeStatus.Gestartet)]
-    [InlineData(AufgabeStatus.InArbeit)]
     [InlineData(AufgabeStatus.Wartend)]
     [InlineData(AufgabeStatus.Beendet)]
     public async Task TestStatusTransitions_AnyStatusToArchiviert_IsAllowed(AufgabeStatus fromStatus)
@@ -77,23 +106,23 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
         await act.Should().NotThrowAsync();
     }
 
-    /// <summary>Ungültiger Übergang Neu → InArbeit wirft InvalidStatusTransitionException.</summary>
+    /// <summary>Ungültiger Übergang Neu → Beendet wirft InvalidStatusTransitionException.</summary>
     [Fact]
     public async Task TestStatusValidation_InvalidTransition_ThrowsException()
     {
         var aufgabe = await _sut.CreateAsync(_projektId, "Ungültiger Übergang", null);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.InArbeit);
+        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
         await act.Should().ThrowAsync<InvalidStatusTransitionException>();
     }
 
-    /// <summary>Ungültiger Übergang Beendet → InArbeit wirft InvalidStatusTransitionException.</summary>
+    /// <summary>Ungültiger Übergang Beendet → Gestartet wirft InvalidStatusTransitionException.</summary>
     [Fact]
-    public async Task TestStatusValidation_BeendetToInArbeit_ThrowsException()
+    public async Task TestStatusValidation_BeendetToGestartet_ThrowsException()
     {
         var aufgabe = await ErstelleAufgabeInStatus(AufgabeStatus.Beendet);
 
-        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.InArbeit);
+        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
         await act.Should().ThrowAsync<InvalidStatusTransitionException>();
     }
 

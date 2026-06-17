@@ -17,6 +17,15 @@ public abstract class WpfTestBase : IDisposable
     private const string BuildConfigRelease = "Release";
     private const string TargetFramework = "net10.0-windows10.0.17763.0";
 
+    /// <summary>Kurzes Timeout (10s) für schnell erscheinende UI-Elemente.</summary>
+    protected static readonly TimeSpan Short = TimeSpan.FromSeconds(10);
+
+    /// <summary>Mittleres Timeout (15s) für UI-Elemente nach asynchronen Operationen.</summary>
+    protected static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
+
+    /// <summary>Langes Timeout (30s), z. B. für das initiale Erscheinen des Hauptfensters.</summary>
+    protected static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
+
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
     private readonly string _testDbPath;
@@ -88,6 +97,10 @@ public abstract class WpfTestBase : IDisposable
 
         try { DeleteTestDatabase(); }
         catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Testdatenbank: {ex}"); }
+
+        // Umgebungsvariable zurücksetzen, damit sie nicht in andere Tests im selben Prozess
+        // hineinleckt (z. B. PluginManagerTests, die ohne Test-Modus-Einschränkung laufen sollen).
+        Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", null);
     }
 
     /// <summary>
@@ -178,6 +191,153 @@ public abstract class WpfTestBase : IDisposable
     {
         CreateProject(mainWindow, name);
         OpenProject(mainWindow, name);
+    }
+
+    /// <summary>
+    /// Wählt einen Eintrag in einer ComboBox per Klick auf das ComboBoxItem aus (robuster als
+    /// FlaUI's <c>Select(string)</c>, das bei manchen TwoWay-Bindings das Binding nicht zuverlässig aktualisiert).
+    /// </summary>
+    protected static void SelectComboBoxItemByClick(AutomationElement comboBoxElement, string itemText, TimeSpan timeout)
+    {
+        var comboBox = comboBoxElement.AsComboBox();
+        comboBox.Click();
+        Thread.Sleep(300);
+
+        var item = WaitForElement(comboBoxElement, cf => cf.ByName(itemText), timeout);
+        item.Click();
+        Thread.Sleep(200);
+    }
+
+    /// <summary>
+    /// Erstellt ein temporäres lokales Quellverzeichnis mit einem Unterordner (simuliertes Repository)
+    /// für Tests des LocalDirectoryPlugin. Gibt den Pfad des Quellverzeichnisses zurück.
+    /// </summary>
+    protected string CreateLocalSourceDirectory(string repositoryFolderName)
+    {
+        var sourceDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"softwareschmiede_e2e_source_{Guid.NewGuid():N}");
+        var repositoryPath = Path.Combine(sourceDirectory, repositoryFolderName);
+        Directory.CreateDirectory(repositoryPath);
+        File.WriteAllText(Path.Combine(repositoryPath, "readme.txt"), "E2E-Testdatei");
+        return sourceDirectory;
+    }
+
+    /// <summary>
+    /// Öffnet die Einstellungsseite, wählt das LocalDirectoryPlugin als SCM-Plugin, setzt WorkspaceMode
+    /// auf InSourceDirectory (Standard) oder SeparateWorkingDirectory, trägt das Quellverzeichnis ein
+    /// und speichert. Navigiert anschließend zurück zum Dashboard.
+    /// SeparateWorkingDirectory wird benötigt, wenn mehrere Aufgaben dasselbe Quellverzeichnis nutzen,
+    /// da InSourceDirectory nach dem ersten Lauf uncommitted changes im Quellverzeichnis hinterlassen kann.
+    /// </summary>
+    protected void ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, string sourceDirectory, bool useInSourceDirectoryMode = true)
+    {
+        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), TimeSpan.FromSeconds(10));
+        einstellungenButton.AsButton().Click();
+
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+
+        var quellcodeTab = WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), TimeSpan.FromSeconds(10));
+        quellcodeTab.Click();
+
+        if (useInSourceDirectoryMode)
+        {
+            var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), TimeSpan.FromSeconds(10));
+            SelectComboBoxItemByClick(workspaceModeBox, "InSourceDirectory", TimeSpan.FromSeconds(10));
+        }
+
+        var sourceDirectoryBox = WaitForElement(mainWindow, cf => cf.ByName("SourceDirectory"), TimeSpan.FromSeconds(10));
+        sourceDirectoryBox.AsTextBox().Text = sourceDirectory;
+
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+        speichernButton.AsButton().Click();
+
+        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
+
+        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(10));
+        dashboardButton.AsButton().Click();
+    }
+
+    /// <summary>
+    /// Öffnet den Repository-Zuweisungs-Dialog, wählt das erste Repository aus der Liste
+    /// (LocalDirectoryPlugin ist im Test-Modus das einzige verfügbare SCM-Plugin) und bestätigt die Zuweisung.
+    /// </summary>
+    protected void AssignLocalDirectoryRepository(AutomationElement mainWindow)
+    {
+        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), TimeSpan.FromSeconds(10));
+        zuweisenButton.AsButton().Click();
+
+        var dialog = WaitForWindow("Repository zuweisen", TimeSpan.FromSeconds(10));
+
+        AutomationElement[] items = [];
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var listBox = dialog.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.List));
+            if (listBox is not null)
+            {
+                items = listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
+                if (items.Length > 0)
+                    break;
+            }
+            Thread.Sleep(200);
+        }
+
+        if (items.Length == 0)
+            throw new TimeoutException("Repository-Liste im Zuweisungsdialog enthielt kein Element innerhalb des Timeouts.");
+
+        items[0].Click();
+
+        var zuweisenBestaetigenButton = WaitForElement(dialog, cf => cf.ByName("Zuweisen"), TimeSpan.FromSeconds(10));
+        zuweisenBestaetigenButton.AsButton().Click();
+    }
+
+    /// <summary>
+    /// Startet die Anwendung, konfiguriert das LocalDirectoryPlugin mit einem neu erstellten lokalen
+    /// Quellverzeichnis, legt ein Projekt an, öffnet es, weist das Repository zu und erstellt eine
+    /// neue Aufgabe. Gibt das Hauptfenster zurück, in dem die Aufgabe im Edit-Panel (Status "Neu")
+    /// bereit zum Starten ist.
+    /// </summary>
+    protected AutomationElement SetupProjectMitNeuerAufgabe(
+        string repositoryFolderName,
+        string projektName,
+        bool useInSourceDirectoryMode = true)
+    {
+        var sourceDirectory = CreateLocalSourceDirectory(repositoryFolderName);
+
+        var app = LaunchApp();
+        var mainWindow = app.GetMainWindow(Automation, Long)!;
+
+        ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory, useInSourceDirectoryMode);
+
+        NavigateToProjecten(mainWindow);
+        CreateAndOpenProject(mainWindow, projektName);
+
+        AssignLocalDirectoryRepository(mainWindow);
+
+        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
+        aufgabeNeuButton.AsButton().Click();
+
+        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+
+        return mainWindow;
+    }
+
+    /// <summary>
+    /// Klickt den "Starten"-Button und bedient den anschließend erscheinenden Plugin-Auswahl-Dialog:
+    /// wählt das angegebene KI-Plugin aus und bestätigt mit "OK".
+    /// </summary>
+    protected void StartenUndPluginWaehlen(AutomationElement mainWindow, string pluginName)
+    {
+        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+        startenButton.AsButton().Click();
+
+        var dialog = WaitForWindow("KI-Plugin auswählen", Medium);
+        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
+        SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
+
+        var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);
+        okButton.AsButton().Click();
     }
 
     private static string ResolveAppExePath()

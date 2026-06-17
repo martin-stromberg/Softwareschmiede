@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -20,6 +21,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Mock<IArbeitsverzeichnisResolver> _arbeitsverzeichnisResolverMock;
+    private readonly KiAusfuehrungsService _kiAusfuehrungsService;
     private readonly EntwicklungsprozessService _sut;
     private readonly Guid _projektId = new Guid("44444444-4444-4444-4444-444444444444");
 
@@ -38,12 +40,18 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
 
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        _kiAusfuehrungsService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+
         _sut = new EntwicklungsprozessService(
             _aufgabeService,
             _protokollService,
+            null,
             _gitPluginMock.Object,
             CreatePluginSelectionService(_kiPluginMock.Object),
             _arbeitsverzeichnisResolverMock.Object,
+            null,
+            _kiAusfuehrungsService,
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
@@ -56,7 +64,11 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _db.SaveChanges();
     }
 
-    public void Dispose() => _db.Dispose();
+    public void Dispose()
+    {
+        _kiAusfuehrungsService.Dispose();
+        _db.Dispose();
+    }
 
     private PluginSelectionService CreatePluginSelectionService(params IKiPlugin[] kiPlugins)
     {
@@ -89,8 +101,76 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.Is<string>(b => b.Contains("login-feature")), It.IsAny<CancellationToken>()), Times.Once);
 
         var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
-        updatedAufgabe!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
         updatedAufgabe.BranchName.Should().Contain("login-feature");
+    }
+
+    /// <summary>ProzessStartenUndCliStartenAsync klont, setzt Status auf Gestartet und startet die CLI.</summary>
+    [Fact]
+    public async Task TestProzessStartenUndCliStartenAsync_Success()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kombinierter Start", null);
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        // Act
+        await _sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, "https://github.com/test/repo", null, "Softwareschmiede.TestKi");
+
+        // Assert
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
+        _kiAusfuehrungsService.IsRunning(aufgabe.Id).Should().BeTrue();
+    }
+
+    /// <summary>ProzessStartenUndCliStartenAsync setzt Status zurück und löscht das Klon-Verzeichnis, wenn das Klonen fehlschlägt.</summary>
+    [Fact]
+    public async Task TestProzessStartenUndCliStartenAsync_RepositoryCloneFails_RollbackStatus()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Klonen fehlschlägt", null);
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Klonen fehlgeschlagen"));
+
+        // Act
+        var act = () => _sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, "https://github.com/test/repo", null, "Softwareschmiede.TestKi");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Neu);
+    }
+
+    /// <summary>ProzessStartenUndCliStartenAsync setzt Status zurück und löscht das Klon-Verzeichnis, wenn der CLI-Start fehlschlägt.</summary>
+    [Fact]
+    public async Task TestProzessStartenUndCliStartenAsync_CliStartFails_RollbackStatus()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "CLI-Start fehlschlägt", null);
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("CLI-Start fehlgeschlagen"));
+
+        // Act
+        var act = () => _sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, "https://github.com/test/repo", null, "Softwareschmiede.TestKi");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Neu);
     }
 
     /// <summary>ProzessStartenAsync blockiert den Start nicht, wenn das Repository-Startskript fehlschlägt.</summary>
@@ -151,7 +231,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Assert
         var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         updatedAufgabe.Should().NotBeNull();
-        updatedAufgabe!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
         var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
         protokoll.Should().Contain(entry =>
             entry.Typ == ProtokollTyp.GitAktion

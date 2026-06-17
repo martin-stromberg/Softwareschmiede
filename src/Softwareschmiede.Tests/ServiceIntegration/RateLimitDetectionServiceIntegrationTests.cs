@@ -57,8 +57,6 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Vorschlag-Aufgabe", null);
 
         await _aufgabeService.StartenAsync(aufgabe.Id, "main", "/tmp/repo");
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
-        await _aufgabeService.SetStatusAsync(aufgabe.Id, AufgabeStatus.InArbeit);
 
         await _aufgabeService.SavePromptVorschlagAsync(
             aufgabe.Id,

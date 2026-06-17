@@ -89,9 +89,9 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().HaveCount(2);
     }
 
-    /// <summary>StartenAsync setzt Status auf ArbeitsverzeichnisEingerichtet und setzt Branch und KlonPfad.</summary>
+    /// <summary>StartenAsync setzt Status auf Gestartet und setzt Branch und KlonPfad.</summary>
     [Fact]
-    public async Task StartenAsync_ShouldSetStatusArbeitsverzeichnisEingerichtetAndBranchName_WhenAufgabeExists()
+    public async Task StartenAsync_ShouldSetStatusGestartetAndBranchName_WhenAufgabeExists()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "Zu startende Aufgabe", null);
@@ -101,7 +101,7 @@ public sealed class AufgabeServiceTests : IDisposable
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        result!.Status.Should().Be(AufgabeStatus.Gestartet);
         result.BranchName.Should().Be("feature/test-branch");
         result.LokalerKlonPfad.Should().Be("/tmp/klon");
     }
@@ -142,19 +142,19 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().BeNull();
     }
 
-    /// <summary>StatusSetzenAsync setzt Status auf InArbeit via generische Methode.</summary>
+    /// <summary>StatusSetzenAsync setzt Status auf Gestartet via generische Methode.</summary>
     [Fact]
-    public async Task StatusSetzenAsync_ShouldSetStatusInArbeit_WhenAufgabeExists()
+    public async Task StatusSetzenAsync_ShouldSetStatusGestartet_WhenAufgabeExists()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "KI-Aufgabe", null);
 
         // Act
-        await _sut.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.InArbeit);
+        await _sut.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet);
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.InArbeit);
+        result!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
     /// <summary>AbschliessenAsync setzt Status auf Beendet und setzt AbschlussDatum.</summary>
@@ -400,11 +400,11 @@ public sealed class AufgabeServiceTests : IDisposable
         var aufgabe = await _sut.CreateAsync(_projektId, "Gültiger-Übergang", null);
 
         // Act
-        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        result!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
     private static DiffResult CreateDiffResult(Guid aufgabeId, string filePath, DateTimeOffset generatedAt)

@@ -30,7 +30,7 @@ public sealed class AufgabeRecoveryService
 
     /// <summary>
     /// Scannt alle Aufgaben nach Recovery-Kandidaten.
-    /// Kandidaten: Status <see cref="AufgabeStatus.InArbeit"/> oder <see cref="AufgabeStatus.Wartend"/>,
+    /// Kandidaten: Status <see cref="AufgabeStatus.Gestartet"/> oder <see cref="AufgabeStatus.Wartend"/>,
     /// Heartbeat älter als 5 Minuten, kein laufender CLI-Prozess.
     /// </summary>
     public async Task<IEnumerable<Guid>> ScanForRecoveryCandidatesAsync(CancellationToken ct = default)
@@ -39,7 +39,7 @@ public sealed class AufgabeRecoveryService
 
         var kandidaten = await _db.Aufgaben
             .AsNoTracking()
-            .Where(a => (a.Status == AufgabeStatus.InArbeit || a.Status == AufgabeStatus.Wartend)
+            .Where(a => (a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
                 && a.LastHeartbeatUtc != null
                 && a.LastHeartbeatUtc < cutoff)
             .Select(a => a.Id)
@@ -50,7 +50,7 @@ public sealed class AufgabeRecoveryService
 
     /// <summary>
     /// Führt eine manuelle Recovery durch.
-    /// Erlaubt nur Recovery aus <see cref="AufgabeStatus.InArbeit"/> oder <see cref="AufgabeStatus.Wartend"/>.
+    /// Erlaubt nur Recovery aus <see cref="AufgabeStatus.Gestartet"/> oder <see cref="AufgabeStatus.Wartend"/>.
     /// </summary>
     public async Task RecoverManuellAsync(Guid aufgabeId, CancellationToken ct = default)
     {
@@ -199,5 +199,5 @@ public sealed class AufgabeRecoveryService
             reasonCode);
 
     internal static bool IstRecoveryStatus(AufgabeStatus status)
-        => status is AufgabeStatus.InArbeit or AufgabeStatus.Wartend;
+        => status is AufgabeStatus.Gestartet or AufgabeStatus.Wartend;
 }

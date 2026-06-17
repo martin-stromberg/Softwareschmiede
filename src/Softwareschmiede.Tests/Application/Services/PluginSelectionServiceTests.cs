@@ -153,6 +153,43 @@ public sealed class PluginSelectionServiceTests
         resolved.PluginPrefix.Should().Be("Softwareschmiede.StoredGit");
     }
 
+    /// <summary>ResolveDevelopmentAutomationPluginWithProjectScopeAsync nutzt Projekt-Default wenn vorhanden.</summary>
+    [Fact]
+    public async Task TestResolvePluginWithProjectScope_UsesProjectDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await defaultSettings.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+
+        var pluginManager = CreatePluginManager([]);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, projektId);
+
+        // Assert
+        resolved.Should().Be("Softwareschmiede.ProjectKi");
+    }
+
+    /// <summary>ResolveDevelopmentAutomationPluginWithProjectScopeAsync gibt null zurück (Dialog erforderlich), falls kein Projekt- oder Aufgaben-Plugin vorhanden.</summary>
+    [Fact]
+    public async Task TestResolvePluginWithProjectScope_ReturnsNullIfNoDefault()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var pluginManager = CreatePluginManager([]);
+        var sut = new PluginSelectionService(pluginManager.Object, defaultSettings, NullLogger<PluginSelectionService>.Instance);
+
+        // Act
+        var resolved = await sut.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(null, Guid.NewGuid());
+
+        // Assert
+        resolved.Should().BeNull();
+    }
+
     private static Mock<IPluginManager> CreatePluginManager(
         IReadOnlyList<IKiPlugin> kiPlugins,
         IReadOnlyList<IGitPlugin>? gitPlugins = null)

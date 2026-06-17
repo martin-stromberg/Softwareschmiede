@@ -72,9 +72,7 @@ public sealed partial class StatusIndicatorControl : UserControl
         (StatusText, StatusColor) = status switch
         {
             AufgabeStatus.Neu => ("Neu", Brushes.Gray),
-            AufgabeStatus.ArbeitsverzeichnisEingerichtet => ("Eingerichtet", Brushes.SteelBlue),
             AufgabeStatus.Gestartet => ("Gestartet", Brushes.DodgerBlue),
-            AufgabeStatus.InArbeit => ("In Arbeit", Brushes.Orange),
             AufgabeStatus.Wartend => ("Wartend", Brushes.Goldenrod),
             AufgabeStatus.Beendet => ("Beendet", Brushes.SeaGreen),
             AufgabeStatus.Archiviert => ("Archiviert", Brushes.DimGray),

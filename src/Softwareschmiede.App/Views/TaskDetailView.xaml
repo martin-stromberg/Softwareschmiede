@@ -44,7 +44,7 @@
                             <controls:RibbonLargeButton ButtonIcon="▶"
                                                         ButtonText="Starten"
                                                         AutomationName="Starten"
-                                                        ButtonCommand="{Binding StatusGestartetSetzenCommand}" />
+                                                        ButtonCommand="{Binding StartenCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="✓"
                                                         ButtonText="Beenden"
                                                         AutomationName="Beenden"
@@ -57,17 +57,10 @@
                 <controls:RibbonGroup GruppenName="CLI">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
-                            <StackPanel VerticalAlignment="Center" Margin="4,0">
-                                <ComboBox ItemsSource="{Binding VerfuegbareKiPlugins}"
-                                          SelectedItem="{Binding SelectedKiPluginPrefix}"
-                                          Width="150"
-                                          Margin="0,0,0,4"
-                                          Visibility="{Binding IsCliRunning, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
-                                <controls:RibbonLargeButton ButtonIcon="▶ CLI"
-                                                            ButtonText="CLI Starten"
-                                                            AutomationName="CliStarten"
-                                                            ButtonCommand="{Binding CliStartenCommand}" />
-                            </StackPanel>
+                            <controls:RibbonLargeButton ButtonIcon="🔌"
+                                                        ButtonText="Plugin ändern"
+                                                        AutomationName="PluginAendern"
+                                                        ButtonCommand="{Binding PluginAendernCommand}" />
                             <controls:RibbonLargeButton ButtonIcon="■"
                                                         ButtonText="Stoppen"
                                                         AutomationName="CliStoppen"
@@ -148,7 +141,7 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- CLI-Panel (Status ∈ {Gestartet, InArbeit, Wartend}) -->
+            <!-- CLI-Panel (Status ∈ {Gestartet, Wartend}) -->
             <Grid Visibility="{Binding ShowCliPanel, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

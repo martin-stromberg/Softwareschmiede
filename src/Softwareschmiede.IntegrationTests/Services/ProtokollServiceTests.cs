@@ -209,7 +209,7 @@ public sealed class ProtokollServiceTests
         var eintrag = await service.AddStatusUebergangAsync(
             aufgabeId,
             AufgabeStatus.Neu,
-            AufgabeStatus.InArbeit);
+            AufgabeStatus.Gestartet);
 
         // Assert
         await using var db2 = db.CreateNewContext();
@@ -218,7 +218,7 @@ public sealed class ProtokollServiceTests
         loaded.Should().NotBeNull();
         loaded!.Typ.Should().Be(ProtokollTyp.StatusUebergang);
         loaded.Inhalt.Should().Contain("Neu");
-        loaded.Inhalt.Should().Contain("InArbeit");
+        loaded.Inhalt.Should().Contain("Gestartet");
     }
 
     /// <summary>

@@ -20,6 +20,7 @@ public sealed class EntwicklungsprozessService
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly IArbeitsverzeichnisResolver _arbeitsverzeichnisResolver;
     private readonly RepositoryStartskriptService? _repositoryStartskriptService;
+    private readonly KiAusfuehrungsService? _kiAusfuehrungsService;
     private readonly ILogger<EntwicklungsprozessService> _logger;
 
     private const string RateLimitMarkerPrefix = "[[SOFTWARESCHMIEDE_RATE_LIMIT";
@@ -40,6 +41,7 @@ public sealed class EntwicklungsprozessService
             pluginSelectionService,
             arbeitsverzeichnisResolver,
             null,
+            null,
             logger)
     {
     }
@@ -54,6 +56,30 @@ public sealed class EntwicklungsprozessService
         IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
         RepositoryStartskriptService? repositoryStartskriptService,
         ILogger<EntwicklungsprozessService> logger)
+        : this(
+            aufgabeService,
+            protokollService,
+            projektService,
+            gitPlugin,
+            pluginSelectionService,
+            arbeitsverzeichnisResolver,
+            repositoryStartskriptService,
+            null,
+            logger)
+    {
+    }
+
+    /// <inheritdoc cref="EntwicklungsprozessService"/>
+    public EntwicklungsprozessService(
+        AufgabeService aufgabeService,
+        ProtokollService protokollService,
+        ProjektService? projektService,
+        IGitPlugin gitPlugin,
+        PluginSelectionService pluginSelectionService,
+        IArbeitsverzeichnisResolver arbeitsverzeichnisResolver,
+        RepositoryStartskriptService? repositoryStartskriptService,
+        KiAusfuehrungsService? kiAusfuehrungsService,
+        ILogger<EntwicklungsprozessService> logger)
     {
         _aufgabeService = aufgabeService;
         _protokollService = protokollService;
@@ -62,12 +88,13 @@ public sealed class EntwicklungsprozessService
         _pluginSelectionService = pluginSelectionService;
         _arbeitsverzeichnisResolver = arbeitsverzeichnisResolver;
         _repositoryStartskriptService = repositoryStartskriptService;
+        _kiAusfuehrungsService = kiAusfuehrungsService;
         _logger = logger;
     }
 
     /// <summary>
     /// Richtet das Git-Repository für eine Aufgabe ein: Klon, Branch, optionales Startskript.
-    /// Setzt den Status auf <see cref="AufgabeStatus.ArbeitsverzeichnisEingerichtet"/>.
+    /// Setzt den Status auf <see cref="AufgabeStatus.Gestartet"/>.
     /// </summary>
     public async Task ProzessStartenAsync(
         Guid aufgabeId,
@@ -160,6 +187,66 @@ public sealed class EntwicklungsprozessService
         await _protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.GitAktion, protokollNachricht, ct: ct);
 
         _logger.LogInformation("Repository-Setup für Aufgabe {AufgabeId} abgeschlossen.", aufgabeId);
+    }
+
+    /// <summary>
+    /// Kombiniert Repository-Setup (Klon, Branch) und CLI-Start in einem Schritt.
+    /// Setzt den Status direkt auf <see cref="AufgabeStatus.Gestartet"/> und startet anschließend die CLI mit dem gewählten Plugin.
+    /// Im Fehlerfall wird der Status zurückgesetzt und das Klon-Verzeichnis gelöscht.
+    /// </summary>
+    public async Task ProzessStartenUndCliStartenAsync(
+        Guid aufgabeId,
+        string repositoryUrl,
+        string? basisBranchName,
+        string? kiPluginPrefix,
+        CancellationToken ct = default)
+    {
+        if (_kiAusfuehrungsService is null)
+        {
+            throw new InvalidOperationException("KiAusfuehrungsService ist nicht konfiguriert.");
+        }
+
+        await ProzessStartenAsync(aufgabeId, repositoryUrl, basisBranchName, null, ct);
+
+        try
+        {
+            var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
+                ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+
+            if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
+            {
+                throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+            }
+
+            var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
+            await _kiAusfuehrungsService.StartCliAsync(aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CLI-Start für Aufgabe {AufgabeId} fehlgeschlagen, Rollback wird durchgeführt.", aufgabeId);
+            await RollbackStartAsync(aufgabeId, ct);
+            throw;
+        }
+    }
+
+    private async Task RollbackStartAsync(Guid aufgabeId, CancellationToken ct)
+    {
+        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct);
+        if (aufgabe is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(aufgabe.LokalerKlonPfad) && Directory.Exists(aufgabe.LokalerKlonPfad))
+        {
+            DeleteDirectoryForce(aufgabe.LokalerKlonPfad);
+        }
+
+        await _aufgabeService.StatusSetzenAsync(aufgabeId, AufgabeStatus.Neu, ct);
     }
 
     /// <summary>Führt einen manuellen Commit durch.</summary>

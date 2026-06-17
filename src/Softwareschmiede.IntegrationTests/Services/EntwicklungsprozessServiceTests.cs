@@ -95,7 +95,7 @@ public sealed class EntwicklungsprozessServiceTests
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Aufgaben.FindAsync(aufgabeId);
 
-        loaded!.Status.Should().Be(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.BranchName.Should().StartWith("task/");
         loaded.BranchName.Should().Contain(aufgabeId.ToString("N"));
         loaded.LokalerKlonPfad.Should().NotBeNullOrEmpty();

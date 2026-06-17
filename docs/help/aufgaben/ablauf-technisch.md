@@ -49,7 +49,45 @@ Ablauf:
 6. MainWindow wechselt DataTemplate: `ProjectDetailViewModel` → `ProjectDetailView` wird gerendert
 7. `TaskDetailView` wird nicht mehr angezeigt
 
-### 0. Aufgabe anlegen und bearbeiten (Status: Neu)
+### 0. Kombinierter Start-Ablauf: Repository klonen + CLI starten (Status: Neu → Gestartet)
+
+Ausgelöst durch den „Starten"-Button im Ribbon der `TaskDetailView` (nur aktiv wenn Status == `Neu`).
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.StartenCommand` — RelayCommand mit CanExecute-Bedingung: Status == `Neu` && !IsCliRunning
+- `TaskDetailViewModel.StartenAsync` — Orchestriert Plugin-Dialog, Klonen und CLI-Start
+- `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` — Wählt das Git-Plugin
+- `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` — Zeigt KI-Plugin-Dialog (falls nicht als Projekt-Standard gespeichert)
+- `PluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync` / `SaveProjectDefaultPluginPrefixAsync` — Projekt-Level Plugin-Speicherung
+- `EntwicklungsprozessService.ProzessStartenAsync` — Klont Repository und legt Branch an
+- `KiAusfuehrungsService.StartCliAsync` — Startet den KI-CLI-Prozess
+- `PluginSelectionResult` — DTO mit ausgewähltem Plugin-Prefix und SaveAsProjectDefault-Flag
+
+Ablauf:
+1. Anwender klickt „Starten" Button im Ribbon
+2. `TaskDetailViewModel.StartenAsync()` wird aufgerufen
+3. Prüfung: `Aufgabe.Status == Neu`, sonst Fehler
+4. `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` ermittelt Git-Plugin
+5. `PluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.KiAutomation)` prüft Projekt-Standard für KI-Plugin
+6. Falls kein Projekt-Standard vorhanden:
+   - `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` zeigt Dialog mit verfügbaren KI-Plugins
+   - Benutzer wählt Plugin und optional Checkbox „Für dieses Projekt verwenden"
+   - Falls Checkbox aktiviert: `PluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync` speichert als Projekt-Standard
+7. `EntwicklungsprozessService.ProzessStartenAsync(aufgabeId, repositoryUrl, basisBranch, gitPlugin)` wird aufgerufen:
+   - Arbeitsverzeichnis wird ermittelt
+   - Repository wird geklont in `{workdir}/softwareschmiede/{aufgabeId}`
+   - Branch wird erstellt oder checked out
+   - Status wird auf `Gestartet` gesetzt (nicht zwischendurch auf andere Status)
+8. `KiAusfuehrungsService.StartCliAsync(aufgabeId, kiPluginPrefix)` wird aufgerufen:
+   - KI-Plugin wird geladen
+   - `IKiPlugin.StartCliAsync` liefert `ProcessStartInfo`
+   - `Process.Start()` startet den nativen Prozess
+   - Event `CliProcessStatusChanged` → `IsCliRunning = true`
+9. Fenster wird eingebettet (siehe Abschnitt „Fenster einbetten")
+10. UI zeigt CLI-Panel mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
+11. Bei Fehler (Klone fehlgeschlagen, CLI-Start fehlgeschlagen): Fehler wird angezeigt, Status bleibt `Neu`, Rollback des Klonverzeichnisses falls nötig
+
+### 0.5. Aufgabe anlegen und bearbeiten (Status: Neu)
 
 Ausgelöst durch den „Speichern"-Button in der Edit-Panel-Ansicht.
 
@@ -67,32 +105,49 @@ Ablauf:
 5. `AufgabeService.UpdateAsync()` wird aufgerufen
 6. Bei Erfolg: `LadenAsync()` neu laden, Toast anzeigen; bei Fehler: `FehlerMeldung` anzeigen
 
-### 1. Repository einrichten (`ProzessStartenAsync`)
+### 1. Automatischer CLI-Neustart bei Ansicht-Laden (Status: Gestartet, kein Prozess läuft)
 
-Ausgelöst durch den „Gestartet setzen"-Button in `TaskDetailView`.
-
-Beteiligte Komponenten:
-- `EntwicklungsprozessService.ProzessStartenAsync` — Orchestriert den Startablauf
-- `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` — Wählt das SCM-Plugin
-- `IArbeitsverzeichnisResolver.ResolveAsync` — Ermittelt das lokale Arbeitsverzeichnis
-- `IGitPlugin.CloneRepositoryAsync` — Klont das Repository
-- `IGitPlugin.CreateBranchAsync` / `CheckoutRemoteBranchAsync` — Legt den task/-Branch an oder checkt einen vorhandenen aus
-- `AufgabeService.SetStatusAsync` — Setzt Status auf `ArbeitsverzeichnisEingerichtet`, dann `Gestartet`
-
-### 2. CLI starten (`StartCliAsync`)
-
-Ausgelöst durch „CLI starten" in `TaskDetailView`.
+Falls die Aufgabendetailansicht für eine Aufgabe im Status `Gestartet` geöffnet wird und kein aktiver CLI-Prozess läuft (z.B. nach Neustart der Anwendung), wird die CLI automatisch neu gestartet.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.CliStartenAsync` — Koordiniert Plugin-Auflösung und Service-Aufruf
-- `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync` — Wählt das KI-Plugin
-- `KiAusfuehrungsService.StartCliAsync` — Startet den CLI-Prozess, gibt `CliProcessHandle` zurück
-- `IKiPlugin.StartCliAsync` — Plugin liefert `ProcessStartInfo` (Executable, Argumente, CWD)
-- `Process.Start()` — Startet den nativen Prozess
-- `KiAusfuehrungsService.CliProcessStatusChanged` — Event: UI wird informiert
-- `AufgabeService.SetStatusAsync` — Status → `InArbeit`
+- `TaskDetailViewModel.LadenAsync` — Lädt Aufgabe, prüft Status und Prozess-Zustand
+- `KiAusfuehrungsService.IsRunning(aufgabeId)` — Prüft, ob Prozess läuft
+- `CliAutomatischNeustartenAsync` — Startet CLI neu mit gespeichertem Plugin
 
-### 3. Fenster einbetten (`ProcessWindowHost`)
+Ablauf:
+1. Benutzer navigiert zu Aufgabendetailansicht
+2. `LadenAsync` wird aufgerufen (registriert in AufgabeId-Property-Setter)
+3. Aufgabe wird mit `AufgabeService.GetDetailAsync` geladen
+4. Prüfung: `Aufgabe.Status == Gestartet && !KiAusfuehrungsService.IsRunning(aufgabeId)` ?
+5. Falls wahr: `CliAutomatischNeustartenAsync` wird aufgerufen
+6. Gespeichertes Plugin wird ermittelt (Aufgaben-Plugin oder Projekt-Standard oder Global-Default)
+7. `KiAusfuehrungsService.StartCliAsync` wird aufgerufen
+8. CLI-Fenster wird eingebettet; Benutzer sieht laufenden Prozess
+
+### 2. Plugin-Wechsel bei laufender CLI (Status: Gestartet/Wartend mit aktiver CLI)
+
+Ausgelöst durch den „Plugin ändern"-Button im Ribbon (nur aktiv wenn `IsCliRunning` && Status ∈ {Gestartet, Wartend}).
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.PluginAendernCommand` — RelayCommand mit CanExecute-Bedingung: IsCliRunning && Status ∈ {Gestartet, Wartend}
+- `TaskDetailViewModel.PluginWechselAsync` — Orchestriert Dialog, Stop, Restart
+- `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` — Zeigt Dialog mit aktuellem Plugin vorselektiert
+- `KiAusfuehrungsService.StopCliAsync` — Beendet aktuellen Prozess
+- `KiAusfuehrungsService.StartCliAsync` — Startet neuen Prozess mit gewähltem Plugin
+- `PluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync` — Speichert neues Plugin als Projekt-Standard falls gewünscht
+
+Ablauf:
+1. Anwender klickt „Plugin ändern" Button im Ribbon
+2. `PluginWechselAsync()` wird aufgerufen
+3. `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` zeigt Dialog mit verfügbaren Plugins
+4. Benutzer wählt neues Plugin und optional Checkbox „Für dieses Projekt verwenden"
+5. `KiAusfuehrungsService.StopCliAsync()` wird aufgerufen (mit Timeout ~5s)
+6. Falls StopCliAsync fehlschlägt: Fehler wird angezeigt, Dialog bleibt offen, kein Neustart durchgeführt
+7. Falls erfolgreich: `KiAusfuehrungsService.StartCliAsync` mit neuem Plugin-Prefix aufgerufen
+8. Neuer Prozess wird eingebettet
+9. Falls Checkbox aktiviert: `PluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync` speichert neues Standard-Plugin
+
+### 4. Fenster einbetten (`ProcessWindowHost`)
 
 Beteiligte Komponenten:
 - `TaskDetailView.xaml.cs` — abonniert `TaskDetailViewModel.CliProzessGestartet`
@@ -101,7 +156,7 @@ Beteiligte Komponenten:
 - `NativeMethods.SetParent(handle, _hostHandle)` — bindet das CLI-Fenster an den WPF-Container
 - `NativeMethods.SetWindowLong` — entfernt `WS_CAPTION` und `WS_THICKFRAME` aus dem eingebetteten Fenster
 
-### 4. Info/CLI-Ansicht umschalten
+### 5. Info/CLI-Ansicht umschalten
 
 Ausgelöst durch Toggle-Button im CLI-Panel.
 
@@ -115,18 +170,18 @@ Ablauf:
 2. `InfoCliToggleCommand.Execute()` → `IsInfoViewVisible = !IsInfoViewVisible`
 3. ProcessWindowHost und Info-Panel wechseln ihre Sichtbarkeit (nur UI-Zustand, kein Service-Aufruf)
 
-### 5. Prozess beendet sich
+### 6. Prozess beendet sich
 
 - `Process.Exited`-Event wird ausgelöst
 - `KiAusfuehrungsService.CliProcessStatusChanged` → `CliProcessStatus.Gestoppt`
 - `TaskDetailViewModel.OnCliProcessStatusChanged` → `IsCliRunning = false`
 - Anwender kann Status manuell auf `Beendet` setzen oder via `AufgabeAbschliessenCommand`
 
-### 6. Aufgabe abschließen (`AbschliessenAsync`)
+### 7. Aufgabe abschließen (`AbschliessenAsync`)
 
 - `EntwicklungsprozessService.AbschliessenAsync` — Setzt Status auf `Beendet`, löscht optional Klonverzeichnis
 
-### 7. Aufgabe löschen (`LoeschenAsync`)
+### 8. Aufgabe löschen (`LoeschenAsync`)
 
 Ausgelöst durch den „Löschen"-Button im Ribbon.
 

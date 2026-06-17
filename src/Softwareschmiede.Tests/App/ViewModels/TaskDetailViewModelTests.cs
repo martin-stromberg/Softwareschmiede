@@ -22,6 +22,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly EntwicklungsprozessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly Mock<IDialogService> _dialogServiceMock;
+    private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Guid _projektId = Guid.NewGuid();
 
     public TaskDetailViewModelTests()
@@ -33,20 +34,55 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
 
+        _kiPluginMock = new Mock<IKiPlugin>();
+        _kiPluginMock.SetupGet(p => p.PluginName).Returns("Test KI");
+        _kiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestKi");
+        _kiPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
+        _kiPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c ping 127.0.0.1 -n 5 > nul",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        var gitPluginForResolutionMock = new Mock<IGitPlugin>();
+        gitPluginForResolutionMock.SetupGet(p => p.PluginName).Returns("Test Git");
+        gitPluginForResolutionMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestGit");
+        gitPluginForResolutionMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginForResolutionMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        gitPluginForResolutionMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitPluginForResolutionMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
         var pluginManagerMock = new Mock<IPluginManager>();
-        pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
+        pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+        pluginManagerMock.Setup(p => p.GetDefaultDevelopmentAutomationPlugin()).Returns(_kiPluginMock.Object);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
+        pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(gitPluginForResolutionMock.Object);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
+        arbeitsverzeichnisMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Softwareschmiede.Domain.ValueObjects.ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
         _entwicklungsprozessService = new EntwicklungsprozessService(
             _aufgabeService,
             _protokollService,
+            null,
             gitPluginMock.Object,
             _pluginSelectionService,
             arbeitsverzeichnisMock.Object,
+            null,
+            _kiService,
             NullLogger<EntwicklungsprozessService>.Instance);
 
         _dialogServiceMock = new Mock<IDialogService>();
@@ -117,18 +153,6 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ShowCliPanel.Should().BeTrue();
         sut.ShowEditPanel.Should().BeFalse();
         sut.ShowDiffPanel.Should().BeFalse();
-    }
-
-    /// <summary>ShowCliPanel ist true für Status InArbeit.</summary>
-    [Fact]
-    public async Task ShowCliPanel_IsTrue_WhenStatusInArbeit()
-    {
-        var aufgabe = await ErstelleAufgabe(AufgabeStatus.InArbeit);
-        var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        sut.ShowCliPanel.Should().BeTrue();
     }
 
     /// <summary>ShowCliPanel ist true für Status Wartend.</summary>
@@ -562,5 +586,233 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         zurueckAufgerufen.Should().BeFalse();
+    }
+
+    // --- StartenCommand ---
+
+    /// <summary>StartenCommand.CanExecute ist true wenn Status Neu und CLI nicht läuft.</summary>
+    [Fact]
+    public async Task TestStartenCommand_CanExecute_StatusNeuNotCliRunning()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.StartenCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    /// <summary>StartenCommand.CanExecute ist false wenn Status != Neu.</summary>
+    [Fact]
+    public async Task TestStartenCommand_CanExecute_StatusNotNeu_ReturnsFalse()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.StartenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>StartenAsync zeigt den Plugin-Dialog, falls die Aufgabe kein Plugin hat.</summary>
+    [Fact]
+    public async Task TestStartenAsync_ShowsDialogIfNoPluginSelected()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
+            It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>StartenAsync speichert den Projekt-Default, falls die Checkbox aktiviert wurde.</summary>
+    [Fact]
+    public async Task TestStartenAsync_SavesProjectDefaultIfCheckboxActivated()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", true));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var gespeichert = await pluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync(aufgabe.ProjektId, Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
+        gespeichert.Should().Be("Softwareschmiede.TestKi");
+    }
+
+    /// <summary>StartenAsync speichert keinen Projekt-Default, falls die Checkbox deaktiviert ist.</summary>
+    [Fact]
+    public async Task TestStartenAsync_DoesNotSaveProjectDefaultIfCheckboxDeactivated()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var gespeichert = await pluginDefaultSettingsService.GetDefaultPluginPrefixAsync(Softwareschmiede.Domain.Enums.PluginType.DevelopmentAutomation);
+        gespeichert.Should().BeNull();
+    }
+
+    /// <summary>StartenAsync ruft den kombinierten Prozess auf und die CLI läuft danach.</summary>
+    [Fact]
+    public async Task TestStartenAsync_InvokesCombinedProcess_StartsCliUponSuccess()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue();
+        var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        aktualisiert!.Status.Should().Be(AufgabeStatus.Gestartet);
+    }
+
+    // --- PluginAendernCommand ---
+
+    /// <summary>PluginAendernCommand.CanExecute ist true wenn CLI läuft.</summary>
+    [Fact]
+    public async Task TestPluginWechselCommand_CanExecute_CliRunning()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        sut.PluginAendernCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    /// <summary>PluginAendernCommand.CanExecute ist false wenn CLI nicht läuft.</summary>
+    [Fact]
+    public async Task TestPluginWechselCommand_CanExecute_CliNotRunning_ReturnsFalse()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.PluginAendernCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>PluginWechselAsync stoppt die alte CLI, zeigt den Dialog und startet die neue CLI.</summary>
+    [Fact]
+    public async Task TestPluginWechselAsync_StopsCliAndStartsNew()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        sut.IsCliRunning.Should().BeTrue();
+
+        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue();
+        _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
+            It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    /// <summary>PluginWechselAsync zeigt einen Fehler, falls StopCliAsync fehlschlägt, und bricht den Wechsel ab.</summary>
+    [Fact]
+    public async Task TestPluginWechselAsync_StopCliFailure_ShowsError()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        _kiService.Dispose();
+
+        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+    }
+
+    // --- LadenAsync: Automatischer CLI-Neustart ---
+
+    /// <summary>LadenAsync startet die CLI automatisch, falls Status Gestartet und kein Prozess läuft.</summary>
+    [Fact]
+    public async Task TestLoadAsync_AutoRestartsCli_StatusGestartetNoRunningProcess()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Auto-Restart-Aufgabe", "Beschreibung");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", Path.GetTempPath());
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi");
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue();
+    }
+
+    /// <summary>LadenAsync startet die CLI nicht erneut, falls sie bereits läuft.</summary>
+    [Fact]
+    public async Task TestLoadAsync_NoAutoRestart_CliAlreadyRunning()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        sut.IsCliRunning.Should().BeTrue();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue();
+    }
+
+    /// <summary>LadenAsync startet die CLI nicht, falls Status != Gestartet.</summary>
+    [Fact]
+    public async Task TestLoadAsync_NoAutoRestart_StatusNotGestartet()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeFalse();
     }
 }

@@ -31,7 +31,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     [Fact]
     public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);
@@ -45,7 +45,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     [Fact]
     public async Task ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 1);
 
         var running = new E2EFakeRunningStatusSource(false);
@@ -73,7 +73,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     [Fact]
     public async Task ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(isRunning: true);
@@ -87,7 +87,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_Setzt_StatusAufGestartet()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);

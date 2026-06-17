@@ -94,7 +94,7 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
             benutzerService.Object,
             NullLogger<BenachrichtigungsService>.Instance);
 
-        await sut.DispatchAsync(aufgabeId, AufgabeStatus.InArbeit);
+        await sut.DispatchAsync(aufgabeId, AufgabeStatus.Gestartet);
 
         var logs = _db.BenachrichtigungsDispatchLogs.Where(l => l.AufgabeId == aufgabeId).ToList();
         logs.Should().NotBeEmpty();

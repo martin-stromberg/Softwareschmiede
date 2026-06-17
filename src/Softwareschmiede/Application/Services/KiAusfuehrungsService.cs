@@ -16,6 +16,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private readonly ConcurrentDictionary<Guid, CliProcessHandle> _handles = new();
     private readonly ILogger<KiAusfuehrungsService> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
+    private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
     public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, IServiceScopeFactory scopeFactory)
@@ -192,6 +193,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <inheritdoc/>
     public void Dispose()
     {
+        _isDisposed = true;
+
         foreach (var handle in _handles.Values)
         {
             try
@@ -214,12 +217,36 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
     private async Task PersistFehlgeschlagenAsync(Guid aufgabeId)
     {
+        if (_isDisposed)
+        {
+            _logger.LogWarning(
+                "Status nach Fehler für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
+                aufgabeId);
+            return;
+        }
+
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
+
+            if (_isDisposed)
+            {
+                _logger.LogWarning(
+                    "Status nach Fehler für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
+                    aufgabeId);
+                return;
+            }
+
             var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
             await aufgabeService.StatusSetzenAsync(aufgabeId, AufgabeStatus.Beendet);
             _logger.LogInformation("Aufgabe {AufgabeId}: Status nach Fehler auf Beendet gesetzt.", aufgabeId);
+        }
+        catch (ObjectDisposedException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Status nach Fehler für Aufgabe {AufgabeId} konnte nicht persistiert werden, da der ServiceProvider während des Shutdowns bereits disposed wurde.",
+                aufgabeId);
         }
         catch (Exception ex)
         {

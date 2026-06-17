@@ -7,6 +7,14 @@ namespace Softwareschmiede.App.Services;
 /// <summary>WPF-Implementierung von <see cref="IDialogService"/> mit MessageBox und eigenen Dialogen.</summary>
 public sealed class WpfDialogService : IDialogService
 {
+    private readonly PluginSelectionDialogService _pluginSelectionDialogService;
+
+    /// <inheritdoc cref="WpfDialogService"/>
+    public WpfDialogService(PluginSelectionDialogService pluginSelectionDialogService)
+    {
+        _pluginSelectionDialogService = pluginSelectionDialogService;
+    }
+
     /// <inheritdoc/>
     public bool BestaetigenDialog(string nachricht, string titel)
         => MessageBox.Show(
@@ -25,4 +33,12 @@ public sealed class WpfDialogService : IDialogService
             };
             return dialog.ShowDialog() == true;
         });
+
+    /// <inheritdoc/>
+    public Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
+        IEnumerable<string> availablePlugins,
+        string? currentSelection,
+        Guid projektId,
+        CancellationToken ct = default)
+        => _pluginSelectionDialogService.ShowPluginSelectionDialogAsync(availablePlugins, currentSelection, projektId, ct);
 }

@@ -13,9 +13,7 @@ public sealed class AufgabeStatusEnumTests
         var values = Enum.GetValues<AufgabeStatus>();
 
         values.Should().Contain(AufgabeStatus.Neu);
-        values.Should().Contain(AufgabeStatus.ArbeitsverzeichnisEingerichtet);
         values.Should().Contain(AufgabeStatus.Gestartet);
-        values.Should().Contain(AufgabeStatus.InArbeit);
         values.Should().Contain(AufgabeStatus.Wartend);
         values.Should().Contain(AufgabeStatus.Beendet);
         values.Should().Contain(AufgabeStatus.Archiviert);
@@ -32,14 +30,14 @@ public sealed class AufgabeStatusEnumTests
         names.Should().NotContain("KiAktiv");
         names.Should().NotContain("Abgeschlossen");
         names.Should().NotContain("Fehlgeschlagen");
+        names.Should().NotContain("ArbeitsverzeichnisEingerichtet");
+        names.Should().NotContain("InArbeit");
     }
 
     /// <summary>Alle neuen Enum-Werte sind gültige Integerwerte.</summary>
     [Theory]
     [InlineData(AufgabeStatus.Neu)]
-    [InlineData(AufgabeStatus.ArbeitsverzeichnisEingerichtet)]
     [InlineData(AufgabeStatus.Gestartet)]
-    [InlineData(AufgabeStatus.InArbeit)]
     [InlineData(AufgabeStatus.Wartend)]
     [InlineData(AufgabeStatus.Beendet)]
     [InlineData(AufgabeStatus.Archiviert)]

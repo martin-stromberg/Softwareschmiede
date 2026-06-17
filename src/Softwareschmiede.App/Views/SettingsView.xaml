@@ -9,6 +9,7 @@
             <local:PluginSettingFieldTemplateSelector.TextTemplate>
                 <DataTemplate>
                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="{Binding Field.Key}"
                              Width="320"
                              HorizontalAlignment="Left" />
                 </DataTemplate>
@@ -45,6 +46,7 @@
             <local:PluginSettingFieldTemplateSelector.EnumTemplate>
                 <DataTemplate>
                     <ComboBox SelectedValue="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                              AutomationProperties.Name="{Binding Field.Key}"
                               ItemsSource="{Binding Field.EnumOptions}"
                               Width="220"
                               HorizontalAlignment="Left" />

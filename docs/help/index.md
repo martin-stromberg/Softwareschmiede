@@ -4,7 +4,7 @@
 
 ## Kernfunktionen
 
-- [Aufgaben & KI-Entwicklungsprozess](aufgaben/index.md) — Aufgaben sind die Arbeitseinheiten der Softwareschmiede; die Aufgabendetailansicht mit Ribbon-Menü bietet umfassende Verwaltung mit Status-abhängigem Content-Switching (Edit-, CLI-, Diff-Panels), eingebettetem Terminalfenster und Info-Toggle.
+- [Aufgaben & KI-Entwicklungsprozess](aufgaben/index.md) — Aufgaben sind die Arbeitseinheiten der Softwareschmiede. Der optimierte Aufgabenworkflow kombiniert Repository-Klone und CLI-Start in einem Schritt über einen einzelnen „Starten"-Button; die KI-Plugin-Auswahl erfolgt per Dialog mit optionaler Speicherung als Projekt-Standard. Die Aufgabendetailansicht mit Ribbon-Menü bietet umfassende Verwaltung mit Status-abhängigem Content-Switching (Edit-, CLI-, Diff-Panels), eingebettetem Terminalfenster, Info-Toggle und automatischem CLI-Neustart.
 - [Projekte](projekte/index.md) — Projekte sind die zentrale Organisationseinheit; jedes Projekt fasst ein oder mehrere Git-Repositories sowie zugehörige Aufgaben zusammen. Die Projektdetailansicht bietet umfassende Verwaltung mit Ribbon-Menü, Bearbeitung und Repository-Management.
 
 ## Benutzeroberfläche

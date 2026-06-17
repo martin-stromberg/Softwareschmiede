@@ -29,7 +29,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         var running = new FakeRunningAutomationStatusSource(false);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
@@ -57,10 +57,10 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     }
 
     [Theory]
-    [InlineData(AufgabeStatus.InArbeit, true)]
+    [InlineData(AufgabeStatus.Gestartet, true)]
     [InlineData(AufgabeStatus.Wartend, true)]
     [InlineData(AufgabeStatus.Neu, false)]
-    [InlineData(AufgabeStatus.ArbeitsverzeichnisEingerichtet, false)]
+    [InlineData(AufgabeStatus.Archiviert, false)]
     [InlineData(AufgabeStatus.Beendet, false)]
     public void IstRecoveryStatus_ShouldMatchAllowedStates(AufgabeStatus status, bool expected)
     {
@@ -70,7 +70,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         var running = new FakeRunningAutomationStatusSource(true);
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
@@ -96,7 +96,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.InArbeit);
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
         var running = new ThrowingRunningAutomationStatusSource();
         var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
 
@@ -116,7 +116,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             Id = Guid.NewGuid(),
             ProjektId = _projektId,
             Titel = "Alte InArbeit Aufgabe",
-            Status = AufgabeStatus.InArbeit,
+            Status = AufgabeStatus.Gestartet,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
@@ -138,7 +138,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             Id = Guid.NewGuid(),
             ProjektId = _projektId,
             Titel = "Frische InArbeit Aufgabe",
-            Status = AufgabeStatus.InArbeit,
+            Status = AufgabeStatus.Gestartet,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
@@ -179,7 +179,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             Id = Guid.NewGuid(),
             ProjektId = _projektId,
             Titel = "Laufende Aufgabe",
-            Status = AufgabeStatus.InArbeit,
+            Status = AufgabeStatus.Gestartet,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };

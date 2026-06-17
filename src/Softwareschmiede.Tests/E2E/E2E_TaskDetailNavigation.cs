@@ -16,9 +16,6 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public sealed class E2E_TaskDetailNavigation : WpfTestBase
 {
-    private static readonly TimeSpan Short = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
-
     /// <summary>
     /// Szenario: Projekt öffnen, Doppelklick auf Aufgabe in der Aufgabenliste.
     /// Prüft: TaskDetailView wird fensterumfassend angezeigt (ProjectDetailView nicht mehr sichtbar).

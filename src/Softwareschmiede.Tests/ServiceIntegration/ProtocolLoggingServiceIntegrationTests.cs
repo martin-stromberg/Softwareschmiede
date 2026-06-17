@@ -65,11 +65,11 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     {
         await SeedAufgabeAsync();
 
-        await _protokollService.AddStatusUebergangAsync(_aufgabeId, AufgabeStatus.Neu, AufgabeStatus.ArbeitsverzeichnisEingerichtet);
+        await _protokollService.AddStatusUebergangAsync(_aufgabeId, AufgabeStatus.Neu, AufgabeStatus.Gestartet);
 
         var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId);
         eintraege.Should().HaveCount(1);
         eintraege[0].Typ.Should().Be(ProtokollTyp.StatusUebergang);
-        eintraege[0].Inhalt.Should().Contain("ArbeitsverzeichnisEingerichtet");
+        eintraege[0].Inhalt.Should().Contain("Gestartet");
     }
 }

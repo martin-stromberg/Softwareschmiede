@@ -103,4 +103,51 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         handle.Should().NotBeNull();
         handle.AufgabeId.Should().Be(aufgabeId);
     }
+
+    /// <summary>
+    /// Regressionstest für die Race Condition beim App-Shutdown: Wenn ein CLI-Prozess mit
+    /// Fehler-ExitCode beendet wird, während der ScopeFactory-Zugriff (z. B. weil der
+    /// IServiceProvider während des Anwendungs-Shutdowns bereits disposed wurde) eine
+    /// ObjectDisposedException wirft, darf PersistFehlgeschlagenAsync diese nicht unbehandelt
+    /// weiterwerfen (führte zuvor zu einer TaskScheduler.UnobservedTaskException).
+    /// </summary>
+    [Fact]
+    public async Task ProcessExited_ScopeFactoryDisposed_PersistiertNichtUndWirftNicht()
+    {
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        scopeFactoryMock
+            .Setup(f => f.CreateScope())
+            .Throws(() => new ObjectDisposedException("IServiceProvider"));
+
+        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+
+        var aufgabeId = Guid.NewGuid();
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 1",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        var statusEvents = new List<CliProcessStatus>();
+        var fehlerSignal = new TaskCompletionSource();
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            statusEvents.Add(status);
+            if (status == CliProcessStatus.Fehler)
+            {
+                fehlerSignal.TrySetResult();
+            }
+        };
+
+        await sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+
+        var completed = await Task.WhenAny(fehlerSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        completed.Should().Be(fehlerSignal.Task, "der Exited-Handler sollte trotz disposed ScopeFactory ausgelöst werden, ohne die Anwendung zum Absturz zu bringen");
+
+        statusEvents.Should().Contain(CliProcessStatus.Fehler);
+    }
 }

@@ -266,7 +266,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     }
 
     /// <inheritdoc/>
-    public Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
+    public override Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
     {
         var sourceDir = _credentialStore.GetCredential($"{PluginPrefix}.{SourceDirectoryKey}");
         if (string.IsNullOrWhiteSpace(sourceDir) || !Directory.Exists(sourceDir))

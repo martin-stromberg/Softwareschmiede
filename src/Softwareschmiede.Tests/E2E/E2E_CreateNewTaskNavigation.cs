@@ -17,9 +17,6 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
 {
-    private static readonly TimeSpan Short = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
-
     /// <summary>
     /// Szenario: Neue Aufgabe erstellen, Titel ausfüllen, speichern.
     /// Prüft: Neue Aufgabe mit Status "Neu" wird persistiert, erscheint in der Liste,

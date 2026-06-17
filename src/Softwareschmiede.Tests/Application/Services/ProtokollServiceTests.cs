@@ -129,12 +129,12 @@ public sealed class ProtokollServiceTests : IDisposable
         var result = await _sut.AddStatusUebergangAsync(
             _aufgabeId,
             AufgabeStatus.Neu,
-            AufgabeStatus.InArbeit);
+            AufgabeStatus.Gestartet);
 
         // Assert
         result.Typ.Should().Be(ProtokollTyp.StatusUebergang);
         result.Inhalt.Should().Contain("Neu");
-        result.Inhalt.Should().Contain("InArbeit");
+        result.Inhalt.Should().Contain("Gestartet");
     }
 
     /// <summary>SuchenAsync findet Einträge anhand des Suchbegriffs im Inhalt.</summary>

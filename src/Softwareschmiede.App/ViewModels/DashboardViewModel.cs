@@ -27,7 +27,7 @@ public sealed class DashboardViewModel : ViewModelBase
         private set => SetProperty(ref _projektAnzahl, value);
     }
 
-    /// <summary>Anzahl aktiver Aufgaben (Status InArbeit).</summary>
+    /// <summary>Anzahl aktiver Aufgaben (Status Gestartet).</summary>
     public int AktiveAufgaben
     {
         get => _aktiveAufgaben;
