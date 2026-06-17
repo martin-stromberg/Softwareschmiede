@@ -414,7 +414,7 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, new Mock<IServiceScopeFactory>().Object));
         Services.AddSingleton(gitService);
         Services.AddSingleton(diffService);
         Services.AddSingleton(protokollService);

@@ -14,6 +14,7 @@ public sealed class PluginManager : IPluginManager
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<PluginManager> _logger;
     private readonly string _pluginDirectory;
+    private readonly bool _applyTestModeFilter;
     private readonly object _sync = new();
     private readonly List<IGitPlugin> _gitPlugins = [];
     private readonly List<IKiPlugin> _kiPlugins = [];
@@ -27,6 +28,9 @@ public sealed class PluginManager : IPluginManager
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
+        // Test-Modus-Filter nur anwenden, wenn das Standard-Plugin-Verzeichnis genutzt wird.
+        // Bei explizit übergebenem Verzeichnis (z. B. in Unit-Tests) wird der Filter nicht angewandt.
+        _applyTestModeFilter = pluginDirectory is null;
         _pluginDirectory = pluginDirectory ?? Path.Combine(AppContext.BaseDirectory, "plugins");
     }
 
@@ -111,7 +115,7 @@ public sealed class PluginManager : IPluginManager
             return;
         }
 
-        var testMode = IsTestMode();
+        var testMode = _applyTestModeFilter && IsTestMode();
         foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly)
             .Concat(Directory.GetDirectories(_pluginDirectory, "*", SearchOption.TopDirectoryOnly)
                 .SelectMany(folder => Directory.GetFiles(folder, "*.dll", SearchOption.TopDirectoryOnly))))

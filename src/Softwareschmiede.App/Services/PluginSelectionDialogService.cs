@@ -10,9 +10,10 @@ public sealed class PluginSelectionDialogService
     public Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
         IEnumerable<string> availablePlugins,
         string? currentSelection,
-        Guid projektId,
         CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         var result = System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             var viewModel = new PluginSelectionDialogViewModel(availablePlugins, currentSelection);

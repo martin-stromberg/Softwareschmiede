@@ -15,6 +15,5 @@ public interface IDialogService
     Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
         IEnumerable<string> availablePlugins,
         string? currentSelection,
-        Guid projektId,
         CancellationToken ct = default);
 }

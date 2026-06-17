@@ -38,7 +38,6 @@ public sealed class WpfDialogService : IDialogService
     public Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
         IEnumerable<string> availablePlugins,
         string? currentSelection,
-        Guid projektId,
         CancellationToken ct = default)
-        => _pluginSelectionDialogService.ShowPluginSelectionDialogAsync(availablePlugins, currentSelection, projektId, ct);
+        => _pluginSelectionDialogService.ShowPluginSelectionDialogAsync(availablePlugins, currentSelection, ct);
 }

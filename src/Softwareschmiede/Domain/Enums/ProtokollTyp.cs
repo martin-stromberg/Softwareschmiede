@@ -22,5 +22,8 @@ public enum ProtokollTyp
     CliOutput,
 
     /// <summary>Erkannter Rate-Limit-Marker aus der CLI-Ausgabe.</summary>
-    RateLimit
+    RateLimit,
+
+    /// <summary>Interne Systemmeldung (z. B. Prozessende mit Fehlercode).</summary>
+    SystemMeldung
 }

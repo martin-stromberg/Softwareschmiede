@@ -79,6 +79,14 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
             var psi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct);
 
+            // Sicherstellen, dass der vollständige PATH des aktuellen Prozesses übergeben wird.
+            // Bei UseShellExecute=false wird nur der Prozess-PATH genutzt — der kann bei WPF-Apps
+            // kürzer sein als der vollständige Nutzer-PATH (z. B. fehlt npm/node bin-Verzeichnis).
+            if (!psi.EnvironmentVariables.ContainsKey("PATH"))
+            {
+                psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            }
+
             _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} starten.", aufgabeId);
 
             var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -104,7 +112,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 else if (exitCode.HasValue && exitCode.Value != 0)
                 {
                     status = CliProcessStatus.Fehler;
-                    _ = PersistFehlgeschlagenAsync(aufgabeId);
+                    _ = PersistFehlgeschlagenAsync(aufgabeId, exitCode.Value);
                 }
                 else
                 {
@@ -115,10 +123,21 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             };
 
             // Handle VOR process.Start() eintragen, damit der Exited-Handler
-            // das Handle immer vorfindet (Befund #3).
+            // das Handle immer vorfindet (Race-Condition bei sehr kurzlebigen Prozessen).
             _handles[aufgabeId] = handle;
 
-            if (!process.Start())
+            bool started;
+            try
+            {
+                started = process.Start();
+            }
+            catch
+            {
+                _handles.TryRemove(aufgabeId, out _);
+                throw;
+            }
+
+            if (!started)
             {
                 _handles.TryRemove(aufgabeId, out _);
                 throw new InvalidOperationException("Prozess konnte nicht gestartet werden.");
@@ -145,17 +164,17 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         }
 
         var process = handle.Process;
-        if (process.HasExited)
-        {
-            return;
-        }
-
         handle.AbsichtlichGestoppt = true;
 
         _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} beenden.", aufgabeId);
 
         try
         {
+            if (process.HasExited)
+            {
+                return;
+            }
+
             process.CloseMainWindow();
             var exited = await WaitForExitAsync(process, TimeSpan.FromSeconds(5), ct);
             if (!exited)
@@ -215,7 +234,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         _startLock.Dispose();
     }
 
-    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId)
+    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId, int exitCode)
     {
         if (_isDisposed)
         {
@@ -239,7 +258,14 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
             var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
             await aufgabeService.StatusSetzenAsync(aufgabeId, AufgabeStatus.Beendet);
-            _logger.LogInformation("Aufgabe {AufgabeId}: Status nach Fehler auf Beendet gesetzt.", aufgabeId);
+
+            var protokollService = scope.ServiceProvider.GetRequiredService<ProtokollService>();
+            await protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.SystemMeldung,
+                $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode}).");
+
+            _logger.LogInformation("Aufgabe {AufgabeId}: Status nach Fehler auf Beendet gesetzt (ExitCode: {ExitCode}).", aufgabeId, exitCode);
         }
         catch (ObjectDisposedException ex)
         {

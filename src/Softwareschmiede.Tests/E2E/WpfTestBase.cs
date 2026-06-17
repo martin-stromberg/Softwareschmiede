@@ -4,6 +4,7 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Input;
 using FlaUI.UIA3;
+using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -101,6 +102,19 @@ public abstract class WpfTestBase : IDisposable
         // Umgebungsvariable zurücksetzen, damit sie nicht in andere Tests im selben Prozess
         // hineinleckt (z. B. PluginManagerTests, die ohne Test-Modus-Einschränkung laufen sollen).
         Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", null);
+
+        // LocalDirectoryPlugin-Credentials aus dem OS-weiten Windows-Credential-Store löschen,
+        // damit der WorkspaceMode nicht zwischen E2E-Tests leakt.
+        try { DeleteLocalDirectoryPluginCredentials(); }
+        catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Plugin-Credentials: {ex}"); }
+    }
+
+    private static void DeleteLocalDirectoryPluginCredentials()
+    {
+        var store = new WindowsCredentialStore();
+        store.DeleteCredential("LocalDirectoryPlugin.WorkspaceMode");
+        store.DeleteCredential("LocalDirectoryPlugin.SourceDirectory");
+        store.DeleteCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory");
     }
 
     /// <summary>

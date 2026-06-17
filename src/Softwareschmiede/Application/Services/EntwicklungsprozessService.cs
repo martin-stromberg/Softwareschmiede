@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -22,8 +21,6 @@ public sealed class EntwicklungsprozessService
     private readonly RepositoryStartskriptService? _repositoryStartskriptService;
     private readonly KiAusfuehrungsService? _kiAusfuehrungsService;
     private readonly ILogger<EntwicklungsprozessService> _logger;
-
-    private const string RateLimitMarkerPrefix = "[[SOFTWARESCHMIEDE_RATE_LIMIT";
 
     /// <inheritdoc cref="EntwicklungsprozessService"/>
     public EntwicklungsprozessService(
@@ -206,10 +203,10 @@ public sealed class EntwicklungsprozessService
             throw new InvalidOperationException("KiAusfuehrungsService ist nicht konfiguriert.");
         }
 
-        await ProzessStartenAsync(aufgabeId, repositoryUrl, basisBranchName, null, ct);
-
         try
         {
+            await ProzessStartenAsync(aufgabeId, repositoryUrl, basisBranchName, null, ct);
+
             var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
                 ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
 
@@ -223,12 +220,14 @@ public sealed class EntwicklungsprozessService
         }
         catch (OperationCanceledException)
         {
+            _logger.LogWarning("CLI-Start für Aufgabe {AufgabeId} abgebrochen, Rollback wird durchgeführt.", aufgabeId);
+            await RollbackStartAsync(aufgabeId, CancellationToken.None);
             throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "CLI-Start für Aufgabe {AufgabeId} fehlgeschlagen, Rollback wird durchgeführt.", aufgabeId);
-            await RollbackStartAsync(aufgabeId, ct);
+            await RollbackStartAsync(aufgabeId, CancellationToken.None);
             throw;
         }
     }
@@ -418,52 +417,6 @@ public sealed class EntwicklungsprozessService
         return new StartskriptErgebnis("Startskript erfolgreich ausgeführt.");
     }
 
-    /// <summary>
-    /// Parst einen Rate-Limit-Marker aus einer CLI-Ausgabezeile.
-    /// Format: <c>[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601_DATETIME]]</c>
-    /// </summary>
-    public static bool TryParseRateLimitSuggestion(string outputLine, out SuggestionInfo? suggestion)
-    {
-        suggestion = null;
-
-        if (string.IsNullOrWhiteSpace(outputLine))
-        {
-            return false;
-        }
-
-        var startIndex = outputLine.IndexOf(RateLimitMarkerPrefix, StringComparison.Ordinal);
-        if (startIndex < 0)
-        {
-            return false;
-        }
-
-        var markerStart = startIndex + RateLimitMarkerPrefix.Length;
-        var endIndex = outputLine.IndexOf("]]", markerStart, StringComparison.Ordinal);
-        if (endIndex < 0)
-        {
-            return false;
-        }
-
-        var payload = outputLine[markerStart..endIndex];
-
-        DateTimeOffset? resetUtc = null;
-        if (payload.StartsWith(":", StringComparison.Ordinal))
-        {
-            var timestampRaw = payload[1..].Trim();
-            if (DateTimeOffset.TryParse(
-                    timestampRaw,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out var parsed))
-            {
-                resetUtc = parsed;
-            }
-        }
-
-        suggestion = new SuggestionInfo(resetUtc);
-        return true;
-    }
-
     private async Task<GitRepository> ResolveRepositoryAsync(Aufgabe aufgabe, string repositoryUrl, CancellationToken ct)
     {
         if (aufgabe.GitRepository is not null)
@@ -552,9 +505,6 @@ public sealed class EntwicklungsprozessService
         Directory.Delete(path, recursive: true);
     }
 }
-
-/// <summary>Information zu einem erkannten Rate-Limit-Marker.</summary>
-public sealed record SuggestionInfo(DateTimeOffset? AusfuehrenAbUtc);
 
 /// <summary>Ergebnis der manuellen Ausführung eines Repository-Startskripts.</summary>
 public sealed record StartskriptErgebnis(string Message);

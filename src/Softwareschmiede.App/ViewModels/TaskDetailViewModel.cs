@@ -284,7 +284,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             await LadeVerfuegbarePluginsAsync(ct);
 
-            if (Aufgabe?.Status == Domain.Enums.AufgabeStatus.Gestartet && !_isCliRunning)
+            // Unmittelbar vor dem Auto-Restart nochmals live prüfen, ob der Prozess läuft.
+            // Verhindert doppelten CLI-Start, wenn der Prozess nach dem Starten extrem schnell
+            // abstürzt und LadenAsync ihn bereits als nicht-laufend sieht.
+            if (Aufgabe?.Status == Domain.Enums.AufgabeStatus.Gestartet && !_kiService.IsRunning(_aufgabeId))
             {
                 await CliAutomatischNeustartenAsync(ct);
             }
@@ -600,10 +603,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private async Task StartCliAndUpdateStateAsync(string pluginPrefix, string lokalerKlonPfad, string? optionalParameters, CancellationToken ct)
     {
         var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(pluginPrefix, ct);
+        IsCliRunning = true;
         var handle = await _kiService.StartCliAsync(_aufgabeId, kiPlugin, lokalerKlonPfad, optionalParameters, ct);
 
         SelectedKiPluginPrefix = pluginPrefix;
-        IsCliRunning = true;
+        if (!_kiService.IsRunning(_aufgabeId))
+        {
+            IsCliRunning = false;
+            return;
+        }
+
         CliProzessGestartet?.Invoke(handle.Process);
     }
 
@@ -612,7 +621,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         var dialogResult = await _dialogService.ShowPluginSelectionDialogAsync(
             VerfuegbareKiPlugins,
             _selectedKiPluginPrefix,
-            aufgabe.ProjektId,
             ct);
 
         if (string.IsNullOrEmpty(dialogResult.SelectedPluginPrefix))
@@ -622,10 +630,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             await _pluginSelectionService.SaveProjectDefaultPluginPrefixAsync(aufgabe.ProjektId, PluginType.DevelopmentAutomation, dialogResult.SelectedPluginPrefix, ct);
         }
-        else
-        {
-            await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, dialogResult.SelectedPluginPrefix, ct);
-        }
+
+        await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, dialogResult.SelectedPluginPrefix, ct);
 
         return dialogResult.SelectedPluginPrefix;
     }

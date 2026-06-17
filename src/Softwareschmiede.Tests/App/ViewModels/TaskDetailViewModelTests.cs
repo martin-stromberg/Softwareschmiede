@@ -624,13 +624,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
-            It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>StartenAsync speichert den Projekt-Default, falls die Checkbox aktiviert wurde.</summary>
@@ -643,7 +643,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", true));
 
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
@@ -663,7 +663,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
@@ -683,7 +683,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
 
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
@@ -705,7 +705,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
@@ -734,7 +734,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();
@@ -743,7 +743,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         sut.IsCliRunning.Should().BeTrue();
         _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
-            It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     /// <summary>PluginWechselAsync zeigt einen Fehler, falls StopCliAsync fehlschlägt, und bricht den Wechsel ab.</summary>
@@ -756,7 +756,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
@@ -794,7 +794,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
         sut.IsCliRunning.Should().BeTrue();

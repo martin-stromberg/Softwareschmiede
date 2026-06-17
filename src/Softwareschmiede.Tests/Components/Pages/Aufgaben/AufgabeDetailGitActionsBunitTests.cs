@@ -832,7 +832,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, new Mock<IServiceScopeFactory>().Object));
         Services.AddSingleton(gitService);
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);
@@ -998,7 +998,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, new Mock<IServiceScopeFactory>().Object));
         Services.AddSingleton(gitService);
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);

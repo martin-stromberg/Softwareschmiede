@@ -115,16 +115,8 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<AufgabeService>();
         services.AddScoped<ProjektService>();
         services.AddScoped<ProtokollService>();
-        services.AddScoped<EntwicklungsprozessService>(sp => new EntwicklungsprozessService(
-            sp.GetRequiredService<AufgabeService>(),
-            sp.GetRequiredService<ProtokollService>(),
-            sp.GetService<ProjektService>(),
-            sp.GetRequiredService<IGitPlugin>(),
-            sp.GetRequiredService<PluginSelectionService>(),
-            sp.GetRequiredService<IArbeitsverzeichnisResolver>(),
-            sp.GetService<RepositoryStartskriptService>(),
-            sp.GetRequiredService<KiAusfuehrungsService>(),
-            sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
+        services.AddScoped<RepositoryStartskriptService>();
+        services.AddScoped<EntwicklungsprozessService>();
         services.AddScoped<BenachrichtigungsService>();
         services.AddScoped<BenachrichtigungsEinstellungenService>();
         services.AddScoped<BenachrichtigungsAuditService>();
