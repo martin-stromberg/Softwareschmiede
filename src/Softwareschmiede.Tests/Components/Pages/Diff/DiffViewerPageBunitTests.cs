@@ -65,7 +65,7 @@ public sealed class DiffViewerPageBunitTests : TestContext
             Id = Guid.NewGuid(),
             ProjektId = projekt.Id,
             Titel = "DiffViewer Page Test Task",
-            Status = AufgabeStatus.InBearbeitung,
+            Status = AufgabeStatus.InArbeit,
             ErstellungsDatum = DateTimeOffset.UtcNow,
         };
 

@@ -1,0 +1,90 @@
+# Aufgaben & KI-Entwicklungsprozess — Datenmodell
+
+## Entitäten
+
+### `Aufgabe`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `ProjektId` | `Guid` | FK → Projekt |
+| `GitRepositoryId` | `Guid?` | FK → GitRepository |
+| `Titel` | `string` | Aufgabentitel |
+| `AnforderungsBeschreibung` | `string?` | Prompt-Vorlage / Anforderungstext |
+| `Status` | `AufgabeStatus` | Aktueller Status (siehe unten) |
+| `BranchName` | `string?` | Name des Git-Branches |
+| `LokalerKlonPfad` | `string?` | Lokaler Pfad des geklonten Repositories |
+| `AgentenpaketName` | `string?` | Name des Agentenpakets |
+| `AgentenName` | `string?` | Name des gewählten Agenten |
+| `KiPluginPrefix` | `string?` | Plugin-Prefix des KI-Plugins |
+| `ErstellungsDatum` | `DateTimeOffset` | Anlagezeitpunkt |
+| `AbschlussDatum` | `DateTimeOffset?` | Abschlusszeitpunkt |
+| `AktiveRunId` | `string?` | Run-ID eines laufenden KI-Prozesses |
+| `LastHeartbeatUtc` | `DateTimeOffset?` | Letzter Heartbeat-Zeitstempel |
+| `RecoveryVersion` | `int` | Concurrency-Token für Recovery |
+| `VorschlagPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
+| `VorschlagAusfuehrenAbUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
+
+### `Protokolleintrag`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `AufgabeId` | `Guid` | FK → Aufgabe |
+| `Zeitstempel` | `DateTimeOffset` | Zeitpunkt des Eintrags |
+| `Typ` | `ProtokollTyp` | `Prompt`, `KiAntwort`, `GitAktion`, `StatusUebergang`, `TestErgebnis` |
+| `Inhalt` | `string` | Inhalt (Markdown) |
+| `AgentName` | `string?` | Name des Agenten |
+
+### `IssueReferenz`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `AufgabeId` | `Guid` | FK → Aufgabe |
+| `IssueNummer` | `int` | Issue-Nummer im Provider |
+| `Titel` | `string` | Titel des Issues |
+| `IssueUrl` | `string?` | Direkt-URL zum Issue |
+
+## Statusübergänge
+
+```mermaid
+stateDiagram-v2
+    [*] --> Neu : Neu angelegt
+    Neu --> ArbeitsverzeichnisEingerichtet : Klon erstellt
+    ArbeitsverzeichnisEingerichtet --> Gestartet : Branch erstellt
+    Gestartet --> InArbeit : CLI gestartet
+    InArbeit --> Wartend : Rate-Limit erkannt
+    InArbeit --> Beendet : CLI beendet / Abschließen
+    Wartend --> Gestartet : Recovery (manuell)
+    Beendet --> Archiviert : Archivieren
+    Neu --> Archiviert : Archivieren
+    Gestartet --> Archiviert : Archivieren
+```
+
+## Beziehungen
+
+```mermaid
+erDiagram
+    Aufgabe {
+        Guid Id
+        Guid ProjektId
+        string Titel
+        AufgabeStatus Status
+        string BranchName
+        string LokalerKlonPfad
+    }
+    Protokolleintrag {
+        Guid Id
+        Guid AufgabeId
+        ProtokollTyp Typ
+        string Inhalt
+    }
+    IssueReferenz {
+        Guid Id
+        Guid AufgabeId
+        int IssueNummer
+    }
+    Aufgabe ||--o{ Protokolleintrag : "hat"
+    Aufgabe ||--o| IssueReferenz : "hat"
+```

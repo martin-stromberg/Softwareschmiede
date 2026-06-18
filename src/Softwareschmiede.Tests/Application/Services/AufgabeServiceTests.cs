@@ -47,7 +47,7 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().NotBeNull();
         result.Id.Should().NotBeEmpty();
         result.Titel.Should().Be("Test Aufgabe");
-        result.Status.Should().Be(AufgabeStatus.Offen);
+        result.Status.Should().Be(AufgabeStatus.Neu);
         result.ProjektId.Should().Be(_projektId);
     }
 
@@ -89,9 +89,9 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().HaveCount(2);
     }
 
-    /// <summary>StartenAsync setzt Status auf InBearbeitung und setzt Branch und KlonPfad.</summary>
+    /// <summary>StartenAsync setzt Status auf Gestartet und setzt Branch und KlonPfad.</summary>
     [Fact]
-    public async Task StartenAsync_ShouldSetStatusInBearbeitungAndBranchName_WhenAufgabeExists()
+    public async Task StartenAsync_ShouldSetStatusGestartetAndBranchName_WhenAufgabeExists()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "Zu startende Aufgabe", null);
@@ -101,7 +101,7 @@ public sealed class AufgabeServiceTests : IDisposable
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        result!.Status.Should().Be(AufgabeStatus.Gestartet);
         result.BranchName.Should().Be("feature/test-branch");
         result.LokalerKlonPfad.Should().Be("/tmp/klon");
     }
@@ -142,87 +142,35 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().BeNull();
     }
 
-    /// <summary>KiAktiviertAsync setzt Status auf KiAktiv.</summary>
+    /// <summary>StatusSetzenAsync setzt Status auf Gestartet via generische Methode.</summary>
     [Fact]
-    public async Task KiAktiviertAsync_ShouldSetStatusKiAktiv_WhenAufgabeExists()
+    public async Task StatusSetzenAsync_ShouldSetStatusGestartet_WhenAufgabeExists()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "KI-Aufgabe", null);
 
         // Act
-        await _sut.KiAktiviertAsync(aufgabe.Id);
+        await _sut.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet);
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.KiAktiv);
+        result!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
-    /// <summary>KiAbgeschlossenAsync setzt Status zurück auf InBearbeitung.</summary>
+    /// <summary>AbschliessenAsync setzt Status auf Beendet und setzt AbschlussDatum.</summary>
     [Fact]
-    public async Task KiAbgeschlossenAsync_ShouldSetStatusInBearbeitung_WhenAufgabeIsKiAktiv()
-    {
-        // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "KI fertig Aufgabe", null);
-        await _sut.KiAktiviertAsync(aufgabe.Id);
-
-        // Act
-        await _sut.KiAbgeschlossenAsync(aufgabe.Id);
-
-        // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.InBearbeitung);
-    }
-
-    /// <summary>AbschliessenAsync setzt Status auf Abgeschlossen, löscht Branch und KlonPfad und setzt AbschlussDatum.</summary>
-    [Fact]
-    public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndClearBranch_WhenAufgabeExists()
+    public async Task AbschliessenAsync_ShouldSetStatusBeendetAndSetAbschlussDatum_WhenAufgabeExists()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "Abzuschließende Aufgabe", null);
-        await _sut.StartenAsync(aufgabe.Id, "feature/branch", "/tmp/klon");
 
         // Act
         await _sut.AbschliessenAsync(aufgabe.Id);
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.Abgeschlossen);
-        result.BranchName.Should().BeNull();
-        result.LokalerKlonPfad.Should().BeNull();
+        result!.Status.Should().Be(AufgabeStatus.Beendet);
         result.AbschlussDatum.Should().NotBeNull();
-    }
-
-    /// <summary>AbbrechenAsync setzt Status zurück auf Offen und löscht Branch und KlonPfad.</summary>
-    [Fact]
-    public async Task AbbrechenAsync_ShouldSetStatusOffenAndClearBranch_WhenAufgabeExists()
-    {
-        // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Abzubrechende Aufgabe", null);
-        await _sut.StartenAsync(aufgabe.Id, "feature/branch-to-abort", "/tmp/klon-abort");
-
-        // Act
-        await _sut.AbbrechenAsync(aufgabe.Id);
-
-        // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.Offen);
-        result.BranchName.Should().BeNull();
-        result.LokalerKlonPfad.Should().BeNull();
-    }
-
-    /// <summary>FehlgeschlagenAsync setzt Status auf Fehlgeschlagen.</summary>
-    [Fact]
-    public async Task FehlgeschlagenAsync_ShouldSetStatusFehlgeschlagen_WhenAufgabeExists()
-    {
-        // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Fehlgeschlagene Aufgabe", null);
-
-        // Act
-        await _sut.FehlgeschlagenAsync(aufgabe.Id);
-
-        // Assert
-        var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.Fehlgeschlagen);
     }
 
     /// <summary>UpdateAsync aktualisiert Titel, Agenteninfos und KI-Plugin.</summary>
@@ -233,14 +181,12 @@ public sealed class AufgabeServiceTests : IDisposable
         var aufgabe = await _sut.CreateAsync(_projektId, "Alter Titel", "Alte Beschreibung");
 
         // Act
-        await _sut.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Beschreibung", "mein-paket", "mein-agent", "Softwareschmiede.Ki");
+        await _sut.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Beschreibung", "Softwareschmiede.Ki");
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
         result!.Titel.Should().Be("Neuer Titel");
         result.AnforderungsBeschreibung.Should().Be("Neue Beschreibung");
-        result.AgentenpaketName.Should().Be("mein-paket");
-        result.AgentenName.Should().Be("mein-agent");
         result.KiPluginPrefix.Should().Be("Softwareschmiede.Ki");
     }
 
@@ -316,9 +262,9 @@ public sealed class AufgabeServiceTests : IDisposable
         result.VorschlagAusfuehrenAbUtc.Should().BeNull();
     }
 
-    /// <summary>VerwerfenAsync archiviert eine offene Aufgabe.</summary>
+    /// <summary>VerwerfenAsync archiviert eine neue Aufgabe.</summary>
     [Fact]
-    public async Task VerwerfenAsync_ShouldSetStatusArchiviert_WhenOffeneAufgabeArchiviertWird()
+    public async Task VerwerfenAsync_ShouldSetStatusArchiviert_WhenNeueAufgabeArchiviertWird()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null);
@@ -331,9 +277,9 @@ public sealed class AufgabeServiceTests : IDisposable
         result!.Status.Should().Be(AufgabeStatus.Archiviert);
     }
 
-    /// <summary>VerwerfenAsync löscht eine offene Aufgabe dauerhaft.</summary>
+    /// <summary>VerwerfenAsync löscht eine neue Aufgabe dauerhaft.</summary>
     [Fact]
-    public async Task VerwerfenAsync_ShouldRemoveAufgabe_WhenOffeneAufgabeGeloeschtWird()
+    public async Task VerwerfenAsync_ShouldRemoveAufgabe_WhenNeueAufgabeGeloeschtWird()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "Zu verwerfende Aufgabe", null);
@@ -346,9 +292,9 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().BeNull();
     }
 
-    /// <summary>VerwerfenAsync wirft eine Ausnahme, wenn die Aufgabe nicht offen ist.</summary>
+    /// <summary>VerwerfenAsync wirft eine Ausnahme, wenn die Aufgabe nicht neu ist.</summary>
     [Fact]
-    public async Task VerwerfenAsync_ShouldThrowInvalidOperationException_WhenAufgabeIsNotOffen()
+    public async Task VerwerfenAsync_ShouldThrowInvalidOperationException_WhenAufgabeIsNotNeu()
     {
         // Arrange
         var aufgabe = await _sut.CreateAsync(_projektId, "Bereits gestartete Aufgabe", null);
@@ -359,7 +305,7 @@ public sealed class AufgabeServiceTests : IDisposable
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Nur offene Aufgaben können verworfen werden.");
+            .WithMessage("Nur neue Aufgaben können verworfen werden.");
     }
 
     /// <summary>StartenAsync wirft InvalidOperationException wenn Aufgabe nicht gefunden.</summary>
@@ -384,11 +330,81 @@ public sealed class AufgabeServiceTests : IDisposable
         var aufgabe = await _sut.CreateAsync(_projektId, "Status-Aufgabe", null);
 
         // Act
-        await _sut.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Fehlgeschlagen);
+        await _sut.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Beendet);
 
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
-        result!.Status.Should().Be(AufgabeStatus.Fehlgeschlagen);
+        result!.Status.Should().Be(AufgabeStatus.Beendet);
+    }
+
+    /// <summary>TestHeartbeatUpdate: LastHeartbeatUtc wird aktualisiert; Alter wird korrekt berechnet.</summary>
+    [Fact]
+    public async Task TestHeartbeatUpdate()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Heartbeat-Aufgabe", null);
+        aufgabe.LastHeartbeatUtc.Should().BeNull();
+
+        // Act – Heartbeat aktualisieren
+        var vorUpdate = DateTimeOffset.UtcNow;
+        await _sut.UpdateHeartbeatAsync(aufgabe.Id);
+        var nachUpdate = DateTimeOffset.UtcNow;
+
+        // Assert – Heartbeat wurde gesetzt
+        var geladen = await _sut.GetByIdAsync(aufgabe.Id);
+        geladen!.LastHeartbeatUtc.Should().NotBeNull();
+        geladen.LastHeartbeatUtc!.Value.Should().BeOnOrAfter(vorUpdate.AddSeconds(-1));
+        geladen.LastHeartbeatUtc!.Value.Should().BeOnOrBefore(nachUpdate.AddSeconds(1));
+
+        // Alter ist 0 Minuten (frischer Heartbeat)
+        var ageMinutes = await _sut.GetHeartbeatAgeMinutesAsync(aufgabe.Id);
+        ageMinutes.Should().NotBeNull();
+        ageMinutes!.Value.Should().BeGreaterThanOrEqualTo(0);
+        ageMinutes!.Value.Should().BeLessThan(2);
+    }
+
+    /// <summary>GetHeartbeatAgeMinutesAsync gibt null zurück wenn kein Heartbeat gesetzt.</summary>
+    [Fact]
+    public async Task GetHeartbeatAgeMinutesAsync_ShouldReturnNull_WhenNoHeartbeatSet()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "No-Heartbeat-Aufgabe", null);
+
+        // Act
+        var result = await _sut.GetHeartbeatAgeMinutesAsync(aufgabe.Id);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    /// <summary>TestStatusValidation: SetStatusAsync wirft InvalidStatusTransitionException bei ungültigem Übergang.</summary>
+    [Fact]
+    public async Task TestStatusValidation()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Validierungs-Aufgabe", null);
+
+        // Act – ungültiger Übergang Neu → Beendet
+        var act = () => _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidStatusTransitionException>()
+            .WithMessage("*Neu*Beendet*");
+    }
+
+    /// <summary>SetStatusAsync erlaubt gültige Übergänge ohne Exception.</summary>
+    [Fact]
+    public async Task SetStatusAsync_ShouldSetStatus_WhenTransitionIsAllowed()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Gültiger-Übergang", null);
+
+        // Act
+        await _sut.SetStatusAsync(aufgabe.Id, AufgabeStatus.Gestartet);
+
+        // Assert
+        var result = await _sut.GetByIdAsync(aufgabe.Id);
+        result!.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
     private static DiffResult CreateDiffResult(Guid aufgabeId, string filePath, DateTimeOffset generatedAt)

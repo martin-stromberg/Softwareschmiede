@@ -97,9 +97,9 @@ public sealed class MainLayoutTests
 
     [Theory]
     [InlineData(BenachrichtigungsModus.Deaktiviert, false, BenachrichtigungsEntscheidung.Unterdrueckt, "KanalDeaktiviert", 0)]
-    [InlineData(BenachrichtigungsModus.NurAufgabenseite, false, BenachrichtigungsEntscheidung.Unterdrueckt, "NichtAufAufgabenseite", 0)]
-    [InlineData(BenachrichtigungsModus.NurAufgabenseite, true, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
-    [InlineData(BenachrichtigungsModus.Global, false, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
+    [InlineData(BenachrichtigungsModus.Banner, false, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
+    [InlineData(BenachrichtigungsModus.Banner, true, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
+    [InlineData(BenachrichtigungsModus.Ton, false, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
     public async Task VerarbeiteToastAsync_ShouldHonorModeMatrix(
         BenachrichtigungsModus modus,
         bool istAufgabenseite,
@@ -122,7 +122,7 @@ public sealed class MainLayoutTests
         toasts.Should().HaveCount(erwarteteToasts);
 
         var audit = harness.Db.BenachrichtigungsDispatchLogs
-            .Where(log => log.Kanal == BenachrichtigungsKanal.Toast)
+            .Where(log => log.Kanal == BenachrichtigungsKanal.Banner)
             .Single();
         audit.Entscheidung.Should().Be(erwarteteEntscheidung);
         audit.Grund.Should().Be(erwarteterGrund);
@@ -131,9 +131,9 @@ public sealed class MainLayoutTests
 
     [Theory]
     [InlineData(BenachrichtigungsModus.Deaktiviert, false, BenachrichtigungsEntscheidung.Unterdrueckt, "KanalDeaktiviert", 0)]
-    [InlineData(BenachrichtigungsModus.NurAufgabenseite, false, BenachrichtigungsEntscheidung.Unterdrueckt, "NichtAufAufgabenseite", 0)]
-    [InlineData(BenachrichtigungsModus.NurAufgabenseite, true, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
-    [InlineData(BenachrichtigungsModus.Global, false, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
+    [InlineData(BenachrichtigungsModus.Banner, false, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
+    [InlineData(BenachrichtigungsModus.Banner, true, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
+    [InlineData(BenachrichtigungsModus.Ton, false, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
     public async Task VerarbeiteTonAsync_ShouldHonorModeMatrix(
         BenachrichtigungsModus modus,
         bool istAufgabenseite,
@@ -176,7 +176,7 @@ public sealed class MainLayoutTests
             "VerarbeiteTonAsync",
             ereignis,
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
 
         harness.JsRuntime.Invocations.Should().ContainSingle();
@@ -202,7 +202,7 @@ public sealed class MainLayoutTests
             "VerarbeiteTonAsync",
             ereignis,
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
 
         harness.JsRuntime.Invocations.Should().ContainSingle();
@@ -226,7 +226,7 @@ public sealed class MainLayoutTests
             "VerarbeiteTonAsync",
             CreateEreignis(),
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
 
         var toast = GetToasts(harness.Sut).Single();
@@ -251,7 +251,7 @@ public sealed class MainLayoutTests
             "VerarbeiteTonAsync",
             CreateEreignis(),
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
 
         var toast = GetToasts(harness.Sut).Single();
@@ -276,7 +276,7 @@ public sealed class MainLayoutTests
             "VerarbeiteTonAsync",
             CreateEreignis(),
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
 
         var toast = GetToasts(harness.Sut).Single();
@@ -300,14 +300,14 @@ public sealed class MainLayoutTests
             "VerarbeiteToastAsync",
             ereignis,
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
         await InvokePrivateAsync(
             harness.Sut,
             "VerarbeiteTonAsync",
             ereignis,
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
 
         await InvokePrivateAsync(
@@ -315,18 +315,18 @@ public sealed class MainLayoutTests
             "VerarbeiteToastAsync",
             ereignis,
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
         await InvokePrivateAsync(
             harness.Sut,
             "VerarbeiteTonAsync",
             ereignis,
             harness.BenutzerId,
-            BenachrichtigungsModus.Global,
+            BenachrichtigungsModus.Ton,
             false);
 
         harness.Db.BenachrichtigungsDispatchLogs.Should().HaveCount(2);
-        harness.Db.BenachrichtigungsDispatchLogs.Should().ContainSingle(log => log.Kanal == BenachrichtigungsKanal.Toast);
+        harness.Db.BenachrichtigungsDispatchLogs.Should().ContainSingle(log => log.Kanal == BenachrichtigungsKanal.Banner);
         harness.Db.BenachrichtigungsDispatchLogs.Should().ContainSingle(log => log.Kanal == BenachrichtigungsKanal.Ton);
         GetToasts(harness.Sut).Should().HaveCount(1);
         harness.JsRuntime.Invocations.Should().HaveCount(1);
@@ -380,7 +380,7 @@ public sealed class MainLayoutTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Aufgabe A",
-            AufgabeStatus.InBearbeitung,
+            AufgabeStatus.InArbeit,
             DateTimeOffset.UtcNow);
     }
 

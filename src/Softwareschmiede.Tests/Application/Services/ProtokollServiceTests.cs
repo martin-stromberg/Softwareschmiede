@@ -37,7 +37,7 @@ public sealed class ProtokollServiceTests : IDisposable
             Id = _aufgabeId,
             ProjektId = _projektId,
             Titel = "Protokoll-Testaufgabe",
-            Status = AufgabeStatus.Offen,
+            Status = AufgabeStatus.Neu,
             ErstellungsDatum = DateTimeOffset.UtcNow
         });
         _db.SaveChanges();
@@ -128,13 +128,13 @@ public sealed class ProtokollServiceTests : IDisposable
         // Arrange & Act
         var result = await _sut.AddStatusUebergangAsync(
             _aufgabeId,
-            AufgabeStatus.Offen,
-            AufgabeStatus.InBearbeitung);
+            AufgabeStatus.Neu,
+            AufgabeStatus.Gestartet);
 
         // Assert
         result.Typ.Should().Be(ProtokollTyp.StatusUebergang);
-        result.Inhalt.Should().Contain("Offen");
-        result.Inhalt.Should().Contain("InBearbeitung");
+        result.Inhalt.Should().Contain("Neu");
+        result.Inhalt.Should().Contain("Gestartet");
     }
 
     /// <summary>SuchenAsync findet Einträge anhand des Suchbegriffs im Inhalt.</summary>
@@ -181,5 +181,90 @@ public sealed class ProtokollServiceTests : IDisposable
 
         // Assert
         result.Should().BeEmpty();
+    }
+
+    /// <summary>TestRateLimitMarkerParsing: Marker wird geparst und DateTimeOffset extrahiert.</summary>
+    [Fact]
+    public void TestRateLimitMarkerParsing()
+    {
+        // Gültiger Marker mit Zeitstempel
+        var line = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-10T15:30:00Z]]";
+        var found = ProtokollService.TryParseRateLimitMarker(line, out var resetUtc);
+
+        found.Should().BeTrue();
+        resetUtc.Should().NotBeNull();
+        resetUtc!.Value.Year.Should().Be(2026);
+        resetUtc!.Value.Month.Should().Be(6);
+        resetUtc!.Value.Day.Should().Be(10);
+        resetUtc!.Value.Hour.Should().Be(15);
+        resetUtc!.Value.Minute.Should().Be(30);
+    }
+
+    /// <summary>Rate-Limit-Marker ohne Zeitstempel wird erkannt aber resetUtc bleibt null.</summary>
+    [Fact]
+    public void TryParseRateLimitMarker_WithoutTimestamp_ReturnsTrueButNullResetUtc()
+    {
+        var line = "[[SOFTWARESCHMIEDE_RATE_LIMIT]]";
+        var found = ProtokollService.TryParseRateLimitMarker(line, out var resetUtc);
+
+        found.Should().BeTrue();
+        resetUtc.Should().BeNull();
+    }
+
+    /// <summary>Rate-Limit-Marker mit ungültigem Zeitstempel wird erkannt aber resetUtc bleibt null.</summary>
+    [Fact]
+    public void TryParseRateLimitMarker_WithInvalidTimestamp_ReturnsTrueButNullResetUtc()
+    {
+        var line = "[[SOFTWARESCHMIEDE_RATE_LIMIT:not-a-date]]";
+        var found = ProtokollService.TryParseRateLimitMarker(line, out var resetUtc);
+
+        found.Should().BeTrue();
+        resetUtc.Should().BeNull();
+    }
+
+    /// <summary>Zeilen ohne Marker liefern false.</summary>
+    [Fact]
+    public void TryParseRateLimitMarker_WithNoMarker_ReturnsFalse()
+    {
+        var found = ProtokollService.TryParseRateLimitMarker("normale CLI-Ausgabe", out var resetUtc);
+
+        found.Should().BeFalse();
+        resetUtc.Should().BeNull();
+    }
+
+    /// <summary>Leere Zeile liefert false.</summary>
+    [Fact]
+    public void TryParseRateLimitMarker_WithEmptyLine_ReturnsFalse()
+    {
+        var found = ProtokollService.TryParseRateLimitMarker(string.Empty, out var resetUtc);
+
+        found.Should().BeFalse();
+        resetUtc.Should().BeNull();
+    }
+
+    /// <summary>AddCliOutputAsync speichert Ausgabe und erstellt zusätzlichen RateLimit-Eintrag bei Marker.</summary>
+    [Fact]
+    public async Task AddCliOutputAsync_ShouldCreateRateLimitEntry_WhenMarkerDetected()
+    {
+        var markerLine = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
+
+        await _sut.AddCliOutputAsync(_aufgabeId, markerLine);
+
+        var eintraege = await _sut.GetByAufgabeAsync(_aufgabeId);
+        eintraege.Should().HaveCount(2);
+        eintraege.Should().Contain(e => e.Typ == ProtokollTyp.CliOutput);
+        eintraege.Should().Contain(e => e.Typ == ProtokollTyp.RateLimit);
+    }
+
+    /// <summary>AddCliOutputAsync speichert Ausgabezeile als CliOutput ohne Marker.</summary>
+    [Fact]
+    public async Task AddCliOutputAsync_ShouldCreateSingleEntry_WhenNoMarker()
+    {
+        await _sut.AddCliOutputAsync(_aufgabeId, "normale Ausgabe");
+
+        var eintraege = await _sut.GetByAufgabeAsync(_aufgabeId);
+        eintraege.Should().HaveCount(1);
+        eintraege[0].Typ.Should().Be(ProtokollTyp.CliOutput);
+        eintraege[0].Inhalt.Should().Be("normale Ausgabe");
     }
 }

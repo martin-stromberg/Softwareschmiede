@@ -25,7 +25,7 @@ public sealed class AufgabeDetailRecoveryTests
         markup.Should().Contain("disabled=\"@(_processing || !_recoveryAllowed)\"");
         markup.Should().Contain("_showRecoveryConfirm");
         codeBehind.Should().Contain("AufgabeRecoveryService.IstRecoveryStatus(_aufgabe.Status)");
-        recoveryService.Should().Contain("AufgabeStatus.KiAktiv or AufgabeStatus.TestsLaufen");
+        recoveryService.Should().Contain("AufgabeStatus.InArbeit or AufgabeStatus.Wartend");
         codeBehind.Should().Contain("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
     }
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FluentAssertions;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
@@ -5,66 +6,61 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.Domain.Abstractions;
 
-/// <summary>Tests for file/path helpers in CliKiPluginBase.</summary>
+/// <summary>Tests für die Basisklasse CliKiPluginBase.</summary>
 public sealed class CliKiPluginBaseTests
 {
-    /// <summary>Builds expected provider-specific context and task names.</summary>
+    /// <summary>StartCliAsync gibt ProcessStartInfo aus BuildProcessStartInfo zurück.</summary>
     [Fact]
-    public void BuildFileNames_ShouldIncludeProviderPrefix()
+    public async Task StartCliAsync_ShouldReturnProcessStartInfo_FromBuildProcessStartInfo()
     {
-        var sut = new TestCliKiPlugin("claude");
-        var id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        var runId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        var sut = new TestCliKiPlugin(supportsSession: false);
 
-        sut.BuildContextFileName(id).Should().Be("claude.context.md");
-        sut.BuildTaskFileName(runId).Should().Be("11111111-2222-3333-4444-555555555555.claude.task.md");
+        var result = await sut.StartCliAsync("/repo/path");
+
+        result.FileName.Should().Be("test-cli");
+        result.WorkingDirectory.Should().Be("/repo/path");
     }
 
-    /// <summary>Builds expected provider-specific context and task paths.</summary>
-    [Fact]
-    public void BuildFilePaths_ShouldCombineRepoPathAndFileName()
+    /// <summary>SupportsSessionContinuation gibt den konfigurierten Wert zurück.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SupportsSessionContinuation_ShouldReturnConfiguredValue(bool expected)
     {
-        var sut = new TestCliKiPlugin("copilot");
-        var repoPath = @"C:\repos\demo";
-        var id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-        var runId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        var sut = new TestCliKiPlugin(supportsSession: expected);
 
-        sut.BuildContextFilePath(repoPath, id)
-            .Should().Be(Path.Combine(repoPath, "copilot.context.md"));
-        sut.BuildContextFilePath(repoPath)
-            .Should().Be(Path.Combine(repoPath, "copilot.context.md"));
-        sut.BuildTaskFilePath(repoPath, runId)
-            .Should().Be(Path.Combine(repoPath, "11111111-2222-3333-4444-555555555555.copilot.task.md"));
+        sut.SupportsSessionContinuation().Should().Be(expected);
     }
 
-    /// <summary>Preserves unusual provider prefixes for deterministic naming.</summary>
+    /// <summary>StartCliAsync gibt den übergebenen Parameter an BuildProcessStartInfo weiter.</summary>
     [Fact]
-    public void BuildFileNames_ShouldPreserveCustomPrefix()
+    public async Task StartCliAsync_ShouldPassParameters_ToBuildProcessStartInfo()
     {
-        var sut = new TestCliKiPlugin("custom.prefix");
-        var id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var sut = new TestCliKiPlugin(supportsSession: true);
 
-        sut.BuildContextFileName(id).Should().Be("custom.prefix.context.md");
+        var result = await sut.StartCliAsync("/repo", "session-123");
+
+        result.Arguments.Should().Be("session-123");
     }
 
-    private sealed class TestCliKiPlugin(string prefix) : CliKiPluginBase
+    private sealed class TestCliKiPlugin(bool supportsSession) : CliKiPluginBase
     {
-        public override string ProviderDateiPraefix { get; } = prefix;
+        public override string ProviderDateiPraefix => "test";
         public override string PluginName => "Test";
         public override string PluginPrefix => "Softwareschmiede.Test";
         public override PluginType PluginType => PluginType.DevelopmentAutomation;
         public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
-        public override Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default) => Task.FromResult<IEnumerable<AgentInfo>>([]);
-        public override Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default) => Task.FromResult(true);
-        public override Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default) => Task.CompletedTask;
-        public override IAsyncEnumerable<string> StartDevelopmentAsync(string prompt, AgentInfo agent, string localRepoPath, string? model = null, CancellationToken ct = default) => EmptyStream();
-        public override Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default) => Task.FromResult(new TestResult(true, []));
+        public override bool SupportsSessionContinuation() => supportsSession;
         public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
 
-        private static async IAsyncEnumerable<string> EmptyStream()
+        protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
         {
-            await Task.CompletedTask;
-            yield break;
+            return new ProcessStartInfo
+            {
+                FileName = "test-cli",
+                Arguments = parameters ?? string.Empty,
+                WorkingDirectory = localRepoPath,
+            };
         }
     }
 }

@@ -11,17 +11,17 @@ namespace Softwareschmiede.IntegrationTests.Services;
 public sealed class AufgabeRecoveryServiceTests
 {
     [Fact]
-    public async Task RecoverManuellAsync_ShouldSetInBearbeitungAndCreateAudit_WhenStatusIsTestsLaufen()
+    public async Task RecoverManuellAsync_ShouldSetGestartetAndCreateAudit_WhenStatusIsGestartet()
     {
         await using var db = await DatabaseFixture.CreateAsync();
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.TestsLaufen);
+        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
         var sut = new AufgabeRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
 
         await sut.RecoverManuellAsync(aufgabe.Id);
 
         await using var assertContext = db.CreateNewContext();
         var loaded = await assertContext.Aufgaben.FindAsync(aufgabe.Id);
-        loaded!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.RecoveryVersion.Should().Be(1);
         assertContext.Protokolleintraege
             .Count(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.StatusUebergang && p.Inhalt.Contains("Manuelle Wiederherstellung"))
@@ -32,7 +32,7 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldThrowAndKeepStatus_WhenProcessingIsStillRunning()
     {
         await using var db = await DatabaseFixture.CreateAsync();
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.KiAktiv);
+        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
         var sut = new AufgabeRecoveryService(db.Context, new AlwaysRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(aufgabe.Id);
@@ -42,7 +42,7 @@ public sealed class AufgabeRecoveryServiceTests
 
         await using var assertContext = db.CreateNewContext();
         var loaded = await assertContext.Aufgaben.FindAsync(aufgabe.Id);
-        loaded!.Status.Should().Be(AufgabeStatus.KiAktiv);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.RecoveryVersion.Should().Be(0);
         assertContext.Protokolleintraege.Count(p => p.AufgabeId == aufgabe.Id).Should().Be(0);
     }
@@ -51,7 +51,7 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldThrowConcurrencyConflict_WhenRecoveryVersionChangedConcurrently()
     {
         await using var db = await DatabaseFixture.CreateAsync();
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.KiAktiv);
+        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
         using var concurrentContext = db.CreateNewContext();
         var runningStatus = new MutatingNotRunningAutomationStatusSource(() =>
         {
@@ -68,7 +68,7 @@ public sealed class AufgabeRecoveryServiceTests
 
         await using var assertContext = db.CreateNewContext();
         var loaded = await assertContext.Aufgaben.FindAsync(aufgabe.Id);
-        loaded!.Status.Should().Be(AufgabeStatus.KiAktiv);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.RecoveryVersion.Should().Be(1);
         assertContext.Protokolleintraege.Count(p => p.AufgabeId == aufgabe.Id).Should().Be(0);
     }
@@ -77,7 +77,7 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldRejectInvalidState()
     {
         await using var db = await DatabaseFixture.CreateAsync();
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Offen);
+        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Neu);
         var sut = new AufgabeRecoveryService(db.Context, new AlwaysNotRunningAutomationStatusSource(), NullLogger<AufgabeRecoveryService>.Instance);
 
         var act = () => sut.RecoverManuellAsync(aufgabe.Id);
@@ -90,7 +90,7 @@ public sealed class AufgabeRecoveryServiceTests
     public async Task RecoverManuellAsync_ShouldAllowExactlyOneSuccess_WhenTriggeredInParallel()
     {
         await using var db = await DatabaseFixture.CreateAsync();
-        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.KiAktiv);
+        var aufgabe = await CreateTaskAsync(db, AufgabeStatus.Gestartet);
 
         await using var context1 = db.CreateNewContext();
         await using var context2 = db.CreateNewContext();
@@ -106,7 +106,7 @@ public sealed class AufgabeRecoveryServiceTests
 
         await using var assertContext = db.CreateNewContext();
         var loaded = await assertContext.Aufgaben.FindAsync(aufgabe.Id);
-        loaded!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         assertContext.Protokolleintraege
             .Count(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.StatusUebergang && p.Inhalt.Contains("Manuelle Wiederherstellung"))
             .Should().Be(1);

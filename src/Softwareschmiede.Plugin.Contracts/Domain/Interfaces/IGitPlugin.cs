@@ -102,4 +102,8 @@ public interface IGitPlugin : IPlugin
     /// <param name="ct">Cancellation Token.</param>
     Task MergeToSourceAsync(string localPath, CancellationToken ct = default)
         => throw new NotSupportedException($"'{nameof(MergeToSourceAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
+
+    /// <summary>Liefert die für dieses Plugin verfügbaren Repositories aus der externen Quelle.</summary>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default);
 }

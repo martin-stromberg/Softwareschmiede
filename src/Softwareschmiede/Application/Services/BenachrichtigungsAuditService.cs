@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Infrastructure.Data;
@@ -20,6 +21,7 @@ public sealed class BenachrichtigungsAuditService
         _logger = logger;
     }
 
+    /// <summary>Persistiert eine Benachrichtigungsentscheidung als Audit-Eintrag.</summary>
     public async Task LogAsync(
         Guid ereignisId,
         Guid aufgabeId,

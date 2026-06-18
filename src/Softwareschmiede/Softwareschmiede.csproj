@@ -1,56 +1,28 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\start.ps1" Link="start.ps1" />
+    <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="XtermBlazor" Version="2.4.0" />
-    <ProjectReference Include="..\Softwareschmiede.Client\Softwareschmiede.Client.csproj" />
-    <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj" />
-    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.KiSimulator\Softwareschmiede.Plugin.KiSimulator.csproj" />
-    <PackageReference Include="Markdig" Version="0.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.*" />
   </ItemGroup>
 
-  <Target Name="CopyPluginsToHostOutput" AfterTargets="Build">
-    <ItemGroup>
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.KiSimulator\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-    </ItemGroup>
-    <MakeDir Directories="$(OutDir)plugins" />
-    <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(OutDir)plugins" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CopyPluginsToPublishOutput" BeforeTargets="Publish">
-    <ItemGroup>
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHub\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-      <PluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.KiSimulator\bin\$(Configuration)\$(TargetFramework)\*.dll" />
-    </ItemGroup>
-    <MakeDir Directories="$(PublishDir)plugins" />
-    <Copy SourceFiles="@(PluginArtifacts)" DestinationFolder="$(PublishDir)plugins" SkipUnchangedFiles="true" />
-  </Target>
 
 </Project>

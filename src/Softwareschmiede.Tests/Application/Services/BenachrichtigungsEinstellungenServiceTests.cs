@@ -25,11 +25,11 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
         await sut.SaveAsync(
             "user-a",
-            new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Global));
+            new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton));
 
         var loaded = await sut.GetAsync("user-a");
-        loaded.ToastModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
-        loaded.TonModus.Should().Be(BenachrichtigungsModus.Global);
+        loaded.BannerModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
+        loaded.TonModus.Should().Be(BenachrichtigungsModus.Ton);
     }
 
     [Fact]
@@ -40,8 +40,8 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
         var loaded = await sut.GetAsync("unknown-user");
 
-        loaded.ToastModus.Should().Be(BenachrichtigungsModus.Global);
-        loaded.TonModus.Should().Be(BenachrichtigungsModus.NurAufgabenseite);
+        loaded.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
+        loaded.TonModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
     }
 
     [Fact]
@@ -50,12 +50,12 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
         await using var db = CreateDb();
         var sut = new BenachrichtigungsEinstellungenService(db);
 
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Global));
-        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.NurAufgabenseite, BenachrichtigungsModus.Deaktiviert));
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Ton));
+        await sut.SaveAsync("user-a", new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Banner, BenachrichtigungsModus.Deaktiviert));
 
         db.BenachrichtigungsEinstellungen.Should().ContainSingle(e => e.BenutzerId == "user-a");
         var loaded = await sut.GetAsync("user-a");
-        loaded.ToastModus.Should().Be(BenachrichtigungsModus.NurAufgabenseite);
+        loaded.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
         loaded.TonModus.Should().Be(BenachrichtigungsModus.Deaktiviert);
     }
 

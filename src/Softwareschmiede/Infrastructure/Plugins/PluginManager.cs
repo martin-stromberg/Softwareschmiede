@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -13,11 +14,13 @@ public sealed class PluginManager : IPluginManager
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<PluginManager> _logger;
     private readonly string _pluginDirectory;
+    private readonly bool _applyTestModeFilter;
     private readonly object _sync = new();
     private readonly List<IGitPlugin> _gitPlugins = [];
     private readonly List<IKiPlugin> _kiPlugins = [];
     private bool _initialized;
 
+    /// <summary>Erstellt eine neue Instanz von <see cref="PluginManager"/>.</summary>
     public PluginManager(
         IServiceProvider serviceProvider,
         ILogger<PluginManager> logger,
@@ -25,21 +28,27 @@ public sealed class PluginManager : IPluginManager
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
+        // Test-Modus-Filter nur anwenden, wenn das Standard-Plugin-Verzeichnis genutzt wird.
+        // Bei explizit übergebenem Verzeichnis (z. B. in Unit-Tests) wird der Filter nicht angewandt.
+        _applyTestModeFilter = pluginDirectory is null;
         _pluginDirectory = pluginDirectory ?? Path.Combine(AppContext.BaseDirectory, "plugins");
     }
 
+    /// <inheritdoc/>
     public IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins()
     {
         EnsureInitialized();
         return _gitPlugins;
     }
 
+    /// <inheritdoc/>
     public IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins()
     {
         EnsureInitialized();
         return _kiPlugins;
     }
 
+    /// <inheritdoc/>
     public IGitPlugin GetDefaultSourceCodeManagementPlugin()
     {
         EnsureInitialized();
@@ -47,6 +56,7 @@ public sealed class PluginManager : IPluginManager
                ?? throw new InvalidOperationException("Kein Source-Code-Management-Plugin verfügbar.");
     }
 
+    /// <inheritdoc/>
     public IKiPlugin GetDefaultDevelopmentAutomationPlugin()
     {
         EnsureInitialized();
@@ -82,6 +92,18 @@ public sealed class PluginManager : IPluginManager
         }
     }
 
+    private static bool IsTestMode()
+        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH"));
+
+    private static bool IsAllowedInTestMode(string dllFileName)
+    {
+        var name = Path.GetFileNameWithoutExtension(dllFileName);
+        return name.Equals("Softwareschmiede.Plugin.LocalDirectory", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.KiSimulator", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.ClaudeCli", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.GitHubCopilot", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void DiscoverPlugins()
     {
         _gitPlugins.Clear();
@@ -93,8 +115,16 @@ public sealed class PluginManager : IPluginManager
             return;
         }
 
-        foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly))
+        var testMode = _applyTestModeFilter && IsTestMode();
+        foreach (var dllPath in Directory.GetFiles(_pluginDirectory, "*.dll", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.GetDirectories(_pluginDirectory, "*", SearchOption.TopDirectoryOnly)
+                .SelectMany(folder => Directory.GetFiles(folder, "*.dll", SearchOption.TopDirectoryOnly))))
         {
+            if (testMode && !IsAllowedInTestMode(Path.GetFileName(dllPath)))
+            {
+                _logger.LogInformation("Test-Modus: Plugin übersprungen: {DllPath}", dllPath);
+                continue;
+            }
             LoadPluginsFromDll(dllPath);
         }
 

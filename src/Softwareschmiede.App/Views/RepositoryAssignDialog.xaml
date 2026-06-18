@@ -1,0 +1,104 @@
+<Window x:Class="Softwareschmiede.App.Views.RepositoryAssignDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Repository zuweisen"
+        Background="{DynamicResource SurfaceBrush}"
+        Width="500"
+        Height="400"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Titel -->
+        <TextBlock Grid.Row="0"
+                   Text="Repository zuweisen"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   Margin="0,0,0,16" />
+
+        <!-- Plugin-Auswahl -->
+        <ComboBox Grid.Row="1"
+                  ItemsSource="{Binding AvailableScmPlugins}"
+                  SelectedItem="{Binding SelectedScmPlugin, Mode=TwoWay}"
+                  DisplayMemberPath="PluginName"
+                  Background="{DynamicResource BackgroundBrush}"
+                  Padding="8,6"
+                  Margin="0,0,0,12" />
+
+        <!-- Repository-Liste -->
+        <ListBox Grid.Row="2"
+                 Visibility="{Binding HasScmPlugins, Converter={StaticResource BoolToVisibilityConverter}}"
+                 ItemsSource="{Binding VerfuegbareRepositories}"
+                 SelectedItem="{Binding SelectedRepository}"
+                 Background="{DynamicResource BackgroundBrush}"
+                 BorderBrush="{DynamicResource BorderBrush}"
+                 BorderThickness="1"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="8,4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition />
+                            <RowDefinition />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="{Binding Name}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Row="1"
+                                   Text="{Binding Url}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Hilfe-Panel (bei fehlenden Plugins) -->
+        <Border Grid.Row="2"
+                Visibility="{Binding HasScmPlugins, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                Background="{DynamicResource BackgroundBrush}"
+                Padding="16"
+                VerticalAlignment="Center"
+                HorizontalAlignment="Stretch">
+            <StackPanel>
+                <TextBlock Text="Keine SCM-Plugins installiert"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           Margin="0,0,0,8" />
+                <TextBlock Text="Um Repositories zuzuweisen, installieren Sie bitte ein SCM-Plugin (z.B. GitHub Plugin). Weitere Informationen finden Sie in der Dokumentation."
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextWrapping="Wrap"
+                           LineHeight="18" />
+            </StackPanel>
+        </Border>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0">
+            <Button Content="Abbrechen"
+                    Command="{Binding AbbrechenCommand}"
+                    Padding="12,6"
+                    Margin="0,0,8,0" />
+            <Button Content="Zuweisen"
+                    Command="{Binding BestaetigenCommand}"
+                    Padding="12,6"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="White"
+                    BorderThickness="0" />
+        </StackPanel>
+    </Grid>
+</Window>

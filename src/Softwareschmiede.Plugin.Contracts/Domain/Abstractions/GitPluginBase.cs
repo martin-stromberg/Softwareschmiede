@@ -117,4 +117,7 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin
     {
         return _cliRunner.RunAsync("git", args, workingDirectory, environmentVariables, ct);
     }
+
+    public virtual Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
+        => Task.FromResult(Enumerable.Empty<AvailableRepository>());
 }

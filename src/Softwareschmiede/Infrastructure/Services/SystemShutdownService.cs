@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Interfaces;
 
 namespace Softwareschmiede.Infrastructure.Services;

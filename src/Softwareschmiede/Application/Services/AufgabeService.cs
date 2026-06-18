@@ -26,6 +26,7 @@ public sealed class AufgabeService
         _logger.LogInformation("Aufgaben für Projekt {ProjektId} abrufen.", projektId);
         return await _db.Aufgaben
             .AsNoTracking()
+            .Include(a => a.IssueReferenz)
             .Where(a => a.ProjektId == projektId && a.Status != AufgabeStatus.Archiviert)
             .OrderByDescending(a => a.ErstellungsDatum)
             .ToListAsync(ct);
@@ -40,6 +41,21 @@ public sealed class AufgabeService
             .Where(a => a.ProjektId == projektId && a.Status == AufgabeStatus.Archiviert)
             .OrderByDescending(a => a.ErstellungsDatum)
             .ToListAsync(ct);
+    }
+
+    /// <summary>Gibt die Anzahl aktiver (Gestartet) und wartender (Wartend) Aufgaben als Tupel zurück — eine einzige Abfrage.</summary>
+    public async Task<(int Aktiv, int Wartend)> GetAktiveUndWartendeCountAsync(CancellationToken ct = default)
+    {
+        var counts = await _db.Aufgaben
+            .AsNoTracking()
+            .Where(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
+            .GroupBy(a => a.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var aktiv = counts.FirstOrDefault(c => c.Status == AufgabeStatus.Gestartet)?.Count ?? 0;
+        var wartend = counts.FirstOrDefault(c => c.Status == AufgabeStatus.Wartend)?.Count ?? 0;
+        return (aktiv, wartend);
     }
 
     /// <summary>Gibt eine Aufgabe anhand ihrer ID zurück.</summary>
@@ -111,7 +127,7 @@ public sealed class AufgabeService
         return normalized.TrimStart('/').ToLowerInvariant();
     }
 
-    /// <summary>Erstellt eine neue Aufgabe.</summary>
+    /// <summary>Erstellt eine neue Aufgabe mit Status <see cref="AufgabeStatus.Neu"/>.</summary>
     public async Task<Aufgabe> CreateAsync(
         Guid projektId,
         string titel,
@@ -128,7 +144,7 @@ public sealed class AufgabeService
             GitRepositoryId = gitRepositoryId,
             Titel = titel,
             AnforderungsBeschreibung = anforderungsBeschreibung,
-            Status = AufgabeStatus.Offen,
+            Status = AufgabeStatus.Neu,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
@@ -155,7 +171,7 @@ public sealed class AufgabeService
             GitRepositoryId = gitRepositoryId,
             Titel = issue.Titel,
             AnforderungsBeschreibung = issue.Body,
-            Status = AufgabeStatus.Offen,
+            Status = AufgabeStatus.Neu,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
@@ -180,13 +196,11 @@ public sealed class AufgabeService
         return aufgabe;
     }
 
-    /// <summary>Aktualisiert Titel, Beschreibung und Agenteninformationen einer Aufgabe.</summary>
+    /// <summary>Aktualisiert Titel, Beschreibung und KI-Plugin-Prefix einer Aufgabe.</summary>
     public async Task UpdateAsync(
         Guid id,
         string titel,
         string? anforderungsBeschreibung,
-        string? agentenpaketName,
-        string? agentenName,
         string? kiPluginPrefix = null,
         CancellationToken ct = default)
     {
@@ -197,15 +211,63 @@ public sealed class AufgabeService
 
         aufgabe.Titel = titel;
         aufgabe.AnforderungsBeschreibung = anforderungsBeschreibung;
-        aufgabe.AgentenpaketName = agentenpaketName;
-        aufgabe.AgentenName = agentenName;
         aufgabe.KiPluginPrefix = kiPluginPrefix;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisiert.", id);
     }
 
-    /// <summary>Löscht eine Aufgabe. Nur für archivierte, fehlgeschlagene oder abgeschlossene Aufgaben.</summary>
+    /// <summary>Setzt die IssueReferenz einer Aufgabe. Übergabe von null entfernt die bestehende Referenz.</summary>
+    public async Task UpdateIssueReferenzAsync(Guid id, Issue? issue, CancellationToken ct = default)
+    {
+        _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} aktualisieren.", id);
+
+        var aufgabe = await _db.Aufgaben
+            .Include(a => a.IssueReferenz)
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        if (issue == null)
+        {
+            if (aufgabe.IssueReferenz != null)
+                _db.Remove(aufgabe.IssueReferenz);
+            aufgabe.IssueReferenz = null;
+        }
+        else
+        {
+            if (aufgabe.IssueReferenz != null)
+            {
+                aufgabe.IssueReferenz.IssueNummer = issue.Nummer;
+                aufgabe.IssueReferenz.Titel = issue.Titel;
+                aufgabe.IssueReferenz.Body = issue.Body;
+                aufgabe.IssueReferenz.LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels);
+                aufgabe.IssueReferenz.Milestone = issue.Milestone;
+                aufgabe.IssueReferenz.IssueUrl = issue.IssueUrl;
+            }
+            else
+            {
+                var neueReferenz = new IssueReferenz
+                {
+                    Id = Guid.NewGuid(),
+                    AufgabeId = aufgabe.Id,
+                    IssueNummer = issue.Nummer,
+                    Titel = issue.Titel,
+                    Body = issue.Body,
+                    LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
+                    Milestone = issue.Milestone,
+                    IssueUrl = issue.IssueUrl
+                };
+                aufgabe.IssueReferenz = neueReferenz;
+                _db.IssueReferenzen.Add(neueReferenz);
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+        _db.ChangeTracker.Clear();
+        _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} aktualisiert.", id);
+    }
+
+    /// <summary>Löscht eine Aufgabe.</summary>
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} löschen.", id);
@@ -213,13 +275,19 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
+        if (aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.Wartend)
+        {
+            throw new InvalidOperationException(
+                $"Aufgabe {id} kann nicht gelöscht werden, da sie aktiv ist (Status: {aufgabe.Status}). Bitte zuerst abbrechen oder abschließen.");
+        }
+
         _db.Aufgaben.Remove(aufgabe);
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe {AufgabeId} gelöscht.", id);
     }
 
-    /// <summary>Verwirft eine offene Aufgabe durch Archivieren oder Löschen.</summary>
+    /// <summary>Verwirft eine Aufgabe im Status Neu durch Archivieren oder Löschen.</summary>
     public async Task VerwerfenAsync(Guid id, VerwerfenAktion aktion, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} verwerfen (Aktion: {Aktion}).", id, aktion);
@@ -227,9 +295,9 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status != AufgabeStatus.Offen)
+        if (aufgabe.Status != AufgabeStatus.Neu)
         {
-            throw new InvalidOperationException("Nur offene Aufgaben können verworfen werden.");
+            throw new InvalidOperationException("Nur neue Aufgaben können verworfen werden.");
         }
 
         if (aktion == VerwerfenAktion.Archivieren)
@@ -244,7 +312,7 @@ public sealed class AufgabeService
         _logger.LogInformation("Aufgabe {AufgabeId} verworfen und dauerhaft gelöscht.", id);
     }
 
-    /// <summary>Archiviert eine Aufgabe. Nur für abgeschlossene oder fehlgeschlagene Aufgaben möglich.</summary>
+    /// <summary>Archiviert eine Aufgabe. Nur für Aufgaben im Status Beendet möglich.</summary>
     public async Task ArchivierenAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} archivieren.", id);
@@ -252,10 +320,9 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status is not (AufgabeStatus.Abgeschlossen or AufgabeStatus.Fehlgeschlagen))
+        if (aufgabe.Status is not AufgabeStatus.Beendet)
         {
-            throw new InvalidOperationException(
-                "Nur abgeschlossene oder fehlgeschlagene Aufgaben können archiviert werden.");
+            throw new InvalidOperationException("Nur beendete Aufgaben können archiviert werden.");
         }
 
         aufgabe.Status = AufgabeStatus.Archiviert;
@@ -264,7 +331,7 @@ public sealed class AufgabeService
         _logger.LogInformation("Aufgabe {AufgabeId} archiviert.", id);
     }
 
-    /// <summary>Startet eine Aufgabe: Status → InBearbeitung, Branch und Klonpfad setzen.</summary>
+    /// <summary>Startet eine Aufgabe: Status → Gestartet, Branch und Arbeitsverzeichnis setzen.</summary>
     public async Task StartenAsync(Guid id, string branchName, string lokalerKlonPfad, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} starten (Branch: {BranchName}).", id, branchName);
@@ -272,30 +339,18 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.Status = AufgabeStatus.InBearbeitung;
+        aufgabe.Status = AufgabeStatus.Gestartet;
         aufgabe.BranchName = branchName;
         aufgabe.LokalerKlonPfad = lokalerKlonPfad;
 
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Aufgabe {AufgabeId} gestartet.", id);
-    }
-
-    /// <summary>Setzt den Status auf KiAktiv.</summary>
-    public async Task KiAktiviertAsync(Guid id, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Aufgabe {AufgabeId}: KI aktiviert.", id);
-
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        aufgabe.Status = AufgabeStatus.KiAktiv;
-        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Aufgabe {AufgabeId} gestartet (Status: Gestartet).", id);
     }
 
     /// <summary>Speichert einen Vorschlagsprompt und optionalen Ausführungszeitpunkt für die Aufgabe.</summary>
     public async Task SavePromptVorschlagAsync(Guid id, string? prompt, DateTimeOffset? ausfuehrenAbUtc, CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt speichern (mit Ausführungszeitpunkt: {HasAusfuehrenAb}).", id, ausfuehrenAbUtc.HasValue);
+        _logger.LogInformation("Aufgabe {AufgabeId}: Vorschlagsprompt speichern.", id);
 
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
@@ -326,19 +381,7 @@ public sealed class AufgabeService
         await _db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Setzt den Status zurück auf InBearbeitung nach KI-Abschluss.</summary>
-    public async Task KiAbgeschlossenAsync(Guid id, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Aufgabe {AufgabeId}: KI abgeschlossen, zurück auf InBearbeitung.", id);
-
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        aufgabe.Status = AufgabeStatus.InBearbeitung;
-        await _db.SaveChangesAsync(ct);
-    }
-
-    /// <summary>Schließt eine Aufgabe ab: Status → Abgeschlossen, AbschlussDatum setzen, Branch und Klonpfad leeren.</summary>
+    /// <summary>Schließt eine Aufgabe ab: Status → Beendet, AbschlussDatum setzen, Branch- und Klonpfad-Felder leeren.</summary>
     public async Task AbschliessenAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abschließen.", id);
@@ -346,44 +389,32 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.Status = AufgabeStatus.Abgeschlossen;
+        aufgabe.Status = AufgabeStatus.Beendet;
         aufgabe.AbschlussDatum = DateTimeOffset.UtcNow;
         aufgabe.BranchName = null;
         aufgabe.LokalerKlonPfad = null;
 
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Aufgabe {AufgabeId} abgeschlossen.", id);
+        _logger.LogInformation("Aufgabe {AufgabeId} abgeschlossen (Status: Beendet).", id);
     }
 
-    /// <summary>Bricht eine Aufgabe ab: Status → Offen, Branch und Klonpfad leeren.</summary>
-    public async Task AbbrechenAsync(Guid id, CancellationToken ct = default)
+    /// <summary>Setzt den Status einer Aufgabe mit Validierung der erlaubten Übergänge.</summary>
+    public async Task SetStatusAsync(Guid id, AufgabeStatus newStatus, CancellationToken ct = default)
     {
-        _logger.LogInformation("Aufgabe {AufgabeId} abbrechen.", id);
+        _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} setzen.", id, newStatus);
 
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        aufgabe.Status = AufgabeStatus.Offen;
-        aufgabe.BranchName = null;
-        aufgabe.LokalerKlonPfad = null;
+        ValidateStatusTransition(aufgabe.Status, newStatus);
 
+        aufgabe.Status = newStatus;
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Aufgabe {AufgabeId} abgebrochen, Status zurück auf Offen.", id);
+
+        _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} gesetzt.", id, newStatus);
     }
 
-    /// <summary>Setzt den Status auf Fehlgeschlagen.</summary>
-    public async Task FehlgeschlagenAsync(Guid id, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Aufgabe {AufgabeId}: Fehlgeschlagen.", id);
-
-        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
-            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
-
-        aufgabe.Status = AufgabeStatus.Fehlgeschlagen;
-        await _db.SaveChangesAsync(ct);
-    }
-
-    /// <summary>Setzt den Status einer Aufgabe generisch.</summary>
+    /// <summary>Setzt den Status einer Aufgabe generisch (ohne Transitions-Validierung).</summary>
     public async Task StatusSetzenAsync(Guid id, AufgabeStatus status, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} setzen.", id, status);
@@ -395,5 +426,55 @@ public sealed class AufgabeService
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} gesetzt.", id, status);
+    }
+
+    /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe.</summary>
+    public async Task UpdateHeartbeatAsync(Guid id, CancellationToken ct = default)
+    {
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Gibt die Minuten seit dem letzten Heartbeat zurück (null wenn kein Heartbeat gesetzt).</summary>
+    public async Task<int?> GetHeartbeatAgeMinutesAsync(Guid id, CancellationToken ct = default)
+    {
+        var aufgabe = await _db.Aufgaben
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        if (aufgabe.LastHeartbeatUtc is null)
+        {
+            return null;
+        }
+
+        var ageMinutes = (int)(DateTimeOffset.UtcNow - aufgabe.LastHeartbeatUtc.Value).TotalMinutes;
+        return ageMinutes;
+    }
+
+    private static void ValidateStatusTransition(AufgabeStatus current, AufgabeStatus next)
+    {
+        if (next == AufgabeStatus.Archiviert)
+        {
+            return;
+        }
+
+        var allowed = current switch
+        {
+            AufgabeStatus.Neu => new[] { AufgabeStatus.Gestartet },
+            AufgabeStatus.Gestartet => new[] { AufgabeStatus.Wartend, AufgabeStatus.Beendet },
+            AufgabeStatus.Wartend => new[] { AufgabeStatus.Gestartet, AufgabeStatus.Beendet },
+            AufgabeStatus.Beendet => Array.Empty<AufgabeStatus>(),
+            AufgabeStatus.Archiviert => Array.Empty<AufgabeStatus>(),
+            _ => Array.Empty<AufgabeStatus>()
+        };
+
+        if (!allowed.Contains(next))
+        {
+            throw new InvalidStatusTransitionException(current, next);
+        }
     }
 }

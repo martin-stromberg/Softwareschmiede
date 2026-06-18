@@ -140,7 +140,7 @@ public sealed class DiffCachingServiceTests : IDisposable
             Id = aufgabeId,
             ProjektId = projektId,
             Titel = "Aufgabe",
-            Status = AufgabeStatus.Offen,
+            Status = AufgabeStatus.Neu,
             ErstellungsDatum = DateTimeOffset.UtcNow
         });
         var persisted = new DiffResult

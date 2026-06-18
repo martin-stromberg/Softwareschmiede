@@ -22,12 +22,14 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
     private readonly ICliRunner _cliRunner;
     private readonly ILogger<GitWorkspaceBrowserService> _logger;
 
+    /// <summary>Erstellt eine neue Instanz von <see cref="GitWorkspaceBrowserService"/>.</summary>
     public GitWorkspaceBrowserService(ICliRunner cliRunner, ILogger<GitWorkspaceBrowserService> logger)
     {
         _cliRunner = cliRunner;
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public async Task<WorkspaceSnapshot> LoadSnapshotAsync(string repositoryPath, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
@@ -61,6 +63,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return snapshot;
     }
 
+    /// <inheritdoc/>
     public async Task<FilePreview> LoadPreviewAsync(string repositoryPath, WorkspaceFileNode node, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -117,6 +120,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return new FilePreview(relativePath, sourceRelativePath, false, false, false, currentContent, original, null);
     }
 
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<WorkspaceFileNode>> LoadCommitFilesAsync(string repositoryPath, string commitSha, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
@@ -137,6 +141,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return BuildCommitFileTree(commitSha, result.StdOut);
     }
 
+    /// <inheritdoc/>
     public async Task<FilePreview> LoadCommitPreviewAsync(string repositoryPath, WorkspaceFileNode node, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);

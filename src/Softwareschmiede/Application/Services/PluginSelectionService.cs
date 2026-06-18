@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -32,6 +33,10 @@ public sealed class PluginSelectionService
     public Task SaveDefaultPluginPrefixAsync(PluginType pluginType, string? pluginPrefix, CancellationToken ct = default)
         => _defaultSettingsService.SaveDefaultPluginPrefixAsync(pluginType, pluginPrefix, ct);
 
+    /// <summary>Speichert den PluginPrefix als Projekt-Standard für den Plugin-Typ.</summary>
+    public Task SaveProjectDefaultPluginPrefixAsync(Guid projektId, PluginType pluginType, string? pluginPrefix, CancellationToken ct = default)
+        => _defaultSettingsService.SaveProjectDefaultPluginPrefixAsync(projektId, pluginType, pluginPrefix, ct);
+
     /// <summary>Löst das SCM-Plugin auf.</summary>
     public async Task<IGitPlugin> ResolveSourceCodeManagementPluginAsync(string? selectedPluginPrefix, CancellationToken ct = default)
     {
@@ -47,6 +52,18 @@ public sealed class PluginSelectionService
         return resolved;
     }
 
+    /// <summary>Gibt alle verfügbaren KI-Plugin-Prefixe zurück.</summary>
+    public Task<IReadOnlyList<string>> GetAvailableKiPluginPrefixesAsync(CancellationToken ct = default)
+    {
+        var plugins = _pluginManager.GetDevelopmentAutomationPlugins();
+        var prefixe = (IReadOnlyList<string>)plugins
+            .Select(p => p.PluginPrefix)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return Task.FromResult(prefixe);
+    }
+
     /// <summary>Löst das KI-Plugin auf.</summary>
     public async Task<IKiPlugin> ResolveDevelopmentAutomationPluginAsync(string? selectedPluginPrefix, CancellationToken ct = default)
     {
@@ -60,6 +77,36 @@ public sealed class PluginSelectionService
             ct);
 
         return resolved;
+    }
+
+    /// <summary>
+    /// Löst das KI-Plugin-Prefix mit Projekt-Kontext auf: Aufgaben-Plugin → Projekt-Default → Global-Default.
+    /// Wird nichts gefunden, gibt die Methode <c>null</c> zurück; der Aufrufer muss in diesem Fall
+    /// den Plugin-Auswahl-Dialog anzeigen.
+    /// </summary>
+    public async Task<string?> ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
+        string? aufgabenPluginPrefix,
+        Guid projektId,
+        CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(aufgabenPluginPrefix))
+        {
+            return aufgabenPluginPrefix.Trim();
+        }
+
+        var projectDefault = await _defaultSettingsService.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, ct);
+        if (!string.IsNullOrWhiteSpace(projectDefault))
+        {
+            return projectDefault;
+        }
+
+        var globalDefault = await _defaultSettingsService.GetDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ct);
+        if (!string.IsNullOrWhiteSpace(globalDefault))
+        {
+            return globalDefault;
+        }
+
+        return null;
     }
 
     private async Task<TPlugin> ResolvePluginAsync<TPlugin>(

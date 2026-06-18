@@ -8,6 +8,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Verwaltet benutzerbezogene Einstellungen und Audio-Dateien für KI-Benachrichtigungen.</summary>
 public sealed class BenachrichtigungsEinstellungenService
 {
+    /// <summary>Maximale erlaubte Audio-Dateigröße in Bytes (10 MB).</summary>
     public const int MaxAudioDateigroesseBytes = 10 * 1024 * 1024;
 
     private static readonly HashSet<string> ErlaubteErweiterungen = new(StringComparer.OrdinalIgnoreCase)
@@ -36,6 +37,7 @@ public sealed class BenachrichtigungsEinstellungenService
         _db = db;
     }
 
+    /// <summary>Gibt die gespeicherten Benachrichtigungseinstellungen des Benutzers zurück.</summary>
     public async Task<BenachrichtigungsEinstellungenDto> GetAsync(string benutzerId, CancellationToken ct = default)
     {
         var einstellung = await _db.BenachrichtigungsEinstellungen
@@ -45,13 +47,14 @@ public sealed class BenachrichtigungsEinstellungenService
         if (einstellung is null)
         {
             return new BenachrichtigungsEinstellungenDto(
-                BenachrichtigungsModus.Global,
-                BenachrichtigungsModus.NurAufgabenseite);
+                BenachrichtigungsModus.Banner,
+                BenachrichtigungsModus.Deaktiviert);
         }
 
-        return new BenachrichtigungsEinstellungenDto(einstellung.ToastModus, einstellung.TonModus);
+        return new BenachrichtigungsEinstellungenDto(einstellung.BannerModus, einstellung.TonModus);
     }
 
+    /// <summary>Speichert die Benachrichtigungseinstellungen des Benutzers.</summary>
     public async Task SaveAsync(string benutzerId, BenachrichtigungsEinstellungenDto dto, CancellationToken ct = default)
     {
         var einstellung = await _db.BenachrichtigungsEinstellungen
@@ -67,12 +70,13 @@ public sealed class BenachrichtigungsEinstellungenService
             _db.BenachrichtigungsEinstellungen.Add(einstellung);
         }
 
-        einstellung.ToastModus = dto.ToastModus;
+        einstellung.BannerModus = dto.BannerModus;
         einstellung.TonModus = dto.TonModus;
         einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Gibt Metadaten der hochgeladenen Audio-Datei des Benutzers zurück.</summary>
     public async Task<BenachrichtigungsAudioInfoDto> GetAudioInfoAsync(string benutzerId, CancellationToken ct = default)
     {
         var audio = await _db.BenachrichtigungsAudioDateien
@@ -87,6 +91,7 @@ public sealed class BenachrichtigungsEinstellungenService
         return new BenachrichtigungsAudioInfoDto(true, audio.OriginalDateiname, audio.MimeType, audio.GroesseBytes);
     }
 
+    /// <summary>Gibt den Base64-kodierten Audio-Payload des Benutzers zurück.</summary>
     public async Task<BenachrichtigungsAudioPayload?> GetAudioPayloadAsync(string benutzerId, CancellationToken ct = default)
     {
         var audio = await _db.BenachrichtigungsAudioDateien
@@ -101,6 +106,7 @@ public sealed class BenachrichtigungsEinstellungenService
         return new BenachrichtigungsAudioPayload(audio.MimeType, Convert.ToBase64String(audio.Inhalt));
     }
 
+    /// <summary>Speichert eine neue Audio-Datei für den Benutzer.</summary>
     public async Task UploadAudioAsync(
         string benutzerId,
         string dateiname,
@@ -131,6 +137,7 @@ public sealed class BenachrichtigungsEinstellungenService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Löscht die benutzerdefinierte Audio-Datei des Benutzers.</summary>
     public async Task RemoveAudioAsync(string benutzerId, CancellationToken ct = default)
     {
         var existing = await _db.BenachrichtigungsAudioDateien

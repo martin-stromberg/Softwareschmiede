@@ -76,4 +76,53 @@ public sealed class PluginDefaultSettingsServiceTests
         var entity = await db.AppEinstellungen.SingleAsync(e => e.Schluessel == "plugins.default.SourceCodeManagement");
         entity.Wert.Should().BeNull();
     }
+
+    /// <summary>Gespeicherter Projekt-Default wird korrekt abgerufen.</summary>
+    [Fact]
+    public async Task TestGetProjectDefaultPluginPrefix_ReturnsStoredValue()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var sut = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+        await sut.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+
+        // Act
+        var value = await sut.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation);
+
+        // Assert
+        value.Should().Be("Softwareschmiede.ProjectKi");
+    }
+
+    /// <summary>Falls kein Projekt-Default gespeichert ist, wird null zurückgegeben.</summary>
+    [Fact]
+    public async Task TestGetProjectDefaultPluginPrefix_NoProjectDefault_ReturnsNull()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var sut = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+
+        // Act
+        var value = await sut.GetProjectDefaultPluginPrefixAsync(Guid.NewGuid(), PluginType.DevelopmentAutomation);
+
+        // Assert
+        value.Should().BeNull();
+    }
+
+    /// <summary>Projekt-Default wird mit scoped Key in AppEinstellung gespeichert.</summary>
+    [Fact]
+    public async Task TestSaveProjectDefaultPluginPrefix_StoresInAppEinstellung()
+    {
+        // Arrange
+        await using var db = TestDbContextFactory.Create();
+        var sut = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var projektId = Guid.NewGuid();
+
+        // Act
+        await sut.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi");
+
+        // Assert
+        var entity = await db.AppEinstellungen.SingleAsync(e => e.Schluessel == $"plugins.default.project.{projektId}.DevelopmentAutomation");
+        entity.Wert.Should().Be("Softwareschmiede.ProjectKi");
+    }
 }

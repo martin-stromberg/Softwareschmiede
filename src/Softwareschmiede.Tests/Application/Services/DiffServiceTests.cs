@@ -166,7 +166,7 @@ public sealed class DiffServiceTests : IDisposable
             Id = aufgabeId,
             ProjektId = projektId,
             Titel = "Diff-Aufgabe",
-            Status = AufgabeStatus.Offen,
+            Status = AufgabeStatus.Neu,
             ErstellungsDatum = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();

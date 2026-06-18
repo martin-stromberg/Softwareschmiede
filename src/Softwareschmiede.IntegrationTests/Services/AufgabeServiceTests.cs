@@ -40,7 +40,7 @@ public sealed class AufgabeServiceTests
         loaded.Should().NotBeNull();
         loaded!.Titel.Should().Be("Test-Aufgabe");
         loaded.AnforderungsBeschreibung.Should().Be("Anforderungsbeschreibung");
-        loaded.Status.Should().Be(AufgabeStatus.Offen);
+        loaded.Status.Should().Be(AufgabeStatus.Neu);
         loaded.ProjektId.Should().Be(projektId);
     }
 
@@ -63,7 +63,7 @@ public sealed class AufgabeServiceTests
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
 
-        loaded!.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
         loaded.BranchName.Should().Be("task/feature-branch");
         loaded.LokalerKlonPfad.Should().Be(@"C:\klone\aufgabe");
     }
@@ -90,7 +90,7 @@ public sealed class AufgabeServiceTests
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
 
-        loaded!.Status.Should().Be(AufgabeStatus.Abgeschlossen);
+        loaded!.Status.Should().Be(AufgabeStatus.Beendet);
         loaded.AbschlussDatum.Should().NotBeNull();
         // Toleranz von 2 Sekunden, da DateTimeOffset als Unix-Millisekunden gespeichert wird (Präzisionsverlust < 1 ms)
         loaded.AbschlussDatum!.Value.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(2));
@@ -230,7 +230,7 @@ public sealed class AufgabeServiceTests
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Nur offene Aufgaben können verworfen werden.");
+            .WithMessage("Nur neue Aufgaben können verworfen werden.");
     }
 
     /// <summary>
@@ -291,28 +291,26 @@ public sealed class AufgabeServiceTests
     }
 
     /// <summary>
-    /// Testet, dass AbbrechenAsync den Status auf Offen zurücksetzt und Branch/Pfad löscht.
+    /// Testet, dass SetStatusAsync den Status auf Beendet setzt.
     /// </summary>
     [Fact]
-    public async Task AbbrechenAsync_ShouldResetStatusToOffenAndClearBranchInfo_WhenAufgabeInBearbeitung()
+    public async Task SetStatusAsync_ShouldSetStatusBeendet_WhenAufgabeIsGestartet()
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
         var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
-        var aufgabe = await service.CreateAsync(projektId, "Abzubrechende Aufgabe", null);
-        await service.StartenAsync(aufgabe.Id, "task/abzubrechen", @"C:\klone\abzubrechen");
+        var aufgabe = await service.CreateAsync(projektId, "Aufgabe für Statuswechsel", null);
+        await service.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet);
 
         // Act
-        await service.AbbrechenAsync(aufgabe.Id);
+        await service.SetStatusAsync(aufgabe.Id, AufgabeStatus.Beendet);
 
         // Assert
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
 
-        loaded!.Status.Should().Be(AufgabeStatus.Offen);
-        loaded.BranchName.Should().BeNull();
-        loaded.LokalerKlonPfad.Should().BeNull();
+        loaded!.Status.Should().Be(AufgabeStatus.Beendet);
     }
 
     /// <summary>
@@ -328,7 +326,7 @@ public sealed class AufgabeServiceTests
         var aufgabe = await service.CreateAsync(projektId, "Ursprünglicher Titel", "Alt");
 
         // Act
-        await service.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Anforderung", "CopilotPaket", "GithubCopilot");
+        await service.UpdateAsync(aufgabe.Id, "Neuer Titel", "Neue Anforderung", "copilot");
 
         // Assert
         await using var db2 = db.CreateNewContext();
@@ -336,7 +334,6 @@ public sealed class AufgabeServiceTests
 
         loaded!.Titel.Should().Be("Neuer Titel");
         loaded.AnforderungsBeschreibung.Should().Be("Neue Anforderung");
-        loaded.AgentenpaketName.Should().Be("CopilotPaket");
-        loaded.AgentenName.Should().Be("GithubCopilot");
+        loaded.KiPluginPrefix.Should().Be("copilot");
     }
 }

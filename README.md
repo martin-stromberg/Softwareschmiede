@@ -4,6 +4,7 @@
 
 [![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor)](https://blazor.net/)
+[![WPF](https://img.shields.io/badge/WPF-Desktop-512BD4?logo=dotnet)](https://learn.microsoft.com/dotnet/desktop/wpf/)
 [![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-zu%20definieren-lightgrey)](#-lizenz)
@@ -32,13 +33,17 @@
 18. [Lizenz](#-lizenz)
 19. [Kontakt](#-kontakt)
 
+> **Hinweis:** Das Projekt befindet sich in der Migration von Blazor Server zu einer nativen **WPF-Desktopanwendung**. Beide Frontends nutzen dieselben Domain- und Service-Schichten. Details unter [WPF-Desktopanwendung (in Entwicklung)](#️-wpf-desktopanwendung-in-entwicklung).
+
 ---
 
 ## 📖 Projektbeschreibung
 
-**Softwareschmiede** ist eine webbasierte **Einzelnutzer-Anwendung** auf Basis von **Blazor Server (.NET 10+)**, die den vollständigen Workflow der **KI-gestützten Softwareentwicklung** in einer einheitlichen Oberfläche verwaltet.
+**Softwareschmiede** ist eine **Einzelnutzer-Anwendung**, die den vollständigen Workflow der **KI-gestützten Softwareentwicklung** in einer einheitlichen Oberfläche verwaltet.
 
 Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Login** und verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung und KI-Steuerung an einem zentralen Ort.
+
+Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WPF-Desktopanwendung** migriert. Das neue WPF-Projekt (`src/Softwareschmiede.App`) ist bereits in der Solution enthalten; die bisherige Blazor-Oberfläche ist weiterhin aktiv bis zur vollständigen Ablösung.
 
 ### Geschäftsziele
 
@@ -54,7 +59,7 @@ Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Lo
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-05-27**
+Stand: **2026-06-11**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -68,12 +73,113 @@ Stand: **2026-05-27**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
 ---
 
 ## 🚀 Features
+
+#### Feature 72: Aufgabenworkflow Optimierung (in Arbeit)
+
+**Vereinfachter Aufgabenworkflow mit direktem Start und Plugin-Dialog:**
+
+- **Direkter Übergang von "Neu" zu "Gestartet":** Neuer `StartenCommand` kombiniert Repository-Klone und CLI-Start in einem Schritt. Zwischenstatus `ArbeitsverzeichnisEingerichtet` und `InArbeit` wurden entfernt.
+- **Plugin-Auswahl-Dialog:** Bei fehlendem KI-Plugin wird ein Dialog angezeigt. Checkbox "Für dieses Projekt verwenden" ermöglicht optionale Speicherung als Projekt-Standard.
+- **Plugin-Wechsel bei laufender CLI:** Neuer `PluginAendernCommand` öffnet Dialog zur Plugin-Auswahl, stoppt alte CLI und startet neue mit gewähltem Plugin.
+- **Automatischer CLI-Neustart:** Beim Öffnen einer Aufgabe mit Status "Gestartet" wird die CLI automatisch neu gestartet, falls kein Prozess läuft.
+- **Vereinfachtes Statusmodell:** Neue Status-Übergänge: `Neu` → `Gestartet` → `Wartend`/`Beendet`/`Archiviert` (direkt, ohne Zwischenstatus).
+
+**Betroffene Komponenten und Änderungen:**
+
+- `AufgabeStatus` (Enum) – `ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernt
+- `EntwicklungsprozessService` – neue Methode `ProzessStartenUndCliStartenAsync` für kombinierten Ablauf
+- `PluginSelectionService` – Projekt-Level Plugin-Speicherung via `PluginDefaultSettingsService`
+- `TaskDetailViewModel` – neue Commands `StartenCommand`, `PluginAendernCommand` mit automatischem CLI-Neustart in `LadenAsync`
+- `PluginSelectionDialog.xaml` – neuer Dialog für Plugin-Auswahl mit Checkbox
+- `PluginSelectionDialogService`, `PluginSelectionResult` – neue Service-Klasse und DTO für Dialog-Integration
+- Datenbankmigrationen – `20260616112522_SimplifyAufgabeStatusEnum` migriert alte Status zu `Gestartet`
+
+#### Feature 72: WPF separate Aufgabendetailansicht (implementiert ✅)
+
+**Aufgabendetailansicht aus der Inline-Position ausgelagert in eine fensterumfassende, separate View:**
+
+- **Navigation zwischen Projekt- und Aufgabendetail:** Nach Doppelklick auf eine Aufgabe in der Aufgabenliste navigiert die Anwendung zur separaten `TaskDetailView`. Die `ProjectDetailView` wird nicht mehr angezeigt.
+- **Zurück-Navigation:** Ein Zurück-Button in der Aufgabendetail führt zurück zur Projektdetailansicht.
+- **Neuanlage von Aufgaben:** "Neue Aufgabe"-Button in der `ProjectDetailView` öffnet die `TaskDetailView` mit leerem Bearbeitungsformular. Nach dem Speichern wird die neue Aufgabe mit Status "Neu" persistiert und die Navigation kehrt zur `ProjectDetailView` zurück.
+- **Callback-basierte Navigation:** Navigationsmechanismus nutzt Callbacks (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) für konsistente Architektur. Keine zentrale Service-Klasse erforderlich.
+- **Fehlerbehandlung:** Bei Speicherfehlern wird eine Fehlermeldung angezeigt und die `TaskDetailView` bleibt offen zur Korrektur. Keine automatische Navigation.
+
+**Betroffene Komponenten und Änderungen:**
+
+- `ProjectDetailViewModel` – neue Callbacks und Methoden für Task-Navigation
+- `TaskDetailViewModel` – unverändert; erhält Callbacks für Rücknavigation
+- `ProjectListViewModel` – neue Methoden `ZeigeTaskDetailView()` und `KehreZuProjectZurueck()` zum Content-Switching
+- `ProjectDetailView.xaml` – Entfernung der inline `<views:TaskDetailView>`-Bindung
+- MainWindow (XAML) – Content-Switching zwischen `ProjectDetailView` und `TaskDetailView` via DataTemplate-Matching
+
+#### Feature 72: WPF-Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (implementiert ✅)
+
+**Ribbon-basierte Aktionsleiste und Status-abhängiges Content-Switching in der Aufgabendetailansicht:**
+
+- **Ribbon-Menü mit drei Gruppen:**
+  - **Navigation:** Zurück-Button zur Aufgabenliste
+  - **Aufgabe:** Speichern, Löschen, Starten (sichtbar wenn Status=Neu), Beenden (sichtbar wenn Status=Gestartet/InArbeit/Wartend)
+  - **CLI:** KI-Plugin-Auswahl (ComboBox), CLI-Starten- und Stoppen-Buttons
+
+- **Status-abhängiges Content-Switching:** Drei verschiedene Panels je nach Aufgabenstatus:
+  - **Status=Neu (Edit-Panel):** Bearbeitbare TextBox-Felder für Titel und Anforderungsbeschreibung mit Speichern-Button im Ribbon
+  - **Status=Gestartet/InArbeit/Wartend (CLI-Panel):** Eingebettetes CLI-Fenster mit optionalem Toggle-Button zur Info-Ansicht (zeigt Aufgabeeigenschaften + Protokoll)
+  - **Status=Beendet (Diff-Panel):** Platzhalter für Diff-Ansicht der Arbeitsverzeichnisänderungen
+
+- **Neue ViewModel-Eigenschaften und Commands:**
+  - `ShowEditPanel`, `ShowCliPanel`, `ShowDiffPanel` (computed Properties je nach Status)
+  - `IsInfoViewVisible` (Toggle zwischen CLI-Fenster und Info-Panel bei laufender Aufgabe)
+  - `EditTitel`, `EditAnforderungsBeschreibung` (bearbeitbare Kopien für Edit-Modus)
+  - `KannSpeichern`, `KannLoeschen` (CanExecute-Logik je nach Status und CLI-Zustand)
+  - `SpeichernCommand`, `LoeschenCommand`, `InfoCliToggleCommand` (neue Commands mit CanExecute-Validierung)
+
+- **Validierung und Fehlerbehandlung:**
+  - Speichern nur möglich wenn Status ∈ {Neu, Gestartet} und CLI läuft nicht und Titel ≠ leer
+  - Löschen nur möglich wenn Status ∉ {Beendet, Archiviert} und CLI läuft nicht
+  - Bestätigungsdialog vor dem Löschen einer Aufgabe
+  - Fehlerbehandlung mit Fehlermeldungs-Banner
+
+- **Betroffene Komponenten:**
+  - `TaskDetailViewModel` – erweitert um neue Properties und Commands
+  - `TaskDetailView.xaml` – neuer Aufbau mit Ribbon (Grid.Row="0"), Content-Switching-Grid (Grid.Row="2")
+  - `AufgabeStatusToVisibilityConverter` – neuer Converter für Sichtbarkeitsbindung nach Status
+
+#### Feature 72: WPF Plugin-Einstellungen & Styling (implementiert ✅)
+
+**Einstellungsregisterkarten für Quellcodeverwaltung und KI-Plugins mit dynamischen Plugin-Einstellungspanels:**
+
+- **Plugin-Auswahl pro Kategorie:** Getrennte Register für **Quellcodeverwaltung** (SCM) und **KI** mit ComboBox zur Auswahl eines Standard-Plugins pro Kategorie
+- **Dynamische Plugin-Einstellungspanels:** Nach Plugin-Auswahl werden die vom Plugin bereitgestellten Einstellungsgruppen (via `GetSettingGroups()`) dynamisch geladen und als Eingabefelder in der UI angezeigt
+- **Feldtyp-spezifische Eingabekomponenten:** Automatisches Rendering verschiedener Feldtypen:
+  - `Text` → TextBox
+  - `Secret` → PasswordBox
+  - `Integer` → numerisches TextBox-Feld
+  - `Boolean` → CheckBox
+  - `Enum` → ComboBox mit Optionsauswahl
+  - `FilePath` → TextBox mit Browse-Button
+- **Globale Dark-Mode-kompatible Styles:** Einheitliche Styles für Label, CheckBox, TextBox und weitere Eingabekomponenten in den Theme-Dictionaries (`DarkTheme.xaml`, `LightTheme.xaml`) mit konsistenten Farben und Hover-/Checked-Zuständen
+- **Plugin-spezifische Einstellungspersistierung:** Alle Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert; Standard-Plugins werden als String-Namen in `AppEinstellung` gespeichert
+
+#### Feature 72: WPF-Plugin-Verfügbarkeit & Dialog-Erweiterung (implementiert ✅)
+
+Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl eines SCM-Plugins erweitert:
+
+- **Plugin-Auswahl:** ComboBox zur expliziten Auswahl des SCM-Plugins vor der Repository-Zuordnung
+- **Plugin-gefilterte Repositories:** Nach Plugin-Auswahl werden nur die Repositories für dieses Plugin angezeigt
+- **Hilfe-Panel bei fehlenden Plugins:** Falls keine SCM-Plugins vorhanden sind, wird statt der Eingabekomponenten ein Hilfe-Panel mit Instruktionen angezeigt
+- **Dark-Mode Button-Fix:** Sichtbarkeitsproblem des „Zuweisen"-Buttons im Dark-Mode behoben (`Foreground`-Binding statt hardcodiertes Weiß)
+
+**Betroffene Komponenten:**
+- `RepositoryAssignViewModel` – neue Properties: `AvailableScmPlugins`, `SelectedScmPlugin`, `HasScmPlugins`
+- `RepositoryAssignDialog.xaml` – ComboBox für Plugin-Auswahl, Hilfe-Panel, Grid-Struktur erweitert
+- `RepositoryAssignViewModelTests` – neue Unit-Tests für Plugin-Laden und Repository-Filterung
 
 ### 📁 Projektmanagement
 - Beliebig viele Softwareprojekte anlegen, bearbeiten, archivieren und löschen
@@ -173,6 +279,48 @@ Stand: **2026-05-27**
 - Farbkodierte Statusanzeige (KI aktiv = blau, Fehlgeschlagen = rot, Abgeschlossen = grün)
 - Direktnavigation zum Aufgabenprotokoll per Klick
 
+### 🖥️ WPF-Desktopanwendung (in Entwicklung)
+
+Das Projekt `src/Softwareschmiede.App` enthält die neue native WPF-Oberfläche als Ablösung der Blazor-Anwendung:
+
+#### Kernfeatures
+
+- **MVVM-Architektur:** Alle Views besitzen eigene ViewModels (`ViewModelBase` mit `INotifyPropertyChanged`)
+- **Dark Mode:** `DarkModeService` wechselt WPF-ResourceDictionary zwischen `DarkTheme.xaml` und `LightTheme.xaml`
+- **CLI-Fenstereinbettung:** `ProcessWindowHost`-Control bettet CLI-Prozessfenster via Win32 `SetParent` in die WPF-UI ein
+- **Recovery-Banner:** `RecoveryBannerControl` zeigt beim Start automatisch erkannte Recovery-Kandidaten an (Aufgaben mit Heartbeat > 5 Min und Status `InArbeit`/`Wartend`)
+- **Status-Anzeige:** `StatusIndicatorControl` visualisiert den aktuellen Aufgabenstatus
+- **Audio-Benachrichtigungen:** `WpfAudioService` spielt WAV/MP3-Dateien über WPF-`MediaPlayer` ab
+- **Eingebettetes DI:** Startup via `Microsoft.Extensions.Hosting` + `Microsoft.Extensions.DependencyInjection`
+- **Logging:** Serilog mit File- und Console-Sink
+- **Plugin-Kopie via MSBuild:** Nach dem Build werden Plugin-DLLs automatisch in `bin/<Config>/plugins/` kopiert
+
+#### Projektdetailansicht (neu)
+
+Die erweiterte Projektdetailansicht (`ProjectDetailView.xaml`) bietet eine vollständige Bearbeitungsoberfläche mit:
+
+- **Ribbon-Menü:** Gruppierte Aktionsleiste mit vier Gruppen:
+  - **Navigation:** Zurück-Button zur Projektübersicht
+  - **Projekt:** Speichern und Löschen von Projektdaten
+  - **Aufgaben:** Neue Aufgabe anlegen, Status-Filter für Aufgabenliste
+  - **Repository:** Zuweisen von Repositories, Öffnen im Browser
+- **Projekt-Kachel:** Anzeige und Bearbeitung von Projektsymbol (📁), Titel und Beschreibung
+- **Aufgaben-Kachel:** Filterbare Liste der Aufgaben des Projekts (Filter: Alle, Aktiv, Archiviert)
+- **Repository-Zuweisungs-Dialog:** Wahl und Zuweisung aus bestehenden Repositories (`RepositoryAssignDialog`, `RepositoryAssignViewModel`)
+- **Konsistente UX:** Ansicht für Projektanlage und -bearbeitung (Status "Neu" bei Anlage, bearbeitbare Felder)
+- **Validierung:** Projektname erforderlich, max. 100 Zeichen; Beschreibung max. 500 Zeichen
+- **Bestätigungsdialog:** MessageBox-Bestätigung vor dem Löschen eines Projekts
+
+**Vereinfachtes Aufgaben-Statusmodell (WPF):**
+
+| Status | Bedeutung |
+|--------|-----------|
+| `Neu` | Aufgabe angelegt, noch nicht gestartet |
+| `Gestartet` | Git-Repository geklont, Branch erstellt, CLI läuft |
+| `Wartend` | Rate-Limit erkannt oder Prompt-Vorschlag gespeichert |
+| `Beendet` | Aufgabe abgeschlossen oder fehlgeschlagen |
+| `Archiviert` | Aufgabe archiviert |
+
 ### 🎨 Branding & UI-Assets
 - Anwendung nutzt ein dediziertes SVG-Favicon `favicon-hammer-pick.svg` (gekreuzter Hammer/Pickel) aus `src/Softwareschmiede/wwwroot/`
 - Browser-Head enthält konsistente SVG-Referenzen (`icon`, `shortcut icon`, `mask-icon`) für moderne Browserdarstellung
@@ -191,8 +339,8 @@ Die wichtigsten UI-Abläufe sind im [Benutzerleitfaden](docs/user-guide.md) sowi
 
 | Voraussetzung | Version | Hinweis |
 |---------------|---------|---------|
-| **Windows** | 10 / 11 | Pflicht – Windows Credential Store wird benötigt |
-| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) |
+| **Windows** | 10 / 11 | Pflicht – Windows Credential Store und WPF werden benötigt |
+| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) – WPF-Projekt (`net10.0-windows`) erfordert Windows-SDK |
 | **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen |
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
 | **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
@@ -232,20 +380,39 @@ cd Softwareschmiede
 
 ### 2. Abhängigkeiten wiederherstellen & bauen
 
+**Blazor Server (aktuell produktiv):**
+
 ```powershell
 dotnet restore
 dotnet build src/Softwareschmiede/Softwareschmiede.csproj
 ```
 
-Beim Build des Host-Projekts werden die Plugin-DLLs automatisch nach `bin/<Config>/<TFM>/plugins/` kopiert (inkl. Publish-Ausgabe).
+**WPF-Desktopanwendung (in Entwicklung):**
+
+```powershell
+dotnet restore
+dotnet build src/Softwareschmiede.App/Softwareschmiede.App.csproj
+```
+
+Beim Build werden die Plugin-DLLs automatisch nach `bin/<Config>/plugins/` kopiert (MSBuild-Target `CopyPluginsToOutput`).
 
 ### 3. Anwendung starten
+
+**Blazor Server:**
 
 ```powershell
 dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj
 ```
 
-Die Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurierten Port) erreichbar.
+Die Blazor-Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurierten Port) erreichbar.
+
+**WPF-Desktop:**
+
+```powershell
+dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj
+```
+
+Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 
 ### 4. Erste Schritte
 
@@ -418,12 +585,16 @@ cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANT
 
 ### Standardplugin je Pluginart konfigurieren
 
-- In **Einstellungen** kann pro Pluginart genau ein Standardplugin gespeichert werden:
-  - `SourceCodeManagement` (z. B. GitHub)
-  - `DevelopmentAutomation` (z. B. GitHub Copilot oder Claude CLI)
-- Die Auswahl wird persistent in den App-Einstellungen gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt.
-- Für Git-Aktionen gilt: eine projektspezifische Repository-Auswahl (Aufgabe/Projekt) hat Vorrang; das Standardplugin dient als Fallback.
-- Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin.
+- In **Einstellungen → Quellcodeverwaltung** und **Einstellungen → KI** können Standard-Plugins pro Pluginart gewählt und konfiguriert werden:
+  - **Quellcodeverwaltung** (SourceCodeManagement): z. B. GitHub oder Local Directory
+  - **KI** (DevelopmentAutomation): z. B. GitHub Copilot oder Claude CLI
+- Die Auswahl wird persistent in den App-Einstellungen (`DefaultScmPluginKey`, `DefaultKiPluginKey`) gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt
+- Nach Plugin-Auswahl können plugin-spezifische Einstellungen konfiguriert werden:
+  - Die verfügbaren Felder werden vom Plugin via `GetSettingGroups()` definiert
+  - Feldtypen (Text, Secret, Integer, Boolean, Enum, FilePath) werden entsprechend gerendert
+  - Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert
+- Für Git-Aktionen gilt: eine projektspezifische Repository-Auswahl (Aufgabe/Projekt) hat Vorrang; das Standardplugin dient als Fallback
+- Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin
 
 ### Arbeitsverzeichnis für lokale Klone
 
@@ -540,6 +711,19 @@ Softwareschmiede/                            # Solution Root
 │   │   │       ├── Aufgaben/
 │   │   │       └── Agentenpakete/
 │   │   └── wwwroot/                         # Statische Assets (CSS, JS, Bilder)
+│   ├── Softwareschmiede.App/                # WPF-Desktopanwendung (net10.0-windows)
+│   │   ├── Views/                           # MainWindow, Dashboard-, Projekt-, Aufgaben-, Einstellungs-Views
+│   │   │   ├── ProjectDetailView.xaml       # Projektdetailansicht mit Ribbon-Menü und Kacheln
+│   │   │   ├── RepositoryAssignDialog.xaml # Dialog zur Repository-Zuweisung
+│   │   │   └── ...
+│   │   ├── ViewModels/                      # MVVM-ViewModels (ViewModelBase, MainWindowViewModel, ...)
+│   │   │   ├── ProjectDetailViewModel.cs    # ViewModel für Projektdetailansicht
+│   │   │   ├── RepositoryAssignViewModel.cs # ViewModel für Repository-Dialog
+│   │   │   └── ...
+│   │   ├── Controls/                        # ProcessWindowHost, StatusIndicatorControl, RecoveryBannerControl
+│   │   ├── Services/                        # DarkModeService, WpfAudioService
+│   │   ├── Themes/                          # DarkTheme.xaml, LightTheme.xaml
+│   │   └── Converters/                      # AppConverters (WPF-Wertkonverter)
 │   ├── Softwareschmiede.Client/             # Blazor WebAssembly Client Assembly
 │   ├── Softwareschmiede.IntegrationTests/   # Integrations-Tests
 │   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, PluginType
@@ -550,6 +734,9 @@ Softwareschmiede/                            # Solution Root
 │   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
 │   └── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
 ├── docs/                                    # Planungsdokumente und Architektur
+│   ├── features/72-wpf/                     # WPF-Migrationsdokumentation
+│   │   ├── requirement.md                   # Technische Anforderungsspezifikation
+│   │   └── plan.md                          # Umsetzungsplan inkl. Designentscheidungen
 │   ├── requirements/
 │   │   ├── requirements-analysis.md
 │   │   └── plugin-klassenbibliotheken-github-und-copilot.md
@@ -566,7 +753,7 @@ Softwareschmiede/                            # Solution Root
 
 ## 🏗️ Architektur
 
-Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten:
+Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten. Die Präsentationsschicht wird derzeit von Blazor Server auf WPF migriert; Domain, Application und Infrastructure bleiben für beide Frontends identisch:
 
 ```mermaid
 flowchart TB
@@ -609,7 +796,8 @@ flowchart TB
 
 | Schicht | Verantwortung |
 |---------|---------------|
-| **Presentation** | UI-Rendering, Benutzerinteraktion, ViewModel-Binding, Echtzeit-Updates via SignalR |
+| **Presentation (Blazor)** | UI-Rendering, Benutzerinteraktion, ViewModel-Binding, Echtzeit-Updates via SignalR |
+| **Presentation (WPF, in Entwicklung)** | Native Windows-UI, MVVM (ViewModelBase), Dark Mode, CLI-Fenstereinbettung via Win32 SetParent |
 | **Application** | Anwendungsfalllogik, Koordination von Domain und Infrastructure, Plugin-Aufruf |
 | **Domain** | Fachentitäten, Domänenregeln, Plugin-Interfaces – **keine** äußeren Abhängigkeiten |
 | **Infrastructure** | DB-Zugriff, CLI-Prozesse, Credential Store, Dateisystem |
@@ -725,9 +913,17 @@ Feature-spezifische Testartefakte:
 
 Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
 
+**Blazor Server:**
+
 - **Development:** `dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj`
 - **Publish:** `dotnet publish src/Softwareschmiede/Softwareschmiede.csproj -c Release`
 - Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
+
+**WPF-Desktopanwendung (in Entwicklung):**
+
+- **Development:** `dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj`
+- **Publish:** `dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release`
+- Log-Dateien werden unter `{Programmverzeichnis}/logs` abgelegt (Serilog File-Sink).
 
 Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügbar sein (`copilot` oder `claude`; für Claude-Läufe zusätzlich `ANTHROPIC_API_KEY` als Credential).
 
@@ -738,7 +934,12 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
-- Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview“** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
+- **WPF Aufgabenworkflow-Optimierung (Feature #72):** Vereinfachtes Aufgaben-Statusmodell mit direktem Übergang von "Neu" zu "Gestartet"; neuer `StartenCommand` kombiniert Repository-Klone und CLI-Start in einem Schritt; Plugin-Auswahl-Dialog mit optionaler Projekt-Level-Speicherung; `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI mit Prozess-Neustart; automatischer CLI-Neustart beim Aufgabe-Laden; Enum-Vereinfachung (`ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernt); Datenbankmigrationen und Status-Validierung; E2E-Tests für alle Szenarien; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-17**)
+- **WPF separate Aufgabendetailansicht (Feature #72):** Aufgabendetailansicht aus der Inline-Position in `ProjectDetailView` ausgelagert in eine fensterumfassende, separate View; Callback-basierte Navigation (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) zwischen `ProjectDetailView` und `TaskDetailView` implementiert; Neuanlage von Aufgaben öffnet `TaskDetailView` mit leerem Formular und persistiert neue Aufgabe mit Status "Neu"; Fehlerbehandlung mit lokaler Fehlermeldung; Dokumentation in requirement.md und plan.md aktualisiert (**2026-06-16**)
+- **WPF Plugin-Einstellungen & Styling (Feature #72):** Einstellungsansicht um zwei neue Register (Quellcodeverwaltung, KI) mit Plugin-Auswahl und dynamisch geladenen Einstellungspanels erweitert; feldtyp-spezifische Eingabekomponenten (TextBox, PasswordBox, CheckBox, ComboBox, FilePath); globale Dark-Mode-kompatible Styles in Theme-Dictionaries; StandardPlugin-Persistierung in AppEinstellung (**2026-06-15**)
+- **WPF-Projektdetailansicht (Feature #72):** Projektdetailansicht mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (Symbol, Titel, Beschreibung — bearbeitbar), Aufgaben-Kachel (filterbar nach Status), Repository-Zuweisungs-Dialog und E2E-Tests vollständig implementiert; README und Roadmap aktualisiert (**2026-06-13**)
+- **WPF-Migration (Feature #72):** `src/Softwareschmiede.App` als neues WPF-Projekt ergänzt — MVVM-Gerüst, Views, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Service, neues Aufgaben-Statusmodell (`Neu` → `ArbeitsverzeichnisEingerichtet` → `Gestartet` → `InArbeit` → `Wartend` → `Beendet`) in README dokumentiert (**2026-06-11**)
+- Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview”** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
 - Sollzustand vom **2026-05-25** eingearbeitet: **KI-Plugin Pflicht**, **Agentenpaket/Agent optional** in Voraussetzungen, Installation, Usage und Issue-58-Beschreibung vereinheitlicht
 - Feature **„KI-Protokoll Auto-Scroll“ (F027)** in README ergänzt (Features/Usage/Changelog) inkl. Verweis auf die neue Fachdokumentation und den Dokumentationsplan-Abschnitt vom 2026-05-25
 - Diff-Funktionalität in README konsolidiert (Implementierungsstatus, Feature- und Usage-Abschnitte) inkl. Verweisen auf `/api/diff`
@@ -775,7 +976,33 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] Folgeanweisungen mit Agent- und Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
 - [x] Windows Credential Store Integration
 
-### v1.x – Erweiterungen
+### v2.0 – WPF-Desktopanwendung (in Entwicklung)
+- [x] WPF-Projekt `src/Softwareschmiede.App` erstellt (net10.0-windows)
+- [x] MVVM-Gerüst: Views, ViewModels, ViewModelBase
+- [x] Dark Mode via `DarkModeService` + ResourceDictionary-Themes
+- [x] CLI-Fenstereinbettung via `ProcessWindowHost` (Win32 SetParent)
+- [x] Recovery-Banner (`RecoveryBannerControl`) und Status-Indikator (`StatusIndicatorControl`)
+- [x] Audio-Benachrichtigungen via `WpfAudioService` (WPF MediaPlayer)
+- [x] Plugin-DLL-Kopie via MSBuild-Target
+- [x] Projektdetailansicht mit Ribbon-Menü, Projekt-/Aufgaben-Kacheln und Repository-Verwaltung
+- [x] E2E-Tests für Projektdetailansicht (Bearbeitung, Löschen, Aufgaben, Repository-Verwaltung, Navigation)
+- [x] Einstellungsansicht mit Registerkarten für Plugin-Konfiguration (SCM/KI) mit dynamischen Einstellungspanels
+- [x] Globale Dark-Mode-kompatible Styles für UI-Komponenten (Label, CheckBox, TextBox, etc.)
+- [x] Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff)
+- [x] Separate Aufgabendetailansicht (fensterumfassende View statt inline) – Feature 72
+- [ ] Aufgabenworkflow-Optimierung – Feature 72 (in Entwicklung)
+  - [ ] Enum-Vereinfachung: `ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernen
+  - [ ] `StartenCommand` mit kombiniertem Repository-Klone + CLI-Start
+  - [ ] Plugin-Auswahl-Dialog mit optionalem Projekt-Level-Standard
+  - [ ] `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI
+  - [ ] Automatischer CLI-Neustart bei Aufgabe-Laden
+  - [ ] E2E-Tests für alle Szenarien
+  - [ ] Datenbankmigrationen und Status-Validierung
+- [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
+- [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
+- [ ] Blazor-Code vollständig entfernt
+
+### v2.x – Erweiterungen
 - [ ] GitLab-Plugin
 - [ ] Azure DevOps-Plugin
 - [ ] Weitere KI-Plugins (z. B. OpenAI, Gemini als dedizierte Provider)
@@ -819,7 +1046,13 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Feature F025: Gebrandetes Favicon (Hammer & Spitzhacke)](docs/business/features/F025-favicon-hammer-pick-svg.md) | Fachliche Beschreibung des SVG-Favicons für Browser-Tab, Lesezeichen und angeheftete Kontexte |
 | [Feature F026: KI-Plugin-spezifische Agenten-Discovery und -Auswahl](docs/business/features/F026-ki-plugin-spezifische-agenten-discovery-auswahl.md) | Fachliche Beschreibung der plugin-spezifischen Auswahl mit **KI-Plugin als Pflichtfeld** sowie optionalem Agentenpaket/Agent inkl. Persistenz je Aufgabe |
 | [Feature F027: KI-Protokoll Auto-Scroll](docs/business/features/F027-ki-protokoll-auto-scroll.md) | Fachliche Beschreibung des Scroll-Verhaltens im KI-Protokoll (Initial-Scroll, bedingtes Follow-Scrolling, manueller Scroll-Lock) |
-| [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll“ (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll“ – 2026-05-25“ |
+| [Feature F072: WPF Aufgabenworkflow-Optimierung](docs/features/72-wpf-aufgabenworkflow/requirement.md) | Anforderungsanalyse zur Vereinfachung des Aufgabenworkflows durch Enum-Vereinfachung, direkten Start mit kombiniertem Klone+CLI, Plugin-Dialog mit Projekt-Standard-Speicherung, Plugin-Wechsel und automatischen CLI-Neustart |
+| [Plan: WPF Aufgabenworkflow-Optimierung](docs/features/72-wpf-aufgabenworkflow/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen für jeden Schritt (Starten, Plugin-Dialog, Plugin-Wechsel, automatischer CLI-Neustart), Enum-Änderungen, neue Service-Methoden und Datenbankmigrationen |
+| [Feature F072: WPF separate Aufgabendetailansicht](docs/features/72-wpf-separate-aufgabenansicht/requirement.md) | Anforderungsanalyse für die Auslagerung der Aufgabendetailansicht aus der Inline-Position in eine fensterumfassende, separate View mit Callback-basierter Navigation |
+| [Plan: WPF separate Aufgabendetailansicht](docs/features/72-wpf-separate-aufgabenansicht/plan.md) | Umsetzungsplan mit Designentscheidungen (Callback-basierte Navigation, sofortiger Wechsel ohne Animation, Fehlerbehandlung), Programmabläufen (Aufgabe öffnen, neue Aufgabe erstellen, zurück navigieren, speichern und navigieren), Änderungen an bestehenden Klassen und Validierungsregeln |
+| [Feature F072: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/requirement.md) | Anforderungsanalyse für Einstellungsansicht mit Plugin-Registerkarten, dynamischen Einstellungspanels und globalen Dark-Mode-Styles |
+| [Plan: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen, neuen Klassen und Validierungsregeln |
+| [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll” (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll” – 2026-05-25” |
 | [API: Issue 58 Agenten-Discovery/Auswahl](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für plugin-spezifische Discovery, Prefix-Auflösung und Persistenz (`KiPluginPrefix`) |
 | [Flow: Issue 58 Agenten-Discovery/Auswahl](docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | Ablaufdiagramm für UI-Reihenfolge, Kompatibilitätsprüfung und Start-/Folgeprompt-Dispatch |
 | [Requirements: Issue 58](docs/requirements/issue-58-agenten-discovery-agenten-auswahl-ki-plugin-spezifisch-requirements-analysis.md) | Anforderungen und Akzeptanzkriterien für plugin-spezifische Discovery/Auswahl |

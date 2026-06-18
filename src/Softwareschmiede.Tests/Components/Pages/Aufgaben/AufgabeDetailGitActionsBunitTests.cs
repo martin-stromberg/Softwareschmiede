@@ -134,8 +134,8 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
     }
 
     [Theory]
-    [InlineData(AufgabeStatus.KiAktiv)]
-    [InlineData(AufgabeStatus.TestsLaufen)]
+    [InlineData(AufgabeStatus.InArbeit)]
+    [InlineData(AufgabeStatus.Wartend)]
     public async Task AufgabeDetail_ShouldShowRecoveryButton_ForRecoverableStates(AufgabeStatus status)
     {
         var capabilities = new GitActionCapabilities(
@@ -273,7 +273,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.KiAktiv, isRunning: true);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.InArbeit, isRunning: true);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -294,7 +294,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.InBearbeitung, isRunning: false);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Gestartet, isRunning: false);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -313,7 +313,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.TestsLaufen, isRunning: false);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Wartend, isRunning: false);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -325,7 +325,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.WaitForAssertion(() => cut.Markup.Should().Contain("Aufgabe wurde erfolgreich wiederhergestellt."));
 
         var loaded = await harness.Db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == harness.AufgabeId);
-        loaded.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded.Status.Should().Be(AufgabeStatus.Gestartet);
         harness.Db.Protokolleintraege
             .Count(e => e.AufgabeId == harness.AufgabeId && e.Typ == ProtokollTyp.StatusUebergang && e.Inhalt.Contains("Manuelle Wiederherstellung"))
             .Should().Be(1);
@@ -342,7 +342,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.KiAktiv, isRunning: false);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.InArbeit, isRunning: false);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -358,7 +358,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.WaitForAssertion(() => cut.Markup.Should().Contain("Status wurde zurückgesetzt. Eine neue Anfrage kann jetzt gesendet werden."));
 
         var loaded = await harness.Db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == harness.AufgabeId);
-        loaded.Status.Should().Be(AufgabeStatus.InBearbeitung);
+        loaded.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
     [Fact]
@@ -372,7 +372,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.KiAktiv, isRunning: true);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.InArbeit, isRunning: true);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -394,7 +394,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Offen, isRunning: false);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Neu, isRunning: false);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -418,7 +418,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Offen, isRunning: false);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Neu, isRunning: false);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -445,7 +445,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             CanCreatePullRequest: false,
             CanMergeToSource: true);
 
-        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Offen, isRunning: false);
+        await using var harness = await ConfigureComponentServicesAsync(capabilities, AufgabeStatus.Neu, isRunning: false);
 
         var cut = RenderComponent<AufgabeDetail>(parameters => parameters.Add(page => page.Id, harness.AufgabeId));
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Wird geladen..."));
@@ -689,7 +689,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 
     private async Task<TestHarness> ConfigureComponentServicesAsync(
         GitActionCapabilities capabilities,
-        AufgabeStatus status = AufgabeStatus.InBearbeitung,
+        AufgabeStatus status = AufgabeStatus.Gestartet,
         bool isRunning = false,
         Guid? latestDiffResultId = null,
         string projectName = "BUnit-Test-Projekt")
@@ -811,9 +811,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             protokollService,
             gitPluginMock.Object,
             pluginSelection,
-            agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var gitService = new GitOrchestrationService(
@@ -834,7 +832,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, new Mock<IServiceScopeFactory>().Object));
         Services.AddSingleton(gitService);
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);
@@ -877,7 +875,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             ProjektId = projekt.Id,
             GitRepositoryId = repository.Id,
             Titel = "BUnit-Test-Aufgabe",
-            Status = AufgabeStatus.InBearbeitung,
+            Status = AufgabeStatus.Gestartet,
             AgentenpaketName = "paket-a",
             AgentenName = "agent-a",
             LokalerKlonPfad = Path.GetTempPath(),
@@ -979,9 +977,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             protokollService,
             selectedGitPluginMock.Object,
             pluginSelection,
-            agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var gitService = new GitOrchestrationService(
@@ -1002,7 +998,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         Services.AddSingleton(runningStatusSourceMock.Object);
         Services.AddSingleton(new AufgabeRecoveryService(db, runningStatusSourceMock.Object, NullLogger<AufgabeRecoveryService>.Instance));
         Services.AddSingleton(entwicklungsprozessService);
-        Services.AddSingleton(new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
+        Services.AddSingleton(new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, new Mock<IServiceScopeFactory>().Object));
         Services.AddSingleton(gitService);
         Services.AddSingleton(protokollService);
         Services.AddSingleton(projektService);

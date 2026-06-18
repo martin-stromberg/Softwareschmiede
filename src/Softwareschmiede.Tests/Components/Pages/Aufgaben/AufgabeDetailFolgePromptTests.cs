@@ -26,7 +26,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         var razorPath = Path.Combine(root, "src", "Softwareschmiede", "Components", "Pages", "Aufgaben", "AufgabeDetail.razor");
         var markup = File.ReadAllText(razorPath);
 
-        markup.Should().Contain("@if (_aufgabe.Status is AufgabeStatus.InBearbeitung or AufgabeStatus.KiAktiv)");
+        markup.Should().Contain("@if (_aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.InArbeit)");
         markup.Should().Contain("<div class=\"card-title\">💬 KI-Anfrage</div>");
         markup.Should().Contain("@bind=\"_kiAgentName\"");
         markup.Should().Contain("@if (_protokoll.Any(p => p.Typ == ProtokollTyp.Prompt))");
@@ -978,7 +978,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         markup.Should().Contain("id=\"streamingOutput\"");
         markup.Should().Contain("id=\"historyProtokoll\"");
         markup.Should().Contain("@RenderProtokollInhalt(BuildStreamingArbeitsprotokollMarkdown())");
-        markup.Should().Contain("@if (_aufgabe.Status == AufgabeStatus.KiAktiv && _streamingLines.Count > 0)");
+        markup.Should().Contain("@if (_aufgabe.Status == AufgabeStatus.InArbeit && _streamingLines.Count > 0)");
         markup.Should().Contain("class=\"@GetProtokollCssClass(eintrag.Typ)\"");
         markup.Should().Contain("@GetProtokollLabel(eintrag.Typ):");
 
@@ -1064,7 +1064,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
         var jsRuntime = new FakeJsRuntime { ScrollToEndResult = true };
         SetInjectedProperty(sut, "JsRuntime", jsRuntime);
-        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.KiAktiv });
+        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.InArbeit });
         SetPrivateField(sut, "_streamingLines", new List<string> { "Zeile 1" });
         SetPrivateField(sut, "_streamingInitialScrollPending", true);
         SetPrivateField(sut, "_protokoll", new List<Protokolleintrag>());
@@ -1088,7 +1088,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             ScrollToEndResult = true
         };
         SetInjectedProperty(sut, "JsRuntime", jsRuntime);
-        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.KiAktiv });
+        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.InArbeit });
         SetPrivateField(sut, "_streamingLines", new List<string> { "Alt" });
         SetPrivateField(sut, "_streamingInitialScrollPending", false);
         SetPrivateField(sut, "_protokoll", new List<Protokolleintrag>());
@@ -1118,7 +1118,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             ScrollToEndResult = true
         };
         SetInjectedProperty(sut, "JsRuntime", jsRuntime);
-        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.KiAktiv });
+        SetPrivateField(sut, "_aufgabe", new Aufgabe { Status = AufgabeStatus.InArbeit });
         SetPrivateField(sut, "_streamingLines", new List<string> { "Alt" });
         SetPrivateField(sut, "_streamingInitialScrollPending", false);
         SetPrivateField(sut, "_protokoll", new List<Protokolleintrag>());
@@ -1178,7 +1178,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             Id = Guid.NewGuid(),
             ProjektId = projekt.Id,
             Titel = "Aufgabe",
-            Status = AufgabeStatus.InBearbeitung,
+            Status = AufgabeStatus.Gestartet,
             AgentenpaketName = "paket-a",
             AgentenName = initialAgent,
             KiPluginPrefix = storedTaskKiPluginPrefix,
@@ -1276,9 +1276,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             protokollService,
             gitPluginMock.Object,
             pluginSelectionService,
-            agentPackageServiceMock.Object,
             arbeitsverzeichnisResolverMock.Object,
-            new ConfigurationBuilder().Build(),
             NullLogger<EntwicklungsprozessService>.Instance);
         var gitService = new GitOrchestrationService(
             aufgabeService,
@@ -1307,7 +1305,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         SetInjectedProperty(sut, "PluginSelection", pluginSelectionService);
         SetInjectedProperty(sut, "AufgabeService", aufgabeService);
         SetInjectedProperty(sut, "EntwicklungsprozessService", entwicklungsprozessService);
-        SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(new Mock<IServiceScopeFactory>().Object, NullLogger<KiAusfuehrungsService>.Instance));
+        SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, new Mock<IServiceScopeFactory>().Object));
         SetInjectedProperty(sut, "GitService", gitService);
         SetInjectedProperty(sut, "GitWorkspaceBrowserService", workspaceBrowserServiceMock.Object);
         SetInjectedProperty(sut, "ProtokollService", protokollService);

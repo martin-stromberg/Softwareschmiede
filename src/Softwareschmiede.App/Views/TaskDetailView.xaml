@@ -1,0 +1,314 @@
+<UserControl x:Class="Softwareschmiede.App.Views.TaskDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
+             Background="{DynamicResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Ribbon-Menü -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="8,8,8,8">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+
+                <!-- Gruppe: Navigation -->
+                <controls:RibbonGroup GruppenName="Navigation">
+                    <controls:RibbonGroup.ItemsContent>
+                        <controls:RibbonLargeButton ButtonIcon="←"
+                                                    ButtonText="Zurück"
+                                                    AutomationName="Zurück"
+                                                    ButtonCommand="{Binding ZurueckCommand}" />
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
+                <!-- Gruppe: Aufgabe -->
+                <controls:RibbonGroup GruppenName="Aufgabe">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="💾"
+                                                        ButtonText="Speichern"
+                                                        AutomationName="Speichern"
+                                                        ButtonCommand="{Binding SpeichernCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🗑"
+                                                        ButtonText="Löschen"
+                                                        AutomationName="Löschen"
+                                                        ButtonCommand="{Binding LoeschenCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="▶"
+                                                        ButtonText="Starten"
+                                                        AutomationName="Starten"
+                                                        ButtonCommand="{Binding StartenCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="✓"
+                                                        ButtonText="Beenden"
+                                                        AutomationName="Beenden"
+                                                        ButtonCommand="{Binding AufgabeAbschliessenCommand}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
+                <!-- Gruppe: CLI -->
+                <controls:RibbonGroup GruppenName="CLI">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="🔌"
+                                                        ButtonText="Plugin ändern"
+                                                        AutomationName="PluginAendern"
+                                                        ButtonCommand="{Binding PluginAendernCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="■"
+                                                        ButtonText="Stoppen"
+                                                        AutomationName="CliStoppen"
+                                                        ButtonCommand="{Binding CliStoppenCommand}"
+                                                        Visibility="{Binding IsCliRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
+                <!-- Gruppe: Issue -->
+                <controls:RibbonGroup GruppenName="Issue"
+                                      Visibility="{Binding CanAssignIssue, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="🔗"
+                                                        ButtonText="Issue zuweisen"
+                                                        AutomationName="IssueZuweisen"
+                                                        ButtonCommand="{Binding IssueZuweisenCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🌐"
+                                                        ButtonText="Issue öffnen"
+                                                        AutomationName="IssueOeffnen"
+                                                        ButtonCommand="{Binding IssueBrowserOeffnenCommand}"
+                                                        Visibility="{Binding CurrentIssueReferenz, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
+            </StackPanel>
+        </Border>
+
+        <!-- Fehler -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource ErrorBrush}"
+                Padding="12,8"
+                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" />
+        </Border>
+
+        <!-- Hauptinhalt: Status-abhängiges Content-Switching -->
+        <Grid Grid.Row="2">
+
+            <!-- Edit-Panel (Status=Neu) -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding ShowEditPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Margin="24">
+                    <Border Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="16">
+                        <StackPanel>
+                            <TextBlock Text="Aufgabe bearbeiten"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="0,0,0,16" />
+
+                            <TextBlock Text="Titel"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       Margin="0,0,0,4" />
+                            <TextBox Text="{Binding EditTitel, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="EditTitel"
+                                     FontSize="14"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     Background="{DynamicResource BackgroundBrush}"
+                                     BorderBrush="{DynamicResource BorderBrush}"
+                                     BorderThickness="1"
+                                     Padding="8,6"
+                                     Margin="0,0,0,16" />
+
+                            <TextBlock Text="Anforderungsbeschreibung"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       Margin="0,0,0,4" />
+                            <TextBox Text="{Binding EditAnforderungsBeschreibung, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="EditAnforderungsBeschreibung"
+                                     FontSize="14"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     Background="{DynamicResource BackgroundBrush}"
+                                     BorderBrush="{DynamicResource BorderBrush}"
+                                     BorderThickness="1"
+                                     Padding="8,6"
+                                     MinHeight="120"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Margin="0,0,0,12" />
+
+                            <TextBlock Text="Speichern-Button im Ribbon verwenden"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       FontStyle="Italic" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- CLI-Panel (Status ∈ {Gestartet, Wartend}) -->
+            <Grid Visibility="{Binding ShowCliPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Toggle-Leiste -->
+                <StackPanel Grid.Row="0"
+                            Orientation="Horizontal"
+                            Background="{DynamicResource SurfaceBrush}"
+                            Margin="16,8">
+                    <TextBlock Text="Ansicht:"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               FontSize="12"
+                               Margin="0,0,8,0" />
+                    <ToggleButton IsChecked="{Binding IsInfoViewVisible}"
+                                  AutomationProperties.Name="InfoCliToggle"
+                                  Command="{Binding InfoCliToggleCommand}"
+                                  Padding="12,4"
+                                  FontSize="12">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton">
+                                <Setter Property="Content" Value="CLI" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter Property="Content" Value="Info" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ToggleButton.Style>
+                    </ToggleButton>
+                </StackPanel>
+
+                <!-- Inhalt: CLI-Fenster oder Info-Panel -->
+                <Grid Grid.Row="1">
+                    <!-- ProcessWindowHost (CLI-Fenster, sichtbar wenn IsInfoViewVisible=false) -->
+                    <controls:ProcessWindowHost x:Name="CliWindowHost"
+                                                EmbeddedHandle="{Binding EmbeddedWindowHandle}"
+                                                Visibility="{Binding IsInfoViewVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+
+                    <!-- Info-Panel (sichtbar wenn IsInfoViewVisible=true) -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Visibility="{Binding IsInfoViewVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Margin="16">
+                            <Border Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="16"
+                                    Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding AufgabeTitel}"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               Margin="0,0,0,8" />
+                                    <TextBlock Text="{Binding AufgabeStatus}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               Margin="0,0,0,8" />
+                                    <TextBlock Text="{Binding Aufgabe.AnforderungsBeschreibung}"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Protokoll"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               Margin="0,0,0,8" />
+                                    <ListBox ItemsSource="{Binding Protokolleintraege}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             MaxHeight="400">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="4,2" MaxWidth="800">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="160" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Zeitstempel, StringFormat='{}{0:dd.MM.yyyy HH:mm:ss}'}"
+                                                               FontSize="11"
+                                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                                               VerticalAlignment="Top" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Typ}"
+                                                               FontSize="11"
+                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               VerticalAlignment="Top" />
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding Inhalt}"
+                                                               FontSize="12"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               TextWrapping="Wrap" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+
+            <!-- Diff-Panel (Status=Beendet) -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding ShowDiffPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Margin="24">
+                    <Border Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="16">
+                        <TextBlock Text="Diff-Ansicht wird hier angezeigt... (Implementierung folgt später)"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   FontStyle="Italic"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+        </Grid>
+
+        <!-- Statusleiste -->
+        <Border Grid.Row="3"
+                Background="{DynamicResource SidebarBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,4">
+            <controls:StatusIndicatorControl Status="{Binding AufgabeStatus, Mode=OneWay}" />
+        </Border>
+    </Grid>
+</UserControl>

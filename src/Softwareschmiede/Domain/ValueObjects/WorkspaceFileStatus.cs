@@ -5,6 +5,7 @@ namespace Softwareschmiede.Domain.ValueObjects;
 /// <param name="WorktreeStatus">Status im Arbeitsverzeichnis.</param>
 public sealed record WorkspaceFileStatus(char IndexStatus, char WorktreeStatus)
 {
+    /// <summary>Parst einen zweistelligen Git-Porcelain-Statuscode.</summary>
     public static WorkspaceFileStatus Parse(string porcelainCode)
     {
         if (string.IsNullOrWhiteSpace(porcelainCode) || porcelainCode.Length < 2)
@@ -15,22 +16,31 @@ public sealed record WorkspaceFileStatus(char IndexStatus, char WorktreeStatus)
         return new WorkspaceFileStatus(porcelainCode[0], porcelainCode[1]);
     }
 
+    /// <summary>Gibt an, ob die Datei von Git ignoriert wird.</summary>
     public bool IsIgnored => IndexStatus == '!' && WorktreeStatus == '!';
 
+    /// <summary>Gibt an, ob die Datei nicht versioniert ist.</summary>
     public bool IsUntracked => IndexStatus == '?' && WorktreeStatus == '?';
 
+    /// <summary>Gibt an, ob die Datei gelöscht wurde.</summary>
     public bool IsDeleted => IndexStatus == 'D' || WorktreeStatus == 'D';
 
+    /// <summary>Gibt an, ob die Datei einen Merge-Konflikt hat.</summary>
     public bool IsConflict => IndexStatus == 'U' || WorktreeStatus == 'U';
 
+    /// <summary>Gibt an, ob die Datei umbenannt oder kopiert wurde.</summary>
     public bool IsRenameOrCopy => IndexStatus is 'R' or 'C' || WorktreeStatus is 'R' or 'C';
 
+    /// <summary>Gibt an, ob der Dateityp geändert wurde.</summary>
     public bool IsTypeChanged => IndexStatus == 'T' || WorktreeStatus == 'T';
 
+    /// <summary>Gibt an, ob die Datei im Index gestaged ist.</summary>
     public bool IsStaged => IndexStatus is not (' ' or '?' or '!');
 
+    /// <summary>Gibt an, ob die Datei im Arbeitsverzeichnis Änderungen hat.</summary>
     public bool IsDirty => WorktreeStatus is not (' ' or '?' or '!');
 
+    /// <summary>Kurztext für das Status-Badge.</summary>
     public string BadgeText => IsUntracked
         ? "??"
         : IsIgnored
@@ -41,6 +51,7 @@ public sealed record WorkspaceFileStatus(char IndexStatus, char WorktreeStatus)
                     IndexStatus == ' ' ? string.Empty : IndexStatus.ToString(),
                     WorktreeStatus == ' ' ? string.Empty : WorktreeStatus.ToString());
 
+    /// <summary>CSS-Klasse für die farbliche Darstellung des Status.</summary>
     public string CssClass => IsIgnored
         ? "git-status-ignored"
         : IsUntracked
@@ -63,6 +74,7 @@ public sealed record WorkspaceFileStatus(char IndexStatus, char WorktreeStatus)
                                             ? "git-status-staged"
                                             : "git-status-dirty";
 
+    /// <summary>Lesbare Beschreibung des Dateistatus.</summary>
     public string Description => IsIgnored
         ? "Ignoriert"
         : IsUntracked

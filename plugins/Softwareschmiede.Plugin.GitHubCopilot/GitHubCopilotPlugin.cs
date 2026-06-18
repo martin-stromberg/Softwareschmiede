@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Logging;
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -10,14 +10,11 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>
 /// GitHub Copilot Plugin – nutzt das <c>copilot</c>-CLI für KI-gestützte Entwicklung.
-/// Der Prozess läuft im Repository-Verzeichnis, sodass der Agent Dateien direkt anlegen und ändern kann.
-/// Die Agent-Datei wird als Kontext-Präambel an den Prompt angehängt.
 /// </summary>
 public sealed class GitHubCopilotPlugin : CliKiPluginBase
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 
-    private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubCopilotPlugin> _logger;
 
@@ -53,54 +50,101 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
                 Label: "Copilot CLI Pfad",
                 FieldType: PluginSettingFieldType.Text,
                 Placeholder: "C:\\Program Files\\GitHub Copilot\\copilot.exe",
-                Description: "Optionaler absoluter Pfad zur copilot-Executable. Erforderlich für IIS, wenn der Application-Pool die PATH-Variable nicht enthält.",
+                Description: "Optionaler absoluter Pfad zur copilot-Executable.",
                 IsRequired: false)
         ])
     ];
 
     /// <summary>Erstellt eine neue Instanz des <see cref="GitHubCopilotPlugin"/>.</summary>
     public GitHubCopilotPlugin(
-        ICliRunner cliRunner,
         ICredentialStore credentialStore,
         ILogger<GitHubCopilotPlugin> logger)
     {
-        _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
     }
 
-    private IDictionary<string, string> GetGhEnvironment(string localRepoPath)
+    /// <inheritdoc/>
+    public override bool SupportsSessionContinuation() => false;
+
+    /// <inheritdoc/>
+    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
-        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
-
-        var runtimeRoot = Path.Combine(localRepoPath, ".softwareschmiede", "copilot-runtime");
-        var userProfile = Path.Combine(runtimeRoot, "userprofile");
-        var localAppData = Path.Combine(runtimeRoot, "localappdata");
-        var appData = Path.Combine(runtimeRoot, "appdata");
-        var temp = Path.Combine(runtimeRoot, "temp");
-
-        Directory.CreateDirectory(runtimeRoot);
-        Directory.CreateDirectory(userProfile);
-        Directory.CreateDirectory(localAppData);
-        Directory.CreateDirectory(appData);
-        Directory.CreateDirectory(temp);
-
-        var env = new Dictionary<string, string>
+        _logger.LogInformation("Pruefe GitHub-Copilot-Plugin-Health.");
+        try
         {
-            ["USERPROFILE"] = userProfile,
-            ["HOME"] = userProfile,
-            ["LOCALAPPDATA"] = localAppData,
-            ["APPDATA"] = appData,
-            ["TEMP"] = temp,
-            ["TMP"] = temp,
+            var copilotCommand = GetCopilotCommand();
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = copilotCommand,
+                    Arguments = "--version",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                }
+            };
+
+            process.Start();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* ignorieren */ }
+            }
+            return process.ExitCode == 0;
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Copilot-CLI nicht gefunden oder nicht ausführbar.");
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+    {
+        _logger.LogInformation(
+            "GitHubCopilotPlugin BuildProcessStartInfo (Repo: {RepoPath}, Parameters: {Parameters}).",
+            localRepoPath,
+            parameters);
+
+        var copilotCommand = GetCopilotCommand();
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = copilotCommand,
+            WorkingDirectory = localRepoPath,
+            UseShellExecute = false,
+            CreateNoWindow = false,
         };
 
-        if (!string.IsNullOrEmpty(token))
+        if (!string.IsNullOrWhiteSpace(parameters))
         {
-            env["GH_TOKEN"] = token;
+            psi.Arguments = parameters;
         }
 
-        return env;
+        // Umgebungsisolation (USERPROFILE, HOME, APPDATA etc.) wurde bewusst entfernt.
+        // Das copilot-CLI benötigt die Standard-Umgebungsvariablen des Benutzerprofils,
+        // um seine eigene Konfiguration (Token, OAuth-Cache, Proxy-Einstellungen) zu laden.
+        // Eine vollständige Isolation würde dazu führen, dass das CLI keine Authentifizierung findet.
+        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        if (!string.IsNullOrEmpty(token))
+        {
+            psi.EnvironmentVariables["GH_TOKEN"] = token;
+        }
+
+        return psi;
     }
 
     private string GetCopilotCommand()
@@ -112,232 +156,5 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         }
 
         return "copilot";
-    }
-
-    /// <inheritdoc/>
-    public override Task<IEnumerable<AgentInfo>> GetAvailableAgentsAsync(string agentPackagePath, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Lese Agenten aus Paket {PackagePath}.", agentPackagePath);
-
-        var agents = DiscoverAgents(agentPackagePath, Path.Combine(".github", "agents"));
-
-        _logger.LogInformation("{Count} Agenten im Paket gefunden.", agents.Count);
-        return Task.FromResult<IEnumerable<AgentInfo>>(agents);
-    }
-
-    /// <inheritdoc/>
-    public override Task<bool> IsAgentPackageCompatibleAsync(string agentPackagePath, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Prufe Kompatibilitat des Agentenpakets {PackagePath}.", agentPackagePath);
-
-        if (!Directory.Exists(agentPackagePath))
-        {
-            _logger.LogWarning("Agentenpaket-Verzeichnis {Path} nicht gefunden.", agentPackagePath);
-            return Task.FromResult(false);
-        }
-
-        var compatible = Directory.Exists(Path.Combine(agentPackagePath, ".github", "agents"));
-
-        if (!compatible)
-        {
-            _logger.LogWarning(
-                "Agentenpaket {PackagePath} ist nicht kompatibel mit GitHub Copilot: Kein '.github/agents'-Ordner gefunden.",
-                agentPackagePath);
-        }
-
-        return Task.FromResult(compatible);
-    }
-
-    /// <inheritdoc/>
-    public override async Task DeployAgentPackageAsync(string agentPackagePath, string localRepoPath, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Deploye Agentenpaket {PackagePath} nach {RepoPath}.", agentPackagePath, localRepoPath);
-
-        var githubSourceDir = Path.Combine(agentPackagePath, ".github");
-        if (!Directory.Exists(githubSourceDir))
-        {
-            _logger.LogWarning(
-                "Kein '.github'-Ordner im Agentenpaket {PackagePath} gefunden. Deploy wird ubersprungen.",
-                agentPackagePath);
-            return;
-        }
-
-        var githubTargetDir = Path.Combine(localRepoPath, ".github");
-
-        await Task.Run(() =>
-        {
-            foreach (var sourceFile in Directory.GetFiles(githubSourceDir, "*", SearchOption.AllDirectories))
-            {
-                var relativePath = Path.GetRelativePath(githubSourceDir, sourceFile);
-                var targetFile = Path.Combine(githubTargetDir, relativePath);
-                Directory.CreateDirectory(Path.GetDirectoryName(targetFile)!);
-                File.Copy(sourceFile, targetFile, overwrite: true);
-            }
-        }, ct);
-
-        _logger.LogInformation("Agentenpaket '.github'-Ordner erfolgreich nach {TargetDir} deployed.", githubTargetDir);
-    }
-
-    /// <inheritdoc/>
-    public override async IAsyncEnumerable<string> StartDevelopmentAsync(
-        string prompt,
-        AgentInfo agent,
-        string localRepoPath,
-        string? model = null,
-        [EnumeratorCancellation] CancellationToken ct = default)
-    {
-        _logger.LogInformation("Starte KI-Entwicklung mit Agent {AgentName} in {RepoPath}.", agent.Name, localRepoPath);
-        
-        EnsureGitignoreEntries(localRepoPath);
-
-        var (instruction, includeContext) = CliKiPluginBase.UnwrapPromptContextMarker(prompt);
-        var promptFile = BuildTaskFilePath(localRepoPath, Guid.NewGuid());
-        await File.WriteAllTextAsync(promptFile, instruction, ct);
-
-        var cliPrompt = BuildCliPrompt(localRepoPath, promptFile, includeContext);
-        var args = BuildCopilotArgs(cliPrompt, agent, model);
-        var env = GetGhEnvironment(localRepoPath);
-        var copilotCommand = GetCopilotCommand();
-
-        _logger.LogInformation("Rufe copilot CLI mit Agent {AgentName} auf.", agent.Name);
-
-        var stream = _cliRunner.StreamAsync(copilotCommand, args, localRepoPath, env, ct);
-        await using var enumerator = stream.GetAsyncEnumerator(ct);
-
-        while (true)
-        {
-            bool hasNext;
-            try
-            {
-                hasNext = await enumerator.MoveNextAsync();
-            }
-            catch (Win32Exception ex)
-            {
-                throw new InvalidOperationException(
-                    "Copilot CLI wurde nicht gefunden. Bitte in den Plugin-Einstellungen 'Copilot CLI Pfad' als absoluten Pfad setzen (z.B. C:\\Program Files\\GitHub Copilot\\copilot.exe).",
-                    ex);
-            }
-
-            if (!hasNext)
-            {
-                break;
-            }
-
-            yield return enumerator.Current;
-        }
-    }
-
-    /// <summary>
-    /// Baut die Argument-Liste für den <c>copilot</c>-CLI-Aufruf zusammen.
-    /// <para>
-    /// Der Prompt wird als kompakter Steuertext übergeben und verweist auf die
-    /// zuvor erzeugte Task-Datei (und optional die Kontextdatei).
-    /// Für den nicht-interaktiven Skript-Modus sind folgende Flags erforderlich:
-    /// <list type="bullet">
-    ///   <item><c>--allow-all-tools</c> – alle Tool-Aufrufe ohne Bestätigung (Pflicht im Skript-Modus, sonst Exit-Code 1)</item>
-    ///   <item><c>--allow-all-paths</c> – Dateizugriff auf beliebige Pfade</item>
-    ///   <item><c>--no-ask-user</c> – deaktiviert Rückfragen, Agent arbeitet autonom</item>
-    ///   <item><c>--silent</c> – unterdrückt Statistik-Ausgaben, liefert nur die Agenten-Antwort</item>
-    /// </list>
-    /// </para>
-    /// </summary>
-    private static IEnumerable<string> BuildCopilotArgs(string cliPrompt, AgentInfo agent, string? model)
-    {
-        var args = new List<string>
-        {
-            "--prompt", $"\"{cliPrompt}\"",
-            "--allow-all-tools",
-            "--allow-all-paths",
-            "--no-ask-user",
-            "--silent",
-        };
-
-        if (!string.IsNullOrWhiteSpace(agent.Name))
-        {
-            args.AddRange(["--agent", agent.Name]);
-        }
-
-        // Kein --model-Flag → GitHub wählt automatisch das passende Modell
-        if (!string.IsNullOrWhiteSpace(model))
-        {
-            args.AddRange(["--model", model]);
-        }
-        else
-        {
-            args.AddRange(["--model", "auto"]);
-        }
-
-        return args;
-    }
-
-    private string BuildCliPrompt(string localRepoPath, string taskFilePath, bool includeContext)
-        => base.BuildCliPrompt(localRepoPath, taskFilePath, includeContext);
-
-    /// <inheritdoc/>
-    public override async Task<TestResult> RunTestsAsync(string localRepoPath, CancellationToken ct = default)
-    {
-        _logger.LogInformation("Fuhre Tests in {RepoPath} aus.", localRepoPath);
-
-        var result = await _cliRunner.RunAsync(
-            "dotnet",
-            ["test", "--verbosity", "normal", "--logger", "trx"],
-            localRepoPath,
-            null,
-            ct);
-
-        var output = string.IsNullOrEmpty(result.StdOut) || string.IsNullOrEmpty(result.StdErr)
-            ? result.StdOut + result.StdErr
-            : $"{result.StdOut}{Environment.NewLine}{result.StdErr}";
-        var ergebnisse = ParseTestOutput(output);
-        var bestanden = result.IsSuccess;
-
-        _logger.LogInformation(
-            "Tests abgeschlossen. Bestanden: {Bestanden}, Anzahl Ergebnisse: {Count}.",
-            bestanden, ergebnisse.Count);
-
-        return new TestResult(bestanden, ergebnisse);
-    }
-
-    private static List<TestErgebnisInfo> ParseTestOutput(string output)
-    {
-        var results = new List<TestErgebnisInfo>();
-        foreach (var line in output.Split('\n'))
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("Passed", StringComparison.OrdinalIgnoreCase))
-            {
-                results.Add(new TestErgebnisInfo(trimmed, TestStatus.Bestanden, null, TimeSpan.Zero));
-            }
-            else if (trimmed.StartsWith("Failed", StringComparison.OrdinalIgnoreCase))
-            {
-                results.Add(new TestErgebnisInfo(trimmed, TestStatus.Fehlgeschlagen, trimmed, TimeSpan.Zero));
-            }
-            else if (trimmed.StartsWith("Skipped", StringComparison.OrdinalIgnoreCase))
-            {
-                results.Add(new TestErgebnisInfo(trimmed, TestStatus.Uebersprungen, null, TimeSpan.Zero));
-            }
-        }
-        return results;
-    }
-
-    /// <inheritdoc/>
-    public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
-    {
-        _logger.LogInformation("Prufe GitHub-Copilot-Plugin-Health.");
-        try
-        {
-            var result = await _cliRunner.RunAsync(GetCopilotCommand(), ["--version"], null, null, ct);
-            if (result is null)
-            {
-                _logger.LogWarning("Copilot-Healthcheck lieferte kein Ergebnis vom CLI-Runner.");
-                return false;
-            }
-
-            return result.IsSuccess;
-        }
-        catch (Win32Exception)
-        {
-            return false;
-        }
     }
 }

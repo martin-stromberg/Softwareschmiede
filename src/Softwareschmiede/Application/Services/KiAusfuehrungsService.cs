@@ -1,331 +1,408 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
-using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>
-/// Singleton-Service, der laufende KI-Ausführungen verwaltet.
-/// Ermöglicht Hintergrundausführung unabhängig von der Blazor-Komponenten-Lebensdauer:
-/// Der Anwender kann wegnavigieren und zurückkehren – der Lauf läuft weiter und
-/// der Puffer der bisherigen Ausgabe ist noch verfügbar.
+/// Singleton-Service, der laufende CLI-Prozesse für KI-Ausführungen verwaltet.
+/// Startet, stoppt und überwacht CLI-Prozesse pro Aufgabe.
 /// </summary>
-/// <remarks>
-/// Ownership der Sessions: Dieser Service ist Singleton und hält alle aktiven <see cref="KiSession"/>-Objekte.
-/// Abgeschlossene Sessions bleiben nach Ende kurzzeitig erhalten (bis die Komponente die Daten gelesen hat)
-/// und werden beim nächsten Laden der Seite bereinigt.
-/// </remarks>
-public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource
+public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDisposable
 {
-    private readonly ConcurrentDictionary<Guid, KiSession> _sessions = new();
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ConcurrentDictionary<Guid, CliProcessHandle> _handles = new();
     private readonly ILogger<KiAusfuehrungsService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
-    public KiAusfuehrungsService(IServiceScopeFactory scopeFactory, ILogger<KiAusfuehrungsService> logger)
+    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, IServiceScopeFactory scopeFactory)
     {
-        _scopeFactory = scopeFactory;
         _logger = logger;
+        _scopeFactory = scopeFactory;
+    }
+
+    /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
+    public event Action<Guid, CliProcessStatus>? CliProcessStatusChanged;
+
+    /// <inheritdoc/>
+    public event Action<int, int>? RunningCountChanged;
+
+    /// <inheritdoc/>
+    public bool IsRunning(Guid aufgabeId)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        {
+            return false;
+        }
+
+        try { return !handle.Process.HasExited; }
+        catch { return false; }
+    }
+
+    /// <summary>Gibt den laufenden Prozess für eine Aufgabe zurück, oder null wenn kein Prozess läuft.</summary>
+    public System.Diagnostics.Process? GetRunningProcess(Guid aufgabeId)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var handle))
+            return null;
+        try { return !handle.Process.HasExited ? handle.Process : null; }
+        catch { return null; }
     }
 
     /// <summary>
-    /// Wird ausgelöst, wenn sich die Anzahl laufender Automatisierungen ändert.
-    /// Liefert den vorherigen und den aktuellen Wert.
+    /// Speichert das bekannte Fenster-Handle (HWND) des CLI-Prozesses für späteres Wieder-Einbetten.
+    /// Wird vom View aufgerufen sobald das Fenster erstmalig eingebettet wurde.
     /// </summary>
-    public event Action<int, int>? RunningCountChanged;
-
-    /// <summary>Gibt an, ob für die Aufgabe aktuell eine KI-Ausführung läuft.</summary>
-    public bool IsRunning(Guid aufgabeId)
-        => _sessions.TryGetValue(aufgabeId, out var session) && session.IsRunning;
-
-    /// <summary>Gibt die Anzahl aktuell laufender KI-Ausführungen zurück.</summary>
-    public int GetRunningCount()
-        => _sessions.Values.Count(session => session.IsRunning);
-
-    /// <summary>
-    /// Gibt alle bisher gepufferten Ausgabezeilen einer laufenden oder gerade beendeten Session zurück.
-    /// Gibt eine leere Liste zurück, wenn keine Session existiert.
-    /// </summary>
-    public IReadOnlyList<string> GetBufferedLines(Guid aufgabeId)
-        => _sessions.TryGetValue(aufgabeId, out var session)
-            ? session.GetLines()
-            : [];
-
-    /// <summary>
-    /// Abonniert neue Ausgabezeilen einer laufenden Session.
-    /// Das zurückgegebene <see cref="IDisposable"/> beendet das Abonnement beim Dispose.
-    /// </summary>
-    /// <param name="aufgabeId">Aufgabe, auf die abonniert werden soll.</param>
-    /// <param name="onLine">Callback, der für jede neue Zeile aufgerufen wird.</param>
-    /// <returns>IDisposable zum Beenden des Abonnements – muss beim Component-Dispose aufgerufen werden.</returns>
-    public IDisposable? Subscribe(Guid aufgabeId, Action<string> onLine)
+    public void SetFensterHandle(Guid aufgabeId, IntPtr handle)
     {
-        if (!_sessions.TryGetValue(aufgabeId, out var session) || !session.IsRunning)
+        if (_handles.TryGetValue(aufgabeId, out var h))
+            h.FensterHandle = handle;
+    }
+
+    /// <summary>
+    /// Gibt das gespeicherte Fenster-Handle des CLI-Prozesses zurück, oder <see cref="IntPtr.Zero"/>
+    /// wenn kein Handle gespeichert oder der Prozess nicht mehr aktiv ist.
+    /// </summary>
+    public IntPtr GetFensterHandle(Guid aufgabeId)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var h))
+            return IntPtr.Zero;
+        return h.FensterHandle;
+    }
+
+    /// <inheritdoc/>
+    public int GetRunningCount()
+        => _handles.Values.Count(h =>
+        {
+            try { return !h.Process.HasExited; }
+            catch { return false; }
+        });
+
+    private readonly SemaphoreSlim _startLock = new(1, 1);
+
+    /// <summary>Startet einen CLI-Prozess für eine Aufgabe und gibt das Handle zurück.</summary>
+    public async Task<CliProcessHandle> StartCliAsync(
+        Guid aufgabeId,
+        IKiPlugin kiPlugin,
+        string localRepoPath,
+        string? optionalParameters = null,
+        CancellationToken ct = default)
+    {
+        await _startLock.WaitAsync(ct);
+        try
+        {
+            if (_handles.TryGetValue(aufgabeId, out var existing))
+            {
+                bool istNochAktiv;
+                try { istNochAktiv = !existing.Process.HasExited; }
+                catch { istNochAktiv = false; }
+
+                if (istNochAktiv)
+                {
+                    _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
+                    return existing;
+                }
+            }
+
+            var psi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct);
+
+            // Sicherstellen, dass der vollständige PATH des aktuellen Prozesses übergeben wird.
+            // Bei UseShellExecute=false wird nur der Prozess-PATH genutzt — der kann bei WPF-Apps
+            // kürzer sein als der vollständige Nutzer-PATH (z. B. fehlt npm/node bin-Verzeichnis).
+            if (!psi.EnvironmentVariables.ContainsKey("PATH"))
+            {
+                psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            }
+
+            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} starten.", aufgabeId);
+
+            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            var handle = new CliProcessHandle(aufgabeId, process);
+
+            process.Exited += (_, _) =>
+            {
+                var exitCode = TryGetExitCode(process);
+                _logger.LogInformation(
+                    "CLI-Prozess für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
+                    aufgabeId,
+                    exitCode);
+
+                _handles.TryRemove(aufgabeId, out _);
+
+                RaiseRunningCountChanged();
+
+                CliProcessStatus status;
+                if (handle.AbsichtlichGestoppt)
+                {
+                    status = CliProcessStatus.Gestoppt;
+                }
+                else if (exitCode.HasValue && exitCode.Value != 0)
+                {
+                    status = CliProcessStatus.Fehler;
+                    _ = PersistFehlgeschlagenAsync(aufgabeId, exitCode.Value);
+                }
+                else
+                {
+                    status = CliProcessStatus.Gestoppt;
+                }
+
+                CliProcessStatusChanged?.Invoke(aufgabeId, status);
+            };
+
+            // Handle VOR process.Start() eintragen, damit der Exited-Handler
+            // das Handle immer vorfindet (Race-Condition bei sehr kurzlebigen Prozessen).
+            _handles[aufgabeId] = handle;
+
+            bool started;
+            try
+            {
+                started = process.Start();
+            }
+            catch
+            {
+                _handles.TryRemove(aufgabeId, out _);
+                throw;
+            }
+
+            if (!started)
+            {
+                _handles.TryRemove(aufgabeId, out _);
+                throw new InvalidOperationException("Prozess konnte nicht gestartet werden.");
+            }
+
+            _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, process.Id);
+            RaiseRunningCountChanged();
+            CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
+
+            return handle;
+        }
+        finally
+        {
+            _startLock.Release();
+        }
+    }
+
+    /// <summary>Stoppt den laufenden CLI-Prozess für eine Aufgabe (SIGTERM → 5s → Kill).</summary>
+    public async Task StopCliAsync(Guid aufgabeId, CancellationToken ct = default)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var handle))
+        {
+            return;
+        }
+
+        var process = handle.Process;
+        handle.AbsichtlichGestoppt = true;
+
+        _logger.LogInformation("CLI-Prozess für Aufgabe {AufgabeId} beenden.", aufgabeId);
+
+        try
+        {
+            if (process.HasExited)
+            {
+                return;
+            }
+
+            process.CloseMainWindow();
+            var exited = await WaitForExitAsync(process, TimeSpan.FromSeconds(5), ct);
+            if (!exited)
+            {
+                _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} antwortet nicht – Kill.", aufgabeId);
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Beenden des CLI-Prozesses für Aufgabe {AufgabeId}.", aufgabeId);
+        }
+    }
+
+    /// <summary>Gibt den Exit-Code des letzten Prozesses zurück.</summary>
+    public int? GetLastExitCode(Guid aufgabeId)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var handle))
         {
             return null;
         }
 
-        return session.Subscribe(onLine);
+        return TryGetExitCode(handle.Process);
     }
 
-    /// <summary>
-    /// Startet einen KI-Lauf im Hintergrund.
-    /// Kehrt sofort zurück – der eigentliche Lauf findet in einem Background-Task statt.
-    /// </summary>
-    /// <param name="aufgabeId">Aufgabe, für die die KI gestartet wird.</param>
-    /// <param name="prompt">Anforderungs-Prompt des Anwenders.</param>
-    /// <param name="agent">Gewählter Agent.</param>
-    /// <param name="model">Optionales KI-Modell.</param>
-    /// <param name="onStarted">Optionaler Callback nach erfolgreicher Initialisierung (Status gesetzt).</param>
-    /// <param name="onCompleted">Optionaler Callback nach Abschluss oder Fehler.</param>
-    public void StartKiLauf(
-        Guid aufgabeId,
-        string prompt,
-        AgentInfo agent,
-        string? selectedKiPluginPrefix = null,
-        string? model = null,
-        FolgeanweisungsKontextmodus? kontextmodus = null,
-        Action? onStarted = null,
-        Action? onStatus = null,
-        Action<bool>? onCompleted = null)
+    /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe (für externe Nutzung durch AufgabeService).</summary>
+    public void UpdateHeartbeat(Guid aufgabeId)
     {
-        if (IsRunning(aufgabeId))
+        if (_handles.TryGetValue(aufgabeId, out var handle))
         {
-            _logger.LogWarning("KI-Lauf für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
-            return;
-        }
-
-        var session = new KiSession();
-        var previousRunningCount = GetRunningCount();
-        _sessions[aufgabeId] = session;
-        RaiseRunningCountChanged(previousRunningCount);
-
-        _logger.LogInformation("KI-Hintergrundlauf für Aufgabe {AufgabeId} mit Agent {AgentName} gestartet.", aufgabeId, agent.Name);
-
-
-        var completed = false;
-        var statusChanged = false;
-        var statusEntryCount = 0;
-        var maxStatusCount = 10;
-        var lastStatusEvent = DateTime.MinValue;
-        var statusInterval = TimeSpan.FromSeconds(10);
-        _ = Task.Run(async () =>
-        {
-            while (!completed)
-            {
-                await Task.Delay(100);
-
-                if (!statusChanged)
-                    return;
-                if (lastStatusEvent.Add(statusInterval) > DateTime.MinValue && (statusEntryCount < maxStatusCount))
-                    return;
-                lastStatusEvent = DateTime.MinValue;
-                statusEntryCount = 0;
-                statusChanged = false;
-                onStatus?.Invoke();
-            }
-        });
-
-        // Hintergrund-Task: eigener Scope für Scoped-Services (EntwicklungsprozessService, DbContext etc.)
-        _ = Task.Run(async () =>
-        {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var entwicklungsprozessService = scope.ServiceProvider.GetRequiredService<EntwicklungsprozessService>();
-
-            bool fehler = false;
-            try
-            {
-                // Scoped Service im Background-Task-Scope ausführen
-                await foreach (var line in entwicklungsprozessService.KiStartenAsync(
-                    aufgabeId,
-                    prompt,
-                    agent,
-                    selectedKiPluginPrefix,
-                    model,
-                    kontextmodus,
-                    session.CancellationToken))
-                {
-                    var hasJustStarted = !session.GetLines().Any();
-                    session.AddLine(line);
-
-                    // Einmalig nach der ersten Zeile den "gestartet"-Callback auslösen
-                    if (hasJustStarted)
-                    {
-                        onStarted?.Invoke();
-                    }
-                    statusEntryCount += 1;
-                    statusChanged = true;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("KI-Lauf für Aufgabe {AufgabeId} wurde abgebrochen.", aufgabeId);
-                fehler = true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Fehler im KI-Hintergrundlauf für Aufgabe {AufgabeId}.", aufgabeId);
-                session.AddLine($"[Fehler] {ex.Message}");
-                fehler = true;
-            }
-            finally
-            {
-                completed = true;
-                var previousCount = GetRunningCount();
-                session.Complete(fehler);
-                RaiseRunningCountChanged(previousCount);
-                onCompleted?.Invoke(fehler);
-                _logger.LogInformation("KI-Hintergrundlauf für Aufgabe {AufgabeId} beendet (Fehler: {Fehler}).", aufgabeId, fehler);
-            }
-        });
-    }
-
-    /// <summary>Bricht den laufenden KI-Lauf für die angegebene Aufgabe ab.</summary>
-    public void AbortKiLauf(Guid aufgabeId)
-    {
-        if (_sessions.TryGetValue(aufgabeId, out var session))
-        {
-            session.Cancel();
+            handle.LastHeartbeat = DateTimeOffset.UtcNow;
         }
     }
 
-    /// <summary>Entfernt eine beendete Session aus dem Puffer (Cleanup nach Seiten-Reload).</summary>
-    public void SessionBereinigen(Guid aufgabeId)
+    /// <inheritdoc/>
+    public void Dispose()
     {
-        if (_sessions.TryGetValue(aufgabeId, out var session) && !session.IsRunning)
-        {
-            _sessions.TryRemove(aufgabeId, out _);
-        }
-    }
+        _isDisposed = true;
 
-    private void RaiseRunningCountChanged(int previousRunningCount)
-    {
-        var currentRunningCount = GetRunningCount();
-        if (previousRunningCount == currentRunningCount)
-        {
-            return;
-        }
-
-        RunningCountChanged?.Invoke(previousRunningCount, currentRunningCount);
-    }
-}
-
-/// <summary>
-/// Repräsentiert eine einzelne laufende oder gerade beendete KI-Ausführung.
-/// Thread-sicher: alle Zugriffe auf <see cref="_lines"/> und <see cref="_subscribers"/> sind durch einen Lock geschützt.
-/// </summary>
-internal sealed class KiSession : IDisposable
-{
-    private static readonly TimeSpan BlockPause = TimeSpan.FromSeconds(2);
-    private readonly Func<DateTimeOffset> _nowProvider;
-    private readonly List<string> _lines = [];
-    private readonly List<Action<string>> _subscribers = [];
-    private readonly Lock _lock = new();
-    private readonly CancellationTokenSource _cts = new();
-    private DateTimeOffset? _lastLineAt;
-
-    /// <summary>Gibt an, ob die Session noch aktiv ist.</summary>
-    public bool IsRunning { get; private set; } = true;
-
-    /// <summary>Gibt an, ob die Session mit einem Fehler beendet wurde.</summary>
-    public bool IsError { get; private set; }
-
-    /// <summary>CancellationToken für den Background-Task.</summary>
-    public CancellationToken CancellationToken => _cts.Token;
-
-    internal KiSession(Func<DateTimeOffset>? nowProvider = null)
-    {
-        _nowProvider = nowProvider ?? (() => DateTimeOffset.Now);
-    }
-
-    /// <summary>Gibt eine Kopie der bisher gepufferten Ausgabezeilen zurück.</summary>
-    public IReadOnlyList<string> GetLines()
-    {
-        lock (_lock)
-        {
-            return [.. _lines];
-        }
-    }
-
-    /// <summary>Fügt eine Ausgabezeile hinzu und benachrichtigt alle Subscriber.</summary>
-    public void AddLine(string line)
-    {
-        var now = _nowProvider();
-        List<Action<string>> subscribers;
-        List<string> additionalLines = new();
-        lock (_lock)
-        {
-            if (_lastLineAt is null || now - _lastLineAt >= BlockPause)
-            {
-                additionalLines.Add(string.Empty);
-                additionalLines.Add(now.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"));
-                _lines.AddRange(additionalLines);
-            }
-
-            _lines.Add(line);
-            _lastLineAt = now;
-            subscribers = [.. _subscribers];
-        }
-
-        // Subscriber außerhalb des Locks aufrufen, um Deadlocks zu vermeiden
-        foreach (var subscriber in subscribers)
+        foreach (var handle in _handles.Values)
         {
             try
             {
-                foreach (var addLine in additionalLines)
+                if (!handle.Process.HasExited)
                 {
-                    subscriber(addLine);
+                    handle.Process.Kill(entireProcessTree: true);
                 }
-                subscriber(line);
+
+                handle.Process.Dispose();
             }
             catch (Exception)
             {
-                // Subscriber-Fehler sollen die Session nicht abbrechen
             }
         }
+
+        _handles.Clear();
+        _startLock.Dispose();
     }
 
-    /// <summary>Registriert einen Subscriber für neue Ausgabezeilen.</summary>
-    /// <param name="callback">Callback, der für jede neue Zeile aufgerufen wird.</param>
-    /// <returns>IDisposable zum Beenden des Abonnements.</returns>
-    public IDisposable Subscribe(Action<string> callback)
+    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId, int exitCode)
     {
-        lock (_lock)
+        if (_isDisposed)
         {
-            _subscribers.Add(callback);
+            _logger.LogWarning(
+                "Status nach Fehler für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
+                aufgabeId);
+            return;
         }
 
-        return new Unsubscriber(() =>
+        try
         {
-            lock (_lock)
+            await using var scope = _scopeFactory.CreateAsyncScope();
+
+            if (_isDisposed)
             {
-                _subscribers.Remove(callback);
+                _logger.LogWarning(
+                    "Status nach Fehler für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
+                    aufgabeId);
+                return;
             }
-        });
-    }
 
-    /// <summary>Markiert die Session als abgeschlossen.</summary>
-    public void Complete(bool fehler)
-    {
-        lock (_lock)
+            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+            await aufgabeService.StatusSetzenAsync(aufgabeId, AufgabeStatus.Beendet);
+
+            var protokollService = scope.ServiceProvider.GetRequiredService<ProtokollService>();
+            await protokollService.AddEintragAsync(
+                aufgabeId,
+                ProtokollTyp.SystemMeldung,
+                $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode}).");
+
+            _logger.LogInformation("Aufgabe {AufgabeId}: Status nach Fehler auf Beendet gesetzt (ExitCode: {ExitCode}).", aufgabeId, exitCode);
+        }
+        catch (ObjectDisposedException ex)
         {
-            IsRunning = false;
-            IsError = fehler;
-            _subscribers.Clear();
+            _logger.LogWarning(
+                ex,
+                "Status nach Fehler für Aufgabe {AufgabeId} konnte nicht persistiert werden, da der ServiceProvider während des Shutdowns bereits disposed wurde.",
+                aufgabeId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Persistieren des Beendet-Status für Aufgabe {AufgabeId}.", aufgabeId);
         }
     }
 
-    /// <summary>Bricht den Background-Task ab.</summary>
-    public void Cancel() => _cts.Cancel();
-
-    /// <inheritdoc/>
-    public void Dispose() => _cts.Dispose();
-
-    private sealed class Unsubscriber(Action onDispose) : IDisposable
+    private void RaiseRunningCountChanged()
     {
-        public void Dispose() => onDispose();
+        int previous;
+        int current;
+        lock (_runningCountLock)
+        {
+            previous = _previousRunningCount;
+            current = GetRunningCount();
+            _previousRunningCount = current;
+        }
+
+        RunningCountChanged?.Invoke(previous, current);
     }
+
+    private int _previousRunningCount;
+    private readonly object _runningCountLock = new();
+
+    private static int? TryGetExitCode(Process process)
+    {
+        try
+        {
+            return process.HasExited ? process.ExitCode : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static async Task<bool> WaitForExitAsync(Process process, TimeSpan timeout, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
+        try
+        {
+            await process.WaitForExitAsync(cts.Token);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+}
+
+/// <summary>Handle auf einen laufenden CLI-Prozess.</summary>
+public sealed class CliProcessHandle
+{
+    /// <summary>Aufgaben-ID zu der dieser Prozess gehört.</summary>
+    public Guid AufgabeId { get; }
+
+    /// <summary>Der verwaltete Prozess.</summary>
+    public Process Process { get; }
+
+    /// <summary>Zeitstempel des letzten Heartbeats.</summary>
+    public DateTimeOffset LastHeartbeat { get; set; } = DateTimeOffset.UtcNow;
+
+    private volatile bool _absichtlichGestoppt;
+    private IntPtr _fensterHandle = IntPtr.Zero;
+
+    /// <summary>Gibt an, ob der Prozess absichtlich durch <see cref="KiAusfuehrungsService.StopCliAsync"/> beendet wurde.</summary>
+    public bool AbsichtlichGestoppt
+    {
+        get => _absichtlichGestoppt;
+        set => _absichtlichGestoppt = value;
+    }
+
+    /// <summary>
+    /// Das bekannte HWND des CLI-Fensters. Wird beim ersten Einbetten gesetzt und
+    /// für erneutes Einbetten nach Navigation-Zurück wiederverwendet, da SetParent
+    /// das HWND nicht verändert.
+    /// </summary>
+    public IntPtr FensterHandle
+    {
+        get => _fensterHandle;
+        set => _fensterHandle = value;
+    }
+
+    /// <summary>Erstellt ein neues Handle.</summary>
+    public CliProcessHandle(Guid aufgabeId, Process process)
+    {
+        AufgabeId = aufgabeId;
+        Process = process;
+    }
+}
+
+/// <summary>Status eines CLI-Prozesses.</summary>
+public enum CliProcessStatus
+{
+    /// <summary>Prozess läuft.</summary>
+    Gestartet,
+    /// <summary>Prozess wurde gestoppt.</summary>
+    Gestoppt,
+    /// <summary>Prozess ist mit einem Fehler beendet.</summary>
+    Fehler
 }

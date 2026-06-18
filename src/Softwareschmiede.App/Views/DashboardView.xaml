@@ -1,0 +1,83 @@
+<UserControl x:Class="Softwareschmiede.App.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
+             Background="{DynamicResource BackgroundBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Titel -->
+        <TextBlock Grid.Row="0"
+                   Text="Dashboard"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   Margin="0,0,0,24" />
+
+        <!-- Statistik-Kacheln -->
+        <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,24">
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,12,0"
+                    Padding="16">
+                <StackPanel>
+                    <TextBlock Text="Projekte" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14" />
+                    <TextBlock Text="{Binding ProjektAnzahl}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="6,0"
+                    Padding="16">
+                <StackPanel>
+                    <TextBlock Text="Aktive Aufgaben" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14" />
+                    <TextBlock Text="{Binding AktiveAufgaben}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="12,0,0,0"
+                    Padding="16">
+                <StackPanel>
+                    <TextBlock Text="Wartend" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="14" />
+                    <TextBlock Text="{Binding WartendAufgaben}" FontSize="36" FontWeight="Bold" Foreground="{DynamicResource WarningBrush}" />
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- Recovery-Banner -->
+        <controls:RecoveryBannerControl Grid.Row="2"
+                                         Margin="0,0,0,16"
+                                         CandidateCount="{Binding RecoveryKandidaten.Count, Mode=OneWay}" />
+
+        <!-- Fehler -->
+        <Border Grid.Row="3"
+                Background="{DynamicResource ErrorBrush}"
+                CornerRadius="8"
+                Padding="16,12"
+                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" FontSize="14" />
+        </Border>
+    </Grid>
+
+    <UserControl.Triggers>
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <!-- Laden wird via Command in Loaded-Event ausgelöst -->
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </UserControl.Triggers>
+</UserControl>

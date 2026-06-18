@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace Softwareschmiede.Application.Services;
 
@@ -14,6 +15,7 @@ public sealed class KiAufgabenBenachrichtigungsHub
         _logger = logger;
     }
 
+    /// <summary>Registriert einen Callback für KI-Aufgaben-Abschlussereignisse.</summary>
     public IDisposable Subscribe(Func<KiAufgabenAbschlussEreignis, Task> callback)
     {
         var id = Guid.NewGuid();
@@ -21,6 +23,7 @@ public sealed class KiAufgabenBenachrichtigungsHub
         return new Subscription(() => _subscriber.TryRemove(id, out _));
     }
 
+    /// <summary>Verteilt ein KI-Aufgaben-Abschlussereignis an alle Abonnenten.</summary>
     public async Task PublishAsync(KiAufgabenAbschlussEreignis ereignis)
     {
         var snapshot = _subscriber.Values.ToArray();

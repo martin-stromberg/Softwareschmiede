@@ -203,7 +203,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(200);
             e.HasIndex(b => b.BenutzerId).IsUnique();
-            e.Property(b => b.ToastModus).HasConversion<string>();
+            e.Property(b => b.BannerModus).HasConversion<string>();
             e.Property(b => b.TonModus).HasConversion<string>();
             e.Property(b => b.AktualisiertAm).HasConversion(
                 v => v.ToUnixTimeMilliseconds(),
