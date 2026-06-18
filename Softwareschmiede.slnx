@@ -1,12 +1,16 @@
 <Solution>
-  <Project Path="plugins/Softwareschmiede.Plugin.ClaudeCli/Softwareschmiede.Plugin.ClaudeCli.csproj" />
-  <Project Path="plugins/Softwareschmiede.Plugin.GitHub/Softwareschmiede.Plugin.GitHub.csproj" />
-  <Project Path="plugins/Softwareschmiede.Plugin.LocalDirectory/Softwareschmiede.Plugin.LocalDirectory.csproj" />
-  <Project Path="plugins/Softwareschmiede.Plugin.GitHubCopilot/Softwareschmiede.Plugin.GitHubCopilot.csproj" />
-  <Project Path="plugins/Softwareschmiede.Plugin.KiSimulator/Softwareschmiede.Plugin.KiSimulator.csproj" />
-<Project Path="src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj" />
-  <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj" />
+  <Folder Name="/Plugins/">
+    <Project Path="plugins/Softwareschmiede.Plugin.ClaudeCli/Softwareschmiede.Plugin.ClaudeCli.csproj" />
+    <Project Path="plugins/Softwareschmiede.Plugin.GitHub/Softwareschmiede.Plugin.GitHub.csproj" />
+    <Project Path="plugins/Softwareschmiede.Plugin.GitHubCopilot/Softwareschmiede.Plugin.GitHubCopilot.csproj" />
+    <Project Path="plugins/Softwareschmiede.Plugin.KiSimulator/Softwareschmiede.Plugin.KiSimulator.csproj" />
+    <Project Path="plugins/Softwareschmiede.Plugin.LocalDirectory/Softwareschmiede.Plugin.LocalDirectory.csproj" />
+    <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj" />
+  </Folder>
+  <Project Path="src/Softwareschmiede.App/Softwareschmiede.App.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
+  <Project Path="src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj" />
   <Project Path="src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj" />
   <Project Path="src/Softwareschmiede/Softwareschmiede.csproj" />
-  <Project Path="src/Softwareschmiede.App/Softwareschmiede.App.csproj" />
 </Solution>
