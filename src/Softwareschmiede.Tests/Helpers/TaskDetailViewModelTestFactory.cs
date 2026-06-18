@@ -37,6 +37,8 @@ public static class TaskDetailViewModelTestFactory
             kiService,
             NullLogger<EntwicklungsprozessService>.Instance);
 
+        var serviceProviderMock = new Mock<IServiceProvider>();
+
         return new TaskDetailViewModel(
             aufgabeService,
             protokollService,
@@ -44,6 +46,8 @@ public static class TaskDetailViewModelTestFactory
             entwicklungsprozessService,
             pluginSelectionService,
             dialogServiceMock.Object,
+            pluginManagerMock.Object,
+            serviceProviderMock.Object,
             NullLogger<TaskDetailViewModel>.Instance);
     }
 }

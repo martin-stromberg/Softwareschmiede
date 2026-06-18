@@ -226,6 +226,75 @@
                     </Grid>
                 </Border>
 
+                <!-- Offene Anforderungen (Issues) -->
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20"
+                        Margin="0 10"
+                        Visibility="{Binding KannIssuesLaden, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="Offene Anforderungen"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,8" />
+
+                        <TextBlock Grid.Row="1"
+                                   Text="Wird geladen…"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   Visibility="{Binding IsLoadingIssues, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   Margin="0,0,0,8" />
+
+                        <ListBox Grid.Row="2"
+                                 AutomationProperties.Name="IssueVorschlaege"
+                                 ItemsSource="{Binding IssueVorschlaege}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 MaxHeight="300">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="8,4">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition />
+                                            <RowDefinition />
+                                        </Grid.RowDefinitions>
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal">
+                                            <TextBlock FontSize="11"
+                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       Margin="0,0,6,0">
+                                                <Run Text="#" /><Run Text="{Binding Nummer}" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding Titel}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="Offene Anforderung"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource AccentBrush}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <EventSetter Event="MouseDoubleClick" Handler="IssueDoubleClick" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </Grid>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
     </Grid>

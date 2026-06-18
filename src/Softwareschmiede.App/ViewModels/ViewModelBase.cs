@@ -173,3 +173,63 @@ public sealed class AsyncRelayCommand : ICommand
     /// <summary>Bricht die laufende Ausführung ab.</summary>
     public void Cancel() => _cts?.Cancel();
 }
+
+/// <summary>Asynchroner Relay-Command mit Parameter.</summary>
+public sealed class AsyncRelayCommand<T> : ICommand
+{
+    private readonly Func<T?, CancellationToken, Task> _execute;
+    private readonly Func<T?, bool>? _canExecute;
+    private volatile int _isExecuting;
+    private CancellationTokenSource? _cts;
+
+    /// <inheritdoc cref="AsyncRelayCommand{T}"/>
+    public AsyncRelayCommand(Func<T?, CancellationToken, Task> execute, Func<T?, bool>? canExecute = null)
+    {
+        _execute = execute;
+        _canExecute = canExecute;
+    }
+
+    /// <inheritdoc/>
+    public event EventHandler? CanExecuteChanged
+    {
+        add => CommandManager.RequerySuggested += value;
+        remove => CommandManager.RequerySuggested -= value;
+    }
+
+    /// <inheritdoc/>
+    public bool CanExecute(object? parameter) => _isExecuting == 0 && (_canExecute?.Invoke((T?)parameter) ?? true);
+
+    /// <inheritdoc/>
+    public async void Execute(object? parameter) => await ExecuteAsync(parameter is T t ? t : default);
+
+    /// <summary>Führt den Command aus und gibt den Task zurück, der im Test direkt awaited werden kann.</summary>
+    public async Task ExecuteAsync(T? parameter = default)
+    {
+        if (Interlocked.CompareExchange(ref _isExecuting, 1, 0) != 0)
+            return;
+
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        CommandManager.InvalidateRequerySuggested();
+
+        try
+        {
+            await _execute(parameter, _cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Abgebrochen - kein Fehler
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AsyncRelayCommand<T>] Unbehandelte Ausnahme: {ex}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isExecuting, 0);
+            _cts?.Dispose();
+            _cts = null;
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+}

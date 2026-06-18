@@ -8,6 +8,7 @@ using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.ViewModels;
@@ -19,6 +20,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private readonly AufgabeService _aufgabeService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IDialogService _dialogService;
+    private readonly IPluginManager _pluginManager;
     private readonly ILogger<ProjectDetailViewModel> _logger;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur Listenansicht zurückkehren möchte.</summary>
@@ -43,6 +45,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private GitRepository? _selectedRepository;
     private AufgabenFilterTyp _aufgabenFilter = AufgabenFilterTyp.Alle;
     private bool _isFilterOverlayVisible;
+    private bool _isLoadingIssues;
     private bool _disposed;
     private Guid _aktuelleAufgabeId;
 
@@ -132,6 +135,24 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die Ansicht im Neuanlage-Modus ist (noch kein persistiertes Projekt).</summary>
     public bool IsNeuanlage => _projektId == Guid.Empty;
 
+    /// <summary>Collection von geladenen Issues aus dem SCM-Plugin.</summary>
+    public ObservableCollection<Issue> IssueVorschlaege { get; } = new();
+
+    /// <summary>Gibt an, ob Issues gerade geladen werden.</summary>
+    public bool IsLoadingIssues
+    {
+        get => _isLoadingIssues;
+        private set => SetProperty(ref _isLoadingIssues, value);
+    }
+
+    /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat.</summary>
+    public bool KannIssuesLaden => _selectedRepository != null
+        && _pluginManager.GetSourceCodeManagementPlugins() is { Count: > 0 } plugins
+        && plugins.Any(p => p is IGitPlugin);
+
+    /// <summary>Erstellt eine Aufgabe aus einem Issue-Vorschlag.</summary>
+    public AsyncRelayCommand<Issue> AufgabeAusIssueErstellenCommand { get; }
+
     /// <summary>Lädt das Projekt neu.</summary>
     public ICommand LadenCommand { get; }
 
@@ -165,12 +186,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         AufgabeService aufgabeService,
         IServiceProvider serviceProvider,
         IDialogService dialogService,
+        IPluginManager pluginManager,
         ILogger<ProjectDetailViewModel> logger)
     {
         _projektService = projektService;
         _aufgabeService = aufgabeService;
         _serviceProvider = serviceProvider;
         _dialogService = dialogService;
+        _pluginManager = pluginManager;
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
@@ -184,6 +207,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         FilterCommand = new RelayCommand(() => IsFilterOverlayVisible = !IsFilterOverlayVisible);
         RepositoryZuweisenCommand = new AsyncRelayCommand(RepositoryZuweisenAsync, () => _projektId != Guid.Empty);
         RepositoryOeffnenCommand = new RelayCommand(RepositoryOeffnen, () => _selectedRepository != null);
+        AufgabeAusIssueErstellenCommand = new AsyncRelayCommand<Issue>(AufgabeAusIssueErstellenAsync);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -209,6 +233,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 ProjektBeschreibung = Projekt.Beschreibung;
                 SelectedRepository = Projekt.Repositories.FirstOrDefault();
             }
+
+            await LadenIssuesAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -431,6 +457,84 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         };
         foreach (var aufgabe in quelle)
             GefilterteAufgaben.Add(aufgabe);
+    }
+
+    private async Task LadenIssuesAsync(CancellationToken ct)
+    {
+        if (_selectedRepository == null)
+            return;
+
+        var scmPlugins = _pluginManager.GetSourceCodeManagementPlugins();
+        var gitPlugin = scmPlugins.OfType<IGitPlugin>().FirstOrDefault();
+        if (gitPlugin == null)
+            return;
+
+        IsLoadingIssues = true;
+        IssueVorschlaege.Clear();
+
+        try
+        {
+            var bereitsKonvertierteNummern = Aufgaben
+                .Where(a => a.IssueReferenz?.IssueNummer != null)
+                .Select(a => a.IssueReferenz!.IssueNummer!.Value)
+                .ToHashSet();
+
+            var issues = await gitPlugin.GetIssuesAsync(_selectedRepository.RepositoryUrl, ct);
+            foreach (var issue in issues)
+            {
+                if (!bereitsKonvertierteNummern.Contains(issue.Nummer))
+                    IssueVorschlaege.Add(issue);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Laden der Issues für Repository {RepositoryUrl}.", _selectedRepository.RepositoryUrl);
+        }
+        finally
+        {
+            IsLoadingIssues = false;
+        }
+    }
+
+    private async Task AufgabeAusIssueErstellenAsync(Issue? issue, CancellationToken ct)
+    {
+        if (issue == null || _projektId == Guid.Empty)
+            return;
+
+        if (!_dialogService.BestaetigenDialog(
+                $"Issue '{issue.Titel}' als Aufgabe erstellen?",
+                "Issue konvertieren"))
+            return;
+
+        try
+        {
+            var aufgabe = await _aufgabeService.CreateFromIssueAsync(
+                _projektId,
+                issue,
+                _selectedRepository?.Id,
+                ct);
+
+            var verbleibend = IssueVorschlaege.Where(i => i.Nummer != issue.Nummer).ToList();
+            IssueVorschlaege.Clear();
+            foreach (var i in verbleibend)
+                IssueVorschlaege.Add(i);
+
+            Aufgaben.Add(aufgabe);
+            AktualisiereGefilterteAufgaben();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Issue #{IssueNummer}.", issue.Nummer);
+            SetFehler(ex);
+        }
     }
 
     private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);

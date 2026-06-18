@@ -18,6 +18,7 @@ public sealed class ProjectListViewModelTests : IDisposable
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
+    private readonly Mock<IPluginManager> _pluginManagerMock;
 
     public ProjectListViewModelTests()
     {
@@ -26,6 +27,9 @@ public sealed class ProjectListViewModelTests : IDisposable
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
+        _pluginManagerMock = new Mock<IPluginManager>();
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
     }
 
     public void Dispose() => _db.Dispose();
@@ -45,6 +49,7 @@ public sealed class ProjectListViewModelTests : IDisposable
             _aufgabeService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
+            _pluginManagerMock.Object,
             NullLogger<ProjectDetailViewModel>.Instance);
     }
 

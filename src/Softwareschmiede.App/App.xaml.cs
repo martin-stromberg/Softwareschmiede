@@ -159,6 +159,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<RepositoryAssignViewModel>();
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<IssueSelectionDialogViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

@@ -1,4 +1,5 @@
 using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Services;
 
@@ -15,5 +16,10 @@ public interface IDialogService
     Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
         IEnumerable<string> availablePlugins,
         string? currentSelection,
+        CancellationToken ct = default);
+
+    /// <summary>Zeigt den Issue-Auswahl-Dialog und gibt das gewählte Issue zurück, oder null wenn abgebrochen.</summary>
+    Task<Issue?> ShowIssueSelectionDialogAsync(
+        IssueSelectionDialogViewModel viewModel,
         CancellationToken ct = default);
 }

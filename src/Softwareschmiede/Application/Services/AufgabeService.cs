@@ -26,6 +26,7 @@ public sealed class AufgabeService
         _logger.LogInformation("Aufgaben für Projekt {ProjektId} abrufen.", projektId);
         return await _db.Aufgaben
             .AsNoTracking()
+            .Include(a => a.IssueReferenz)
             .Where(a => a.ProjektId == projektId && a.Status != AufgabeStatus.Archiviert)
             .OrderByDescending(a => a.ErstellungsDatum)
             .ToListAsync(ct);
@@ -214,6 +215,56 @@ public sealed class AufgabeService
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} aktualisiert.", id);
+    }
+
+    /// <summary>Setzt die IssueReferenz einer Aufgabe. Übergabe von null entfernt die bestehende Referenz.</summary>
+    public async Task UpdateIssueReferenzAsync(Guid id, Issue? issue, CancellationToken ct = default)
+    {
+        _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} aktualisieren.", id);
+
+        var aufgabe = await _db.Aufgaben
+            .Include(a => a.IssueReferenz)
+            .FirstOrDefaultAsync(a => a.Id == id, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        if (issue == null)
+        {
+            if (aufgabe.IssueReferenz != null)
+                _db.Remove(aufgabe.IssueReferenz);
+            aufgabe.IssueReferenz = null;
+        }
+        else
+        {
+            if (aufgabe.IssueReferenz != null)
+            {
+                aufgabe.IssueReferenz.IssueNummer = issue.Nummer;
+                aufgabe.IssueReferenz.Titel = issue.Titel;
+                aufgabe.IssueReferenz.Body = issue.Body;
+                aufgabe.IssueReferenz.LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels);
+                aufgabe.IssueReferenz.Milestone = issue.Milestone;
+                aufgabe.IssueReferenz.IssueUrl = issue.IssueUrl;
+            }
+            else
+            {
+                var neueReferenz = new IssueReferenz
+                {
+                    Id = Guid.NewGuid(),
+                    AufgabeId = aufgabe.Id,
+                    IssueNummer = issue.Nummer,
+                    Titel = issue.Titel,
+                    Body = issue.Body,
+                    LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
+                    Milestone = issue.Milestone,
+                    IssueUrl = issue.IssueUrl
+                };
+                aufgabe.IssueReferenz = neueReferenz;
+                _db.IssueReferenzen.Add(neueReferenz);
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+        _db.ChangeTracker.Clear();
+        _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} aktualisiert.", id);
     }
 
     /// <summary>Löscht eine Aufgabe.</summary>

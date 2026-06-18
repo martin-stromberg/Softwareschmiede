@@ -8,6 +8,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
@@ -103,8 +104,21 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _db.Dispose();
     }
 
-    private TaskDetailViewModel CreateSut(Action? zurueckAction = null)
+    private TaskDetailViewModel CreateSut(
+        Action? zurueckAction = null,
+        IPluginManager? pluginManager = null,
+        IServiceProvider? serviceProvider = null)
     {
+        if (pluginManager == null)
+        {
+            var defaultPluginManagerMock = new Mock<IPluginManager>();
+            defaultPluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
+            defaultPluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+            pluginManager = defaultPluginManagerMock.Object;
+        }
+
+        var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
+
         var vm = new TaskDetailViewModel(
             _aufgabeService,
             _protokollService,
@@ -112,6 +126,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
             _entwicklungsprozessService,
             _pluginSelectionService,
             _dialogServiceMock.Object,
+            pluginManager,
+            serviceProviderObj,
             NullLogger<TaskDetailViewModel>.Instance);
         vm.ZurueckAction = zurueckAction;
         return vm;
@@ -939,5 +955,153 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeFalse();
+    }
+
+    // --- CanAssignIssue ---
+
+    private Mock<IPluginManager> ErstelleGitPluginManager()
+    {
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+        pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+        return pluginManagerMock;
+    }
+
+    /// <summary>CanAssignIssue ist true wenn Aufgabe vorhanden und Plugin Issues unterstützt und kein CLI läuft.</summary>
+    [Fact]
+    public async Task CanAssignIssue_TrueWhenAufgabeExistsAndPluginSupportsIssues()
+    {
+        // Arrange
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut(pluginManager: ErstelleGitPluginManager().Object);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert
+        sut.CanAssignIssue.Should().BeTrue();
+    }
+
+    /// <summary>CanAssignIssue ist false wenn IsCliRunning == true.</summary>
+    [Fact]
+    public async Task CanAssignIssue_FalseWhenCliRunning()
+    {
+        // Arrange
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut(pluginManager: ErstelleGitPluginManager().Object);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        // Assert: CLI läuft → CanAssignIssue = false
+        sut.IsCliRunning.Should().BeTrue();
+        sut.CanAssignIssue.Should().BeFalse();
+    }
+
+    /// <summary>IssueBrowserOeffnenCommand.CanExecute ist false wenn IssueUrl null ist.</summary>
+    [Fact]
+    public async Task IssueBrowserOeffnenCommand_CannotExecuteWhenUrlNull()
+    {
+        // Arrange
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert: Aufgabe hat keine IssueReferenz → CanExecute false
+        sut.CurrentIssueReferenz.Should().BeNull();
+        sut.IssueBrowserOeffnenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>IssueZuweisenCommand.CanExecute ist false wenn kein Plugin vorhanden.</summary>
+    [Fact]
+    public async Task IssueZuweisenCommand_CannotExecuteWhenNoPlugin()
+    {
+        // Arrange
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert: Standard-Plugin-Manager gibt keine SCM-Plugins zurück
+        sut.CanAssignIssue.Should().BeFalse();
+        sut.IssueZuweisenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>IssueZuweisenAsync tut nichts wenn Dialog abgebrochen wird.</summary>
+    [Fact]
+    public async Task IssueZuweisenAsync_UserAbortDoesNothing()
+    {
+        // Arrange
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+        pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+
+        var dialogVm = new IssueSelectionDialogViewModel(gitPluginMock.Object, NullLogger<IssueSelectionDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueSelectionDialogViewModel))).Returns(dialogVm);
+
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueSelectionDialogAsync(It.IsAny<IssueSelectionDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Issue?)null);
+
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Act
+        await ((AsyncRelayCommand)sut.IssueZuweisenCommand).ExecuteAsync();
+
+        // Assert: IssueReferenz unverändert (null)
+        sut.CurrentIssueReferenz.Should().BeNull();
+    }
+
+    /// <summary>IssueZuweisenAsync aktualisiert CurrentIssueReferenz wenn Dialog bestätigt wird.</summary>
+    [Fact]
+    public async Task IssueZuweisenAsync_ShowsDialogAndUpdatesCurrentIssueReferenz()
+    {
+        // Arrange
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var selectedIssue = new Issue(42, "Gewähltes Issue", "Body", [], null, "https://github.com/test/42");
+
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([selectedIssue]);
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+        pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+
+        var dialogVm = new IssueSelectionDialogViewModel(gitPluginMock.Object, NullLogger<IssueSelectionDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueSelectionDialogViewModel))).Returns(dialogVm);
+
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueSelectionDialogAsync(It.IsAny<IssueSelectionDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(selectedIssue);
+
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Act
+        await ((AsyncRelayCommand)sut.IssueZuweisenCommand).ExecuteAsync();
+
+        // Assert
+        sut.CurrentIssueReferenz.Should().NotBeNull();
+        sut.CurrentIssueReferenz!.IssueNummer.Should().Be(42);
+        sut.CurrentIssueReferenz.IssueUrl.Should().Be("https://github.com/test/42");
     }
 }

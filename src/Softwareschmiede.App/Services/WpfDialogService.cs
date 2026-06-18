@@ -1,6 +1,7 @@
 using System.Windows;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Services;
 
@@ -40,4 +41,20 @@ public sealed class WpfDialogService : IDialogService
         string? currentSelection,
         CancellationToken ct = default)
         => _pluginSelectionDialogService.ShowPluginSelectionDialogAsync(availablePlugins, currentSelection, ct);
+
+    /// <inheritdoc/>
+    public Task<Issue?> ShowIssueSelectionDialogAsync(
+        IssueSelectionDialogViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new IssueSelectionDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            var result = dialog.ShowDialog();
+            return result == true ? viewModel.SelectedIssue : null;
+        }).Task;
+    }
 }

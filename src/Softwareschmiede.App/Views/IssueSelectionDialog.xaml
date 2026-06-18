@@ -1,0 +1,86 @@
+<Window x:Class="Softwareschmiede.App.Views.IssueSelectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Issue auswählen"
+        Background="{DynamicResource SurfaceBrush}"
+        Width="640"
+        Height="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Titel -->
+        <TextBlock Grid.Row="0"
+                   Text="Issue auswählen"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   Margin="0,0,0,16" />
+
+        <!-- Ladeindikator -->
+        <TextBlock Grid.Row="1"
+                   Text="Wird geladen…"
+                   Foreground="{DynamicResource SecondaryTextBrush}"
+                   Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"
+                   Margin="0,0,0,8" />
+
+        <!-- Issue-Liste -->
+        <DataGrid Grid.Row="2"
+                  AutomationProperties.Name="IssueAuswahl"
+                  ItemsSource="{Binding VerfuegbareIssues}"
+                  SelectedItem="{Binding SelectedIssue, Mode=TwoWay}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  Background="{DynamicResource BackgroundBrush}"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1"
+                  RowBackground="{DynamicResource BackgroundBrush}"
+                  AlternatingRowBackground="{DynamicResource SurfaceBrush}"
+                  GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column"
+                  Margin="0,0,0,16">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="#"
+                                    Binding="{Binding Nummer}"
+                                    Width="50" />
+                <DataGridTextColumn Header="Titel"
+                                    Binding="{Binding Titel}"
+                                    Width="*" />
+                <DataGridTextColumn Header="Beschreibung"
+                                    Binding="{Binding Body}"
+                                    Width="2*">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Abbrechen"
+                    AutomationProperties.Name="Abbrechen"
+                    Command="{Binding AbbrechenCommand}"
+                    Padding="12,6"
+                    Margin="0,0,8,0" />
+            <Button Content="OK"
+                    AutomationProperties.Name="OK"
+                    Command="{Binding BestaetigenCommand}"
+                    Padding="12,6"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="White"
+                    BorderThickness="0" />
+        </StackPanel>
+    </Grid>
+</Window>

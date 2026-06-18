@@ -21,6 +21,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
+    private readonly Mock<IPluginManager> _pluginManagerMock;
 
     public ProjectDetailViewModelTests()
     {
@@ -29,6 +30,8 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
+        _pluginManagerMock = new Mock<IPluginManager>();
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
     }
 
     public void Dispose() => _db.Dispose();
@@ -44,6 +47,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
             _aufgabeService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
+            _pluginManagerMock.Object,
             NullLogger<ProjectDetailViewModel>.Instance);
         vm.ZurueckAction = zurueckAction;
         vm.ProjektListeAktualisierenCallback = projektHinzugefuegtCallback;
@@ -363,5 +367,162 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         sut.Aufgaben.Should().HaveCount(2);
         sut.Aufgaben.Should().ContainSingle(a => a.Id == aufgabe1.Id && a.Titel == "Aufgabe 1 - Geändert");
         sut.Aufgaben.Should().ContainSingle(a => a.Id == aufgabe2.Id && a.Titel == "Aufgabe 2");
+    }
+
+    // --- Issue-Laden ---
+
+    private static Issue ErstelleIssue(int nummer = 1, string titel = "Issue-Titel")
+        => new(nummer, titel, "Body", [], null, "https://github.com/test/repo/issues/" + nummer);
+
+    private Mock<IGitPlugin> SetupGitPlugin(IEnumerable<Issue>? issues = null)
+    {
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(issues ?? []);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins())
+            .Returns([gitPluginMock.Object]);
+        return gitPluginMock;
+    }
+
+    /// <summary>LadenIssuesAsync lädt Issues wenn IGitPlugin vorhanden ist.</summary>
+    [Fact]
+    public async Task LadenIssuesAsync_LoadsIssuesWhenRepositorySupportsIssues()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Issue-Test-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test-repo");
+        SetupGitPlugin([ErstelleIssue(1), ErstelleIssue(2)]);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        // Act
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert
+        sut.IssueVorschlaege.Should().HaveCount(2);
+        sut.IsLoadingIssues.Should().BeFalse();
+    }
+
+    /// <summary>LadenIssuesAsync gibt leere Liste zurück wenn kein SCM-Plugin vorhanden ist.</summary>
+    [Fact]
+    public async Task LadenIssuesAsync_ReturnsEmptyListWhenPluginDoesNotSupport()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Kein-Plugin-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test-repo");
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        // Act
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert
+        sut.IssueVorschlaege.Should().BeEmpty();
+    }
+
+    /// <summary>LadenIssuesAsync handhabt Exceptions gracefully: IssueVorschlaege bleibt leer, IsLoadingIssues = false.</summary>
+    [Fact]
+    public async Task LadenIssuesAsync_HandlesExceptionGracefully()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Exception-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test-repo");
+
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Netzwerkfehler"));
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        // Act
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert
+        sut.IssueVorschlaege.Should().BeEmpty();
+        sut.IsLoadingIssues.Should().BeFalse();
+    }
+
+    /// <summary>LadenIssuesAsync filtert Issues heraus, deren Nummer bereits in Aufgaben als IssueReferenz vorhanden ist.</summary>
+    [Fact]
+    public async Task LadenIssuesAsync_FiltersOutAlreadyConvertedIssues()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Filter-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test-repo");
+
+        var existingIssue = ErstelleIssue(1);
+        await _aufgabeService.CreateFromIssueAsync(projekt.Id, existingIssue);
+
+        SetupGitPlugin([ErstelleIssue(1), ErstelleIssue(2)]);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        // Act
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert: Issue #1 wurde gefiltert, nur Issue #2 bleibt
+        sut.IssueVorschlaege.Should().HaveCount(1);
+        sut.IssueVorschlaege[0].Nummer.Should().Be(2);
+    }
+
+    /// <summary>AufgabeAusIssueErstellenCommand erstellt Aufgabe, entfernt Issue aus Vorschlaegen und fügt sie zu Aufgaben hinzu.</summary>
+    [Fact]
+    public async Task AufgabeAusIssueErstellenAsync_CreatesAufgabeAndRemovesFromVorschlaege()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Konvertierung-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test-repo");
+        var issue = ErstelleIssue(42, "Mein Issue");
+        SetupGitPlugin([issue]);
+
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Act
+        await sut.AufgabeAusIssueErstellenCommand.ExecuteAsync(issue);
+
+        // Assert
+        sut.IssueVorschlaege.Should().BeEmpty();
+        sut.Aufgaben.Should().Contain(a => a.Titel == "Mein Issue");
+        var aufgabe = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        aufgabe.Should().Contain(a => a.Titel == "Mein Issue");
+    }
+
+    /// <summary>AufgabeAusIssueErstellenCommand tut nichts wenn Benutzer den Bestätigungsdialog abbricht.</summary>
+    [Fact]
+    public async Task AufgabeAusIssueErstellenAsync_UserCancellation_DoesNothing()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Abbruch-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test-repo");
+        var issue = ErstelleIssue(99);
+        SetupGitPlugin([issue]);
+
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        var vorschlaegVorher = sut.IssueVorschlaege.Count;
+
+        // Act
+        await sut.AufgabeAusIssueErstellenCommand.ExecuteAsync(issue);
+
+        // Assert: Keine Aufgabe erstellt, Vorschlage unverändert
+        sut.IssueVorschlaege.Should().HaveCount(vorschlaegVorher);
+        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        aufgaben.Should().BeEmpty();
     }
 }

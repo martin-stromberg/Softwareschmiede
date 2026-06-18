@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -21,6 +24,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly EntwicklungsprozessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly IDialogService _dialogService;
+    private readonly IPluginManager _pluginManager;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly Action<Action> _dispatcherInvoke;
 
@@ -75,6 +80,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowDiffPanel));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
+            OnPropertyChanged(nameof(CanAssignIssue));
+            OnPropertyChanged(nameof(CurrentIssueReferenz));
         }
     }
 
@@ -108,6 +115,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannCliStoppen));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
+            OnPropertyChanged(nameof(CanAssignIssue));
         }
     }
 
@@ -182,9 +190,17 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         && !string.IsNullOrEmpty(_editTitel);
 
     /// <summary>CanExecute für LoeschenCommand: Status ∉ {Beendet, Archiviert} &amp;&amp; !IsCliRunning.</summary>
-    public bool KannLoeschen => _aufgabe?.Status is not (Domain.Enums.AufgabeStatus.Beendet or Domain.Enums.AufgabeStatus.Archiviert)
+    public bool KannLoeschen => _aufgabe?.Status is not (Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend)
         && _aufgabe != null
         && !_isCliRunning;
+
+    /// <summary>true wenn Aufgabe vorhanden, SCM-Plugin Issues unterstützt und kein CLI läuft.</summary>
+    public bool CanAssignIssue => _aufgabe != null
+        && !_isCliRunning
+        && _pluginManager.GetSourceCodeManagementPlugins().Any(p => p is IGitPlugin);
+
+    /// <summary>Aktuelle Issue-Zuweisung der Aufgabe.</summary>
+    public IssueReferenz? CurrentIssueReferenz => _aufgabe?.IssueReferenz;
 
     /// <summary>Lädt die Aufgabe.</summary>
     public ICommand LadenCommand { get; }
@@ -212,6 +228,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Navigiert zurück zur vorherigen Ansicht.</summary>
     public ICommand ZurueckCommand { get; }
+
+    /// <summary>Öffnet den Issue-Auswahl-Dialog und weist das gewählte Issue der Aufgabe zu.</summary>
+    public ICommand IssueZuweisenCommand { get; }
+
+    /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
+    public ICommand IssueBrowserOeffnenCommand { get; }
 
     /// <summary>Event: Ein CLI-Prozess wurde gestartet, Handle ist verfügbar.</summary>
     public event Action<System.Diagnostics.Process>? CliProzessGestartet;
@@ -243,6 +265,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         EntwicklungsprozessService entwicklungsprozessService,
         PluginSelectionService pluginSelectionService,
         IDialogService dialogService,
+        IPluginManager pluginManager,
+        IServiceProvider serviceProvider,
         ILogger<TaskDetailViewModel> logger,
         Action<Action>? dispatcherInvoke = null)
     {
@@ -252,6 +276,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _entwicklungsprozessService = entwicklungsprozessService;
         _pluginSelectionService = pluginSelectionService;
         _dialogService = dialogService;
+        _pluginManager = pluginManager;
+        _serviceProvider = serviceProvider;
         _logger = logger;
         // Dispatcher einmalig bei der Konstruktion erfassen, damit kein späterer Zugriff auf
         // Application.Current nötig ist (kann beim Shutdown null sein).
@@ -278,6 +304,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         LoeschenCommand = new AsyncRelayCommand(LoeschenAsync, () => KannLoeschen);
         InfoCliToggleCommand = new RelayCommand(InfoCliToggle);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
+        IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
+        IssueBrowserOeffnenCommand = new RelayCommand(
+            IssueBrowserOeffnen,
+            () => CurrentIssueReferenz?.IssueUrl != null);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -470,6 +500,61 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    private async Task IssueZuweisenAsync(CancellationToken ct)
+    {
+        if (_aufgabe == null)
+            return;
+
+        var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins().OfType<IGitPlugin>().FirstOrDefault();
+        if (gitPlugin == null)
+            return;
+
+        var dialogVm = _serviceProvider.GetRequiredService<IssueSelectionDialogViewModel>();
+
+        var repositoryId = _aufgabe.GitRepository?.RepositoryUrl ?? string.Empty;
+        await dialogVm.LoadAsync(repositoryId, ct);
+
+        var selectedIssue = await _dialogService.ShowIssueSelectionDialogAsync(dialogVm, ct);
+        if (selectedIssue == null)
+            return;
+
+        try
+        {
+            await _aufgabeService.UpdateIssueReferenzAsync(_aufgabeId, selectedIssue, ct);
+            await LadenAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Zuweisen des Issues für Aufgabe {AufgabeId}.", _aufgabeId);
+            SetFehler(ex);
+        }
+    }
+
+    private void IssueBrowserOeffnen()
+    {
+        var url = CurrentIssueReferenz?.IssueUrl;
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Öffnen der Issue-URL {IssueUrl}.", url);
+            SetFehler(ex);
         }
     }
 

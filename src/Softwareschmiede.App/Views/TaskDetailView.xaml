@@ -70,6 +70,24 @@
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
+                <!-- Gruppe: Issue -->
+                <controls:RibbonGroup GruppenName="Issue"
+                                      Visibility="{Binding CanAssignIssue, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="🔗"
+                                                        ButtonText="Issue zuweisen"
+                                                        AutomationName="IssueZuweisen"
+                                                        ButtonCommand="{Binding IssueZuweisenCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🌐"
+                                                        ButtonText="Issue öffnen"
+                                                        AutomationName="IssueOeffnen"
+                                                        ButtonCommand="{Binding IssueBrowserOeffnenCommand}"
+                                                        Visibility="{Binding CurrentIssueReferenz, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
             </StackPanel>
         </Border>
 
