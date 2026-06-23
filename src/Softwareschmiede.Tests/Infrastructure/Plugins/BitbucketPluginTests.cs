@@ -444,6 +444,31 @@ public sealed class BitbucketPluginTests
         issues[0].Body.Should().BeNull();
     }
 
+    /// <summary>ResolveGitCloneUrl wandelt Browser-URL korrekt um.</summary>
+    [Theory]
+    [InlineData(
+        "https://bitbucket.vectron.de/projects/ERP/repos/udr-aufbereitung/browse",
+        "https://bitbucket.vectron.de/scm/ERP/udr-aufbereitung.git")]
+    [InlineData(
+        "https://bitbucket.vectron.de/projects/ERP/repos/udr-aufbereitung",
+        "https://bitbucket.vectron.de/scm/ERP/udr-aufbereitung.git")]
+    [InlineData(
+        "https://bitbucket.example.com:7990/projects/MY/repos/myrepo/browse",
+        "https://bitbucket.example.com:7990/scm/MY/myrepo.git")]
+    [InlineData(
+        "https://bitbucket.example.com/rest/api/1.0/projects/KEY/repos/slug",
+        "https://bitbucket.example.com/scm/KEY/slug.git")]
+    [InlineData(
+        "https://bitbucket.example.com/scm/KEY/slug.git",
+        "https://bitbucket.example.com/scm/KEY/slug.git")]
+    [InlineData(
+        "https://bitbucket.example.com/scm/KEY/slug",
+        "https://bitbucket.example.com/scm/KEY/slug.git")]
+    public void ResolveGitCloneUrl_ShouldReturnCorrectCloneUrl(string input, string expected)
+    {
+        BitbucketPlugin.ResolveGitCloneUrl(input).Should().Be(expected);
+    }
+
     /// <summary>GetDefaultBranchAsync entfernt CRLF aus Windows-Ausgabe.</summary>
     [Fact]
     public async Task GetDefaultBranchAsync_ShouldTrimCarriageReturn_WhenOutputHasCRLF()

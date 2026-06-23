@@ -183,6 +183,19 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return env;
     }
 
+    private string[] GetGitHttpAuthArgs()
+    {
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+        if (!hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+            return [];
+
+        var user = _credentialStore.GetCredential(BitbucketUserKey) ?? string.Empty;
+        var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey) ?? string.Empty;
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{user}:{appPassword}"));
+
+        // credential.helper="" deaktiviert GCM/Keychain, damit der Basic-Auth-Header greift.
+        return ["-c", "credential.helper=", "-c", $"http.extraheader=Authorization: Basic {encoded}"];
+    }
 
     private string[] GetJiraCurlAuthArgs()
     {
@@ -215,6 +228,41 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return builder.Uri.AbsoluteUri;
     }
 
+    /// <summary>
+    /// Wandelt eine Bitbucket-Server-URL (Browser oder API) in eine Git-HTTP-Clone-URL um.
+    /// Browser:  https://host/projects/KEY/repos/SLUG/browse  → https://host/scm/KEY/SLUG.git
+    /// API:      https://host/rest/api/1.0/projects/KEY/repos/SLUG → https://host/scm/KEY/SLUG.git
+    /// SCM:      https://host/scm/KEY/SLUG.git → unverändert
+    /// </summary>
+    internal static string ResolveGitCloneUrl(string repositoryUrl)
+    {
+        var uri = new Uri(repositoryUrl);
+        var path = uri.AbsolutePath.TrimEnd('/');
+        var baseUrl = $"{uri.Scheme}://{uri.Host}{(uri.IsDefaultPort ? "" : $":{uri.Port}")}";
+
+        // Bereits eine SCM-URL
+        if (path.StartsWith("/scm/", StringComparison.OrdinalIgnoreCase))
+            return repositoryUrl.TrimEnd('/').EndsWith(".git") ? repositoryUrl : repositoryUrl.TrimEnd('/') + ".git";
+
+        // Browser-URL: /projects/KEY/repos/SLUG[/...]
+        // API-URL:     /rest/api/1.0/projects/KEY/repos/SLUG[/...]
+        var patterns = new[]
+        {
+            @"/projects/([^/]+)/repos/([^/]+)",
+            @"/rest/api/\d+\.\d+/projects/([^/]+)/repos/([^/]+)"
+        };
+
+        foreach (var pattern in patterns)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(path, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (m.Success)
+                return $"{baseUrl}/scm/{m.Groups[1].Value}/{m.Groups[2].Value}.git";
+        }
+
+        // Fallback: URL unverändert zurückgeben
+        return repositoryUrl;
+    }
+
     /// <inheritdoc/>
     public override async Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default)
     {
@@ -228,11 +276,12 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
 
-        // Bitbucket Server leitet Credential-URLs auf die Login-Seite um.
-        // Die netrc-Datei (gesetzt in GetGitEnvironment) übernimmt die Authentifizierung.
-        var cloneUrl = hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase)
-            ? repositoryUrl
-            : BuildAuthenticatedCloneUrl(repositoryUrl, user, appPassword);
+        // Browser-URL in Git-SCM-Clone-URL umwandeln, dann Credentials einbetten.
+        var resolvedUrl = hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase)
+            ? ResolveGitCloneUrl(repositoryUrl)
+            : repositoryUrl;
+
+        var cloneUrl = BuildAuthenticatedCloneUrl(resolvedUrl, user, appPassword);
 
         var result = await _cliRunner.RunAsync(
             "git",
@@ -250,7 +299,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     {
         var result = await _cliRunner.RunAsync(
             "git",
-            ["pull"],
+            [..GetGitHttpAuthArgs(), "pull"],
             localPath,
             GetGitEnvironment(),
             ct);
@@ -264,7 +313,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     {
         var result = await _cliRunner.RunAsync(
             "git",
-            ["push", "--set-upstream", "origin", branchName],
+            [..GetGitHttpAuthArgs(), "push", "--set-upstream", "origin", branchName],
             localPath,
             GetGitEnvironment(),
             ct);
