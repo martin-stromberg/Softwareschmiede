@@ -64,7 +64,7 @@ Stand: **2026-06-11**
 | Bereich | Status | Hinweise |
 |---|---|---|
 | Projekt-, Aufgaben- und Protokollverwaltung | ✅ Implementiert | Blazor-UI inkl. Dashboard, Detailseiten und Verlauf |
-| SCM-Plugins | ✅ Implementiert | `GitHub` und `LocalDirectoryPlugin` produktiv verfügbar |
+| SCM-Plugins | ✅ Implementiert | `GitHub`, `BitBucket` und `LocalDirectoryPlugin` produktiv verfügbar |
 | Separates Arbeitsverzeichnis mit Git-Workflow-Fallback | ✅ Implementiert | `git init`-Fallback, Pull ohne Merge (inkl. Nutzerhinweis), Push als Datei-Sync inkl. Delete-Sync über `git status` |
 | KI-Plugins | ✅ Implementiert | `GitHub Copilot` und `Claude CLI` produktiv verfügbar |
 | Standardplugin-Mechanik | ✅ Implementiert | Auflösung: explizite Auswahl → gespeichertes Standardplugin → Fallback |
@@ -191,6 +191,7 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 ### 🔗 Git-Integration (Plugin-System)
 - **Plugin-Architektur** über `IGitPlugin`-Interface – austauschbar für verschiedene Git-Provider
 - **GitHub-Plugin**: vollständige GitHub-Integration via `gh` CLI (inkl. Push/Pull/Pull Request/Issues)
+- **BitBucket-Plugin**: BitBucket Cloud und Self-Hosted Integration mit Jira-Support
 - **LocalDirectoryPlugin**: lokales SCM-Plugin ohne Remote-Provider mit `WorkspaceMode` (`SeparateWorkingDirectory` oder `InSourceDirectory`) und lokalisierten UI-Optionen
 - **Projektspezifische `IGitPlugin`-Auflösung:** `GitOrchestrationService` und `AufgabeDetail` nutzen primär das an Aufgabe/Projekt gebundene Repository-Plugin (inkl. lokalem Repository via `LocalDirectoryPlugin`) und nur bei fehlender/mehrdeutiger Zuordnung den Standard-Fallback.
 - **Live Project Browser mit Git-Status:** Auf der Aufgabenseite werden Branch-Commit-Zahl (relativ zur Basisreferenz), lokale Änderungen, Tree-/Listenansicht und Datei-Vorschau direkt aus dem lokalen Repositoryzustand geladen.
@@ -230,7 +231,7 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 - FR-4-Fallback-Handling im Preview-Flow: klare Fallbacks bei fehlender Auswahl, fehlendem DiffResult, gelöschten/binären Dateien und Hint-basierten Vorschauzuständen
 
 ### ✅ Aufgabenverwaltung
-- Aufgaben aus GitHub Issues anlegen (Titel, Body, Labels, Milestone werden übernommen)
+- Aufgaben aus GitHub Issues oder Jira (BitBucket) anlegen (Titel, Body, Labels/Kategorien werden übernommen)
 - Freie Aufgaben ohne Issue-Referenz anlegen
 - Durchgängige Issue-Verknüpfung von Aufgabenanlage über Branch bis Pull Request
 - Statusmodell: `Offen` → `In Bearbeitung` → `KI aktiv` / `Tests laufen` → `Abgeschlossen` / `Fehlgeschlagen`
@@ -730,6 +731,7 @@ Softwareschmiede/                            # Solution Root
 │   └── Softwareschmiede.Tests/              # Unit-Tests (xUnit, FluentAssertions, Moq)
 ├── plugins/                                 # Plugin-Projekte (separate Klassenbibliotheken)
 │   ├── Softwareschmiede.Plugin.GitHub/      # Git-Provider Plugin
+│   ├── Softwareschmiede.Plugin.BitBucket/   # BitBucket Cloud & Self-Hosted Plugin
 │   ├── Softwareschmiede.Plugin.LocalDirectory/ # Lokales SCM-Plugin (WorkspaceMode)
 │   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
 │   └── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
@@ -782,7 +784,7 @@ flowchart TB
     subgraph Infrastructure["Infrastructure Layer"]
         INL1["EF Core / SQLite"]
         INL2["PluginManager laedt Plugin-DLLs aus dem plugins-Ordner"]
-        INL3["GitHubPlugin / LocalDirectoryPlugin / GitHubCopilotPlugin / ClaudeCliPlugin"]
+        INL3["GitHubPlugin / BitBucketPlugin / LocalDirectoryPlugin / GitHubCopilotPlugin / ClaudeCliPlugin"]
         INL4["CLI-Runner fuer gh, copilot und claude"]
         INL5["Windows Credential Store"]
         INL6["AgentPackageReader"]

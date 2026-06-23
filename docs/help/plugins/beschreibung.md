@@ -18,6 +18,7 @@ Jedes Plugin implementiert `IPlugin` und gehört einem von zwei Typen an:
 | Plugin | Typ | Beschreibung |
 |--------|-----|--------------|
 | `GitHubPlugin` | SCM | GitHub-Integration über GitHub CLI (`gh`) |
+| `BitbucketPlugin` | SCM | BitBucket Cloud und Self-Hosted (Server/Data Center); Jira-Integration |
 | `LocalDirectoryPlugin` | SCM | Arbeitet direkt auf einem lokalen Verzeichnis ohne Remote |
 | `ClaudeCliPlugin` | KI | Claude Code CLI – nutzt `claude` CLI mit Stream-JSON-Output |
 | `GitHubCopilotPlugin` | KI | GitHub Copilot CLI – nutzt `copilot` CLI |

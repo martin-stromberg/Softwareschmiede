@@ -16,3 +16,9 @@
 
 - [Einstellungen](einstellungen/index.md) — Bündelt alle systemweiten Konfigurationen: Plugin-Einstellungen, Arbeitsverzeichnis, Benachrichtigungen und Erscheinungsbild.
 - [Plugin-System](plugins/index.md) — SCM- und KI-Plugins werden als separate .NET-Klassenbibliotheken bereitgestellt und per `PluginManager` zur Laufzeit entdeckt.
+
+### SCM-Plugins (Quellcodeverwaltung)
+
+- [GitHub-Plugin](plugins/index.md) — GitHub.com Integration über GitHub CLI
+- [BitBucket-Plugin](plugins/bitbucket-plugin/index.md) — BitBucket Cloud und Self-Hosted (Server/Data Center) mit optionaler Jira-Integration
+- [Local Directory Plugin](plugins/index.md) — Lokale Git-Repositories ohne Remote

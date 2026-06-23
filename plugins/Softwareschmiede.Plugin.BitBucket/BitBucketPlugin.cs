@@ -1,18 +1,20 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
-using System.Reflection;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
 
+/// <summary>SCM-Plugin für Bitbucket Cloud und Bitbucket Server/Data Center (Self-Hosted).</summary>
 public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 {
     private const string BitbucketUserKey = "Softwareschmiede.Bitbucket.Username";
     private const string BitbucketAppPasswordKey = "Softwareschmiede.Bitbucket.AppPassword";
     private const string BitbucketWorkspaceKey = "Softwareschmiede.Bitbucket.Workspace";
+    private const string BitbucketHostingModeKey = "Softwareschmiede.Bitbucket.HostingMode";
+    private const string BitbucketSelfHostedUrlKey = "Softwareschmiede.Bitbucket.SelfHostedUrl";
 
     private const string RepositoryUrlKey = "RepositoryUrl";
     private const string RepositoryNameKey = "RepositoryName";
@@ -21,10 +23,16 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<BitbucketPlugin> _logger;
 
+    /// <inheritdoc/>
     public override string PluginName => "Bitbucket";
+
+    /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.Bitbucket";
+
+    /// <inheritdoc/>
     public override PluginType PluginType => PluginType.SourceCodeManagement;
 
+    /// <inheritdoc cref="BitbucketPlugin"/>
     public BitbucketPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<BitbucketPlugin> logger)
         : base(cliRunner)
     {
@@ -33,6 +41,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         _logger = logger;
     }
 
+    /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() =>
     [
         new PluginSettingGroup("Authentifizierung",
@@ -94,10 +103,30 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 Placeholder: "xxxx-xxxx",
                 Description: "Jira API Token (nicht Bitbucket App Password!).",
                 IsRequired: true)
+        ]),
+        new PluginSettingGroup("BitBucket-Hosting",
+        [
+            new PluginSettingField(
+                Key: "HostingMode",
+                Label: "Hosting-Modus",
+                FieldType: PluginSettingFieldType.Enum,
+                Placeholder: "Cloud",
+                Description: "Cloud nutzt api.bitbucket.org, Self-Hosted eine eigene URL.",
+                IsRequired: true,
+                EnumOptions: ["Cloud", "SelfHosted"]),
+
+            new PluginSettingField(
+                Key: "SelfHostedUrl",
+                Label: "BitBucket URL (Self-Hosted)",
+                FieldType: PluginSettingFieldType.Url,
+                Placeholder: "https://bitbucket.example.com",
+                Description: "Nur erforderlich wenn Hosting-Modus auf Self-Hosted gesetzt. Basis-URL ohne Pfad.",
+                IsRequired: false)
         ])
 
     ];
 
+    /// <inheritdoc/>
     public override IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() =>
     [
         new PluginSettingField(
@@ -134,12 +163,21 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
 
-            var netrcContent = $@"machine bitbucket.org
-login {user}
-password {appPassword}
-";
+            string host;
+            var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+            if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+            {
+                var selfHostedUrl = _credentialStore.GetCredential(BitbucketSelfHostedUrlKey);
+                if (string.IsNullOrWhiteSpace(selfHostedUrl))
+                    throw new InvalidOperationException("Self-Hosted URL ist nicht konfiguriert. Bitte die BitBucket-Einstellungen überprüfen.");
+                host = new Uri(selfHostedUrl).Host;
+            }
+            else
+            {
+                host = "bitbucket.org";
+            }
 
-            File.WriteAllText(netrcPath, netrcContent);
+            UpdateNetrcEntry(netrcPath, host, user, appPassword);
         }
 
         return env;
@@ -156,6 +194,7 @@ password {appPassword}
         return builder.Uri.AbsoluteUri;
     }
 
+    /// <inheritdoc/>
     public override async Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Klone Bitbucket-Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
@@ -179,6 +218,7 @@ password {appPassword}
             throw new InvalidOperationException($"git clone fehlgeschlagen: {result.StdErr}");
     }
 
+    /// <inheritdoc/>
     public override async Task PullAsync(string localPath, CancellationToken ct = default)
     {
         var result = await _cliRunner.RunAsync(
@@ -192,6 +232,7 @@ password {appPassword}
             throw new InvalidOperationException($"git pull fehlgeschlagen: {result.StdErr}");
     }
 
+    /// <inheritdoc/>
     public override async Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
     {
         var result = await _cliRunner.RunAsync(
@@ -205,12 +246,16 @@ password {appPassword}
             throw new InvalidOperationException($"git push fehlgeschlagen: {result.StdErr}");
     }
 
+    /// <inheritdoc/>
     public override async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
         var jiraUrl = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraUrl");
         var jiraProject = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey");
         var jiraEmail = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraEmail");
         var jiraToken = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraApiToken");
+
+        if (string.IsNullOrWhiteSpace(jiraUrl))
+            return [];
 
         var jql = $"project={jiraProject} ORDER BY created DESC";
         var apiUrl = $"{jiraUrl}/rest/api/3/search?jql={Uri.EscapeDataString(jql)}";
@@ -242,7 +287,7 @@ password {appPassword}
             var fields = el.GetProperty("fields");
 
             var summary = fields.GetProperty("summary").GetString() ?? "";
-            var description = fields.TryGetProperty("description", out var desc)
+            var description = fields.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.Object
                 ? desc.GetProperty("content").ToString()
                 : null;
 
@@ -263,6 +308,7 @@ password {appPassword}
         return list;
     }
 
+    /// <inheritdoc/>
     public override async Task<PullRequest> CreatePullRequestAsync(
         string repositoryId,
         string branchName,
@@ -273,14 +319,29 @@ password {appPassword}
         var user = _credentialStore.GetCredential(BitbucketUserKey);
         var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
 
-        var apiUrl = $"https://api.bitbucket.org/2.0/repositories/{repositoryId}/pullrequests";
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+        string apiUrl;
+        if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = repositoryId.Split('/', 2);
+            var projectKey = parts.Length > 0 ? parts[0] : repositoryId;
+            var repoSlug = parts.Length > 1 ? parts[1] : repositoryId;
+            apiUrl = $"{GetBitbucketApiBaseUrl()}/rest/api/1.0/projects/{projectKey}/repos/{repoSlug}/pull-requests";
+        }
+        else
+        {
+            apiUrl = $"{GetBitbucketApiBaseUrl()}/2.0/repositories/{repositoryId}/pullrequests";
+        }
+
+        var repositoryUrl = BuildRepositoryCloneUrl(repositoryId, hostingMode);
+        var defaultBranch = await GetDefaultBranchAsync(repositoryUrl, ct);
 
         var payload = JsonSerializer.Serialize(new
         {
             title,
             description = body,
             source = new { branch = new { name = branchName } },
-            destination = new { branch = new { name = "main" } }
+            destination = new { branch = new { name = defaultBranch } }
         });
 
         var result = await _cliRunner.RunAsync(
@@ -295,11 +356,28 @@ password {appPassword}
 
         using var doc = JsonDocument.Parse(result.StdOut);
         var id = doc.RootElement.GetProperty("id").GetInt32();
-        var link = doc.RootElement.GetProperty("links").GetProperty("html").GetProperty("href").GetString() ?? "";
+        var links = doc.RootElement.GetProperty("links");
+        string link;
+        if (links.TryGetProperty("html", out var htmlLink))
+        {
+            link = htmlLink.GetProperty("href").GetString() ?? "";
+        }
+        else if (links.TryGetProperty("self", out var selfLinks) && selfLinks.ValueKind == JsonValueKind.Array)
+        {
+            var first = selfLinks.EnumerateArray().FirstOrDefault();
+            link = first.ValueKind != JsonValueKind.Undefined
+                ? first.GetProperty("href").GetString() ?? ""
+                : "";
+        }
+        else
+        {
+            link = "";
+        }
 
         return new PullRequest(id, title, link, branchName);
     }
 
+    /// <inheritdoc/>
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         var bbUser = _credentialStore.GetCredential(BitbucketUserKey);
@@ -309,14 +387,31 @@ password {appPassword}
         var jiraToken = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraApiToken");
         var jiraUrl = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraUrl");
 
-        var bb = await _cliRunner.RunAsync("curl", ["-s", "-u", $"{bbUser}:{bbPass}", "https://api.bitbucket.org/2.0/user"], null, null, ct);
-        var jira = await _cliRunner.RunAsync("curl", ["-s", "-u", $"{jiraEmail}:{jiraToken}", $"{jiraUrl}/rest/api/3/myself"], null, null, ct);
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+        string bbApiUrl;
+        if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+        {
+            var selfHostedUrl = _credentialStore.GetCredential(BitbucketSelfHostedUrlKey);
+            if (string.IsNullOrWhiteSpace(selfHostedUrl))
+                throw new InvalidOperationException("Self-Hosted URL ist nicht konfiguriert.");
+            bbApiUrl = $"{GetBitbucketApiBaseUrl()}/rest/api/1.0/user";
+        }
+        else
+        {
+            bbApiUrl = $"{GetBitbucketApiBaseUrl()}/2.0/user";
+        }
 
-        return bb.IsSuccess && !bb.StdOut.Contains("error")
-            && jira.IsSuccess && !jira.StdOut.Contains("error");
+        var bb = await _cliRunner.RunAsync("curl", ["-s", "-u", $"{bbUser}:{bbPass}", bbApiUrl], null, null, ct);
+        var bbOk = bb.IsSuccess && !bb.StdOut.Contains("error");
+
+        if (string.IsNullOrWhiteSpace(jiraUrl))
+            return bbOk;
+
+        var jira = await _cliRunner.RunAsync("curl", ["-s", "-u", $"{jiraEmail}:{jiraToken}", $"{jiraUrl}/rest/api/3/myself"], null, null, ct);
+        return bbOk && jira.IsSuccess && !jira.StdOut.Contains("error");
     }
 
-
+    /// <inheritdoc/>
     public override async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default)
     {
         var result = await _cliRunner.RunAsync(
@@ -336,6 +431,7 @@ password {appPassword}
             .ToList();
     }
 
+    /// <inheritdoc/>
     public override async Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
     {
         var user = _credentialStore.GetCredential(BitbucketUserKey);
@@ -345,7 +441,7 @@ password {appPassword}
         if (string.IsNullOrWhiteSpace(workspace))
             return [];
 
-        var apiUrl = $"https://api.bitbucket.org/2.0/repositories/{workspace}?pagelen=100";
+        var apiUrl = $"{GetBitbucketApiBaseUrl()}{GetBitbucketRepositoriesPath(workspace)}";
 
         var result = await _cliRunner.RunAsync(
             "curl",
@@ -365,17 +461,55 @@ password {appPassword}
                 return [];
 
             return values.EnumerateArray()
-                .Select(e => new AvailableRepository(
-                    Name: e.GetProperty("name").GetString() ?? string.Empty,
-                    UpdatedAt:
+                .Select(e =>
+                {
+                    var name = e.GetProperty("name").GetString() ?? string.Empty;
+
+                    string nameWithOwner;
+                    if (e.TryGetProperty("full_name", out var fullName))
+                    {
+                        nameWithOwner = fullName.GetString() ?? string.Empty;
+                    }
+                    else
+                    {
+                        var projectKey = e.TryGetProperty("project", out var proj) && proj.TryGetProperty("key", out var key)
+                            ? key.GetString() ?? string.Empty
+                            : string.Empty;
+                        var slug = e.TryGetProperty("slug", out var slugEl) ? slugEl.GetString() ?? name : name;
+                        nameWithOwner = string.IsNullOrEmpty(projectKey) ? slug : $"{projectKey}/{slug}";
+                    }
+
+                    string url;
+                    var repoLinks = e.GetProperty("links");
+                    if (repoLinks.TryGetProperty("html", out var htmlEl))
+                    {
+                        url = htmlEl.GetProperty("href").GetString() ?? string.Empty;
+                    }
+                    else if (repoLinks.TryGetProperty("self", out var selfEl) && selfEl.ValueKind == JsonValueKind.Array)
+                    {
+                        var firstSelf = selfEl.EnumerateArray().FirstOrDefault();
+                        url = firstSelf.ValueKind != JsonValueKind.Undefined
+                            ? firstSelf.GetProperty("href").GetString() ?? string.Empty
+                            : string.Empty;
+                    }
+                    else
+                    {
+                        url = string.Empty;
+                    }
+
+                    DateTime updatedAt =
                         e.TryGetProperty("updated_on", out var updated)
                             ? updated.GetDateTime()
                             : e.TryGetProperty("created_on", out var created)
                                 ? created.GetDateTime()
-                                : DateTime.MinValue,
-                    NameWithOwner: e.GetProperty("full_name").GetString() ?? string.Empty,
-                    Url: e.GetProperty("links").GetProperty("html").GetProperty("href").GetString() ?? string.Empty
-                ))
+                                : DateTime.MinValue;
+
+                    return new AvailableRepository(
+                        Name: name,
+                        UpdatedAt: updatedAt,
+                        NameWithOwner: nameWithOwner,
+                        Url: url);
+                })
                 .ToList();
         }
         catch
@@ -384,6 +518,7 @@ password {appPassword}
         }
     }
 
+    /// <inheritdoc/>
     public override async Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default)
     {
         var result = await _cliRunner.RunAsync(
@@ -395,11 +530,88 @@ password {appPassword}
 
         if (result.IsSuccess)
         {
-            var line = result.StdOut.Split('\n').FirstOrDefault() ?? "";
+            var line = (result.StdOut.Split('\n').FirstOrDefault() ?? "").TrimEnd('\r', '\n');
             if (line.StartsWith("ref: refs/heads/"))
-                return line.Replace("ref: refs/heads/", "").Split('\t')[0];
+                return line.Replace("ref: refs/heads/", "").Split('\t')[0].TrimEnd('\r', '\n');
         }
 
         return "main";
+    }
+
+    private static void UpdateNetrcEntry(string netrcPath, string host, string user, string appPassword)
+    {
+        var existingContent = File.Exists(netrcPath) ? File.ReadAllText(netrcPath) : string.Empty;
+
+        var newEntry = $"machine {host}{Environment.NewLine}login {user}{Environment.NewLine}password {appPassword}";
+
+        var lines = existingContent.Split('\n');
+        var result = new List<string>();
+        var i = 0;
+        var replaced = false;
+
+        while (i < lines.Length)
+        {
+            var trimmed = lines[i].TrimEnd('\r');
+            if (trimmed.Equals($"machine {host}", StringComparison.OrdinalIgnoreCase))
+            {
+                result.Add(newEntry);
+                replaced = true;
+                i++;
+                while (i < lines.Length && !lines[i].TrimEnd('\r').StartsWith("machine ", StringComparison.OrdinalIgnoreCase))
+                    i++;
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(trimmed))
+                    result.Add(trimmed);
+                i++;
+            }
+        }
+
+        if (!replaced)
+            result.Add(newEntry);
+
+        File.WriteAllText(netrcPath, string.Join(Environment.NewLine, result));
+    }
+
+    private string BuildRepositoryCloneUrl(string repositoryId, string hostingMode)
+    {
+        if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseUrl = GetBitbucketApiBaseUrl();
+            var parts = repositoryId.Split('/', 2);
+            var projectKey = parts.Length > 0 ? parts[0] : repositoryId;
+            var repoSlug = parts.Length > 1 ? parts[1] : repositoryId;
+            return $"{baseUrl}/scm/{projectKey}/{repoSlug}.git";
+        }
+
+        return $"https://bitbucket.org/{repositoryId}.git";
+    }
+
+    /// <summary>Gibt die API-Basis-URL zurück — Cloud oder Self-Hosted je nach Konfiguration.</summary>
+    internal string GetBitbucketApiBaseUrl()
+    {
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+
+        if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+        {
+            var selfHostedUrl = _credentialStore.GetCredential(BitbucketSelfHostedUrlKey);
+            if (string.IsNullOrWhiteSpace(selfHostedUrl))
+                throw new InvalidOperationException("Self-Hosted URL ist nicht konfiguriert.");
+            return selfHostedUrl.TrimEnd('/');
+        }
+
+        return "https://api.bitbucket.org";
+    }
+
+    /// <summary>Gibt den API-Pfad für Repositories zurück — Cloud oder Self-Hosted je nach Konfiguration.</summary>
+    internal string GetBitbucketRepositoriesPath(string workspace)
+    {
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+
+        if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+            return $"/rest/api/1.0/projects/{workspace}/repos";
+
+        return $"/2.0/repositories/{workspace}?pagelen=100";
     }
 }
