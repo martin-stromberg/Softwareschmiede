@@ -183,6 +183,27 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return env;
     }
 
+
+    private string[] GetJiraCurlAuthArgs()
+    {
+        var email = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraEmail") ?? string.Empty;
+        var token = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraApiToken") ?? string.Empty;
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{email}:{token}"));
+        return ["-H", $"Authorization: Basic {encoded}"];
+    }
+
+    private string[] GetCurlAuthArgs()
+    {
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+        var token = _credentialStore.GetCredential(BitbucketAppPasswordKey) ?? string.Empty;
+
+        if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
+            return ["-H", $"Authorization: Bearer {token}"];
+
+        var user = _credentialStore.GetCredential(BitbucketUserKey) ?? string.Empty;
+        return ["-u", $"{user}:{token}"];
+    }
+
     private static string BuildAuthenticatedCloneUrl(string repositoryUrl, string user, string appPassword)
     {
         var uri = new Uri(repositoryUrl);
@@ -249,20 +270,18 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
-        var jiraUrl = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraUrl");
         var jiraProject = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey");
-        var jiraEmail = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraEmail");
-        var jiraToken = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraApiToken");
+        var jiraUrl = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraUrl");
 
         if (string.IsNullOrWhiteSpace(jiraUrl))
             return [];
 
         var jql = $"project={jiraProject} ORDER BY created DESC";
-        var apiUrl = $"{jiraUrl}/rest/api/3/search?jql={Uri.EscapeDataString(jql)}";
+        var apiUrl = $"{jiraUrl.TrimEnd('/')}/rest/api/3/search/jql?jql={Uri.EscapeDataString(jql)}&fields=key&fields=summary&fields=description&fields=labels&fields=status&maxResults=100";
 
         var result = await _cliRunner.RunAsync(
             "curl",
-            ["-s", "-u", $"{jiraEmail}:{jiraToken}", "-H", "Accept: application/json", apiUrl],
+            ["-s", ..GetJiraCurlAuthArgs(), "-H", "Accept: application/json", apiUrl],
             null,
             null,
             ct);
@@ -270,23 +289,37 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         if (!result.IsSuccess)
             return [];
 
-        return ParseJiraIssues(result.StdOut);
+        _logger.LogDebug("Jira Issues Response: {Response}", result.StdOut);
+
+        using var doc = JsonDocument.Parse(result.StdOut);
+        if (doc.RootElement.TryGetProperty("errorMessages", out var errorMessages) &&
+            errorMessages.ValueKind == JsonValueKind.Array &&
+            errorMessages.GetArrayLength() > 0)
+        {
+            var msg = errorMessages.EnumerateArray().First().GetString() ?? "Unbekannter Fehler";
+            _logger.LogWarning("Jira API-Fehler beim Laden der Issues: {Error}", msg);
+            return [];
+        }
+
+        return ParseJiraIssues(doc.RootElement);
     }
 
-    private static IEnumerable<Issue> ParseJiraIssues(string json)
+    private static IEnumerable<Issue> ParseJiraIssues(JsonElement root)
     {
-        using var doc = JsonDocument.Parse(json);
         var list = new List<Issue>();
 
-        if (!doc.RootElement.TryGetProperty("issues", out var issues))
+        if (!root.TryGetProperty("issues", out var issues))
             return list;
 
         foreach (var el in issues.EnumerateArray())
         {
-            var key = el.GetProperty("key").GetString() ?? "";
-            var fields = el.GetProperty("fields");
+            var key = el.TryGetProperty("key", out var keyEl) ? keyEl.GetString() ?? "" : "";
+            var issueUrl = el.TryGetProperty("self", out var selfEl) ? selfEl.GetString() : null;
 
-            var summary = fields.GetProperty("summary").GetString() ?? "";
+            if (!el.TryGetProperty("fields", out var fields))
+                continue;
+
+            var summary = fields.TryGetProperty("summary", out var summaryEl) ? summaryEl.GetString() ?? "" : "";
             var description = fields.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.Object
                 ? desc.GetProperty("content").ToString()
                 : null;
@@ -296,12 +329,12 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 : new List<string>();
 
             list.Add(new Issue(
-                Nummer: 0, // Jira hat keine numerischen IDs
+                Nummer: 0,
                 Titel: $"{key}: {summary}",
                 Body: description,
                 Labels: labels,
                 Milestone: null,
-                IssueUrl: null
+                IssueUrl: issueUrl
             ));
         }
 
@@ -316,9 +349,6 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         string body,
         CancellationToken ct = default)
     {
-        var user = _credentialStore.GetCredential(BitbucketUserKey);
-        var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
-
         var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
         string apiUrl;
         if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
@@ -346,7 +376,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var result = await _cliRunner.RunAsync(
             "curl",
-            ["-s", "-u", $"{user}:{appPassword}", "-H", "Content-Type: application/json", "-d", payload, apiUrl],
+            ["-s", ..GetCurlAuthArgs(), "-H", "Content-Type: application/json", "-d", payload, apiUrl],
             null,
             null,
             ct);
@@ -380,11 +410,6 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
-        var bbUser = _credentialStore.GetCredential(BitbucketUserKey);
-        var bbPass = _credentialStore.GetCredential(BitbucketAppPasswordKey);
-
-        var jiraEmail = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraEmail");
-        var jiraToken = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraApiToken");
         var jiraUrl = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraUrl");
 
         var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
@@ -401,14 +426,14 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             bbApiUrl = $"{GetBitbucketApiBaseUrl()}/2.0/user";
         }
 
-        var bb = await _cliRunner.RunAsync("curl", ["-s", "-u", $"{bbUser}:{bbPass}", bbApiUrl], null, null, ct);
-        var bbOk = bb.IsSuccess && !bb.StdOut.Contains("error");
+        var bb = await _cliRunner.RunAsync("curl", ["-s", ..GetCurlAuthArgs(), bbApiUrl], null, null, ct);
+        var bbOk = bb.IsSuccess && !HasBitbucketApiError(bb.StdOut);
 
         if (string.IsNullOrWhiteSpace(jiraUrl))
             return bbOk;
 
-        var jira = await _cliRunner.RunAsync("curl", ["-s", "-u", $"{jiraEmail}:{jiraToken}", $"{jiraUrl}/rest/api/3/myself"], null, null, ct);
-        return bbOk && jira.IsSuccess && !jira.StdOut.Contains("error");
+        var jira = await _cliRunner.RunAsync("curl", ["-s", ..GetJiraCurlAuthArgs(), $"{jiraUrl.TrimEnd('/')}/rest/api/3/myself"], null, null, ct);
+        return bbOk && jira.IsSuccess && !HasBitbucketApiError(jira.StdOut);
     }
 
     /// <inheritdoc/>
@@ -434,8 +459,6 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default)
     {
-        var user = _credentialStore.GetCredential(BitbucketUserKey);
-        var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
         var workspace = _credentialStore.GetCredential(BitbucketWorkspaceKey);
 
         if (string.IsNullOrWhiteSpace(workspace))
@@ -445,7 +468,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var result = await _cliRunner.RunAsync(
             "curl",
-            ["-s", "-u", $"{user}:{appPassword}", apiUrl],
+            ["-s", ..GetCurlAuthArgs(), apiUrl],
             null,
             null,
             ct);
@@ -456,6 +479,12 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         try
         {
             using var doc = JsonDocument.Parse(result.StdOut);
+
+            if (HasBitbucketErrors(doc.RootElement, out var errorMsg))
+            {
+                _logger.LogWarning("Bitbucket API-Fehler beim Laden der Repositories: {Error}", errorMsg);
+                return [];
+            }
 
             if (!doc.RootElement.TryGetProperty("values", out var values))
                 return [];
@@ -613,5 +642,37 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             return $"/rest/api/1.0/projects/{workspace}/repos";
 
         return $"/2.0/repositories/{workspace}?pagelen=100";
+    }
+
+    private static bool HasBitbucketErrors(JsonElement root, out string message)
+    {
+        if (root.TryGetProperty("errors", out var errors) &&
+            errors.ValueKind == JsonValueKind.Array &&
+            errors.GetArrayLength() > 0)
+        {
+            var first = errors.EnumerateArray().First();
+            message = first.TryGetProperty("message", out var msg)
+                ? msg.GetString() ?? "Unbekannter Fehler"
+                : "Unbekannter Fehler";
+            return true;
+        }
+
+        message = string.Empty;
+        return false;
+    }
+
+    private static bool HasBitbucketApiError(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return HasBitbucketErrors(doc.RootElement, out _);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
