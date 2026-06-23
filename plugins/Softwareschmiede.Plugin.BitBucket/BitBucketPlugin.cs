@@ -226,7 +226,13 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(appPassword))
             throw new InvalidOperationException("Bitbucket-Authentifizierung fehlt.");
 
-        var cloneUrl = BuildAuthenticatedCloneUrl(repositoryUrl, user, appPassword);
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+
+        // Bitbucket Server leitet Credential-URLs auf die Login-Seite um.
+        // Die netrc-Datei (gesetzt in GetGitEnvironment) übernimmt die Authentifizierung.
+        var cloneUrl = hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase)
+            ? repositoryUrl
+            : BuildAuthenticatedCloneUrl(repositoryUrl, user, appPassword);
 
         var result = await _cliRunner.RunAsync(
             "git",
@@ -321,7 +327,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
             var summary = fields.TryGetProperty("summary", out var summaryEl) ? summaryEl.GetString() ?? "" : "";
             var description = fields.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.Object
-                ? desc.GetProperty("content").ToString()
+                ? RenderAdf(desc)
                 : null;
 
             var labels = fields.TryGetProperty("labels", out var lbl)
@@ -339,6 +345,70 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         }
 
         return list;
+    }
+
+    private static string RenderAdf(JsonElement node)
+    {
+        var sb = new System.Text.StringBuilder();
+        RenderAdfNode(node, sb);
+        return sb.ToString().Trim();
+    }
+
+    private static void RenderAdfNode(JsonElement node, System.Text.StringBuilder sb)
+    {
+        if (!node.TryGetProperty("type", out var typeEl))
+            return;
+
+        var type = typeEl.GetString() ?? "";
+
+        switch (type)
+        {
+            case "text":
+                if (node.TryGetProperty("text", out var text))
+                    sb.Append(text.GetString());
+                break;
+
+            case "hardBreak":
+                sb.AppendLine();
+                break;
+
+            case "paragraph":
+                RenderAdfChildren(node, sb);
+                sb.AppendLine();
+                break;
+
+            case "bulletList":
+            case "orderedList":
+                RenderAdfChildren(node, sb);
+                break;
+
+            case "listItem":
+                sb.Append("- ");
+                RenderAdfChildren(node, sb);
+                break;
+
+            case "heading":
+                RenderAdfChildren(node, sb);
+                sb.AppendLine();
+                break;
+
+            case "codeBlock":
+                RenderAdfChildren(node, sb);
+                sb.AppendLine();
+                break;
+
+            default:
+                RenderAdfChildren(node, sb);
+                break;
+        }
+    }
+
+    private static void RenderAdfChildren(JsonElement node, System.Text.StringBuilder sb)
+    {
+        if (!node.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
+            return;
+        foreach (var child in content.EnumerateArray())
+            RenderAdfNode(child, sb);
     }
 
     /// <inheritdoc/>
