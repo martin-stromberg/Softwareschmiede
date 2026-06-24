@@ -5,6 +5,7 @@
 | Plugin | Voraussetzung |
 |--------|---------------|
 | `GitHubPlugin` | GitHub CLI (`gh`) installiert und eingeloggt |
+| `BitbucketPlugin` | Git und curl installiert; BitBucket Cloud oder Self-Hosted Account |
 | `LocalDirectoryPlugin` | Git installiert |
 | `ClaudeCliPlugin` | Claude Code CLI (`claude`) installiert; optionaler Anthropic API Key |
 | `GitHubCopilotPlugin` | GitHub Copilot CLI (`copilot`) installiert und eingeloggt |
@@ -32,6 +33,22 @@ Plugin-Einstellungen werden in der **Einstellungsseite** verwaltet:
 | Feld | Beschreibung |
 |------|--------------|
 | Token | GitHub Personal Access Token (PAT) mit `repo`-Scope |
+
+**BitbucketPlugin**
+
+| Feld | Beschreibung |
+|------|--------------|
+| Hosting-Modus | Cloud oder Self-Hosted |
+| BitBucket Username | E-Mail oder Benutzername |
+| App Password | App Password / Token mit `repository:read`, `repository:write`, `pullrequest:write` |
+| BitBucket Workspace | Workspace-Name (Cloud) oder Project Key (Self-Hosted) |
+| BitBucket URL (Self-Hosted) | Basis-URL der Self-Hosted-Installation (nur bei Self-Hosted erforderlich) |
+| Jira Base URL | (Optional) Jira Cloud Basis-URL |
+| Jira Project Key | (Optional) Jira Project Key |
+| Jira Login E-Mail | (Optional) Jira API Benutzername |
+| Jira API Token | (Optional) Jira API Token |
+
+Für detaillierte Anleitung siehe [BitBucket-Plugin — Installation & Konfiguration](bitbucket-plugin/installation.md).
 
 **ClaudeCliPlugin**
 

@@ -19,10 +19,11 @@
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
   </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup>    
     <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
     <!-- Plugin-Projekte als Build-Abhängigkeit ohne Assembly-Referenz, damit ihre DLLs vor dem CopyPluginsToOutput-Target vorliegen -->
+	  <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.BitBucket\Softwareschmiede.Plugin.BitBucket.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj" ReferenceOutputAssembly="false" />
@@ -49,6 +50,13 @@
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.GitHub" />
     <Copy SourceFiles="@(GitHubPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.GitHub" SkipUnchangedFiles="true" />
+
+	  <!-- BitBucket Plugin -->
+	  <ItemGroup>
+		  <BitBucketPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.BitBucket\bin\$(Configuration)\net10.0\*.dll" />
+	  </ItemGroup>
+	  <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.BitBucket" />
+	  <Copy SourceFiles="@(BitBucketPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.BitBucket" SkipUnchangedFiles="true" />
 
     <!-- LocalDirectory Plugin -->
     <ItemGroup>
