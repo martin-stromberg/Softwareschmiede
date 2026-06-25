@@ -104,6 +104,30 @@ Ports werden in der BitBucket-URL unterstützt.
 
 5. **Git-Clone-URLs**: Das Plugin konstruiert Clone-URLs aus der konfigurierten Basis-URL. Falls Git SSH-Keys statt HTTP-Auth verwendet werden, muss der SSH-Agent entsprechend konfiguriert sein.
 
+6. **.netrc auf Windows**: Git unter Windows liest `.netrc` nicht direkt, sondern nutzt den Windows Credential Manager oder Git-interne Credential-Helper. Das Plugin aktualisiert `.netrc` automatisch, aber unter Windows wird auch der Git Credential-Helper konsultiert. Falls Credentials gecacht sind, muss der Cache möglicherweise manuell geleert werden.
+
+### Authentifizierungsmechanismen (technisch)
+
+Das Plugin nutzt unterschiedliche Authentifizierungsmechanismen für verschiedene Operationen:
+
+| Operation | Cloud | Self-Hosted |
+|-----------|-------|-------------|
+| **git clone** | Credentials in URL eingebettet (`user:password@host`) + `.netrc`-Fallback | Credentials in URL + `.netrc`-Fallback |
+| **git pull / push** | `.netrc`-Eintrag für `bitbucket.org` | HTTP-Header mit Base64-codiertem `Authorization: Basic` |
+| **curl API-Aufrufe** | HTTP Basic Auth (`-u user:password`) | Bearer Token (`Authorization: Bearer`) |
+
+**`.netrc`-Handling** (Cloud und Self-Hosted):
+- Für Cloud: `.netrc`-Eintrag mit Host `bitbucket.org`, Login und Password
+- Für Self-Hosted: `.netrc`-Eintrag mit dem konfigurierten Host (z.B. `bitbucket.example.com`)
+- **Windows**: Datei heißt `_netrc` und liegt unter `C:\Users\{username}\_netrc`
+- **Linux/Mac**: Datei heißt `.netrc` und liegt unter `~/.netrc`
+- Das Plugin aktualisiert die `.netrc`-Datei automatisch bei jeder Git-Operation mit dem Muster:
+  ```
+  machine {host}
+  login {username}
+  password {app_password}
+  ```
+
 ## Vergleich mit GitHub-Plugin
 
 | Feature | BitBucket Cloud | BitBucket Self-Hosted | GitHub |

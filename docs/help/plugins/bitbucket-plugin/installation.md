@@ -169,6 +169,56 @@ Intern speichert das Plugin Werte unter folgenden Keys im Windows Credential Sto
 2. Versuche eine manuelle Health-Check durchführen
 3. Falls Self-Hosted: Prüfe, dass die API-Version unterstützt wird (1.0+)
 
+## Authentifizierung und .netrc-Verwaltung
+
+Das Plugin verwaltet Git-Authentifizierung über `.netrc`-Dateien (`.netrc` auf Linux/Mac, `_netrc` auf Windows). Diese Datei wird vom Plugin automatisch erstellt und aktualisiert.
+
+### .netrc-Datei (automatisch verwaltet)
+
+Das Plugin schreibt einen Eintrag in die `.netrc`-Datei für jede Git-Operation:
+
+```
+machine bitbucket.org          (Cloud)
+login {dein_username}
+password {dein_app_password}
+```
+
+Oder für Self-Hosted:
+
+```
+machine bitbucket.example.com
+login {dein_username}
+password {dein_app_password}
+```
+
+**Speicherpfad:**
+- **Windows**: `C:\Users\{username}\_netrc`
+- **Linux/Mac**: `~/.netrc`
+
+**Wichtig:** Falls du Git-Befehle manuell ausführst (z.B. in einem Terminal), liest Git die `.netrc`-Datei automatisch für HTTP-Basic-Auth. Falls du Authentifizierungsfehler bekommst, kann ein manuelles Löschen der `.netrc`-Datei helfen (das Plugin erstellt sie beim nächsten Aufruf neu).
+
+**Linux/Mac — Datei-Permissions:** Das Plugin setzt die Permissions der `.netrc`-Datei automatisch auf `0600` (nur der Eigentümer darf lesen/schreiben). Git ignoriert `.netrc`-Dateien mit zu offenen Permissions. Falls du Authentifizierungsfehler auf Linux/Mac bekommst, prüfe: `ls -la ~/.netrc` — die Datei sollte `-rw-------` zeigen.
+
+**Credential-Rotation:** Nach dem ersten Clone wird die Remote-URL automatisch auf die reine HTTPS-URL (ohne Credentials) zurückgesetzt. Dadurch funktionieren Pull/Push auch nach einem App-Password-Wechsel korrekt, da die neue `.netrc`-Datei verwendet wird.
+
+**SSH-URLs werden nicht unterstützt:** Das Plugin unterstützt ausschließlich HTTPS-URLs. SSH-URLs (`git@bitbucket.org:...` oder `ssh://...`) werden mit einer Fehlermeldung abgelehnt. Bitte verwende immer HTTPS-URLs.
+
+### Windows Credential Manager
+
+Unter Windows kann Git auch den **Windows Credential Manager** nutzen, um Credentials zu cachen. Falls du Authentifizierungsfehler bekommst, können gecachte alte Credentials das neue App Password blockieren.
+
+**Credentials aus dem Credential Manager löschen:**
+
+1. Öffne **Anmeldedaten-Manager** (Windows Suche: "Anmeldedaten verwalten")
+2. Navigiere zu **Windows-Anmeldedaten** oder **Generische Anmeldedaten**
+3. Suche nach Einträgen für `bitbucket.org` oder `git:https://bitbucket.org`
+4. Lösche alle Bitbucket-bezogenen Einträge
+5. Versuche erneut einen Health-Check
+
+### Terminal-Prompts deaktivieren
+
+Das Plugin deaktiviert interaktive Git-Prompts automatisch, indem es `GIT_TERMINAL_PROMPT=0` setzt. Dies verhindert, dass Git im Terminal nach Credentials fragt.
+
 ## API-Endpunkte (Referenz)
 
 Die Plugin-APIs sind intern und nicht öffentlich exponiert. Jedoch nutzt das Plugin folgende BitBucket-API-Endpunkte:

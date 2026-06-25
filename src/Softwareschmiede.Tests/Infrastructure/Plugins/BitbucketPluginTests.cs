@@ -210,6 +210,40 @@ public sealed class BitbucketPluginTests
             .WithMessage("*Self-Hosted URL ist nicht konfiguriert*");
     }
 
+    /// <summary>PullAsync wirft Exception wenn Credentials fehlen.</summary>
+    [Fact]
+    public async Task PullAsync_ShouldThrow_WhenCredentialsAreMissing()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns((string?)null);
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns((string?)null);
+
+        var act = () => _sut.PullAsync("/local/repo");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Bitbucket-Authentifizierung fehlt*");
+    }
+
+    /// <summary>PushBranchAsync wirft Exception wenn Credentials fehlen.</summary>
+    [Fact]
+    public async Task PushBranchAsync_ShouldThrow_WhenCredentialsAreMissing()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns((string?)null);
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns((string?)null);
+
+        var act = () => _sut.PushBranchAsync("/local/repo", "feature/test");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Bitbucket-Authentifizierung fehlt*");
+    }
+
     /// <summary>CheckHealthAsync prüft Cloud-API-URL für Cloud-Modus.</summary>
     [Fact]
     public async Task CheckHealthAsync_ShouldUseCloudApiUrl_WhenHostingModeIsCloud()
@@ -489,5 +523,632 @@ public sealed class BitbucketPluginTests
         var branch = await _sut.GetDefaultBranchAsync("https://bitbucket.org/owner/repo.git");
 
         branch.Should().Be("main");
+    }
+
+    /// <summary>UpdateNetrcEntry schreibt korrektes .netrc-Format beim Anlegen eines neuen Eintrags.</summary>
+    [Fact]
+    public void UpdateNetrcEntry_ShouldFormatCorrectly_WhenCreatingNewEntry()
+    {
+        var netrcPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            BitbucketPlugin.UpdateNetrcEntry(netrcPath, "bitbucket.org", "testuser", "testtoken");
+
+            var content = File.ReadAllText(netrcPath);
+            content.Should().Contain("machine bitbucket.org");
+            content.Should().Contain("login testuser");
+            content.Should().Contain("password testtoken");
+        }
+        finally
+        {
+            if (File.Exists(netrcPath))
+                File.Delete(netrcPath);
+        }
+    }
+
+    /// <summary>GetGitEnvironment setzt .netrc-Eintrag für bitbucket.org wenn Modus Cloud ist.</summary>
+    [Fact]
+    public void GetGitEnvironment_ShouldUseCloudHost_WhenHostingModeIsCloud()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+
+        var tempNetrcPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            var env = _sut.GetGitEnvironment(tempNetrcPath);
+
+            env.Should().ContainKey("GIT_TERMINAL_PROMPT");
+            env["GIT_TERMINAL_PROMPT"].Should().Be("0");
+
+            var netrcContent = File.ReadAllText(tempNetrcPath);
+            netrcContent.Should().Contain("machine bitbucket.org");
+            netrcContent.Should().Contain("login testuser");
+        }
+        finally
+        {
+            if (File.Exists(tempNetrcPath))
+                File.Delete(tempNetrcPath);
+        }
+    }
+
+    /// <summary>GetGitEnvironment setzt .netrc-Eintrag für Self-Hosted-Host wenn Modus SelfHosted ist.</summary>
+    [Fact]
+    public void GetGitEnvironment_ShouldUseSelfHostedHost_WhenHostingModeIsSelfHosted()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("SelfHosted");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl"))
+            .Returns("https://bitbucket.example.com");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+
+        var tempNetrcPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            var env = _sut.GetGitEnvironment(tempNetrcPath);
+
+            env.Should().ContainKey("GIT_TERMINAL_PROMPT");
+            env["GIT_TERMINAL_PROMPT"].Should().Be("0");
+
+            var netrcContent = File.ReadAllText(tempNetrcPath);
+            netrcContent.Should().Contain("machine bitbucket.example.com");
+            netrcContent.Should().Contain("login testuser");
+        }
+        finally
+        {
+            if (File.Exists(tempNetrcPath))
+                File.Delete(tempNetrcPath);
+        }
+    }
+
+    /// <summary>BuildAuthenticatedCloneUrl bettet Credentials als user:password@host in URL ein.</summary>
+    [Fact]
+    public void BuildAuthenticatedCloneUrl_ShouldEmbedCredentials_WhenCalled()
+    {
+        var result = BitbucketPlugin.BuildAuthenticatedCloneUrl(
+            "https://bitbucket.org/workspace/repo.git",
+            "myuser",
+            "mypassword");
+
+        result.Should().Contain("myuser");
+        result.Should().Contain("mypassword");
+        result.Should().Contain("bitbucket.org");
+    }
+
+    /// <summary>BuildAuthenticatedCloneUrl kodiert '@' in E-Mail-Benutzernamen als '%40'.</summary>
+    [Fact]
+    public void BuildAuthenticatedCloneUrl_ShouldEncodeAtSignInEmailUsername()
+    {
+        var result = BitbucketPlugin.BuildAuthenticatedCloneUrl(
+            "https://bitbucket.org/workspace/repo.git",
+            "martin@example.com",
+            "mytoken");
+
+        result.Should().Be("https://martin%40example.com:mytoken@bitbucket.org/workspace/repo.git");
+    }
+
+    /// <summary>BuildAuthenticatedCloneUrl kodiert Sonderzeichen im Passwort.</summary>
+    [Fact]
+    public void BuildAuthenticatedCloneUrl_ShouldEncodeSpecialCharsInPassword()
+    {
+        var result = BitbucketPlugin.BuildAuthenticatedCloneUrl(
+            "https://bitbucket.org/workspace/repo.git",
+            "testuser",
+            "pass@word!");
+
+        result.Should().Be("https://testuser:pass%40word%21@bitbucket.org/workspace/repo.git");
+    }
+
+    /// <summary>UpdateNetrcEntry schreibt Unix-Zeilenenden (kein CRLF) in die .netrc-Datei.</summary>
+    [Fact]
+    public void UpdateNetrcEntry_ShouldWriteUnixLineEndings()
+    {
+        var netrcPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            BitbucketPlugin.UpdateNetrcEntry(netrcPath, "bitbucket.org", "testuser", "testtoken");
+
+            var bytes = File.ReadAllBytes(netrcPath);
+            var content = System.Text.Encoding.UTF8.GetString(bytes);
+            content.Should().NotContain("\r\n");
+            content.Should().Contain("machine bitbucket.org\nlogin testuser\npassword testtoken");
+        }
+        finally
+        {
+            if (File.Exists(netrcPath))
+                File.Delete(netrcPath);
+        }
+    }
+
+    /// <summary>GetGitEnvironment enthält keinen GIT_SSH_COMMAND-Eintrag.</summary>
+    [Fact]
+    public void GetGitEnvironment_ShouldNotContainGitSshCommand()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns((string?)null);
+
+        var env = _sut.GetGitEnvironment();
+
+        env.Should().NotContainKey("GIT_SSH_COMMAND");
+    }
+
+    /// <summary>GetGitEnvironment schreibt keinen .netrc-Eintrag wenn Username nur Leerzeichen enthält.</summary>
+    [Fact]
+    public void GetGitEnvironment_ShouldNotWriteNetrc_WhenUsernameIsWhitespaceOnly()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("   ");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+
+        var tempNetrcPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            _sut.GetGitEnvironment(tempNetrcPath);
+
+            File.Exists(tempNetrcPath).Should().BeFalse();
+        }
+        finally
+        {
+            if (File.Exists(tempNetrcPath))
+                File.Delete(tempNetrcPath);
+        }
+    }
+
+    /// <summary>CloneRepositoryAsync loggt den Hosting-Modus bei erfolgreichem Aufruf.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldLogHostingMode_OnSuccess()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("https://bitbucket.org/workspace/repo.git", "/tmp/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Any(x => x == "clone")),
+            null,
+            It.IsAny<IDictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullAsync für Cloud gibt leere HTTP-Auth-Args zurück und verlässt sich auf .netrc.</summary>
+    [Fact]
+    public async Task PullAsync_Cloud_ShouldUseNetrc_NotHttpHeaders()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("test-value");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<IDictionary<string, string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/local/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a =>
+                a.Any(x => x == "pull") &&
+                !a.Any(x => x.Contains("http.extraheader", StringComparison.Ordinal))),
+            It.IsAny<string>(),
+            It.IsAny<IDictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PushBranchAsync für Cloud gibt leere HTTP-Auth-Args zurück und verlässt sich auf .netrc.</summary>
+    [Fact]
+    public async Task PushBranchAsync_Cloud_ShouldUseNetrc_NotHttpHeaders()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("test-value");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<IDictionary<string, string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/local/repo", "feature/my-branch");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a =>
+                a.Any(x => x == "push") &&
+                !a.Any(x => x.Contains("http.extraheader", StringComparison.Ordinal))),
+            It.IsAny<string>(),
+            It.IsAny<IDictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>CloneRepositoryAsync wirft Exception bei SSH-URL.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldThrow_WhenUrlIsSsh()
+    {
+        var act = () => _sut.CloneRepositoryAsync("git@bitbucket.org:workspace/repo.git", "/tmp/repo");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*SSH-URLs werden nicht unterstützt*");
+    }
+
+    /// <summary>CloneRepositoryAsync wirft Exception bei ssh://-URL.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldThrow_WhenUrlIsSshScheme()
+    {
+        var act = () => _sut.CloneRepositoryAsync("ssh://git@bitbucket.org/workspace/repo.git", "/tmp/repo");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*SSH-URLs werden nicht unterstützt*");
+    }
+
+    /// <summary>CloneRepositoryAsync setzt Remote-URL nach erfolgreichem Clone auf plain HTTPS zurück.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldResetRemoteUrl_AfterSuccessfulClone()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.CloneRepositoryAsync("https://bitbucket.org/workspace/repo.git", "/tmp/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a =>
+                a.Any(x => x == "remote") &&
+                a.Any(x => x == "set-url") &&
+                a.Any(x => x == "origin") &&
+                a.Any(x => x == "https://bitbucket.org/workspace/repo.git")),
+            "/tmp/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>CloneRepositoryAsync wirft sanitisierte Exception wenn GetGitEnvironment fehlschlägt.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldThrowSanitizedException_WhenGetGitEnvironmentFails()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("SelfHosted");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl"))
+            .Returns((string?)null);
+
+        var act = () => _sut.CloneRepositoryAsync("https://bitbucket.example.com/scm/key/repo.git", "/tmp/repo");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Self-Hosted URL ist nicht konfiguriert*");
+    }
+
+    /// <summary>GetRemoteBranchesAsync gibt leere Liste zurück wenn Self-Hosted-URL fehlt.</summary>
+    [Fact]
+    public async Task GetRemoteBranchesAsync_ShouldReturnEmpty_WhenSelfHostedUrlMissing()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("SelfHosted");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl"))
+            .Returns((string?)null);
+
+        var result = await _sut.GetRemoteBranchesAsync("https://bitbucket.example.com/scm/key/repo.git");
+
+        result.Should().BeEmpty();
+    }
+
+    /// <summary>GetDefaultBranchAsync gibt "main" zurück wenn Self-Hosted-URL fehlt.</summary>
+    [Fact]
+    public async Task GetDefaultBranchAsync_ShouldReturnMain_WhenSelfHostedUrlMissing()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("SelfHosted");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl"))
+            .Returns((string?)null);
+
+        var result = await _sut.GetDefaultBranchAsync("https://bitbucket.example.com/scm/key/repo.git");
+
+        result.Should().Be("main");
+    }
+
+    /// <summary>UpdateNetrcEntry schreibt neuen Eintrag ohne CRLF wenn zwei Einträge vorhanden sind.</summary>
+    [Fact]
+    public void UpdateNetrcEntry_ShouldWriteUnixLineEndings_WhenMultipleEntries()
+    {
+        var netrcPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        try
+        {
+            BitbucketPlugin.UpdateNetrcEntry(netrcPath, "bitbucket.org", "user1", "pass1");
+            BitbucketPlugin.UpdateNetrcEntry(netrcPath, "github.com", "user2", "pass2");
+
+            var bytes = File.ReadAllBytes(netrcPath);
+            var content = System.Text.Encoding.UTF8.GetString(bytes);
+            content.Should().NotContain("\r\n");
+            content.Should().Contain("machine bitbucket.org");
+            content.Should().Contain("machine github.com");
+        }
+        finally
+        {
+            if (File.Exists(netrcPath))
+                File.Delete(netrcPath);
+        }
+    }
+
+    /// <summary>SanitizeSensitiveOutput über BuildAuthenticatedCloneUrl entfernt percent-kodiertes Passwort.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldSanitizePercentEncodedPassword_InErrorMessage()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("pass@word");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "fatal: repository 'https://testuser:pass%40word@bitbucket.org/workspace/repo.git/' not found"));
+
+        var act = () => _sut.CloneRepositoryAsync("https://bitbucket.org/workspace/repo.git", "/tmp/repo");
+
+        var ex = await act.Should().ThrowAsync<InvalidOperationException>();
+        ex.Which.Message.Should().NotContain("pass%40word");
+        ex.Which.Message.Should().NotContain("pass@word");
+    }
+
+    /// <summary>PullAsync für Self-Hosted nutzt HTTP-Header-Auth.</summary>
+    [Fact]
+    public async Task PullAsync_SelfHosted_ShouldUseHttpHeaderAuth()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("test-value");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("SelfHosted");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl"))
+            .Returns("https://bitbucket.example.com");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<IDictionary<string, string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/local/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a =>
+                a.Any(x => x == "pull") &&
+                a.Any(x => x.Contains("http.extraheader", StringComparison.Ordinal))),
+            It.IsAny<string>(),
+            It.IsAny<IDictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PushBranchAsync für Self-Hosted nutzt HTTP-Header-Auth.</summary>
+    [Fact]
+    public async Task PushBranchAsync_SelfHosted_ShouldUseHttpHeaderAuth()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("test-value");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("SelfHosted");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl"))
+            .Returns("https://bitbucket.example.com");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<IDictionary<string, string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/local/repo", "feature/my-branch");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a =>
+                a.Any(x => x == "push") &&
+                a.Any(x => x.Contains("http.extraheader", StringComparison.Ordinal))),
+            It.IsAny<string>(),
+            It.IsAny<IDictionary<string, string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>CheckHealthAsync gibt true zurück wenn Cloud-API antwortet.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ShouldReturnTrue_WhenCloudApiRespondsSuccessfully()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns((string?)null);
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "curl",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "{\"account_id\":\"123\"}", string.Empty));
+
+        var result = await _sut.CheckHealthAsync();
+
+        result.Should().BeTrue();
+    }
+
+    /// <summary>CheckHealthAsync gibt false zurück wenn Cloud-API Fehler enthält.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ShouldReturnFalse_WhenCloudApiReturnsError()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("Cloud");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.Username"))
+            .Returns("testuser");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns((string?)null);
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "curl",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "{\"errors\":[{\"message\":\"Unauthorized\"}]}", string.Empty));
+
+        var result = await _sut.CheckHealthAsync();
+
+        result.Should().BeFalse();
+    }
+
+    /// <summary>CheckHealthAsync gibt true zurück wenn Self-Hosted-API antwortet.</summary>
+    [Fact]
+    public async Task CheckHealthAsync_ShouldReturnTrue_WhenSelfHostedApiRespondsSuccessfully()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode"))
+            .Returns("SelfHosted");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl"))
+            .Returns("https://bitbucket.example.com");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.AppPassword"))
+            .Returns("testtoken");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns((string?)null);
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "curl",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "{\"name\":\"testuser\"}", string.Empty));
+
+        var result = await _sut.CheckHealthAsync();
+
+        result.Should().BeTrue();
     }
 }

@@ -7,5 +7,6 @@ Das BitBucket-Plugin unterstützt Git-basierte Repositories bei **BitBucket Clou
 ## Inhalt
 
 - [Beschreibung](beschreibung.md)
+- [Technischer Ablauf](ablauf-technisch.md)
 - [Installation & Konfiguration](installation.md)
 - [Fehlerbehebung](troubleshooting.md)

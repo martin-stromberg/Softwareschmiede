@@ -146,20 +146,23 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             IsRequired: true)
     ];
 
-    private IDictionary<string, string> GetGitEnvironment()
+    /// <summary>
+    /// Erstellt Umgebungsvariablen für git-Befehle. Setzt einen .netrc-Eintrag für HTTP-Basic-Auth:
+    /// Cloud → machine bitbucket.org, Self-Hosted → machine {configured-host}.
+    /// </summary>
+    internal IDictionary<string, string> GetGitEnvironment(string? netrcPath = null)
     {
         var user = _credentialStore.GetCredential(BitbucketUserKey);
         var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
 
         var env = new Dictionary<string, string>
         {
-            ["GIT_TERMINAL_PROMPT"] = "0",
-            ["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            ["GIT_TERMINAL_PROMPT"] = "0"
         };
 
-        if (!string.IsNullOrEmpty(user) && !string.IsNullOrEmpty(appPassword))
+        if (!string.IsNullOrWhiteSpace(user) && !string.IsNullOrWhiteSpace(appPassword))
         {
-            var netrcPath = Path.Combine(
+            var resolvedNetrcPath = netrcPath ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
 
@@ -177,12 +180,18 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 host = "bitbucket.org";
             }
 
-            UpdateNetrcEntry(netrcPath, host, user, appPassword);
+            _logger.LogDebug("Setze .netrc-Eintrag für Host {Host} (Modus: {HostingMode}).", host, hostingMode);
+            UpdateNetrcEntry(resolvedNetrcPath, host, user, appPassword);
         }
 
         return env;
     }
 
+    /// <summary>
+    /// Gibt git-Argumente für HTTP-Authentifizierung zurück.
+    /// Cloud: leeres Array — Authentifizierung erfolgt via .netrc-Eintrag für bitbucket.org.
+    /// Self-Hosted: HTTP-Header-Argument mit Basic-Auth-Credentials.
+    /// </summary>
     private string[] GetGitHttpAuthArgs()
     {
         var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
@@ -205,6 +214,11 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return ["-H", $"Authorization: Basic {encoded}"];
     }
 
+    /// <summary>
+    /// Gibt curl-Authentifizierungsargumente zurück.
+    /// Cloud: HTTP Basic Auth (-u user:appPassword).
+    /// Self-Hosted: Bearer-Token-Header (-H "Authorization: Bearer token").
+    /// </summary>
     private string[] GetCurlAuthArgs()
     {
         var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
@@ -217,15 +231,17 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return ["-u", $"{user}:{token}"];
     }
 
-    private static string BuildAuthenticatedCloneUrl(string repositoryUrl, string user, string appPassword)
+    /// <summary>
+    /// Bettet Credentials in die Clone-URL ein. Wird ausschließlich für git clone verwendet.
+    /// Format: https://user:appPassword@host/path.git
+    /// </summary>
+    internal static string BuildAuthenticatedCloneUrl(string repositoryUrl, string user, string appPassword)
     {
         var uri = new Uri(repositoryUrl);
-        var builder = new UriBuilder(uri)
-        {
-            UserName = Uri.EscapeDataString(user),
-            Password = Uri.EscapeDataString(appPassword)
-        };
-        return builder.Uri.AbsoluteUri;
+        var encodedUser = Uri.EscapeDataString(user);
+        var encodedPass = Uri.EscapeDataString(appPassword);
+        var port = uri.IsDefaultPort ? "" : $":{uri.Port}";
+        return $"{uri.Scheme}://{encodedUser}:{encodedPass}@{uri.Host}{port}{uri.PathAndQuery}";
     }
 
     /// <summary>
@@ -268,6 +284,10 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     {
         _logger.LogInformation("Klone Bitbucket-Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
 
+        if (repositoryUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase) ||
+            repositoryUrl.StartsWith("ssh://", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("SSH-URLs werden nicht unterstützt. Bitte eine HTTPS-URL verwenden.");
+
         var user = _credentialStore.GetCredential(BitbucketUserKey);
         var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
 
@@ -283,20 +303,72 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var cloneUrl = BuildAuthenticatedCloneUrl(resolvedUrl, user, appPassword);
 
+        _logger.LogInformation("Verwende Hosting-Modus: {HostingMode}. Authentifizierung via eingebettete URL-Credentials.", hostingMode);
+
+        IDictionary<string, string> gitEnv;
+        try
+        {
+            gitEnv = GetGitEnvironment();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError("Bitbucket-Konfigurationsfehler beim Vorbereiten von git clone: {Message}", ex.Message);
+            throw;
+        }
+
         var result = await _cliRunner.RunAsync(
             "git",
             ["clone", cloneUrl, targetPath],
             null,
-            GetGitEnvironment(),
+            gitEnv,
             ct);
 
         if (!result.IsSuccess)
-            throw new InvalidOperationException($"git clone fehlgeschlagen: {result.StdErr}");
+        {
+            var stdErr = result.StdErr;
+            var sanitizedStdErr = SanitizeSensitiveOutput(stdErr, user, appPassword);
+            if (stdErr.Contains("Invalid username or token", StringComparison.OrdinalIgnoreCase) ||
+                stdErr.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogError(
+                    "Bitbucket-Authentifizierung fehlgeschlagen (Modus: {HostingMode}). " +
+                    "Bitte Benutzernamen und App Password prüfen. Details: {StdErr}",
+                    hostingMode, sanitizedStdErr);
+            }
+            else
+            {
+                _logger.LogError(
+                    "git clone fehlgeschlagen (Modus: {HostingMode}). Details: {StdErr}",
+                    hostingMode, sanitizedStdErr);
+            }
+
+            throw new InvalidOperationException($"git clone fehlgeschlagen: {sanitizedStdErr}");
+        }
+
+        // Credentials aus Remote-URL entfernen, damit Pull/Push nach Credential-Rotation
+        // nicht mit veralteten URL-Credentials fehlschlagen.
+        await _cliRunner.RunAsync(
+            "git",
+            ["remote", "set-url", "origin", resolvedUrl],
+            targetPath,
+            null,
+            ct);
     }
 
     /// <inheritdoc/>
     public override async Task PullAsync(string localPath, CancellationToken ct = default)
     {
+        var user = _credentialStore.GetCredential(BitbucketUserKey);
+        var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
+
+        if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(appPassword))
+            throw new InvalidOperationException("Bitbucket-Authentifizierung fehlt.");
+
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+        _logger.LogDebug("git pull (Modus: {HostingMode}, Authentifizierung: {AuthMethod}).",
+            hostingMode,
+            hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase) ? "HTTP-Header" : ".netrc");
+
         var result = await _cliRunner.RunAsync(
             "git",
             [..GetGitHttpAuthArgs(), "pull"],
@@ -305,12 +377,41 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             ct);
 
         if (!result.IsSuccess)
-            throw new InvalidOperationException($"git pull fehlgeschlagen: {result.StdErr}");
+        {
+            var stdErr = result.StdErr;
+            var sanitizedStdErr = SanitizeSensitiveOutput(stdErr, user, appPassword);
+            if (stdErr.Contains("Invalid username or token", StringComparison.OrdinalIgnoreCase) ||
+                stdErr.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogError(
+                    "Bitbucket-Authentifizierung bei git pull fehlgeschlagen (Modus: {HostingMode}). Details: {StdErr}",
+                    hostingMode, sanitizedStdErr);
+            }
+            else
+            {
+                _logger.LogError(
+                    "git pull fehlgeschlagen (Modus: {HostingMode}). Details: {StdErr}",
+                    hostingMode, sanitizedStdErr);
+            }
+
+            throw new InvalidOperationException($"git pull fehlgeschlagen: {sanitizedStdErr}");
+        }
     }
 
     /// <inheritdoc/>
     public override async Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default)
     {
+        var user = _credentialStore.GetCredential(BitbucketUserKey);
+        var appPassword = _credentialStore.GetCredential(BitbucketAppPasswordKey);
+
+        if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(appPassword))
+            throw new InvalidOperationException("Bitbucket-Authentifizierung fehlt.");
+
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+        _logger.LogDebug("git push (Modus: {HostingMode}, Authentifizierung: {AuthMethod}).",
+            hostingMode,
+            hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase) ? "HTTP-Header" : ".netrc");
+
         var result = await _cliRunner.RunAsync(
             "git",
             [..GetGitHttpAuthArgs(), "push", "--set-upstream", "origin", branchName],
@@ -319,7 +420,25 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             ct);
 
         if (!result.IsSuccess)
-            throw new InvalidOperationException($"git push fehlgeschlagen: {result.StdErr}");
+        {
+            var stdErr = result.StdErr;
+            var sanitizedStdErr = SanitizeSensitiveOutput(stdErr, user, appPassword);
+            if (stdErr.Contains("Invalid username or token", StringComparison.OrdinalIgnoreCase) ||
+                stdErr.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogError(
+                    "Bitbucket-Authentifizierung bei git push fehlgeschlagen (Modus: {HostingMode}). Details: {StdErr}",
+                    hostingMode, sanitizedStdErr);
+            }
+            else
+            {
+                _logger.LogError(
+                    "git push fehlgeschlagen (Modus: {HostingMode}). Details: {StdErr}",
+                    hostingMode, sanitizedStdErr);
+            }
+
+            throw new InvalidOperationException($"git push fehlgeschlagen: {sanitizedStdErr}");
+        }
     }
 
     /// <inheritdoc/>
@@ -558,11 +677,22 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default)
     {
+        IDictionary<string, string> gitEnv;
+        try
+        {
+            gitEnv = GetGitEnvironment();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning("GetRemoteBranchesAsync: Konfigurationsfehler, leere Branch-Liste zurückgegeben. {Message}", ex.Message);
+            return [];
+        }
+
         var result = await _cliRunner.RunAsync(
             "git",
             ["ls-remote", "--heads", repositoryUrl],
             null,
-            GetGitEnvironment(),
+            gitEnv,
             ct);
 
         if (!result.IsSuccess)
@@ -669,11 +799,22 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default)
     {
+        IDictionary<string, string> gitEnv;
+        try
+        {
+            gitEnv = GetGitEnvironment();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning("GetDefaultBranchAsync: Konfigurationsfehler, 'main' als Default zurückgegeben. {Message}", ex.Message);
+            return "main";
+        }
+
         var result = await _cliRunner.RunAsync(
             "git",
             ["ls-remote", "--symref", repositoryUrl, "HEAD"],
             null,
-            GetGitEnvironment(),
+            gitEnv,
             ct);
 
         if (result.IsSuccess)
@@ -686,11 +827,11 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return "main";
     }
 
-    private static void UpdateNetrcEntry(string netrcPath, string host, string user, string appPassword)
+    internal static void UpdateNetrcEntry(string netrcPath, string host, string user, string appPassword)
     {
         var existingContent = File.Exists(netrcPath) ? File.ReadAllText(netrcPath) : string.Empty;
 
-        var newEntry = $"machine {host}{Environment.NewLine}login {user}{Environment.NewLine}password {appPassword}";
+        var newEntry = $"machine {host}\nlogin {user}\npassword {appPassword}";
 
         var lines = existingContent.Split('\n');
         var result = new List<string>();
@@ -719,7 +860,19 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         if (!replaced)
             result.Add(newEntry);
 
-        File.WriteAllText(netrcPath, string.Join(Environment.NewLine, result));
+        File.WriteAllText(netrcPath, string.Join("\n", result));
+
+        if (!OperatingSystem.IsWindows())
+        {
+            try
+            {
+                File.SetUnixFileMode(netrcPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            catch
+            {
+                // chmod nicht kritisch — Fehler unterdrücken, da .netrc ggf. noch funktioniert
+            }
+        }
     }
 
     private string BuildRepositoryCloneUrl(string repositoryId, string hostingMode)
@@ -793,5 +946,39 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         {
             return false;
         }
+    }
+
+    // Known limitation: Diese Methode ist eine angepasste Kopie der gleichnamigen Methode in GitHubPlugin.
+    // Die Signaturen unterscheiden sich (user+appPassword vs. token), daher ist eine Extraktion
+    // in eine gemeinsame Hilfsklasse nicht trivial und wurde zurückgestellt.
+    private static string SanitizeSensitiveOutput(string? message, string? user, string? appPassword)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return "unbekannter Fehler";
+
+        var sanitized = message;
+
+        if (!string.IsNullOrWhiteSpace(appPassword))
+        {
+            sanitized = sanitized.Replace(appPassword, "***", StringComparison.Ordinal);
+            var encodedPassword = Uri.EscapeDataString(appPassword);
+            if (!string.Equals(encodedPassword, appPassword, StringComparison.Ordinal))
+                sanitized = sanitized.Replace(encodedPassword, "***", StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(user))
+            sanitized = System.Text.RegularExpressions.Regex.Replace(
+                sanitized,
+                $@"{System.Text.RegularExpressions.Regex.Escape(user)}:[^@\s]+@",
+                "***:***@",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        sanitized = System.Text.RegularExpressions.Regex.Replace(
+            sanitized,
+            @"https://[^:@\s]+:[^@\s]+@",
+            "https://***:***@",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        return sanitized.Trim();
     }
 }

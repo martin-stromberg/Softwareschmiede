@@ -123,8 +123,8 @@
      ```
    - Falls die Datei fehlt oder falsch ist, führe einen Health-Check durch — das Plugin aktualisiert die netrc-Datei automatisch
 3. Falls SSH-URLs verwendet werden:
-   - Stelle sicher, dass der SSH-Agent läuft und SSH-Keys konfiguriert sind
-   - Öffne ein Terminal und prüfe: `ssh -T git@bitbucket.org` (Cloud) oder `ssh -T git@bitbucket.company.com` (Self-Hosted)
+   - Das Plugin unterstützt ausschließlich HTTPS-URLs. SSH-URLs (`git@bitbucket.org:...` oder `ssh://...`) werden abgelehnt.
+   - Verwende die HTTPS-URL des Repositories (z.B. `https://bitbucket.org/workspace/repo.git`)
 4. Netzwerk-Firewall:
    - Prüfe, dass Port 443 (HTTPS) oder 22 (SSH) offen ist
    - Falls hinter Proxy: Konfiguriere Git mit Proxy-Einstellungen
@@ -234,6 +234,131 @@
    - Öffne `https://bitbucket.company.com/rest/api/1.0/user` im Browser (mit Basic Auth)
    - Falls 404: Möglicherweise ist API 1.0 nicht verfügbar (sehr alte BitBucket-Version)
    - Frag den Administrator nach der BitBucket-Version
+
+## .netrc-Datei beschädigt oder falsch konfiguriert
+
+**Symptom:** Git-Operationen schlagen mit `Invalid username or token` fehl, obwohl die Credentials korrekt sind.
+
+**Ursachen:**
+- `.netrc`-Datei ist beschädigt (ungültiges Format)
+- `.netrc`-Datei hat falsche Permissions (sollte `0600` sein)
+- `.netrc`-Eintrag wurde manuell bearbeitet und hat Syntax-Fehler
+- Auf Windows: Git nutzt Credential Manager statt `.netrc`
+
+**Lösung:**
+1. **Datei löschen und neu generieren:**
+   - Lösche die `.netrc`-Datei:
+     - Windows: `C:\Users\{username}\_netrc`
+     - Linux/Mac: `~/.netrc`
+   - Führe einen Health-Check aus oder starte eine Git-Operation
+   - Das Plugin erstellt die Datei automatisch neu
+
+2. **Permissions prüfen (Linux/Mac):**
+   ```bash
+   ls -la ~/.netrc
+   # Sollte zeigen: -rw------- (0600)
+   chmod 600 ~/.netrc
+   ```
+
+3. **Format prüfen:**
+   - Öffne die `.netrc`-Datei und prüfe, dass sie folgendes Format hat:
+     ```
+     machine bitbucket.org
+     login {username}
+     password {app_password}
+     ```
+   - Keine leeren Zeilen zwischen den Zeilen
+   - Keine zusätzlichen Leerzeichen
+
+4. **Windows Credential Manager prüfen:**
+   - Öffne **Anmeldedaten-Manager** und lösche alle Bitbucket-Einträge
+   - Dies zwingt Git, die `.netrc`-Datei zu verwenden
+
+## Authentifizierung funktioniert, aber nur kurzzeitig
+
+**Symptom:** Git-Operationen funktionieren manchmal, manchmal schlagen sie fehl mit Authentifizierungsfehler.
+
+**Ursachen:**
+- Credentials sind von Git gecacht und werden später durch neue überschrieben
+- `.netrc`-Datei wird nicht konsistent gelesen
+- Windows Credential Manager hat mehrere Einträge für den gleichen Host
+
+**Lösung:**
+1. **Gemischte Credentials bereinigen:**
+   - Lösche die `.netrc`-Datei
+   - Öffne **Anmeldedaten-Manager** und lösche alle Bitbucket-Einträge
+   - Führe einen Health-Check aus
+   - Versuche dann erneut
+
+2. **Git Credential Cache leeren:**
+   ```bash
+   git credential reject
+   host=bitbucket.org
+   protocol=https
+   # Drücke CTRL+D auf Linux/Mac oder CTRL+Z, Enter auf Windows
+   ```
+
+3. **Nur ein App Password verwenden:**
+   - Stelle sicher, dass du nur ein gültiges App Password verwendest
+   - Falls mehrere Passwörter erstellt wurden, lösche die alten und behalte nur das aktuelle
+
+## Fehlermeldung: "Invalid username or token" bei Cloud-Clone
+
+**Symptom:** `git clone` schlägt fehl mit der Meldung "fatal: Authentication failed" oder "Invalid username or token", obwohl die Credentials korrekt sind.
+
+**Ursachen:**
+- App Password hat keine erforderliche Permission (`repository:read`)
+- E-Mail als Benutzername mit `@`-Zeichen wurde nicht korrekt URL-kodiert
+- Credentials wurden nicht in die Clone-URL eingebettet
+
+**Lösung:**
+1. **App Password Permissions prüfen:**
+   - Melde dich bei BitBucket Cloud an
+   - Gehe zu **Personal Settings** → **App Passwords**
+   - Klicke auf dein Passwort
+   - Prüfe, dass ☑ `repository:read` aktiviert ist
+   - Falls nicht, klicke **Edit** und aktiviere die Permission
+
+2. **E-Mail-Benutzernamen URL-kodieren:**
+   - Falls dein Username eine E-Mail ist (z.B. `martin@example.com`), wird das `@` als `%40` kodiert
+   - Die Clone-URL sollte sein: `https://martin%40example.com:password@bitbucket.org/workspace/repo.git`
+   - Das Plugin macht dies automatisch, aber stelle sicher, dass dein Username korrekt konfiguriert ist
+
+3. **Credentials zurücksetzen:**
+   - Lösche die `.netrc`-Datei und den Credential Manager (siehe oben)
+   - Führe einen Health-Check aus
+   - Versuche erneut zu klonen
+
+## Fehlermeldung: "Authentication failed" bei Self-Hosted
+
+**Symptom:** Git-Operationen gegen Self-Hosted schlagen fehl mit `Authentication failed`, obwohl die Credentials in der Cloud funktionieren.
+
+**Ursachen:**
+- Self-Hosted-Host in `.netrc` ist falsch
+- Unterschiedliche App-Password-Formate zwischen Cloud und Self-Hosted
+- Self-Hosted-Authentifizierung benötigt andere Permissions als Cloud
+
+**Lösung:**
+1. **Self-Hosted-Host in .netrc prüfen:**
+   - Öffne die `.netrc`-Datei und prüfe, dass der Host korrekt ist:
+     ```
+     machine bitbucket.example.com  (NICHT: machine bitbucket.example.com:7990)
+     login {username}
+     password {app_password}
+     ```
+   - Der Host sollte nur Hostname und Port, aber nicht das Protokoll enthalten
+
+2. **Self-Hosted-URL-Konfiguration prüfen:**
+   - Öffne **Einstellungen** → **BitBucket-Plugin**
+   - Prüfe, dass die **BitBucket-URL (Self-Hosted)** korrekt ist (z.B. `https://bitbucket.example.com`)
+   - URL muss Basis-URL ohne Pfad sein
+
+3. **API-Authentifizierung direkt testen:**
+   ```bash
+   curl -u {username}:{password} https://bitbucket.example.com/rest/api/1.0/user
+   ```
+   - Wenn dies funktioniert (HTTP 200), liegt das Problem bei Git oder `.netrc`
+   - Wenn dies fehlschlägt (HTTP 401), sind die Credentials falsch
 
 ## Weitere Probleme
 
