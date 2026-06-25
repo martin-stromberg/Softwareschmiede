@@ -64,7 +64,7 @@ Stand: **2026-06-11**
 | Bereich | Status | Hinweise |
 |---|---|---|
 | Projekt-, Aufgaben- und Protokollverwaltung | ✅ Implementiert | Blazor-UI inkl. Dashboard, Detailseiten und Verlauf |
-| SCM-Plugins | ✅ Implementiert | `GitHub`, `BitBucket` und `LocalDirectoryPlugin` produktiv verfügbar |
+| SCM-Plugins | ✅ Implementiert | `GitHub`, `BitBucket` (Cloud + Self-Hosted) und `LocalDirectoryPlugin` produktiv verfügbar; **BitBucket Cloud Git-Authentifizierung robustifiziert: `.netrc`-basierte Auth für Pull/Push, Credential-Embedding für Clone, Hosting-Mode-Differenzierung** |
 | Separates Arbeitsverzeichnis mit Git-Workflow-Fallback | ✅ Implementiert | `git init`-Fallback, Pull ohne Merge (inkl. Nutzerhinweis), Push als Datei-Sync inkl. Delete-Sync über `git status` |
 | KI-Plugins | ✅ Implementiert | `GitHub Copilot` und `Claude CLI` produktiv verfügbar |
 | Standardplugin-Mechanik | ✅ Implementiert | Auflösung: explizite Auswahl → gespeichertes Standardplugin → Fallback |
@@ -936,6 +936,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **BitBucket Cloud Git-Authentifizierung robustifiziert:** `.netrc`-basierte Authentifizierung für Pull/Push-Operationen gegen Bitbucket Cloud, Credential-Embedding (`user:appPassword`) für Clone-URLs, Hosting-Mode-Differenzierung (Cloud vs. Self-Hosted) in `GetGitEnvironment()` und `BuildAuthenticatedCloneUrl()`, erweiterte Fehlerbehandlung und Logging für Debugging; Anforderungsanalyse und Umsetzungsplan in `docs/features/bitbucket-cloud/requirement.md` und `docs/features/bitbucket-cloud/plan.md` dokumentiert (**2026-06-25**)
 - **WPF Aufgabenworkflow-Optimierung (Feature #72):** Vereinfachtes Aufgaben-Statusmodell mit direktem Übergang von "Neu" zu "Gestartet"; neuer `StartenCommand` kombiniert Repository-Klone und CLI-Start in einem Schritt; Plugin-Auswahl-Dialog mit optionaler Projekt-Level-Speicherung; `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI mit Prozess-Neustart; automatischer CLI-Neustart beim Aufgabe-Laden; Enum-Vereinfachung (`ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernt); Datenbankmigrationen und Status-Validierung; E2E-Tests für alle Szenarien; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-17**)
 - **WPF separate Aufgabendetailansicht (Feature #72):** Aufgabendetailansicht aus der Inline-Position in `ProjectDetailView` ausgelagert in eine fensterumfassende, separate View; Callback-basierte Navigation (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) zwischen `ProjectDetailView` und `TaskDetailView` implementiert; Neuanlage von Aufgaben öffnet `TaskDetailView` mit leerem Formular und persistiert neue Aufgabe mit Status "Neu"; Fehlerbehandlung mit lokaler Fehlermeldung; Dokumentation in requirement.md und plan.md aktualisiert (**2026-06-16**)
 - **WPF Plugin-Einstellungen & Styling (Feature #72):** Einstellungsansicht um zwei neue Register (Quellcodeverwaltung, KI) mit Plugin-Auswahl und dynamisch geladenen Einstellungspanels erweitert; feldtyp-spezifische Eingabekomponenten (TextBox, PasswordBox, CheckBox, ComboBox, FilePath); globale Dark-Mode-kompatible Styles in Theme-Dictionaries; StandardPlugin-Persistierung in AppEinstellung (**2026-06-15**)
@@ -1109,6 +1110,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Testlücken: Issue-/Branch-/PR-Linking](docs/tests/testluecken-issue-branch-pr-linking.md) | Dokumentation des geschlossenen Lückenstands für das Linking-Feature |
 | [Testplan: Plugin-Klassenbibliotheken](docs/tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md) | Abgedeckte Testbereiche für Plugin-Discovery, Build-Kopie und Laufzeitverhalten |
 | [Testlücken: Plugin-Klassenbibliotheken](docs/tests/testluecken-plugin-klassenbibliotheken-github-und-copilot.md) | Aktueller Stand der offenen Testlücken für das Plugin-Feature |
+| [Requirements: BitBucket Cloud Git-Authentifizierung](docs/features/bitbucket-cloud/requirement.md) | Anforderungsanalyse zur Robustifizierung der Git-Authentifizierung gegen Bitbucket Cloud (`.netrc`-basiert, Hosting-Mode-Differenzierung, Credential-Management) |
+| [Plan: BitBucket Cloud Git-Authentifizierung](docs/features/bitbucket-cloud/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen (Clone/Pull/Push/Health-Check), Änderungen an `BitbucketPlugin`, Fehlerbehandlung, Dokumentation und Testabdeckung |
 
 ---
 
