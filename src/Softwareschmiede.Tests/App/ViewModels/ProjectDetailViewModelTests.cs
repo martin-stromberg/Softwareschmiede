@@ -193,7 +193,8 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var testRepo = new AvailableRepository("test-repo", DateTime.UtcNow, "test/repo", "https://github.com/test/repo");
 
         var pluginMock = new Mock<IGitPlugin>();
-        pluginMock.Setup(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        pluginMock.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        pluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
 
         var repositoryAssignVm = new RepositoryAssignViewModel(NullLogger<RepositoryAssignViewModel>.Instance);
         repositoryAssignVm.SelectedRepository = testRepo;
@@ -378,6 +379,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     {
         var gitPluginMock = new Mock<IGitPlugin>();
         gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginMock.SetupGet(p => p.PluginPrefix).Returns("SourceCodeManagement");
         gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(issues ?? []);
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins())

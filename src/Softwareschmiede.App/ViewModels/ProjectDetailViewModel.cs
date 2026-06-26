@@ -148,7 +148,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat.</summary>
     public bool KannIssuesLaden => _selectedRepository != null
         && _pluginManager.GetSourceCodeManagementPlugins()
-            .Any(p => p.PluginPrefix == _selectedRepository.PluginTyp);
+            .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginTyp, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Erstellt eine Aufgabe aus einem Issue-Vorschlag.</summary>
     public AsyncRelayCommand<Issue> AufgabeAusIssueErstellenCommand { get; }
@@ -439,11 +439,15 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
     private void ReplaceOrAddAufgabe(Aufgabe aufgabe)
     {
-        var index = Aufgaben.ToList().FindIndex(a => a.Id == aufgabe.Id);
-        if (index >= 0)
-            Aufgaben[index] = aufgabe;
-        else
-            Aufgaben.Add(aufgabe);
+        for (var i = 0; i < Aufgaben.Count; i++)
+        {
+            if (Aufgaben[i].Id == aufgabe.Id)
+            {
+                Aufgaben[i] = aufgabe;
+                return;
+            }
+        }
+        Aufgaben.Add(aufgabe);
     }
 
     private void AktualisiereGefilterteAufgaben()
@@ -461,13 +465,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
     private async Task LadenIssuesAsync(CancellationToken ct)
     {
-        if (_selectedRepository == null)
+        var repository = _selectedRepository;
+        if (repository == null)
             return;
 
         var scmPlugins = _pluginManager.GetSourceCodeManagementPlugins();
         var gitPlugin = scmPlugins
-            .OfType<IGitPlugin>()
-            .FirstOrDefault(p => p.PluginPrefix == _selectedRepository.PluginTyp);
+            .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
         if (gitPlugin == null)
             return;
 
@@ -481,7 +485,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 .Select(a => a.IssueReferenz!.IssueNummer!.Value)
                 .ToHashSet();
 
-            var issues = await gitPlugin.GetIssuesAsync(_selectedRepository.RepositoryUrl, ct);
+            var issues = await gitPlugin.GetIssuesAsync(repository.RepositoryUrl, ct);
             foreach (var issue in issues)
             {
                 if (!bereitsKonvertierteNummern.Contains(issue.Nummer))
@@ -494,7 +498,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Laden der Issues für Repository {RepositoryUrl}.", _selectedRepository.RepositoryUrl);
+            _logger.LogError(ex, "Fehler beim Laden der Issues für Repository {RepositoryUrl}.", repository.RepositoryUrl);
         }
         finally
         {
@@ -520,10 +524,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 _selectedRepository?.Id,
                 ct);
 
-            var verbleibend = IssueVorschlaege.Where(i => i.Nummer != issue.Nummer).ToList();
-            IssueVorschlaege.Clear();
-            foreach (var i in verbleibend)
-                IssueVorschlaege.Add(i);
+            var zuEntfernen = IssueVorschlaege.FirstOrDefault(i => i.Nummer == issue.Nummer);
+            if (zuEntfernen != null)
+                IssueVorschlaege.Remove(zuEntfernen);
 
             Aufgaben.Add(aufgabe);
             AktualisiereGefilterteAufgaben();

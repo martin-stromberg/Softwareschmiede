@@ -15,6 +15,7 @@
             <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
             <converters:NullOrEmptyToVisibilityConverter x:Key="NullOrEmptyToVisibilityConverter" />
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
+            <converters:UnassignedRepositoriesConverter x:Key="UnassignedRepositoriesConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

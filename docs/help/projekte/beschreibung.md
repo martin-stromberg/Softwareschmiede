@@ -50,8 +50,23 @@ Repositories können eine `RepositoryStartKonfiguration` enthalten, die beim Sta
 - Projekt „Backend-API" mit einem GitHub-Repository und mehreren Aufgaben für Features und Bugfixes. Der Projektname und die Beschreibung werden in der Detailansicht angepasst, Repositories über den „Zuweisen"-Button hinzugefügt.
 - Projekt „Lokale Tools" mit einem `LocalDirectoryPlugin`-Repository, das direkt auf ein Verzeichnis zeigt.
 
+### Repository-Suggestions (Projektübersicht)
+
+Auf der Projektübersichtsseite erscheint unterhalb der Projektkacheln ein **Suggestions-Panel** mit unzugeordneten Repositories. Dieses Panel zeigt automatisch alle Repositories an, die aus verfügbaren SCM-Plugins stammen, aber noch nicht einem Projekt zugeordnet wurden.
+
+**Funktionsweise:**
+- Die Liste wird sortiert nach dem Datum der letzten Änderung (neueste zuerst), um aktive Repositories prominent anzuzeigen.
+- Jeder Eintrag zeigt den Repository-Namen und eine relative Zeitangabe der letzten Änderung (z.B. "vor 2 Stunden").
+- Ein Doppelklick auf einen Eintrag erstellt automatisch ein neues Projekt mit dem Repository-Namen und ordnet das Repository zu.
+- Das Panel wird beim Laden der Projektübersicht und beim Zurücknavigieren von der Projektdetailansicht aktualisiert, sodass neu zugeordnete Repositories sofort verschwinden.
+
+**Fehlerbehandlung:**
+- Falls ein SCM-Plugin bei der Abfrage seiner Repositories fehlschlägt, wird dieses Plugin übersprungen; andere Plugins werden weiterhin abgefragt. Ein Fehler wird im Anwendungsprotokoll vermerkt.
+- Falls keine Repositories vorhanden sind oder alle bereits zugeordnet wurden, bleibt das Panel leer (mit entsprechender Überschrift).
+
 ## Einschränkungen
 
 - Archivierte Projekte erscheinen nicht im Dashboard, sind aber weiterhin in der Projektliste sichtbar.
 - Hat ein Projekt mehrere aktive Repositories und eine Aufgabe referenziert keines davon eindeutig, wird der Entwicklungsprozessstart verweigert.
 - Der Aufgabenfilter ist nur ein Anzeigefilter und beeinflusst nicht die Datenbankabfrage; alle Aufgaben werden geladen.
+- Das Suggestions-Panel zeigt keine Repositories an, wenn alle verfügbaren Repositories bereits zugeordnet wurden.

@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
@@ -12,16 +14,143 @@ public sealed class ProjektServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly Mock<ILogger<ProjektService>> _loggerMock;
+    private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly ProjektService _sut;
 
     public ProjektServiceTests()
     {
         _db = TestDbContextFactory.Create();
         _loggerMock = new Mock<ILogger<ProjektService>>();
-        _sut = new ProjektService(_db, _loggerMock.Object);
+        _pluginManagerMock = new Mock<IPluginManager>();
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
+        _sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
     }
 
     public void Dispose() => _db.Dispose();
+
+    private static Mock<IGitPlugin> CreatePluginMockWithRepositories(params AvailableRepository[] repositories)
+    {
+        var mock = new Mock<IGitPlugin>();
+        mock.Setup(p => p.PluginName).Returns("TestPlugin");
+        mock.Setup(p => p.PluginPrefix).Returns("TestPlugin");
+        mock.Setup(p => p.GetAvailableRepositoriesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(repositories);
+        return mock;
+    }
+
+    /// <summary>GetUnassignedRepositoriesAsync gibt alle Repositories zurück, wenn keine zugeordnet sind.</summary>
+    [Fact]
+    public async Task GetUnassignedRepositoriesAsync_ShouldReturnAllRepositories_WhenAllUnassigned()
+    {
+        // Arrange
+        var repo1 = new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://github.com/owner/repo1");
+        var repo2 = new AvailableRepository("repo2", DateTime.UtcNow, "owner/repo2", "https://github.com/owner/repo2");
+        var plugin = CreatePluginMockWithRepositories(repo1, repo2);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin.Object]);
+        var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
+
+        // Act
+        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Should().Contain(r => r.Url == "https://github.com/owner/repo1");
+        result.Should().Contain(r => r.Url == "https://github.com/owner/repo2");
+    }
+
+    /// <summary>GetUnassignedRepositoriesAsync filtert zugeordnete Repositories heraus.</summary>
+    [Fact]
+    public async Task GetUnassignedRepositoriesAsync_ShouldExcludeAssignedRepositories()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Test-Projekt", null);
+        await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/owner/repo1", "owner/repo1");
+
+        var repoAssigned = new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://github.com/owner/repo1");
+        var repoFree = new AvailableRepository("repo2", DateTime.UtcNow, "owner/repo2", "https://github.com/owner/repo2");
+        var plugin = CreatePluginMockWithRepositories(repoAssigned, repoFree);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin.Object]);
+        var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
+
+        // Act
+        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+
+        // Assert
+        result.Should().HaveCount(1);
+        result.Single().Url.Should().Be("https://github.com/owner/repo2");
+    }
+
+    /// <summary>GetUnassignedRepositoriesAsync sortiert primär nach UpdatedAt absteigend, sekundär nach Name aufsteigend.</summary>
+    [Fact]
+    public async Task GetUnassignedRepositoriesAsync_ShouldSortByUpdatedAtDescendingThenByNameAscending()
+    {
+        // Arrange
+        var older = DateTime.UtcNow.AddDays(-2);
+        var newer = DateTime.UtcNow.AddDays(-1);
+        var repos = new[]
+        {
+            new AvailableRepository("b-repo", older, "owner/b-repo", "https://github.com/owner/b-repo"),
+            new AvailableRepository("a-repo", newer, "owner/a-repo", "https://github.com/owner/a-repo"),
+            new AvailableRepository("c-repo", older, "owner/c-repo", "https://github.com/owner/c-repo"),
+        };
+        var plugin = CreatePluginMockWithRepositories(repos);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin.Object]);
+        var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
+
+        // Act
+        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+
+        // Assert
+        result.Should().HaveCount(3);
+        result[0].Name.Should().Be("a-repo");
+        result[1].Name.Should().Be("b-repo");
+        result[2].Name.Should().Be("c-repo");
+    }
+
+    /// <summary>GetUnassignedRepositoriesAsync ignoriert fehlerhafte Plugins und gibt Ergebnisse der anderen zurück.</summary>
+    [Fact]
+    public async Task GetUnassignedRepositoriesAsync_ShouldHandlePluginError_AndContinueWithOtherPlugins()
+    {
+        // Arrange
+        var faultyPlugin = new Mock<IGitPlugin>();
+        faultyPlugin.Setup(p => p.PluginName).Returns("FaultyPlugin");
+        faultyPlugin.Setup(p => p.GetAvailableRepositoriesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
+
+        var workingRepo = new AvailableRepository("working-repo", DateTime.UtcNow, "owner/working", "https://github.com/owner/working");
+        var workingPlugin = CreatePluginMockWithRepositories(workingRepo);
+
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins())
+            .Returns([faultyPlugin.Object, workingPlugin.Object]);
+        var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
+
+        // Act
+        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+
+        // Assert
+        result.Should().HaveCount(1);
+        result.Single().Url.Should().Be("https://github.com/owner/working");
+    }
+
+    /// <summary>GetUnassignedRepositoriesAsync gibt eine leere Liste zurück, wenn alle Repositories zugeordnet sind.</summary>
+    [Fact]
+    public async Task GetUnassignedRepositoriesAsync_ShouldReturnEmptyList_WhenAllRepositoriesAssigned()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Test-Projekt", null);
+        await _sut.AddRepositoryAsync(projekt.Id, "GitHub", "https://github.com/owner/repo1", "owner/repo1");
+
+        var repo = new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://github.com/owner/repo1");
+        var plugin = CreatePluginMockWithRepositories(repo);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin.Object]);
+        var sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
+
+        // Act
+        var result = (await sut.GetUnassignedRepositoriesAsync()).ToList();
+
+        // Assert
+        result.Should().BeEmpty();
+    }
 
     /// <summary>CreateAsync erstellt ein neues Projekt mit Aktiv-Status und gibt es zurück.</summary>
     [Fact]

@@ -150,6 +150,36 @@ Der gewählte Filter-Status bleibt aktiv und die Aufgabenliste wird entsprechend
 ### Ergebnis
 Die Aufgabendetailansicht öffnet sich und zeigt alle Informationen und Optionen für die Aufgabe.
 
+## Projekt aus unzugeordnetem Repository erstellen (Suggestion)
+
+### Voraussetzungen
+- Sie befinden sich auf der Projektübersicht (Dashboard).
+- Es existieren unzugeordnete Repositories (Panel unter den Projektkacheln ist nicht leer).
+- Mindestens ein SCM-Plugin ist installiert.
+
+### Schritte
+
+1. Suchen Sie das gewünschte Repository im Suggestions-Panel unterhalb der Projektkacheln.
+2. Doppelklicken Sie auf den Repository-Eintrag.
+
+### Ergebnis
+Ein neues Projekt wird erstellt, der Repository-Name wird als Projektname verwendet, das Repository wird dem Projekt automatisch zugeordnet. Das neue Projekt erscheint sofort in den Projektkacheln, und der Repository-Eintrag verschwindet aus dem Suggestions-Panel.
+
+> **Hinweis:** Der neue Projektname entspricht dem Repository-Namen. Sie können den Namen später in der Projektdetailansicht ändern, indem Sie das Projekt öffnen, den Namen bearbeiten und speichern.
+
+### Zeitformatierung im Panel
+
+Die Zeitangaben werden relativ zur aktuellen Zeit angezeigt:
+- **"gerade eben"** — Repository wurde in der letzten Minute geändert
+- **"vor X Minuten"** — Änderung liegt X Minuten zurück
+- **"vor X Stunden"** — Änderung liegt X Stunden zurück
+- **"vor X Tagen"** — Änderung liegt X Tage zurück
+- **"vor X Monaten"** — Änderung liegt X Monate zurück
+- **"vor X Jahren"** — Änderung liegt X Jahre zurück
+- **"unbekannt"** — Kein Änderungsdatum verfügbar
+
+Die Liste ist absteigend nach Änderungsdatum sortiert, sodass die aktivsten Repositories oben angezeigt werden.
+
 ## Navigation
 
 ### Zurück zur Projektübersicht

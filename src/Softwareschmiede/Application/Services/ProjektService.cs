@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
@@ -18,12 +20,14 @@ public sealed class ProjektService
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<ProjektService> _logger;
+    private readonly IPluginManager _pluginManager;
 
     /// <inheritdoc cref="ProjektService"/>
-    public ProjektService(SoftwareschmiededDbContext db, ILogger<ProjektService> logger)
+    public ProjektService(SoftwareschmiededDbContext db, ILogger<ProjektService> logger, IPluginManager? pluginManager = null)
     {
         _db = db;
         _logger = logger;
+        _pluginManager = pluginManager ?? NullPluginManager.Instance;
     }
 
     /// <summary>Gibt alle Projekte zurück.</summary>
@@ -188,6 +192,40 @@ public sealed class ProjektService
             .AsNoTracking()
             .OrderBy(r => r.RepositoryName)
             .ToListAsync(ct);
+    }
+
+    /// <summary>Gibt alle unzugeordneten Repositories aus allen SCM-Plugins zurück, sortiert nach UpdatedAt absteigend, dann Name aufsteigend.</summary>
+    public async Task<IEnumerable<AvailableRepository>> GetUnassignedRepositoriesAsync(CancellationToken ct = default)
+    {
+        _logger.LogInformation("Unzugeordnete Repositories aus allen SCM-Plugins laden.");
+
+        var assignedUrls = await _db.GitRepositories
+            .AsNoTracking()
+            .Select(r => r.RepositoryUrl)
+            .ToHashSetAsync(StringComparer.OrdinalIgnoreCase, ct);
+
+        var allRepositories = new List<AvailableRepository>();
+        foreach (var plugin in _pluginManager.GetSourceCodeManagementPlugins())
+        {
+            try
+            {
+                var repos = await plugin.GetAvailableRepositoriesAsync(ct);
+                allRepositories.AddRange(repos);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Plugin '{PluginName}' konnte keine Repositories liefern.", plugin.PluginName);
+            }
+        }
+
+        return allRepositories
+            .Where(r => !string.IsNullOrEmpty(r.Url) && !assignedUrls.Contains(r.Url))
+            .OrderByDescending(r => r.UpdatedAt)
+            .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>Entfernt ein Git-Repository aus einem Projekt.</summary>
@@ -371,4 +409,14 @@ public sealed class ProjektService
     private static bool IsGitHubPlugin(string pluginType)
         => string.Equals(pluginType, LegacyGitHubPluginType, StringComparison.OrdinalIgnoreCase)
            || string.Equals(pluginType, GitHubPluginPrefix, StringComparison.OrdinalIgnoreCase);
+
+    private sealed class NullPluginManager : IPluginManager
+    {
+        public static readonly NullPluginManager Instance = new();
+
+        public IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins() => [];
+        public IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins() => [];
+        public IGitPlugin GetDefaultSourceCodeManagementPlugin() => throw new InvalidOperationException("Kein SCM-Plugin verfügbar.");
+        public IKiPlugin GetDefaultDevelopmentAutomationPlugin() => throw new InvalidOperationException("Kein KI-Plugin verfügbar.");
+    }
 }

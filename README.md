@@ -73,13 +73,36 @@ Stand: **2026-06-11**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden** |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
 ---
 
 ## 🚀 Features
+
+#### Repository-Suggestion-Panel auf der Projektübersichtsseite (in Arbeit)
+
+**Neues Panel mit Vorschlägen unzugeordneter Repositories:**
+
+- **Aggregation aller Git-Plugins:** Zeigt unzugeordnete Repositories aus **allen** verfügbaren SCM-Plugins (GitHub, BitBucket, LocalDirectory, etc.) in einer einheitlichen Liste an
+- **Sortierung nach letzter Aktivität:** Repositories werden nach `UpdatedAt` absteigend sortiert; neuste zuerst (mit Case-insensitive Fallback auf Repository-Namen)
+- **Relative Zeitformatierung:** Anzeige der letzten Änderung in lesbaren relativen Formaten (z. B. "vor 2 Stunden", "vor 1 Tag")
+- **Panel-Platzierung:** Neuer Bereich unterhalb der Projektkacheln auf der Projektübersichtsseite (ProjectListView), volle Breite und dynamische Höhe
+- **Projekt-Schnellerstellung:** Doppelklick auf ein Repository in der Suggestions-Liste erstellt ein neues Projekt mit automatischer Repository-Zuordnung
+- **Echtzeit-Updates:** Beim Laden der Seite und nach Rückkehr von der Projektdetailansicht wird die Liste automatisch aktualisiert
+- **Fehlerrobustheit:** Fehler bei einzelnen Plugins werden abgefangen; andere Plugins funktionieren weiterhin
+
+**Betroffene Komponenten und Änderungen:**
+
+- `ProjektService.GetUnassignedRepositoriesAsync()` – neue Service-Methode zum Aggregieren, Filtern und Sortieren
+- `ProjectListViewModel.UnassignedRepositories` – neue Property (ObservableCollection) für UI-Binding
+- `ProjectListViewModel.IsLoadingRepositories` – Loading-Flag für Suggestions-Panel
+- `ProjectListViewModel.RepositoryDoubleclickCommand` – neuer Command für Projekt-Schnellerstellung
+- `UnassignedRepositoriesConverter` – neuer Value Converter für relative Datumsformatierung
+- `ProjectListView.xaml` – neues Panel mit ItemsControl für Repositories
+- Unit-Tests für Service-Methode, ViewModel und Converter
+- E2E-Tests für Repository-Vorschläge, Sortierung, Datumsformatierung und Projekt-Schnellerstellung
 
 #### Feature 72: Aufgabenworkflow Optimierung (in Arbeit)
 
@@ -936,6 +959,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **Repository-Suggestion-Panel (in Arbeit):** Neues Panel auf der Projektübersichtsseite mit Vorschlägen unzugeordneter Repositories aus allen Git-Plugins, sortiert nach letzter Aktivität mit relativer Datumsformatierung; Doppelklick erstellt neues Projekt mit automatischer Repository-Zuordnung; Echtzeit-Updates beim Laden und nach Rückkehr von Projektdetail; Fehlerrobustheit bei Plugin-Ausfällen; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-26**)
 - **WPF Aufgabenworkflow-Optimierung (Feature #72):** Vereinfachtes Aufgaben-Statusmodell mit direktem Übergang von "Neu" zu "Gestartet"; neuer `StartenCommand` kombiniert Repository-Klone und CLI-Start in einem Schritt; Plugin-Auswahl-Dialog mit optionaler Projekt-Level-Speicherung; `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI mit Prozess-Neustart; automatischer CLI-Neustart beim Aufgabe-Laden; Enum-Vereinfachung (`ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernt); Datenbankmigrationen und Status-Validierung; E2E-Tests für alle Szenarien; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-17**)
 - **WPF separate Aufgabendetailansicht (Feature #72):** Aufgabendetailansicht aus der Inline-Position in `ProjectDetailView` ausgelagert in eine fensterumfassende, separate View; Callback-basierte Navigation (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) zwischen `ProjectDetailView` und `TaskDetailView` implementiert; Neuanlage von Aufgaben öffnet `TaskDetailView` mit leerem Formular und persistiert neue Aufgabe mit Status "Neu"; Fehlerbehandlung mit lokaler Fehlermeldung; Dokumentation in requirement.md und plan.md aktualisiert (**2026-06-16**)
 - **WPF Plugin-Einstellungen & Styling (Feature #72):** Einstellungsansicht um zwei neue Register (Quellcodeverwaltung, KI) mit Plugin-Auswahl und dynamisch geladenen Einstellungspanels erweitert; feldtyp-spezifische Eingabekomponenten (TextBox, PasswordBox, CheckBox, ComboBox, FilePath); globale Dark-Mode-kompatible Styles in Theme-Dictionaries; StandardPlugin-Persistierung in AppEinstellung (**2026-06-15**)
@@ -1000,6 +1024,13 @@ Zuletzt dokumentiert (README-/Doku-Update):
   - [ ] Automatischer CLI-Neustart bei Aufgabe-Laden
   - [ ] E2E-Tests für alle Szenarien
   - [ ] Datenbankmigrationen und Status-Validierung
+- [ ] Repository-Suggestion-Panel (in Entwicklung)
+  - [ ] Service-Methode `GetUnassignedRepositoriesAsync()` implementieren
+  - [ ] Value Converter für relative Datumsformatierung (`UnassignedRepositoriesConverter`)
+  - [ ] ProjectListViewModel erweitern um `UnassignedRepositories` und `RepositoryDoubleclickCommand`
+  - [ ] ProjectListView XAML mit neuem Suggestions-Panel
+  - [ ] Unit-Tests für Service und ViewModel
+  - [ ] E2E-Tests für Anzeige, Sortierung und Projekt-Schnellerstellung
 - [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
 - [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
 - [ ] Blazor-Code vollständig entfernt
@@ -1054,6 +1085,9 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Plan: WPF separate Aufgabendetailansicht](docs/features/72-wpf-separate-aufgabenansicht/plan.md) | Umsetzungsplan mit Designentscheidungen (Callback-basierte Navigation, sofortiger Wechsel ohne Animation, Fehlerbehandlung), Programmabläufen (Aufgabe öffnen, neue Aufgabe erstellen, zurück navigieren, speichern und navigieren), Änderungen an bestehenden Klassen und Validierungsregeln |
 | [Feature F072: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/requirement.md) | Anforderungsanalyse für Einstellungsansicht mit Plugin-Registerkarten, dynamischen Einstellungspanels und globalen Dark-Mode-Styles |
 | [Plan: WPF Plugin-Einstellungen & Styling](docs/features/72-wpf-plugineinstellungen/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen, neuen Klassen und Validierungsregeln |
+| [Anforderungen: Repository-Suggestion-Panel](docs/features/repository-suggestion/requirement.md) | Fachliche Anforderungsanalyse zur Anzeige unzugeordneter Repositories auf der Projektübersichtsseite mit Aggregation, Filterung, Sortierung und Fehlerbehandlung |
+| [Plan: Repository-Suggestion-Panel](docs/features/repository-suggestion/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen (Laden, Rückkehr, Doppelklick), Änderungen an bestehenden Klassen, Datenbankmigrationen (keine) und Tests |
+| [Bestandsaufnahme: Repository-Suggestion-Panel](docs/features/repository-suggestion/inventory.md) | Analyse des bestehenden Codes bezüglich der Anforderung inkl. kritische Erkenntnisse und Implementierungsempfehlungen |
 | [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll” (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll” – 2026-05-25” |
 | [API: Issue 58 Agenten-Discovery/Auswahl](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für plugin-spezifische Discovery, Prefix-Auflösung und Persistenz (`KiPluginPrefix`) |
 | [Flow: Issue 58 Agenten-Discovery/Auswahl](docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | Ablaufdiagramm für UI-Reihenfolge, Kompatibilitätsprüfung und Start-/Folgeprompt-Dispatch |

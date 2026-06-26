@@ -254,6 +254,116 @@ Beteiligte Komponenten:
 5. `TaskDetailViewModel.AufgabeId` wird auf aufgaben-ID gesetzt
 6. `SelectedTaskViewModel` wird gesetzt (UI zeigt Aufgabendetail-Ansicht)
 
+### 11. Projektübersicht laden (mit Repository-Suggestions)
+
+**Auslöser:** Benutzer öffnet die Projektübersichtsseite (`ProjectListView`).
+
+Beteiligte Komponenten:
+- `ProjectListView.xaml` — UI mit Projektkacheln und Suggestions-Panel
+- `ProjectListViewModel.LadenCommand` — wird via `Loaded`-Event ausgelöst
+- `ProjectListViewModel.LadenAsync` — Ladelogik
+- `ProjektService.GetAllAsync` — lädt alle Projekte
+- `ProjektService.GetUnassignedRepositoriesAsync` — lädt unzugeordnete Repositories
+- `UnassignedRepositories`-Collection — hält Suggestions für UI
+- `UnassignedRepositoriesConverter` — formatiert Datumsangaben
+
+**Flow:**
+1. `ProjectListView` wird geladen; `Loaded`-Event wird ausgelöst
+2. `LadenCommand` wird ausgelöst (RelayCommand)
+3. `LadenAsync()` wird asynchron ausgeführt:
+   - `IsLoading = true` wird gesetzt → UI zeigt Ladesymbol
+   - `FehlerMeldung = null` wird gesetzt (alte Fehlermeldung löschen)
+   - `projektTask = ProjektService.GetAllAsync(ct)` wird gestartet
+   - `suggestionsTask = LadenRepositorienSuggestionsAsync(ct)` wird gestartet (parallel)
+   - `Task.WhenAll(projektTask, suggestionsTask)` wartet auf beide Tasks
+4. Nach Abschluss:
+   - `Projekte`-Collection wird geleert
+   - Projekte aus `projektTask.Result` werden einzeln in Collection hinzugefügt (ObservableCollection triggert UI-Update)
+   - `IsLoading = false` wird gesetzt → UI zeigt Inhalte
+
+**Flow (UnassignedRepositories laden):**
+1. `LadenRepositorienSuggestionsAsync()` wird parallel ausgeführt:
+   - `IsLoadingRepositories = true` wird gesetzt → Loading-Indikator wird angezeigt
+   - `ProjektService.GetUnassignedRepositoriesAsync(ct)` wird aufgerufen
+2. In `ProjektService.GetUnassignedRepositoriesAsync()`:
+   - Hash-Set aller zugeordneten Repository-URLs wird erstellt: `assignedUrls = SELECT RepositoryUrl FROM GitRepositories`
+   - Für jedes SCM-Plugin in `IPluginManager.GetSourceCodeManagementPlugins()`:
+     - Try: `plugin.GetAvailableRepositoriesAsync(ct)` wird aufgerufen
+     - Alle Repositories werden zu `allRepositories`-Liste hinzugefügt
+     - Catch: Plugin-Fehler wird geloggt, andere Plugins werden fortgesetzt
+   - Repositories werden gefiltert: `.Where(r => !assignedUrls.Contains(r.Url))`
+   - Repositories werden sortiert:
+     - Primär: `OrderByDescending(r => r.UpdatedAt)` (neueste zuerst)
+     - Sekundär: `ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)` (alphabetisch)
+   - Gefilterte und sortierte Liste wird zurückgegeben
+3. Zurück in `LadenRepositorienSuggestionsAsync()`:
+   - `UnassignedRepositories`-Collection wird geleert
+   - Repositories aus Ergebnis werden einzeln in Collection hinzugefügt (ObservableCollection triggert UI-Update)
+   - `IsLoadingRepositories = false` wird gesetzt → Loading-Indikator wird verborgen
+
+**Fehlerbehandlung:**
+- Bei `OperationCanceledException`: Exception wird weitergeleitet
+- Bei Exception in `LadenRepositorienSuggestionsAsync()`: Fehler wird geloggt, `UnassignedRepositories` bleibt leer
+
+### 12. Projekt aus unzugeordnetem Repository erstellen (Doppelklick)
+
+**Auslöser:** Benutzer doppelklickt auf Repository im Suggestions-Panel.
+
+Beteiligte Komponenten:
+- `ProjectListView.xaml` — ItemsControl mit MouseDoubleClick-Binding
+- `ProjectListViewModel.RepositoryDoubleclickCommand` — AsyncRelayCommand<AvailableRepository>
+- `ProjectListViewModel.ProjektAusRepositoryErstellen` — Projektierstellungslogik
+- `ProjektService.CreateAsync` — erstellt Projekt
+- `ProjektService.AddRepositoryAsync` — ordnet Repository zu
+- `IPluginManager` — findet Plugin für Repository
+- `ProjectListViewModel.LadenAsync` — wird aufgerufen zum Neuladen
+
+**Flow:**
+1. Benutzer doppelklickt auf Repository-Eintrag
+2. `MouseDoubleClick`-Event wird ausgelöst
+3. `RepositoryDoubleclickCommand.Execute(avail ablerepo)` wird aufgerufen
+4. `ProjektAusRepositoryErstellen(avail ablerepo)` wird asynchron ausgeführt:
+   - `FindPluginPrefixForRepositoryAsync(repo.Url, ct)` wird aufgerufen:
+     - Für jedes SCM-Plugin in `IPluginManager.GetSourceCodeManagementPlugins()`:
+       - Try: `plugin.GetAvailableRepositoriesAsync(ct)` wird aufgerufen
+       - Liste wird durchsucht: `.Any(r => r.Url == repo.Url)`
+       - Wenn gefunden: `plugin.PluginPrefix` wird zurückgegeben
+       - Catch: Plugin-Fehler wird geloggt, nächstes Plugin
+     - Falls kein Plugin gefunden: leerer String wird zurückgegeben
+   - `ProjektService.CreateAsync(repo.Name, null, ct)` wird aufgerufen → neues Projekt wird erstellt
+   - `ProjektService.AddRepositoryAsync(projekt.Id, pluginPrefix, repo.Url, repo.Name, ct)` wird aufgerufen → Repository wird zugeordnet
+   - `NeuesProjektHinzufuegen()` wird aufgerufen:
+     - `LadenAsync()` wird erneut ausgeführt (Projekte und Suggestions werden neugeladen)
+     - Neues Projekt erscheint in Projektkacheln
+     - Repository verschwindet aus Suggestions-Panel (weil es jetzt zugeordnet ist)
+
+**Fehlerbehandlung:**
+- Bei `OperationCanceledException`: Exception wird weitergeleitet
+- Bei Exception: `FehlerMeldung` wird gesetzt, Fehler wird geloggt
+
+### 13. Zurücknavigieren von Projektdetail (mit Suggestions-Update)
+
+**Auslöser:** Benutzer klickt „Zurück"-Button in `ProjectDetailViewModel` oder wählt neues Projekt.
+
+Beteiligte Komponenten:
+- `ProjectDetailViewModel.ZurueckCommand` — wird ausgelöst
+- `ProjectDetailViewModel.NavigateBackToProjectCallback` — wird aufgerufen
+- `ProjectListViewModel.KehreZuProjectZurueck` — wird aufgerufen
+- `ProjectListViewModel.LadenRepositorienSuggestionsAsync` — lädt Suggestions neu
+
+**Flow:**
+1. `ProjectDetailViewModel.ZurueckCommand` wird ausgelöst
+2. `NavigateBackToProjectCallback?.Invoke()` wird aufgerufen
+3. In `ProjectListViewModel.KehreZuProjectZurueck()`:
+   - `DetailViewModel = _currentProjectDetailViewModel` wird gesetzt → Detailansicht wird wieder angezeigt
+   - `LadenRepositorienSuggestionsAsync(CancellationToken.None)` wird aufgerufen → Suggestions werden aktualisiert (asynchron im Hintergrund)
+4. Repository-Liste wird neu geladen (wie in Schritt 11, Flow-Punkt 2)
+   - Repositories, die gerade zugeordnet wurden, verschwinden aus Panel
+   - Neue oder aktualisierte Repositories erscheinen
+
+**Fehlerbehandlung:**
+- Bei Exception in `LadenRepositorienSuggestionsAsync()`: Fehler wird geloggt, `UnassignedRepositories` wird nicht aktualisiert (alte Liste bleibt sichtbar)
+
 ## Diagramm
 
 ```mermaid

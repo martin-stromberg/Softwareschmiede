@@ -34,77 +34,144 @@
         <ScrollViewer Grid.Row="1"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding Projekte}"
-                          Margin="24">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="{DynamicResource SurfaceBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="12"
-                                Width="280"
-                                Height="180"
-                                Margin="0,0,16,16"
-                                Padding="20"
-                                Cursor="Hand"
-                                Focusable="True"
-                                KeyboardNavigation.IsTabStop="True">
-                            <Border.InputBindings>
-                                <MouseBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                             CommandParameter="{Binding}"
-                                             MouseAction="LeftClick" />
-                                <KeyBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            Key="Return" />
-                            </Border.InputBindings>
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
+            <StackPanel>
+                <!-- Projektkacheln -->
+                <ItemsControl ItemsSource="{Binding Projekte}"
+                              Margin="24,24,24,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Width="280"
+                                    Height="180"
+                                    Margin="0,0,16,16"
+                                    Padding="20"
+                                    Cursor="Hand"
+                                    Focusable="True"
+                                    KeyboardNavigation.IsTabStop="True">
+                                <Border.InputBindings>
+                                    <MouseBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                 CommandParameter="{Binding}"
+                                                 MouseAction="LeftClick" />
+                                    <KeyBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Key="Return" />
+                                </Border.InputBindings>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
 
-                                <!-- Projektsymbol -->
-                                <Border Grid.Row="0"
-                                        Background="{DynamicResource AccentBrush}"
-                                        Width="48"
-                                        Height="48"
-                                        CornerRadius="12"
-                                        Margin="0,0,0,12"
-                                        HorizontalAlignment="Left">
-                                    <TextBlock Text="📁"
-                                               FontSize="24"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center" />
-                                </Border>
+                                    <!-- Projektsymbol -->
+                                    <Border Grid.Row="0"
+                                            Background="{DynamicResource AccentBrush}"
+                                            Width="48"
+                                            Height="48"
+                                            CornerRadius="12"
+                                            Margin="0,0,0,12"
+                                            HorizontalAlignment="Left">
+                                        <TextBlock Text="📁"
+                                                   FontSize="24"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
 
-                                <!-- Projekttitel -->
-                                <TextBlock Grid.Row="1"
-                                           Text="{Binding Name}"
-                                           FontSize="18"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                           TextTrimming="CharacterEllipsis"
-                                           Margin="0,0,0,8" />
+                                    <!-- Projekttitel -->
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Name}"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,0,0,8" />
 
-                                <!-- Kurzbeschreibung -->
-                                <TextBlock Grid.Row="2"
-                                           Text="{Binding Beschreibung}"
-                                           Foreground="{DynamicResource SecondaryTextBrush}"
-                                           FontSize="13"
-                                           TextWrapping="Wrap"
-                                           TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Top" />
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                                    <!-- Kurzbeschreibung -->
+                                    <TextBlock Grid.Row="2"
+                                               Text="{Binding Beschreibung}"
+                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                               FontSize="13"
+                                               TextWrapping="Wrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Top" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Suggestions-Panel: Unzugeordnete Repositories -->
+                <Border Margin="24,16,24,24"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20">
+                    <StackPanel>
+                        <TextBlock Text="Unzugeordnete Repositories"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,12" />
+
+                        <!-- Lade-Indikator -->
+                        <TextBlock Text="Wird geladen..."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   FontSize="13"
+                                   Visibility="{Binding IsLoadingRepositories, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+
+                        <ItemsControl ItemsSource="{Binding UnassignedRepositories}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Vertical" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource BackgroundBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="8,10"
+                                            Cursor="Hand">
+                                        <Border.InputBindings>
+                                            <MouseBinding Command="{Binding DataContext.RepositoryDoubleclickCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                         CommandParameter="{Binding}"
+                                                         MouseAction="LeftDoubleClick" />
+                                        </Border.InputBindings>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding NameWithOwner}"
+                                                       FontSize="14"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding UpdatedAt, Converter={StaticResource UnassignedRepositoriesConverter}}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="16,0,0,0" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- Projektdetail (Vollbild-Overlay) -->

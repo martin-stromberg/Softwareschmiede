@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.ViewModels;
 
@@ -13,17 +15,22 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 {
     private readonly ProjektService _projektService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IPluginManager _pluginManager;
     private readonly ILogger<ProjectListViewModel> _logger;
     private readonly SemaphoreSlim _ladenSemaphore = new(1, 1);
 
     private Projekt? _selectedProjekt;
     private bool _isLoading;
+    private bool _isLoadingRepositories;
     private string? _fehlerMeldung;
     private ViewModelBase? _detailViewModel;
     private ProjectDetailViewModel? _currentProjectDetailViewModel;
 
     /// <summary>Liste aller Projekte.</summary>
     public ObservableCollection<Projekt> Projekte { get; } = new();
+
+    /// <summary>Liste der unzugeordneten Repositories aus allen SCM-Plugins.</summary>
+    public ObservableCollection<AvailableRepository> UnassignedRepositories { get; } = new();
 
     /// <summary>Das aktuell ausgewählte Projekt.</summary>
     public Projekt? SelectedProjekt
@@ -73,6 +80,13 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _isLoading, value);
     }
 
+    /// <summary>Gibt an, ob unzugeordnete Repositories geladen werden.</summary>
+    public bool IsLoadingRepositories
+    {
+        get => _isLoadingRepositories;
+        private set => SetProperty(ref _isLoadingRepositories, value);
+    }
+
     /// <summary>Fehlermeldung bei Ladefehlern.</summary>
     public string? FehlerMeldung
     {
@@ -95,6 +109,9 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     /// <summary>Wählt ein Projekt aus und zeigt die Details.</summary>
     public ICommand WaehleProjektCommand { get; }
 
+    /// <summary>Erstellt ein neues Projekt aus einem unzugeordneten Repository und ordnet das Repository zu.</summary>
+    public AsyncRelayCommand<AvailableRepository> RepositoryDoubleclickCommand { get; }
+
     /// <summary>Wird aufgerufen, wenn sich der Titel des Detailbereichs ändert (z. B. Projektname). Null bedeutet, kein Detailtitel aktiv.</summary>
     public Action<string?>? DetailTitelAenderungAction { get; set; }
 
@@ -102,10 +119,12 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     public ProjectListViewModel(
         ProjektService projektService,
         IServiceProvider serviceProvider,
+        IPluginManager pluginManager,
         ILogger<ProjectListViewModel> logger)
     {
         _projektService = projektService;
         _serviceProvider = serviceProvider;
+        _pluginManager = pluginManager;
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
@@ -121,6 +140,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
                 SelectedProjekt = projekt;
             }
         });
+        RepositoryDoubleclickCommand = new AsyncRelayCommand<AvailableRepository>(ProjektAusRepositoryErstellen);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -131,7 +151,11 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
             IsLoading = true;
             FehlerMeldung = null;
 
-            var projekte = await _projektService.GetAllAsync(ct);
+            var projektTask = _projektService.GetAllAsync(ct);
+            var suggestionsTask = LadenRepositorienSuggestionsAsync(ct);
+            await Task.WhenAll(projektTask, suggestionsTask);
+
+            var projekte = projektTask.Result;
             Projekte.Clear();
             foreach (var projekt in projekte)
                 Projekte.Add(projekt);
@@ -150,6 +174,76 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
             IsLoading = false;
             _ladenSemaphore.Release();
         }
+    }
+
+    private async Task LadenRepositorienSuggestionsAsync(CancellationToken ct)
+    {
+        IsLoadingRepositories = true;
+        try
+        {
+            var repos = await _projektService.GetUnassignedRepositoriesAsync(ct);
+            UnassignedRepositories.Clear();
+            foreach (var repo in repos)
+                UnassignedRepositories.Add(repo);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Laden der unzugeordneten Repositories.");
+        }
+        finally
+        {
+            IsLoadingRepositories = false;
+        }
+    }
+
+    private async Task ProjektAusRepositoryErstellen(AvailableRepository? repo, CancellationToken ct)
+    {
+        if (repo is null)
+            return;
+
+        try
+        {
+            var pluginPrefix = await FindPluginPrefixForRepositoryAsync(repo.Url, ct);
+            var projekt = await _projektService.CreateAsync(repo.Name, null, ct);
+            await _projektService.AddRepositoryAsync(projekt.Id, pluginPrefix, repo.Url, repo.Name, ct);
+            await NeuesProjektHinzufuegen();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen eines Projekts aus Repository '{RepositoryName}'.", repo.Name);
+            SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);
+        }
+    }
+
+    private async Task<string> FindPluginPrefixForRepositoryAsync(string repositoryUrl, CancellationToken ct)
+    {
+        foreach (var plugin in _pluginManager.GetSourceCodeManagementPlugins())
+        {
+            try
+            {
+                var repos = await plugin.GetAvailableRepositoriesAsync(ct);
+                if (repos.Any(r => string.Equals(r.Url, repositoryUrl, StringComparison.OrdinalIgnoreCase)))
+                    return plugin.PluginPrefix;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Plugin '{PluginName}' konnte beim Suchen des PluginPrefix nicht abgefragt werden.", plugin.PluginName);
+            }
+        }
+
+        return string.Empty;
     }
 
     private async Task ProjektArchivierenAsync(CancellationToken ct)
@@ -231,6 +325,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
     private void KehreZuProjectZurueck()
     {
         DetailViewModel = _currentProjectDetailViewModel;
+        _ = LadenRepositorienSuggestionsAsync(CancellationToken.None);
     }
 
     /// <inheritdoc/>
