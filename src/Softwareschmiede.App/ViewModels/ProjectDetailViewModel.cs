@@ -46,6 +46,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private AufgabenFilterTyp _aufgabenFilter = AufgabenFilterTyp.Alle;
     private bool _isFilterOverlayVisible;
     private bool _isLoadingIssues;
+    private bool _kannIssuesLaden;
     private bool _disposed;
     private Guid _aktuelleAufgabeId;
 
@@ -111,7 +112,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     public GitRepository? SelectedRepository
     {
         get => _selectedRepository;
-        set => SetProperty(ref _selectedRepository, value);
+        set
+        {
+            if (SetProperty(ref _selectedRepository, value))
+            {
+                AktualisiereKannIssuesLaden();
+            }
+        }
     }
 
     /// <summary>Aktueller Aufgabenfilter.</summary>
@@ -146,9 +153,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat.</summary>
-    public bool KannIssuesLaden => _selectedRepository != null
-        && _pluginManager.GetSourceCodeManagementPlugins()
-            .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+    public bool KannIssuesLaden
+    {
+        get => _kannIssuesLaden;
+        private set => SetProperty(ref _kannIssuesLaden, value);
+    }
 
     /// <summary>Erstellt eine Aufgabe aus einem Issue-Vorschlag.</summary>
     public AsyncRelayCommand<Issue> AufgabeAusIssueErstellenCommand { get; }
@@ -540,6 +549,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Issue #{IssueNummer}.", issue.Nummer);
             SetFehler(ex);
         }
+    }
+
+    private void AktualisiereKannIssuesLaden()
+    {
+        KannIssuesLaden = _selectedRepository != null
+            && _pluginManager.GetSourceCodeManagementPlugins()
+                .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginTyp, StringComparison.OrdinalIgnoreCase));
     }
 
     private void SetFehler(Exception ex) => SetFehler(ref _fehlerMeldung, nameof(FehlerMeldung), ex);

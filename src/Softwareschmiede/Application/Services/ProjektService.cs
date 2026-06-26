@@ -14,6 +14,7 @@ public sealed class ProjektService
     private const string LocalDirectoryPluginPrefix = "LocalDirectoryPlugin";
     private const string LegacyGitHubPluginType = "GitHub";
     private const string GitHubPluginPrefix = "Softwareschmiede.GitHub";
+    private const string BitbucketPluginPrefix = "Softwareschmiede.Bitbucket";
     private const string SourceDirectoryFieldKey = "SourceDirectory";
     private const string RepositoryUrlFieldKey = "RepositoryUrl";
     private const string RepositoryNameFieldKey = "RepositoryName";
@@ -339,6 +340,21 @@ public sealed class ProjektService
                 throw new InvalidOperationException("Für GitHub ist 'RepositoryName' ein Pflichtfeld.");
             }
         }
+
+        if (IsBitbucketPlugin(pluginType))
+        {
+            if (!fieldValues.TryGetValue(RepositoryUrlFieldKey, out var repositoryUrl)
+                || string.IsNullOrWhiteSpace(repositoryUrl))
+            {
+                throw new InvalidOperationException("Für Bitbucket ist 'RepositoryUrl' ein Pflichtfeld.");
+            }
+
+            if (!fieldValues.TryGetValue(RepositoryNameFieldKey, out var repositoryName)
+                || string.IsNullOrWhiteSpace(repositoryName))
+            {
+                throw new InvalidOperationException("Für Bitbucket ist 'RepositoryName' ein Pflichtfeld.");
+            }
+        }
     }
 
     private static string ResolveRepositoryUrl(string pluginType, IReadOnlyDictionary<string, string> fieldValues)
@@ -409,6 +425,9 @@ public sealed class ProjektService
     private static bool IsGitHubPlugin(string pluginType)
         => string.Equals(pluginType, LegacyGitHubPluginType, StringComparison.OrdinalIgnoreCase)
            || string.Equals(pluginType, GitHubPluginPrefix, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsBitbucketPlugin(string pluginType)
+        => string.Equals(pluginType, BitbucketPluginPrefix, StringComparison.OrdinalIgnoreCase);
 
     private sealed class NullPluginManager : IPluginManager
     {

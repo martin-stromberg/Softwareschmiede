@@ -190,7 +190,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         && !string.IsNullOrEmpty(_editTitel);
 
     /// <summary>CanExecute für LoeschenCommand: Status ∉ {Beendet, Archiviert} &amp;&amp; !IsCliRunning.</summary>
-    public bool KannLoeschen => _aufgabe?.Status is not (Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend)
+    public bool KannLoeschen => _aufgabe?.Status is not (Domain.Enums.AufgabeStatus.Beendet or Domain.Enums.AufgabeStatus.Archiviert)
         && _aufgabe != null
         && !_isCliRunning;
 
@@ -508,7 +508,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (_aufgabe == null)
             return;
 
-        var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins().OfType<IGitPlugin>().FirstOrDefault();
+        var pluginTyp = _aufgabe.GitRepository?.PluginTyp;
+        var gitPlugin = pluginTyp != null
+            ? _pluginManager.GetSourceCodeManagementPlugins()
+                .FirstOrDefault(p => string.Equals(p.PluginPrefix, pluginTyp, StringComparison.OrdinalIgnoreCase))
+            : _pluginManager.GetSourceCodeManagementPlugins().FirstOrDefault();
         if (gitPlugin == null)
             return;
 
