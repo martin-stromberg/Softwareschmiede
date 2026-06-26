@@ -147,8 +147,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat.</summary>
     public bool KannIssuesLaden => _selectedRepository != null
-        && _pluginManager.GetSourceCodeManagementPlugins() is { Count: > 0 } plugins
-        && plugins.Any(p => p is IGitPlugin);
+        && _pluginManager.GetSourceCodeManagementPlugins()
+            .Any(p => p.PluginPrefix == _selectedRepository.PluginTyp);
 
     /// <summary>Erstellt eine Aufgabe aus einem Issue-Vorschlag.</summary>
     public AsyncRelayCommand<Issue> AufgabeAusIssueErstellenCommand { get; }
@@ -373,7 +373,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             {
                 await _projektService.AddRepositoryAsync(
                     _projektId,
-                    scmPlugin.PluginType.ToString(),
+                    scmPlugin.PluginPrefix,
                     repo.Url,
                     repo.Name,
                     ct);
@@ -465,7 +465,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
 
         var scmPlugins = _pluginManager.GetSourceCodeManagementPlugins();
-        var gitPlugin = scmPlugins.OfType<IGitPlugin>().FirstOrDefault();
+        var gitPlugin = scmPlugins
+            .OfType<IGitPlugin>()
+            .FirstOrDefault(p => p.PluginPrefix == _selectedRepository.PluginTyp);
         if (gitPlugin == null)
             return;
 
