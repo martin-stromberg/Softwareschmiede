@@ -281,6 +281,8 @@
                                        Foreground="{DynamicResource SecondaryTextBrush}"
                                        Margin="0,0,0,8" />
                             <ComboBox SelectedValue="{Binding DefaultKiPlugin, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectedValuePath="PluginName"
+                                      AutomationProperties.Name="DefaultKiPlugin"
                                       ItemsSource="{Binding KiPlugins}"
                                       Margin="0,0,0,12"
                                       Padding="8,6"

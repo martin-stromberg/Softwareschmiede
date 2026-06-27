@@ -51,7 +51,8 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
                 FieldType: PluginSettingFieldType.Enum,
                 Description: "InSourceDirectory arbeitet direkt im Quellpfad. SeparateWorkingDirectory erstellt eine Arbeitskopie.",
                 IsRequired: true,
-                EnumOptions: [WorkspaceMode.InSourceDirectory.ToString(), WorkspaceMode.SeparateWorkingDirectory.ToString()]),
+                EnumOptions: [WorkspaceMode.InSourceDirectory.ToString(), WorkspaceMode.SeparateWorkingDirectory.ToString()],
+                DefaultValue: WorkspaceMode.SeparateWorkingDirectory.ToString()),
             new(
                 Key: SourceDirectoryKey,
                 Label: "SourceDirectory (optional)",

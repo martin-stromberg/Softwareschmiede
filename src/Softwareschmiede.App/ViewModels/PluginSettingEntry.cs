@@ -46,7 +46,7 @@ public sealed class PluginSettingEntry : ViewModelBase
     public PluginSettingEntry(PluginSettingField field, string? currentValue)
     {
         Field = field;
-        _value = currentValue ?? string.Empty;
+        _value = currentValue ?? field.DefaultValue ?? string.Empty;
         _boolValue = string.Equals(_value, "true", StringComparison.OrdinalIgnoreCase);
     }
 }
