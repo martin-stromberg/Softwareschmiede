@@ -42,6 +42,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _editTitel;
     private string? _editAnforderungsBeschreibung;
     private bool _disposed;
+    private string _cliStatusText = "CLI inaktiv";
+    private PseudoConsoleSession? _cliStatusSession;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -120,6 +122,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
         }
+    }
+
+    /// <summary>Aktueller Laufzeitstatus der CLI für die Fußzeile.</summary>
+    public string CliStatusText
+    {
+        get => _cliStatusText;
+        private set => SetProperty(ref _cliStatusText, value);
     }
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
@@ -318,6 +327,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
             IsCliRunning = _kiService.IsRunning(_aufgabeId);
+            AttachCliStatusSession(_kiService.GetPseudoConsoleSession(_aufgabeId));
 
             EditTitel = Aufgabe?.Titel;
             EditAnforderungsBeschreibung = Aufgabe?.AnforderungsBeschreibung;
@@ -592,7 +602,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             IsCliRunning = status == CliProcessStatus.Gestartet;
             if (status != CliProcessStatus.Gestartet)
+            {
+                AttachCliStatusSession(null);
+                CliStatusText = status == CliProcessStatus.Fehler
+                    ? "CLI-Status: Fehler"
+                    : "CLI inaktiv";
                 CliGestoppt?.Invoke();
+            }
         });
     }
 
@@ -604,6 +620,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _disposed = true;
 
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
+        AttachCliStatusSession(null);
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
         _ladenCts = null;
@@ -643,7 +660,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
             if (session != null)
+            {
+                AttachCliStatusSession(session);
                 PseudoConsoleSessionGestartet?.Invoke(session);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -744,7 +764,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             }
 
             if (handle.PseudoConsoleSession != null)
+            {
+                AttachCliStatusSession(handle.PseudoConsoleSession);
                 PseudoConsoleSessionGestartet?.Invoke(handle.PseudoConsoleSession);
+            }
         }
         catch
         {
@@ -771,5 +794,45 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, dialogResult.SelectedPluginPrefix, ct);
 
         return dialogResult.SelectedPluginPrefix;
+    }
+
+    private void AttachCliStatusSession(PseudoConsoleSession? session)
+    {
+        if (ReferenceEquals(_cliStatusSession, session))
+        {
+            UpdateCliStatusText(session?.RuntimeStatus ?? CliRuntimeStatus.Inaktiv);
+            return;
+        }
+
+        if (_cliStatusSession != null)
+            _cliStatusSession.RuntimeStatusChanged -= OnCliRuntimeStatusChanged;
+
+        _cliStatusSession = session;
+
+        if (_cliStatusSession != null)
+        {
+            _cliStatusSession.RuntimeStatusChanged += OnCliRuntimeStatusChanged;
+            UpdateCliStatusText(_cliStatusSession.RuntimeStatus);
+        }
+        else
+        {
+            UpdateCliStatusText(CliRuntimeStatus.Inaktiv);
+        }
+    }
+
+    private void OnCliRuntimeStatusChanged(object? sender, CliRuntimeStatusChangedEventArgs e)
+    {
+        _dispatcherInvoke(() => UpdateCliStatusText(e.Status));
+    }
+
+    private void UpdateCliStatusText(CliRuntimeStatus status)
+    {
+        CliStatusText = status switch
+        {
+            CliRuntimeStatus.Laeuft => "CLI-Status: Ausführung läuft",
+            CliRuntimeStatus.WartetAufEingabe => "CLI-Status: Wartet auf Eingabe",
+            CliRuntimeStatus.Inaktiv => "CLI inaktiv",
+            _ => "CLI-Status: unbekannt"
+        };
     }
 }

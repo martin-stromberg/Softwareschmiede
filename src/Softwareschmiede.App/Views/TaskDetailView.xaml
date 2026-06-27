@@ -314,7 +314,24 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="12,4">
-            <controls:StatusIndicatorControl Status="{Binding AufgabeStatus, Mode=OneWay}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <controls:StatusIndicatorControl Grid.Column="0"
+                                                 Status="{Binding AufgabeStatus, Mode=OneWay}" />
+
+                <TextBlock Grid.Column="2"
+                           Text="{Binding CliStatusText}"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           AutomationProperties.Name="CliStatusText"
+                           Visibility="{Binding ShowCliPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
+            </Grid>
         </Border>
     </Grid>
 </UserControl>
