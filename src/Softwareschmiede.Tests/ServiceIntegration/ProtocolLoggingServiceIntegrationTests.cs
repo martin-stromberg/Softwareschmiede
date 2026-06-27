@@ -15,6 +15,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
     private readonly ProjektService _projektService;
     private Guid _aufgabeId;
 
+    /// <summary>ProtocolLoggingServiceIntegrationTests.</summary>
     public ProtocolLoggingServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
@@ -23,6 +24,7 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private async Task SeedAufgabeAsync()
@@ -32,7 +34,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         _aufgabeId = aufgabe.Id;
     }
 
+    /// <summary><summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>.</summary>
     [Fact]
+    /// <summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>
     public async Task AddCliOutputAsync_StreichtAusgabeInProtokoll()
     {
         await SeedAufgabeAsync();
@@ -45,7 +49,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
         eintraege.All(e => e.Typ == ProtokollTyp.CliOutput).Should().BeTrue();
     }
 
+    /// <summary><summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>.</summary>
     [Fact]
+    /// <summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>
     public async Task AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert()
     {
         await SeedAufgabeAsync();
@@ -60,7 +66,9 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
             eintraege[i].Inhalt.Should().Be(zeilen[i]);
     }
 
+    /// <summary><summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>.</summary>
     [Fact]
+    /// <summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>
     public async Task AddStatusUebergangAsync_ErstelltEintragImProtokoll()
     {
         await SeedAufgabeAsync();

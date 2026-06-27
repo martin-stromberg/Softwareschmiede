@@ -17,6 +17,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>Softwareschmiede.App.App</StartupObject>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>    

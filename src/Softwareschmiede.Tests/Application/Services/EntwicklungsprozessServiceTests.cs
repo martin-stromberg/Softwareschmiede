@@ -25,6 +25,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     private readonly EntwicklungsprozessService _sut;
     private readonly Guid _projektId = new Guid("44444444-4444-4444-4444-444444444444");
 
+    /// <summary>EntwicklungsprozessServiceTests.</summary>
     public EntwicklungsprozessServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -64,6 +65,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _db.SaveChanges();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         _kiAusfuehrungsService.Dispose();
@@ -238,7 +240,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             && entry.Inhalt.Contains("Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden", StringComparison.Ordinal));
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference.</summary>
     public async Task ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference()
     {
         var issue = new Issue(321, "Issue Branch", "Body", ["enhancement"], null, "https://github.com/test/repo/issues/321");
@@ -321,7 +325,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath.</summary>
     public async Task ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath()
     {
         // Arrange
@@ -345,7 +351,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback.</summary>
     public async Task ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback()
     {
         // Arrange
@@ -369,7 +377,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault.</summary>
     public async Task ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault()
     {
         // Arrange
@@ -424,7 +434,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         updatedAufgabe.BranchName.Should().NotBe("MAIN");
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone.</summary>
     public async Task ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone()
     {
         // Arrange
@@ -456,7 +468,9 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous.</summary>
     public async Task ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous()
     {
         // Arrange

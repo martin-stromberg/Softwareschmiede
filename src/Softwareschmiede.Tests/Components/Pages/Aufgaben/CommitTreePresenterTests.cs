@@ -4,9 +4,12 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
+/// <summary>CommitTreePresenterTests.</summary>
 public sealed class CommitTreePresenterTests
 {
+    /// <summary><summary>ToggleCommitAsync_ShouldLoadChildrenOnce_WhenExpandedFirstTime.</summary>.</summary>
     [Fact]
+    /// <summary>ToggleCommitAsync_ShouldLoadChildrenOnce_WhenExpandedFirstTime.</summary>
     public async Task ToggleCommitAsync_ShouldLoadChildrenOnce_WhenExpandedFirstTime()
     {
         var presenter = new CommitTreePresenter();
@@ -31,7 +34,9 @@ public sealed class CommitTreePresenterTests
         commit.IsExpanded.Should().BeTrue();
     }
 
+    /// <summary><summary>RetryLoadCommitFilesAsync_ShouldSetErrorState_WhenLoaderFails.</summary>.</summary>
     [Fact]
+    /// <summary>RetryLoadCommitFilesAsync_ShouldSetErrorState_WhenLoaderFails.</summary>
     public async Task RetryLoadCommitFilesAsync_ShouldSetErrorState_WhenLoaderFails()
     {
         var presenter = new CommitTreePresenter();
@@ -44,14 +49,18 @@ public sealed class CommitTreePresenterTests
         commit.ErrorMessage.Should().Be("kaputt");
     }
 
+    /// <summary><summary>RequiresCommitPreview_ShouldReturnTrue_ForCommitNodes.</summary>.</summary>
     [Fact]
+    /// <summary>RequiresCommitPreview_ShouldReturnTrue_ForCommitNodes.</summary>
     public void RequiresCommitPreview_ShouldReturnTrue_ForCommitNodes()
     {
         CommitTreePresenter.RequiresCommitPreview(new WorkspaceFileNode { RelativePath = "a.cs", CommitSha = "abc" }).Should().BeTrue();
         CommitTreePresenter.RequiresCommitPreview(new WorkspaceFileNode { RelativePath = "a.cs" }).Should().BeFalse();
     }
 
+    /// <summary><summary>GetVisibleCommitRows_ShouldFlattenExpandedCommitTree.</summary>.</summary>
     [Fact]
+    /// <summary>GetVisibleCommitRows_ShouldFlattenExpandedCommitTree.</summary>
     public void GetVisibleCommitRows_ShouldFlattenExpandedCommitTree()
     {
         var presenter = new CommitTreePresenter();
@@ -87,7 +96,9 @@ public sealed class CommitTreePresenterTests
         rows[1].Depth.Should().Be(2);
     }
 
+    /// <summary><summary>GetVisibleCommitRows_ShouldReturnEmpty_WhenCommitIsNotExpanded.</summary>.</summary>
     [Fact]
+    /// <summary>GetVisibleCommitRows_ShouldReturnEmpty_WhenCommitIsNotExpanded.</summary>
     public void GetVisibleCommitRows_ShouldReturnEmpty_WhenCommitIsNotExpanded()
     {
         var presenter = new CommitTreePresenter();

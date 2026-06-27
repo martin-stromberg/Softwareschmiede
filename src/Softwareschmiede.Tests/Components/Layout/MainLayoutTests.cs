@@ -13,9 +13,12 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Tests.Components.Layout;
 
+/// <summary>MainLayoutTests.</summary>
 public sealed class MainLayoutTests
 {
+    /// <summary><summary>MainLayoutMarkup_ShouldContainRunningCountAndAutoShutdownToggle.</summary>.</summary>
     [Fact]
+    /// <summary>MainLayoutMarkup_ShouldContainRunningCountAndAutoShutdownToggle.</summary>
     public void MainLayoutMarkup_ShouldContainRunningCountAndAutoShutdownToggle()
     {
         var root = FindRepositoryRoot();
@@ -28,7 +31,9 @@ public sealed class MainLayoutTests
         markup.Should().Contain("@onchange=\"AutoShutdownChanged\"");
     }
 
+    /// <summary><summary>OnInitialized_ShouldLoadRunningCount_SubscribeAndDisableAutoShutdown.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitialized_ShouldLoadRunningCount_SubscribeAndDisableAutoShutdown.</summary>
     public void OnInitialized_ShouldLoadRunningCount_SubscribeAndDisableAutoShutdown()
     {
         var runningSource = new FakeRunningAutomationStatusSource { RunningCount = 3 };
@@ -43,7 +48,9 @@ public sealed class MainLayoutTests
         orchestrator.SetEnabledCalls.Should().ContainSingle().Which.Should().BeFalse();
     }
 
+    /// <summary><summary>AutoShutdownChanged_ShouldParseBoolValue.</summary>.</summary>
     [Fact]
+    /// <summary>AutoShutdownChanged_ShouldParseBoolValue.</summary>
     public void AutoShutdownChanged_ShouldParseBoolValue()
     {
         using var harness = CreateHarness(new FakeRunningAutomationStatusSource(), new FakeAutoShutdownOrchestrator());
@@ -56,7 +63,9 @@ public sealed class MainLayoutTests
         orchestrator.SetEnabledCalls.Should().ContainSingle().Which.Should().BeTrue();
     }
 
+    /// <summary><summary>AutoShutdownChanged_ShouldParseStringBoolValue.</summary>.</summary>
     [Fact]
+    /// <summary>AutoShutdownChanged_ShouldParseStringBoolValue.</summary>
     public void AutoShutdownChanged_ShouldParseStringBoolValue()
     {
         using var harness = CreateHarness(new FakeRunningAutomationStatusSource(), new FakeAutoShutdownOrchestrator());
@@ -69,7 +78,9 @@ public sealed class MainLayoutTests
         orchestrator.SetEnabledCalls.Should().ContainSingle().Which.Should().BeTrue();
     }
 
+    /// <summary><summary>AutoShutdownChanged_ShouldFallbackToFalse_OnInvalidValue.</summary>.</summary>
     [Fact]
+    /// <summary>AutoShutdownChanged_ShouldFallbackToFalse_OnInvalidValue.</summary>
     public void AutoShutdownChanged_ShouldFallbackToFalse_OnInvalidValue()
     {
         using var harness = CreateHarness(new FakeRunningAutomationStatusSource(), new FakeAutoShutdownOrchestrator());
@@ -82,7 +93,9 @@ public sealed class MainLayoutTests
         orchestrator.SetEnabledCalls.Should().ContainSingle().Which.Should().BeFalse();
     }
 
+    /// <summary><summary>Dispose_ShouldUnsubscribeFromRunningCountChanged.</summary>.</summary>
     [Fact]
+    /// <summary>Dispose_ShouldUnsubscribeFromRunningCountChanged.</summary>
     public void Dispose_ShouldUnsubscribeFromRunningCountChanged()
     {
         using var harness = CreateHarness();
@@ -95,11 +108,17 @@ public sealed class MainLayoutTests
         runningSource.SubscriberCount.Should().Be(0);
     }
 
+    /// <summary><summary>VerarbeiteToastAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteToastAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteToastAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteToastAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteToastAsync_ShouldHonorModeMatrix.</summary>.</summary>
     [Theory]
     [InlineData(BenachrichtigungsModus.Deaktiviert, false, BenachrichtigungsEntscheidung.Unterdrueckt, "KanalDeaktiviert", 0)]
     [InlineData(BenachrichtigungsModus.Banner, false, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
     [InlineData(BenachrichtigungsModus.Banner, true, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
     [InlineData(BenachrichtigungsModus.Ton, false, BenachrichtigungsEntscheidung.Gesendet, "ToastAngezeigt", 1)]
+    /// <summary>VerarbeiteToastAsync_ShouldHonorModeMatrix.</summary>
     public async Task VerarbeiteToastAsync_ShouldHonorModeMatrix(
         BenachrichtigungsModus modus,
         bool istAufgabenseite,
@@ -129,11 +148,17 @@ public sealed class MainLayoutTests
         audit.Modus.Should().Be(modus);
     }
 
+    /// <summary><summary>VerarbeiteTonAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteTonAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteTonAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteTonAsync_ShouldHonorModeMatrix.</summary>.</summary>
+    /// <summary><summary>VerarbeiteTonAsync_ShouldHonorModeMatrix.</summary>.</summary>
     [Theory]
     [InlineData(BenachrichtigungsModus.Deaktiviert, false, BenachrichtigungsEntscheidung.Unterdrueckt, "KanalDeaktiviert", 0)]
     [InlineData(BenachrichtigungsModus.Banner, false, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
     [InlineData(BenachrichtigungsModus.Banner, true, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
     [InlineData(BenachrichtigungsModus.Ton, false, BenachrichtigungsEntscheidung.Gesendet, "StandardtonFallback", 1)]
+    /// <summary>VerarbeiteTonAsync_ShouldHonorModeMatrix.</summary>
     public async Task VerarbeiteTonAsync_ShouldHonorModeMatrix(
         BenachrichtigungsModus modus,
         bool istAufgabenseite,
@@ -163,7 +188,9 @@ public sealed class MainLayoutTests
         audit.Modus.Should().Be(modus);
     }
 
+    /// <summary><summary>VerarbeiteTonAsync_ShouldUseUserAudio_WhenAvailable.</summary>.</summary>
     [Fact]
+    /// <summary>VerarbeiteTonAsync_ShouldUseUserAudio_WhenAvailable.</summary>
     public async Task VerarbeiteTonAsync_ShouldUseUserAudio_WhenAvailable()
     {
         using var harness = CreateHarness();
@@ -191,7 +218,9 @@ public sealed class MainLayoutTests
         audit.Grund.Should().Be("BenutzerdefinierterTon");
     }
 
+    /// <summary><summary>VerarbeiteTonAsync_ShouldUseDefaultAudioFallback_WhenNoUserAudioExists.</summary>.</summary>
     [Fact]
+    /// <summary>VerarbeiteTonAsync_ShouldUseDefaultAudioFallback_WhenNoUserAudioExists.</summary>
     public async Task VerarbeiteTonAsync_ShouldUseDefaultAudioFallback_WhenNoUserAudioExists()
     {
         using var harness = CreateHarness();
@@ -215,7 +244,9 @@ public sealed class MainLayoutTests
         audit.Grund.Should().Be("StandardtonFallback");
     }
 
+    /// <summary><summary>VerarbeiteTonAsync_ShouldCreateWarningToastAndAudit_WhenDeferred.</summary>.</summary>
     [Fact]
+    /// <summary>VerarbeiteTonAsync_ShouldCreateWarningToastAndAudit_WhenDeferred.</summary>
     public async Task VerarbeiteTonAsync_ShouldCreateWarningToastAndAudit_WhenDeferred()
     {
         using var harness = CreateHarness();
@@ -240,7 +271,9 @@ public sealed class MainLayoutTests
         audit.Grund.Should().Be("AutoplayBlockiert");
     }
 
+    /// <summary><summary>VerarbeiteTonAsync_ShouldCreateErrorToastAndAudit_WhenFailed.</summary>.</summary>
     [Fact]
+    /// <summary>VerarbeiteTonAsync_ShouldCreateErrorToastAndAudit_WhenFailed.</summary>
     public async Task VerarbeiteTonAsync_ShouldCreateErrorToastAndAudit_WhenFailed()
     {
         using var harness = CreateHarness();
@@ -265,7 +298,9 @@ public sealed class MainLayoutTests
         audit.Grund.Should().Be("AudioPlaybackFehler");
     }
 
+    /// <summary><summary>VerarbeiteTonAsync_ShouldCreateErrorToastAndAudit_WhenJsInteropThrows.</summary>.</summary>
     [Fact]
+    /// <summary>VerarbeiteTonAsync_ShouldCreateErrorToastAndAudit_WhenJsInteropThrows.</summary>
     public async Task VerarbeiteTonAsync_ShouldCreateErrorToastAndAudit_WhenJsInteropThrows()
     {
         using var harness = CreateHarness();
@@ -289,7 +324,9 @@ public sealed class MainLayoutTests
         audit.Grund.Should().Be("JsInteropFehler");
     }
 
+    /// <summary><summary>VerarbeiteBenachrichtigungen_ShouldDeduplicateByEreignisId_PerChannel.</summary>.</summary>
     [Fact]
+    /// <summary>VerarbeiteBenachrichtigungen_ShouldDeduplicateByEreignisId_PerChannel.</summary>
     public async Task VerarbeiteBenachrichtigungen_ShouldDeduplicateByEreignisId_PerChannel()
     {
         using var harness = CreateHarness();
@@ -427,8 +464,10 @@ public sealed class MainLayoutTests
 
         public int SubscriberCount => RunningCountChanged?.GetInvocationList().Length ?? 0;
 
+        /// <summary>GetRunningCount.</summary>
         public int GetRunningCount() => RunningCount;
 
+        /// <summary>IsRunning.</summary>
         public bool IsRunning(Guid aufgabeId) => RunningCount > 0;
     }
 
@@ -436,16 +475,19 @@ public sealed class MainLayoutTests
     {
         public List<bool> SetEnabledCalls { get; } = [];
 
+        /// <summary>SetEnabled.</summary>
         public void SetEnabled(bool enabled) => SetEnabledCalls.Add(enabled);
     }
 
     private sealed class FakeBenutzerkontextService : IBenutzerkontextService
     {
+        /// <summary>GetBenutzerId.</summary>
         public string GetBenutzerId() => "test-user";
     }
 
     private sealed class FakeNavigationManager : NavigationManager
     {
+        /// <summary>FakeNavigationManager.</summary>
         public FakeNavigationManager()
         {
             Initialize("http://localhost/", "http://localhost/");
@@ -463,6 +505,7 @@ public sealed class MainLayoutTests
         public Exception? Exception { get; set; }
         public List<JsCall> Invocations { get; } = [];
 
+        /// <summary>ValueTask.</summary>
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
         {
             Invocations.Add(new JsCall(identifier, args ?? []));
@@ -475,6 +518,7 @@ public sealed class MainLayoutTests
             return new ValueTask<TValue>((TValue?)value!);
         }
 
+        /// <summary>ValueTask.</summary>
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
         {
             return InvokeAsync<TValue>(identifier, args);
@@ -483,6 +527,7 @@ public sealed class MainLayoutTests
 
     private sealed class TestMainLayout : MainLayout
     {
+        /// <summary>InvokeOnInitialized.</summary>
         public void InvokeOnInitialized() => OnInitialized();
     }
 
@@ -527,6 +572,7 @@ public sealed class MainLayoutTests
 
     private sealed class MainLayoutHarness : IDisposable
     {
+        /// <summary>MainLayoutHarness.</summary>
         public MainLayoutHarness(
             SoftwareschmiededDbContext db,
             TestMainLayout sut,
@@ -553,6 +599,7 @@ public sealed class MainLayoutTests
         public FakeJsRuntime JsRuntime { get; }
         public string BenutzerId { get; }
 
+        /// <summary>Dispose.</summary>
         public void Dispose()
         {
             Sut.Dispose();

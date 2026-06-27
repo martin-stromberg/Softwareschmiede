@@ -19,6 +19,7 @@ using DomainDiffLine = Softwareschmiede.Domain.Entities.DiffLine;
 
 namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
+/// <summary>AufgabeDetailWorkspacePreviewBunitTests.</summary>
 public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
 {
     /// <summary>
@@ -48,7 +49,9 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         }, timeout: TimeSpan.FromSeconds(3));
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldShowPreviewErrorHint_WhenLoadPreviewThrows.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldShowPreviewErrorHint_WhenLoadPreviewThrows.</summary>
     public async Task AufgabeDetail_ShouldShowPreviewErrorHint_WhenLoadPreviewThrows()
     {
         await using var harness = await ConfigureComponentServicesAsync(loadPreviewShouldThrow: true);
@@ -69,7 +72,9 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         });
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldRenderLazyLoadErrorAndRetry_ForBranchCommitNode.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldRenderLazyLoadErrorAndRetry_ForBranchCommitNode.</summary>
     public async Task AufgabeDetail_ShouldRenderLazyLoadErrorAndRetry_ForBranchCommitNode()
     {
         await using var harness = await ConfigureComponentServicesAsync(
@@ -92,7 +97,9 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         });
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldRecoverAfterRetry_WhenCommitFileLoadFailsOnce.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldRecoverAfterRetry_WhenCommitFileLoadFailsOnce.</summary>
     public async Task AufgabeDetail_ShouldRecoverAfterRetry_WhenCommitFileLoadFailsOnce()
     {
         await using var harness = await ConfigureComponentServicesAsync(
@@ -125,7 +132,9 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
         });
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldUseCommitPreview_WhenCommitFileIsSelected.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldUseCommitPreview_WhenCommitFileIsSelected.</summary>
     public async Task AufgabeDetail_ShouldUseCommitPreview_WhenCommitFileIsSelected()
     {
         await using var harness = await ConfigureComponentServicesAsync(
@@ -613,6 +622,7 @@ public sealed class AufgabeDetailWorkspacePreviewBunitTests : TestContext
     {
         public Guid AufgabeId { get; } = aufgabeId;
 
+        /// <summary>DisposeAsync.</summary>
         public ValueTask DisposeAsync()
         {
             memoryCache.Dispose();

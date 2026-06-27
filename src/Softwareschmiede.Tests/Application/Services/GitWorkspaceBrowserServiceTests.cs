@@ -200,7 +200,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.CommitCount.Should().Be(0);
     }
 
+    /// <summary><summary>LoadSnapshotAsync_ShouldUseFallbackBaseBranch_WhenOriginHeadCannotBeResolved.</summary>.</summary>
     [Fact]
+    /// <summary>LoadSnapshotAsync_ShouldUseFallbackBaseBranch_WhenOriginHeadCannotBeResolved.</summary>
     public async Task LoadSnapshotAsync_ShouldUseFallbackBaseBranch_WhenOriginHeadCannotBeResolved()
     {
         var repositoryPath = CreateTempDirectory();
@@ -219,7 +221,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].ShortSha.Should().Be("aaaaaaa");
     }
 
+    /// <summary><summary>LoadSnapshotAsync_ShouldHandleAmbiguousRemoteHeadOutput_ByUsingFirstValidReference.</summary>.</summary>
     [Fact]
+    /// <summary>LoadSnapshotAsync_ShouldHandleAmbiguousRemoteHeadOutput_ByUsingFirstValidReference.</summary>
     public async Task LoadSnapshotAsync_ShouldHandleAmbiguousRemoteHeadOutput_ByUsingFirstValidReference()
     {
         var repositoryPath = CreateTempDirectory();
@@ -238,7 +242,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].Sha.Should().Be("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     }
 
+    /// <summary><summary>LoadSnapshotAsync_ShouldNormalizeRemoteHeadArrowReference.</summary>.</summary>
     [Fact]
+    /// <summary>LoadSnapshotAsync_ShouldNormalizeRemoteHeadArrowReference.</summary>
     public async Task LoadSnapshotAsync_ShouldNormalizeRemoteHeadArrowReference()
     {
         var repositoryPath = CreateTempDirectory();
@@ -257,7 +263,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].Sha.Should().Be("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     }
 
+    /// <summary><summary>LoadSnapshotAsync_ShouldFallbackToKnownReference_WhenRemoteHeadOutputIsWhitespace.</summary>.</summary>
     [Fact]
+    /// <summary>LoadSnapshotAsync_ShouldFallbackToKnownReference_WhenRemoteHeadOutputIsWhitespace.</summary>
     public async Task LoadSnapshotAsync_ShouldFallbackToKnownReference_WhenRemoteHeadOutputIsWhitespace()
     {
         var repositoryPath = CreateTempDirectory();
@@ -276,7 +284,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].ShortSha.Should().Be("ccccccc");
     }
 
+    /// <summary><summary>LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected.</summary>.</summary>
     [Fact]
+    /// <summary>LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected.</summary>
     public async Task LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected()
     {
         var repositoryPath = CreateTempDirectory();
@@ -292,7 +302,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits.Should().BeEmpty();
     }
 
+    /// <summary><summary>LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha.</summary>.</summary>
     [Fact]
+    /// <summary>LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha.</summary>
     public async Task LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha()
     {
         var repositoryPath = CreateTempDirectory();
@@ -307,7 +319,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         fileNode!.CommitSha.Should().Be(commitSha);
     }
 
+    /// <summary><summary>LoadCommitFilesAsync_ShouldIgnoreIncompleteRenameTokens_AndKeepValidEntries.</summary>.</summary>
     [Fact]
+    /// <summary>LoadCommitFilesAsync_ShouldIgnoreIncompleteRenameTokens_AndKeepValidEntries.</summary>
     public async Task LoadCommitFilesAsync_ShouldIgnoreIncompleteRenameTokens_AndKeepValidEntries()
     {
         var repositoryPath = CreateTempDirectory();
@@ -325,7 +339,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         FindNode(files, Path.Combine("src", "Old.cs")).Should().BeNull();
     }
 
+    /// <summary><summary>LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions.</summary>.</summary>
     [Fact]
+    /// <summary>LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions.</summary>
     public async Task LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions()
     {
         var repositoryPath = CreateTempDirectory();
@@ -350,7 +366,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         preview.OriginalContent.Should().Be("old-content");
     }
 
+    /// <summary><summary>LoadCommitPreviewAsync_ShouldReturnHint_WhenNodeIsDirectory.</summary>.</summary>
     [Fact]
+    /// <summary>LoadCommitPreviewAsync_ShouldReturnHint_WhenNodeIsDirectory.</summary>
     public async Task LoadCommitPreviewAsync_ShouldReturnHint_WhenNodeIsDirectory()
     {
         var repositoryPath = CreateTempDirectory();
@@ -369,7 +387,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         preview.OriginalContent.Should().BeNull();
     }
 
+    /// <summary><summary>LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter.</summary>.</summary>
     [Fact]
+    /// <summary>LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter.</summary>
     public async Task LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter()
     {
         var repositoryPath = CreateTempDirectory();
@@ -396,7 +416,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         preview.OriginalContent.Should().BeNull();
     }
 
+    /// <summary><summary>LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded.</summary>.</summary>
     [Fact]
+    /// <summary>LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded.</summary>
     public async Task LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded()
     {
         var repositoryPath = CreateTempDirectory();

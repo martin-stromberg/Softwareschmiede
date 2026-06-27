@@ -1,0 +1,282 @@
+using System.Drawing;
+
+namespace Softwareschmiede.Domain.Terminal;
+
+/// <summary>Zustandsbehafteter Terminal-Buffer: verwaltet ein 2D-Grid aus <see cref="TerminalCell"/>-Werten,
+/// Cursor-Position, SGR-Attribut-Zustand und einen Scrollback-Ringpuffer.</summary>
+public sealed class TerminalBuffer
+{
+    private readonly object _lock = new();
+    private TerminalCell[,] _grid;
+    private int _cols;
+    private int _rows;
+    private int _cursorRow;
+    private int _cursorCol;
+    private readonly Queue<TerminalCell[]> _scrollback = new();
+    private const int MaxScrollbackLines = 1000;
+
+    private Color _currentForeground = Color.FromArgb(229, 229, 229);
+    private Color _currentBackground = Color.Black;
+    private bool _currentBold;
+    private bool _currentDim;
+    private bool _currentUnderline;
+
+    /// <summary>Erstellt einen neuen Terminal-Buffer mit der angegebenen Größe.</summary>
+    /// <param name="cols">Spaltenanzahl.</param>
+    /// <param name="rows">Zeilenanzahl.</param>
+    public TerminalBuffer(int cols, int rows)
+    {
+        _cols = Math.Max(1, cols);
+        _rows = Math.Max(1, rows);
+        _grid = new TerminalCell[_rows, _cols];
+        FillGrid(_grid, _rows, _cols);
+    }
+
+    /// <summary>Aktuelle Zeilenanzahl des Buffers.</summary>
+    public int Rows
+    {
+        get { lock (_lock) return _rows; }
+    }
+
+    /// <summary>Aktuelle Spaltenanzahl des Buffers.</summary>
+    public int Cols
+    {
+        get { lock (_lock) return _cols; }
+    }
+
+    /// <summary>Aktuelle Cursor-Zeile (0-basiert).</summary>
+    public int CursorRow
+    {
+        get { lock (_lock) return _cursorRow; }
+    }
+
+    /// <summary>Aktuelle Cursor-Spalte (0-basiert).</summary>
+    public int CursorCol
+    {
+        get { lock (_lock) return _cursorCol; }
+    }
+
+    /// <summary>Wendet ein Terminal-Ereignis auf den Buffer an.</summary>
+    /// <param name="evt">Das anzuwendende Ereignis.</param>
+    public void Apply(TerminalEvent evt)
+    {
+        lock (_lock)
+        {
+            switch (evt)
+            {
+                case TextWrittenEvent e:
+                    ApplyText(e.Text);
+                    break;
+                case CursorMovedEvent e:
+                    if (e.IsAbsolute)
+                    {
+                        _cursorRow = Clamp(e.Row, 0, _rows - 1);
+                        _cursorCol = Clamp(e.Col, 0, _cols - 1);
+                    }
+                    else
+                    {
+                        _cursorRow = Clamp(_cursorRow + e.Row, 0, _rows - 1);
+                        _cursorCol = Clamp(_cursorCol + e.Col, 0, _cols - 1);
+                    }
+                    break;
+                case CursorMovedRelativeEvent e:
+                    _cursorRow = Clamp(_cursorRow + e.DeltaRow, 0, _rows - 1);
+                    _cursorCol = Clamp(_cursorCol + e.DeltaCol, 0, _cols - 1);
+                    break;
+                case ColorChangedEvent e:
+                    ApplyColor(e);
+                    break;
+                case ScreenClearedEvent e:
+                    ApplyClearScreen(e.Mode);
+                    break;
+                case LineErasedEvent e:
+                    ApplyEraseLine(e.Mode);
+                    break;
+                case CursorVisibilityChangedEvent:
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Passt die Buffer-Größe an und erhält den sichtbaren Inhalt soweit möglich.</summary>
+    /// <param name="cols">Neue Spaltenanzahl.</param>
+    /// <param name="rows">Neue Zeilenanzahl.</param>
+    public void Resize(int cols, int rows)
+    {
+        lock (_lock)
+        {
+            cols = Math.Max(1, cols);
+            rows = Math.Max(1, rows);
+
+            var newGrid = new TerminalCell[rows, cols];
+            FillGrid(newGrid, rows, cols);
+
+            var copyRows = Math.Min(_rows, rows);
+            var copyCols = Math.Min(_cols, cols);
+            for (var r = 0; r < copyRows; r++)
+                for (var c = 0; c < copyCols; c++)
+                    newGrid[r, c] = _grid[r, c];
+
+            _grid = newGrid;
+            _cols = cols;
+            _rows = rows;
+            _cursorRow = Clamp(_cursorRow, 0, _rows - 1);
+            _cursorCol = Clamp(_cursorCol, 0, _cols - 1);
+        }
+    }
+
+    /// <summary>Gibt eine Kopie der Zellen einer Zeile zurück.</summary>
+    /// <param name="rowIndex">Zeilenindex (0-basiert).</param>
+    /// <returns>Ein Array der Zellen in der angegebenen Zeile.</returns>
+    public TerminalCell[] GetRow(int rowIndex)
+    {
+        lock (_lock)
+        {
+            if (rowIndex < 0 || rowIndex >= _rows)
+                return Array.Empty<TerminalCell>();
+
+            var result = new TerminalCell[_cols];
+            for (var c = 0; c < _cols; c++)
+                result[c] = _grid[rowIndex, c];
+            return result;
+        }
+    }
+
+    private void ApplyText(string text)
+    {
+        foreach (var ch in text)
+        {
+            switch (ch)
+            {
+                case '\r':
+                    _cursorCol = 0;
+                    break;
+                case '\n':
+                    AdvanceLine();
+                    break;
+                case '\x08':
+                    if (_cursorCol > 0) _cursorCol--;
+                    break;
+                default:
+                    if (_cursorCol >= _cols)
+                    {
+                        _cursorCol = 0;
+                        AdvanceLine();
+                    }
+                    _grid[_cursorRow, _cursorCol] = new TerminalCell
+                    {
+                        Character = ch,
+                        Foreground = _currentForeground,
+                        Background = _currentBackground,
+                        Bold = _currentBold,
+                        Dim = _currentDim,
+                        Underline = _currentUnderline,
+                    };
+                    _cursorCol++;
+                    break;
+            }
+        }
+    }
+
+    private void AdvanceLine()
+    {
+        _cursorRow++;
+        if (_cursorRow >= _rows)
+        {
+            ScrollUp();
+            _cursorRow = _rows - 1;
+        }
+    }
+
+    private void ScrollUp()
+    {
+        var topRow = new TerminalCell[_cols];
+        for (var c = 0; c < _cols; c++)
+            topRow[c] = _grid[0, c];
+
+        if (_scrollback.Count >= MaxScrollbackLines)
+            _scrollback.Dequeue();
+        _scrollback.Enqueue(topRow);
+
+        for (var r = 0; r < _rows - 1; r++)
+            for (var c = 0; c < _cols; c++)
+                _grid[r, c] = _grid[r + 1, c];
+
+        for (var c = 0; c < _cols; c++)
+            _grid[_rows - 1, c] = TerminalCell.Default;
+    }
+
+    private void ApplyColor(ColorChangedEvent e)
+    {
+        if (e.Reset)
+        {
+            _currentForeground = TerminalCell.Default.Foreground;
+            _currentBackground = TerminalCell.Default.Background;
+            _currentBold = false;
+            _currentDim = false;
+            _currentUnderline = false;
+            return;
+        }
+
+        if (e.Foreground.HasValue) _currentForeground = e.Foreground.Value;
+        if (e.Background.HasValue) _currentBackground = e.Background.Value;
+        if (e.Bold.HasValue) _currentBold = e.Bold.Value;
+        if (e.Dim.HasValue) _currentDim = e.Dim.Value;
+        if (e.Underline.HasValue) _currentUnderline = e.Underline.Value;
+    }
+
+    private void ApplyClearScreen(int mode)
+    {
+        switch (mode)
+        {
+            case 0:
+                for (var c = _cursorCol; c < _cols; c++)
+                    _grid[_cursorRow, c] = TerminalCell.Default;
+                for (var r = _cursorRow + 1; r < _rows; r++)
+                    for (var c = 0; c < _cols; c++)
+                        _grid[r, c] = TerminalCell.Default;
+                break;
+            case 1:
+                for (var r = 0; r < _cursorRow; r++)
+                    for (var c = 0; c < _cols; c++)
+                        _grid[r, c] = TerminalCell.Default;
+                for (var c = 0; c <= _cursorCol; c++)
+                    _grid[_cursorRow, c] = TerminalCell.Default;
+                break;
+            default:
+                FillGrid(_grid, _rows, _cols);
+                _cursorRow = 0;
+                _cursorCol = 0;
+                break;
+        }
+    }
+
+    private void ApplyEraseLine(int mode)
+    {
+        switch (mode)
+        {
+            case 0:
+                for (var c = _cursorCol; c < _cols; c++)
+                    _grid[_cursorRow, c] = TerminalCell.Default;
+                break;
+            case 1:
+                for (var c = 0; c <= _cursorCol; c++)
+                    _grid[_cursorRow, c] = TerminalCell.Default;
+                break;
+            default:
+                for (var c = 0; c < _cols; c++)
+                    _grid[_cursorRow, c] = TerminalCell.Default;
+                break;
+        }
+    }
+
+    private static void FillGrid(TerminalCell[,] grid, int rows, int cols)
+    {
+        for (var r = 0; r < rows; r++)
+            for (var c = 0; c < cols; c++)
+                grid[r, c] = TerminalCell.Default;
+    }
+
+    private static int Clamp(int value, int min, int max)
+        => value < min ? min : value > max ? max : value;
+}

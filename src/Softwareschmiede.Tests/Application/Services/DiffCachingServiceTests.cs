@@ -8,12 +8,14 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
+/// <summary>DiffCachingServiceTests.</summary>
 public sealed class DiffCachingServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly IMemoryCache _memoryCache;
     private readonly DiffCachingService _sut;
 
+    /// <summary>DiffCachingServiceTests.</summary>
     public DiffCachingServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -21,7 +23,9 @@ public sealed class DiffCachingServiceTests : IDisposable
         _sut = new DiffCachingService(_db, _memoryCache, NullLogger<DiffCachingService>.Instance);
     }
 
+    /// <summary><summary>SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache.</summary>.</summary>
     [Fact]
+    /// <summary>SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache.</summary>
     public async Task SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache()
     {
         // Arrange
@@ -37,7 +41,9 @@ public sealed class DiffCachingServiceTests : IDisposable
         loaded.FilePath.Should().Be(seeded.FilePath);
     }
 
+    /// <summary><summary>GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired.</summary>.</summary>
     [Fact]
+    /// <summary>GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired.</summary>
     public async Task GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired()
     {
         // Arrange
@@ -62,7 +68,9 @@ public sealed class DiffCachingServiceTests : IDisposable
         loaded.Should().BeNull();
     }
 
+    /// <summary><summary>InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache.</summary>.</summary>
     [Fact]
+    /// <summary>InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache.</summary>
     public async Task InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache()
     {
         // Arrange
@@ -79,7 +87,9 @@ public sealed class DiffCachingServiceTests : IDisposable
         loaded.Should().BeNull();
     }
 
+    /// <summary><summary>CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries.</summary>.</summary>
     [Fact]
+    /// <summary>CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries.</summary>
     public async Task CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries()
     {
         // Arrange
@@ -117,6 +127,7 @@ public sealed class DiffCachingServiceTests : IDisposable
         _db.DiffCaches.Should().ContainSingle(dc => dc.CacheKey == "active-cleanup");
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         _memoryCache.Dispose();

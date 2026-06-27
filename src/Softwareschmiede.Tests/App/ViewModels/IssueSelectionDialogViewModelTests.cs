@@ -12,6 +12,7 @@ public sealed class IssueSelectionDialogViewModelTests
 {
     private readonly Mock<IGitPlugin> _gitPluginMock;
 
+    /// <summary>IssueSelectionDialogViewModelTests.</summary>
     public IssueSelectionDialogViewModelTests()
     {
         _gitPluginMock = new Mock<IGitPlugin>();

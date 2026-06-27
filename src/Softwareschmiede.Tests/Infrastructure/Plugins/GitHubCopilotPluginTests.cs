@@ -12,6 +12,7 @@ public sealed class GitHubCopilotPluginTests
     private readonly Mock<ICredentialStore> _credentialStoreMock;
     private readonly GitHubCopilotPlugin _sut;
 
+    /// <summary>GitHubCopilotPluginTests.</summary>
     public GitHubCopilotPluginTests()
     {
         _credentialStoreMock = new Mock<ICredentialStore>();

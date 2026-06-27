@@ -12,6 +12,7 @@ public sealed class ClaudeCliPluginTests
     private readonly Mock<ICredentialStore> _credentialStoreMock;
     private readonly ClaudeCliPlugin _sut;
 
+    /// <summary>ClaudeCliPluginTests.</summary>
     public ClaudeCliPluginTests()
     {
         _credentialStoreMock = new Mock<ICredentialStore>();

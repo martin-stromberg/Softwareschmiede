@@ -12,6 +12,7 @@ using DomainDiffLine = Softwareschmiede.Domain.Entities.DiffLine;
 
 namespace Softwareschmiede.Tests.Components.Diff;
 
+/// <summary>DiffViewerBunitTests.</summary>
 public sealed class DiffViewerBunitTests : TestContext
 {
     /// <summary>
@@ -39,7 +40,9 @@ public sealed class DiffViewerBunitTests : TestContext
         });
     }
 
+    /// <summary><summary>DiffViewer_ShouldShowValidationError_WhenDiffResultIdIsEmpty.</summary>.</summary>
     [Fact]
+    /// <summary>DiffViewer_ShouldShowValidationError_WhenDiffResultIdIsEmpty.</summary>
     public void DiffViewer_ShouldShowValidationError_WhenDiffResultIdIsEmpty()
     {
         Services.AddSingleton(CreateDiffServiceWithEmptyDatabase());
@@ -53,7 +56,9 @@ public sealed class DiffViewerBunitTests : TestContext
         cut.Markup.Should().Contain("A valid diff id is required.");
     }
 
+    /// <summary><summary>DiffViewer_ShouldShowNotFoundAndStandaloneBackLink_WhenDiffDoesNotExist.</summary>.</summary>
     [Fact]
+    /// <summary>DiffViewer_ShouldShowNotFoundAndStandaloneBackLink_WhenDiffDoesNotExist.</summary>
     public void DiffViewer_ShouldShowNotFoundAndStandaloneBackLink_WhenDiffDoesNotExist()
     {
         Services.AddSingleton(CreateDiffServiceWithEmptyDatabase());
@@ -72,7 +77,9 @@ public sealed class DiffViewerBunitTests : TestContext
         });
     }
 
+    /// <summary><summary>DiffViewer_ShouldShowNotFoundWithoutBackLink_WhenEmbedded.</summary>.</summary>
     [Fact]
+    /// <summary>DiffViewer_ShouldShowNotFoundWithoutBackLink_WhenEmbedded.</summary>
     public void DiffViewer_ShouldShowNotFoundWithoutBackLink_WhenEmbedded()
     {
         Services.AddSingleton(CreateDiffServiceWithEmptyDatabase());
@@ -201,6 +208,7 @@ public sealed class DiffViewerBunitTests : TestContext
         public Guid FirstDiffId { get; } = firstDiffId;
         public Guid SecondDiffId { get; } = secondDiffId;
 
+        /// <summary>DisposeAsync.</summary>
         public ValueTask DisposeAsync()
         {
             memoryCache.Dispose();

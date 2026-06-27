@@ -14,6 +14,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     private readonly AufgabeService _aufgabeService;
     private readonly ProjektService _projektService;
 
+    /// <summary>RateLimitDetectionServiceIntegrationTests.</summary>
     public RateLimitDetectionServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
@@ -22,9 +23,12 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
+    /// <summary><summary>MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt.</summary>.</summary>
     [Fact]
+    /// <summary>MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt.</summary>
     public async Task MarkerInAusgabe_WirdErkannt_UndRateLimitEintragErstellt()
     {
         var projekt = await _projektService.CreateAsync("RateLimit-Projekt", null);
@@ -38,7 +42,9 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         eintraege.Should().Contain(e => e.Typ == ProtokollTyp.RateLimit);
     }
 
+    /// <summary><summary>ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt.</summary>.</summary>
     [Fact]
+    /// <summary>ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt.</summary>
     public void ParseRateLimitMarker_ExtrahiertZeitstempel_Korrekt()
     {
         var (found, _, resetUtc) = ProtokollService.ParseRateLimitMarker("[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]");
@@ -50,7 +56,9 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         resetUtc.Value.Day.Should().Be(15);
     }
 
+    /// <summary><summary>VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend.</summary>.</summary>
     [Fact]
+    /// <summary>VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend.</summary>
     public async Task VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend()
     {
         var projekt = await _projektService.CreateAsync("Vorschlag-Projekt", null);
@@ -71,7 +79,9 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         geladen.VorschlagAusfuehrenAbUtc.Should().NotBeNull();
     }
 
+    /// <summary><summary>ClearPromptVorschlag_EntferntVorschlagUndZeitstempel.</summary>.</summary>
     [Fact]
+    /// <summary>ClearPromptVorschlag_EntferntVorschlagUndZeitstempel.</summary>
     public async Task ClearPromptVorschlag_EntferntVorschlagUndZeitstempel()
     {
         var projekt = await _projektService.CreateAsync("Clear-Projekt", null);

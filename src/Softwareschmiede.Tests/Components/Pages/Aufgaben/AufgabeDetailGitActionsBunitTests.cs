@@ -17,9 +17,12 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
+/// <summary>AufgabeDetailGitActionsBunitTests.</summary>
 public sealed class AufgabeDetailGitActionsBunitTests : TestContext
 {
+    /// <summary><summary>AufgabeDetail_ShouldRenderExactlyThreeRegisterTabs_WithTabSemantics.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldRenderExactlyThreeRegisterTabs_WithTabSemantics.</summary>
     public async Task AufgabeDetail_ShouldRenderExactlyThreeRegisterTabs_WithTabSemantics()
     {
         var capabilities = new GitActionCapabilities(
@@ -41,7 +44,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.Find("div[role='tablist']").GetAttribute("aria-label").Should().Be("Aufgabe Detail Register");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldKeepGlobalInfoBoxesVisible_AcrossAllRegisters.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldKeepGlobalInfoBoxesVisible_AcrossAllRegisters.</summary>
     public async Task AufgabeDetail_ShouldKeepGlobalInfoBoxesVisible_AcrossAllRegisters()
     {
         var capabilities = new GitActionCapabilities(
@@ -68,7 +73,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         }
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldRenderExactlyOneRegisterContent_AfterEachTabSwitch.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldRenderExactlyOneRegisterContent_AfterEachTabSwitch.</summary>
     public async Task AufgabeDetail_ShouldRenderExactlyOneRegisterContent_AfterEachTabSwitch()
     {
         var capabilities = new GitActionCapabilities(
@@ -106,7 +113,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         });
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldCloseGitDialogs_WhenLeavingProjectDirectoryRegister.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldCloseGitDialogs_WhenLeavingProjectDirectoryRegister.</summary>
     public async Task AufgabeDetail_ShouldCloseGitDialogs_WhenLeavingProjectDirectoryRegister()
     {
         var capabilities = new GitActionCapabilities(
@@ -133,9 +142,13 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.WaitForAssertion(() => cut.Markup.Should().NotContain("Jetzt pullen"));
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldShowRecoveryButton_ForRecoverableStates.</summary>.</summary>
+    /// <summary><summary>AufgabeDetail_ShouldShowRecoveryButton_ForRecoverableStates.</summary>.</summary>
+    /// <summary><summary>AufgabeDetail_ShouldShowRecoveryButton_ForRecoverableStates.</summary>.</summary>
     [Theory]
     [InlineData(AufgabeStatus.InArbeit)]
     [InlineData(AufgabeStatus.Wartend)]
+    /// <summary>AufgabeDetail_ShouldShowRecoveryButton_ForRecoverableStates.</summary>
     public async Task AufgabeDetail_ShouldShowRecoveryButton_ForRecoverableStates(AufgabeStatus status)
     {
         var capabilities = new GitActionCapabilities(
@@ -155,7 +168,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         recoveryButton.HasAttribute("disabled").Should().BeFalse();
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldShowProjectNameBelowTitle_WhenProjectIsAssigned.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldShowProjectNameBelowTitle_WhenProjectIsAssigned.</summary>
     public async Task AufgabeDetail_ShouldShowProjectNameBelowTitle_WhenProjectIsAssigned()
     {
         var capabilities = new GitActionCapabilities(
@@ -174,7 +189,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.Markup.Should().Contain("Projekt: Alpha");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsEmpty.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsEmpty.</summary>
     public async Task AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsEmpty()
     {
         var capabilities = new GitActionCapabilities(
@@ -193,7 +210,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.Markup.Should().Contain("Projekt: ohne projekt");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsWhitespace.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsWhitespace.</summary>
     public async Task AufgabeDetail_ShouldShowProjectFallback_WhenProjectNameIsWhitespace()
     {
         var capabilities = new GitActionCapabilities(
@@ -214,7 +233,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.Markup.Should().Contain("Projekt: ohne projekt");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldRenderProjectNameAsPlainText_WhenProjectNameContainsHtml.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldRenderProjectNameAsPlainText_WhenProjectNameContainsHtml.</summary>
     public async Task AufgabeDetail_ShouldRenderProjectNameAsPlainText_WhenProjectNameContainsHtml()
     {
         var capabilities = new GitActionCapabilities(
@@ -236,7 +257,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.Markup.Should().NotContain("Projekt: <b>Alpha</b>");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldRenderProjectTextDirectlyBelowTitle.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldRenderProjectTextDirectlyBelowTitle.</summary>
     public async Task AufgabeDetail_ShouldRenderProjectTextDirectlyBelowTitle()
     {
         var capabilities = new GitActionCapabilities(
@@ -262,7 +285,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         projectElement!.TextContent.Should().Contain("Projekt: Alpha");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldDisableRecoveryButtonAndShowReason_WhenAutomationIsRunning.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldDisableRecoveryButtonAndShowReason_WhenAutomationIsRunning.</summary>
     public async Task AufgabeDetail_ShouldDisableRecoveryButtonAndShowReason_WhenAutomationIsRunning()
     {
         var capabilities = new GitActionCapabilities(
@@ -283,7 +308,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.Markup.Should().Contain("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldNotShowRecoveryButton_ForInvalidStates.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldNotShowRecoveryButton_ForInvalidStates.</summary>
     public async Task AufgabeDetail_ShouldNotShowRecoveryButton_ForInvalidStates()
     {
         var capabilities = new GitActionCapabilities(
@@ -302,7 +329,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         cut.FindAll("button").Any(button => button.TextContent.Contains("Aufgabe wiederherstellen")).Should().BeFalse();
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldRecoverTaskAndShowSuccess_WhenRecoveryIsTriggered.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldRecoverTaskAndShowSuccess_WhenRecoveryIsTriggered.</summary>
     public async Task AufgabeDetail_ShouldRecoverTaskAndShowSuccess_WhenRecoveryIsTriggered()
     {
         var capabilities = new GitActionCapabilities(
@@ -331,7 +360,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             .Should().Be(1);
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldShowStatusResetButton_ForKiAktiv_WhenAutomationIsNotRunning.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldShowStatusResetButton_ForKiAktiv_WhenAutomationIsNotRunning.</summary>
     public async Task AufgabeDetail_ShouldShowStatusResetButton_ForKiAktiv_WhenAutomationIsNotRunning()
     {
         var capabilities = new GitActionCapabilities(
@@ -361,7 +392,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         loaded.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldDisableStatusResetButtonAndShowReason_WhenAutomationIsRunning.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldDisableStatusResetButtonAndShowReason_WhenAutomationIsRunning.</summary>
     public async Task AufgabeDetail_ShouldDisableStatusResetButtonAndShowReason_WhenAutomationIsRunning()
     {
         var capabilities = new GitActionCapabilities(
@@ -602,7 +635,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             Times.Never);
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldInvokePullOnProjectSelectedGitPlugin.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldInvokePullOnProjectSelectedGitPlugin.</summary>
     public async Task AufgabeDetail_ShouldInvokePullOnProjectSelectedGitPlugin()
     {
         var defaultCapabilities = new GitActionCapabilities(
@@ -643,7 +678,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
             Times.Never);
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldShowDiffButtonAndNavigateToWrapperRoute_WhenLatestDiffExists.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldShowDiffButtonAndNavigateToWrapperRoute_WhenLatestDiffExists.</summary>
     public async Task AufgabeDetail_ShouldShowDiffButtonAndNavigateToWrapperRoute_WhenLatestDiffExists()
     {
         var capabilities = new GitActionCapabilities(
@@ -668,7 +705,9 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         navigationManager.Uri.Should().EndWith($"/diff/{harness.LatestDiffResultId}");
     }
 
+    /// <summary><summary>AufgabeDetail_ShouldNotShowDiffButton_WhenNoLatestDiffExists.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetail_ShouldNotShowDiffButton_WhenNoLatestDiffExists.</summary>
     public async Task AufgabeDetail_ShouldNotShowDiffButton_WhenNoLatestDiffExists()
     {
         var capabilities = new GitActionCapabilities(
@@ -1022,6 +1061,7 @@ public sealed class AufgabeDetailGitActionsBunitTests : TestContext
         public Mock<IGitPlugin> DefaultGitPlugin { get; } = defaultGitPlugin;
         public Mock<IGitPlugin> SelectedGitPlugin { get; } = selectedGitPlugin;
 
+        /// <summary>DisposeAsync.</summary>
         public ValueTask DisposeAsync()
         {
             db.Dispose();

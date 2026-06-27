@@ -13,6 +13,7 @@ public sealed class AgentPackageReaderTests : IDisposable
     private readonly string _baseDir;
     private readonly AgentPackageReader _sut;
 
+    /// <summary>AgentPackageReaderTests.</summary>
     public AgentPackageReaderTests()
     {
         _baseDir = Path.Combine(Path.GetTempPath(), "agent-packages-test-" + Guid.NewGuid().ToString("N"));
@@ -26,6 +27,7 @@ public sealed class AgentPackageReaderTests : IDisposable
             envMock.Object);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_baseDir))

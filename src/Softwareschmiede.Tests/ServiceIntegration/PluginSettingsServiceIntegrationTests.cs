@@ -13,12 +13,15 @@ public sealed class PluginSettingsServiceIntegrationTests
     private readonly InMemoryCredentialStore _credentialStore = new();
     private readonly PluginSettingsService _sut;
 
+    /// <summary>PluginSettingsServiceIntegrationTests.</summary>
     public PluginSettingsServiceIntegrationTests()
     {
         _sut = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
     }
 
+    /// <summary><summary>SetValue_SpeichertWert_UndGetValue_LaeadtIhn.</summary>.</summary>
     [Fact]
+    /// <summary>SetValue_SpeichertWert_UndGetValue_LaeadtIhn.</summary>
     public void SetValue_SpeichertWert_UndGetValue_LaeadtIhn()
     {
         var plugin = new FakeSettingsPlugin("TestPlugin", "test.plugin");
@@ -30,7 +33,9 @@ public sealed class PluginSettingsServiceIntegrationTests
         geladen.Should().Be("mein-api-schluessel");
     }
 
+    /// <summary><summary>HasValue_GibtFalse_OhneGespeichertenWert.</summary>.</summary>
     [Fact]
+    /// <summary>HasValue_GibtFalse_OhneGespeichertenWert.</summary>
     public void HasValue_GibtFalse_OhneGespeichertenWert()
     {
         var plugin = new FakeSettingsPlugin("LeeresPlugin", "empty.plugin");
@@ -39,7 +44,9 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut.HasValue(plugin, field).Should().BeFalse();
     }
 
+    /// <summary><summary>HasValue_GibtTrue_NachSpeichern.</summary>.</summary>
     [Fact]
+    /// <summary>HasValue_GibtTrue_NachSpeichern.</summary>
     public void HasValue_GibtTrue_NachSpeichern()
     {
         var plugin = new FakeSettingsPlugin("VollPlugin", "voll.plugin");
@@ -49,7 +56,9 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut.HasValue(plugin, field).Should().BeTrue();
     }
 
+    /// <summary><summary>DeleteValue_EntferntGespeichertenWert.</summary>.</summary>
     [Fact]
+    /// <summary>DeleteValue_EntferntGespeichertenWert.</summary>
     public void DeleteValue_EntferntGespeichertenWert()
     {
         var plugin = new FakeSettingsPlugin("DeletePlugin", "delete.plugin");
@@ -61,7 +70,9 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut.HasValue(plugin, field).Should().BeFalse();
     }
 
+    /// <summary><summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>.</summary>
     [Fact]
+    /// <summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>
     public void GetValue_GibtNull_OhneGespeichertenWert()
     {
         var plugin = new FakeSettingsPlugin("NullPlugin", "null.plugin");
@@ -78,14 +89,17 @@ internal sealed class InMemoryCredentialStore : ICredentialStore
 
     public string? GetCredential(string key) => _store.TryGetValue(key, out var v) ? v : null;
 
+    /// <summary>SetCredential.</summary>
     public void SetCredential(string key, string value) => _store[key] = value;
 
+    /// <summary>DeleteCredential.</summary>
     public void DeleteCredential(string key) => _store.Remove(key);
 }
 
 /// <summary>Fake-Plugin für Einstellungs-Tests.</summary>
 internal sealed class FakeSettingsPlugin : IPlugin
 {
+    /// <summary>FakeSettingsPlugin.</summary>
     public FakeSettingsPlugin(string pluginName, string pluginPrefix)
     {
         PluginName = pluginName;
@@ -96,6 +110,7 @@ internal sealed class FakeSettingsPlugin : IPlugin
     public string PluginPrefix { get; }
     public PluginType PluginType => PluginType.DevelopmentAutomation;
 
+    /// <summary>IReadOnlyList.</summary>
     public IReadOnlyList<PluginSettingGroup> GetSettingGroups()
         => Array.Empty<PluginSettingGroup>();
 }

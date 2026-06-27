@@ -7,11 +7,14 @@ using Softwareschmiede.Infrastructure.Plugins;
 
 namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 
+/// <summary>PluginManagerTests.</summary>
 public sealed class PluginManagerTests : IDisposable
 {
     private readonly string _tempDirectory = Path.Combine(Path.GetTempPath(), $"plugin-manager-{Guid.NewGuid():N}");
 
+    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing.</summary>.</summary>
     [Fact]
+    /// <summary>GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing.</summary>
     public void GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing()
     {
         var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
@@ -20,7 +23,9 @@ public sealed class PluginManagerTests : IDisposable
         sut.GetDevelopmentAutomationPlugins().Should().BeEmpty();
     }
 
+    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists.</summary>.</summary>
     [Fact]
+    /// <summary>GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists.</summary>
     public void GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -32,7 +37,9 @@ public sealed class PluginManagerTests : IDisposable
         sut.GetDevelopmentAutomationPlugins().Should().BeEmpty();
     }
 
+    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist.</summary>.</summary>
     [Fact]
+    /// <summary>GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist.</summary>
     public void GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -58,7 +65,9 @@ public sealed class PluginManagerTests : IDisposable
         kiPlugins.Should().Contain(p => p.PluginName == "KI Simulator");
     }
 
+    /// <summary><summary>GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>.</summary>
     [Fact]
+    /// <summary>GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>
     public void GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded()
     {
         var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
@@ -69,7 +78,9 @@ public sealed class PluginManagerTests : IDisposable
             .WithMessage("*Source-Code-Management-Plugin*");
     }
 
+    /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>.</summary>
     [Fact]
+    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>
     public void GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded()
     {
         var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
@@ -80,7 +91,9 @@ public sealed class PluginManagerTests : IDisposable
             .WithMessage("*Development-Automation-Plugin*");
     }
 
+    /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded.</summary>.</summary>
     [Fact]
+    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded.</summary>
     public void GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -95,7 +108,9 @@ public sealed class PluginManagerTests : IDisposable
         result.PluginName.Should().Be("GitHub Copilot");
     }
 
+    /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded.</summary>.</summary>
     [Fact]
+    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded.</summary>
     public void GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -108,7 +123,9 @@ public sealed class PluginManagerTests : IDisposable
         result.PluginName.Should().Be("Claude CLI");
     }
 
+    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes.</summary>.</summary>
     [Fact]
+    /// <summary>GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes.</summary>
     public void GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -132,6 +149,7 @@ public sealed class PluginManagerTests : IDisposable
         kiSecond.Should().HaveCount(4);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

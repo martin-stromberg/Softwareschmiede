@@ -11,15 +11,19 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AppEinstellungService _einstellungService;
 
+    /// <summary>WindowGeometryServiceIntegrationTests.</summary>
     public WindowGeometryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
+    /// <summary><summary>Fenstergeometrie_WirdGespeichert_UndWiederhergestellt.</summary>.</summary>
     [Fact]
+    /// <summary>Fenstergeometrie_WirdGespeichert_UndWiederhergestellt.</summary>
     public async Task Fenstergeometrie_WirdGespeichert_UndWiederhergestellt()
     {
         var geometry = new WindowGeometrySettings(X: 200, Y: 150, Width: 1400, Height: 900);
@@ -33,7 +37,9 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
         geladen.Height.Should().Be(900);
     }
 
+    /// <summary><summary>Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck.</summary>.</summary>
     [Fact]
+    /// <summary>Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck.</summary>
     public async Task Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck()
     {
         var geladen = await _einstellungService.GetWindowGeometryAsync();
@@ -44,7 +50,9 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
         geladen.Height.Should().BeNull();
     }
 
+    /// <summary><summary>Fenstergeometrie_KannMehrmalsAktualisiert_Werden.</summary>.</summary>
     [Fact]
+    /// <summary>Fenstergeometrie_KannMehrmalsAktualisiert_Werden.</summary>
     public async Task Fenstergeometrie_KannMehrmalsAktualisiert_Werden()
     {
         await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(100, 100, 1200, 800));
@@ -58,7 +66,9 @@ public sealed class WindowGeometryServiceIntegrationTests : IDisposable
         geladen.Height.Should().Be(1000);
     }
 
+    /// <summary><summary>Fenstergeometrie_BeimNeustart_WirdWiederhergestellt.</summary>.</summary>
     [Fact]
+    /// <summary>Fenstergeometrie_BeimNeustart_WirdWiederhergestellt.</summary>
     public async Task Fenstergeometrie_BeimNeustart_WirdWiederhergestellt()
     {
         await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(50, 75, 1280, 720));

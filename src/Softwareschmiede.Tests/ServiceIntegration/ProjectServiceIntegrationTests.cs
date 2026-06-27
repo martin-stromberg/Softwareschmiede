@@ -13,6 +13,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
 
+    /// <summary>ProjectServiceIntegrationTests.</summary>
     public ProjectServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
@@ -20,9 +21,12 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
+    /// <summary><summary>ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu.</summary>.</summary>
     [Fact]
+    /// <summary>ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu.</summary>
     public async Task ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu()
     {
         var projekt = await _projektService.CreateAsync("Neues Projekt", null);
@@ -35,7 +39,9 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         aufgabe.Status.Should().Be(AufgabeStatus.Neu);
     }
 
+    /// <summary><summary>MehrereProjekte_KoennenErstellt_UndGeladen_Werden.</summary>.</summary>
     [Fact]
+    /// <summary>MehrereProjekte_KoennenErstellt_UndGeladen_Werden.</summary>
     public async Task MehrereProjekte_KoennenErstellt_UndGeladen_Werden()
     {
         await _projektService.CreateAsync("Projekt A", null);
@@ -45,7 +51,9 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         alle.Count.Should().BeGreaterOrEqualTo(2);
     }
 
+    /// <summary><summary>Aufgabe_KannInProjektGeladen_Werden.</summary>.</summary>
     [Fact]
+    /// <summary>Aufgabe_KannInProjektGeladen_Werden.</summary>
     public async Task Aufgabe_KannInProjektGeladen_Werden()
     {
         var projekt = await _projektService.CreateAsync("Test Projekt", null);

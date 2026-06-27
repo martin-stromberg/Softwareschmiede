@@ -13,9 +13,12 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Tests.Components.Pages;
 
+/// <summary>EinstellungenBaseArbeitsverzeichnisTests.</summary>
 public sealed class EinstellungenBaseArbeitsverzeichnisTests
 {
+    /// <summary><summary>OnInitializedAsync_ShouldLoadSavedWorkdirAndFallbackHint_WhenResolverUsesFallback.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldLoadSavedWorkdirAndFallbackHint_WhenResolverUsesFallback.</summary>
     public async Task OnInitializedAsync_ShouldLoadSavedWorkdirAndFallbackHint_WhenResolverUsesFallback()
     {
         await using var db = CreateDb();
@@ -35,7 +38,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.ArbeitsverzeichnisFallbackHinweis.Should().Contain("Fallback verwendet");
     }
 
+    /// <summary><summary>ArbeitsverzeichnisSpeichernAsync_ShouldSetValidationError_WhenInputIsInvalid.</summary>.</summary>
     [Fact]
+    /// <summary>ArbeitsverzeichnisSpeichernAsync_ShouldSetValidationError_WhenInputIsInvalid.</summary>
     public async Task ArbeitsverzeichnisSpeichernAsync_ShouldSetValidationError_WhenInputIsInvalid()
     {
         await using var db = CreateDb();
@@ -54,7 +59,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.ArbeitsverzeichnisStatusMessage.Should().Be("Arbeitsverzeichnis konnte nicht gespeichert werden.");
     }
 
+    /// <summary><summary>ArbeitsverzeichnisZuruecksetzenAsync_ShouldClearStoredWorkdir.</summary>.</summary>
     [Fact]
+    /// <summary>ArbeitsverzeichnisZuruecksetzenAsync_ShouldClearStoredWorkdir.</summary>
     public async Task ArbeitsverzeichnisZuruecksetzenAsync_ShouldClearStoredWorkdir()
     {
         await using var db = CreateDb();
@@ -76,7 +83,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.ArbeitsverzeichnisStatusIsError.Should().BeFalse();
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldLoadStoredDefaultPlugin_WhenPrefixIsValid.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldLoadStoredDefaultPlugin_WhenPrefixIsValid.</summary>
     public async Task OnInitializedAsync_ShouldLoadStoredDefaultPlugin_WhenPrefixIsValid()
     {
         await using var db = CreateDb();
@@ -101,7 +110,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetDefaultPluginSelection(PluginType.SourceCodeManagement).Should().Be("Softwareschmiede.GitHub");
     }
 
+    /// <summary><summary>StandardPluginSpeichernAsync_ShouldPersistValidSelection.</summary>.</summary>
     [Fact]
+    /// <summary>StandardPluginSpeichernAsync_ShouldPersistValidSelection.</summary>
     public async Task StandardPluginSpeichernAsync_ShouldPersistValidSelection()
     {
         await using var db = CreateDb();
@@ -128,7 +139,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetDefaultPluginStatusIsError(PluginType.SourceCodeManagement).Should().BeFalse();
     }
 
+    /// <summary><summary>StandardPluginSpeichernAsync_ShouldSetError_WhenSelectionIsInvalidForType.</summary>.</summary>
     [Fact]
+    /// <summary>StandardPluginSpeichernAsync_ShouldSetError_WhenSelectionIsInvalidForType.</summary>
     public async Task StandardPluginSpeichernAsync_ShouldSetError_WhenSelectionIsInvalidForType()
     {
         await using var db = CreateDb();
@@ -153,7 +166,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetDefaultPluginStatusMessage(PluginType.SourceCodeManagement).Should().Contain("Ungültige Plugin-Auswahl");
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldFallbackForInvalidEnumSetting.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldFallbackForInvalidEnumSetting.</summary>
     public async Task OnInitializedAsync_ShouldFallbackForInvalidEnumSetting()
     {
         await using var db = CreateDb();
@@ -195,7 +210,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetFieldValidationMessage("LocalDirectoryPlugin.WorkspaceMode").Should().Contain("Ungültiger gespeicherter Wert");
     }
 
+    /// <summary><summary>SpeichernAsync_ShouldPersistEnumValueAsStableString.</summary>.</summary>
     [Fact]
+    /// <summary>SpeichernAsync_ShouldPersistEnumValueAsStableString.</summary>
     public async Task SpeichernAsync_ShouldPersistEnumValueAsStableString()
     {
         await using var db = CreateDb();
@@ -237,7 +254,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
             Times.Once);
     }
 
+    /// <summary><summary>SpeichernAsync_ShouldRejectInvalidEnumSelection_AndNotPersist.</summary>.</summary>
     [Fact]
+    /// <summary>SpeichernAsync_ShouldRejectInvalidEnumSelection_AndNotPersist.</summary>
     public async Task SpeichernAsync_ShouldRejectInvalidEnumSelection_AndNotPersist()
     {
         await using var db = CreateDb();
@@ -277,7 +296,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         credentialStoreMock.Verify(c => c.SetCredential(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary><summary>ZuruecksetzenAsync_ShouldResetEnumToSeparateWorkingDirectory_WhenAvailable.</summary>.</summary>
     [Fact]
+    /// <summary>ZuruecksetzenAsync_ShouldResetEnumToSeparateWorkingDirectory_WhenAvailable.</summary>
     public async Task ZuruecksetzenAsync_ShouldResetEnumToSeparateWorkingDirectory_WhenAvailable()
     {
         await using var db = CreateDb();
@@ -316,7 +337,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().Be("SeparateWorkingDirectory");
     }
 
+    /// <summary><summary>ZuruecksetzenAsync_ShouldResetEnumToFirstOption_WhenSeparateModeNotPresent.</summary>.</summary>
     [Fact]
+    /// <summary>ZuruecksetzenAsync_ShouldResetEnumToFirstOption_WhenSeparateModeNotPresent.</summary>
     public async Task ZuruecksetzenAsync_ShouldResetEnumToFirstOption_WhenSeparateModeNotPresent()
     {
         await using var db = CreateDb();
@@ -354,7 +377,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().Be("InSourceDirectory");
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldTrimStoredEnumValue_WhenValid.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldTrimStoredEnumValue_WhenValid.</summary>
     public async Task OnInitializedAsync_ShouldTrimStoredEnumValue_WhenValid()
     {
         await using var db = CreateDb();
@@ -393,7 +418,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().Be("InSourceDirectory");
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldUseEmptyValue_WhenEnumOptionsMissing.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldUseEmptyValue_WhenEnumOptionsMissing.</summary>
     public async Task OnInitializedAsync_ShouldUseEmptyValue_WhenEnumOptionsMissing()
     {
         await using var db = CreateDb();
@@ -432,7 +459,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         sut.GetInputValue("LocalDirectoryPlugin.WorkspaceMode").Should().BeEmpty();
     }
 
+    /// <summary><summary>SpeichernAsync_ShouldSetValidationMessage_ForEnumWithoutOptions.</summary>.</summary>
     [Fact]
+    /// <summary>SpeichernAsync_ShouldSetValidationMessage_ForEnumWithoutOptions.</summary>
     public async Task SpeichernAsync_ShouldSetValidationMessage_ForEnumWithoutOptions()
     {
         await using var db = CreateDb();
@@ -472,7 +501,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         credentialStoreMock.Verify(c => c.SetCredential(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary><summary>GetEnumOptionDisplayLabel_ShouldReturnTranslatedLabel_ForWorkspaceModeOptions.</summary>.</summary>
     [Fact]
+    /// <summary>GetEnumOptionDisplayLabel_ShouldReturnTranslatedLabel_ForWorkspaceModeOptions.</summary>
     public void GetEnumOptionDisplayLabel_ShouldReturnTranslatedLabel_ForWorkspaceModeOptions()
     {
         var field = new PluginSettingField(
@@ -488,7 +519,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         labelSeparate.Should().Be("Mit separatem Arbeitsverzeichnis arbeiten");
     }
 
+    /// <summary><summary>EinstellungenMarkup_ShouldUseEnumDisplayLabelHelper_ForWorkspaceModeRendering.</summary>.</summary>
     [Fact]
+    /// <summary>EinstellungenMarkup_ShouldUseEnumDisplayLabelHelper_ForWorkspaceModeRendering.</summary>
     public void EinstellungenMarkup_ShouldUseEnumDisplayLabelHelper_ForWorkspaceModeRendering()
     {
         var root = FindRepositoryRoot();
@@ -498,7 +531,9 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         markup.Should().Contain("@GetEnumOptionDisplayLabel(field, enumOption)");
     }
 
+    /// <summary><summary>EinstellungenMarkup_ShouldRenderPluginFieldsDynamically_WithoutHardcodedWorkingDirectoryField.</summary>.</summary>
     [Fact]
+    /// <summary>EinstellungenMarkup_ShouldRenderPluginFieldsDynamically_WithoutHardcodedWorkingDirectoryField.</summary>
     public void EinstellungenMarkup_ShouldRenderPluginFieldsDynamically_WithoutHardcodedWorkingDirectoryField()
     {
         var root = FindRepositoryRoot();
@@ -594,20 +629,34 @@ public sealed class EinstellungenBaseArbeitsverzeichnisTests
         public bool ArbeitsverzeichnisStatusIsError => _arbeitsverzeichnisStatusIsError;
         public string? ArbeitsverzeichnisFallbackHinweis => _arbeitsverzeichnisFallbackHinweis;
         public string? GetDefaultPluginSelection(PluginType pluginType) => _defaultPluginSelections.GetValueOrDefault(pluginType);
+        /// <summary>SetDefaultPluginSelection.</summary>
         public void SetDefaultPluginSelection(PluginType pluginType, string? pluginPrefix) => _defaultPluginSelections[pluginType] = pluginPrefix;
+        /// <summary>GetDefaultPluginStatusMessage.</summary>
         public string GetDefaultPluginStatusMessage(PluginType pluginType) => _defaultPluginStatusMessages.GetValueOrDefault(pluginType, string.Empty);
+        /// <summary>GetDefaultPluginStatusIsError.</summary>
         public bool GetDefaultPluginStatusIsError(PluginType pluginType) => _defaultPluginStatusIsError.GetValueOrDefault(pluginType);
+        /// <summary>GetInputValue.</summary>
         public string GetInputValue(string stateKey) => _inputValues.GetValueOrDefault(stateKey, string.Empty);
+        /// <summary>GetFieldValidationMessage.</summary>
         public string GetFieldValidationMessage(string stateKey) => _fieldValidationMessages.GetValueOrDefault(stateKey, string.Empty);
+        /// <summary>SetInputValue.</summary>
         public void SetInputValue(string stateKey, string value) => _inputValues[stateKey] = value;
 
+        /// <summary>InvokeOnInitializedAsync.</summary>
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
+        /// <summary>InvokeArbeitsverzeichnisSpeichernAsync.</summary>
         public Task InvokeArbeitsverzeichnisSpeichernAsync() => ArbeitsverzeichnisSpeichernAsync();
+        /// <summary>InvokeArbeitsverzeichnisInputChanged.</summary>
         public void InvokeArbeitsverzeichnisInputChanged(string value) => ArbeitsverzeichnisInputChanged(value);
+        /// <summary>InvokeArbeitsverzeichnisZuruecksetzenAsync.</summary>
         public Task InvokeArbeitsverzeichnisZuruecksetzenAsync() => ArbeitsverzeichnisZuruecksetzenAsync();
+        /// <summary>InvokeStandardPluginSpeichernAsync.</summary>
         public Task InvokeStandardPluginSpeichernAsync(PluginType pluginType) => StandardPluginSpeichernAsync(pluginType);
+        /// <summary>InvokeSpeichernAsync.</summary>
         public Task InvokeSpeichernAsync(IPlugin plugin) => SpeichernAsync(plugin);
+        /// <summary>InvokeZuruecksetzenAsync.</summary>
         public Task InvokeZuruecksetzenAsync(IPlugin plugin) => ZuruecksetzenAsync(plugin);
+        /// <summary>InvokeEnumDisplayLabel.</summary>
         public static string InvokeEnumDisplayLabel(PluginSettingField field, string enumOption) => GetEnumOptionDisplayLabel(field, enumOption);
     }
 }

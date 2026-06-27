@@ -13,6 +13,7 @@ public sealed class CodexPluginTests
     private readonly Mock<ICredentialStore> _credentialStoreMock;
     private readonly CodexPlugin _sut;
 
+    /// <summary>CodexPluginTests.</summary>
     public CodexPluginTests()
     {
         _credentialStoreMock = new Mock<ICredentialStore>();

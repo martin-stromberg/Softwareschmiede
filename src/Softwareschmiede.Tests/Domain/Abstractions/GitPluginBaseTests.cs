@@ -7,9 +7,12 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.Domain.Abstractions;
 
+/// <summary>GitPluginBaseTests.</summary>
 public sealed class GitPluginBaseTests
 {
+    /// <summary><summary>CreateBranchAsync_ShouldRunCheckoutMinusB.</summary>.</summary>
     [Fact]
+    /// <summary>CreateBranchAsync_ShouldRunCheckoutMinusB.</summary>
     public async Task CreateBranchAsync_ShouldRunCheckoutMinusB()
     {
         var cli = new Mock<ICliRunner>();
@@ -27,7 +30,9 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
+    /// <summary><summary>CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails.</summary>.</summary>
     [Fact]
+    /// <summary>CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails.</summary>
     public async Task CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -46,7 +51,9 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git checkout -b fehlgeschlagen*");
     }
 
+    /// <summary><summary>CommitAsync_ShouldRunAddAndCommit.</summary>.</summary>
     [Fact]
+    /// <summary>CommitAsync_ShouldRunAddAndCommit.</summary>
     public async Task CommitAsync_ShouldRunAddAndCommit()
     {
         var cli = new Mock<ICliRunner>();
@@ -71,7 +78,9 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
+    /// <summary><summary>CommitAsync_ShouldThrow_WhenGitAddFails.</summary>.</summary>
     [Fact]
+    /// <summary>CommitAsync_ShouldThrow_WhenGitAddFails.</summary>
     public async Task CommitAsync_ShouldThrow_WhenGitAddFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -90,7 +99,9 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git add fehlgeschlagen*");
     }
 
+    /// <summary><summary>CommitAsync_ShouldThrow_WhenGitCommitFails.</summary>.</summary>
     [Fact]
+    /// <summary>CommitAsync_ShouldThrow_WhenGitCommitFails.</summary>
     public async Task CommitAsync_ShouldThrow_WhenGitCommitFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -116,7 +127,9 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git commit fehlgeschlagen*");
     }
 
+    /// <summary><summary>CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess.</summary>.</summary>
     [Fact]
+    /// <summary>CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess.</summary>
     public async Task CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess()
     {
         var cli = new Mock<ICliRunner>();
@@ -134,7 +147,9 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
+    /// <summary><summary>EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails.</summary>.</summary>
     [Fact]
+    /// <summary>EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails.</summary>
     public async Task EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -153,7 +168,9 @@ public sealed class GitPluginBaseTests
             .WithMessage("*ist kein Git-Repository*");
     }
 
+    /// <summary><summary>ResetAsync_ShouldThrow_WhenGitFails.</summary>.</summary>
     [Fact]
+    /// <summary>ResetAsync_ShouldThrow_WhenGitFails.</summary>
     public async Task ResetAsync_ShouldThrow_WhenGitFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -205,15 +222,23 @@ public sealed class GitPluginBaseTests
         public override string PluginName => "Test";
         public override string PluginPrefix => "Test";
         public override PluginType PluginType => PluginType.SourceCodeManagement;
+        /// <summary>IReadOnlyList.</summary>
         public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         public override Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default) => Task.FromResult<IEnumerable<Issue>>([]);
+        /// <summary>CloneRepositoryAsync.</summary>
         public override Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default) => Task.CompletedTask;
+        /// <summary>PushBranchAsync.</summary>
         public override Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default) => Task.CompletedTask;
+        /// <summary>PullAsync.</summary>
         public override Task PullAsync(string localPath, CancellationToken ct = default) => Task.CompletedTask;
+        /// <summary>Task.</summary>
         public override Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default) => Task.FromResult(new PullRequest(1, "t", "u", "b"));
+        /// <summary>Task.</summary>
         public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public override Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default) => Task.FromResult<IEnumerable<string>>([]);
+        /// <summary>Task.</summary>
         public override Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default) => Task.FromResult("main");
+        /// <summary>EnsureRepoAsync.</summary>
         public Task EnsureRepoAsync(string localPath, CancellationToken ct = default) => EnsureGitRepositoryAsync(localPath, ct);
     }
 }

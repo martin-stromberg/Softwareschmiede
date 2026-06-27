@@ -8,11 +8,13 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
+/// <summary>AufgabeRecoveryServiceTests.</summary>
 public sealed class AufgabeRecoveryServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly Guid _projektId = Guid.NewGuid();
 
+    /// <summary>AufgabeRecoveryServiceTests.</summary>
     public AufgabeRecoveryServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -26,7 +28,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         _db.SaveChanges();
     }
 
+    /// <summary><summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning.</summary>.</summary>
     [Fact]
+    /// <summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning.</summary>
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -41,7 +45,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         _db.Protokolleintraege.Single(e => e.AufgabeId == aufgabe.Id).Inhalt.Should().Contain("Manuelle Wiederherstellung");
     }
 
+    /// <summary><summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning.</summary>.</summary>
     [Fact]
+    /// <summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning.</summary>
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Wartend);
@@ -56,18 +62,27 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         _db.Protokolleintraege.Count(e => e.AufgabeId == aufgabe.Id && e.Typ == ProtokollTyp.StatusUebergang).Should().Be(1);
     }
 
+    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
+    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
+    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
+    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
+    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
+    /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
     [Theory]
     [InlineData(AufgabeStatus.Gestartet, true)]
     [InlineData(AufgabeStatus.Wartend, true)]
     [InlineData(AufgabeStatus.Neu, false)]
     [InlineData(AufgabeStatus.Archiviert, false)]
     [InlineData(AufgabeStatus.Beendet, false)]
+    /// <summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>
     public void IstRecoveryStatus_ShouldMatchAllowedStates(AufgabeStatus status, bool expected)
     {
         AufgabeRecoveryService.IstRecoveryStatus(status).Should().Be(expected);
     }
 
+    /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>.</summary>
     [Fact]
+    /// <summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -80,7 +95,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             .WithMessage("Wiederherstellung nicht möglich, Verarbeitung läuft noch.");
     }
 
+    /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable.</summary>.</summary>
     [Fact]
+    /// <summary>RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable.</summary>
     public async Task RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Neu);
@@ -93,7 +110,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             .WithMessage("Wiederherstellung für aktuellen Status nicht verfügbar.");
     }
 
+    /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails.</summary>.</summary>
     [Fact]
+    /// <summary>RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails.</summary>
     public async Task RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -194,6 +213,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         kandidaten.Should().BeEmpty();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private async Task<Aufgabe> ErstelleAufgabeAsync(AufgabeStatus status)
@@ -214,14 +234,18 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     private sealed class FakeRunningAutomationStatusSource(bool isRunning) : IRunningAutomationStatusSource
     {
         public event Action<int, int>? RunningCountChanged;
+        /// <summary>GetRunningCount.</summary>
         public int GetRunningCount() => isRunning ? 1 : 0;
+        /// <summary>IsRunning.</summary>
         public bool IsRunning(Guid aufgabeId) => isRunning;
     }
 
     private sealed class ThrowingRunningAutomationStatusSource : IRunningAutomationStatusSource
     {
         public event Action<int, int>? RunningCountChanged;
+        /// <summary>GetRunningCount.</summary>
         public int GetRunningCount() => 0;
+        /// <summary>IsRunning.</summary>
         public bool IsRunning(Guid aufgabeId) => throw new TimeoutException("simulated");
     }
 }
