@@ -33,6 +33,78 @@ def parse_codes(text):
     return {c.strip().upper() for c in text.replace(";", ",").split(",") if c.strip()}
 
 
+def find_nearest_csproj(start_dir):
+    """Sucht die nächstgelegene .csproj-Datei im Verzeichnisbaum aufwärts."""
+    current = start_dir
+    while True:
+        for entry in os.scandir(current):
+            if entry.name.endswith(".csproj") and entry.is_file():
+                return entry.path
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+
+
+def check_csproj_for_xmldoc(csproj_path):
+    """Gibt eine Liste von Problemen zurück (leer = alles OK)."""
+    try:
+        tree = ET.parse(csproj_path)
+        root = tree.getroot()
+    except ET.ParseError:
+        return []
+
+    generate_doc = False
+    treat_all_as_errors = False
+    all_no_warn = set()
+    all_warnings_as_errors = set()
+    all_warnings_not_as_errors = set()
+
+    for pg in root.iter("PropertyGroup"):
+        node = pg.find("GenerateDocumentationFile")
+        if node is not None and (node.text or "").strip().lower() == "true":
+            generate_doc = True
+        node = pg.find("TreatWarningsAsErrors")
+        if node is not None and (node.text or "").strip().lower() == "true":
+            treat_all_as_errors = True
+        node = pg.find("NoWarn")
+        if node is not None:
+            all_no_warn |= parse_codes(node.text)
+        node = pg.find("WarningsAsErrors")
+        if node is not None:
+            all_warnings_as_errors |= parse_codes(node.text)
+        node = pg.find("WarningsNotAsErrors")
+        if node is not None:
+            all_warnings_not_as_errors |= parse_codes(node.text)
+
+    problems = []
+    if not generate_doc:
+        problems.append(
+            "<GenerateDocumentationFile>true</GenerateDocumentationFile> fehlt oder ist nicht auf true gesetzt"
+        )
+    suppressed_in_no_warn = XML_DOC_CODES & all_no_warn
+    if suppressed_in_no_warn:
+        problems.append(
+            "XML-Dokumentationswarnungen in <NoWarn> unterdrückt: "
+            + ", ".join(sorted(suppressed_in_no_warn))
+        )
+    downgraded = XML_DOC_CODES & all_warnings_not_as_errors
+    if downgraded:
+        problems.append(
+            "XML-Dokumentationswarnungen in <WarningsNotAsErrors> herabgestuft: "
+            + ", ".join(sorted(downgraded))
+        )
+    cs1591_via_treat = treat_all_as_errors and "CS1591" not in all_warnings_not_as_errors
+    cs1591_explicit = "CS1591" in all_warnings_as_errors
+    if not cs1591_via_treat and not cs1591_explicit:
+        problems.append(
+            "CS1591 ist nicht als Fehler konfiguriert – "
+            "<WarningsAsErrors>CS1591</WarningsAsErrors> oder "
+            "<TreatWarningsAsErrors>true</TreatWarningsAsErrors> fehlt"
+        )
+    return problems
+
+
 data = json.load(sys.stdin)
 file = (
     data.get("tool_input", {}).get("file_path")
@@ -68,94 +140,42 @@ if is_cs:
     except OSError:
         sys.exit(0)
 
+    csproj_problems = []
+    csproj_path = find_nearest_csproj(os.path.dirname(os.path.abspath(file)))
+    if csproj_path:
+        csproj_problems = check_csproj_for_xmldoc(csproj_path)
+
+    messages = []
     if violations:
-        lines = "\n".join(
+        pragma_lines = "\n".join(
             "  ✗ Zeile {}: {} ({})".format(ln, code, src)
             for ln, src, code in violations
         )
-        context = (
+        messages.append(
             "[XML-Doc-Check] #pragma warning disable für XML-Dokumentationscodes "
             "ist in Codedateien verboten:\n{}\nEntferne die Pragma-Anweisung und "
-            "ergänze stattdessen die fehlenden XML-Kommentare.".format(lines)
+            "ergänze stattdessen die fehlenden XML-Kommentare.".format(pragma_lines)
         )
+    if csproj_problems:
+        proj_name = os.path.basename(csproj_path) if csproj_path else "unbekannt"
+        messages.append(
+            "[csproj XML-Doc-Check] Zugehörige Projektdatei {} hat Probleme:\n{}".format(
+                proj_name,
+                "\n".join("  ✗ " + p for p in csproj_problems),
+            )
+        )
+
+    if messages:
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": "PostToolUse",
-                "additionalContext": context,
+                "additionalContext": "\n\n".join(messages),
             }
         }))
     sys.exit(0)
 
 # ── .csproj-Prüfung ───────────────────────────────────────────────────────────
-try:
-    tree = ET.parse(file)
-    root = tree.getroot()
-except ET.ParseError:
-    sys.exit(0)  # Ungültige XML-Datei – nicht blockieren
-
-generate_doc = False
-treat_all_as_errors = False
-all_no_warn = set()
-all_warnings_as_errors = set()
-all_warnings_not_as_errors = set()
-
-for pg in root.iter("PropertyGroup"):
-    node = pg.find("GenerateDocumentationFile")
-    if node is not None and (node.text or "").strip().lower() == "true":
-        generate_doc = True
-
-    node = pg.find("TreatWarningsAsErrors")
-    if node is not None and (node.text or "").strip().lower() == "true":
-        treat_all_as_errors = True
-
-    node = pg.find("NoWarn")
-    if node is not None:
-        all_no_warn |= parse_codes(node.text)
-
-    node = pg.find("WarningsAsErrors")
-    if node is not None:
-        all_warnings_as_errors |= parse_codes(node.text)
-
-    node = pg.find("WarningsNotAsErrors")
-    if node is not None:
-        all_warnings_not_as_errors |= parse_codes(node.text)
-
-problems = []
-
-# 1. GenerateDocumentationFile muss true sein
-if not generate_doc:
-    problems.append(
-        "<GenerateDocumentationFile>true</GenerateDocumentationFile> fehlt oder ist nicht auf true gesetzt"
-    )
-
-# 2. Kein XML-Doc-Code darf in NoWarn unterdrückt sein
-suppressed_in_no_warn = XML_DOC_CODES & all_no_warn
-if suppressed_in_no_warn:
-    problems.append(
-        "XML-Dokumentationswarnungen in <NoWarn> unterdrückt: "
-        + ", ".join(sorted(suppressed_in_no_warn))
-    )
-
-# 3. Kein XML-Doc-Code darf in WarningsNotAsErrors herabgestuft sein
-downgraded = XML_DOC_CODES & all_warnings_not_as_errors
-if downgraded:
-    problems.append(
-        "XML-Dokumentationswarnungen in <WarningsNotAsErrors> herabgestuft: "
-        + ", ".join(sorted(downgraded))
-    )
-
-# 4. CS1591 muss als Fehler konfiguriert sein:
-#    Entweder TreatWarningsAsErrors=true (und CS1591 nicht in WarningsNotAsErrors)
-#    oder CS1591 explizit in WarningsAsErrors
-cs1591_via_treat = treat_all_as_errors and "CS1591" not in all_warnings_not_as_errors
-cs1591_explicit = "CS1591" in all_warnings_as_errors
-if not cs1591_via_treat and not cs1591_explicit:
-    problems.append(
-        "CS1591 ist nicht als Fehler konfiguriert – "
-        "<WarningsAsErrors>CS1591</WarningsAsErrors> oder "
-        "<TreatWarningsAsErrors>true</TreatWarningsAsErrors> fehlt"
-    )
-
+problems = check_csproj_for_xmldoc(file)
 if problems:
     context = "[csproj XML-Doc-Check] Probleme in {}:\n{}".format(
         os.path.basename(file),
