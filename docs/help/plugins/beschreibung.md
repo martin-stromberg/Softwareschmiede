@@ -22,6 +22,7 @@ Jedes Plugin implementiert `IPlugin` und gehört einem von zwei Typen an:
 | `LocalDirectoryPlugin` | SCM | Arbeitet direkt auf einem lokalen Verzeichnis ohne Remote |
 | `ClaudeCliPlugin` | KI | Claude Code CLI – nutzt `claude` CLI mit Stream-JSON-Output |
 | `GitHubCopilotPlugin` | KI | GitHub Copilot CLI – nutzt `copilot` CLI |
+| `CodexPlugin` | KI | Codex CLI – nutzt `codex` CLI aus der Anwendung heraus |
 | `KiSimulatorPlugin` | KI | Simulierter KI-Agent für Entwicklung und Tests |
 
 ### Einstellungen
@@ -34,6 +35,7 @@ Das Standard-SCM-Plugin und das Standard-KI-Plugin werden in den App-Einstellung
 
 - Für GitHub-Repositories wird `GitHubPlugin` als SCM gewählt; der GitHub-Token wird unter `Softwareschmiede.GitHub.Token` gespeichert.
 - Für KI-Läufe mit Claude wird `ClaudeCliPlugin` gewählt; der Anthropic API Key wird optional als `ANTHROPIC_API_KEY`-Umgebungsvariable übergeben.
+- Für KI-Läufe mit Codex wird `CodexPlugin` gewählt; optional kann ein absoluter Pfad zur `codex`-Executable unter `Softwareschmiede.Codex.ExecutablePath` gespeichert werden.
 
 ## Einschränkungen
 

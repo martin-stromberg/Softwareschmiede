@@ -66,7 +66,7 @@ Stand: **2026-06-11**
 | Projekt-, Aufgaben- und Protokollverwaltung | ✅ Implementiert | Blazor-UI inkl. Dashboard, Detailseiten und Verlauf |
 | SCM-Plugins | ✅ Implementiert | `GitHub`, `BitBucket` und `LocalDirectoryPlugin` produktiv verfügbar |
 | Separates Arbeitsverzeichnis mit Git-Workflow-Fallback | ✅ Implementiert | `git init`-Fallback, Pull ohne Merge (inkl. Nutzerhinweis), Push als Datei-Sync inkl. Delete-Sync über `git status` |
-| KI-Plugins | ✅ Implementiert | `GitHub Copilot` und `Claude CLI` produktiv verfügbar |
+| KI-Plugins | ✅ Implementiert | `GitHub Copilot`, `Claude CLI` und `Codex CLI` produktiv verfügbar |
 | Standardplugin-Mechanik | ✅ Implementiert | Auflösung: explizite Auswahl → gespeichertes Standardplugin → Fallback |
 | Folgeanweisungen mit Kontextsteuerung | ✅ Implementiert | Kontext mitgeben / ignorieren / neu beginnen |
 | Lokale Deploymentfähigkeit | ✅ Implementiert | Windows-zentrierter Betrieb, lokale SQLite + Credential Store |
@@ -265,7 +265,8 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 - **Plugin-Architektur** über `IKiPlugin`-Interface – austauschbar für verschiedene KI-Systeme
 - **GitHub Copilot-Plugin**: KI-Integration via `copilot` CLI
 - **Claude-CLI-Plugin** (`claude-cli-integration`): KI-Integration via `claude` CLI inkl. `ANTHROPIC_API_KEY`-Weitergabe aus dem Windows Credential Store
-- Provider-spezifische Kontext- und Task-Dateien (`*.copilot.context.md`, `*.claude.context.md`, `*.copilot-task.md`, `*.claude-task.md`)
+- **Codex-CLI-Plugin**: KI-Integration via `codex` CLI mit optional konfigurierbarem Executable-Pfad
+- Provider-spezifische Kontext- und Task-Dateien (`*.copilot.context.md`, `*.claude.context.md`, `*.codex.context.md`, `*.copilot-task.md`, `*.claude-task.md`, `*.codex-task.md`)
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Sidebar-Footer zeigt live die Anzahl laufender Automatisierungen; optionaler Auto-Shutdown-Toggle erscheint nur bei aktiven Läufen
 - **Benachrichtigungssystem für abgeschlossene KI-Aufgaben:** Abschlussereignisse aus `KiStartenAsync` werden über den `KiAufgabenBenachrichtigungsHub` verteilt und im `MainLayout` als Toast/Hinweiston verarbeitet (Modi: `Deaktiviert`, `NurAufgabenseite`, `Global`)
@@ -369,6 +370,7 @@ Die wichtigsten UI-Abläufe sind im [Benutzerleitfaden](docs/user-guide.md) sowi
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
 | **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
 | **Claude CLI** (`claude`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
+| **Codex CLI** (`codex`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.Codex` (`codex --version`) |
 | **GitHub Copilot** | aktives Abo | Optional – nur für Copilot-basierte KI-Läufe |
 | **Anthropic API Key** | vorhanden | Optional – nur für Claude-CLI-Läufe (Credential `Softwareschmiede.ClaudeCli.Token`) |
 
@@ -444,7 +446,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
 3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt erstellen und ein SCM-Plugin wählen
 4. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
-5. **KI-Plugin wählen (Pflicht)** – Copilot oder Claude CLI auswählen (explizit oder via Standardplugin/Fallback)
+5. **KI-Plugin wählen (Pflicht)** – Copilot, Claude CLI oder Codex CLI auswählen (explizit oder via Standardplugin/Fallback)
 6. **Optional: Agentenpaket wählen** – bei Bedarf ein kompatibles Paket aus `agent-packages/` zuweisen
 7. **Optional: Agent wählen** – bei Bedarf einen Agenten aus dem gewählten Paket setzen
 8. **KI-Lauf starten** – Prompt eingeben und den Prozess starten
@@ -491,15 +493,16 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 - `DELETE /api/diff/{id}` entfernt ein Diff; `POST /api/diff/{id}/invalidate-cache` invalidiert nur den Cache.
 - Referenzdokumentation: [HTTP-Endpunkte](docs/api/http-endpoints.md), [API-Index](docs/api/README.md)
 
-### KI-Plugin-Auswahl (Copilot oder Claude CLI)
+### KI-Plugin-Auswahl (Copilot, Claude CLI oder Codex CLI)
 
 - In den Einstellungen kann je Pluginart (`SourceCodeManagement`, `DevelopmentAutomation`) ein Standardplugin gespeichert werden.
 - Beim Prompt-Senden kann das KI-Plugin explizit ausgewählt werden; in der UI ist das Standardplugin für `DevelopmentAutomation` vorausgewählt.
 - Auflösungskette zur Laufzeit: **explizite Auswahl → gespeichertes Standardplugin → Fallback auf verfügbares Plugin**.
 - Für Start/Senden muss ein KI-Plugin aufgelöst werden (explizit oder über Standard/Fallback).
 - Agentenpaket und Agent bleiben optional; ohne Auswahl greift das Standardverhalten des gewählten KI-Plugins.
-- Bei installierten Plugins stehen aktuell **GitHub Copilot** und **Claude CLI** zur Verfügung.
+- Bei installierten Plugins stehen aktuell **GitHub Copilot**, **Claude CLI** und **Codex CLI** zur Verfügung.
 - Claude-Läufe nutzen den Credential-Key `Softwareschmiede.ClaudeCli.Token` und setzen `ANTHROPIC_API_KEY` für den CLI-Prozess.
+- Codex-Läufe nutzen standardmäßig `codex`; optional kann `Softwareschmiede.Codex.ExecutablePath` gesetzt werden.
 - Agentenpakete müssen für Claude einen `.github`-Ordner enthalten, damit sie als kompatibel gelten.
 
 ### Issue 58: Plugin-spezifische Agenten-Discovery/Auswahl
@@ -595,6 +598,7 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 |-----------|--------|
 | `Softwareschmiede.GitHub.Token` | GitHub Personal Access Token |
 | `Softwareschmiede.ClaudeCli.Token` | Anthropic API Key für Claude CLI (`ANTHROPIC_API_KEY`) |
+| `Softwareschmiede.Codex.ExecutablePath` | Optionaler absoluter Pfad zur Codex-CLI |
 
 ### Weitere Plugin-Konfiguration
 
@@ -611,7 +615,7 @@ cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANT
 
 - In **Einstellungen → Quellcodeverwaltung** und **Einstellungen → KI** können Standard-Plugins pro Pluginart gewählt und konfiguriert werden:
   - **Quellcodeverwaltung** (SourceCodeManagement): z. B. GitHub oder Local Directory
-  - **KI** (DevelopmentAutomation): z. B. GitHub Copilot oder Claude CLI
+  - **KI** (DevelopmentAutomation): z. B. GitHub Copilot, Claude CLI oder Codex CLI
 - Die Auswahl wird persistent in den App-Einstellungen (`DefaultScmPluginKey`, `DefaultKiPluginKey`) gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt
 - Nach Plugin-Auswahl können plugin-spezifische Einstellungen konfiguriert werden:
   - Die verfügbaren Felder werden vom Plugin via `GetSettingGroups()` definiert
@@ -671,7 +675,7 @@ Hinweise:
 
 ### Was sind Agentenpakete?
 
-Agentenpakete sind **Verzeichnisse mit `.agent.md`-Dateien**, die KI-Agenten und deren Instruktionen definieren. Sie werden beim Start eines KI-Laufs automatisch in das Arbeitsverzeichnis des Branches kopiert und vom KI-Plugin (z. B. GitHub Copilot oder Claude CLI) ausgewertet.
+Agentenpakete sind **Verzeichnisse mit `.agent.md`-Dateien**, die KI-Agenten und deren Instruktionen definieren. Sie werden beim Start eines KI-Laufs automatisch in das Arbeitsverzeichnis des Branches kopiert und vom KI-Plugin (z. B. GitHub Copilot, Claude CLI oder Codex CLI) ausgewertet.
 
 ### Speicherort
 
@@ -757,7 +761,8 @@ Softwareschmiede/                            # Solution Root
 │   ├── Softwareschmiede.Plugin.BitBucket/   # BitBucket Cloud & Self-Hosted Plugin
 │   ├── Softwareschmiede.Plugin.LocalDirectory/ # Lokales SCM-Plugin (WorkspaceMode)
 │   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
-│   └── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
+│   ├── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
+│   └── Softwareschmiede.Plugin.Codex/       # KI-Plugin (Codex CLI)
 ├── docs/                                    # Planungsdokumente und Architektur
 │   ├── features/72-wpf/                     # WPF-Migrationsdokumentation
 │   │   ├── requirement.md                   # Technische Anforderungsspezifikation
@@ -998,6 +1003,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] GitHub-Plugin (gh CLI) – vollständige Git-Integration
 - [x] GitHub Copilot-Plugin (copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
 - [x] Claude-CLI-Plugin (claude CLI) – KI-Steuerung inkl. Credential-Integration und Agentenpaket-Kompatibilitätsprüfung
+- [x] Codex-CLI-Plugin (codex CLI) – KI-Steuerung mit optional konfigurierbarem Executable-Pfad
 - [x] Blazor UI: Dashboard, Projekte, Aufgaben, Protokoll, Agentenpakete
 - [x] Folgeanweisungen mit Agent- und Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
 - [x] Windows Credential Store Integration

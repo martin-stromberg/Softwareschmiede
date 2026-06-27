@@ -17,6 +17,12 @@
 - [Einstellungen](einstellungen/index.md) — Bündelt alle systemweiten Konfigurationen: Plugin-Einstellungen, Arbeitsverzeichnis, Benachrichtigungen und Erscheinungsbild.
 - [Plugin-System](plugins/index.md) — SCM- und KI-Plugins werden als separate .NET-Klassenbibliotheken bereitgestellt und per `PluginManager` zur Laufzeit entdeckt.
 
+### KI-Plugins (Entwicklungsautomatisierung)
+
+- [Claude CLI](plugins/index.md) — Claude CLI aus Aufgaben heraus starten
+- [GitHub Copilot](plugins/index.md) — GitHub Copilot CLI aus Aufgaben heraus starten
+- [Codex CLI](plugins/index.md) — Codex CLI aus Aufgaben heraus starten
+
 ### SCM-Plugins (Quellcodeverwaltung)
 
 - [GitHub-Plugin](plugins/index.md) — GitHub.com Integration über GitHub CLI
