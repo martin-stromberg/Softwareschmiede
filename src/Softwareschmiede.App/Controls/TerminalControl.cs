@@ -64,6 +64,7 @@ public sealed class TerminalControl : FrameworkElement
         if (session == null)
         {
             _buffer = null;
+            InvalidateVisual();
             return;
         }
 
