@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Softwareschmiede.Domain.Terminal;
 
 namespace Softwareschmiede.Infrastructure.Terminal;
 
@@ -18,6 +19,10 @@ public sealed class PseudoConsoleSession : IDisposable
 
     /// <summary>Der verwaltete Prozess der Sitzung.</summary>
     public Process Process => _process;
+
+    /// <summary>Der Terminal-Buffer dieser Sitzung. Wird von <c>TerminalControl</c> gesetzt und
+    /// bei erneuter Anzeige wiederverwendet, damit der Bildschirminhalt erhalten bleibt.</summary>
+    public TerminalBuffer? Buffer { get; set; }
 
     /// <summary>Erstellt eine neue <see cref="PseudoConsoleSession"/>.</summary>
     /// <param name="pseudoConsole">Die zugehörige Pseudo Console.</param>

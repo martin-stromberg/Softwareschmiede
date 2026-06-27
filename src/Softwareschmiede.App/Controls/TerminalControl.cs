@@ -61,19 +61,37 @@ public sealed class TerminalControl : FrameworkElement
         _readCts?.Dispose();
         _readCts = null;
 
-        // Parser zurücksetzen, damit keine Zustandsreste der alten Session die neue Session beeinflussen.
-        _parser = new AnsiSequenceParser();
-
         if (session == null)
+        {
+            _buffer = null;
             return;
+        }
 
+        MeasureCellSize();
         var cols = CalculateCols();
         var rows = CalculateRows();
-        _buffer = new TerminalBuffer(cols, rows);
+
+        if (session.Buffer != null)
+        {
+            // Bestehenden Buffer wiederverwenden: Bildschirminhalt bleibt erhalten wenn der
+            // Anwender zur Aufgabe zurücknavigiert, ohne dass neue Ausgabe eintreffen muss.
+            _buffer = session.Buffer;
+            _buffer.Resize(cols, rows);
+        }
+        else
+        {
+            _buffer = new TerminalBuffer(cols, rows);
+            session.Buffer = _buffer;
+            // Parser zurücksetzen: neue Session, kein Zustandsrest der alten Session.
+            _parser = new AnsiSequenceParser();
+        }
 
         var cts = new CancellationTokenSource();
         _readCts = cts;
         _ = Task.Run(() => ReadLoopAsync(session, _buffer, cts.Token));
+
+        // Sofort rendern, damit vorhandener Bufferinhalt sichtbar wird ohne auf neue Ausgabe warten.
+        _ = Dispatcher.InvokeAsync(InvalidateVisual);
     }
 
     private async Task ReadLoopAsync(PseudoConsoleSession session, TerminalBuffer buffer, CancellationToken ct)
