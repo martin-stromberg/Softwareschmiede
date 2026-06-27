@@ -10,6 +10,8 @@ Das Terminal-System ermöglicht die direkte, interaktive Bedienung von KI-CLI-To
 
 Das System nutzt Windows Pseudo Console (ConPTY) API zum Starten des CLI-Prozesses. Der Prozess-Output wird als Byte-Stream aus einer anonymen Pipe gelesen und durch den `AnsiSequenceParser` in strukturierte Terminal-Ereignisse (Text, Cursor-Bewegung, Farben, Erase-Befehle) zerlegt. Ein `TerminalBuffer` verwaltet einen 2D-Grid aus `TerminalCell`-Objekten mit Zeichen, Farben und Text-Attributen. Das `TerminalControl` rendert diesen Buffer per `DrawingContext` mit monospace-Schriftart; Tastatureingaben werden durch `KeyToVt100Encoder` in VT100-Escape-Sequenzen konvertiert und in die Prozess-Input-Pipe geschrieben.
 
+Die Aufgabendetailansicht zeigt den Laufzeitstatus der CLI in der Fusszeile. `PseudoConsoleSession` verfolgt dafuer die letzte Ausgabe- und Eingabeaktivitaet: Frische I/O-Aktivitaet wird als laufende Ausfuehrung angezeigt; bleibt Ausgabe bei weiterhin laufendem Prozess aus, wird nach kurzer Zeit "Wartet auf Eingabe" angezeigt.
+
 ### Prozess-Lifecycle
 
 1. `KiAusfuehrungsService.StartWithPseudoConsoleAsync` erstellt eine Pseudo Console mit `CreatePseudoConsole` API.
@@ -19,6 +21,7 @@ Das System nutzt Windows Pseudo Console (ConPTY) API zum Starten des CLI-Prozess
 5. `TerminalControl.Session`-Property wird gesetzt; Control startet Read-Loop aus Output-Pipe.
 6. `AnsiSequenceParser.Parse` zerlegt eingehende Bytes; `TerminalBuffer.Apply` wendet Events an.
 7. `TerminalControl.OnRender` rendert `TerminalBuffer`-Inhalt per `DrawingContext`.
+8. `TaskDetailViewModel.CliStatusText` aktualisiert die Fusszeile bei Laufzeitstatus-Aenderungen der Session.
 
 ### Größenanpassung
 

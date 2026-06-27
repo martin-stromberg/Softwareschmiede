@@ -119,6 +119,8 @@ public sealed class TerminalControl : FrameworkElement
                 if (bytesRead == 0)
                     break;
 
+                session.MarkOutputActivity();
+
                 var events = _parser.Parse(data.AsSpan(0, bytesRead));
                 foreach (var evt in events)
                     buffer.Apply(evt);
@@ -219,7 +221,11 @@ public sealed class TerminalControl : FrameworkElement
         var bytes = KeyToVt100Encoder.Encode(e);
         if (bytes != null && Session?.InputStream != null)
         {
-            try { Session.InputStream.Write(bytes); }
+            try
+            {
+                Session.InputStream.Write(bytes);
+                Session.MarkInputActivity();
+            }
             catch { }
             e.Handled = true;
         }
@@ -233,7 +239,11 @@ public sealed class TerminalControl : FrameworkElement
         if (!string.IsNullOrEmpty(e.Text) && Session?.InputStream != null)
         {
             var bytes = KeyToVt100Encoder.EncodeText(e.Text);
-            try { Session.InputStream.Write(bytes); }
+            try
+            {
+                Session.InputStream.Write(bytes);
+                Session.MarkInputActivity();
+            }
             catch { }
             e.Handled = true;
         }
