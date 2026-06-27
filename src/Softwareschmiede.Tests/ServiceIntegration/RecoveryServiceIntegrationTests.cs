@@ -16,6 +16,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     private readonly ProjektService _projektService;
     private readonly Guid _projektId;
 
+    /// <summary>RecoveryServiceIntegrationTests.</summary>
     public RecoveryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
@@ -26,9 +27,12 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         _projektId = projekt.Id;
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
+    /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>.</summary>
     [Fact]
+    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>
     public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -42,7 +46,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         kandidaten.Should().Contain(aufgabe.Id);
     }
 
+    /// <summary><summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>.</summary>
     [Fact]
+    /// <summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>
     public async Task ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -56,7 +62,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         kandidaten.Should().NotContain(aufgabe.Id);
     }
 
+    /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>.</summary>
     [Fact]
+    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>
     public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Wartend);
@@ -70,7 +78,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         kandidaten.Should().Contain(aufgabe.Id);
     }
 
+    /// <summary><summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>.</summary>
     [Fact]
+    /// <summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>
     public async Task ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -84,7 +94,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
         kandidaten.Should().NotContain(aufgabe.Id);
     }
 
+    /// <summary><summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>.</summary>
     [Fact]
+    /// <summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>
     public async Task RecoverManuellAsync_Setzt_StatusAufGestartet()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -128,11 +140,14 @@ internal sealed class E2EFakeRunningStatusSource : IRunningAutomationStatusSourc
 {
     private readonly bool _isRunning;
 
+    /// <summary>E2EFakeRunningStatusSource.</summary>
     public E2EFakeRunningStatusSource(bool isRunning) => _isRunning = isRunning;
 
     public event Action<int, int>? RunningCountChanged;
 
+    /// <summary>IsRunning.</summary>
     public bool IsRunning(Guid aufgabeId) => _isRunning;
 
+    /// <summary>GetRunningCount.</summary>
     public int GetRunningCount() => _isRunning ? 1 : 0;
 }

@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace Softwareschmiede.Tests.Components;
 
+/// <summary>AppTests.</summary>
 public sealed class AppTests
 {
     /// <summary>

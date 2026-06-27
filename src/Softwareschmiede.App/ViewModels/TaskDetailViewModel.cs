@@ -9,6 +9,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App.ViewModels;
 
@@ -36,7 +37,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _isCliRunning;
     private string? _selectedKiPluginPrefix;
     private string? _optionalCliParameters;
-    private IntPtr _embeddedWindowHandle = IntPtr.Zero;
     private CancellationTokenSource? _ladenCts;
     private bool _isInfoViewVisible;
     private string? _editTitel;
@@ -75,6 +75,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
             OnPropertyChanged(nameof(KannCliStoppen));
+            OnPropertyChanged(nameof(KannCliNeuStarten));
             OnPropertyChanged(nameof(ShowEditPanel));
             OnPropertyChanged(nameof(ShowCliPanel));
             OnPropertyChanged(nameof(ShowDiffPanel));
@@ -86,6 +87,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Titel der Aufgabe.</summary>
+    /// <value>Der Titel der Aufgabe, oder ein Platzhaltertext während des Ladens.</value>
     public string AufgabeTitel => _aufgabe?.Titel ?? "(wird geladen…)";
 
     /// <summary>Status der Aufgabe.</summary>
@@ -113,6 +115,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             SetProperty(ref _isCliRunning, value);
             OnPropertyChanged(nameof(KannCliStoppen));
+            OnPropertyChanged(nameof(KannCliNeuStarten));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
@@ -121,6 +124,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
     public bool KannCliStoppen => _isCliRunning;
+
+    /// <summary>Gibt an, ob die CLI neu gestartet werden kann (Status Gestartet/Wartend, aber kein Prozess läuft).</summary>
+    public bool KannCliNeuStarten => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Gestartet
+        or Domain.Enums.AufgabeStatus.Wartend
+        && !_isCliRunning;
 
     /// <summary>Gewähltes KI-Plugin (Prefix).</summary>
     public string? SelectedKiPluginPrefix
@@ -136,17 +144,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _optionalCliParameters, value);
     }
 
-    /// <summary>Handle des eingebetteten CLI-Fensters (für ProcessWindowHost).</summary>
-    public IntPtr EmbeddedWindowHandle
-    {
-        get => _embeddedWindowHandle;
-        set => SetProperty(ref _embeddedWindowHandle, value);
-    }
-
     /// <summary>Protokolleinträge der Aufgabe.</summary>
+    /// <value>Die geladenen Protokolleinträge der Aufgabe.</value>
     public ObservableCollection<Protokolleintrag> Protokolleintraege { get; } = new();
 
     /// <summary>Verfügbare KI-Plugin-Prefixe.</summary>
+    /// <value>Die Liste der verfügbaren KI-Plugin-Prefixe.</value>
     public ObservableCollection<string> VerfuegbareKiPlugins { get; } = new();
 
     /// <summary>Steuert Sichtbarkeit zwischen Info-Panel und CLI-Fenster; Initial = false (CLI sichtbar).</summary>
@@ -189,8 +192,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         && !_isCliRunning
         && !string.IsNullOrEmpty(_editTitel);
 
-    /// <summary>CanExecute für LoeschenCommand: Status ∉ {Beendet, Archiviert} &amp;&amp; !IsCliRunning.</summary>
-    public bool KannLoeschen => _aufgabe?.Status is not (Domain.Enums.AufgabeStatus.Beendet or Domain.Enums.AufgabeStatus.Archiviert)
+    /// <summary>CanExecute für LoeschenCommand: Status ∉ {Archiviert} &amp;&amp; !IsCliRunning.</summary>
+    /// <value>true wenn die Aufgabe gelöscht werden kann.</value>
+    public bool KannLoeschen => _aufgabe?.Status is not Domain.Enums.AufgabeStatus.Archiviert
         && _aufgabe != null
         && !_isCliRunning;
 
@@ -210,6 +214,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Startet die Aufgabe: kombiniertes Klonen, Plugin-Auflösung und CLI-Start.</summary>
     public ICommand StartenCommand { get; }
+
+    /// <summary>Startet die CLI für eine bereits laufende Aufgabe neu (nach manuellem Stopp).</summary>
+    public ICommand CliNeustartenCommand { get; }
 
     /// <summary>Wechselt das KI-Plugin bei laufender CLI: Dialog, Stop, Restart.</summary>
     public ICommand PluginAendernCommand { get; }
@@ -235,27 +242,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
     public ICommand IssueBrowserOeffnenCommand { get; }
 
-    /// <summary>Event: Ein CLI-Prozess wurde gestartet, Handle ist verfügbar.</summary>
-    public event Action<System.Diagnostics.Process>? CliProzessGestartet;
+    /// <summary>Wird gefeuert, wenn eine neue <see cref="PseudoConsoleSession"/> gestartet wurde.</summary>
+    public event Action<PseudoConsoleSession>? PseudoConsoleSessionGestartet;
 
-    /// <summary>
-    /// Gibt den laufenden CLI-Prozess zurück, oder null wenn kein Prozess läuft.
-    /// Wird vom View-Loaded-Handler verwendet, um das Fenster einzubetten wenn
-    /// CliProzessGestartet bereits gefeuert hat bevor der Handler registriert wurde.
-    /// </summary>
-    public System.Diagnostics.Process? GetRunningProcess() => _kiService.GetRunningProcess(_aufgabeId);
+    /// <summary>Wird gefeuert, wenn der CLI-Prozess der aktuellen Aufgabe beendet wurde.</summary>
+    public event Action? CliGestoppt;
 
-    /// <summary>
-    /// Speichert das bekannte HWND des CLI-Fensters. SetParent ändert das HWND nicht,
-    /// daher kann dasselbe Handle nach Navigation-Zurück zum Wieder-Einbetten genutzt werden.
-    /// </summary>
-    public void SetCliWindowHandle(IntPtr handle) => _kiService.SetFensterHandle(_aufgabeId, handle);
-
-    /// <summary>
-    /// Gibt das gespeicherte HWND des CLI-Fensters zurück, oder <see cref="IntPtr.Zero"/>
-    /// wenn noch kein Handle bekannt ist.
-    /// </summary>
-    public IntPtr GetCliWindowHandle() => _kiService.GetFensterHandle(_aufgabeId);
+    /// <summary>Gibt die aktive <see cref="PseudoConsoleSession"/> für die aktuelle Aufgabe zurück, oder null.</summary>
+    /// <returns>Die aktive <see cref="PseudoConsoleSession"/>, oder null wenn keine Session läuft.</returns>
+    public PseudoConsoleSession? GetPseudoConsoleSession() => _kiService.GetPseudoConsoleSession(_aufgabeId);
 
     /// <inheritdoc cref="TaskDetailViewModel"/>
     public TaskDetailViewModel(
@@ -297,6 +292,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
         CliStoppenCommand = new AsyncRelayCommand(CliStoppenAsync, () => KannCliStoppen);
+        CliNeustartenCommand = new AsyncRelayCommand(CliNeustartenAsync, () => KannCliNeuStarten);
         StartenCommand = new AsyncRelayCommand(StartenAsync, () => AufgabeStatus == Domain.Enums.AufgabeStatus.Neu && !_isCliRunning);
         PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => ShowCliPanel && !_isCliRunning);
@@ -384,11 +380,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             await _kiService.StopCliAsync(_aufgabeId, ct);
-            _dispatcherInvoke(() =>
-            {
-                IsCliRunning = false;
-                EmbeddedWindowHandle = IntPtr.Zero;
-            });
+            _dispatcherInvoke(() => IsCliRunning = false);
         }
         catch (OperationCanceledException)
         {
@@ -398,6 +390,28 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "Fehler beim Stoppen des CLI für Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"CLI-Stoppfehler: {ex.Message}";
+        }
+    }
+
+    private async Task CliNeustartenAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty || _aufgabe is null)
+            return;
+
+        FehlerMeldung = null;
+
+        try
+        {
+            await CliAutomatischNeustartenAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim manuellen CLI-Neustart für Aufgabe {AufgabeId}.", _aufgabeId);
+            FehlerMeldung = $"CLI konnte nicht gestartet werden: {ex.Message}";
         }
     }
 
@@ -578,7 +592,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             IsCliRunning = status == CliProcessStatus.Gestartet;
             if (status != CliProcessStatus.Gestartet)
-                EmbeddedWindowHandle = IntPtr.Zero;
+                CliGestoppt?.Invoke();
         });
     }
 
@@ -627,12 +641,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             await LadenAsync(ct);
 
-            // ProzessStartenUndCliStartenAsync startet die CLI intern ohne CliProzessGestartet zu feuern.
-            // Das Event ist aber nötig, damit TaskDetailView.WaitForWindowHandleAsync den Prozess
-            // überwacht und EmbeddedWindowHandle setzt.
-            var runningProcess = _kiService.GetRunningProcess(_aufgabeId);
-            if (runningProcess != null)
-                CliProzessGestartet?.Invoke(runningProcess);
+            var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
+            if (session != null)
+                PseudoConsoleSessionGestartet?.Invoke(session);
         }
         catch (OperationCanceledException)
         {
@@ -673,11 +684,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            _dispatcherInvoke(() =>
-            {
-                IsCliRunning = false;
-                EmbeddedWindowHandle = IntPtr.Zero;
-            });
+            _dispatcherInvoke(() => IsCliRunning = false);
 
             var lokalerKlonPfad = _aufgabe.LokalerKlonPfad ?? string.Empty;
             await StartCliAndUpdateStateAsync(pluginPrefix, lokalerKlonPfad, _optionalCliParameters, ct);
@@ -727,7 +734,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IsCliRunning = true;
         try
         {
-            var handle = await _kiService.StartCliAsync(_aufgabeId, kiPlugin, lokalerKlonPfad, optionalParameters, ct);
+            var handle = await _kiService.StartWithPseudoConsoleAsync(_aufgabeId, kiPlugin, lokalerKlonPfad, optionalParameters, ct);
 
             SelectedKiPluginPrefix = pluginPrefix;
             if (!_kiService.IsRunning(_aufgabeId))
@@ -736,7 +743,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            CliProzessGestartet?.Invoke(handle.Process);
+            if (handle.PseudoConsoleSession != null)
+                PseudoConsoleSessionGestartet?.Invoke(handle.PseudoConsoleSession);
         }
         catch
         {

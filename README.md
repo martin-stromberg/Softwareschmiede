@@ -59,21 +59,22 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-06-11**
+Stand: **2026-06-27**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
 | Projekt-, Aufgaben- und Protokollverwaltung | ✅ Implementiert | Blazor-UI inkl. Dashboard, Detailseiten und Verlauf |
 | SCM-Plugins | ✅ Implementiert | `GitHub`, `BitBucket` und `LocalDirectoryPlugin` produktiv verfügbar |
 | Separates Arbeitsverzeichnis mit Git-Workflow-Fallback | ✅ Implementiert | `git init`-Fallback, Pull ohne Merge (inkl. Nutzerhinweis), Push als Datei-Sync inkl. Delete-Sync über `git status` |
-| KI-Plugins | ✅ Implementiert | `GitHub Copilot` und `Claude CLI` produktiv verfügbar |
+| KI-Plugins | ✅ Implementiert | `GitHub Copilot`, `Claude CLI` und `Codex CLI` produktiv verfügbar |
 | Standardplugin-Mechanik | ✅ Implementiert | Auflösung: explizite Auswahl → gespeichertes Standardplugin → Fallback |
 | Folgeanweisungen mit Kontextsteuerung | ✅ Implementiert | Kontext mitgeben / ignorieren / neu beginnen |
 | Lokale Deploymentfähigkeit | ✅ Implementiert | Windows-zentrierter Betrieb, lokale SQLite + Credential Store |
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests** |
+| **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung; Voraussetzung: Windows 10 Build 17763+ |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -265,7 +266,8 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 - **Plugin-Architektur** über `IKiPlugin`-Interface – austauschbar für verschiedene KI-Systeme
 - **GitHub Copilot-Plugin**: KI-Integration via `copilot` CLI
 - **Claude-CLI-Plugin** (`claude-cli-integration`): KI-Integration via `claude` CLI inkl. `ANTHROPIC_API_KEY`-Weitergabe aus dem Windows Credential Store
-- Provider-spezifische Kontext- und Task-Dateien (`*.copilot.context.md`, `*.claude.context.md`, `*.copilot-task.md`, `*.claude-task.md`)
+- **Codex-CLI-Plugin**: KI-Integration via `codex` CLI mit optional konfigurierbarem Executable-Pfad
+- Provider-spezifische Kontext- und Task-Dateien (`*.copilot.context.md`, `*.claude.context.md`, `*.codex.context.md`, `*.copilot-task.md`, `*.claude-task.md`, `*.codex-task.md`)
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Sidebar-Footer zeigt live die Anzahl laufender Automatisierungen; optionaler Auto-Shutdown-Toggle erscheint nur bei aktiven Läufen
 - **Benachrichtigungssystem für abgeschlossene KI-Aufgaben:** Abschlussereignisse aus `KiStartenAsync` werden über den `KiAufgabenBenachrichtigungsHub` verteilt und im `MainLayout` als Toast/Hinweiston verarbeitet (Modi: `Deaktiviert`, `NurAufgabenseite`, `Global`)
@@ -311,7 +313,7 @@ Das Projekt `src/Softwareschmiede.App` enthält die neue native WPF-Oberfläche 
 
 - **MVVM-Architektur:** Alle Views besitzen eigene ViewModels (`ViewModelBase` mit `INotifyPropertyChanged`)
 - **Dark Mode:** `DarkModeService` wechselt WPF-ResourceDictionary zwischen `DarkTheme.xaml` und `LightTheme.xaml`
-- **CLI-Fenstereinbettung:** `ProcessWindowHost`-Control bettet CLI-Prozessfenster via Win32 `SetParent` in die WPF-UI ein
+- **ConPTY-Terminal-Integration:** Interaktive KI-CLI-Prozesse (Claude CLI, Codex CLI, GitHub Copilot) laufen in einem eingebetteten `TerminalControl` mit nativer VT100-Ansi-Sequenz-Unterstützung; Tastatureingaben funktionieren nativ ohne Verzögerung
 - **Recovery-Banner:** `RecoveryBannerControl` zeigt beim Start automatisch erkannte Recovery-Kandidaten an (Aufgaben mit Heartbeat > 5 Min und Status `InArbeit`/`Wartend`)
 - **Status-Anzeige:** `StatusIndicatorControl` visualisiert den aktuellen Aufgabenstatus
 - **Audio-Benachrichtigungen:** `WpfAudioService` spielt WAV/MP3-Dateien über WPF-`MediaPlayer` ab
@@ -334,6 +336,37 @@ Die erweiterte Projektdetailansicht (`ProjectDetailView.xaml`) bietet eine volls
 - **Konsistente UX:** Ansicht für Projektanlage und -bearbeitung (Status "Neu" bei Anlage, bearbeitbare Felder)
 - **Validierung:** Projektname erforderlich, max. 100 Zeichen; Beschreibung max. 500 Zeichen
 - **Bestätigungsdialog:** MessageBox-Bestätigung vor dem Löschen eines Projekts
+
+#### Terminal-Integration via ConPTY (neu)
+
+Die Aufgabendetailansicht nutzt **Windows Pseudo Console (ConPTY) API** zur direkten, interaktiven Ausführung von KI-CLI-Prozessen:
+
+- **TerminalControl**: WPF-Element, das den Prozess-Output in Echtzeit rendert
+- **VT100-ANSI-Parsing**: `AnsiSequenceParser` zerlegt Escape-Sequenzen in strukturierte Events (Text, Cursor-Bewegung, Farben, Erase)
+- **Farbunterstützung**: SGR 3-bit (8 Farben), 8-bit (256 Farben) und 24-bit (True Color) RGB
+- **Keyboard-Input**: `KeyToVt100Encoder` konvertiert WPF-Tastatureingaben (Pfeiltasten, F1–F12, Ctrl+C, etc.) in VT100-Sequenzen
+- **Größenanpassung**: Terminal-Zeilen/-Spalten passen sich automatisch an verfügbare Pixel an; `ResizePseudoConsole` synchronisiert die echte Terminalsize
+- **Scrollback-Puffer**: 1000-Zeilen-Ringpuffer für Scroll-Funktionalität
+
+**Technische Komponenten:**
+- `PseudoConsole` — P/Invoke-Wrapper für ConPTY-Handle und Pipes
+- `PseudoConsoleSession` — koordiniert Prozess, Input/Output-Pipes, Resize
+- `PseudoConsoleProcessStarter` — startet CLI-Prozess mit PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE
+- `TerminalBuffer` — 2D-Grid aus `TerminalCell`-Objekten mit Farben und Attributen
+- `AnsiSequenceParser` — zustandsbehafteter VT100-Parser
+- `KeyToVt100Encoder` — WPF Key → VT100 Byte-Sequenz Mapping
+
+**Beispiele:**
+- Claude CLI direkt in der Aufgabenansicht bedienen, ohne das Fenster zu wechseln
+- Codex CLI mit voller Farbunterstützung interaktiv nutzen
+- Tastatureingaben funktionieren nativ ohne Verzögerung
+
+**Bekannte Grenzen:**
+- Scrollback-Puffer auf 1000 Zeilen begrenzt (ältere Zeilen gehen verloren)
+- Mouse-Tracking-Sequenzen werden nicht unterstützt (nicht erforderlich für Standard-CLI-Verwendung)
+- OSC-Sequenzen (z. B. Fenstertitel) werden verworfen
+
+**Voraussetzung:** Windows 10 Build 17763+ erforderlich (Projekt zielt auf `net10.0-windows10.0.17763.0`)
 
 **Vereinfachtes Aufgaben-Statusmodell (WPF):**
 
@@ -363,12 +396,13 @@ Die wichtigsten UI-Abläufe sind im [Benutzerleitfaden](docs/user-guide.md) sowi
 
 | Voraussetzung | Version | Hinweis |
 |---------------|---------|---------|
-| **Windows** | 10 / 11 | Pflicht – Windows Credential Store und WPF werden benötigt |
-| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) – WPF-Projekt (`net10.0-windows`) erfordert Windows-SDK |
+| **Windows** | 10 (Build 17763+) / 11 | Pflicht – Windows Credential Store, WPF und Pseudo Console API (ConPTY) werden benötigt |
+| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) – WPF-Projekt (`net10.0-windows10.0.17763.0`) erfordert Windows-SDK und Zielversion mindestens Build 17763 |
 | **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen |
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
 | **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
 | **Claude CLI** (`claude`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
+| **Codex CLI** (`codex`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.Codex` (`codex --version`) |
 | **GitHub Copilot** | aktives Abo | Optional – nur für Copilot-basierte KI-Läufe |
 | **Anthropic API Key** | vorhanden | Optional – nur für Claude-CLI-Läufe (Credential `Softwareschmiede.ClaudeCli.Token`) |
 
@@ -444,7 +478,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
 3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt erstellen und ein SCM-Plugin wählen
 4. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
-5. **KI-Plugin wählen (Pflicht)** – Copilot oder Claude CLI auswählen (explizit oder via Standardplugin/Fallback)
+5. **KI-Plugin wählen (Pflicht)** – Copilot, Claude CLI oder Codex CLI auswählen (explizit oder via Standardplugin/Fallback)
 6. **Optional: Agentenpaket wählen** – bei Bedarf ein kompatibles Paket aus `agent-packages/` zuweisen
 7. **Optional: Agent wählen** – bei Bedarf einen Agenten aus dem gewählten Paket setzen
 8. **KI-Lauf starten** – Prompt eingeben und den Prozess starten
@@ -491,15 +525,16 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 - `DELETE /api/diff/{id}` entfernt ein Diff; `POST /api/diff/{id}/invalidate-cache` invalidiert nur den Cache.
 - Referenzdokumentation: [HTTP-Endpunkte](docs/api/http-endpoints.md), [API-Index](docs/api/README.md)
 
-### KI-Plugin-Auswahl (Copilot oder Claude CLI)
+### KI-Plugin-Auswahl (Copilot, Claude CLI oder Codex CLI)
 
 - In den Einstellungen kann je Pluginart (`SourceCodeManagement`, `DevelopmentAutomation`) ein Standardplugin gespeichert werden.
 - Beim Prompt-Senden kann das KI-Plugin explizit ausgewählt werden; in der UI ist das Standardplugin für `DevelopmentAutomation` vorausgewählt.
 - Auflösungskette zur Laufzeit: **explizite Auswahl → gespeichertes Standardplugin → Fallback auf verfügbares Plugin**.
 - Für Start/Senden muss ein KI-Plugin aufgelöst werden (explizit oder über Standard/Fallback).
 - Agentenpaket und Agent bleiben optional; ohne Auswahl greift das Standardverhalten des gewählten KI-Plugins.
-- Bei installierten Plugins stehen aktuell **GitHub Copilot** und **Claude CLI** zur Verfügung.
+- Bei installierten Plugins stehen aktuell **GitHub Copilot**, **Claude CLI** und **Codex CLI** zur Verfügung.
 - Claude-Läufe nutzen den Credential-Key `Softwareschmiede.ClaudeCli.Token` und setzen `ANTHROPIC_API_KEY` für den CLI-Prozess.
+- Codex-Läufe nutzen standardmäßig `codex`; optional kann `Softwareschmiede.Codex.ExecutablePath` gesetzt werden.
 - Agentenpakete müssen für Claude einen `.github`-Ordner enthalten, damit sie als kompatibel gelten.
 
 ### Issue 58: Plugin-spezifische Agenten-Discovery/Auswahl
@@ -595,6 +630,7 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 |-----------|--------|
 | `Softwareschmiede.GitHub.Token` | GitHub Personal Access Token |
 | `Softwareschmiede.ClaudeCli.Token` | Anthropic API Key für Claude CLI (`ANTHROPIC_API_KEY`) |
+| `Softwareschmiede.Codex.ExecutablePath` | Optionaler absoluter Pfad zur Codex-CLI |
 
 ### Weitere Plugin-Konfiguration
 
@@ -611,7 +647,7 @@ cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANT
 
 - In **Einstellungen → Quellcodeverwaltung** und **Einstellungen → KI** können Standard-Plugins pro Pluginart gewählt und konfiguriert werden:
   - **Quellcodeverwaltung** (SourceCodeManagement): z. B. GitHub oder Local Directory
-  - **KI** (DevelopmentAutomation): z. B. GitHub Copilot oder Claude CLI
+  - **KI** (DevelopmentAutomation): z. B. GitHub Copilot, Claude CLI oder Codex CLI
 - Die Auswahl wird persistent in den App-Einstellungen (`DefaultScmPluginKey`, `DefaultKiPluginKey`) gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt
 - Nach Plugin-Auswahl können plugin-spezifische Einstellungen konfiguriert werden:
   - Die verfügbaren Felder werden vom Plugin via `GetSettingGroups()` definiert
@@ -671,7 +707,7 @@ Hinweise:
 
 ### Was sind Agentenpakete?
 
-Agentenpakete sind **Verzeichnisse mit `.agent.md`-Dateien**, die KI-Agenten und deren Instruktionen definieren. Sie werden beim Start eines KI-Laufs automatisch in das Arbeitsverzeichnis des Branches kopiert und vom KI-Plugin (z. B. GitHub Copilot oder Claude CLI) ausgewertet.
+Agentenpakete sind **Verzeichnisse mit `.agent.md`-Dateien**, die KI-Agenten und deren Instruktionen definieren. Sie werden beim Start eines KI-Laufs automatisch in das Arbeitsverzeichnis des Branches kopiert und vom KI-Plugin (z. B. GitHub Copilot, Claude CLI oder Codex CLI) ausgewertet.
 
 ### Speicherort
 
@@ -757,7 +793,8 @@ Softwareschmiede/                            # Solution Root
 │   ├── Softwareschmiede.Plugin.BitBucket/   # BitBucket Cloud & Self-Hosted Plugin
 │   ├── Softwareschmiede.Plugin.LocalDirectory/ # Lokales SCM-Plugin (WorkspaceMode)
 │   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
-│   └── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
+│   ├── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
+│   └── Softwareschmiede.Plugin.Codex/       # KI-Plugin (Codex CLI)
 ├── docs/                                    # Planungsdokumente und Architektur
 │   ├── features/72-wpf/                     # WPF-Migrationsdokumentation
 │   │   ├── requirement.md                   # Technische Anforderungsspezifikation
@@ -998,6 +1035,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] GitHub-Plugin (gh CLI) – vollständige Git-Integration
 - [x] GitHub Copilot-Plugin (copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
 - [x] Claude-CLI-Plugin (claude CLI) – KI-Steuerung inkl. Credential-Integration und Agentenpaket-Kompatibilitätsprüfung
+- [x] Codex-CLI-Plugin (codex CLI) – KI-Steuerung mit optional konfigurierbarem Executable-Pfad
 - [x] Blazor UI: Dashboard, Projekte, Aufgaben, Protokoll, Agentenpakete
 - [x] Folgeanweisungen mit Agent- und Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
 - [x] Windows Credential Store Integration

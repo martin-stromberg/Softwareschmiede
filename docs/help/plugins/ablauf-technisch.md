@@ -40,6 +40,7 @@ Beteiligte Komponenten:
 - `CliKiPluginBase.DiscoverAgents(path, relativeAgentDirectory)` — Liest `.md`-Dateien aus dem Agentenverzeichnis
 - `ClaudeCliPlugin` liest aus `.claude/commands/`
 - `GitHubCopilotPlugin` liest aus `.github/prompts/`
+- `CodexPlugin` startet die lokal verfügbare `codex`-CLI und kann optional über `Softwareschmiede.Codex.ExecutablePath` auf eine konkrete Executable zeigen
 
 ## Diagramm
 

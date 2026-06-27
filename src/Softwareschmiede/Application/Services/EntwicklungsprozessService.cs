@@ -222,7 +222,7 @@ public sealed class EntwicklungsprozessService
             }
 
             var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
-            await _kiAusfuehrungsService.StartCliAsync(aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct);
+            await _kiAusfuehrungsService.StartWithPseudoConsoleAsync(aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct);
         }
         catch (OperationCanceledException)
         {

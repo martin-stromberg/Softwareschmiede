@@ -26,6 +26,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Guid _projektId = Guid.NewGuid();
 
+    /// <summary>TaskDetailViewModelTests.</summary>
     public TaskDetailViewModelTests()
     {
         _db = TestDbContextFactory.Create();
@@ -98,6 +99,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _db.SaveChanges();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         _kiService.Dispose();
@@ -267,16 +269,16 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.KannLoeschen.Should().BeTrue();
     }
 
-    /// <summary>KannLoeschen ist false wenn Status=Beendet.</summary>
+    /// <summary>KannLoeschen ist true wenn Status=Beendet (beendete Aufgaben können gelöscht werden).</summary>
     [Fact]
-    public async Task KannLoeschen_IsFalse_WhenStatusBeendet()
+    public async Task KannLoeschen_IsTrue_WhenStatusBeendet()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Beendet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.KannLoeschen.Should().BeFalse();
+        sut.KannLoeschen.Should().BeTrue();
     }
 
     /// <summary>KannLoeschen ist false wenn Status=Archiviert.</summary>
@@ -441,16 +443,16 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
     }
 
-    /// <summary>LoeschenCommand hat CanExecute false wenn Status=Beendet.</summary>
+    /// <summary>LoeschenCommand hat CanExecute true wenn Status=Beendet (beendete Aufgaben können gelöscht werden).</summary>
     [Fact]
-    public async Task LoeschenCommand_CanExecuteFalse_WennStatusBeendet()
+    public async Task LoeschenCommand_CanExecuteTrue_WennStatusBeendet()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Beendet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.LoeschenCommand.CanExecute(null).Should().BeFalse();
+        sut.LoeschenCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>LoeschenCommand ruft AufgabeListeAktualisierenCallback auf nach erfolgreichem Löschen.</summary>
@@ -710,20 +712,19 @@ public sealed class TaskDetailViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// StartenAsync muss CliProzessGestartet feuern, damit TaskDetailView.WaitForWindowHandleAsync
-    /// aufgerufen wird und EmbeddedWindowHandle gesetzt werden kann.
-    /// Schlägt fehl solange ProzessStartenUndCliStartenAsync das Event nicht auslöst.
+    /// StartenAsync muss PseudoConsoleSessionGestartet feuern, damit TaskDetailView
+    /// das TerminalControl mit der Session verbinden kann.
     /// </summary>
     [Fact]
-    public async Task StartenAsync_FiresCliProzessGestartet_NachErfolgreichemStart()
+    public async Task StartenAsync_FiresPseudoConsoleSessionGestartet_NachErfolgreichemStart()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        System.Diagnostics.Process? gemeldetProzess = null;
-        sut.CliProzessGestartet += p => gemeldetProzess = p;
+        Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession? gemeldetSession = null;
+        sut.PseudoConsoleSessionGestartet += s => gemeldetSession = s;
 
         _dialogServiceMock
             .Setup(d => d.ShowPluginSelectionDialogAsync(
@@ -732,17 +733,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
-        gemeldetProzess.Should().NotBeNull(
-            "CliProzessGestartet muss nach StartenCommand feuern, damit EmbeddedWindowHandle gesetzt werden kann");
+        gemeldetSession.Should().NotBeNull(
+            "PseudoConsoleSessionGestartet muss nach StartenCommand feuern, damit das TerminalControl die Session erhält");
     }
 
     /// <summary>
-    /// GetRunningProcess gibt nach dem Auto-Restart den laufenden Prozess zurück.
-    /// Das erlaubt TaskDetailView.xaml.cs im Loaded-Handler das Fenster auch dann einzubetten,
-    /// wenn CliProzessGestartet schon gefeuert hat bevor der Handler registriert wurde.
+    /// GetPseudoConsoleSession gibt nach dem Auto-Restart die laufende Session zurück.
+    /// Das erlaubt <see cref="Softwareschmiede.App.Views.TaskDetailView"/> im Loaded-Handler die Session
+    /// auch dann zu holen, wenn PseudoConsoleSessionGestartet schon gefeuert hat.
     /// </summary>
     [Fact]
-    public async Task GetRunningProcess_ReturnsProcess_AfterAutoRestartInLadenAsync()
+    public async Task GetPseudoConsoleSession_ReturnsSession_AfterAutoRestartInLadenAsync()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Auto-Restart-Aufgabe", "Beschreibung");
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", Path.GetTempPath());
@@ -752,23 +753,23 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        // Simuliert: Loaded feuert NACH LadenAsync/CliProzessGestartet.
-        // Der View ruft GetRunningProcess() im Loaded-Handler auf und startet WaitForWindowHandleAsync manuell.
-        var process = sut.GetRunningProcess();
+        // Simuliert: Loaded feuert NACH LadenAsync/PseudoConsoleSessionGestartet.
+        // Der View ruft GetPseudoConsoleSession() im Loaded-Handler auf und setzt TerminalConsole.Session direkt.
+        var session = sut.GetPseudoConsoleSession();
 
-        process.Should().NotBeNull(
-            "GetRunningProcess muss den laufenden Prozess liefern damit der View EmbeddedWindowHandle " +
-            "setzen kann wenn Loaded nach CliProzessGestartet feuert");
+        session.Should().NotBeNull(
+            "GetPseudoConsoleSession muss die Session liefern damit der View das TerminalControl verbinden kann " +
+            "wenn Loaded nach PseudoConsoleSessionGestartet feuert");
     }
 
     /// <summary>
     /// Navigiert der Anwender zurück (Dispose des alten VM), läuft die CLI weiter.
     /// Öffnet er die Aufgabe erneut, muss das neue VM IsCliRunning=true melden
-    /// und GetRunningProcess() den Prozess zurückgeben, damit der Loaded-Handler
-    /// das Fenster wieder einbetten kann.
+    /// und GetPseudoConsoleSession() die Session zurückgeben, damit der Loaded-Handler
+    /// das TerminalControl verbinden kann.
     /// </summary>
     [Fact]
-    public async Task NachNavigateBack_WiederoeffnenFindetLaufendenProzessUndSetzIsCliRunning()
+    public async Task NachNavigateBack_WiederoeffnenFindetLaufendeSessionUndSetzIsCliRunning()
     {
         // Aufgabe starten
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
@@ -791,47 +792,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         zweiteVm.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
 
-        // CLI muss noch laufen und GetRunningProcess muss den Prozess liefern
+        // CLI muss noch laufen und GetPseudoConsoleSession muss die Session liefern
         zweiteVm.IsCliRunning.Should().BeTrue(
             "CLI soll nach Navigation-Zurück weiterlaufen");
-        zweiteVm.GetRunningProcess().Should().NotBeNull(
-            "GetRunningProcess muss den Prozess zurückgeben damit der Loaded-Handler das Fenster wieder einbetten kann");
-    }
-
-    /// <summary>
-    /// Nach dem ersten Einbetten (View ruft SetCliWindowHandle auf) wird das HWND in
-    /// KiAusfuehrungsService gespeichert. Ein neues VM nach Navigation-Zurück findet
-    /// dasselbe Handle via GetCliWindowHandle – ohne erneutes process.MainWindowHandle-Polling.
-    /// </summary>
-    [Fact]
-    public async Task SetUndGetCliWindowHandle_SpeichertHandleAufgabenbezogen()
-    {
-        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
-        var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(
-                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
-
-        // View simuliert: Handle nach erstem Einbetten speichern
-        var fakeHwnd = new IntPtr(0x1234ABCD);
-        sut.SetCliWindowHandle(fakeHwnd);
-
-        sut.GetCliWindowHandle().Should().Be(fakeHwnd,
-            "GetCliWindowHandle muss dasselbe Handle zurückgeben das via SetCliWindowHandle gespeichert wurde");
-
-        // Nach Navigation-Zurück (Dispose) muss neues VM dasselbe Handle finden
-        sut.Dispose();
-        var zweiteVm = CreateSut();
-        zweiteVm.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
-
-        zweiteVm.GetCliWindowHandle().Should().Be(fakeHwnd,
-            "Neues VM muss das gespeicherte HWND finden damit der Loaded-Handler das Fenster direkt einbetten kann");
+        zweiteVm.GetPseudoConsoleSession().Should().NotBeNull(
+            "GetPseudoConsoleSession muss die Session zurückgeben damit der Loaded-Handler das TerminalControl verbinden kann");
     }
 
     // --- PluginAendernCommand ---

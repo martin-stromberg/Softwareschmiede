@@ -15,6 +15,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     private readonly AufgabeService _sut;
     private readonly Guid _projektId = Guid.NewGuid();
 
+    /// <summary>AufgabeStatusTransitionTests.</summary>
     public AufgabeStatusTransitionTests()
     {
         _db = TestDbContextFactory.Create();
@@ -30,6 +31,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
         _db.SaveChanges();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     /// <summary>Direkter Übergang Neu → Gestartet ist erlaubt.</summary>

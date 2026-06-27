@@ -101,6 +101,7 @@ public sealed class PluginManager : IPluginManager
         return name.Equals("Softwareschmiede.Plugin.LocalDirectory", StringComparison.OrdinalIgnoreCase)
             || name.Equals("Softwareschmiede.Plugin.KiSimulator", StringComparison.OrdinalIgnoreCase)
             || name.Equals("Softwareschmiede.Plugin.ClaudeCli", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("Softwareschmiede.Plugin.Codex", StringComparison.OrdinalIgnoreCase)
             || name.Equals("Softwareschmiede.Plugin.GitHubCopilot", StringComparison.OrdinalIgnoreCase);
     }
 

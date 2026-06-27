@@ -232,8 +232,11 @@ public sealed class PluginSelectionServiceTests
         public override string PluginName => name;
         public override string PluginPrefix => prefix;
         public override PluginType PluginType => PluginType.DevelopmentAutomation;
+        /// <summary>IReadOnlyList.</summary>
         public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
+        /// <summary>SupportsSessionContinuation.</summary>
         public override bool SupportsSessionContinuation() => false;
+        /// <summary>Task.</summary>
         public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
 
         protected override System.Diagnostics.ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)

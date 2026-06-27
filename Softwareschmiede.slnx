@@ -2,6 +2,7 @@
   <Folder Name="/Plugins/">
     <Project Path="plugins/Softwareschmiede.Plugin.BitBucket/Softwareschmiede.Plugin.BitBucket.csproj" Id="2143713d-d8c9-4304-a4bb-880aeec7a309" />
     <Project Path="plugins/Softwareschmiede.Plugin.ClaudeCli/Softwareschmiede.Plugin.ClaudeCli.csproj" />
+    <Project Path="plugins/Softwareschmiede.Plugin.Codex/Softwareschmiede.Plugin.Codex.csproj" />
     <Project Path="plugins/Softwareschmiede.Plugin.GitHub/Softwareschmiede.Plugin.GitHub.csproj" />
     <Project Path="plugins/Softwareschmiede.Plugin.GitHubCopilot/Softwareschmiede.Plugin.GitHubCopilot.csproj" />
     <Project Path="plugins/Softwareschmiede.Plugin.KiSimulator/Softwareschmiede.Plugin.KiSimulator.csproj" />

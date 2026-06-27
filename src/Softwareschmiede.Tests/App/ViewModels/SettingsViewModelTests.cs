@@ -23,6 +23,7 @@ public sealed class SettingsViewModelTests : IDisposable
     private readonly InMemoryCredentialStoreForSettings _credentialStore;
     private readonly PluginSettingsService _pluginSettingsService;
 
+    /// <summary>SettingsViewModelTests.</summary>
     public SettingsViewModelTests()
     {
         _db = TestDbContextFactory.Create();
@@ -43,6 +44,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginSettingsService = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private SettingsViewModel CreateSut() =>
@@ -261,6 +263,8 @@ internal sealed class InMemoryCredentialStoreForSettings : ICredentialStore
     private readonly Dictionary<string, string> _store = new();
 
     public string? GetCredential(string key) => _store.TryGetValue(key, out var v) ? v : null;
+    /// <summary>SetCredential.</summary>
     public void SetCredential(string key, string value) => _store[key] = value;
+    /// <summary>DeleteCredential.</summary>
     public void DeleteCredential(string key) => _store.Remove(key);
 }

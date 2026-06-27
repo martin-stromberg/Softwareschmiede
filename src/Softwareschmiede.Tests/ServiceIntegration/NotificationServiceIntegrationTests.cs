@@ -16,6 +16,7 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
     private readonly BenachrichtigungsEinstellungenService _einstellungenService;
     private readonly BenachrichtigungsAuditService _auditService;
 
+    /// <summary>NotificationServiceIntegrationTests.</summary>
     public NotificationServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
@@ -23,27 +24,36 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
         _auditService = new BenachrichtigungsAuditService(_db, NullLogger<BenachrichtigungsAuditService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
+    /// <summary><summary>BenachrichtigungsModus_Banner_IstVorhanden.</summary>.</summary>
     [Fact]
+    /// <summary>BenachrichtigungsModus_Banner_IstVorhanden.</summary>
     public void BenachrichtigungsModus_Banner_IstVorhanden()
     {
         Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Banner);
     }
 
+    /// <summary><summary>BenachrichtigungsModus_Ton_IstVorhanden.</summary>.</summary>
     [Fact]
+    /// <summary>BenachrichtigungsModus_Ton_IstVorhanden.</summary>
     public void BenachrichtigungsModus_Ton_IstVorhanden()
     {
         Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Ton);
     }
 
+    /// <summary><summary>BenachrichtigungsModus_Deaktiviert_IstVorhanden.</summary>.</summary>
     [Fact]
+    /// <summary>BenachrichtigungsModus_Deaktiviert_IstVorhanden.</summary>
     public void BenachrichtigungsModus_Deaktiviert_IstVorhanden()
     {
         Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Deaktiviert);
     }
 
+    /// <summary><summary>BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen.</summary>.</summary>
     [Fact]
+    /// <summary>BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen.</summary>
     public async Task BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen()
     {
         var benutzerId = "test-user";
@@ -56,7 +66,9 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
         geladen.TonModus.Should().Be(BenachrichtigungsModus.Ton);
     }
 
+    /// <summary><summary>BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus.</summary>.</summary>
     [Fact]
+    /// <summary>BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus.</summary>
     public async Task BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus()
     {
         var benutzerId = "audit-user";

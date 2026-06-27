@@ -141,6 +141,11 @@
             "type": "command",
             "statusMessage": "Checking Razor localization...",
             "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_razor_l10n.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking NuGet package versions...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_nuget_versions.py\""
           }
         ]
       }

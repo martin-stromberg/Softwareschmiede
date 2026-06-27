@@ -18,6 +18,7 @@ public sealed class ProtokollServiceTests : IDisposable
     private readonly Guid _aufgabeId = new Guid("22222222-2222-2222-2222-222222222222");
     private readonly Guid _projektId = new Guid("33333333-3333-3333-3333-333333333333");
 
+    /// <summary>ProtokollServiceTests.</summary>
     public ProtokollServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -43,6 +44,7 @@ public sealed class ProtokollServiceTests : IDisposable
         _db.SaveChanges();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     /// <summary>AddEintragAsync erstellt und speichert einen Protokolleintrag.</summary>

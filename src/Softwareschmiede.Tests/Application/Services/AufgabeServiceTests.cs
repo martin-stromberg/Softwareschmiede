@@ -17,6 +17,7 @@ public sealed class AufgabeServiceTests : IDisposable
     private readonly AufgabeService _sut;
     private readonly Guid _projektId = new Guid("11111111-1111-1111-1111-111111111111");
 
+    /// <summary>AufgabeServiceTests.</summary>
     public AufgabeServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -34,6 +35,7 @@ public sealed class AufgabeServiceTests : IDisposable
         _db.SaveChanges();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     /// <summary>CreateAsync erstellt eine Aufgabe mit Status Offen.</summary>

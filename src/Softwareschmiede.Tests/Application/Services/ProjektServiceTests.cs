@@ -17,6 +17,7 @@ public sealed class ProjektServiceTests : IDisposable
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly ProjektService _sut;
 
+    /// <summary>ProjektServiceTests.</summary>
     public ProjektServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -26,6 +27,7 @@ public sealed class ProjektServiceTests : IDisposable
         _sut = new ProjektService(_db, _loggerMock.Object, _pluginManagerMock.Object);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private static Mock<IGitPlugin> CreatePluginMockWithRepositories(params AvailableRepository[] repositories)

@@ -21,6 +21,7 @@ public sealed class ProjectListViewModelTests : IDisposable
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
 
+    /// <summary>ProjectListViewModelTests.</summary>
     public ProjectListViewModelTests()
     {
         _db = TestDbContextFactory.Create();
@@ -33,6 +34,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private ProjectListViewModel CreateSut()

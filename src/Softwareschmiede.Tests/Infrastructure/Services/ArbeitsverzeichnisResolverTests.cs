@@ -7,9 +7,12 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Services;
 
+/// <summary>ArbeitsverzeichnisResolverTests.</summary>
 public sealed class ArbeitsverzeichnisResolverTests
 {
+    /// <summary><summary>ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable.</summary>.</summary>
     [Fact]
+    /// <summary>ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable.</summary>
     public async Task ResolveAsync_ShouldReturnConfiguredPath_WhenPathIsWritable()
     {
         await using var db = TestDbContextFactory.Create();
@@ -30,7 +33,9 @@ public sealed class ArbeitsverzeichnisResolverTests
         }
     }
 
+    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists.</summary>.</summary>
     [Fact]
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists.</summary>
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenNoConfigExists()
     {
         await using var db = TestDbContextFactory.Create();
@@ -44,7 +49,9 @@ public sealed class ArbeitsverzeichnisResolverTests
         result.ResolvedPath.Should().Be(Path.GetTempPath());
     }
 
+    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile.</summary>.</summary>
     [Fact]
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile.</summary>
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsFile()
     {
         await using var db = TestDbContextFactory.Create();
@@ -74,7 +81,9 @@ public sealed class ArbeitsverzeichnisResolverTests
         }
     }
 
+    /// <summary><summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid.</summary>.</summary>
     [Fact]
+    /// <summary>ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid.</summary>
     public async Task ResolveAsync_ShouldFallbackToTemp_WhenConfiguredPathIsInvalid()
     {
         await using var db = TestDbContextFactory.Create();

@@ -12,12 +12,14 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 {
     private readonly KiAusfuehrungsService _sut;
 
+    /// <summary>KiAusfuehrungsServiceTests.</summary>
     public KiAusfuehrungsServiceTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         _sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _sut.Dispose();
 
     /// <summary>IsRunning returns false for unknown task.</summary>
@@ -102,6 +104,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         handle.Should().NotBeNull();
         handle.AufgabeId.Should().Be(aufgabeId);
+    }
+
+    /// <summary>GetPseudoConsoleSession gibt null zurück wenn keine ConPTY-Session gestartet wurde.</summary>
+    [Fact]
+    public void GetPseudoConsoleSession_GibtNull_OhneSession()
+    {
+        _sut.GetPseudoConsoleSession(Guid.NewGuid()).Should().BeNull();
     }
 
     /// <summary>

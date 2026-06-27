@@ -11,6 +11,7 @@ namespace Softwareschmiede.Domain.ValueObjects;
 /// <param name="Description">Optionale Beschreibung / Hinweistext unterhalb des Feldes.</param>
 /// <param name="IsRequired">Gibt an ob das Feld Pflicht ist.</param>
 /// <param name="EnumOptions">Zulässige Optionen für Enum-Felder.</param>
+/// <param name="DefaultValue">Optionaler Standardwert, wenn noch kein Wert gespeichert ist.</param>
 public sealed record PluginSettingField(
     string Key,
     string Label,
@@ -18,4 +19,5 @@ public sealed record PluginSettingField(
     string? Placeholder = null,
     string? Description = null,
     bool IsRequired = false,
-    IReadOnlyList<string>? EnumOptions = null);
+    IReadOnlyList<string>? EnumOptions = null,
+    string? DefaultValue = null);

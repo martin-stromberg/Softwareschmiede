@@ -23,6 +23,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
 
+    /// <summary>ProjectDetailViewModelTests.</summary>
     public ProjectDetailViewModelTests()
     {
         _db = TestDbContextFactory.Create();
@@ -34,6 +35,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private ProjectDetailViewModel CreateSut(

@@ -9,13 +9,19 @@
 
 ## Benutzeroberfläche
 
-- [CLI-Fenster-Einbettung](terminal/index.md) — Das CLI-Fenster des KI-Tools wird via Win32 `SetParent` direkt in die WPF-Aufgabendetailansicht eingebettet.
+- [Terminal-Integration](terminal/index.md) — KI-CLI-Tools (Claude, Codex, GitHub Copilot) werden über Windows Pseudo Console (ConPTY) gestartet und direkt in der WPF-Aufgabendetailansicht gerendert. Der VT100/ANSI-Output wird mit voller Farbunterstützung in einem benutzerdefinierten Control angezeigt; Tastatureingaben werden nativ an den Prozess weitergeleitet.
 - [Diff-Anzeige](diff/index.md) — Zeigt die Unterschiede zwischen zwei Versionen einer Datei, integriert in die Aufgabendetailansicht.
 
 ## Systemverwaltung & Konfiguration
 
 - [Einstellungen](einstellungen/index.md) — Bündelt alle systemweiten Konfigurationen: Plugin-Einstellungen, Arbeitsverzeichnis, Benachrichtigungen und Erscheinungsbild.
 - [Plugin-System](plugins/index.md) — SCM- und KI-Plugins werden als separate .NET-Klassenbibliotheken bereitgestellt und per `PluginManager` zur Laufzeit entdeckt.
+
+### KI-Plugins (Entwicklungsautomatisierung)
+
+- [Claude CLI](plugins/index.md) — Claude CLI aus Aufgaben heraus starten
+- [GitHub Copilot](plugins/index.md) — GitHub Copilot CLI aus Aufgaben heraus starten
+- [Codex CLI](plugins/index.md) — Codex CLI aus Aufgaben heraus starten
 
 ### SCM-Plugins (Quellcodeverwaltung)
 

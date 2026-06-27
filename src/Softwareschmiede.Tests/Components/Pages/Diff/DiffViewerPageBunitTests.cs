@@ -12,9 +12,12 @@ using DomainDiffLine = Softwareschmiede.Domain.Entities.DiffLine;
 
 namespace Softwareschmiede.Tests.Components.Pages.Diff;
 
+/// <summary>DiffViewerPageBunitTests.</summary>
 public sealed class DiffViewerPageBunitTests : TestContext
 {
+    /// <summary><summary>DiffViewerPage_ShouldRenderStandaloneDiffViewer_WhenDiffExists.</summary>.</summary>
     [Fact]
+    /// <summary>DiffViewerPage_ShouldRenderStandaloneDiffViewer_WhenDiffExists.</summary>
     public async Task DiffViewerPage_ShouldRenderStandaloneDiffViewer_WhenDiffExists()
     {
         await using var harness = await CreateHarnessAsync();
@@ -29,7 +32,9 @@ public sealed class DiffViewerPageBunitTests : TestContext
         });
     }
 
+    /// <summary><summary>DiffViewerPage_ShouldRenderStandaloneNotFoundState_WhenDiffDoesNotExist.</summary>.</summary>
     [Fact]
+    /// <summary>DiffViewerPage_ShouldRenderStandaloneNotFoundState_WhenDiffDoesNotExist.</summary>
     public void DiffViewerPage_ShouldRenderStandaloneNotFoundState_WhenDiffDoesNotExist()
     {
         Services.AddSingleton(CreateDiffServiceWithEmptyDatabase());
@@ -153,6 +158,7 @@ public sealed class DiffViewerPageBunitTests : TestContext
     {
         public Guid DiffId { get; } = diffId;
 
+        /// <summary>DisposeAsync.</summary>
         public ValueTask DisposeAsync()
         {
             memoryCache.Dispose();

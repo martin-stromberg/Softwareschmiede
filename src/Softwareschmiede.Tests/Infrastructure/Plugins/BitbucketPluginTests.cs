@@ -449,21 +449,27 @@ public sealed class BitbucketPluginTests
     [InlineData(
         "https://bitbucket.vectron.de/projects/ERP/repos/udr-aufbereitung/browse",
         "https://bitbucket.vectron.de/scm/ERP/udr-aufbereitung.git")]
+    /// <summary>"https://bitbucket.vectron.de/projects/ERP/repos/udr-aufbereitung",.</summary>
     [InlineData(
         "https://bitbucket.vectron.de/projects/ERP/repos/udr-aufbereitung",
         "https://bitbucket.vectron.de/scm/ERP/udr-aufbereitung.git")]
+    /// <summary>"https://bitbucket.example.com:7990/projects/MY/repos/myrepo/browse",.</summary>
     [InlineData(
         "https://bitbucket.example.com:7990/projects/MY/repos/myrepo/browse",
         "https://bitbucket.example.com:7990/scm/MY/myrepo.git")]
+    /// <summary>"https://bitbucket.example.com/rest/api/1.0/projects/KEY/repos/slug",.</summary>
     [InlineData(
         "https://bitbucket.example.com/rest/api/1.0/projects/KEY/repos/slug",
         "https://bitbucket.example.com/scm/KEY/slug.git")]
+    /// <summary>"https://bitbucket.example.com/scm/KEY/slug.git",.</summary>
     [InlineData(
         "https://bitbucket.example.com/scm/KEY/slug.git",
         "https://bitbucket.example.com/scm/KEY/slug.git")]
+    /// <summary>"https://bitbucket.example.com/scm/KEY/slug",.</summary>
     [InlineData(
         "https://bitbucket.example.com/scm/KEY/slug",
         "https://bitbucket.example.com/scm/KEY/slug.git")]
+    /// <summary>ResolveGitCloneUrl_ShouldReturnCorrectCloneUrl.</summary>
     public void ResolveGitCloneUrl_ShouldReturnCorrectCloneUrl(string input, string expected)
     {
         BitbucketPlugin.ResolveGitCloneUrl(input).Should().Be(expected);

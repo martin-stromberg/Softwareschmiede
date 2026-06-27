@@ -8,16 +8,19 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
+/// <summary>RepositoryStartskriptServiceTests.</summary>
 public sealed class RepositoryStartskriptServiceTests : IDisposable
 {
     private readonly string _repositoryRootPath = Path.Combine(Path.GetTempPath(), $"repo-start-script-{Guid.NewGuid():N}");
     private readonly Mock<ICliRunner> _cliRunnerMock = new();
 
+    /// <summary>RepositoryStartskriptServiceTests.</summary>
     public RepositoryStartskriptServiceTests()
     {
         Directory.CreateDirectory(_repositoryRootPath);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_repositoryRootPath))
@@ -26,7 +29,9 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
         }
     }
 
+    /// <summary><summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>.</summary>
     [Fact]
+    /// <summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>
     public async Task RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive()
     {
         var sut = CreateSut();
@@ -45,7 +50,9 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             Times.Never);
     }
 
+    /// <summary><summary>RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot.</summary>.</summary>
     [Fact]
+    /// <summary>RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot.</summary>
     public async Task RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot()
     {
         var sut = CreateSut();
@@ -58,7 +65,9 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
             .WithMessage("*innerhalb des Repositorys*");
     }
 
+    /// <summary><summary>RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds.</summary>.</summary>
     [Fact]
+    /// <summary>RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds.</summary>
     public async Task RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds()
     {
         var scriptPath = CreateScript("scripts/start.ps1");
@@ -97,7 +106,9 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
         capturedArgs.Should().NotContain("-RepositoryPath");
     }
 
+    /// <summary><summary>RunAsync_ShouldThrow_WhenCliExecutionFails.</summary>.</summary>
     [Fact]
+    /// <summary>RunAsync_ShouldThrow_WhenCliExecutionFails.</summary>
     public async Task RunAsync_ShouldThrow_WhenCliExecutionFails()
     {
         var scriptPath = CreateScript("scripts/start.ps1");

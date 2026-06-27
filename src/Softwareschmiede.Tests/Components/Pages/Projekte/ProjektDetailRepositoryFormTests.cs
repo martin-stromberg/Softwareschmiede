@@ -14,11 +14,14 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Components.Pages.Projekte;
 
+/// <summary>ProjektDetailRepositoryFormTests.</summary>
 public sealed class ProjektDetailRepositoryFormTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
 
+    /// <summary><summary>ProjektDetailMarkup_ShouldRenderDynamicRepositoryFields.</summary>.</summary>
     [Fact]
+    /// <summary>ProjektDetailMarkup_ShouldRenderDynamicRepositoryFields.</summary>
     public void ProjektDetailMarkup_ShouldRenderDynamicRepositoryFields()
     {
         var root = FindRepositoryRoot();
@@ -30,7 +33,9 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         markup.Should().Contain("SetRepositoryFieldValue(fieldKey");
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldPreselectStoredDefaultPlugin_AndLoadItsFields.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldPreselectStoredDefaultPlugin_AndLoadItsFields.</summary>
     public async Task OnInitializedAsync_ShouldPreselectStoredDefaultPlugin_AndLoadItsFields()
     {
         var github = CreateGitPlugin(
@@ -57,7 +62,9 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         fields.Should().ContainSingle(f => f.Key == "RepositoryName" && f.IsRequired);
     }
 
+    /// <summary><summary>OnRepositoryPluginChangedAsync_ShouldRemoveObsoleteFieldValues.</summary>.</summary>
     [Fact]
+    /// <summary>OnRepositoryPluginChangedAsync_ShouldRemoveObsoleteFieldValues.</summary>
     public async Task OnRepositoryPluginChangedAsync_ShouldRemoveObsoleteFieldValues()
     {
         var github = CreateGitPlugin(
@@ -92,7 +99,9 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         fieldValues.Should().NotContainKey("LegacyField");
     }
 
+    /// <summary><summary>AddRepositoryAsync_ShouldSetError_WhenRequiredFieldIsMissing.</summary>.</summary>
     [Fact]
+    /// <summary>AddRepositoryAsync_ShouldSetError_WhenRequiredFieldIsMissing.</summary>
     public async Task AddRepositoryAsync_ShouldSetError_WhenRequiredFieldIsMissing()
     {
         var github = CreateGitPlugin(
@@ -111,7 +120,9 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         _db.GitRepositories.Count().Should().Be(0);
     }
 
+    /// <summary><summary>AddRepositoryAsync_ShouldSetError_WhenNoScmPluginsAvailable.</summary>.</summary>
     [Fact]
+    /// <summary>AddRepositoryAsync_ShouldSetError_WhenNoScmPluginsAvailable.</summary>
     public async Task AddRepositoryAsync_ShouldSetError_WhenNoScmPluginsAvailable()
     {
         var sut = await CreateSutAsync([]);
@@ -123,7 +134,9 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         _db.GitRepositories.Count().Should().Be(0);
     }
 
+    /// <summary><summary>StartKonfigurationBearbeiten_ShouldPopulateFields_FromRepositoryConfiguration.</summary>.</summary>
     [Fact]
+    /// <summary>StartKonfigurationBearbeiten_ShouldPopulateFields_FromRepositoryConfiguration.</summary>
     public async Task StartKonfigurationBearbeiten_ShouldPopulateFields_FromRepositoryConfiguration()
     {
         var sut = await CreateSutAsync([]);
@@ -154,7 +167,9 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         GetPrivateField<bool>(sut, "_showStartKonfigurationForm").Should().BeTrue();
     }
 
+    /// <summary><summary>SpeichereStartKonfigurationAsync_ShouldPersistConfiguration_WhenInputIsValid.</summary>.</summary>
     [Fact]
+    /// <summary>SpeichereStartKonfigurationAsync_ShouldPersistConfiguration_WhenInputIsValid.</summary>
     public async Task SpeichereStartKonfigurationAsync_ShouldPersistConfiguration_WhenInputIsValid()
     {
         var sut = await CreateSutAsync([]);
@@ -186,7 +201,9 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         GetPrivateField<string?>(sut, "_startKonfigurationFehler").Should().BeNull();
     }
 
+    /// <summary><summary>SpeichereStartKonfigurationAsync_ShouldSetError_WhenNoRepositoryIsSelected.</summary>.</summary>
     [Fact]
+    /// <summary>SpeichereStartKonfigurationAsync_ShouldSetError_WhenNoRepositoryIsSelected.</summary>
     public async Task SpeichereStartKonfigurationAsync_ShouldSetError_WhenNoRepositoryIsSelected()
     {
         var sut = await CreateSutAsync([]);
@@ -199,6 +216,7 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
         GetPrivateField<string?>(sut, "_startKonfigurationFehler").Should().Be("Kein Repository ausgewählt.");
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private async Task<TestProjektDetailPage> CreateSutAsync(
@@ -330,11 +348,13 @@ public sealed class ProjektDetailRepositoryFormTests : IDisposable
 
     private sealed class TestProjektDetailPage : ProjektDetail
     {
+        /// <summary>InvokeOnInitializedAsync.</summary>
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
     }
 
     private sealed class TestNavigationManager : NavigationManager
     {
+        /// <summary>TestNavigationManager.</summary>
         public TestNavigationManager()
         {
             Initialize("http://localhost/", "http://localhost/");

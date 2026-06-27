@@ -21,6 +21,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     private readonly GitOrchestrationService _sut;
     private readonly Guid _projektId = new("55555555-5555-5555-5555-555555555555");
 
+    /// <summary>GitOrchestrationServiceTests.</summary>
     public GitOrchestrationServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -60,6 +61,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _db.SaveChanges();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         _db.Dispose();
@@ -104,7 +106,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Commit: feat: add tests"));
     }
 
+    /// <summary><summary>CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType.</summary>.</summary>
     [Fact]
+    /// <summary>CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType.</summary>
     public async Task CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -170,7 +174,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.PushBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary><summary>PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed.</summary>.</summary>
     [Fact]
+    /// <summary>PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed.</summary>
     public async Task PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe", null);
@@ -184,7 +190,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
     }
 
+    /// <summary><summary>PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin.</summary>.</summary>
     [Fact]
+    /// <summary>PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin.</summary>
     public async Task PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe Remote", null);
@@ -199,7 +207,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         protokoll.Should().NotContain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
     }
 
+    /// <summary><summary>PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository.</summary>.</summary>
     [Fact]
+    /// <summary>PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository.</summary>
     public async Task PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -228,7 +238,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Kein Merge"));
     }
 
+    /// <summary><summary>CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved.</summary>.</summary>
     [Fact]
+    /// <summary>CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved.</summary>
     public async Task CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -255,7 +267,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Times.Never);
     }
 
+    /// <summary><summary>CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous.</summary>.</summary>
     [Fact]
+    /// <summary>CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous.</summary>
     public async Task CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -287,7 +301,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Times.Never);
     }
 
+    /// <summary><summary>MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry.</summary>.</summary>
     [Fact]
+    /// <summary>MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry.</summary>
     public async Task MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge Aufgabe", null);
@@ -313,7 +329,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.MergeToSourceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary><summary>GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities.</summary>.</summary>
     [Fact]
+    /// <summary>GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities.</summary>
     public async Task GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities Aufgabe", null);
@@ -435,7 +453,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Times.Once);
     }
 
+    /// <summary><summary>PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference.</summary>.</summary>
     [Fact]
+    /// <summary>PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference.</summary>
     public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference()
     {
         var projekt = await _projektService.CreateAsync("Projekt mit Issue", null);
@@ -479,7 +499,9 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Issue #123"));
     }
 
+    /// <summary><summary>PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective.</summary>.</summary>
     [Fact]
+    /// <summary>PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective.</summary>
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective()
     {
         var projekt = await _projektService.CreateAsync("Projekt mit bestehender Direktive", null);

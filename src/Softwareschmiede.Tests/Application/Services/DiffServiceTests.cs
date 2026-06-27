@@ -8,12 +8,14 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
+/// <summary>DiffServiceTests.</summary>
 public sealed class DiffServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly IMemoryCache _memoryCache;
     private readonly DiffService _sut;
 
+    /// <summary>DiffServiceTests.</summary>
     public DiffServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -23,7 +25,9 @@ public sealed class DiffServiceTests : IDisposable
         _sut = new DiffService(_db, algorithm, caching, NullLogger<DiffService>.Instance);
     }
 
+    /// <summary><summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>.</summary>
     [Fact]
+    /// <summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>
     public async Task GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist()
     {
         // Act
@@ -33,7 +37,9 @@ public sealed class DiffServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    /// <summary><summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>.</summary>
     [Fact]
+    /// <summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>
     public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists()
     {
         // Arrange
@@ -51,7 +57,9 @@ public sealed class DiffServiceTests : IDisposable
         _db.DiffResults.Should().ContainSingle(dr => dr.Id == result.Id && dr.Status == DiffResultStatus.Generated);
     }
 
+    /// <summary><summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>.</summary>
     [Fact]
+    /// <summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>
     public async Task GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit()
     {
         // Arrange
@@ -67,7 +75,9 @@ public sealed class DiffServiceTests : IDisposable
         result.TargetContent.Should().BeNull();
     }
 
+    /// <summary><summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>.</summary>
     [Fact]
+    /// <summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>
     public async Task GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows()
     {
         // Arrange
@@ -81,7 +91,9 @@ public sealed class DiffServiceTests : IDisposable
         _db.DiffResults.Should().ContainSingle(dr => dr.AufgabeId == aufgabeId && dr.Status == DiffResultStatus.Error);
     }
 
+    /// <summary><summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>.</summary>
     [Fact]
+    /// <summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>
     public async Task GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe()
     {
         // Arrange
@@ -129,7 +141,9 @@ public sealed class DiffServiceTests : IDisposable
         stats.StatusBreakdown[DiffResultStatus.Error].Should().Be(1);
     }
 
+    /// <summary><summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>.</summary>
     [Fact]
+    /// <summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>
     public async Task DeleteDiffAsync_ShouldDeleteDiff_WhenExisting()
     {
         // Arrange
@@ -144,6 +158,7 @@ public sealed class DiffServiceTests : IDisposable
         _db.DiffResults.Should().NotContain(dr => dr.Id == diff.Id);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose()
     {
         _memoryCache.Dispose();

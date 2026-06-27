@@ -2,9 +2,12 @@ using FluentAssertions;
 
 namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
+/// <summary>AufgabeDetailRecoveryTests.</summary>
 public sealed class AufgabeDetailRecoveryTests
 {
+    /// <summary><summary>AufgabeDetailMarkup_ShouldContainRecoveryActionAndConfirmation.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetailMarkup_ShouldContainRecoveryActionAndConfirmation.</summary>
     public void AufgabeDetailMarkup_ShouldContainRecoveryActionAndConfirmation()
     {
         var root = FindRepositoryRoot();

@@ -115,6 +115,7 @@ public abstract class WpfTestBase : IDisposable
         store.DeleteCredential("LocalDirectoryPlugin.WorkspaceMode");
         store.DeleteCredential("LocalDirectoryPlugin.SourceDirectory");
         store.DeleteCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory");
+        store.DeleteCredential("Softwareschmiede.Codex.ExecutablePath");
     }
 
     /// <summary>

@@ -16,6 +16,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
+/// <summary>NeueAufgabeBunitTests.</summary>
 public sealed class NeueAufgabeBunitTests : TestContext
 {
     /// <summary>Prüft den Flow: Issues laden, Issue auswählen, Aufgabe aus Issue erstellen und zur Detailseite navigieren.</summary>
@@ -139,6 +140,7 @@ public sealed class NeueAufgabeBunitTests : TestContext
         public Guid ProjektId { get; } = projektId;
         public Guid RepositoryId { get; } = repositoryId;
 
+        /// <summary>DisposeAsync.</summary>
         public ValueTask DisposeAsync()
         {
             Db.Dispose();

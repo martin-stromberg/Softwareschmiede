@@ -36,12 +36,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _arbeitsverzeichnis, value);
     }
 
+    /// <summary>Aktuell gewählter Design-Modus (z. B. "Hell", "Dunkel", "System").</summary>
     public string DesignMode
     {
         get => _designMode;
         set => SetProperty(ref _designMode, value);
     }
 
+    /// <summary>Alle verfügbaren Design-Modi.</summary>
+    /// <value>Die Liste der vom Dark-Mode-Service bereitgestellten Modi.</value>
     public IEnumerable<string> DesignModes => _darkModeService.GetAvailableModes();
 
     /// <summary>Standard-KI-Plugin-Prefix.</summary>

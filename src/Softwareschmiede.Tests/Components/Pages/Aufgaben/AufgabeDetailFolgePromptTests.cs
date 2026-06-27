@@ -15,11 +15,14 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Components.Pages.Aufgaben;
 
+/// <summary>AufgabeDetailFolgePromptTests.</summary>
 public sealed class AufgabeDetailFolgePromptTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
 
+    /// <summary><summary>KiPanelMarkup_ShouldContainUnifiedPanel_AndConditionalContextMode.</summary>.</summary>
     [Fact]
+    /// <summary>KiPanelMarkup_ShouldContainUnifiedPanel_AndConditionalContextMode.</summary>
     public void KiPanelMarkup_ShouldContainUnifiedPanel_AndConditionalContextMode()
     {
         var root = FindRepositoryRoot();
@@ -39,7 +42,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         markup.Should().NotContain("Kontext automatisch");
     }
 
+    /// <summary><summary>KiPanelMarkup_ShouldKeepPluginPackageAgentOrder_InPromptAndStartDialog.</summary>.</summary>
     [Fact]
+    /// <summary>KiPanelMarkup_ShouldKeepPluginPackageAgentOrder_InPromptAndStartDialog.</summary>
     public void KiPanelMarkup_ShouldKeepPluginPackageAgentOrder_InPromptAndStartDialog()
     {
         var root = FindRepositoryRoot();
@@ -65,7 +70,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         startAgentIndex.Should().BeGreaterThan(startPackageIndex);
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldDefaultSelectedAgentToInitialAgent.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldDefaultSelectedAgentToInitialAgent.</summary>
     public async Task OnInitializedAsync_ShouldDefaultSelectedAgentToInitialAgent()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -75,7 +82,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_kiAgentName").Should().Be("agent-initial");
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldPreselectStoredDefaultKiPlugin.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldPreselectStoredDefaultKiPlugin.</summary>
     public async Task OnInitializedAsync_ShouldPreselectStoredDefaultKiPlugin()
     {
         var sut = await CreateSutAsync(
@@ -89,7 +98,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_selectedKiPluginPrefix").Should().Be("Softwareschmiede.KiB");
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldPreselectTaskKiPlugin_WhenTaskStoresOne.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldPreselectTaskKiPlugin_WhenTaskStoresOne.</summary>
     public async Task OnInitializedAsync_ShouldPreselectTaskKiPlugin_WhenTaskStoresOne()
     {
         var sut = await CreateSutAsync(
@@ -104,7 +115,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_selectedKiPluginPrefix").Should().Be("Softwareschmiede.KiB");
     }
 
+    /// <summary><summary>OnInitializedAsync_ShouldPrefillPromptAndExecutionTime_WhenTaskContainsSuggestion.</summary>.</summary>
     [Fact]
+    /// <summary>OnInitializedAsync_ShouldPrefillPromptAndExecutionTime_WhenTaskContainsSuggestion.</summary>
     public async Task OnInitializedAsync_ShouldPrefillPromptAndExecutionTime_WhenTaskContainsSuggestion()
     {
         var suggestionUtc = new DateTimeOffset(2026, 06, 01, 11, 50, 0, TimeSpan.Zero);
@@ -165,7 +178,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateProperty<bool>(sut, "IsProjektverzeichnisRegisterAktiv").Should().BeFalse();
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldUseSelectedAgent_AndKeepSelection.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldUseSelectedAgent_AndKeepSelection.</summary>
     public async Task KiStartenAsync_ShouldUseSelectedAgent_AndKeepSelection()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -185,7 +200,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_kiAgentName").Should().Be("agent-alt");
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldShowError_WhenExecutionTimeFormatIsInvalid.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldShowError_WhenExecutionTimeFormatIsInvalid.</summary>
     public async Task KiStartenAsync_ShouldShowError_WhenExecutionTimeFormatIsInvalid()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -200,7 +217,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string?>(sut, "_fehler").Should().Contain("HH:mm");
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldUseDefaultKontextmodus_WhenKiAntwortExists.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldUseDefaultKontextmodus_WhenKiAntwortExists.</summary>
     public async Task KiStartenAsync_ShouldUseDefaultKontextmodus_WhenKiAntwortExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -218,7 +237,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string>(sut, "_prompt").Should().BeEmpty();
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldForwardSelectedKiPluginPrefix.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldForwardSelectedKiPluginPrefix.</summary>
     public async Task KiStartenAsync_ShouldForwardSelectedKiPluginPrefix()
     {
         var sut = await CreateSutAsync(
@@ -236,7 +257,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.StartedRuns[0].KiPluginPrefix.Should().Be("Softwareschmiede.KiB");
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable.</summary>
     public async Task KiStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"], kiPlugins: []);
@@ -250,7 +273,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string?>(sut, "_fehler").Should().Contain("Kein KI-Plugin verfügbar");
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldStartWithoutAgent_WhenNoCompatibleAgentPackagesExist.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldStartWithoutAgent_WhenNoCompatibleAgentPackagesExist.</summary>
     public async Task KiStartenAsync_ShouldStartWithoutAgent_WhenNoCompatibleAgentPackagesExist()
     {
         var sut = await CreateSutAsync(
@@ -268,7 +293,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string?>(sut, "_fehler").Should().BeNull();
     }
 
+    /// <summary><summary>LadeAgentenpaketeAsync_ShouldResetDependentSelections_WhenSelectedPluginHasNoCompatiblePackages.</summary>.</summary>
     [Fact]
+    /// <summary>LadeAgentenpaketeAsync_ShouldResetDependentSelections_WhenSelectedPluginHasNoCompatiblePackages.</summary>
     public async Task LadeAgentenpaketeAsync_ShouldResetDependentSelections_WhenSelectedPluginHasNoCompatiblePackages()
     {
         var sut = await CreateSutAsync(
@@ -295,7 +322,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             .Should().Contain("Kein Agentenpaket gewählt");
     }
 
+    /// <summary><summary>IsAgentenauswahlGueltig_ShouldBeTrue_WhenKiPluginExistsAndPackageAgentAreEmpty.</summary>.</summary>
     [Fact]
+    /// <summary>IsAgentenauswahlGueltig_ShouldBeTrue_WhenKiPluginExistsAndPackageAgentAreEmpty.</summary>
     public async Task IsAgentenauswahlGueltig_ShouldBeTrue_WhenKiPluginExistsAndPackageAgentAreEmpty()
     {
         var sut = await CreateSutAsync(
@@ -309,7 +338,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             .Should().Contain("Kein Agentenpaket gewählt");
     }
 
+    /// <summary><summary>IsAgentenauswahlGueltig_ShouldBeFalse_WhenNoKiPluginExists.</summary>.</summary>
     [Fact]
+    /// <summary>IsAgentenauswahlGueltig_ShouldBeFalse_WhenNoKiPluginExists.</summary>
     public async Task IsAgentenauswahlGueltig_ShouldBeFalse_WhenNoKiPluginExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"], kiPlugins: []);
@@ -320,7 +351,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             .Should().Contain("Kein KI-Plugin verfügbar");
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable.</summary>
     public async Task ProzessStartenAsync_ShouldShowError_WhenNoKiPluginIsAvailable()
     {
         var sut = await CreateSutAsync(
@@ -342,7 +375,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<bool>(sut, "_processing").Should().BeFalse();
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldPersistNullPackageAndAgent_WhenOnlyKiPluginIsSelected.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldPersistNullPackageAndAgent_WhenOnlyKiPluginIsSelected.</summary>
     public async Task ProzessStartenAsync_ShouldPersistNullPackageAndAgent_WhenOnlyKiPluginIsSelected()
     {
         var sut = await CreateSutAsync(
@@ -382,7 +417,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<bool>(sut, "_showStartDialog").Should().BeFalse();
     }
 
+    /// <summary><summary>StartDialogOeffnen_ShouldResetBranchSelection_AndOpenDialog.</summary>.</summary>
     [Fact]
+    /// <summary>StartDialogOeffnen_ShouldResetBranchSelection_AndOpenDialog.</summary>
     public async Task StartDialogOeffnen_ShouldResetBranchSelection_AndOpenDialog()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -398,7 +435,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<List<string>>(sut, "_remoteBranches").Should().BeEmpty();
     }
 
+    /// <summary><summary>ProzessStartenAsync_ShouldShowError_WhenNoActiveRepositoryExists.</summary>.</summary>
     [Fact]
+    /// <summary>ProzessStartenAsync_ShouldShowError_WhenNoActiveRepositoryExists.</summary>
     public async Task ProzessStartenAsync_ShouldShowError_WhenNoActiveRepositoryExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -410,7 +449,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<bool>(sut, "_showStartDialog").Should().BeFalse();
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldNotStart_WhenNeuBeginnenNotConfirmedAndKiAntwortExists.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldNotStart_WhenNeuBeginnenNotConfirmedAndKiAntwortExists.</summary>
     public async Task KiStartenAsync_ShouldNotStart_WhenNeuBeginnenNotConfirmedAndKiAntwortExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -425,7 +466,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string?>(sut, "_fehler").Should().Contain("bestätigen");
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldForwardKontextmodus_WhenNoKiAntwortExists.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldForwardKontextmodus_WhenNoKiAntwortExists.</summary>
     public async Task KiStartenAsync_ShouldForwardKontextmodus_WhenNoKiAntwortExists()
     {
         var sut = await CreateSutAsync(
@@ -443,7 +486,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sut.StartedRuns[0].Kontextmodus.Should().Be(FolgeanweisungsKontextmodus.KontextMitgeben);
     }
 
+    /// <summary><summary>FolgeKontextmodusGeaendert_ShouldResetConfirmation_WhenSwitchingAwayFromNeuBeginnen.</summary>.</summary>
     [Fact]
+    /// <summary>FolgeKontextmodusGeaendert_ShouldResetConfirmation_WhenSwitchingAwayFromNeuBeginnen.</summary>
     public async Task FolgeKontextmodusGeaendert_ShouldResetConfirmation_WhenSwitchingAwayFromNeuBeginnen()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -464,7 +509,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<bool>(sut, "_folgeKontextNeuBeginnenBestaetigt").Should().BeFalse();
     }
 
+    /// <summary><summary>FolgeKontextmodusGeaendert_ShouldIgnoreInvalidValue_AndKeepState.</summary>.</summary>
     [Fact]
+    /// <summary>FolgeKontextmodusGeaendert_ShouldIgnoreInvalidValue_AndKeepState.</summary>
     public async Task FolgeKontextmodusGeaendert_ShouldIgnoreInvalidValue_AndKeepState()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -481,7 +528,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             .Should().Be(FolgeanweisungsKontextmodus.KontextMitgeben);
     }
 
+    /// <summary><summary>KiStartenAsync_ShouldStart_WhenNeuBeginnenConfirmedAndKiAntwortExists.</summary>.</summary>
     [Fact]
+    /// <summary>KiStartenAsync_ShouldStart_WhenNeuBeginnenConfirmedAndKiAntwortExists.</summary>
     public async Task KiStartenAsync_ShouldStart_WhenNeuBeginnenConfirmedAndKiAntwortExists()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -582,7 +631,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string?>(sut, "_selectedWorkspaceSelectionKey").Should().Be("src");
     }
 
+    /// <summary><summary>EvaluateGitActionVisibility_ShouldHidePushPullAndPr_WhenLocalCopyFlow.</summary>.</summary>
     [Fact]
+    /// <summary>EvaluateGitActionVisibility_ShouldHidePushPullAndPr_WhenLocalCopyFlow.</summary>
     public void EvaluateGitActionVisibility_ShouldHidePushPullAndPr_WhenLocalCopyFlow()
     {
         var capabilities = new GitActionCapabilities(
@@ -604,7 +655,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         result.ShowMerge.Should().BeTrue();
     }
 
+    /// <summary><summary>EvaluateGitActionVisibility_ShouldUseFlags_WhenNotInLocalCopyFlow.</summary>.</summary>
     [Fact]
+    /// <summary>EvaluateGitActionVisibility_ShouldUseFlags_WhenNotInLocalCopyFlow.</summary>
     public void EvaluateGitActionVisibility_ShouldUseFlags_WhenNotInLocalCopyFlow()
     {
         var capabilities = new GitActionCapabilities(
@@ -755,7 +808,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<string?>(sut, "_fehler").Should().Be("merge failed");
     }
 
+    /// <summary><summary>RenderProtokollInhalt_ShouldRenderMarkdownHeadings.</summary>.</summary>
     [Fact]
+    /// <summary>RenderProtokollInhalt_ShouldRenderMarkdownHeadings.</summary>
     public void RenderProtokollInhalt_ShouldRenderMarkdownHeadings()
     {
         var markdown = "# 2026-05-11\n\n## Schritt 1\nAnalyse";
@@ -768,7 +823,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         result.Value.Should().Contain(">Schritt 1</h2>");
     }
 
+    /// <summary><summary>RenderProtokollInhalt_ShouldSanitizeJavascriptLinks.</summary>.</summary>
     [Fact]
+    /// <summary>RenderProtokollInhalt_ShouldSanitizeJavascriptLinks.</summary>
     public void RenderProtokollInhalt_ShouldSanitizeJavascriptLinks()
     {
         var markdown = "[Link](javascript:alert('xss'))";
@@ -779,9 +836,13 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         result.Value.Should().Contain("href=\"#\"");
     }
 
+    /// <summary><summary>RenderProtokollInhalt_ShouldSanitizeUnsafeLinkSchemes.</summary>.</summary>
+    /// <summary><summary>RenderProtokollInhalt_ShouldSanitizeUnsafeLinkSchemes.</summary>.</summary>
+    /// <summary><summary>RenderProtokollInhalt_ShouldSanitizeUnsafeLinkSchemes.</summary>.</summary>
     [Theory]
     [InlineData("[Data](data:text/html;base64,PHNjcmlwdD4=)", "data:")]
     [InlineData("[Vbs](vbscript:msgbox(1))", "vbscript:")]
+    /// <summary>RenderProtokollInhalt_ShouldSanitizeUnsafeLinkSchemes.</summary>
     public void RenderProtokollInhalt_ShouldSanitizeUnsafeLinkSchemes(string markdown, string blockedScheme)
     {
         var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", markdown);
@@ -831,7 +892,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         result.Value.Should().NotContain("src=\"#\"");
     }
 
+    /// <summary><summary>SanitizeMarkdownHtml_ShouldRemoveHtmlEventHandlerAttributes.</summary>.</summary>
     [Fact]
+    /// <summary>SanitizeMarkdownHtml_ShouldRemoveHtmlEventHandlerAttributes.</summary>
     public void SanitizeMarkdownHtml_ShouldRemoveHtmlEventHandlerAttributes()
     {
         var html = "<a href=\"#\" onclick=\"alert(1)\" onmouseover='alert(2)'>x</a><img src=\"ok\" oNeRrOr=\"alert(3)\">";
@@ -856,7 +919,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         sanitized.Should().BeEmpty();
     }
 
+    /// <summary><summary>RenderProtokollInhalt_ShouldReturnDashPre_WhenInputIsWhitespace.</summary>.</summary>
     [Fact]
+    /// <summary>RenderProtokollInhalt_ShouldReturnDashPre_WhenInputIsWhitespace.</summary>
     public void RenderProtokollInhalt_ShouldReturnDashPre_WhenInputIsWhitespace()
     {
         var result = InvokePrivateStatic<Microsoft.AspNetCore.Components.MarkupString>("RenderProtokollInhalt", "  \n\t  ");
@@ -864,7 +929,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         result.Value.Should().Be("<pre>&#x2013;</pre>");
     }
 
+    /// <summary><summary>BuildStreamingArbeitsprotokollMarkdown_ShouldCreateDateHeadingAndStepSections.</summary>.</summary>
     [Fact]
+    /// <summary>BuildStreamingArbeitsprotokollMarkdown_ShouldCreateDateHeadingAndStepSections.</summary>
     public async Task BuildStreamingArbeitsprotokollMarkdown_ShouldCreateDateHeadingAndStepSections()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -929,7 +996,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         markdown.Should().NotContain("Implementierung\t\t");
     }
 
+    /// <summary><summary>BuildFallbackHtml_ShouldEncodeInput.</summary>.</summary>
     [Fact]
+    /// <summary>BuildFallbackHtml_ShouldEncodeInput.</summary>
     public void BuildFallbackHtml_ShouldEncodeInput()
     {
         var fallback = InvokePrivateStatic<string>("BuildFallbackHtml", "<script>alert('xss')</script>");
@@ -938,12 +1007,19 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         fallback.Should().NotContain("<script>");
     }
 
+    /// <summary><summary>GetProtokollCssClass_ShouldReturnExpectedCssClass.</summary>.</summary>
+    /// <summary><summary>GetProtokollCssClass_ShouldReturnExpectedCssClass.</summary>.</summary>
+    /// <summary><summary>GetProtokollCssClass_ShouldReturnExpectedCssClass.</summary>.</summary>
+    /// <summary><summary>GetProtokollCssClass_ShouldReturnExpectedCssClass.</summary>.</summary>
+    /// <summary><summary>GetProtokollCssClass_ShouldReturnExpectedCssClass.</summary>.</summary>
+    /// <summary><summary>GetProtokollCssClass_ShouldReturnExpectedCssClass.</summary>.</summary>
     [Theory]
     [InlineData(ProtokollTyp.Prompt, "protokoll-prompt")]
     [InlineData(ProtokollTyp.KiAntwort, "protokoll-antwort")]
     [InlineData(ProtokollTyp.StatusUebergang, "protokoll-status")]
     [InlineData(ProtokollTyp.GitAktion, "protokoll-git")]
     [InlineData(ProtokollTyp.TestErgebnis, "protokoll-test")]
+    /// <summary>GetProtokollCssClass_ShouldReturnExpectedCssClass.</summary>
     public void GetProtokollCssClass_ShouldReturnExpectedCssClass(ProtokollTyp typ, string expectedClass)
     {
         var cssClass = InvokePrivateStatic<string>("GetProtokollCssClass", typ);
@@ -951,12 +1027,19 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         cssClass.Should().Be(expectedClass);
     }
 
+    /// <summary><summary>GetProtokollLabel_ShouldReturnExpectedLabel.</summary>.</summary>
+    /// <summary><summary>GetProtokollLabel_ShouldReturnExpectedLabel.</summary>.</summary>
+    /// <summary><summary>GetProtokollLabel_ShouldReturnExpectedLabel.</summary>.</summary>
+    /// <summary><summary>GetProtokollLabel_ShouldReturnExpectedLabel.</summary>.</summary>
+    /// <summary><summary>GetProtokollLabel_ShouldReturnExpectedLabel.</summary>.</summary>
+    /// <summary><summary>GetProtokollLabel_ShouldReturnExpectedLabel.</summary>.</summary>
     [Theory]
     [InlineData(ProtokollTyp.Prompt, "Prompt")]
     [InlineData(ProtokollTyp.KiAntwort, "KI")]
     [InlineData(ProtokollTyp.StatusUebergang, "Status")]
     [InlineData(ProtokollTyp.GitAktion, "Git")]
     [InlineData(ProtokollTyp.TestErgebnis, "Test")]
+    /// <summary>GetProtokollLabel_ShouldReturnExpectedLabel.</summary>
     public void GetProtokollLabel_ShouldReturnExpectedLabel(ProtokollTyp typ, string expectedLabel)
     {
         var label = InvokePrivateStatic<string>("GetProtokollLabel", typ);
@@ -964,7 +1047,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         label.Should().Be(expectedLabel);
     }
 
+    /// <summary><summary>AufgabeDetailMarkupAndCss_ShouldContainExpectedProtokollClasses.</summary>.</summary>
     [Fact]
+    /// <summary>AufgabeDetailMarkupAndCss_ShouldContainExpectedProtokollClasses.</summary>
     public void AufgabeDetailMarkupAndCss_ShouldContainExpectedProtokollClasses()
     {
         var root = FindRepositoryRoot();
@@ -988,7 +1073,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         css.Should().Contain(".streaming-output");
     }
 
+    /// <summary><summary>ProtokollMarkup_ShouldRenderTimestampAndOptionalAgentName.</summary>.</summary>
     [Fact]
+    /// <summary>ProtokollMarkup_ShouldRenderTimestampAndOptionalAgentName.</summary>
     public void ProtokollMarkup_ShouldRenderTimestampAndOptionalAgentName()
     {
         var root = FindRepositoryRoot();
@@ -999,7 +1086,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         markup.Should().Contain("eintrag.AgentName is not null ? $\"[{eintrag.AgentName}]\" : \"\"");
     }
 
+    /// <summary><summary>AppMarkup_ShouldIncludeLogScrollScript.</summary>.</summary>
     [Fact]
+    /// <summary>AppMarkup_ShouldIncludeLogScrollScript.</summary>
     public void AppMarkup_ShouldIncludeLogScrollScript()
     {
         var root = FindRepositoryRoot();
@@ -1009,7 +1098,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         markup.Should().Contain("js/log-scroll.js");
     }
 
+    /// <summary><summary>LogScrollScript_ShouldExposeExpectedInteropFunctions.</summary>.</summary>
     [Fact]
+    /// <summary>LogScrollScript_ShouldExposeExpectedInteropFunctions.</summary>
     public void LogScrollScript_ShouldExposeExpectedInteropFunctions()
     {
         var root = FindRepositoryRoot();
@@ -1021,10 +1112,15 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         script.Should().Contain("scrollToEnd");
     }
 
+    /// <summary><summary>IsAtEnd_ShouldRespectThreshold.</summary>.</summary>
+    /// <summary><summary>IsAtEnd_ShouldRespectThreshold.</summary>.</summary>
+    /// <summary><summary>IsAtEnd_ShouldRespectThreshold.</summary>.</summary>
+    /// <summary><summary>IsAtEnd_ShouldRespectThreshold.</summary>.</summary>
     [Theory]
     [InlineData(100d, 400d, 300d, 16d, true)]
     [InlineData(84d, 400d, 300d, 16d, true)]
     [InlineData(80d, 400d, 300d, 16d, false)]
+    /// <summary>IsAtEnd_ShouldRespectThreshold.</summary>
     public void IsAtEnd_ShouldRespectThreshold(double scrollTop, double scrollHeight, double clientHeight, double thresholdPx, bool expected)
     {
         var isAtEnd = InvokePrivateStatic<bool>("IsAtEnd", scrollTop, scrollHeight, clientHeight, thresholdPx);
@@ -1032,9 +1128,13 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         isAtEnd.Should().Be(expected);
     }
 
+    /// <summary><summary>TryReadAtEndStateAsync_ShouldEvaluateMetrics_WhenJsReturnsValidData.</summary>.</summary>
+    /// <summary><summary>TryReadAtEndStateAsync_ShouldEvaluateMetrics_WhenJsReturnsValidData.</summary>.</summary>
+    /// <summary><summary>TryReadAtEndStateAsync_ShouldEvaluateMetrics_WhenJsReturnsValidData.</summary>.</summary>
     [Theory]
     [InlineData(84d, 400d, 300d, 1d, true)]
     [InlineData(80d, 400d, 300d, 1d, false)]
+    /// <summary>TryReadAtEndStateAsync_ShouldEvaluateMetrics_WhenJsReturnsValidData.</summary>
     public async Task TryReadAtEndStateAsync_ShouldEvaluateMetrics_WhenJsReturnsValidData(
         double scrollTop,
         double scrollHeight,
@@ -1058,7 +1158,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             && Equals(call.Args[0], "#streamingOutput"));
     }
 
+    /// <summary><summary>OnAfterRenderAsync_ShouldScrollToEnd_WhenStreamingBecomesVisibleAndInitialScrollPending.</summary>.</summary>
     [Fact]
+    /// <summary>OnAfterRenderAsync_ShouldScrollToEnd_WhenStreamingBecomesVisibleAndInitialScrollPending.</summary>
     public async Task OnAfterRenderAsync_ShouldScrollToEnd_WhenStreamingBecomesVisibleAndInitialScrollPending()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -1078,7 +1180,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<bool>(sut, "_streamingInitialScrollPending").Should().BeFalse();
     }
 
+    /// <summary><summary>ApplyPendingScrollAsync_ShouldAutoScrollOnAppend_WhenUserWasAtEnd.</summary>.</summary>
     [Fact]
+    /// <summary>ApplyPendingScrollAsync_ShouldAutoScrollOnAppend_WhenUserWasAtEnd.</summary>
     public async Task ApplyPendingScrollAsync_ShouldAutoScrollOnAppend_WhenUserWasAtEnd()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -1108,7 +1212,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<int>(sut, "_streamingPendingScrollVersion").Should().Be(0);
     }
 
+    /// <summary><summary>ApplyPendingScrollAsync_ShouldPreserveScrollPositionOnAppend_WhenUserWasNotAtEnd.</summary>.</summary>
     [Fact]
+    /// <summary>ApplyPendingScrollAsync_ShouldPreserveScrollPositionOnAppend_WhenUserWasNotAtEnd.</summary>
     public async Task ApplyPendingScrollAsync_ShouldPreserveScrollPositionOnAppend_WhenUserWasNotAtEnd()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -1138,7 +1244,9 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         GetPrivateField<int>(sut, "_streamingPendingScrollVersion").Should().Be(0);
     }
 
+    /// <summary><summary>Dispose_ShouldDisposeExistingKiSubscription.</summary>.</summary>
     [Fact]
+    /// <summary>Dispose_ShouldDisposeExistingKiSubscription.</summary>
     public async Task Dispose_ShouldDisposeExistingKiSubscription()
     {
         var sut = await CreateSutAsync(initialAgent: "agent-initial", weitereAgenten: ["agent-alt"]);
@@ -1150,6 +1258,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         trackingDisposable.IsDisposed.Should().BeTrue();
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
     private async Task<TestAufgabeDetailPage> CreateSutAsync(
@@ -1451,10 +1560,13 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     {
         public List<(string Prompt, AgentInfo Agent, string? Model, FolgeanweisungsKontextmodus? Kontextmodus, string? KiPluginPrefix)> StartedRuns { get; } = [];
 
+        /// <summary>InvokeOnInitializedAsync.</summary>
         public Task InvokeOnInitializedAsync() => OnInitializedAsync();
 
+        /// <summary>InvokeOnParametersSetAsync.</summary>
         public Task InvokeOnParametersSetAsync() => OnParametersSetAsync();
 
+        /// <summary>InvokeOnAfterRenderAsync.</summary>
         public Task InvokeOnAfterRenderAsync(bool firstRender) => OnAfterRenderAsync(firstRender);
 
         protected override void StartKiLauf(
@@ -1475,6 +1587,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
 
     private sealed class TestNavigationManager : Microsoft.AspNetCore.Components.NavigationManager
     {
+        /// <summary>TestNavigationManager.</summary>
         public TestNavigationManager()
         {
             Initialize("http://localhost/", "http://localhost/");
@@ -1490,6 +1603,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
     {
         public bool IsDisposed { get; private set; }
 
+        /// <summary>Dispose.</summary>
         public void Dispose()
         {
             IsDisposed = true;
@@ -1503,6 +1617,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         public Exception? Exception { get; set; }
         public List<JsCall> Invocations { get; } = [];
 
+        /// <summary>ValueTask.</summary>
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
         {
             Invocations.Add(new JsCall(identifier, args ?? []));
@@ -1521,6 +1636,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
             return new ValueTask<TValue>((TValue)value);
         }
 
+        /// <summary>ValueTask.</summary>
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
             => InvokeAsync<TValue>(identifier, args);
     }

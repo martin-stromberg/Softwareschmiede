@@ -13,6 +13,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     private readonly ProjektService _projektService;
     private readonly AufgabeService _aufgabeService;
 
+    /// <summary>TaskStartupServiceIntegrationTests.</summary>
     public TaskStartupServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
@@ -20,9 +21,12 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
     }
 
+    /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
+    /// <summary><summary>StartenAsync_Setzt_Status_AufGestartet.</summary>.</summary>
     [Fact]
+    /// <summary>StartenAsync_Setzt_Status_AufGestartet.</summary>
     public async Task StartenAsync_Setzt_Status_AufGestartet()
     {
         var projekt = await _projektService.CreateAsync("Startup-Projekt", null);
@@ -38,7 +42,9 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         geladen.LokalerKlonPfad.Should().Be("/tmp/repo");
     }
 
+    /// <summary><summary>StatusUebergang_Gestartet_NachWartend_IstErlaubt.</summary>.</summary>
     [Fact]
+    /// <summary>StatusUebergang_Gestartet_NachWartend_IstErlaubt.</summary>
     public async Task StatusUebergang_Gestartet_NachWartend_IstErlaubt()
     {
         var projekt = await _projektService.CreateAsync("Uebergang-Projekt", null);
@@ -51,7 +57,9 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
         geladen!.Status.Should().Be(AufgabeStatus.Wartend);
     }
 
+    /// <summary><summary>StatusUebergang_Wartend_NachGestartet_IstErlaubt.</summary>.</summary>
     [Fact]
+    /// <summary>StatusUebergang_Wartend_NachGestartet_IstErlaubt.</summary>
     public async Task StatusUebergang_Wartend_NachGestartet_IstErlaubt()
     {
         var projekt = await _projektService.CreateAsync("Resume-Projekt", null);

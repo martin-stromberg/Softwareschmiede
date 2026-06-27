@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Application.Services;
 
@@ -19,6 +20,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
+    /// <param name="logger">Logger-Instanz.</param>
+    /// <param name="scopeFactory">Factory für DI-Scopes (wird für Fehler-Persistierung verwendet).</param>
     public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
@@ -44,33 +47,14 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     }
 
     /// <summary>Gibt den laufenden Prozess für eine Aufgabe zurück, oder null wenn kein Prozess läuft.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <returns>Den laufenden <see cref="System.Diagnostics.Process"/>, oder null.</returns>
     public System.Diagnostics.Process? GetRunningProcess(Guid aufgabeId)
     {
         if (!_handles.TryGetValue(aufgabeId, out var handle))
             return null;
         try { return !handle.Process.HasExited ? handle.Process : null; }
         catch { return null; }
-    }
-
-    /// <summary>
-    /// Speichert das bekannte Fenster-Handle (HWND) des CLI-Prozesses für späteres Wieder-Einbetten.
-    /// Wird vom View aufgerufen sobald das Fenster erstmalig eingebettet wurde.
-    /// </summary>
-    public void SetFensterHandle(Guid aufgabeId, IntPtr handle)
-    {
-        if (_handles.TryGetValue(aufgabeId, out var h))
-            h.FensterHandle = handle;
-    }
-
-    /// <summary>
-    /// Gibt das gespeicherte Fenster-Handle des CLI-Prozesses zurück, oder <see cref="IntPtr.Zero"/>
-    /// wenn kein Handle gespeichert oder der Prozess nicht mehr aktiv ist.
-    /// </summary>
-    public IntPtr GetFensterHandle(Guid aufgabeId)
-    {
-        if (!_handles.TryGetValue(aufgabeId, out var h))
-            return IntPtr.Zero;
-        return h.FensterHandle;
     }
 
     /// <inheritdoc/>
@@ -84,6 +68,12 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private readonly SemaphoreSlim _startLock = new(1, 1);
 
     /// <summary>Startet einen CLI-Prozess für eine Aufgabe und gibt das Handle zurück.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="kiPlugin">Das zu verwendende KI-Plugin.</param>
+    /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
+    /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
+    /// <param name="ct">Abbruch-Token.</param>
+    /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public async Task<CliProcessHandle> StartCliAsync(
         Guid aufgabeId,
         IKiPlugin kiPlugin,
@@ -185,7 +175,179 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         }
     }
 
+    /// <summary>Startet einen CLI-Prozess für eine Aufgabe über die Windows Pseudo Console API.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="kiPlugin">Das zu verwendende KI-Plugin.</param>
+    /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
+    /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
+    /// <param name="ct">Abbruch-Token.</param>
+    /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
+    public async Task<CliProcessHandle> StartWithPseudoConsoleAsync(
+        Guid aufgabeId,
+        IKiPlugin kiPlugin,
+        string localRepoPath,
+        string? optionalParameters = null,
+        CancellationToken ct = default)
+    {
+        await _startLock.WaitAsync(ct);
+        try
+        {
+            if (_handles.TryGetValue(aufgabeId, out var existing))
+            {
+                bool istNochAktiv;
+                try { istNochAktiv = !existing.Process.HasExited; }
+                catch { istNochAktiv = false; }
+
+                if (istNochAktiv)
+                {
+                    _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} läuft bereits – zweiter Start abgewiesen.", aufgabeId);
+                    return existing;
+                }
+            }
+
+            // Plugin-Befehl ermitteln (FileName + Arguments) — wird nach cmd.exe-Start in die Konsole gesendet.
+            var pluginPsi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct);
+            var pluginCommand = BuildCliCommand(pluginPsi);
+
+            var workingDir = !string.IsNullOrEmpty(localRepoPath) && Directory.Exists(localRepoPath)
+                ? localRepoPath
+                : Path.GetTempPath();
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                WorkingDirectory = workingDir,
+                UseShellExecute = false,
+                CreateNoWindow = false,
+            };
+            psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+
+            _logger.LogInformation("CLI-Prozess (ConPTY, cmd.exe → {Command}) für Aufgabe {AufgabeId} starten.", pluginCommand, aufgabeId);
+
+            var pseudoConsole = PseudoConsole.Create(220, 50);
+
+            ProcessStartResult startResult;
+            try
+            {
+                startResult = PseudoConsoleProcessStarter.Start(psi, pseudoConsole);
+            }
+            catch
+            {
+                pseudoConsole.Dispose();
+                throw;
+            }
+
+            System.Diagnostics.Process process;
+            try
+            {
+                process = System.Diagnostics.Process.GetProcessById(startResult.Pid);
+                // Das von CreateProcess zurückgegebene Win32-Handle schließen; der verwaltete
+                // Process-Handle aus GetProcessById reicht für das weitere Lifecycle-Management.
+                PseudoConsoleNativeMethods.CloseHandle(startResult.ProcessHandle);
+            }
+            catch
+            {
+                PseudoConsoleNativeMethods.CloseHandle(startResult.ProcessHandle);
+                pseudoConsole.Dispose();
+                throw;
+            }
+
+            var inputStream = new System.IO.FileStream(
+                new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.InputWritePipe, ownsHandle: false),
+                System.IO.FileAccess.Write,
+                bufferSize: 1,
+                isAsync: false);
+
+            var outputStream = new System.IO.FileStream(
+                new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.OutputReadPipe, ownsHandle: false),
+                System.IO.FileAccess.Read,
+                bufferSize: 4096,
+                isAsync: false);
+
+            var session = new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream);
+            var handle = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session };
+
+            // EnableRaisingEvents vor der Handler-Registrierung setzen. So ist sichergestellt, dass
+            // das Exited-Event nicht zwischen Prozessstart und Handler-Registrierung verloren geht.
+            process.EnableRaisingEvents = true;
+            process.Exited += (_, _) =>
+            {
+                // TryRemove ist atomar: gibt false zurück, wenn der Prozess bereits über den
+                // HasExited-Check unten bereinigt wurde. So wird jede Aktion genau einmal ausgeführt.
+                if (!_handles.TryRemove(aufgabeId, out var removedHandle))
+                    return;
+
+                removedHandle.PseudoConsoleSession?.Dispose();
+
+                var exitCode = TryGetExitCode(process);
+                _logger.LogInformation(
+                    "CLI-Prozess (ConPTY) für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
+                    aufgabeId,
+                    exitCode);
+
+                RaiseRunningCountChanged();
+
+                CliProcessStatus status;
+                if (handle.AbsichtlichGestoppt)
+                {
+                    status = CliProcessStatus.Gestoppt;
+                }
+                else if (exitCode.HasValue && exitCode.Value != 0)
+                {
+                    status = CliProcessStatus.Fehler;
+                    _ = PersistFehlgeschlagenAsync(aufgabeId, exitCode.Value);
+                }
+                else
+                {
+                    status = CliProcessStatus.Gestoppt;
+                }
+
+                CliProcessStatusChanged?.Invoke(aufgabeId, status);
+            };
+
+            _handles[aufgabeId] = handle;
+
+            // Wenn der Prozess bereits vor dem Setzen von EnableRaisingEvents beendet wurde,
+            // wird das Exited-Event nicht mehr ausgelöst. Dann hier manuell bereinigen und
+            // frühzeitig zurückkehren — kein Gestartet-Event für einen bereits beendeten Prozess.
+            if (process.HasExited && _handles.TryRemove(aufgabeId, out var earlyExitHandle))
+            {
+                earlyExitHandle.PseudoConsoleSession?.Dispose();
+                RaiseRunningCountChanged();
+                CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
+                return handle;
+            }
+
+            _logger.LogInformation("CLI-Prozess (ConPTY) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, startResult.Pid);
+            RaiseRunningCountChanged();
+            CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
+
+            // Plugin-Befehl verzögert senden: cmd.exe braucht ~200ms bis der Prompt bereit ist.
+            if (!string.IsNullOrEmpty(pluginCommand))
+            {
+                _ = SendCommandDelayedAsync(session, pluginCommand, aufgabeId, ct);
+            }
+
+            return handle;
+        }
+        finally
+        {
+            _startLock.Release();
+        }
+    }
+
+    /// <summary>Gibt die <see cref="PseudoConsoleSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <returns>Die <see cref="PseudoConsoleSession"/>, oder null.</returns>
+    public PseudoConsoleSession? GetPseudoConsoleSession(Guid aufgabeId)
+    {
+        if (!_handles.TryGetValue(aufgabeId, out var handle))
+            return null;
+        return handle.PseudoConsoleSession;
+    }
+
     /// <summary>Stoppt den laufenden CLI-Prozess für eine Aufgabe (SIGTERM → 5s → Kill).</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="ct">Abbruch-Token.</param>
     public async Task StopCliAsync(Guid aufgabeId, CancellationToken ct = default)
     {
         if (!_handles.TryGetValue(aufgabeId, out var handle))
@@ -220,6 +382,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     }
 
     /// <summary>Gibt den Exit-Code des letzten Prozesses zurück.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <returns>Der Exit-Code, oder null wenn kein Prozess bekannt ist.</returns>
     public int? GetLastExitCode(Guid aufgabeId)
     {
         if (!_handles.TryGetValue(aufgabeId, out var handle))
@@ -231,6 +395,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     }
 
     /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe (für externe Nutzung durch AufgabeService).</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
     public void UpdateHeartbeat(Guid aufgabeId)
     {
         if (_handles.TryGetValue(aufgabeId, out var handle))
@@ -253,6 +418,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                     handle.Process.Kill(entireProcessTree: true);
                 }
 
+                handle.PseudoConsoleSession?.Dispose();
                 handle.Process.Dispose();
             }
             catch (Exception)
@@ -286,16 +452,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 return;
             }
 
-            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-            await aufgabeService.StatusSetzenAsync(aufgabeId, AufgabeStatus.Beendet);
-
             var protokollService = scope.ServiceProvider.GetRequiredService<ProtokollService>();
             await protokollService.AddEintragAsync(
                 aufgabeId,
                 ProtokollTyp.SystemMeldung,
-                $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode}).");
+                $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode}). Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden.");
 
-            _logger.LogInformation("Aufgabe {AufgabeId}: Status nach Fehler auf Beendet gesetzt (ExitCode: {ExitCode}).", aufgabeId, exitCode);
+            _logger.LogInformation("Aufgabe {AufgabeId}: CLI-Prozess mit Fehler beendet (ExitCode: {ExitCode}), Status bleibt unverändert.", aufgabeId, exitCode);
         }
         catch (ObjectDisposedException ex)
         {
@@ -353,6 +516,39 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             return false;
         }
     }
+
+    private async Task SendCommandDelayedAsync(PseudoConsoleSession session, string command, Guid aufgabeId, CancellationToken ct = default)
+    {
+        try
+        {
+            await Task.Delay(300, ct);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(command + "\r\n");
+            await session.InputStream.WriteAsync(bytes, ct);
+            await session.InputStream.FlushAsync(ct);
+            _logger.LogInformation("Plugin-Befehl an cmd.exe gesendet für Aufgabe {AufgabeId}: {Command}", aufgabeId, command);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}.", aufgabeId);
+        }
+    }
+
+    private static string BuildCliCommand(System.Diagnostics.ProcessStartInfo psi)
+    {
+        var fileName = psi.FileName;
+        if (string.IsNullOrWhiteSpace(fileName))
+            return string.Empty;
+
+        if (fileName.Contains(' '))
+            fileName = $"\"{fileName}\"";
+
+        return string.IsNullOrWhiteSpace(psi.Arguments)
+            ? fileName
+            : $"{fileName} {psi.Arguments}";
+    }
 }
 
 /// <summary>Handle auf einen laufenden CLI-Prozess.</summary>
@@ -368,7 +564,6 @@ public sealed class CliProcessHandle
     public DateTimeOffset LastHeartbeat { get; set; } = DateTimeOffset.UtcNow;
 
     private volatile bool _absichtlichGestoppt;
-    private IntPtr _fensterHandle = IntPtr.Zero;
 
     /// <summary>Gibt an, ob der Prozess absichtlich durch <see cref="KiAusfuehrungsService.StopCliAsync"/> beendet wurde.</summary>
     public bool AbsichtlichGestoppt
@@ -377,18 +572,12 @@ public sealed class CliProcessHandle
         set => _absichtlichGestoppt = value;
     }
 
-    /// <summary>
-    /// Das bekannte HWND des CLI-Fensters. Wird beim ersten Einbetten gesetzt und
-    /// für erneutes Einbetten nach Navigation-Zurück wiederverwendet, da SetParent
-    /// das HWND nicht verändert.
-    /// </summary>
-    public IntPtr FensterHandle
-    {
-        get => _fensterHandle;
-        set => _fensterHandle = value;
-    }
+    /// <summary>Die zugehörige <see cref="PseudoConsoleSession"/>, oder null bei klassischem Start.</summary>
+    public PseudoConsoleSession? PseudoConsoleSession { get; set; }
 
     /// <summary>Erstellt ein neues Handle.</summary>
+    /// <param name="aufgabeId">ID der zugehörigen Aufgabe.</param>
+    /// <param name="process">Der verwaltete Prozess.</param>
     public CliProcessHandle(Guid aufgabeId, Process process)
     {
         AufgabeId = aufgabeId;

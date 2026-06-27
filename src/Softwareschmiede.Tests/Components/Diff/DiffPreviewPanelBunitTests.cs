@@ -10,6 +10,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Components.Diff;
 
+/// <summary>DiffPreviewPanelBunitTests.</summary>
 public sealed class DiffPreviewPanelBunitTests : TestContext
 {
     /// <summary>
@@ -59,7 +60,9 @@ public sealed class DiffPreviewPanelBunitTests : TestContext
         cut.Markup.Should().Contain("Datei gelöscht. Für diese Datei ist kein Diff verfügbar.");
     }
 
+    /// <summary><summary>DiffPreviewPanel_ShouldRenderDiffViewer_WhenDiffResultIdIsPresent.</summary>.</summary>
     [Fact]
+    /// <summary>DiffPreviewPanel_ShouldRenderDiffViewer_WhenDiffResultIdIsPresent.</summary>
     public void DiffPreviewPanel_ShouldRenderDiffViewer_WhenDiffResultIdIsPresent()
     {
         Services.AddSingleton(CreateDiffServiceWithEmptyDatabase());
@@ -77,7 +80,9 @@ public sealed class DiffPreviewPanelBunitTests : TestContext
         cut.FindComponent<DiffViewer>();
     }
 
+    /// <summary><summary>DiffPreviewPanel_ShouldShowInfoFallback_WhenNoDiffExistsForSelectedFile.</summary>.</summary>
     [Fact]
+    /// <summary>DiffPreviewPanel_ShouldShowInfoFallback_WhenNoDiffExistsForSelectedFile.</summary>
     public void DiffPreviewPanel_ShouldShowInfoFallback_WhenNoDiffExistsForSelectedFile()
     {
         var preview = new FilePreview("plain.txt", null, false, false, false, "content", "content", null);

@@ -17,6 +17,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>Softwareschmiede.App.App</StartupObject>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>    
@@ -28,6 +30,7 @@
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.LocalDirectory\Softwareschmiede.Plugin.LocalDirectory.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHubCopilot\Softwareschmiede.Plugin.GitHubCopilot.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.ClaudeCli\Softwareschmiede.Plugin.ClaudeCli.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.Codex\Softwareschmiede.Plugin.Codex.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.KiSimulator\Softwareschmiede.Plugin.KiSimulator.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
@@ -78,6 +81,13 @@
     </ItemGroup>
     <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.ClaudeCli" />
     <Copy SourceFiles="@(ClaudeCliPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.ClaudeCli" SkipUnchangedFiles="true" />
+
+    <!-- Codex Plugin -->
+    <ItemGroup>
+      <CodexPluginArtifacts Include="$(MSBuildProjectDirectory)\..\..\plugins\Softwareschmiede.Plugin.Codex\bin\$(Configuration)\net10.0\*.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)plugins\Softwareschmiede.Plugin.Codex" />
+    <Copy SourceFiles="@(CodexPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.Codex" SkipUnchangedFiles="true" />
 
     <!-- KiSimulator Plugin -->
     <ItemGroup>

@@ -61,6 +61,11 @@
                                                         ButtonText="Plugin ändern"
                                                         AutomationName="PluginAendern"
                                                         ButtonCommand="{Binding PluginAendernCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="▶"
+                                                        ButtonText="CLI starten"
+                                                        AutomationName="CliNeustarten"
+                                                        ButtonCommand="{Binding CliNeustartenCommand}"
+                                                        Visibility="{Binding KannCliNeuStarten, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="■"
                                                         ButtonText="Stoppen"
                                                         AutomationName="CliStoppen"
@@ -198,10 +203,9 @@
 
                 <!-- Inhalt: CLI-Fenster oder Info-Panel -->
                 <Grid Grid.Row="1">
-                    <!-- ProcessWindowHost (CLI-Fenster, sichtbar wenn IsInfoViewVisible=false) -->
-                    <controls:ProcessWindowHost x:Name="CliWindowHost"
-                                                EmbeddedHandle="{Binding EmbeddedWindowHandle}"
-                                                Visibility="{Binding IsInfoViewVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                    <!-- TerminalControl (CLI-Fenster, sichtbar wenn IsInfoViewVisible=false) -->
+                    <controls:TerminalControl x:Name="TerminalConsole"
+                                              Visibility="{Binding IsInfoViewVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
 
                     <!-- Info-Panel (sichtbar wenn IsInfoViewVisible=true) -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto"

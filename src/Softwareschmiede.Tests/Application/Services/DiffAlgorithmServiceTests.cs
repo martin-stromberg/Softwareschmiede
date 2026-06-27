@@ -5,11 +5,14 @@ using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
+/// <summary>DiffAlgorithmServiceTests.</summary>
 public sealed class DiffAlgorithmServiceTests
 {
     private readonly DiffAlgorithmService _sut = new(NullLogger<DiffAlgorithmService>.Instance);
 
+    /// <summary><summary>GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty.</summary>.</summary>
     [Fact]
+    /// <summary>GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty.</summary>
     public async Task GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty()
     {
         // Act
@@ -21,7 +24,9 @@ public sealed class DiffAlgorithmServiceTests
         await targetAct.Should().ThrowAsync<ArgumentNullException>();
     }
 
+    /// <summary><summary>GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts.</summary>.</summary>
     [Fact]
+    /// <summary>GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts.</summary>
     public async Task GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts()
     {
         // Arrange
@@ -52,7 +57,9 @@ public sealed class DiffAlgorithmServiceTests
         lines[3].TargetLineNumber.Should().Be(3);
     }
 
+    /// <summary><summary>GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded.</summary>.</summary>
     [Fact]
+    /// <summary>GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded.</summary>
     public async Task GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded()
     {
         // Act
