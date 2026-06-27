@@ -236,7 +236,20 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 throw;
             }
 
-            var process = System.Diagnostics.Process.GetProcessById(startResult.Pid);
+            System.Diagnostics.Process process;
+            try
+            {
+                process = System.Diagnostics.Process.GetProcessById(startResult.Pid);
+                // Das von CreateProcess zurückgegebene Win32-Handle schließen; der verwaltete
+                // Process-Handle aus GetProcessById reicht für das weitere Lifecycle-Management.
+                PseudoConsoleNativeMethods.CloseHandle(startResult.ProcessHandle);
+            }
+            catch
+            {
+                PseudoConsoleNativeMethods.CloseHandle(startResult.ProcessHandle);
+                pseudoConsole.Dispose();
+                throw;
+            }
 
             var inputStream = new System.IO.FileStream(
                 new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.InputWritePipe, ownsHandle: false),
@@ -260,8 +273,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             {
                 // TryRemove ist atomar: gibt false zurück, wenn der Prozess bereits über den
                 // HasExited-Check unten bereinigt wurde. So wird jede Aktion genau einmal ausgeführt.
-                if (!_handles.TryRemove(aufgabeId, out _))
+                if (!_handles.TryRemove(aufgabeId, out var removedHandle))
                     return;
+
+                removedHandle.PseudoConsoleSession?.Dispose();
 
                 var exitCode = TryGetExitCode(process);
                 _logger.LogInformation(
@@ -292,11 +307,14 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             _handles[aufgabeId] = handle;
 
             // Wenn der Prozess bereits vor dem Setzen von EnableRaisingEvents beendet wurde,
-            // wird das Exited-Event nicht mehr ausgelöst. Dann hier manuell bereinigen.
-            if (process.HasExited && _handles.TryRemove(aufgabeId, out _))
+            // wird das Exited-Event nicht mehr ausgelöst. Dann hier manuell bereinigen und
+            // frühzeitig zurückkehren — kein Gestartet-Event für einen bereits beendeten Prozess.
+            if (process.HasExited && _handles.TryRemove(aufgabeId, out var earlyExitHandle))
             {
+                earlyExitHandle.PseudoConsoleSession?.Dispose();
                 RaiseRunningCountChanged();
                 CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
+                return handle;
             }
 
             _logger.LogInformation("CLI-Prozess (ConPTY) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, startResult.Pid);
@@ -306,7 +324,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // Plugin-Befehl verzögert senden: cmd.exe braucht ~200ms bis der Prompt bereit ist.
             if (!string.IsNullOrEmpty(pluginCommand))
             {
-                _ = SendCommandDelayedAsync(session, pluginCommand, aufgabeId);
+                _ = SendCommandDelayedAsync(session, pluginCommand, aufgabeId, ct);
             }
 
             return handle;
@@ -499,15 +517,18 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         }
     }
 
-    private async Task SendCommandDelayedAsync(PseudoConsoleSession session, string command, Guid aufgabeId)
+    private async Task SendCommandDelayedAsync(PseudoConsoleSession session, string command, Guid aufgabeId, CancellationToken ct = default)
     {
         try
         {
-            await Task.Delay(300);
+            await Task.Delay(300, ct);
             var bytes = System.Text.Encoding.UTF8.GetBytes(command + "\r\n");
-            await session.InputStream.WriteAsync(bytes);
-            await session.InputStream.FlushAsync();
+            await session.InputStream.WriteAsync(bytes, ct);
+            await session.InputStream.FlushAsync(ct);
             _logger.LogInformation("Plugin-Befehl an cmd.exe gesendet für Aufgabe {AufgabeId}: {Command}", aufgabeId, command);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {
