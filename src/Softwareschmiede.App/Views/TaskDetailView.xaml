@@ -314,7 +314,8 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="12,4">
-            <controls:StatusIndicatorControl Status="{Binding AufgabeStatus, Mode=OneWay}" />
+            <controls:StatusIndicatorControl Status="{Binding AufgabeStatus, Mode=OneWay}"
+                                              BranchName="{Binding AufgabeBranchName, Mode=OneWay}" />
         </Border>
     </Grid>
 </UserControl>

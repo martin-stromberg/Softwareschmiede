@@ -1,6 +1,10 @@
 <UserControl x:Class="Softwareschmiede.App.Controls.StatusIndicatorControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:Softwareschmiede.App.Converters">
+    <UserControl.Resources>
+        <converters:NullOrEmptyToVisibilityConverter x:Key="NullOrEmptyToVisibilityConverter" />
+    </UserControl.Resources>
     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
         <Ellipse x:Name="StatusDot"
                  Width="10"
@@ -11,5 +15,15 @@
                    Foreground="{DynamicResource PrimaryTextBrush}"
                    VerticalAlignment="Center"
                    FontSize="12" />
+        <TextBlock Text=" • "
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   VerticalAlignment="Center"
+                   FontSize="12"
+                   Visibility="{Binding BranchName, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+        <TextBlock Text="{Binding BranchName, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   VerticalAlignment="Center"
+                   FontSize="12"
+                   Visibility="{Binding BranchName, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
     </StackPanel>
 </UserControl>
