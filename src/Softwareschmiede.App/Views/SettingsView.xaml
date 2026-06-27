@@ -166,6 +166,7 @@
                            FontWeight="SemiBold"
                            Margin="0,0,0,4" />
                         <ComboBox SelectedValue="{Binding DesignMode, UpdateSourceTrigger=PropertyChanged}"
+                                  AutomationProperties.Name="DesignMode"
                                   ItemsSource="{Binding DesignModes}"
                                   Margin="0,0,0,12"
                                   Padding="8,6">

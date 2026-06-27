@@ -6,10 +6,12 @@ using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.IntegrationTests.Infrastructure.Plugins;
 
+/// <summary>Integrationstests für das <see cref="LocalDirectoryPlugin"/> mit echtem Dateisystem und Git.</summary>
 public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
 {
     private readonly List<string> _tempPaths = [];
 
+    /// <summary>Prüft Clone, Branch, Commit und Reset im Modus SeparateWorkingDirectory.</summary>
     [Fact]
     public async Task CloneBranchCommitReset_ShouldWork_InSeparateWorkingDirectoryMode()
     {
@@ -36,6 +38,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         countAfterReset.Should().Be(countBeforeReset - 1);
     }
 
+    /// <summary>Prüft, dass im Modus InSourceDirectory direkt im Quellverzeichnis gearbeitet wird.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldRunInSourceDirectory_WhenModeIsInSourceDirectory()
     {
@@ -58,6 +61,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         currentBranch.Should().Be("feature/from-source");
     }
 
+    /// <summary>Prüft, dass Clone fehlschlägt, wenn das Quellverzeichnis uncommittete Änderungen hat.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldFail_WhenSourceWorkspaceIsDirty()
     {
@@ -78,6 +82,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
             .WithMessage("*uncommitted changes*");
     }
 
+    /// <summary>Prüft, dass Clone fehlschlägt, wenn Ziel und Quelle dasselbe Verzeichnis sind.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldFail_WhenSeparateTargetEqualsSource()
     {
@@ -94,6 +99,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
             .WithMessage("*erfordert ein anderes Zielverzeichnis*");
     }
 
+    /// <summary>Prüft, dass Clone fehlschlägt, wenn das Zielverzeichnis nicht leer ist.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldFail_WhenSeparateTargetIsNotEmpty()
     {
@@ -112,6 +118,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
             .WithMessage("*ist nicht leer*");
     }
 
+    /// <summary>Prüft, dass bei leerem Repository-URL das konfigurierte SourceDirectory als Fallback verwendet wird.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldUseSourceDirectoryFallback_WhenRepositoryUrlEmpty()
     {
@@ -132,6 +139,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         File.Exists(Path.Combine(targetPath, "readme.txt")).Should().BeTrue();
     }
 
+    /// <summary>Prüft, dass bei nicht-Git-Quelle ohne Bestätigung eine Kopie mit Git-Init angelegt wird.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldUseCopyFallback_WhenSeparateModeSourceIsNotGitAndInitNotConfirmed()
     {
@@ -152,6 +160,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         Directory.Exists(Path.Combine(sourcePath, ".git")).Should().BeFalse();
     }
 
+    /// <summary>Prüft, dass das Quellverzeichnis beim Copy-Bootstrap nicht verändert wird.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldCopySourceWithoutMutatingIt_WhenSeparateModeUsesCopyBootstrap()
     {
@@ -171,6 +180,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         Directory.Exists(Path.Combine(targetPath, ".git")).Should().BeTrue();
     }
 
+    /// <summary>Prüft, dass Push Dateien synchronisiert und gelöschte/umbenannte Dateien korrekt überträgt.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldSynchronizeFilesAndDeleteTrackedRemovals_InSeparateMode()
     {
@@ -201,6 +211,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         File.Exists(Path.Combine(sourcePath, "new-name.txt")).Should().BeTrue();
     }
 
+    /// <summary>Prüft, dass Pull das Arbeitsverzeichnis ohne Merge aus der Quelle aktualisiert.</summary>
     [Fact]
     public async Task PullAsync_ShouldRefreshWorkspaceFromSource_WithoutMerge()
     {
@@ -251,6 +262,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         File.Exists(Path.Combine(sourcePath, "remove-me.txt")).Should().BeFalse();
     }
 
+    /// <summary>Prüft, dass Branch und Reset nach Neuinstanziierung des Plugins über die Pointer-Datei funktionieren.</summary>
     [Fact]
     public async Task CreateBranchCommitReset_ShouldWork_AfterPluginRecreation_UsingPointerFile()
     {
@@ -274,6 +286,7 @@ public sealed class LocalDirectoryPluginIntegrationTests : IDisposable
         currentBranch.Should().Be("feature/recreated");
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         foreach (var path in _tempPaths.Where(p => Directory.Exists(p)))

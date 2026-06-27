@@ -112,7 +112,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // Sicherstellen, dass der vollständige PATH des aktuellen Prozesses übergeben wird.
             // Bei UseShellExecute=false wird nur der Prozess-PATH genutzt — der kann bei WPF-Apps
             // kürzer sein als der vollständige Nutzer-PATH (z. B. fehlt npm/node bin-Verzeichnis).
-            if (!psi.EnvironmentVariables.ContainsKey("PATH"))
+            if (!psi.UseShellExecute && !psi.EnvironmentVariables.ContainsKey("PATH"))
             {
                 psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
             }

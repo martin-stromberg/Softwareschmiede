@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -19,7 +20,9 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
 {
     /// <summary>
     /// Szenario: Aufgabe im Status "Neu" mit "Starten" auf "Gestartet" wechseln.
-    /// Prüft: Repository wird geklont (lokales Quellverzeichnis via LocalDirectoryPlugin),
+    /// Erster Versuch schlägt erwartungsgemäß fehl, da ConfirmGitInitInSourceDirectory nicht gesetzt ist
+    /// (InSourceDirectory-Modus erfordert explizite Bestätigung für git init).
+    /// Nach Korrektur der Einstellung gelingt der zweite Versuch: Repository wird geklont,
     /// Status wechselt auf "Gestartet" und die CLI wird gestartet (CLI-Panel mit Stoppen-Button sichtbar).
     /// </summary>
     [Fact]
@@ -27,7 +30,17 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
     {
         var mainWindow = SetupProjectMitNeuerAufgabe("AufgabeStarten-Repo", "AufgabeStarten-Projekt");
 
-        // Da kein KI-Plugin vorkonfiguriert ist, zeigt der Start-Ablauf zunächst den Plugin-Auswahl-Dialog
+        // Erster Versuch: ConfirmGitInitInSourceDirectory ist nicht gesetzt → Fehlermeldung erwartet
+        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+
+        // Fehlermeldung wird angezeigt, da git init im Quellverzeichnis nicht bestätigt ist
+        var fehlerBanner = WaitForElement(mainWindow, cf => cf.ByName("FehlerMeldung"), Medium);
+        Assert.NotNull(fehlerBanner);
+
+        // Einstellung korrigieren: ConfirmGitInitInSourceDirectory auf true setzen
+        new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
+
+        // Zweiter Versuch: Plugin-Dialog erneut bedienen, diesmal ist die Bestätigung gesetzt
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
         // Nach erfolgreichem Start: CLI-Panel sichtbar (Stoppen-Button erscheint, da IsCliRunning=true)
@@ -38,8 +51,8 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
         var statusGestartet = WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
         Assert.NotNull(statusGestartet);
 
-        // Kein Fehler angezeigt
-        var fehlerMeldung = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerMeldung);
+        // Kein Fehler mehr angezeigt (Border ist Collapsed → TextBlock nicht im UIA-Baum)
+        var fehlerMeldungNachStart = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+        Assert.Null(fehlerMeldungNachStart);
     }
 }

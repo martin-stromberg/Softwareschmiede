@@ -101,6 +101,7 @@ public sealed class EntwicklungsprozessServiceTests
         loaded.LokalerKlonPfad.Should().NotBeNullOrEmpty();
     }
 
+    /// <summary>Prüft, dass bei Issue-basierten Aufgaben ein Issue-Präfix im Branch-Namen persistiert wird.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldPersistIssueBasedBranch_WhenAufgabeWasCreatedFromIssue()
     {
@@ -191,6 +192,7 @@ public sealed class EntwicklungsprozessServiceTests
         statusEintrag!.Inhalt.Should().Contain("Beendet");
     }
 
+    /// <summary>Prüft, dass der konfigurierte Basispfad als Arbeitsverzeichnis verwendet wird.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldUseConfiguredBasePath_WhenWorkdirSettingExists()
     {
@@ -224,6 +226,7 @@ public sealed class EntwicklungsprozessServiceTests
         }
     }
 
+    /// <summary>Prüft, dass Temp als Fallback-Arbeitsverzeichnis verwendet wird, wenn keine Konfiguration vorliegt.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldUseTempFallback_WhenNoWorkdirSettingExists()
     {
@@ -247,6 +250,7 @@ public sealed class EntwicklungsprozessServiceTests
         gitMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expected, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>Prüft, dass bei ungültigem konfiguriertem Pfad auf Temp zurückgefallen wird.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldFallbackToTemp_WhenConfiguredPathIsUnavailable()
     {
@@ -288,6 +292,7 @@ public sealed class EntwicklungsprozessServiceTests
         }
     }
 
+    /// <summary>Prüft, dass ein Protokolleintrag angelegt wird, wenn der Resolver auf Temp zurückfällt.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldLogFallbackEntry_WhenResolverUsesFallback()
     {

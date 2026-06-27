@@ -4,6 +4,7 @@ using Softwareschmiede.IntegrationTests.Infrastructure;
 
 namespace Softwareschmiede.IntegrationTests.Infrastructure;
 
+/// <summary>Prüft, dass kritische Migrationen vorwärts und rückwärts angewendet werden können.</summary>
 public sealed class WorkdirMigrationTests
 {
     private const string WorkdirMigration = "20260509200234_202605090001_Add_AppEinstellung_Workdir";
@@ -11,6 +12,7 @@ public sealed class WorkdirMigrationTests
     private const string AddKiPluginPrefixMigration = "20260524151645_202605241703_AddKiPluginPrefix";
     private const string PreviousBeforeKiPluginPrefixMigration = "20260523113807_AddKiTaskNotifications";
 
+    /// <summary>Prüft, dass die Workdir-Migration angewendet und zurückgerollt werden kann.</summary>
     [Fact]
     public async Task MigrateAsync_ShouldApplyAndRollbackWorkdirMigration()
     {
@@ -25,6 +27,7 @@ public sealed class WorkdirMigrationTests
         (await TableExistsAsync(db, "AppEinstellungen")).Should().BeTrue();
     }
 
+    /// <summary>Prüft, dass die KiPluginPrefix-Spalte als nullable hinzugefügt und entfernt werden kann.</summary>
     [Fact]
     public async Task MigrateAsync_ShouldApplyAndRollbackKiPluginPrefixMigration_AsNullableColumn()
     {

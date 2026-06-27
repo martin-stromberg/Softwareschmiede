@@ -25,6 +25,8 @@ public sealed class E2E_PluginWechsel : WpfTestBase
     [Fact]
     public void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E()
     {
+        ConfirmLocalDirectoryGitInitInSourceDirectory();
+
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginWechsel-Repo", "PluginWechsel-Projekt");
 
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");

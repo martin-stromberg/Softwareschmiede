@@ -18,6 +18,7 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public sealed class WpfE2ETests : WpfTestBase
 {
+    /// <summary>Prüft, dass nach dem Anlegen eines Projekts die Aufgabenliste sichtbar ist.</summary>
     [Fact]
     public void ProjektErstellen_ZeigtAufgabenListe_E2E()
     {
@@ -33,6 +34,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.NotNull(aufgabeListe);
     }
 
+    /// <summary>Prüft, dass nach Projekterstellung eine neue Aufgabe angelegt werden kann und der Status nicht "Gestartet" ist.</summary>
     [Fact]
     public void ProjektErstellen_UndNeueAufgabeAnlegen_E2E()
     {
@@ -53,6 +55,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.Null(statusGestartetText);
     }
 
+    /// <summary>Prüft, dass nach dem Anlegen einer Aufgabe der "Starten"-Button sichtbar ist und das Fenster ein gültiges Handle besitzt.</summary>
     [Fact]
     public void AufgabeAnlegen_ZeigtStartenButton_E2E()
     {
@@ -72,9 +75,12 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.NotEqual(IntPtr.Zero, windowHandle);
     }
 
+    /// <summary>Prüft, dass der Dark Mode in den Einstellungen umgeschaltet und nach Rückkehr persistiert wird.</summary>
     [Fact]
     public void DarkModeAktivierenUndPersistieren_E2E()
     {
+        SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");
+
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
@@ -85,34 +91,25 @@ public sealed class WpfE2ETests : WpfTestBase
         // Speichern-Button im Ribbon bestätigt, dass die Einstellungsseite geladen ist
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
 
-        // Design-ComboBox suchen (zeigt den aktuellen Modus, z.B. "Hell" oder "Dunkel")
-        var designComboBoxen = mainWindow.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ComboBox));
-        Assert.True(designComboBoxen.Length > 0, "Keine ComboBox auf der Einstellungsseite gefunden.");
-
-        var designComboBox = designComboBoxen[0].AsComboBox();
+        var designComboBoxElement = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
+        var designComboBox = designComboBoxElement.AsComboBox();
         var originalValue = designComboBox.SelectedItem?.Name ?? string.Empty;
 
-        // Dropdown öffnen und einen anderen Eintrag wählen
-        designComboBox.Click();
-        Thread.Sleep(300);
+        var neuerWert = string.Equals(originalValue, "Dark", StringComparison.OrdinalIgnoreCase)
+            ? "Light"
+            : "Dark";
 
-        var items = designComboBox.Items;
-        Assert.True(items.Length > 1, "Design-ComboBox sollte mehrere Optionen enthalten.");
+        designComboBoxElement.Click();
+        var neuerEintrag = WaitForElement(Automation.GetDesktop(), cf => cf.ByName(neuerWert), Short);
+        neuerEintrag.Click();
 
-        // Wähle einen anderen Eintrag als den aktuellen
-        var andererEintrag = items.FirstOrDefault(i => i.Name != originalValue);
-        if (andererEintrag is not null)
-        {
-            andererEintrag.Click();
-        }
-
-        Thread.Sleep(300);
+        WaitForSelectedComboBoxItem(designComboBoxElement, neuerWert, Short);
 
         // Einstellungen speichern über Ribbon-Button
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
         speichernButton.AsButton().Click();
 
-        Thread.Sleep(500);
+        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
 
         // Einstellungsseite verlassen und zurückkehren
         var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(5));
@@ -122,16 +119,12 @@ public sealed class WpfE2ETests : WpfTestBase
 
         // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
-        var designComboBoxenNachRueckkehr = mainWindow.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ComboBox));
-        Assert.True(designComboBoxenNachRueckkehr.Length > 0, "Keine ComboBox nach Rückkehr gefunden.");
-        var designComboBoxNachRueckkehr = designComboBoxenNachRueckkehr[0].AsComboBox();
+        var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short).AsComboBox();
 
-        if (andererEintrag is not null)
-        {
-            Assert.Equal(andererEintrag.Name, designComboBoxNachRueckkehr.SelectedItem?.Name);
-        }
+        Assert.Equal(neuerWert, designComboBoxNachRueckkehr.SelectedItem?.Name);
     }
 
+    /// <summary>Prüft, dass beim sauberen Start kein Recovery-Banner angezeigt wird.</summary>
     [Fact]
     public void Dashboard_KeineRecoveryBanner_BeiSauberemStart_E2E()
     {
@@ -146,6 +139,7 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.Null(recoveryBanner);
     }
 
+    /// <summary>Prüft, dass die Einstellungsseite geöffnet werden kann und der Speichern-Button sichtbar ist.</summary>
     [Fact]
     public void EinstellungenOeffnen_ZeigtEinstellungsSeite_E2E()
     {
@@ -160,9 +154,12 @@ public sealed class WpfE2ETests : WpfTestBase
         Assert.NotNull(speichernButton);
     }
 
+    /// <summary>Prüft, dass das Arbeitsverzeichnis in den Einstellungen geändert und gespeichert werden kann.</summary>
     [Fact]
     public void EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E()
     {
+        SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");
+
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
@@ -182,13 +179,10 @@ public sealed class WpfE2ETests : WpfTestBase
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
         speichernButton.AsButton().Click();
 
-        Thread.Sleep(500);
-
-        var erfolgsMeldung = mainWindow.FindFirstDescendant(cf =>
-            cf.ByName("Einstellungen gespeichert."));
-        Assert.NotNull(erfolgsMeldung);
+        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
     }
 
+    /// <summary>Prüft, dass mehrfache Navigation zur Einstellungsseite stabil bleibt und der Speichern-Button nach Rückkehr wieder erscheint.</summary>
     [Fact]
     public void EinstellungenNavigation_BleibtNachMehrerenKlicks_Stabil_E2E()
     {

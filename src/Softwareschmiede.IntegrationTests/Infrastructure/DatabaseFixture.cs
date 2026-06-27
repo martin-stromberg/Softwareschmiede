@@ -64,6 +64,7 @@ public sealed class DatabaseFixture : IAsyncDisposable
     {
         var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
             .UseSqlite($"Data Source={_dbFilePath}")
+            .AddInterceptors(new SqliteBusyTimeoutInterceptor())
             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 

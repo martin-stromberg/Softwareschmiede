@@ -26,6 +26,8 @@ public sealed class E2E_PluginProjectDefault : WpfTestBase
     [Fact]
     public void PluginDialogMitProjektCheckbox_SpeichertProjektStandardUndStartetCli_E2E()
     {
+        ConfirmLocalDirectoryGitInitInSourceDirectory();
+
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginProjectDefault-Repo", "PluginProjectDefault-Projekt");
 
         var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);

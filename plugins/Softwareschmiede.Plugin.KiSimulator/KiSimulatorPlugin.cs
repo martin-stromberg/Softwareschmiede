@@ -53,14 +53,14 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase
             parameters);
 
         // ping statt timeout.exe verwenden: timeout.exe bricht mit ExitCode 125 ab, wenn kein
-        // Konsolen-Handle verfügbar ist (z. B. bei UseShellExecute=true ohne interaktive Session).
+        // Konsolen-Handle verfügbar ist.
         return new ProcessStartInfo
         {
             FileName = "cmd.exe",
             Arguments = "/c echo KI-Simulator läuft... && ping -n 31 127.0.0.1 > nul",
             WorkingDirectory = localRepoPath,
-            UseShellExecute = true,
-            CreateNoWindow = true,
+            UseShellExecute = false,
+            CreateNoWindow = false,
         };
     }
 }

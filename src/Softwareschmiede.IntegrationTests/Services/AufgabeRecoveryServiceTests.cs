@@ -8,8 +8,10 @@ using Softwareschmiede.IntegrationTests.Infrastructure;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
+/// <summary>Integrationstests für <see cref="AufgabeRecoveryService"/> mit echter SQLite-Datenbank.</summary>
 public sealed class AufgabeRecoveryServiceTests
 {
+    /// <summary>Prüft, dass RecoveryVersion inkrementiert und ein Audit-Eintrag angelegt wird.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldSetGestartetAndCreateAudit_WhenStatusIsGestartet()
     {
@@ -28,6 +30,7 @@ public sealed class AufgabeRecoveryServiceTests
             .Should().Be(1);
     }
 
+    /// <summary>Prüft, dass Recovery abgelehnt wird, wenn der CLI-Prozess noch läuft.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrowAndKeepStatus_WhenProcessingIsStillRunning()
     {
@@ -47,6 +50,7 @@ public sealed class AufgabeRecoveryServiceTests
         assertContext.Protokolleintraege.Count(p => p.AufgabeId == aufgabe.Id).Should().Be(0);
     }
 
+    /// <summary>Prüft, dass ein Nebenläufigkeitskonflikt erkannt wird, wenn RecoveryVersion sich während der Recovery ändert.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldThrowConcurrencyConflict_WhenRecoveryVersionChangedConcurrently()
     {
@@ -73,6 +77,7 @@ public sealed class AufgabeRecoveryServiceTests
         assertContext.Protokolleintraege.Count(p => p.AufgabeId == aufgabe.Id).Should().Be(0);
     }
 
+    /// <summary>Prüft, dass Recovery für ungültige Ausgangszustände abgelehnt wird.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldRejectInvalidState()
     {
@@ -86,6 +91,7 @@ public sealed class AufgabeRecoveryServiceTests
             .WithMessage("Wiederherstellung für aktuellen Status nicht verfügbar.");
     }
 
+    /// <summary>Prüft, dass bei parallelen Recovery-Versuchen mit demselben Snapshot exakt einer erfolgreich ist.</summary>
     [Fact]
     public async Task RecoverManuellAsync_ShouldAllowExactlyOneSuccess_WhenTriggeredInParallel()
     {
@@ -94,12 +100,17 @@ public sealed class AufgabeRecoveryServiceTests
 
         await using var context1 = db.CreateNewContext();
         await using var context2 = db.CreateNewContext();
-        var runningStatus = new AlwaysNotRunningAutomationStatusSource();
+
+        // The barrier ensures both tasks complete their initial entity read (RecoveryVersion=0)
+        // before either proceeds to the transaction and update. Without it, one task may finish
+        // entirely before the other reads, giving the second task a different starting RecoveryVersion
+        // and allowing both to succeed.
+        var runningStatus = new BarrieredNotRunningStatusSource(participantCount: 2);
         var recovery1 = new AufgabeRecoveryService(context1, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
         var recovery2 = new AufgabeRecoveryService(context2, runningStatus, NullLogger<AufgabeRecoveryService>.Instance);
 
-        var task1 = ExecuteRecoverSafeAsync(recovery1, aufgabe.Id);
-        var task2 = ExecuteRecoverSafeAsync(recovery2, aufgabe.Id);
+        var task1 = Task.Run(() => ExecuteRecoverSafeAsync(recovery1, aufgabe.Id));
+        var task2 = Task.Run(() => ExecuteRecoverSafeAsync(recovery2, aufgabe.Id));
         var results = await Task.WhenAll(task1, task2);
 
         results.Count(r => r).Should().Be(1);
@@ -152,6 +163,22 @@ public sealed class AufgabeRecoveryServiceTests
                 beforeReturn();
             }
 
+            return false;
+        }
+    }
+
+    // Ensures all participant tasks have completed their initial DB read before any proceeds to
+    // the transaction and UPDATE. SignalAndWait blocks synchronously, so Task.Run is required in
+    // the calling test to avoid deadlock on a single-threaded context.
+    private sealed class BarrieredNotRunningStatusSource(int participantCount) : IRunningAutomationStatusSource
+    {
+        private readonly Barrier _barrier = new(participantCount);
+        public event Action<int, int>? RunningCountChanged;
+        public int GetRunningCount() => 0;
+
+        public bool IsRunning(Guid aufgabeId)
+        {
+            _barrier.SignalAndWait(TimeSpan.FromSeconds(10));
             return false;
         }
     }

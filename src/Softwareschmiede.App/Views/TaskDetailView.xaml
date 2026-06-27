@@ -96,7 +96,9 @@
                 Background="{DynamicResource ErrorBrush}"
                 Padding="12,8"
                 Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-            <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" />
+            <TextBlock AutomationProperties.Name="FehlerMeldung"
+                       AutomationProperties.HelpText="{Binding FehlerMeldung}"
+                       Text="{Binding FehlerMeldung}" Foreground="White" />
         </Border>
 
         <!-- Hauptinhalt: Status-abhängiges Content-Switching -->

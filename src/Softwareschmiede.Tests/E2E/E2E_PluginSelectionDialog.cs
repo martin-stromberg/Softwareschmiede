@@ -27,6 +27,8 @@ public sealed class E2E_PluginSelectionDialog : WpfTestBase
     [Fact]
     public void StartenOhneGespeichertesPlugin_ZeigtPluginAuswahlDialog_E2E()
     {
+        ConfirmLocalDirectoryGitInitInSourceDirectory();
+
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginDialog-Repo", "PluginDialog-Projekt");
 
         var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);

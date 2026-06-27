@@ -118,6 +118,16 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
+    /// Bestätigt für E2E-Erfolgsszenarien explizit, dass das LocalDirectoryPlugin im Quellverzeichnis git init ausführen darf.
+    /// </summary>
+    protected static void ConfirmLocalDirectoryGitInitInSourceDirectory()
+        => new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
+
+    /// <summary>Setzt den Workspace-Modus des LocalDirectoryPlugins für E2E-Tests.</summary>
+    protected static void SetLocalDirectoryWorkspaceMode(string workspaceMode)
+        => new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.WorkspaceMode", workspaceMode);
+
+    /// <summary>
     /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> gefunden wird.
     /// Wirft <see cref="TimeoutException"/>, wenn das Element nicht innerhalb von <paramref name="timeout"/> erscheint.
     /// </summary>
@@ -132,10 +142,33 @@ public abstract class WpfTestBase : IDisposable
             var element = parent.FindFirstDescendant(conditionFunc);
             if (element is not null)
                 return element;
+
+            var fehlerMeldung = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            if (fehlerMeldung is not null)
+                throw new InvalidOperationException(
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetFehlerText(fehlerMeldung)}");
+
             Thread.Sleep(200);
         }
         throw new TimeoutException(
             $"Element wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
+    }
+
+    private static string GetFehlerText(AutomationElement fehlerMeldung)
+    {
+        string? helpText = null;
+        try
+        {
+            helpText = fehlerMeldung.HelpText;
+        }
+        catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
+        {
+        }
+
+        if (!string.IsNullOrWhiteSpace(helpText))
+            return helpText;
+
+        return fehlerMeldung.Name;
     }
 
     /// <summary>
@@ -222,6 +255,24 @@ public abstract class WpfTestBase : IDisposable
         Thread.Sleep(200);
     }
 
+    /// <summary>Wartet, bis eine ComboBox den erwarteten selektierten Eintrag anzeigt.</summary>
+    protected static void WaitForSelectedComboBoxItem(AutomationElement comboBoxElement, string expectedItemText, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        string? selectedItemName = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            selectedItemName = comboBoxElement.AsComboBox().SelectedItem?.Name;
+            if (string.Equals(selectedItemName, expectedItemText, StringComparison.Ordinal))
+                return;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"ComboBox zeigte nicht innerhalb von {timeout.TotalSeconds}s den erwarteten Eintrag '{expectedItemText}'. Aktuell: '{selectedItemName}'.");
+    }
+
     /// <summary>
     /// Erstellt ein temporäres lokales Quellverzeichnis mit einem Unterordner (simuliertes Repository)
     /// für Tests des LocalDirectoryPlugin. Gibt den Pfad des Quellverzeichnisses zurück.
@@ -254,11 +305,9 @@ public abstract class WpfTestBase : IDisposable
         var quellcodeTab = WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), TimeSpan.FromSeconds(10));
         quellcodeTab.Click();
 
-        if (useInSourceDirectoryMode)
-        {
-            var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), TimeSpan.FromSeconds(10));
-            SelectComboBoxItemByClick(workspaceModeBox, "InSourceDirectory", TimeSpan.FromSeconds(10));
-        }
+        var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), TimeSpan.FromSeconds(10));
+        var workspaceMode = useInSourceDirectoryMode ? "InSourceDirectory" : "SeparateWorkingDirectory";
+        SelectComboBoxItemByClick(workspaceModeBox, workspaceMode, TimeSpan.FromSeconds(10));
 
         var sourceDirectoryBox = WaitForElement(mainWindow, cf => cf.ByName("SourceDirectory"), TimeSpan.FromSeconds(10));
         sourceDirectoryBox.AsTextBox().Text = sourceDirectory;

@@ -46,5 +46,7 @@ public sealed class KiSimulatorPluginTests
 
         psi.FileName.Should().Be("cmd.exe");
         psi.WorkingDirectory.Should().Be(@"C:\repos\demo");
+        psi.UseShellExecute.Should().BeFalse();
+        psi.CreateNoWindow.Should().BeFalse();
     }
 }
