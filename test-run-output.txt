@@ -1,0 +1,281 @@
+Testlauf für "C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" (.NETCoreApp,Version=v10.0)
+Die angegebene Testquelldatei "C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" wurde nicht gefunden.
+Testlauf für "C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" (.NETCoreApp,Version=v10.0)
+Insgesamt 1 Testdateien stimmten mit dem angegebenen Muster überein.
+[xUnit.net 00:00:01.38]     Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.LoeschenCommand_CanExecuteFalse_WennStatusBeendet [FAIL]
+[xUnit.net 00:00:01.39]     Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsTrue_WhenStatusGestartet [FAIL]
+[xUnit.net 00:00:01.39]     Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsFalse_WhenStatusArchiviert [FAIL]
+  Fehler Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.LoeschenCommand_CanExecuteFalse_WennStatusBeendet [21 ms]
+  Fehlermeldung:
+   Expected sut.LoeschenCommand.CanExecute(null) to be False, but found True.
+  Stapelverfolgung:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.BooleanAssertions`1.BeFalse(String because, Object[] becauseArgs)
+   at Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.LoeschenCommand_CanExecuteFalse_WennStatusBeendet() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\App\ViewModels\TaskDetailViewModelTests.cs:line 453
+--- End of stack trace from previous location ---
+  Fehler Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsTrue_WhenStatusGestartet [4 ms]
+  Fehlermeldung:
+   Expected sut.KannLoeschen to be True, but found False.
+  Stapelverfolgung:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.BooleanAssertions`1.BeTrue(String because, Object[] becauseArgs)
+   at Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsTrue_WhenStatusGestartet() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\App\ViewModels\TaskDetailViewModelTests.cs:line 303
+--- End of stack trace from previous location ---
+  Fehler Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsFalse_WhenStatusArchiviert [3 ms]
+  Fehlermeldung:
+   Expected sut.KannLoeschen to be False, but found True.
+  Stapelverfolgung:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.BooleanAssertions`1.BeFalse(String because, Object[] becauseArgs)
+   at Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsFalse_WhenStatusArchiviert() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\App\ViewModels\TaskDetailViewModelTests.cs:line 291
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:01.50]     Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsFalse_WhenStatusBeendet [FAIL]
+  Fehler Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsFalse_WhenStatusBeendet [3 ms]
+  Fehlermeldung:
+   Expected sut.KannLoeschen to be False, but found True.
+  Stapelverfolgung:
+     at FluentAssertions.Execution.XUnit2TestFramework.Throw(String message)
+   at FluentAssertions.Execution.TestFrameworkProvider.Throw(String message)
+   at FluentAssertions.Execution.DefaultAssertionStrategy.HandleFailure(String message)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(Func`1 failReasonFunc)
+   at FluentAssertions.Execution.AssertionScope.FailWith(String message, Object[] args)
+   at FluentAssertions.Primitives.BooleanAssertions`1.BeFalse(String because, Object[] becauseArgs)
+   at Softwareschmiede.Tests.App.ViewModels.TaskDetailViewModelTests.KannLoeschen_IsFalse_WhenStatusBeendet() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\App\ViewModels\TaskDetailViewModelTests.cs:line 279
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:18.73]     Softwareschmiede.Tests.E2E.WpfE2ETests.DarkModeAktivierenUndPersistieren_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.WpfE2ETests.DarkModeAktivierenUndPersistieren_E2E [5 s]
+  Fehlermeldung:
+   Assert.Equal() Failure: Strings differ
+           ↓ (pos 0)
+Expected: "Light"
+Actual:   "Dark"
+           ↑ (pos 0)
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfE2ETests.DarkModeAktivierenUndPersistieren_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfE2EPlaceholderTests.cs:line 131
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:42.46]     Softwareschmiede.Tests.E2E.WpfE2ETests.ProjektErstellen_ZeigtAufgabenListe_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.WpfE2ETests.ProjektErstellen_ZeigtAufgabenListe_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfE2ETests.ProjektErstellen_ZeigtAufgabenListe_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfE2EPlaceholderTests.cs:line 29
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:51.27]     Softwareschmiede.Tests.E2E.WpfE2ETests.EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.WpfE2ETests.EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E [8 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 5s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfE2ETests.EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfE2EPlaceholderTests.cs:line 173
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:01:10.73]     Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.RepositoryZuweisenDialog_ScmPluginListe_EnthaeltErwartetePlugins_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.RepositoryZuweisenDialog_ScmPluginListe_EnthaeltErwartetePlugins_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.RepositoryZuweisenDialog_ScmPluginListe_EnthaeltErwartetePlugins_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\ProjectDetailE2ETests.cs:line 268
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:01:36.48]     Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektBearbeitenUndSpeichern_AktualisierterNameBleibt_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektBearbeitenUndSpeichern_AktualisierterNameBleibt_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektBearbeitenUndSpeichern_AktualisierterNameBleibt_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\ProjectDetailE2ETests.cs:line 132
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:01.67]     Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E [19 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 15s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 192
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\ProjectDetailE2ETests.cs:line 158
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:15.40]     Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.NeuanlageAbbrechen_ErstesProjektNochAufrufbar_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.NeuanlageAbbrechen_ErstesProjektNochAufrufbar_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.NeuanlageAbbrechen_ErstesProjektNochAufrufbar_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\ProjectDetailE2ETests.cs:line 40
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:02:34.41]     Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.RepositoryZuweisen_DialogOeffnetUndSchliessbarPerAbbrechen_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.RepositoryZuweisen_DialogOeffnetUndSchliessbarPerAbbrechen_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.RepositoryZuweisen_DialogOeffnetUndSchliessbarPerAbbrechen_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\ProjectDetailE2ETests.cs:line 241
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:03:00.07]     Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.ZurueckButtonInTaskDetail_NavigiertZuProjectDetailView_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.ZurueckButtonInTaskDetail_NavigiertZuProjectDetailView_E2E [20 s]
+  Fehlermeldung:
+   Assert.Null() Failure: Value is not null
+Expected: null
+Actual:   AutomationId:, Name:Speichern, ControlType:Schaltfläche, FrameworkId:WPF
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitUntilGone(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 172
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 189
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.ZurueckButtonInTaskDetail_NavigiertZuProjectDetailView_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_TaskDetailNavigation.cs:line 83
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:03:13.95]     Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.TaskDetailView_ZeigtKorrekteAufgabendaten_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.TaskDetailView_ZeigtKorrekteAufgabendaten_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.TaskDetailView_ZeigtKorrekteAufgabendaten_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_TaskDetailNavigation.cs:line 63
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:03:27.76]     Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.AufgabeOeffnen_ZeigtTaskDetailViewFensterumfassend_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.AufgabeOeffnen_ZeigtTaskDetailViewFensterumfassend_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.E2E_TaskDetailNavigation.AufgabeOeffnen_ZeigtTaskDetailViewFensterumfassend_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_TaskDetailNavigation.cs:line 29
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:03:41.52]     Softwareschmiede.Tests.E2E.E2E_PluginWechsel.PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_PluginWechsel.PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, String sourceDirectory, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 252
+   at Softwareschmiede.Tests.E2E.WpfTestBase.SetupProjectMitNeuerAufgabe(String repositoryFolderName, String projektName, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 325
+   at Softwareschmiede.Tests.E2E.E2E_PluginWechsel.PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_PluginWechsel.cs:line 28
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:03:55.29]     Softwareschmiede.Tests.E2E.E2E_PluginSelectionDialog.StartenOhneGespeichertesPlugin_ZeigtPluginAuswahlDialog_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_PluginSelectionDialog.StartenOhneGespeichertesPlugin_ZeigtPluginAuswahlDialog_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, String sourceDirectory, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 252
+   at Softwareschmiede.Tests.E2E.WpfTestBase.SetupProjectMitNeuerAufgabe(String repositoryFolderName, String projektName, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 325
+   at Softwareschmiede.Tests.E2E.E2E_PluginSelectionDialog.StartenOhneGespeichertesPlugin_ZeigtPluginAuswahlDialog_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_PluginSelectionDialog.cs:line 30
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:04:09.13]     Softwareschmiede.Tests.E2E.E2E_PluginSelectionDialog.PluginAuswahlAbbrechen_StartetNichtUndBleibtImStatusNeu_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_PluginSelectionDialog.PluginAuswahlAbbrechen_StartetNichtUndBleibtImStatusNeu_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, String sourceDirectory, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 252
+   at Softwareschmiede.Tests.E2E.WpfTestBase.SetupProjectMitNeuerAufgabe(String repositoryFolderName, String projektName, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 325
+   at Softwareschmiede.Tests.E2E.E2E_PluginSelectionDialog.PluginAuswahlAbbrechen_StartetNichtUndBleibtImStatusNeu_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_PluginSelectionDialog.cs:line 61
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:04:23.27]     Softwareschmiede.Tests.E2E.E2E_PluginProjectDefault_NextTask.ZweiteAufgabeImProjekt_UebernimmtGespeichertenProjektStandardOhneDialog_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_PluginProjectDefault_NextTask.ZweiteAufgabeImProjekt_UebernimmtGespeichertenProjektStandardOhneDialog_E2E [14 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, String sourceDirectory, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 269
+   at Softwareschmiede.Tests.E2E.WpfTestBase.SetupProjectMitNeuerAufgabe(String repositoryFolderName, String projektName, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 325
+   at Softwareschmiede.Tests.E2E.E2E_PluginProjectDefault_NextTask.ZweiteAufgabeImProjekt_UebernimmtGespeichertenProjektStandardOhneDialog_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_PluginProjectDefault_NextTask.cs:line 30
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:04:47.31]     Softwareschmiede.Tests.E2E.E2E_PluginProjectDefault.PluginDialogMitProjektCheckbox_SpeichertProjektStandardUndStartetCli_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_PluginProjectDefault.PluginDialogMitProjektCheckbox_SpeichertProjektStandardUndStartetCli_E2E [24 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 15s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.E2E_PluginProjectDefault.PluginDialogMitProjektCheckbox_SpeichertProjektStandardUndStartetCli_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_PluginProjectDefault.cs:line 46
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:05:01.26]     Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation.NeueAufgabeErstellenUndSpeichern_ErscheintInListeUndNavigiertZurueck_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation.NeueAufgabeErstellenUndSpeichern_ErscheintInListeUndNavigiertZurueck_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation.NeueAufgabeErstellenUndSpeichern_ErscheintInListeUndNavigiertZurueck_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_CreateNewTaskNavigation.cs:line 31
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:05:15.10]     Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation.NeueAufgabeAbbrechen_NavigiertZurueckOhneTitelAenderungZuSpeichern_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation.NeueAufgabeAbbrechen_NavigiertZurueckOhneTitelAenderungZuSpeichern_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 178
+   at Softwareschmiede.Tests.E2E.WpfTestBase.CreateAndOpenProject(AutomationElement mainWindow, String name) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 206
+   at Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation.NeueAufgabeAbbrechen_NavigiertZurueckOhneTitelAenderungZuSpeichern_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_CreateNewTaskNavigation.cs:line 65
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:05:29.15]     Softwareschmiede.Tests.E2E.E2E_AutoStartCli.AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_AutoStartCli.AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E [14 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, String sourceDirectory, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 259
+   at Softwareschmiede.Tests.E2E.WpfTestBase.SetupProjectMitNeuerAufgabe(String repositoryFolderName, String projektName, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 325
+   at Softwareschmiede.Tests.E2E.E2E_AutoStartCli.AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_AutoStartCli.cs:line 31
+   at System.RuntimeMethodHandle.InvokeMethod(ObjectHandleOnStack target, Void** arguments, ObjectHandleOnStack sig, BOOL isConstructor, ObjectHandleOnStack result)
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:05:43.00]     Softwareschmiede.Tests.E2E.E2E_AufgabeStarten.AufgabeStarten_KlontRepositoryUndStartetCli_E2E [FAIL]
+  Fehler Softwareschmiede.Tests.E2E.E2E_AufgabeStarten.AufgabeStarten_KlontRepositoryUndStartetCli_E2E [13 s]
+  Fehlermeldung:
+   System.TimeoutException : Element wurde nicht innerhalb von 10s gefunden.
+  Stapelverfolgung:
+     at Softwareschmiede.Tests.E2E.WpfTestBase.WaitForElement(AutomationElement parent, Func`2 conditionFunc, TimeSpan timeout) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 137
+   at Softwareschmiede.Tests.E2E.WpfTestBase.ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, String sourceDirectory, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 252
+   at Softwareschmiede.Tests.E2E.WpfTestBase.SetupProjectMitNeuerAufgabe(String repositoryFolderName, String projektName, Boolean useInSourceDirectoryMode) in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\WpfTestBase.cs:line 325
+   at Softwareschmiede.Tests.E2E.E2E_AufgabeStarten.AufgabeStarten_KlontRepositoryUndStartetCli_E2E() in C:\Users\Martin\Documents\Repositories\Softwareschmiede\src\Softwareschmiede.Tests\E2E\E2E_AufgabeStarten.cs:line 28
+   at System.RuntimeMethodHandle.InvokeMethod(ObjectHandleOnStack target, Void** arguments, ObjectHandleOnStack sig, BOOL isConstructor, ObjectHandleOnStack result)
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Fehler!      : Fehler:    24, erfolgreich:   553, übersprungen:     0, gesamt:   577, Dauer: 5 m 42 s - Softwareschmiede.Tests.dll (net10.0)
