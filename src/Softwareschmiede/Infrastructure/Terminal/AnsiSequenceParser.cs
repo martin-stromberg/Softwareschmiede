@@ -106,8 +106,16 @@ public sealed class AnsiSequenceParser
                     break;
 
                 case State.Osc:
-                    if (b == 0x07 || b == 0x1B)
+                    if (b == 0x07)
                     {
+                        _state = State.Normal;
+                        _paramBuffer.Clear();
+                    }
+                    else if (b == 0x1B)
+                    {
+                        // Zweistelliger String-Terminator ESC \: das nachfolgende \ überspringen.
+                        if (i + 1 < data.Length && data[i + 1] == 0x5C)
+                            i++;
                         _state = State.Normal;
                         _paramBuffer.Clear();
                     }

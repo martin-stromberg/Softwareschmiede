@@ -11,7 +11,7 @@ public sealed class TerminalControl : FrameworkElement
 {
     private TerminalBuffer? _buffer;
     private CancellationTokenSource? _readCts;
-    private AnsiSequenceParser _parser = new();
+    private volatile AnsiSequenceParser _parser = new();
     private static readonly Typeface ConsolasTypeface = new("Consolas");
     private const double FontSize = 13.0;
     private double _cellWidth;
@@ -240,7 +240,7 @@ public sealed class TerminalControl : FrameworkElement
             var cols = CalculateCols();
             var rows = CalculateRows();
             buffer.Resize(cols, rows);
-            _ = session.ResizeAsync(cols, rows);
+            session.Resize(cols, rows);
         }
 
         base.OnRenderSizeChanged(sizeInfo);

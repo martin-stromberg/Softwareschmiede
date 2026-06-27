@@ -58,12 +58,11 @@ internal sealed class PseudoConsole : IDisposable
     /// <summary>Ändert die Größe der Pseudo Console.</summary>
     /// <param name="cols">Neue Spaltenanzahl.</param>
     /// <param name="rows">Neue Zeilenanzahl.</param>
-    internal void Resize(short cols, short rows)
+    /// <returns><c>true</c>, wenn die Größenänderung erfolgreich war; andernfalls <c>false</c>.</returns>
+    internal bool Resize(short cols, short rows)
     {
         var size = new COORD { X = cols, Y = rows };
-        var hr = ResizePseudoConsole(Handle, size);
-        if (hr != 0)
-            throw new InvalidOperationException($"ResizePseudoConsole fehlgeschlagen (HRESULT: 0x{hr:X8}).");
+        return ResizePseudoConsole(Handle, size) == 0;
     }
 
     /// <inheritdoc/>

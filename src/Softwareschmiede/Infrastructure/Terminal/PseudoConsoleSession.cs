@@ -35,12 +35,9 @@ public sealed class PseudoConsoleSession : IDisposable
     /// <summary>Ändert die Größe der Pseudo Console.</summary>
     /// <param name="cols">Neue Spaltenanzahl.</param>
     /// <param name="rows">Neue Zeilenanzahl.</param>
-    /// <returns>Eine abgeschlossene <see cref="Task"/>-Instanz.</returns>
-    public Task ResizeAsync(int cols, int rows)
-    {
-        _pseudoConsole.Resize((short)cols, (short)rows);
-        return Task.CompletedTask;
-    }
+    /// <returns><c>true</c>, wenn die Größenänderung erfolgreich war; andernfalls <c>false</c>.</returns>
+    public bool Resize(int cols, int rows)
+        => _pseudoConsole.Resize((short)cols, (short)rows);
 
     /// <inheritdoc/>
     public void Dispose()
