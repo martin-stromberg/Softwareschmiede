@@ -75,6 +75,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
             OnPropertyChanged(nameof(KannCliStoppen));
+            OnPropertyChanged(nameof(KannCliNeuStarten));
             OnPropertyChanged(nameof(ShowEditPanel));
             OnPropertyChanged(nameof(ShowCliPanel));
             OnPropertyChanged(nameof(ShowDiffPanel));
@@ -114,6 +115,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             SetProperty(ref _isCliRunning, value);
             OnPropertyChanged(nameof(KannCliStoppen));
+            OnPropertyChanged(nameof(KannCliNeuStarten));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
@@ -122,6 +124,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
     public bool KannCliStoppen => _isCliRunning;
+
+    /// <summary>Gibt an, ob die CLI neu gestartet werden kann (Status Gestartet/Wartend, aber kein Prozess läuft).</summary>
+    public bool KannCliNeuStarten => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Gestartet
+        or Domain.Enums.AufgabeStatus.Wartend
+        && !_isCliRunning;
 
     /// <summary>Gewähltes KI-Plugin (Prefix).</summary>
     public string? SelectedKiPluginPrefix
@@ -208,6 +215,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Startet die Aufgabe: kombiniertes Klonen, Plugin-Auflösung und CLI-Start.</summary>
     public ICommand StartenCommand { get; }
 
+    /// <summary>Startet die CLI für eine bereits laufende Aufgabe neu (nach manuellem Stopp).</summary>
+    public ICommand CliNeustartenCommand { get; }
+
     /// <summary>Wechselt das KI-Plugin bei laufender CLI: Dialog, Stop, Restart.</summary>
     public ICommand PluginAendernCommand { get; }
 
@@ -282,6 +292,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
         CliStoppenCommand = new AsyncRelayCommand(CliStoppenAsync, () => KannCliStoppen);
+        CliNeustartenCommand = new AsyncRelayCommand(CliNeustartenAsync, () => KannCliNeuStarten);
         StartenCommand = new AsyncRelayCommand(StartenAsync, () => AufgabeStatus == Domain.Enums.AufgabeStatus.Neu && !_isCliRunning);
         PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => ShowCliPanel && !_isCliRunning);
@@ -379,6 +390,28 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "Fehler beim Stoppen des CLI für Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"CLI-Stoppfehler: {ex.Message}";
+        }
+    }
+
+    private async Task CliNeustartenAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty || _aufgabe is null)
+            return;
+
+        FehlerMeldung = null;
+
+        try
+        {
+            await CliAutomatischNeustartenAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim manuellen CLI-Neustart für Aufgabe {AufgabeId}.", _aufgabeId);
+            FehlerMeldung = $"CLI konnte nicht gestartet werden: {ex.Message}";
         }
     }
 

@@ -61,6 +61,11 @@
                                                         ButtonText="Plugin ändern"
                                                         AutomationName="PluginAendern"
                                                         ButtonCommand="{Binding PluginAendernCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="▶"
+                                                        ButtonText="CLI starten"
+                                                        AutomationName="CliNeustarten"
+                                                        ButtonCommand="{Binding CliNeustartenCommand}"
+                                                        Visibility="{Binding KannCliNeuStarten, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="■"
                                                         ButtonText="Stoppen"
                                                         AutomationName="CliStoppen"
