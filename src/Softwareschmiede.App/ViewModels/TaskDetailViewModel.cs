@@ -76,6 +76,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             SetProperty(ref _aufgabe, value);
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
+            OnPropertyChanged(nameof(AufgabeBranchName));
             OnPropertyChanged(nameof(KannCliStoppen));
             OnPropertyChanged(nameof(KannCliNeuStarten));
             OnPropertyChanged(nameof(ShowEditPanel));
@@ -94,6 +95,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Status der Aufgabe.</summary>
     public AufgabeStatus AufgabeStatus => _aufgabe?.Status ?? Domain.Enums.AufgabeStatus.Neu;
+
+    /// <summary>Branch-Name der Aufgabe.</summary>
+    public string AufgabeBranchName => _aufgabe?.BranchName ?? string.Empty;
 
     /// <summary>Gibt an, ob Daten geladen werden.</summary>
     public bool IsLoading

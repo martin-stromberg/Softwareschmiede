@@ -9,6 +9,7 @@ namespace Softwareschmiede.App.Controls;
 public sealed partial class StatusIndicatorControl : UserControl
 {
     /// <summary>Dependency Property für den Aufgaben-Status.</summary>
+    /// <returns>Registrierte <see cref="DependencyProperty"/>-Instanz.</returns>
     public static readonly DependencyProperty StatusProperty =
         DependencyProperty.Register(
             nameof(Status),
@@ -17,6 +18,7 @@ public sealed partial class StatusIndicatorControl : UserControl
             new PropertyMetadata(AufgabeStatus.Neu, OnStatusChanged));
 
     /// <summary>Dependency Property für den Statustext.</summary>
+    /// <returns>Registrierte <see cref="DependencyProperty"/>-Instanz.</returns>
     public static readonly DependencyProperty StatusTextProperty =
         DependencyProperty.Register(
             nameof(StatusText),
@@ -25,12 +27,22 @@ public sealed partial class StatusIndicatorControl : UserControl
             new PropertyMetadata(string.Empty));
 
     /// <summary>Dependency Property für die Statusfarbe.</summary>
+    /// <returns>Registrierte <see cref="DependencyProperty"/>-Instanz.</returns>
     public static readonly DependencyProperty StatusColorProperty =
         DependencyProperty.Register(
             nameof(StatusColor),
             typeof(Brush),
             typeof(StatusIndicatorControl),
             new PropertyMetadata(Brushes.Gray));
+
+    /// <summary>Dependency Property für den Branch-Namen.</summary>
+    /// <returns>Registrierte <see cref="DependencyProperty"/>-Instanz.</returns>
+    public static readonly DependencyProperty BranchNameProperty =
+        DependencyProperty.Register(
+            nameof(BranchName),
+            typeof(string),
+            typeof(StatusIndicatorControl),
+            new PropertyMetadata(null));
 
     /// <summary>Aufgaben-Status.</summary>
     public AufgabeStatus Status
@@ -51,6 +63,13 @@ public sealed partial class StatusIndicatorControl : UserControl
     {
         get => (Brush)GetValue(StatusColorProperty);
         private set => SetValue(StatusColorProperty, value);
+    }
+
+    /// <summary>Branch-Name der Aufgabe.</summary>
+    public string? BranchName
+    {
+        get => (string?)GetValue(BranchNameProperty);
+        set => SetValue(BranchNameProperty, value);
     }
 
     /// <inheritdoc cref="StatusIndicatorControl"/>

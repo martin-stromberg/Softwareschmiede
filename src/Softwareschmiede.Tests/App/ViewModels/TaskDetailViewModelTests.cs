@@ -143,6 +143,30 @@ public sealed class TaskDetailViewModelTests : IDisposable
         return await _aufgabeService.GetByIdAsync(aufgabe.Id) ?? aufgabe;
     }
 
+    // --- AufgabeBranchName ---
+
+    /// <summary>AufgabeBranchName gibt leeren String zurück wenn Aufgabe null ist.</summary>
+    [Fact]
+    public void AufgabeBranchName_WhenAufgabeIsNull_ReturnsEmptyString()
+    {
+        var sut = CreateSut();
+
+        sut.AufgabeBranchName.Should().BeEmpty();
+    }
+
+    /// <summary>AufgabeBranchName gibt Aufgabe.BranchName zurück wenn Aufgabe einen Branch-Namen hat.</summary>
+    [Fact]
+    public async Task AufgabeBranchName_WhenAufgabeHasBranchName_ReturnsBranchName()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/login-fix", Path.GetTempPath());
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.AufgabeBranchName.Should().Be("feature/login-fix");
+    }
+
     // --- ShowEditPanel, ShowCliPanel, ShowDiffPanel ---
 
     /// <summary>ShowEditPanel ist true wenn Status=Neu.</summary>

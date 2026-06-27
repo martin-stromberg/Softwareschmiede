@@ -320,10 +320,9 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
                 <controls:StatusIndicatorControl Grid.Column="0"
-                                                 Status="{Binding AufgabeStatus, Mode=OneWay}" />
-
+                                                 Status="{Binding AufgabeStatus, Mode=OneWay}"
+                                                 BranchName="{Binding AufgabeBranchName, Mode=OneWay}" />
                 <TextBlock Grid.Column="2"
                            Text="{Binding CliStatusText}"
                            Foreground="{DynamicResource SecondaryTextBrush}"
@@ -331,7 +330,8 @@
                            VerticalAlignment="Center"
                            AutomationProperties.Name="CliStatusText"
                            Visibility="{Binding ShowCliPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
-            </Grid>
+                
+            </Grid>            
         </Border>
     </Grid>
 </UserControl>
