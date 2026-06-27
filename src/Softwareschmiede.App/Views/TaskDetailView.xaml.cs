@@ -16,6 +16,7 @@ public sealed partial class TaskDetailView : UserControl
             if (DataContext is TaskDetailViewModel vm)
             {
                 vm.PseudoConsoleSessionGestartet += OnPseudoConsoleSessionGestartet;
+                vm.CliGestoppt += OnCliGestoppt;
 
                 var existingSession = vm.GetPseudoConsoleSession();
                 if (existingSession != null)
@@ -27,6 +28,7 @@ public sealed partial class TaskDetailView : UserControl
             if (DataContext is TaskDetailViewModel vm)
             {
                 vm.PseudoConsoleSessionGestartet -= OnPseudoConsoleSessionGestartet;
+                vm.CliGestoppt -= OnCliGestoppt;
                 vm.Dispose();
             }
         };
@@ -35,5 +37,10 @@ public sealed partial class TaskDetailView : UserControl
     private void OnPseudoConsoleSessionGestartet(PseudoConsoleSession session)
     {
         TerminalConsole.Session = session;
+    }
+
+    private void OnCliGestoppt()
+    {
+        TerminalConsole.Session = null;
     }
 }

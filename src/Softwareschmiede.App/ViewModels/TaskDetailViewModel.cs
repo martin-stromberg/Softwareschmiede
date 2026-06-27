@@ -235,6 +235,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wird gefeuert, wenn eine neue <see cref="PseudoConsoleSession"/> gestartet wurde.</summary>
     public event Action<PseudoConsoleSession>? PseudoConsoleSessionGestartet;
 
+    /// <summary>Wird gefeuert, wenn der CLI-Prozess der aktuellen Aufgabe beendet wurde.</summary>
+    public event Action? CliGestoppt;
+
     /// <summary>Gibt die aktive <see cref="PseudoConsoleSession"/> für die aktuelle Aufgabe zurück, oder null.</summary>
     /// <returns>Die aktive <see cref="PseudoConsoleSession"/>, oder null wenn keine Session läuft.</returns>
     public PseudoConsoleSession? GetPseudoConsoleSession() => _kiService.GetPseudoConsoleSession(_aufgabeId);
@@ -552,7 +555,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (aufgabeId != _aufgabeId)
             return;
 
-        _dispatcherInvoke(() => IsCliRunning = status == CliProcessStatus.Gestartet);
+        _dispatcherInvoke(() =>
+        {
+            IsCliRunning = status == CliProcessStatus.Gestartet;
+            if (status != CliProcessStatus.Gestartet)
+                CliGestoppt?.Invoke();
+        });
     }
 
     /// <inheritdoc/>
