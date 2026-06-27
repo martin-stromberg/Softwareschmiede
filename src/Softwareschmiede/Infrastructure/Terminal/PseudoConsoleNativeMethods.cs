@@ -19,7 +19,7 @@ internal static class PseudoConsoleNativeMethods
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern int ResizePseudoConsole(IntPtr hPC, COORD size);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [DllImport("kernel32.dll")]
     internal static extern void ClosePseudoConsole(IntPtr hPC);
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -49,7 +49,7 @@ internal static class PseudoConsoleNativeMethods
         IntPtr lpPreviousValue,
         IntPtr lpReturnSize);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [DllImport("kernel32.dll")]
     internal static extern void DeleteProcThreadAttributeList(IntPtr lpAttributeList);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]

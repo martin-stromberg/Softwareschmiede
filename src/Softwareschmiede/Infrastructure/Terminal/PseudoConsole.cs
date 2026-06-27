@@ -61,7 +61,9 @@ internal sealed class PseudoConsole : IDisposable
     internal void Resize(short cols, short rows)
     {
         var size = new COORD { X = cols, Y = rows };
-        ResizePseudoConsole(Handle, size);
+        var hr = ResizePseudoConsole(Handle, size);
+        if (hr != 0)
+            throw new InvalidOperationException($"ResizePseudoConsole fehlgeschlagen (HRESULT: 0x{hr:X8}).");
     }
 
     /// <inheritdoc/>

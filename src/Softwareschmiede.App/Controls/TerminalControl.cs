@@ -11,11 +11,15 @@ public sealed class TerminalControl : FrameworkElement
 {
     private TerminalBuffer? _buffer;
     private CancellationTokenSource? _readCts;
-    private readonly AnsiSequenceParser _parser = new();
+    private AnsiSequenceParser _parser = new();
     private static readonly Typeface ConsolasTypeface = new("Consolas");
     private const double FontSize = 13.0;
     private double _cellWidth;
     private double _cellHeight;
+
+    private static readonly SolidColorBrush BlackBrush = CreateFrozenBrush(Colors.Black);
+    private static readonly SolidColorBrush CursorBrush = CreateFrozenBrush(Color.FromArgb(180, 255, 255, 255));
+    private readonly Dictionary<Color, SolidColorBrush> _brushCache = new();
 
     /// <summary>Dependency Property für die aktive <see cref="PseudoConsoleSession"/>.</summary>
     /// <value>Das registrierte <see cref="DependencyProperty"/> für die Session-Eigenschaft.</value>
@@ -37,6 +41,12 @@ public sealed class TerminalControl : FrameworkElement
     {
         Focusable = true;
         MeasureCellSize();
+        Unloaded += (_, _) =>
+        {
+            _readCts?.Cancel();
+            _readCts?.Dispose();
+            _readCts = null;
+        };
     }
 
     private static void OnSessionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -50,6 +60,9 @@ public sealed class TerminalControl : FrameworkElement
         _readCts?.Cancel();
         _readCts?.Dispose();
         _readCts = null;
+
+        // Parser zurücksetzen, damit keine Zustandsreste der alten Session die neue Session beeinflussen.
+        _parser = new AnsiSequenceParser();
 
         if (session == null)
             return;
@@ -102,7 +115,7 @@ public sealed class TerminalControl : FrameworkElement
     /// <inheritdoc/>
     protected override void OnRender(DrawingContext dc)
     {
-        dc.DrawRectangle(Brushes.Black, null, new Rect(0, 0, ActualWidth, ActualHeight));
+        dc.DrawRectangle(BlackBrush, null, new Rect(0, 0, ActualWidth, ActualHeight));
 
         var buffer = _buffer;
         if (buffer == null)
@@ -130,7 +143,7 @@ public sealed class TerminalControl : FrameworkElement
 
                 if (bgColor != System.Drawing.Color.Black)
                 {
-                    var brush = new SolidColorBrush(Color.FromArgb(bgColor.A, bgColor.R, bgColor.G, bgColor.B));
+                    var brush = GetBrush(Color.FromArgb(bgColor.A, bgColor.R, bgColor.G, bgColor.B));
                     dc.DrawRectangle(brush, null, new Rect(bgStart * _cellWidth, y, (bgEnd - bgStart) * _cellWidth, _cellHeight));
                 }
 
@@ -144,7 +157,7 @@ public sealed class TerminalControl : FrameworkElement
                     continue;
 
                 var fg = cell.Foreground;
-                var fgBrush = new SolidColorBrush(Color.FromArgb(fg.A, fg.R, fg.G, fg.B));
+                var fgBrush = GetBrush(Color.FromArgb(fg.A, fg.R, fg.G, fg.B));
                 var ft = new FormattedText(
                     cell.Character.ToString(),
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -160,7 +173,25 @@ public sealed class TerminalControl : FrameworkElement
 
         var cursorX = cursorCol * _cellWidth;
         var cursorY = cursorRow * _cellHeight;
-        dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)), null, new Rect(cursorX, cursorY, _cellWidth, _cellHeight));
+        dc.DrawRectangle(CursorBrush, null, new Rect(cursorX, cursorY, _cellWidth, _cellHeight));
+    }
+
+    private SolidColorBrush GetBrush(Color color)
+    {
+        if (!_brushCache.TryGetValue(color, out var brush))
+        {
+            brush = CreateFrozenBrush(color);
+            _brushCache[color] = brush;
+        }
+
+        return brush;
+    }
+
+    private static SolidColorBrush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 
     /// <inheritdoc/>

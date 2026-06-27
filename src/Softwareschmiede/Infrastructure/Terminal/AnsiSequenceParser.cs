@@ -124,7 +124,7 @@ public sealed class AnsiSequenceParser
         if (_textBuffer.Count == 0)
             return;
 
-        var text = Encoding.UTF8.GetString(_textBuffer.ToArray());
+        var text = Encoding.UTF8.GetString(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_textBuffer));
         _textBuffer.Clear();
 
         if (text.Length > 0)
@@ -295,9 +295,5 @@ public sealed class AnsiSequenceParser
     }
 
     private static int GetParam(int[] parts, int index, int defaultValue)
-    {
-        if (index >= parts.Length || parts[index] == 0 && defaultValue != 0)
-            return defaultValue;
-        return parts[index];
-    }
+        => index < parts.Length ? parts[index] : defaultValue;
 }

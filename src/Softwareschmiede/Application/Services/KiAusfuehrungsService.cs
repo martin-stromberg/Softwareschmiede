@@ -237,7 +237,6 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             }
 
             var process = System.Diagnostics.Process.GetProcessById(startResult.Pid);
-            process.EnableRaisingEvents = true;
 
             var inputStream = new System.IO.FileStream(
                 new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.InputWritePipe, ownsHandle: false),
@@ -254,15 +253,21 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var session = new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream);
             var handle = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session };
 
+            // EnableRaisingEvents vor der Handler-Registrierung setzen. So ist sichergestellt, dass
+            // das Exited-Event nicht zwischen Prozessstart und Handler-Registrierung verloren geht.
+            process.EnableRaisingEvents = true;
             process.Exited += (_, _) =>
             {
+                // TryRemove ist atomar: gibt false zurück, wenn der Prozess bereits über den
+                // HasExited-Check unten bereinigt wurde. So wird jede Aktion genau einmal ausgeführt.
+                if (!_handles.TryRemove(aufgabeId, out _))
+                    return;
+
                 var exitCode = TryGetExitCode(process);
                 _logger.LogInformation(
                     "CLI-Prozess (ConPTY) für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
                     aufgabeId,
                     exitCode);
-
-                _handles.TryRemove(aufgabeId, out _);
 
                 RaiseRunningCountChanged();
 
@@ -285,6 +290,14 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             };
 
             _handles[aufgabeId] = handle;
+
+            // Wenn der Prozess bereits vor dem Setzen von EnableRaisingEvents beendet wurde,
+            // wird das Exited-Event nicht mehr ausgelöst. Dann hier manuell bereinigen.
+            if (process.HasExited && _handles.TryRemove(aufgabeId, out _))
+            {
+                RaiseRunningCountChanged();
+                CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
+            }
 
             _logger.LogInformation("CLI-Prozess (ConPTY) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, startResult.Pid);
             RaiseRunningCountChanged();
