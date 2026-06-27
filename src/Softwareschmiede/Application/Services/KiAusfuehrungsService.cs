@@ -205,10 +205,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 }
             }
 
-            // Temporär: cmd.exe starten statt der KI-CLI, damit der Nutzer die CLI manuell starten kann.
-            // TODO: kiPlugin.StartCliAsync(...) verwenden, sobald die ConPTY-Integration vollständig getestet ist.
-            _ = kiPlugin;
-            _ = optionalParameters;
+            // Plugin-Befehl ermitteln (FileName + Arguments) — wird nach cmd.exe-Start in die Konsole gesendet.
+            var pluginPsi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct);
+            var pluginCommand = BuildCliCommand(pluginPsi);
+
             var workingDir = !string.IsNullOrEmpty(localRepoPath) && Directory.Exists(localRepoPath)
                 ? localRepoPath
                 : Path.GetTempPath();
@@ -221,7 +221,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             };
             psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
 
-            _logger.LogInformation("CLI-Prozess (ConPTY, cmd.exe) für Aufgabe {AufgabeId} starten.", aufgabeId);
+            _logger.LogInformation("CLI-Prozess (ConPTY, cmd.exe → {Command}) für Aufgabe {AufgabeId} starten.", pluginCommand, aufgabeId);
 
             var pseudoConsole = PseudoConsole.Create(220, 50);
 
@@ -289,6 +289,12 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             _logger.LogInformation("CLI-Prozess (ConPTY) für Aufgabe {AufgabeId} gestartet (PID: {Pid}).", aufgabeId, startResult.Pid);
             RaiseRunningCountChanged();
             CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestartet);
+
+            // Plugin-Befehl verzögert senden: cmd.exe braucht ~200ms bis der Prompt bereit ist.
+            if (!string.IsNullOrEmpty(pluginCommand))
+            {
+                _ = SendCommandDelayedAsync(session, pluginCommand, aufgabeId);
+            }
 
             return handle;
         }
@@ -478,6 +484,36 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         {
             return false;
         }
+    }
+
+    private async Task SendCommandDelayedAsync(PseudoConsoleSession session, string command, Guid aufgabeId)
+    {
+        try
+        {
+            await Task.Delay(300);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(command + "\r\n");
+            await session.InputStream.WriteAsync(bytes);
+            await session.InputStream.FlushAsync();
+            _logger.LogInformation("Plugin-Befehl an cmd.exe gesendet für Aufgabe {AufgabeId}: {Command}", aufgabeId, command);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}.", aufgabeId);
+        }
+    }
+
+    private static string BuildCliCommand(System.Diagnostics.ProcessStartInfo psi)
+    {
+        var fileName = psi.FileName;
+        if (string.IsNullOrWhiteSpace(fileName))
+            return string.Empty;
+
+        if (fileName.Contains(' '))
+            fileName = $"\"{fileName}\"";
+
+        return string.IsNullOrWhiteSpace(psi.Arguments)
+            ? fileName
+            : $"{fileName} {psi.Arguments}";
     }
 }
 
