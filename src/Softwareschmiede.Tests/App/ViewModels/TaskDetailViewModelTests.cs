@@ -443,16 +443,16 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
     }
 
-    /// <summary>LoeschenCommand hat CanExecute false wenn Status=Beendet.</summary>
+    /// <summary>LoeschenCommand hat CanExecute true wenn Status=Beendet (beendete Aufgaben können gelöscht werden).</summary>
     [Fact]
-    public async Task LoeschenCommand_CanExecuteFalse_WennStatusBeendet()
+    public async Task LoeschenCommand_CanExecuteTrue_WennStatusBeendet()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Beendet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.LoeschenCommand.CanExecute(null).Should().BeFalse();
+        sut.LoeschenCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>LoeschenCommand ruft AufgabeListeAktualisierenCallback auf nach erfolgreichem Löschen.</summary>

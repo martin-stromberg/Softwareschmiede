@@ -72,13 +72,15 @@ internal static class PseudoConsoleNativeMethods
         internal short Y;
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    // lpReserved/lpDesktop/lpTitle als IntPtr (nicht string) damit der Struct blittable ist
+    // und via ref sicher an CreateProcess übergeben werden kann.
+    [StructLayout(LayoutKind.Sequential)]
     internal struct STARTUPINFO
     {
         internal int cb;
-        internal string? lpReserved;
-        internal string? lpDesktop;
-        internal string? lpTitle;
+        internal IntPtr lpReserved;    // muss NULL sein
+        internal IntPtr lpDesktop;     // muss NULL sein
+        internal IntPtr lpTitle;       // muss NULL sein
         internal uint dwX;
         internal uint dwY;
         internal uint dwXSize;
@@ -95,7 +97,7 @@ internal static class PseudoConsoleNativeMethods
         internal IntPtr hStdError;
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    [StructLayout(LayoutKind.Sequential)]
     internal struct STARTUPINFOEX
     {
         internal STARTUPINFO StartupInfo;

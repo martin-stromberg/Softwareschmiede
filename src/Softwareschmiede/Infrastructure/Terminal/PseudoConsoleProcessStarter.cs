@@ -30,61 +30,51 @@ internal static class PseudoConsoleProcessStarter
             if (!InitializeProcThreadAttributeList(attributeList, 1, 0, ref size))
                 throw new InvalidOperationException($"InitializeProcThreadAttributeList fehlgeschlagen: {Marshal.GetLastWin32Error()}");
 
-            var hpcon = pc.Handle;
-            var hpconSize = new IntPtr(IntPtr.Size);
-            var hpconPtr = Marshal.AllocHGlobal(IntPtr.Size);
-            try
+            // HPCON-Handle direkt übergeben (nicht Zeiger auf Handle).
+            // Die Win32-API für PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE erwartet den Handle-Wert selbst als lpValue.
+            if (!UpdateProcThreadAttribute(
+                attributeList,
+                0,
+                new IntPtr((long)PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE),
+                pc.Handle,
+                new IntPtr(IntPtr.Size),
+                IntPtr.Zero,
+                IntPtr.Zero))
             {
-                Marshal.WriteIntPtr(hpconPtr, hpcon);
-
-                if (!UpdateProcThreadAttribute(
-                    attributeList,
-                    0,
-                    new IntPtr((long)PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE),
-                    hpconPtr,
-                    hpconSize,
-                    IntPtr.Zero,
-                    IntPtr.Zero))
-                {
-                    throw new InvalidOperationException($"UpdateProcThreadAttribute fehlgeschlagen: {Marshal.GetLastWin32Error()}");
-                }
-
-                var startupInfoEx = new STARTUPINFOEX
-                {
-                    StartupInfo = new STARTUPINFO
-                    {
-                        cb = Marshal.SizeOf<STARTUPINFOEX>(),
-                    },
-                    lpAttributeList = attributeList,
-                };
-
-                if (environmentBlock != null)
-                    environmentPtr = BuildEnvironmentPtr(environmentBlock);
-
-                var creationFlags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT;
-
-                if (!CreateProcess(
-                    null,
-                    commandLine,
-                    IntPtr.Zero,
-                    IntPtr.Zero,
-                    false,
-                    creationFlags,
-                    environmentPtr,
-                    string.IsNullOrEmpty(psi.WorkingDirectory) ? null : psi.WorkingDirectory,
-                    ref startupInfoEx,
-                    out var pi))
-                {
-                    throw new InvalidOperationException($"CreateProcess fehlgeschlagen: {Marshal.GetLastWin32Error()}");
-                }
-
-                CloseHandle(pi.hThread);
-                return new ProcessStartResult(pi.hProcess, pi.dwProcessId);
+                throw new InvalidOperationException($"UpdateProcThreadAttribute fehlgeschlagen: {Marshal.GetLastWin32Error()}");
             }
-            finally
+
+            var startupInfoEx = new STARTUPINFOEX
             {
-                Marshal.FreeHGlobal(hpconPtr);
+                StartupInfo = new STARTUPINFO
+                {
+                    cb = Marshal.SizeOf<STARTUPINFOEX>(),
+                },
+                lpAttributeList = attributeList,
+            };
+
+            if (environmentBlock != null)
+                environmentPtr = BuildEnvironmentPtr(environmentBlock);
+
+            var creationFlags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT;
+
+            if (!CreateProcess(
+                null,
+                commandLine,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                false,
+                creationFlags,
+                environmentPtr,
+                string.IsNullOrEmpty(psi.WorkingDirectory) ? null : psi.WorkingDirectory,
+                ref startupInfoEx,
+                out var pi))
+            {
+                throw new InvalidOperationException($"CreateProcess fehlgeschlagen: {Marshal.GetLastWin32Error()}");
             }
+
+            CloseHandle(pi.hThread);
+            return new ProcessStartResult(pi.hProcess, pi.dwProcessId);
         }
         finally
         {

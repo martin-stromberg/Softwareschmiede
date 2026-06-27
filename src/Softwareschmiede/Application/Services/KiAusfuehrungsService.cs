@@ -209,10 +209,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // TODO: kiPlugin.StartCliAsync(...) verwenden, sobald die ConPTY-Integration vollständig getestet ist.
             _ = kiPlugin;
             _ = optionalParameters;
+            var workingDir = !string.IsNullOrEmpty(localRepoPath) && Directory.Exists(localRepoPath)
+                ? localRepoPath
+                : Path.GetTempPath();
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
-                WorkingDirectory = localRepoPath,
+                WorkingDirectory = workingDir,
                 UseShellExecute = false,
                 CreateNoWindow = false,
             };
