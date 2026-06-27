@@ -1,10 +1,11 @@
-# CLI-Fenster-Einbettung
+# Terminal-Integration
 
-Das CLI-Fenster-Einbettungssystem bettet das native Terminalfenster eines KI-CLI-Tools (Claude CLI, GitHub Copilot CLI) direkt in die WPF-Aufgabendetailansicht ein. Die Integration erfolgt via Win32 `SetParent`-API und erfordert kein separates Backend-Prozess.
+Das Terminal-System rendert die Ausgabe von KI-CLI-Tools (Claude CLI, GitHub Copilot CLI, Codex CLI) nativ in der WPF-Aufgabendetailansicht. Die Implementierung nutzt Windows Pseudo Console (ConPTY) API zum Starten der Prozesse und einen VT100/ANSI-Parser zum Rendering von Ausgabeströmen in einem benutzerdefinierten WPF-Control.
 
 ## Inhalt
 
 - [Beschreibung](beschreibung.md)
 - [Technischer Ablauf](ablauf-technisch.md)
 - [Ablauf für Anwender](ablauf-anwender.md)
-- [Installation & Konfiguration](installation.md)
+- [API](api.md)
+- [Architektur](architektur.md)
