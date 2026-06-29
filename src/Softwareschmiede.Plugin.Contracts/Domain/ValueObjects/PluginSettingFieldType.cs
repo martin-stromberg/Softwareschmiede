@@ -22,5 +22,10 @@ public enum PluginSettingFieldType
     Enum,
 
     /// <summary>Dateipfad mit Datei-Auswahl-Dialog.</summary>
-    FilePath
+    FilePath,
+
+    // Wert 7 ist reserviert / nicht vergeben.
+
+    /// <summary>Kommandozeilenparameter für CLI-Aufrufe.</summary>
+    CommandLineParameters = 8
 }

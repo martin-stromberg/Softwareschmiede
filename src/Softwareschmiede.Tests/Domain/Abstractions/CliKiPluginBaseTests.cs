@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using FluentAssertions;
+using Moq;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.Domain.Abstractions;
@@ -43,27 +45,130 @@ public sealed class CliKiPluginBaseTests
         result.Arguments.Should().Be("session-123");
     }
 
-    private sealed class TestCliKiPlugin(bool supportsSession) : CliKiPluginBase
+    /// <summary>GetCliHelpTextAsync gibt null zurück, wenn die CLI nicht gefunden wird.</summary>
+    [Fact]
+    public async Task GetCliHelpTextAsync_ShouldReturnNull_WhenCliNotFound()
     {
-        public override string ProviderDateiPraefix => "test";
+        var sut = new TestCliKiPluginWithHelpOverride();
+
+        var result = await sut.GetCliHelpTextAsync();
+
+        result.Should().BeNull();
+    }
+
+    /// <summary>GetCliHelpTextAsync gibt Ausgabe zurück, wenn die CLI vorhanden ist (dotnet --help).</summary>
+    [Fact]
+    public async Task GetCliHelpTextAsync_ShouldReturnOutput_WhenCliIsPresent()
+    {
+        var sut = new TestCliKiPluginWithDotnetHelp();
+
+        var result = await sut.GetCliHelpTextAsync();
+
+        result.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>GetCliHelpTextAsync gibt null zurück bei Timeout.</summary>
+    [Fact]
+    public async Task GetCliHelpTextAsync_ShouldReturnNull_OnTimeout()
+    {
+        var sut = new TestCliKiPluginWithShortTimeout("dotnet", TimeSpan.FromMilliseconds(1));
+
+        var result = await sut.GetCliHelpTextAsync();
+
+        result.Should().BeNull();
+    }
+
+    /// <summary>AppendCommandLineParameters hängt den Credential-Wert an leere Arguments an.</summary>
+    [Fact]
+    public async Task AppendCommandLineParameters_ShouldSetArguments_WhenArgumentsAreEmpty()
+    {
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Test.CommandLineParameters"))
+            .Returns("--verbose");
+        var sut = new TestCliKiPluginWithCredentialStore(credentialStoreMock.Object);
+
+        var result = await sut.StartCliAsync("/repo");
+
+        result.Arguments.Should().Be("--verbose");
+    }
+
+    /// <summary>AppendCommandLineParameters hängt den Credential-Wert an bestehende Arguments an.</summary>
+    [Fact]
+    public async Task AppendCommandLineParameters_ShouldAppendArguments_WhenArgumentsExist()
+    {
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Test.CommandLineParameters"))
+            .Returns("--extra-flag");
+        var sut = new TestCliKiPluginWithCredentialStore(credentialStoreMock.Object);
+
+        var result = await sut.StartCliAsync("/repo", "--initial-flag");
+
+        result.Arguments.Should().Be("--initial-flag --extra-flag");
+    }
+
+    /// <summary>AppendCommandLineParameters hat keinen Effekt, wenn kein Credential hinterlegt ist.</summary>
+    [Fact]
+    public async Task AppendCommandLineParameters_ShouldNotModifyArguments_WhenCredentialIsNull()
+    {
+        var credentialStoreMock = new Mock<ICredentialStore>();
+        credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
+        var sut = new TestCliKiPluginWithCredentialStore(credentialStoreMock.Object);
+
+        var result = await sut.StartCliAsync("/repo", "--initial");
+
+        result.Arguments.Should().Be("--initial");
+    }
+
+    private abstract class BaseTestPlugin(string providerPraefix = "test") : CliKiPluginBase
+    {
+        public override string ProviderDateiPraefix => providerPraefix;
         public override string PluginName => "Test";
         public override string PluginPrefix => "Softwareschmiede.Test";
         public override PluginType PluginType => PluginType.DevelopmentAutomation;
         /// <summary>IReadOnlyList.</summary>
         public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         /// <summary>SupportsSessionContinuation.</summary>
-        public override bool SupportsSessionContinuation() => supportsSession;
+        public override bool SupportsSessionContinuation() => false;
         /// <summary>Task.</summary>
         public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+    }
+
+    private sealed class TestCliKiPlugin(bool supportsSession) : BaseTestPlugin("test-cli")
+    {
+        public override bool SupportsSessionContinuation() => supportsSession;
 
         protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+            => new() { FileName = "test-cli", Arguments = parameters ?? string.Empty, WorkingDirectory = localRepoPath };
+    }
+
+    private sealed class TestCliKiPluginWithHelpOverride() : BaseTestPlugin("nonexistent-cli-xyz")
+    {
+        protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+            => new() { FileName = ProviderDateiPraefix, WorkingDirectory = localRepoPath };
+    }
+
+    private sealed class TestCliKiPluginWithCredentialStore(ICredentialStore cs) : BaseTestPlugin
+    {
+        protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
         {
-            return new ProcessStartInfo
-            {
-                FileName = "test-cli",
-                Arguments = parameters ?? string.Empty,
-                WorkingDirectory = localRepoPath,
-            };
+            var psi = new ProcessStartInfo { FileName = "test-cli", Arguments = parameters ?? string.Empty, WorkingDirectory = localRepoPath };
+            AppendCommandLineParameters(psi, cs, PluginPrefix);
+            return psi;
         }
+    }
+
+    private sealed class TestCliKiPluginWithDotnetHelp() : BaseTestPlugin("dotnet")
+    {
+        protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+            => new() { FileName = "dotnet", WorkingDirectory = localRepoPath };
+    }
+
+    private sealed class TestCliKiPluginWithShortTimeout(string exe, TimeSpan timeout) : BaseTestPlugin(exe)
+    {
+        public override Task<string?> GetCliHelpTextAsync(CancellationToken ct = default)
+            => RunHelpCommandAsync(ProviderDateiPraefix, ct, timeout);
+
+        protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+            => new() { FileName = ProviderDateiPraefix, WorkingDirectory = localRepoPath };
     }
 }

@@ -28,7 +28,7 @@ public sealed class ClaudeCliPluginTests
         _sut.PluginName.Should().Be("Claude CLI");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.ClaudeCli");
         _sut.ProviderDateiPraefix.Should().Be("claude");
-        _sut.GetSettingGroups().Single().Fields.Should().ContainSingle(f => f.Key == "Token");
+        _sut.GetSettingGroups().SelectMany(g => g.Fields).Should().Contain(f => f.Key == "Token");
     }
 
     /// <summary>SupportsSessionContinuation returns true.</summary>
@@ -79,5 +79,27 @@ public sealed class ClaudeCliPluginTests
         var psi = await _sut.StartCliAsync("/repo");
 
         psi.EnvironmentVariables.ContainsKey("ANTHROPIC_API_KEY").Should().BeFalse();
+    }
+
+    /// <summary>GetSettingGroups includes CLI-Konfiguration group with CommandLineParameters field.</summary>
+    [Fact]
+    public void GetSettingGroups_ShouldIncludeCliConfigurationGroup()
+    {
+        var groups = _sut.GetSettingGroups();
+
+        groups.Should().Contain(g => g.GroupName == "CLI-Konfiguration");
+        groups.SelectMany(g => g.Fields).Should().Contain(f => f.Key == "CommandLineParameters");
+    }
+
+    /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
+    [Fact]
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.ClaudeCli.CommandLineParameters"))
+            .Returns("--dangerously-skip-permissions");
+
+        var psi = await _sut.StartCliAsync("/repo");
+
+        psi.Arguments.Should().Contain("--dangerously-skip-permissions");
     }
 }

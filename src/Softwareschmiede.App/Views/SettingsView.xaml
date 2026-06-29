@@ -66,6 +66,22 @@
                     </StackPanel>
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.FilePathTemplate>
+            <local:PluginSettingFieldTemplateSelector.CommandLineParametersTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="CommandLineParameters"
+                                 Width="280"
+                                 VerticalAlignment="Center" />
+                        <Button Content="?"
+                                AutomationProperties.Name="CliHilfeButton"
+                                Width="28"
+                                Margin="4,0,0,0"
+                                VerticalAlignment="Center"
+                                Click="OnHilfeButtonClick" />
+                    </StackPanel>
+                </DataTemplate>
+            </local:PluginSettingFieldTemplateSelector.CommandLineParametersTemplate>
         </local:PluginSettingFieldTemplateSelector>
     </UserControl.Resources>
     <Grid>

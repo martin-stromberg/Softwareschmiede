@@ -32,8 +32,11 @@ public sealed class CodexPluginTests
         _sut.PluginType.Should().Be(PluginType.DevelopmentAutomation);
 
         var settings = _sut.GetSettingGroups();
-        settings.Should().ContainSingle(group => group.GroupName == "Ausfuehrung");
-        settings.SelectMany(group => group.Fields).Should().ContainSingle(field => field.Key == "ExecutablePath");
+        settings.Should().HaveCount(2);
+        settings.Should().Contain(group => group.GroupName == "Ausfuehrung");
+        settings.Should().Contain(group => group.GroupName == "CLI-Konfiguration");
+        settings.SelectMany(g => g.Fields).Should().Contain(f => f.Key == "ExecutablePath");
+        settings.SelectMany(g => g.Fields).Should().Contain(f => f.Key == "CommandLineParameters");
     }
 
     /// <summary>SupportsSessionContinuation returns false until a stable local CLI pattern exists.</summary>
@@ -96,5 +99,17 @@ public sealed class CodexPluginTests
 
         psi.EnvironmentVariables.ContainsKey("OPENAI_API_KEY").Should().BeFalse();
         psi.EnvironmentVariables.ContainsKey("CODEX_API_KEY").Should().BeFalse();
+    }
+
+    /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
+    [Fact]
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    {
+        _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Codex.CommandLineParameters"))
+            .Returns("--verbose --model gpt-4");
+
+        var psi = await _sut.StartCliAsync("/repo");
+
+        psi.Arguments.Should().Contain("--verbose --model gpt-4");
     }
 }

@@ -52,6 +52,15 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
                 Placeholder: "C:\\Program Files\\GitHub Copilot\\copilot.exe",
                 Description: "Optionaler absoluter Pfad zur copilot-Executable.",
                 IsRequired: false)
+        ]),
+        new PluginSettingGroup("CLI-Konfiguration",
+        [
+            new PluginSettingField(
+                Key: "CommandLineParameters",
+                Label: "Kommandozeilenparameter",
+                FieldType: PluginSettingFieldType.CommandLineParameters,
+                Description: "Zusätzliche Parameter für den copilot-CLI-Aufruf",
+                IsRequired: false)
         ])
     ];
 
@@ -65,50 +74,17 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
     }
 
     /// <inheritdoc/>
+    public override Task<string?> GetCliHelpTextAsync(CancellationToken ct = default)
+        => RunHelpCommandAsync(GetCopilotCommand(), ct);
+
+    /// <inheritdoc/>
     public override bool SupportsSessionContinuation() => false;
 
     /// <inheritdoc/>
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Pruefe GitHub-Copilot-Plugin-Health.");
-        try
-        {
-            var copilotCommand = GetCopilotCommand();
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = copilotCommand,
-                    Arguments = "--version",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                }
-            };
-
-            process.Start();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(10));
-            try
-            {
-                await process.WaitForExitAsync(cts.Token);
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                try { process.Kill(entireProcessTree: true); } catch { /* ignorieren */ }
-            }
-            return process.ExitCode == 0;
-        }
-        catch (Win32Exception)
-        {
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Copilot-CLI nicht gefunden oder nicht ausführbar.");
-            return false;
-        }
+        return await CheckHealthWithVersionCommandAsync(GetCopilotCommand(), ct);
     }
 
     /// <inheritdoc/>
@@ -119,11 +95,9 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
             localRepoPath,
             parameters);
 
-        var copilotCommand = GetCopilotCommand();
-
         var psi = new ProcessStartInfo
         {
-            FileName = copilotCommand,
+            FileName = GetCopilotCommand(),
             WorkingDirectory = localRepoPath,
             UseShellExecute = false,
             CreateNoWindow = false,
@@ -133,6 +107,8 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
         {
             psi.Arguments = parameters;
         }
+
+        AppendCommandLineParameters(psi, _credentialStore, PluginPrefix);
 
         // Umgebungsisolation (USERPROFILE, HOME, APPDATA etc.) wurde bewusst entfernt.
         // Das copilot-CLI benötigt die Standard-Umgebungsvariablen des Benutzerprofils,
@@ -148,13 +124,5 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
     }
 
     private string GetCopilotCommand()
-    {
-        var configuredPath = _credentialStore.GetCredential($"{PluginPrefix}.{ExecutablePathSettingKey}");
-        if (!string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return configuredPath.Trim().Trim('"');
-        }
-
-        return "copilot";
-    }
+        => ResolveExecutablePath(_credentialStore, PluginPrefix, "copilot");
 }

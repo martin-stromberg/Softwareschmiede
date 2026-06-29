@@ -31,6 +31,145 @@ public abstract class CliKiPluginBase : IKiPlugin
         return Task.FromResult(psi);
     }
 
+    /// <summary>
+    /// Ruft die CLI mit <c>--help</c> auf und gibt den Ausgabetext zurück.
+    /// Gibt <c>null</c> zurück bei Timeout, Prozessfehler oder fehlender CLI.
+    /// </summary>
+    public virtual Task<string?> GetCliHelpTextAsync(CancellationToken ct = default)
+        => RunHelpCommandAsync(ProviderDateiPraefix, ct);
+
+    /// <summary>
+    /// Führt <paramref name="fileName"/> mit <c>--help</c> aus und gibt die Ausgabe zurück.
+    /// </summary>
+    protected static async Task<string?> RunHelpCommandAsync(string fileName, CancellationToken ct, TimeSpan? helpTimeout = null)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(helpTimeout ?? TimeSpan.FromSeconds(10));
+
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = "--help",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                }
+            };
+
+            process.Start();
+
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(cts.Token);
+
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* ignorieren */ }
+                try { await stdoutTask.ConfigureAwait(false); } catch { /* ignorieren */ }
+                try { await stderrTask.ConfigureAwait(false); } catch { /* ignorieren */ }
+                return null;
+            }
+
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+            return string.IsNullOrWhiteSpace(stdout)
+                ? (string.IsNullOrWhiteSpace(stderr) ? null : stderr)
+                : stdout;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gibt den konfigurierten Executable-Pfad aus dem Credential Store zurück,
+    /// oder <paramref name="defaultExecutable"/> als Fallback.
+    /// </summary>
+    protected static string ResolveExecutablePath(ICredentialStore credentialStore, string pluginPrefix, string defaultExecutable)
+    {
+        var configuredPath = credentialStore.GetCredential($"{pluginPrefix}.ExecutablePath");
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return configuredPath.Trim().Trim('"');
+        }
+        return defaultExecutable;
+    }
+
+    /// <summary>
+    /// Liest den gespeicherten <c>CommandLineParameters</c>-Wert aus dem Credential Store
+    /// und hängt ihn an <paramref name="psi"/>.<see cref="ProcessStartInfo.Arguments"/> an.
+    /// </summary>
+    protected static void AppendCommandLineParameters(ProcessStartInfo psi, ICredentialStore credentialStore, string pluginPrefix)
+    {
+        var commandLineParameters = credentialStore.GetCredential($"{pluginPrefix}.CommandLineParameters");
+        if (!string.IsNullOrWhiteSpace(commandLineParameters))
+        {
+            psi.Arguments = string.IsNullOrWhiteSpace(psi.Arguments)
+                ? commandLineParameters
+                : $"{psi.Arguments} {commandLineParameters}";
+        }
+    }
+
+    /// <summary>
+    /// Startet <paramref name="executablePath"/> mit <c>--version</c> und prüft ob ExitCode 0.
+    /// </summary>
+    protected static async Task<bool> CheckHealthWithVersionCommandAsync(string executablePath, CancellationToken ct)
+    {
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    Arguments = "--version",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false,
+                    CreateNoWindow = true,
+                }
+            };
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
+            process.Start();
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* ignorieren */ }
+            }
+            return process.ExitCode == 0;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     /// <inheritdoc/>
     public virtual string GetProcessWindowTitle(Guid aufgabeId) => string.Empty;
 
