@@ -1,6 +1,8 @@
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Interfaces;
 
 namespace Softwareschmiede.App.Views;
@@ -45,4 +47,30 @@ public sealed partial class SettingsView : UserControl
 
     private void OnDateiAuswaehlenClick(object sender, RoutedEventArgs e)
         => PluginSettingEntryEditHelper.OnDateiAuswaehlenClick(sender, e);
+
+    private async void OnHilfeButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not SettingsViewModel vm) return;
+        var plugin = vm.KiPlugins.FirstOrDefault(p => p.PluginName == vm.DefaultKiPlugin);
+        if (plugin is not CliKiPluginBase cliPlugin) return;
+        var element = sender as FrameworkElement;
+        if (element is not null) element.IsEnabled = false;
+        try
+        {
+            var helpText = await cliPlugin.GetCliHelpTextAsync();
+            var text = helpText ?? "Hilfe nicht verfügbar: Kommandozeilen-Tool nicht erreichbar.";
+            var dialog = new HelpTextDialog(text) { Owner = Window.GetWindow(this) };
+            dialog.ShowDialog();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _ = ex;
+            var dialog = new HelpTextDialog("Hilfe nicht verfügbar: Fehler beim Abrufen des Hilfetexts.") { Owner = Window.GetWindow(this) };
+            dialog.ShowDialog();
+        }
+        finally
+        {
+            if (element is not null) element.IsEnabled = true;
+        }
+    }
 }

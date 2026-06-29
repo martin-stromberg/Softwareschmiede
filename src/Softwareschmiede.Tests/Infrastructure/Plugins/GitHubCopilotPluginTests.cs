@@ -28,8 +28,10 @@ public sealed class GitHubCopilotPluginTests
         _sut.PluginName.Should().Be("GitHub Copilot");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHubCopilot");
         _sut.ProviderDateiPraefix.Should().Be("copilot");
-        _sut.GetSettingGroups().Should().HaveCount(2);
+        _sut.GetSettingGroups().Should().HaveCount(3);
         _sut.GetSettingGroups().SelectMany(g => g.Fields).Should().Contain(f => f.Key == "Token");
+        _sut.GetSettingGroups().Should().Contain(g => g.GroupName == "CLI-Konfiguration");
+        _sut.GetSettingGroups().SelectMany(g => g.Fields).Should().Contain(f => f.Key == "CommandLineParameters");
     }
 
     /// <summary>SupportsSessionContinuation returns false.</summary>
@@ -82,5 +84,17 @@ public sealed class GitHubCopilotPluginTests
         var psi = await _sut.StartCliAsync("/repo");
 
         psi.EnvironmentVariables["GH_TOKEN"].Should().Be("ghp_test-token");
+    }
+
+    /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
+    [Fact]
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters"))
+            .Returns("--model gpt-4o");
+
+        var psi = await _sut.StartCliAsync("/repo");
+
+        psi.Arguments.Should().Contain("--model gpt-4o");
     }
 }

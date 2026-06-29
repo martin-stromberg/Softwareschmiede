@@ -29,6 +29,9 @@ public sealed class PluginSettingFieldTemplateSelector : DataTemplateSelector
     /// <summary>Template für Dateipfad-Auswahl.</summary>
     public DataTemplate? FilePathTemplate { get; set; }
 
+    /// <summary>Template für Kommandozeilenparameter mit Hilfe-Button.</summary>
+    public DataTemplate? CommandLineParametersTemplate { get; set; }
+
     /// <inheritdoc/>
     public override DataTemplate? SelectTemplate(object item, DependencyObject container)
     {
@@ -42,6 +45,7 @@ public sealed class PluginSettingFieldTemplateSelector : DataTemplateSelector
             PluginSettingFieldType.Boolean => BooleanTemplate,
             PluginSettingFieldType.Enum => EnumTemplate,
             PluginSettingFieldType.FilePath => FilePathTemplate,
+            PluginSettingFieldType.CommandLineParameters => CommandLineParametersTemplate,
             _ => TextTemplate
         } ?? base.SelectTemplate(item, container);
     }

@@ -37,6 +37,15 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
                 Placeholder: "sk-ant-...",
                 Description: "Anthropic API Key. Wird als ANTHROPIC_API_KEY-Umgebungsvariable an das claude-CLI übergeben.",
                 IsRequired: false)
+        ]),
+        new PluginSettingGroup("CLI-Konfiguration",
+        [
+            new PluginSettingField(
+                Key: "CommandLineParameters",
+                Label: "Kommandozeilenparameter",
+                FieldType: PluginSettingFieldType.CommandLineParameters,
+                Description: "Zusätzliche Parameter für den CLI-Aufruf. Beispiel: --model claude-3-sonnet-20250514",
+                IsRequired: false)
         ])
     ];
 
@@ -69,45 +78,20 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     }
 
     /// <inheritdoc/>
+    public override async Task<string?> GetCliHelpTextAsync(CancellationToken ct = default)
+    {
+        var path = await Task.Run(() => _claudeExecutablePath.Value, ct);
+        return await RunHelpCommandAsync(path, ct);
+    }
+
+    /// <inheritdoc/>
     public override bool SupportsSessionContinuation() => true;
 
     /// <inheritdoc/>
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Pruefe Claude-CLI-Plugin-Health.");
-        try
-        {
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = _claudeExecutablePath.Value,
-                    Arguments = "--version",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                }
-            };
-
-            process.Start();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(10));
-            try
-            {
-                await process.WaitForExitAsync(cts.Token);
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                try { process.Kill(entireProcessTree: true); } catch { /* ignorieren */ }
-            }
-            return process.ExitCode == 0;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Claude-CLI nicht gefunden oder nicht ausführbar.");
-            return false;
-        }
+        return await CheckHealthWithVersionCommandAsync(_claudeExecutablePath.Value, ct);
     }
 
     /// <inheritdoc/>
@@ -131,7 +115,9 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
             psi.Arguments = parameters;
         }
 
-        var token = _credentialStore.GetCredential("Softwareschmiede.ClaudeCli.Token");
+        AppendCommandLineParameters(psi, _credentialStore, PluginPrefix);
+
+        var token = _credentialStore.GetCredential($"{PluginPrefix}.Token");
         if (!string.IsNullOrEmpty(token))
         {
             psi.EnvironmentVariables["ANTHROPIC_API_KEY"] = token;

@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
-using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
@@ -10,7 +9,6 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// <summary>Deterministisches KI-Simulator-Plugin für Tests und lokale Entwicklung.</summary>
 public sealed class KiSimulatorPlugin : CliKiPluginBase
 {
-    private readonly ICredentialStore _credentialStore;
     private readonly ILogger<KiSimulatorPlugin> _logger;
 
     /// <inheritdoc/>
@@ -26,11 +24,8 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase
     public override PluginType PluginType => PluginType.DevelopmentAutomation;
 
     /// <summary>Erstellt eine neue Instanz von <see cref="KiSimulatorPlugin"/>.</summary>
-    public KiSimulatorPlugin(
-        ICredentialStore credentialStore,
-        ILogger<KiSimulatorPlugin> logger)
+    public KiSimulatorPlugin(ILogger<KiSimulatorPlugin> logger)
     {
-        _credentialStore = credentialStore;
         _logger = logger;
     }
 

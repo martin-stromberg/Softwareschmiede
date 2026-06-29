@@ -40,6 +40,15 @@ public sealed class CodexPlugin : CliKiPluginBase
                 Placeholder: "C:\\Program Files\\Codex\\codex.exe",
                 Description: "Optionaler absoluter Pfad zur codex-Executable.",
                 IsRequired: false)
+        ]),
+        new PluginSettingGroup("CLI-Konfiguration",
+        [
+            new PluginSettingField(
+                Key: "CommandLineParameters",
+                Label: "Kommandozeilenparameter",
+                FieldType: PluginSettingFieldType.CommandLineParameters,
+                Description: "Zusätzliche Parameter für den codex-CLI-Aufruf",
+                IsRequired: false)
         ])
     ];
 
@@ -53,50 +62,17 @@ public sealed class CodexPlugin : CliKiPluginBase
     }
 
     /// <inheritdoc/>
+    public override Task<string?> GetCliHelpTextAsync(CancellationToken ct = default)
+        => RunHelpCommandAsync(GetCodexCommand(), ct);
+
+    /// <inheritdoc/>
     public override bool SupportsSessionContinuation() => false;
 
     /// <inheritdoc/>
     public override async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Pruefe Codex-CLI-Plugin-Health.");
-        try
-        {
-            using var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = GetCodexCommand(),
-                    Arguments = "--version",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                }
-            };
-
-            process.Start();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(10));
-            try
-            {
-                await process.WaitForExitAsync(cts.Token);
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                try { process.Kill(entireProcessTree: true); } catch { /* ignore */ }
-            }
-
-            return process.ExitCode == 0;
-        }
-        catch (Win32Exception)
-        {
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Codex-CLI nicht gefunden oder nicht ausfuehrbar.");
-            return false;
-        }
+        return await CheckHealthWithVersionCommandAsync(GetCodexCommand(), ct);
     }
 
     /// <inheritdoc/>
@@ -120,17 +96,11 @@ public sealed class CodexPlugin : CliKiPluginBase
             psi.Arguments = parameters;
         }
 
+        AppendCommandLineParameters(psi, _credentialStore, PluginPrefix);
+
         return psi;
     }
 
     private string GetCodexCommand()
-    {
-        var configuredPath = _credentialStore.GetCredential($"{PluginPrefix}.{ExecutablePathSettingKey}");
-        if (!string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return configuredPath.Trim().Trim('"');
-        }
-
-        return "codex";
-    }
+        => ResolveExecutablePath(_credentialStore, PluginPrefix, "codex");
 }

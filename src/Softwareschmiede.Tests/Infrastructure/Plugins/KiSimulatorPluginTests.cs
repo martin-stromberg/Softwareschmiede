@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Plugins;
 
 namespace Softwareschmiede.Tests.Infrastructure.Plugins;
@@ -15,7 +14,6 @@ public sealed class KiSimulatorPluginTests
     public KiSimulatorPluginTests()
     {
         _sut = new KiSimulatorPlugin(
-            new Mock<ICredentialStore>().Object,
             new Mock<ILogger<KiSimulatorPlugin>>().Object);
     }
 
