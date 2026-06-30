@@ -87,6 +87,30 @@ Ablauf:
 10. UI zeigt CLI-Panel mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
 11. Bei Fehler (Klone fehlgeschlagen, CLI-Start fehlgeschlagen): Fehler wird angezeigt, Status bleibt `Neu`, Rollback des Klonverzeichnisses falls nötig
 
+### 0.3. Automatische issue.md-Erstellung und .gitignore-Aktualisierung
+
+Nach dem erfolgreichen Repository-Klon werden automatisch die Aufgabendaten in lokalen Dateien gespeichert:
+
+Beteiligte Komponenten:
+- `EntwicklungsprozessService.CreateIssueFileAsync` — Erstellt die Datei `issue.md` mit Aufgabebeschreibung
+- `EntwicklungsprozessService.UpdateGitignoreAsync` — Aktualisiert `.gitignore` mit Eintrag für `issue.md`
+- `ILogger<EntwicklungsprozessService>` — Protokolliert erfolgreiche Operationen und Fehler
+
+Ablauf:
+1. Nach `gitPlugin.CloneRepositoryAsync()` wird `CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, ct)` aufgerufen
+   - Markdown-Datei `{lokalerKlonPfad}/issue.md` wird erstellt
+   - Inhalt: `# Aufgabe: [Titel]`; Metadaten (Aufgaben-ID, Branch-Name, Erstellungsdatum); `## Anforderung` mit Aufgabenbeschreibung
+   - Falls `AnforderungsBeschreibung` null oder leer: Fallback-Text `[Keine Anforderungsbeschreibung verfügbar]` wird verwendet
+   - Bei Exception (z. B. IOException): Warnung wird geloggt via `_logger.LogWarning`, Prozess wird nicht unterbrochen
+2. Danach wird `UpdateGitignoreAsync(lokalerKlonPfad, ct)` aufgerufen
+   - `.gitignore`-Datei wird gelesen (oder neue Datei erstellt falls nicht vorhanden)
+   - Prüfung: Ist `issue.md` bereits als Eintrag vorhanden? (Case-insensitive)
+   - Falls nicht vorhanden: Zeile `issue.md` am Ende der Datei hinzufügen (Newline-safe)
+   - Geschrieben via `File.WriteAllTextAsync` mit UTF8-Encoding ohne BOM
+   - Bei Exception: Warnung wird geloggt, Prozess wird nicht unterbrochen
+
+Die Dateien `issue.md` und `.gitignore`-Eintrag sind lokale Dateien und gehören nicht zum VCS. Sie unterstützen den Entwickler, indem sie die Aufgabeninformationen verfügbar machen, ohne sie im Repository zu committen.
+
 ### 0.5. Aufgabe anlegen und bearbeiten (Status: Neu)
 
 Ausgelöst durch den „Speichern"-Button in der Edit-Panel-Ansicht.

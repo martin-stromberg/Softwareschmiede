@@ -177,6 +177,9 @@ public sealed class EntwicklungsprozessService
             }
         }
 
+        await CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, ct);
+        await UpdateGitignoreAsync(lokalerKlonPfad, ct);
+
         await _aufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad, ct);
 
         var protokollNachricht = nutzeExistierendenBranch
@@ -499,6 +502,72 @@ public sealed class EntwicklungsprozessService
             slug = slug[..30].TrimEnd('-');
 
         return string.IsNullOrEmpty(slug) ? "aufgabe" : slug;
+    }
+
+    private async Task CreateIssueFileAsync(string lokalerKlonPfad, Aufgabe aufgabe, string branchName, CancellationToken ct)
+    {
+        try
+        {
+            var beschreibung = string.IsNullOrWhiteSpace(aufgabe.AnforderungsBeschreibung)
+                ? "[Keine Anforderungsbeschreibung verfügbar]"
+                : aufgabe.AnforderungsBeschreibung;
+
+            var inhalt = $"""
+                # Aufgabe: {aufgabe.Titel}
+
+                **Aufgaben-ID:** {aufgabe.Id}
+                **Branch:** {branchName}
+                **Erstellt:** {aufgabe.ErstellungsDatum:yyyy-MM-dd}
+
+                ## Anforderung
+
+                {beschreibung}
+                """;
+
+            var issueFilePath = Path.Combine(lokalerKlonPfad, "issue.md");
+            await File.WriteAllTextAsync(issueFilePath, inhalt, ct);
+            _logger.LogInformation("issue.md für Aufgabe {AufgabeId} erfolgreich erstellt.", aufgabe.Id);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Erstellen von issue.md für Aufgabe {AufgabeId}.", aufgabe.Id);
+        }
+    }
+
+    private async Task UpdateGitignoreAsync(string lokalerKlonPfad, CancellationToken ct)
+    {
+        try
+        {
+            var gitignorePath = Path.Combine(lokalerKlonPfad, ".gitignore");
+            var existingContent = File.Exists(gitignorePath)
+                ? await File.ReadAllTextAsync(gitignorePath, ct)
+                : string.Empty;
+
+            var lines = existingContent.Split('\n').Select(l => l.TrimEnd('\r'));
+            if (lines.Contains("issue.md", StringComparer.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var newContent = existingContent.Length > 0 && !existingContent.EndsWith('\n')
+                ? existingContent + "\nissue.md\n"
+                : existingContent + "issue.md\n";
+
+            await File.WriteAllTextAsync(gitignorePath, newContent, new System.Text.UTF8Encoding(false), ct);
+            _logger.LogInformation(".gitignore für '{KlonPfad}' aktualisiert: 'issue.md' eingetragen.", lokalerKlonPfad);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Aktualisieren von .gitignore in '{KlonPfad}'.", lokalerKlonPfad);
+        }
     }
 
     private static void DeleteDirectoryForce(string path)

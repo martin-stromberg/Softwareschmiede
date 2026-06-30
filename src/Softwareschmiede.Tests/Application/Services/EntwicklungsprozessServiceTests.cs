@@ -84,32 +84,66 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         return new PluginSelectionService(pluginManagerMock.Object, defaultService, new Mock<ILogger<PluginSelectionService>>().Object);
     }
 
+    private string SetupCloneWithDirectoryCreation(string? gitignoreContent = null)
+    {
+        var uniqueBase = Path.Combine(Path.GetTempPath(), $"sw-test-{Guid.NewGuid():N}");
+        _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(uniqueBase, false, "configured", null));
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string path, CancellationToken _) =>
+            {
+                Directory.CreateDirectory(path);
+                if (gitignoreContent != null)
+                    File.WriteAllText(Path.Combine(path, ".gitignore"), gitignoreContent);
+                return Task.CompletedTask;
+            });
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        return uniqueBase;
+    }
+
     /// <summary>ProzessStartenAsync klont das Repository und legt einen Branch an.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldCloneAndCreateBranch_WhenAufgabeExists()
     {
         // Arrange
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Login Feature implementieren", null);
+        var clonePath = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabe.Id.ToString());
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .Returns((string _, string path, CancellationToken _) =>
+            {
+                Directory.CreateDirectory(path);
+                return Task.CompletedTask;
+            });
         _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        // Act
-        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
 
-        // Assert
-        _gitPluginMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
-        _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.Is<string>(b => b.Contains("login-feature")), It.IsAny<CancellationToken>()), Times.Once);
+            // Assert
+            _gitPluginMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+            _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.Is<string>(b => b.Contains("login-feature")), It.IsAny<CancellationToken>()), Times.Once);
 
-        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
-        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
-        updatedAufgabe.BranchName.Should().Contain("login-feature");
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
+            updatedAufgabe.BranchName.Should().Contain("login-feature");
+
+            File.Exists(Path.Combine(clonePath, "issue.md")).Should().BeTrue();
+            File.Exists(Path.Combine(clonePath, ".gitignore")).Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(clonePath))
+                Directory.Delete(clonePath, recursive: true);
+        }
     }
 
     /// <summary>ProzessStartenUndCliStartenAsync klont, setzt Status auf Gestartet und startet die CLI.</summary>
     [Fact]
-    public async Task TestProzessStartenUndCliStartenAsync_Success()
+    public async Task ProzessStartenUndCliStartenAsync_Success()
     {
         // Arrange
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kombinierter Start", null);
@@ -137,7 +171,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
     /// <summary>ProzessStartenUndCliStartenAsync setzt Status zurück und löscht das Klon-Verzeichnis, wenn das Klonen fehlschlägt.</summary>
     [Fact]
-    public async Task TestProzessStartenUndCliStartenAsync_RepositoryCloneFails_RollbackStatus()
+    public async Task ProzessStartenUndCliStartenAsync_RepositoryCloneFails_RollbackStatus()
     {
         // Arrange
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Klonen fehlschlägt", null);
@@ -155,7 +189,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
     /// <summary>ProzessStartenUndCliStartenAsync setzt Status zurück und löscht das Klon-Verzeichnis, wenn der CLI-Start fehlschlägt.</summary>
     [Fact]
-    public async Task TestProzessStartenUndCliStartenAsync_CliStartFails_RollbackStatus()
+    public async Task ProzessStartenUndCliStartenAsync_CliStartFails_RollbackStatus()
     {
         // Arrange
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "CLI-Start fehlschlägt", null);
@@ -240,9 +274,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             && entry.Inhalt.Contains("Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden", StringComparison.Ordinal));
     }
 
-    /// <summary><summary>ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference.</summary>.</summary>
+    /// <summary>ProzessStartenAsync erstellt einen Issue-Branch wenn die Aufgabe eine Issue-Referenz hat.</summary>
     [Fact]
-    /// <summary>ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference.</summary>
     public async Task ProzessStartenAsync_ShouldCreateIssueBranch_WhenAufgabeHasIssueReference()
     {
         var issue = new Issue(321, "Issue Branch", "Body", ["enhancement"], null, "https://github.com/test/repo/issues/321");
@@ -278,7 +311,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary>KiStartenAsync wirft Exception wenn KI bereits aktiv ist.</summary>
+    /// <summary>AbschliessenAsync setzt den Status auf Beendet und fügt einen Statusübergang ins Protokoll ein.</summary>
     [Fact]
     public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndAddProtokoll_WhenAufgabeExists()
     {
@@ -325,9 +358,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary><summary>ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath.</summary>.</summary>
+    /// <summary>ProzessStartenAsync verwendet das konfigurierte Arbeitsverzeichnis als Basis für den Klon-Pfad.</summary>
     [Fact]
-    /// <summary>ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath.</summary>
     public async Task ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath()
     {
         // Arrange
@@ -351,9 +383,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary><summary>ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback.</summary>.</summary>
+    /// <summary>ProzessStartenAsync verwendet den Fallback-Pfad wenn der Resolver einen Fallback zurückgibt.</summary>
     [Fact]
-    /// <summary>ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback.</summary>
     public async Task ProzessStartenAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback()
     {
         // Arrange
@@ -377,9 +408,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary><summary>ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault.</summary>.</summary>
+    /// <summary>ProzessStartenAsync checkt einen existierenden Branch aus wenn der Basis-Branch nicht der Default-Branch ist.</summary>
     [Fact]
-    /// <summary>ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault.</summary>
     public async Task ProzessStartenAsync_ShouldCheckoutExistingBranch_WhenBasisBranchIsNotDefault()
     {
         // Arrange
@@ -434,9 +464,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         updatedAufgabe.BranchName.Should().NotBe("MAIN");
     }
 
-    /// <summary><summary>ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone.</summary>.</summary>
+    /// <summary>ProzessStartenAsync löscht ein bereits vorhandenes Klon-Verzeichnis vor dem Klonen.</summary>
     [Fact]
-    /// <summary>ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone.</summary>
     public async Task ProzessStartenAsync_ShouldDeleteExistingCloneDirectory_BeforeClone()
     {
         // Arrange
@@ -468,9 +497,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         }
     }
 
-    /// <summary><summary>ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous.</summary>.</summary>
+    /// <summary>ProzessStartenAsync wirft eine Exception wenn der Repository-Kontext mehrdeutig ist.</summary>
     [Fact]
-    /// <summary>ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous.</summary>
     public async Task ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous()
     {
         // Arrange
@@ -514,6 +542,369 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*kein eindeutiges Repository*");
         _gitPluginMock.Verify(git => git.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>CreateIssueFileAsync erstellt eine issue.md mit korrektem Markdown-Inhalt.</summary>
+    [Fact]
+    public async Task CreateIssueFileAsync_ShouldCreateIssueFileWithCorrectContent_WhenAufgabeExists()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Login Feature implementieren", "Benutzer soll sich einloggen können.");
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            var issueFilePath = Path.Combine(expectedClonePath, "issue.md");
+            File.Exists(issueFilePath).Should().BeTrue();
+            var content = await File.ReadAllTextAsync(issueFilePath);
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            content.Should().Contain("# Aufgabe: Login Feature implementieren");
+            content.Should().Contain(aufgabe.Id.ToString());
+            content.Should().Contain($"**Branch:** {updatedAufgabe!.BranchName}");
+            content.Should().Contain("**Erstellt:**");
+            content.Should().Contain("## Anforderung");
+            content.Should().Contain("Benutzer soll sich einloggen können.");
+        }
+        finally
+        {
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
+    }
+
+    /// <summary>CreateIssueFileAsync verwendet Fallback-Text wenn AnforderungsBeschreibung null oder leer ist.</summary>
+    [Fact]
+    public async Task CreateIssueFileAsync_ShouldUseFallbackText_WhenAnforderungsBeschreibungIsNullOrEmpty()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Beschreibung", null);
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            var issueFilePath = Path.Combine(expectedClonePath, "issue.md");
+            File.Exists(issueFilePath).Should().BeTrue();
+            var content = await File.ReadAllTextAsync(issueFilePath);
+            content.Should().Contain("[Keine Anforderungsbeschreibung verfügbar]");
+        }
+        finally
+        {
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
+    }
+
+    /// <summary>CreateIssueFileAsync loggt Warnung wenn Datei nicht erstellt werden kann, wirft keine Exception.</summary>
+    [Fact]
+    public async Task CreateIssueFileAsync_ShouldLogWarning_WhenFileCreationFails()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe Datei-Fehler", "Beschreibung");
+        var loggerMock = new Mock<ILogger<EntwicklungsprozessService>>();
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            null,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _arbeitsverzeichnisResolverMock.Object,
+            null,
+            null,
+            loggerMock.Object);
+
+        // CloneRepositoryAsync erstellt das Verzeichnis und legt eine schreibgeschützte issue.md an,
+        // damit File.WriteAllTextAsync deterministisch scheitert.
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string path, CancellationToken _) =>
+            {
+                Directory.CreateDirectory(path);
+                var issueFilePath = Path.Combine(path, "issue.md");
+                File.WriteAllText(issueFilePath, "existing content");
+                File.SetAttributes(issueFilePath, FileAttributes.ReadOnly);
+                return Task.CompletedTask;
+            });
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var clonePath = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabe.Id.ToString());
+        try
+        {
+            // Act
+            var act = () => sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            await act.Should().NotThrowAsync();
+            loggerMock.Verify(
+                x => x.Log(
+                    It.Is<LogLevel>(l => l == LogLevel.Warning),
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.Is<Exception?>(e => e != null),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce());
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
+        }
+        finally
+        {
+            if (Directory.Exists(clonePath))
+            {
+                foreach (var file in Directory.GetFiles(clonePath, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(file, FileAttributes.Normal);
+                Directory.Delete(clonePath, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>UpdateGitignoreAsync erstellt eine neue .gitignore mit dem Eintrag issue.md wenn keine existiert.</summary>
+    [Fact]
+    public async Task UpdateGitignoreAsync_ShouldCreateGitignore_WhenFileDoesNotExist()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Gitignore neu", null);
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            var gitignorePath = Path.Combine(expectedClonePath, ".gitignore");
+            File.Exists(gitignorePath).Should().BeTrue();
+            var lines = await File.ReadAllLinesAsync(gitignorePath);
+            lines.Should().Contain("issue.md");
+        }
+        finally
+        {
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
+    }
+
+    /// <summary>UpdateGitignoreAsync fügt issue.md zu einer bestehenden .gitignore hinzu.</summary>
+    [Fact]
+    public async Task UpdateGitignoreAsync_ShouldAddIssueEntry_WhenGitignoreExists()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Gitignore erweitern", null);
+        var uniqueBase = SetupCloneWithDirectoryCreation("*.log\nbin/\n");
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            var gitignorePath = Path.Combine(expectedClonePath, ".gitignore");
+            var lines = await File.ReadAllLinesAsync(gitignorePath);
+            lines.Should().Contain("*.log");
+            lines.Should().Contain("issue.md");
+        }
+        finally
+        {
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
+    }
+
+    /// <summary>UpdateGitignoreAsync fügt issue.md nicht doppelt ein wenn der Eintrag bereits existiert.</summary>
+    [Fact]
+    public async Task UpdateGitignoreAsync_ShouldNotAddDuplicate_WhenIssueEntryAlreadyExists()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Gitignore kein Duplikat", null);
+        var uniqueBase = SetupCloneWithDirectoryCreation("*.log\nissue.md\n");
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            var gitignorePath = Path.Combine(expectedClonePath, ".gitignore");
+            var lines = await File.ReadAllLinesAsync(gitignorePath);
+            lines.Count(l => l == "issue.md").Should().Be(1);
+        }
+        finally
+        {
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
+    }
+
+    /// <summary>UpdateGitignoreAsync loggt Warnung wenn .gitignore nicht geschrieben werden kann, wirft keine Exception.</summary>
+    [Fact]
+    public async Task UpdateGitignoreAsync_ShouldLogWarning_WhenFileOperationFails()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Gitignore schreibgeschützt", null);
+        var uniqueBase = Path.Combine(Path.GetTempPath(), $"sw-test-{Guid.NewGuid():N}");
+        var loggerMock = new Mock<ILogger<EntwicklungsprozessService>>();
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            null,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _arbeitsverzeichnisResolverMock.Object,
+            null,
+            null,
+            loggerMock.Object);
+
+        _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(uniqueBase, false, "configured", null));
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string path, CancellationToken _) =>
+            {
+                Directory.CreateDirectory(path);
+                var gitignorePath = Path.Combine(path, ".gitignore");
+                File.WriteAllText(gitignorePath, "*.log\n");
+                File.SetAttributes(gitignorePath, FileAttributes.ReadOnly);
+                return Task.CompletedTask;
+            });
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        try
+        {
+            // Act
+            var act = () => sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            await act.Should().NotThrowAsync();
+            loggerMock.Verify(
+                x => x.Log(
+                    It.Is<LogLevel>(l => l == LogLevel.Warning),
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception?>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce());
+        }
+        finally
+        {
+            var clonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+            if (Directory.Exists(clonePath))
+            {
+                foreach (var file in Directory.GetFiles(clonePath, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(file, FileAttributes.Normal);
+                Directory.Delete(clonePath, recursive: true);
+            }
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
+    }
+
+    /// <summary>ProzessStartenAsync erstellt issue.md und aktualisiert .gitignore nach erfolgreichem Klon.</summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldCreateIssueFileAndUpdateGitignore_WhenCloneSucceeds()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Integration issue.md", "Vollständige Anforderungsbeschreibung.");
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            var issueFilePath = Path.Combine(expectedClonePath, "issue.md");
+            File.Exists(issueFilePath).Should().BeTrue();
+            var issueContent = await File.ReadAllTextAsync(issueFilePath);
+            issueContent.Should().Contain("Vollständige Anforderungsbeschreibung.");
+
+            var gitignorePath = Path.Combine(expectedClonePath, ".gitignore");
+            File.Exists(gitignorePath).Should().BeTrue();
+            var gitignoreLines = await File.ReadAllLinesAsync(gitignorePath);
+            gitignoreLines.Should().Contain("issue.md");
+        }
+        finally
+        {
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
+    }
+
+    /// <summary>ProzessStartenAsync setzt den Prozess fort wenn CreateIssueFileAsync fehlschlägt.</summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldContinue_WhenIssueFileCreationFails()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Prozess trotz Datei-Fehler", "Beschreibung");
+        // CloneRepositoryAsync erstellt das Verzeichnis nicht → Datei-Operationen schlagen fehl
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var act = () => _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        await act.Should().NotThrowAsync();
+        var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
+    }
+
+    /// <summary>ProzessStartenAsync setzt den Prozess fort wenn UpdateGitignoreAsync fehlschlägt.</summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldContinue_WhenGitignoreUpdateFails()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Prozess trotz Gitignore-Fehler", "Beschreibung");
+        var uniqueBase = Path.Combine(Path.GetTempPath(), $"sw-test-{Guid.NewGuid():N}");
+        _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(uniqueBase, false, "configured", null));
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string path, CancellationToken _) =>
+            {
+                Directory.CreateDirectory(path);
+                var gitignorePath = Path.Combine(path, ".gitignore");
+                File.WriteAllText(gitignorePath, "*.log\n");
+                File.SetAttributes(gitignorePath, FileAttributes.ReadOnly);
+                return Task.CompletedTask;
+            });
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        try
+        {
+            // Act
+            var act = () => _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+            // Assert
+            await act.Should().NotThrowAsync();
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
+        }
+        finally
+        {
+            var clonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+            if (Directory.Exists(clonePath))
+            {
+                foreach (var file in Directory.GetFiles(clonePath, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(file, FileAttributes.Normal);
+                Directory.Delete(clonePath, recursive: true);
+            }
+            if (Directory.Exists(uniqueBase))
+                Directory.Delete(uniqueBase, recursive: true);
+        }
     }
 
     /// <summary>GetRemoteBranchesAsync löst das gewünschte SCM-Plugin über den Prefix auf und liefert dessen Branches zurück.</summary>

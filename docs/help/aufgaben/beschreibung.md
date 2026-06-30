@@ -2,7 +2,7 @@
 
 ## Zweck
 
-Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optional eine Issue-Referenz aus dem Git-Provider. Die Softwareschmiede führt die Aufgabe KI-gestützt durch, indem sie das Repository klont, einen Branch anlegt und den KI-Agenten mit dem Prompt startet.
+Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optional eine Issue-Referenz aus dem Git-Provider. Die Softwareschmiede führt die Aufgabe KI-gestützt durch, indem sie das Repository klont, einen Branch anlegt, eine lokale `issue.md`-Datei mit der Aufgabenbeschreibung erstellt und den KI-Agenten mit dem Prompt startet.
 
 ## Funktionsweise
 
@@ -14,6 +14,23 @@ Die Aufgabendetailansicht ist eine vollständige, fensterumfassende Ansicht, nic
 - **Zurück zur Projektansicht:** Der „Zurück"-Button im Ribbon navigiert zurück zur Projektdetailansicht. Alle Aufgabenänderungen bleiben erhalten.
 - **Neue Aufgabe:** Klick auf „Neue Aufgabe" im Ribbon der Projektdetailansicht erstellt eine neue Aufgabe mit Status „Neu" und öffnet sofort die Aufgabendetailansicht mit dem Edit-Panel.
 - **Aufgabenlisten-Update:** Nach dem Speichern einer Aufgabe wird die Aufgabenliste in der Projektdetailansicht aktualisiert (nur das geänderte Element wird neu geladen, nicht die gesamte Liste).
+
+### Automatische Aufgabendokumentierung im Repository
+
+Beim Start einer Aufgabe (Repository-Klon) werden automatisch zwei lokale Dateien erstellt:
+
+- **`issue.md`** — Eine Markdown-Datei mit der Aufgabenbeschreibung:
+  - Aufgabentitel
+  - Aufgaben-ID (eindeutige Kennung)
+  - Branch-Name
+  - Erstellungsdatum
+  - Vollständige Anforderungsbeschreibung
+  
+  Diese Datei dient dem KI-Agenten und dem Entwickler als Referenzmaterial während der Aufgabenbearbeitung.
+
+- **`.gitignore`-Eintrag** — Die `.gitignore`-Datei wird automatisch um den Eintrag `issue.md` erweitert, um sicherzustellen, dass diese lokale, aufgabenspezifische Datei nicht in die Versionskontrolle gelangt. Falls die `.gitignore` nicht vorhanden ist, wird sie automatisch erstellt.
+
+Beide Dateien werden lokal im geklonten Repository gespeichert und sind nur für diese spezifische Aufgabe relevant. Sie werden nicht in den Git-Remote-Repositories committet.
 
 ### Lebenszyklus
 
