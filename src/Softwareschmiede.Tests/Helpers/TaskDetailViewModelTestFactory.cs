@@ -13,6 +13,9 @@ namespace Softwareschmiede.Tests.Helpers;
 public static class TaskDetailViewModelTestFactory
 {
     /// <summary>Erstellt ein TaskDetailViewModel mit Mock-Abhängigkeiten und dem übergebenen DbContext/AufgabeService.</summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext.</param>
+    /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
+    /// <returns>Ein vollständig konfiguriertes TaskDetailViewModel.</returns>
     public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService)
     {
         var dialogServiceMock = new Mock<IDialogService>();
@@ -29,12 +32,10 @@ public static class TaskDetailViewModelTestFactory
         var entwicklungsprozessService = new EntwicklungsprozessService(
             aufgabeService,
             protokollService,
-            null,
             gitPluginMock.Object,
             pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            null,
-            kiService,
+            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: kiService),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var serviceProviderMock = new Mock<IServiceProvider>();

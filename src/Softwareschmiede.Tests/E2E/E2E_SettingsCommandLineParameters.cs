@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
 using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -78,7 +79,7 @@ public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
         Assert.NotNull(schliessenButton);
         schliessenButton.AsButton().Click();
 
-        WaitUntilGone(Automation.GetDesktop(), cf => cf.ByName("Hilfe"), Short);
+        WaitUntilGone(Automation.GetDesktop(), cf => cf.ByName("Hilfe").And(cf.ByControlType(ControlType.Window)), Short);
     }
 
     private void OpenKiSettingsWithCodexCli(AutomationElement mainWindow)
