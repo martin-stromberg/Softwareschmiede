@@ -59,7 +59,7 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-06-27**
+Stand: **2026-06-30**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -73,6 +73,7 @@ Stand: **2026-06-27**
 | Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
+| **Automatische issue.md-Dateierstellung beim Repository-Setup** | ✅ Implementiert | Beim Repository-Klon werden automatisch `issue.md` mit Aufgabendaten und `.gitignore`-Eintrag erstellt; `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`; graceful degradation bei Fehlern; Tests implementiert |
 | **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung, CLI-Laufzeitstatus in der Fußzeile (`Ausführung läuft`/`Wartet auf Eingabe`); Voraussetzung: Windows 10 Build 17763+ |
 | **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
@@ -81,6 +82,38 @@ Stand: **2026-06-27**
 ---
 
 ## 🚀 Features
+
+#### Automatische issue.md-Dateierstellung beim Repository-Setup (implementiert ✅)
+
+**Automatische Erstellung einer aufgabenbezogenen `issue.md`-Datei beim Repository-Klon:**
+
+- **Automatische Dateienerstellung:** Beim Start eines Prozesses wird nach dem Repository-Klon automatisch eine `issue.md`-Datei im geklonten Repository erstellt
+- **Aufgabendaten erfasst:** Die Datei enthält Titel, Aufgaben-ID, Branch-Name, Erstellungsdatum und Anforderungsbeschreibung im Markdown-Format
+- **Fallback-Handling:** Bei leerer oder fehlender Anforderungsbeschreibung wird automatisch ein Fallback-Text verwendet
+- **`.gitignore`-Eintrag:** Nach der `issue.md`-Erstellung wird die Datei automatisch in die `.gitignore` eingetragen (Duplikatsprüfung, nur neue Einträge)
+- **Graceful Degradation:** Fehler bei der Datei-Erstellung oder `.gitignore`-Anpassung unterbrechen den Prozessstart nicht; sie werden nur geloggt
+- **Betroffene Komponenten:** Neue private Methoden `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`; Integration in `ProzessStartenAsync` mit Try-Catch-Fehlerbehandlung
+- **Tests:** Unit-Tests für Datei-Erstellung, Fallback-Text, `.gitignore`-Anpassung, Duplikatsprüfung und Fehlerbehandlung; Integrationstests für den Prozessablauf
+
+**Beispiel-Dateiinhalt (`issue.md`):**
+
+```markdown
+# Aufgabe: [Titel]
+
+**Aufgaben-ID:** [aufgabe.Id]  
+**Branch:** [branchName]  
+**Erstellt:** [aufgabe.ErstellungsDatum]  
+
+## Anforderung
+
+[aufgabe.AnforderungsBeschreibung]
+```
+
+**Beispiel-`.gitignore`-Eintrag:**
+
+```
+issue.md
+```
 
 #### Repository-Suggestion-Panel auf der Projektübersichtsseite (in Arbeit)
 
@@ -996,6 +1029,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **Automatische issue.md-Dateierstellung beim Repository-Setup (implementiert ✅):** Beim Repository-Klon wird automatisch eine `issue.md`-Datei mit Aufgabendaten (Titel, ID, Branch, Datum, Anforderungsbeschreibung) im Markdown-Format erstellt; `.gitignore` wird automatisch um den Eintrag `issue.md` erweitert (mit Duplikatsprüfung); Fallback-Text bei leerer Anforderung; Fehlerbehandlung mit Logging (graceful degradation); Neue Methoden `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`, Integration in `ProzessStartenAsync`; Unit-Tests für alle Szenarien (erfolgreiche Erstellung, Fallback-Text, Duplikatsprüfung, Fehlerbehandlung); Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-30**)
 - **Repository-Suggestion-Panel (in Arbeit):** Neues Panel auf der Projektübersichtsseite mit Vorschlägen unzugeordneter Repositories aus allen Git-Plugins, sortiert nach letzter Aktivität mit relativer Datumsformatierung; Doppelklick erstellt neues Projekt mit automatischer Repository-Zuordnung; Echtzeit-Updates beim Laden und nach Rückkehr von Projektdetail; Fehlerrobustheit bei Plugin-Ausfällen; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-26**)
 - **WPF Aufgabenworkflow-Optimierung (Feature #72):** Vereinfachtes Aufgaben-Statusmodell mit direktem Übergang von "Neu" zu "Gestartet"; neuer `StartenCommand` kombiniert Repository-Klone und CLI-Start in einem Schritt; Plugin-Auswahl-Dialog mit optionaler Projekt-Level-Speicherung; `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI mit Prozess-Neustart; automatischer CLI-Neustart beim Aufgabe-Laden; Enum-Vereinfachung (`ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernt); Datenbankmigrationen und Status-Validierung; E2E-Tests für alle Szenarien; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-17**)
 - **WPF separate Aufgabendetailansicht (Feature #72):** Aufgabendetailansicht aus der Inline-Position in `ProjectDetailView` ausgelagert in eine fensterumfassende, separate View; Callback-basierte Navigation (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) zwischen `ProjectDetailView` und `TaskDetailView` implementiert; Neuanlage von Aufgaben öffnet `TaskDetailView` mit leerem Formular und persistiert neue Aufgabe mit Status "Neu"; Fehlerbehandlung mit lokaler Fehlermeldung; Dokumentation in requirement.md und plan.md aktualisiert (**2026-06-16**)
@@ -1054,6 +1088,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] Globale Dark-Mode-kompatible Styles für UI-Komponenten (Label, CheckBox, TextBox, etc.)
 - [x] Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff)
 - [x] Separate Aufgabendetailansicht (fensterumfassende View statt inline) – Feature 72
+- [x] Automatische issue.md-Dateierstellung beim Repository-Setup
 - [ ] Aufgabenworkflow-Optimierung – Feature 72 (in Entwicklung)
   - [ ] Enum-Vereinfachung: `ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernen
   - [ ] `StartenCommand` mit kombiniertem Repository-Klone + CLI-Start
@@ -1126,6 +1161,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Anforderungen: Repository-Suggestion-Panel](docs/features/repository-suggestion/requirement.md) | Fachliche Anforderungsanalyse zur Anzeige unzugeordneter Repositories auf der Projektübersichtsseite mit Aggregation, Filterung, Sortierung und Fehlerbehandlung |
 | [Plan: Repository-Suggestion-Panel](docs/features/repository-suggestion/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen (Laden, Rückkehr, Doppelklick), Änderungen an bestehenden Klassen, Datenbankmigrationen (keine) und Tests |
 | [Bestandsaufnahme: Repository-Suggestion-Panel](docs/features/repository-suggestion/inventory.md) | Analyse des bestehenden Codes bezüglich der Anforderung inkl. kritische Erkenntnisse und Implementierungsempfehlungen |
+| [Anforderungen: Automatische issue.md-Dateierstellung beim Repository-Setup](docs/features/task/d9106b2c17ad42438fedda88f33672c4-issuemd/requirement.md) | Fachliche Anforderungsanalyse zur automatischen Erstellung und `.gitignore`-Eintragsmanagement |
+| [Plan: Automatische issue.md-Dateierstellung beim Repository-Setup](docs/features/task/d9106b2c17ad42438fedda88f33672c4-issuemd/plan.md) | Umsetzungsplan mit Designentscheidungen, Programmabläufen, neuen Methoden (`CreateIssueFileAsync`, `UpdateGitignoreAsync`), Fehlerbehandlung und umfassender Testabdeckung |
 | [Dokumentationsplan: Feature „KI-Protokoll Auto-Scroll” (2026-05-25)](docs/documentation-plan.md) | Änderungs- und Kontextdokumentation zum Feature im Abschnitt „Dokumentationsplan – Feature „KI-Protokoll Auto-Scroll” – 2026-05-25” |
 | [API: Issue 58 Agenten-Discovery/Auswahl](docs/api/ki-plugin-spezifische-agenten-discovery-auswahl.md) | Technischer Contract für plugin-spezifische Discovery, Prefix-Auflösung und Persistenz (`KiPluginPrefix`) |
 | [Flow: Issue 58 Agenten-Discovery/Auswahl](docs/flows/ki-plugin-spezifische-agenten-discovery-auswahl-flow.md) | Ablaufdiagramm für UI-Reihenfolge, Kompatibilitätsprüfung und Start-/Folgeprompt-Dispatch |

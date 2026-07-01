@@ -79,12 +79,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _entwicklungsprozessService = new EntwicklungsprozessService(
             _aufgabeService,
             _protokollService,
-            null,
             gitPluginMock.Object,
             _pluginSelectionService,
             arbeitsverzeichnisMock.Object,
-            null,
-            _kiService,
+            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: _kiService),
             NullLogger<EntwicklungsprozessService>.Instance);
 
         _dialogServiceMock = new Mock<IDialogService>();

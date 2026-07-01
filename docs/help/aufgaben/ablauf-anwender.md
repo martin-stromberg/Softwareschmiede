@@ -50,10 +50,14 @@ Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 
 - Die Anwendung klont das Repository in das konfigurierte Arbeitsverzeichnis.
 - Ein `task/`-Branch wird angelegt.
+- Eine lokale `issue.md`-Datei wird automatisch erstellt, die die Aufgabebeschreibung enthält (Titel, ID, Branch-Name, Erstellungsdatum, Anforderung).
+- Die `.gitignore`-Datei wird automatisch angepasst, um `issue.md` von der Versionskontrolle auszuschließen.
 - Der Status wechselt auf **Gestartet**.
 - Das **CLI-Panel** wird angezeigt.
 
 > **Hinweis:** Das Arbeitsverzeichnis muss in den Einstellungen konfiguriert sein.
+> 
+> Die `issue.md`-Datei ist eine lokale Datei und wird nicht committet. Sie dient als Referenzmaterial für die KI und den Entwickler während der Aufgabenbearbeitung.
 
 ### 4. CLI starten
 
