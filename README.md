@@ -59,7 +59,7 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-06-30**
+Stand: **2026-07-01**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -75,7 +75,7 @@ Stand: **2026-06-30**
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
 | **Automatische issue.md-Dateierstellung beim Repository-Setup** | ✅ Implementiert | Beim Repository-Klon werden automatisch `issue.md` mit Aufgabendaten und `.gitignore`-Eintrag erstellt; `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`; graceful degradation bei Fehlern; Tests implementiert |
 | **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung, CLI-Laufzeitstatus in der Fußzeile (`Ausführung läuft`/`Wartet auf Eingabe`); Voraussetzung: Windows 10 Build 17763+ |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests** |
+| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`** |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -137,6 +137,38 @@ issue.md
 - `ProjectListView.xaml` – neues Panel mit ItemsControl für Repositories
 - Unit-Tests für Service-Methode, ViewModel und Converter
 - E2E-Tests für Repository-Vorschläge, Sortierung, Datumsformatierung und Projekt-Schnellerstellung
+
+#### Issue 81: Aktive Aufgaben im Menü (in Arbeit)
+
+**Anzeige aktiver Aufgaben in der Navigations-Seitenleiste der WPF-Desktopanwendung:**
+
+- **Aktive Aufgaben anzeigen:** Aufgaben mit Status `Gestartet` oder `Wartend` werden in der Seitenleiste als gerahmte Kacheln mit Aufgabentitel und KI-Ausführungsstatus angezeigt
+- **KI-Ausführungsstatus:** Dynamische Status-Anzeige basierend auf `AktiveRunId` und `LastHeartbeatUtc`:
+  - "▶ Läuft" — wenn aktive Run vorhanden und letzter Heartbeat < 5 Minuten
+  - "⏸ Wartet" — wenn Status `Wartend`
+  - "✓ Bereit" oder Status-String als Fallback
+- **Seitenleisten-Sektion:** Neue Sektion unterhalb der Navigationseinträge (Dashboard, Projekte, Einstellungen) mit Scroll-Begrenzer (MaxHeight 300px) zur Anzeige mehrerer Aufgaben
+- **Dashboard-abhängige Sichtbarkeit:** Sektion wird automatisch ausgeblendet wenn Dashboard aktiv ist, um Redundanz zu vermeiden
+- **Navigation zu Aufgabendetail:** Pfeil-Button auf jeder Kachel ermöglicht Direktzugriff auf Aufgabendetailansicht
+- **Dashboard-Integration:** Dashboard zeigt dieselbe Aufgabenliste ohne Höhenbeschränkung (volle Länge)
+- **Sortierung:** Aufgaben nach letzter Aktivität sortiert (nach `LastHeartbeatUtc` absteigend, mit Fallback auf `ErstellungsDatum`)
+- **On-Demand Aktualisierung:** Liste wird bei Navigation und Aufgabe-Laden aktualisiert
+
+**Betroffene Komponenten und Änderungen:**
+
+- `KiAusfuehrungsStatusConverter` – neuer Value Converter für Status-String-Berechnung (IValueConverter)
+- `AufgabeService.GetAktiveAufgabenAsync(CancellationToken)` – neue Service-Methode zum Filtern und Sortieren aktiver Aufgaben
+- `MainWindowViewModel.AktiveAufgaben` – neue Property (ObservableCollection<Aufgabe>, read-only)
+- `MainWindowViewModel.IsDashboardVisible` – neue computed Property für Dashboard-Sichtbarkeits-Logik
+- `MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` – neue Methode zum Abrufen und Befüllen der Collection
+- `MainWindowViewModel.NavigateZuAufgabeCommand` – neuer AsyncRelayCommand<Guid> zur Navigation zur Aufgabendetail
+- `DashboardViewModel.AktiveAufgabenListe` – neue Property (ObservableCollection<Aufgabe>, read-only)
+- `DashboardViewModel.LadenAsync()` – erweitert um Abruf und Befüllung der aktiven Aufgaben
+- `MainWindow.xaml` – Seitenleiste um neue Sektion mit Aufgabenkacheln erweitert
+- `DashboardView.xaml` – neue Sektion mit Aufgabenliste unterhalb Statistik-Kacheln
+- `App.xaml` – KiAusfuehrungsStatusConverter registriert als XAML-Ressource
+- Unit-Tests für Service-Methode, Converter, ViewModels und Commands
+- E2E-Tests für Menü-Anzeige, Navigation, Sichtbarkeits-Toggle und Status-Anzeige
 
 #### Feature 72: Aufgabenworkflow Optimierung (in Arbeit)
 
@@ -808,15 +840,19 @@ Softwareschmiede/                            # Solution Root
 │   │   ├── Views/                           # MainWindow, Dashboard-, Projekt-, Aufgaben-, Einstellungs-Views
 │   │   │   ├── ProjectDetailView.xaml       # Projektdetailansicht mit Ribbon-Menü und Kacheln
 │   │   │   ├── RepositoryAssignDialog.xaml # Dialog zur Repository-Zuweisung
+│   │   │   ├── MainWindow.xaml              # Hauptfenster mit Seitenleiste (aktive Aufgaben)
+│   │   │   ├── DashboardView.xaml           # Dashboard mit Aufgabenliste
 │   │   │   └── ...
 │   │   ├── ViewModels/                      # MVVM-ViewModels (ViewModelBase, MainWindowViewModel, ...)
+│   │   │   ├── MainWindowViewModel.cs       # Haupt-ViewModel mit aktiven Aufgaben
+│   │   │   ├── DashboardViewModel.cs        # Dashboard-ViewModel mit Aufgabenliste
 │   │   │   ├── ProjectDetailViewModel.cs    # ViewModel für Projektdetailansicht
 │   │   │   ├── RepositoryAssignViewModel.cs # ViewModel für Repository-Dialog
 │   │   │   └── ...
 │   │   ├── Controls/                        # ProcessWindowHost, StatusIndicatorControl, RecoveryBannerControl
 │   │   ├── Services/                        # DarkModeService, WpfAudioService
 │   │   ├── Themes/                          # DarkTheme.xaml, LightTheme.xaml
-│   │   └── Converters/                      # AppConverters (WPF-Wertkonverter)
+│   │   ├── Converters/                      # AppConverters, KiAusfuehrungsStatusConverter (WPF-Wertkonverter)
 │   ├── Softwareschmiede.Client/             # Blazor WebAssembly Client Assembly
 │   ├── Softwareschmiede.IntegrationTests/   # Integrations-Tests
 │   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, PluginType
@@ -929,6 +965,14 @@ public interface IKiPlugin : IPlugin { /* AI operations */ }
 - Commit-Dateiknoten tragen `WorkspaceFileNode.CommitSha`; damit wird die Vorschau commit-spezifisch über `LoadCommitPreviewAsync` geladen.
 - Für reguläre Workspace-Dateien bleibt die bestehende Vorschaukette (`LoadPreviewAsync` und dateispezifische Diff-Auflösung) unverändert aktiv.
 
+### Architekturbezug: Aktive Aufgaben im Menü (Issue 81)
+
+- `KiAusfuehrungsStatusConverter` (`IValueConverter`, Presentation-Layer) konvertiert `Aufgabe`-Objekte zu Status-Strings basierend auf Laufzeit-Properties (`AktiveRunId`, `LastHeartbeatUtc`).
+- `AufgabeService.GetAktiveAufgabenAsync()` filtert Aufgaben nach Status (`Gestartet`, `Wartend`) und sortiert nach letzter Aktivität (Application-Layer).
+- `MainWindowViewModel` und `DashboardViewModel` nutzen die Service-Methode um `AktiveAufgaben`-Collections zu befüllen und Navigation zwischen Views zu koordinieren.
+- `NavigateZuAufgabeCommand` nutzt Callbacks zur fensterübergreifenden Navigation zwischen Projekt- und Aufgabendetail (Presentation-Layer Orchestrierung).
+- `IsDashboardVisible` (computed Property) steuert die Sichtbarkeit der Seitenleisten-Sektion über XAML-Binding mit `InvertedBoolToVisibilityConverter`.
+
 ---
 
 ## 🧪 Tests
@@ -1001,6 +1045,12 @@ Feature-spezifische Testartefakte:
 - [Testlückenanalyse: DiffViewer für geänderte Dateien](docs/tests/testluecken-diffviewer-geaenderte-dateien.md)
 - [Testplan: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testplan-changed-artifact-detection-agent-compliance.md)
 - [Testlückenanalyse: Changed Artifact Detection & Agentendefinitions-Compliance](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md)
+- Issue 81 — Aktive Aufgaben im Menü (in Arbeit):
+  - Service-Tests: `AufgabeServiceTests` — `GetAktiveAufgabenAsync()` Filterung nach Status, Sortierung nach Aktivität
+  - Converter-Tests: `KiAusfuehrungsStatusConverterTests` — Status-String-Berechnung (Läuft, Wartet, Fallback)
+  - ViewModel-Tests: `MainWindowViewModelTests` — Properties (`AktiveAufgaben`, `IsDashboardVisible`), `AktiveAufgabenAktualisierenAsync()`, `NavigateZuAufgabeCommand`
+  - ViewModel-Tests: `DashboardViewModelTests` — `AktiveAufgabenListe` Befüllung in `LadenAsync()`
+  - E2E-Tests: Menü-Anzeige, Navigation zu Aufgabendetail, Sichtbarkeits-Toggle (Dashboard-abhängig), Status-Anzeige
 
 ---
 
@@ -1029,6 +1079,7 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **Issue 81: Aktive Aufgaben im Menü (in Arbeit):** Neue Seitenleisten-Sektion in der WPF-Desktopanwendung zeigt aktive Aufgaben (Status `Gestartet` oder `Wartend`) als gerahmte Kacheln mit Titel und dynamischem KI-Ausführungsstatus an; `KiAusfuehrungsStatusConverter` bestimmt Status basierend auf `AktiveRunId` und `LastHeartbeatUtc` (< 5 Min = "Läuft", Wartend = "Wartet"); neue Service-Methode `AufgabeService.GetAktiveAufgabenAsync()` filtert und sortiert Aufgaben nach Aktivität; erweiterte ViewModels mit Properties (`AktiveAufgaben`, `IsDashboardVisible`) und Commands (`NavigateZuAufgabeCommand`); Seitenleisten-Sektion automatisch verborgen wenn Dashboard aktiv; Dashboard zeigt gleiche Liste ohne Höhenlimit; XAML-Erweiterungen in MainWindow und DashboardView; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-07-01**)
 - **Automatische issue.md-Dateierstellung beim Repository-Setup (implementiert ✅):** Beim Repository-Klon wird automatisch eine `issue.md`-Datei mit Aufgabendaten (Titel, ID, Branch, Datum, Anforderungsbeschreibung) im Markdown-Format erstellt; `.gitignore` wird automatisch um den Eintrag `issue.md` erweitert (mit Duplikatsprüfung); Fallback-Text bei leerer Anforderung; Fehlerbehandlung mit Logging (graceful degradation); Neue Methoden `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`, Integration in `ProzessStartenAsync`; Unit-Tests für alle Szenarien (erfolgreiche Erstellung, Fallback-Text, Duplikatsprüfung, Fehlerbehandlung); Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-30**)
 - **Repository-Suggestion-Panel (in Arbeit):** Neues Panel auf der Projektübersichtsseite mit Vorschlägen unzugeordneter Repositories aus allen Git-Plugins, sortiert nach letzter Aktivität mit relativer Datumsformatierung; Doppelklick erstellt neues Projekt mit automatischer Repository-Zuordnung; Echtzeit-Updates beim Laden und nach Rückkehr von Projektdetail; Fehlerrobustheit bei Plugin-Ausfällen; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-26**)
 - **WPF Aufgabenworkflow-Optimierung (Feature #72):** Vereinfachtes Aufgaben-Statusmodell mit direktem Übergang von "Neu" zu "Gestartet"; neuer `StartenCommand` kombiniert Repository-Klone und CLI-Start in einem Schritt; Plugin-Auswahl-Dialog mit optionaler Projekt-Level-Speicherung; `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI mit Prozess-Neustart; automatischer CLI-Neustart beim Aufgabe-Laden; Enum-Vereinfachung (`ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernt); Datenbankmigrationen und Status-Validierung; E2E-Tests für alle Szenarien; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-17**)

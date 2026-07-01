@@ -314,6 +314,60 @@ public sealed class AufgabeServiceTests
     }
 
     /// <summary>
+    /// Testet, dass GetAktiveAufgabenAsync gegen eine echte SQLite-Datenbank absteigend nach
+    /// LastHeartbeatUtc (Fallback ErstellungsDatum) sortiert. Regressionstest für die
+    /// COALESCE-basierte Sortierung, die bei der reinen InMemory-Provider-Testabdeckung
+    /// nicht gegen die tatsächliche SQL-Übersetzung geprüft wird.
+    /// </summary>
+    [Fact]
+    public async Task GetAktiveAufgabenAsync_ShouldSortByLastHeartbeatDescThenByErstellungsDatum_WhenUsingSqlite()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektId = await CreateTestProjektAsync(db);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+
+        var jetzt = DateTimeOffset.UtcNow;
+
+        var mitAltemHeartbeat = new Softwareschmiede.Domain.Entities.Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            Titel = "Alter Heartbeat",
+            Status = AufgabeStatus.Gestartet,
+            ErstellungsDatum = jetzt.AddHours(-3),
+            LastHeartbeatUtc = jetzt.AddMinutes(-10)
+        };
+        var mitNeuemHeartbeat = new Softwareschmiede.Domain.Entities.Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            Titel = "Neuer Heartbeat",
+            Status = AufgabeStatus.Wartend,
+            ErstellungsDatum = jetzt.AddHours(-2),
+            LastHeartbeatUtc = jetzt.AddMinutes(-1)
+        };
+        var ohneHeartbeat = new Softwareschmiede.Domain.Entities.Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            Titel = "Ohne Heartbeat",
+            Status = AufgabeStatus.Gestartet,
+            ErstellungsDatum = jetzt.AddMinutes(-5),
+            LastHeartbeatUtc = null
+        };
+
+        db.Context.Aufgaben.AddRange(mitAltemHeartbeat, mitNeuemHeartbeat, ohneHeartbeat);
+        await db.Context.SaveChangesAsync();
+
+        // Act
+        var result = await service.GetAktiveAufgabenAsync();
+
+        // Assert
+        result.Select(a => a.Id).Should().ContainInOrder(mitNeuemHeartbeat.Id, ohneHeartbeat.Id, mitAltemHeartbeat.Id);
+    }
+
+    /// <summary>
     /// Testet, dass UpdateAsync Titel, Beschreibung und Agenteninformationen persistiert.
     /// </summary>
     [Fact]

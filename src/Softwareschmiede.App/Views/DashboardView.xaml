@@ -8,6 +8,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -56,13 +57,25 @@
             </Border>
         </UniformGrid>
 
+        <!-- Aktive Aufgaben -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,24">
+            <TextBlock Text="Aktive Aufgaben"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource PrimaryTextBrush}"
+                       Margin="0,0,0,8" />
+
+            <ItemsControl ItemsSource="{Binding AktiveAufgabenListe}"
+                          ItemTemplate="{StaticResource AktiveAufgabeCardTemplate}" />
+        </StackPanel>
+
         <!-- Recovery-Banner -->
-        <controls:RecoveryBannerControl Grid.Row="2"
+        <controls:RecoveryBannerControl Grid.Row="3"
                                          Margin="0,0,0,16"
                                          CandidateCount="{Binding RecoveryKandidaten.Count, Mode=OneWay}" />
 
         <!-- Fehler -->
-        <Border Grid.Row="3"
+        <Border Grid.Row="4"
                 Background="{DynamicResource ErrorBrush}"
                 CornerRadius="8"
                 Padding="16,12"

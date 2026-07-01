@@ -16,6 +16,46 @@
             <converters:NullOrEmptyToVisibilityConverter x:Key="NullOrEmptyToVisibilityConverter" />
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
             <converters:UnassignedRepositoriesConverter x:Key="UnassignedRepositoriesConverter" />
+            <converters:KiAusfuehrungsStatusConverter x:Key="KiAusfuehrungsStatusConverter" />
+
+            <!-- Gemeinsames DataTemplate für die Aktive-Aufgabe-Kachel (Seitenleiste und Dashboard) -->
+            <DataTemplate x:Key="AktiveAufgabeCardTemplate">
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Margin="4,4,4,4"
+                        Padding="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding Titel}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       Margin="0,4,0,0" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                Content="→"
+                                Command="{Binding DataContext.NavigateZuAufgabeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding Id}"
+                                Padding="6,3"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                FontSize="13"
+                                VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -455,6 +455,19 @@ public sealed class AufgabeService
         return ageMinutes;
     }
 
+    /// <summary>Gibt alle aktiven Aufgaben (Status Gestartet oder Wartend) zurück, sortiert nach letzter Aktivität.</summary>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    /// <returns>Die aktiven Aufgaben, absteigend nach letzter Aktivität sortiert (maximal 20).</returns>
+    public async Task<List<Aufgabe>> GetAktiveAufgabenAsync(CancellationToken ct = default)
+    {
+        return await _db.Aufgaben
+            .AsNoTracking()
+            .Where(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
+            .OrderByDescending(a => a.LastHeartbeatUtc ?? a.ErstellungsDatum)
+            .Take(20)
+            .ToListAsync(ct);
+    }
+
     private static void ValidateStatusTransition(AufgabeStatus current, AufgabeStatus next)
     {
         if (next == AufgabeStatus.Archiviert)

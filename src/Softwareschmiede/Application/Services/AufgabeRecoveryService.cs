@@ -15,7 +15,8 @@ public sealed class AufgabeRecoveryService
     private readonly IRunningAutomationStatusSource _runningStatusSource;
     private readonly ILogger<AufgabeRecoveryService> _logger;
 
-    private const int HeartbeatTimeoutMinutes = 5;
+    /// <summary>Schwelle in Minuten, ab der ein Heartbeat als abgelaufen gilt (Recovery-Kandidat bzw. KI-Status "nicht mehr aktiv").</summary>
+    public const int HeartbeatTimeoutMinutes = 5;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="AufgabeRecoveryService"/>.</summary>
     public AufgabeRecoveryService(

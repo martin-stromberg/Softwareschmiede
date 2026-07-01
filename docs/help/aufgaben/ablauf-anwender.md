@@ -8,6 +8,18 @@
 
 ## Schritt-für-Schritt-Anleitung
 
+### 0. Schneller Zugriff auf aktive Aufgaben über die Seitenleiste
+
+In der linken Navigationsseitenleiste findest du eine Sektion „Aktive Aufgaben", die bis zu 20 derzeit laufende Aufgaben (Status: Gestartet oder Wartend) anzeigt. Jede Aufgabe wird als gerahmte Kachel mit Titel und aktuellem KI-Ausführungsstatus dargestellt:
+
+- `▶ Läuft` — Die KI arbeitet gerade an der Aufgabe
+- `⏸ Wartet` — Die Aufgabe hat ein Rate-Limit erreicht und wartet auf Wiederaufnahme
+- `✓ Bereit` — Keine aktive Ausführung erkannt
+
+**Aufgabe öffnen:** Klicke auf den Navigations-Button (→) auf einer Aufgabenkachel, um direkt zur Aufgabendetailansicht zu navigieren. Die Seitenleisten-Sektion wird verborgen wenn du das Dashboard aufrufst — dort siehst du stattdessen die vollständige Liste.
+
+> **Hinweis:** Die Anzeige ist auf 20 Aufgaben begrenzt und wird regelmäßig aktualisiert.
+
 ### 0. Navigation zwischen Projekt und Aufgabe
 
 Die Aufgabendetailansicht ist vollständig vom Projekt getrennt dargestellt:

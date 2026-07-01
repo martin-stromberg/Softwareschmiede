@@ -1,6 +1,11 @@
+using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Softwareschmiede.App.Extensions;
 using Softwareschmiede.App.Services;
+using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Entities;
 
 namespace Softwareschmiede.App.ViewModels;
 
@@ -9,6 +14,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 {
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly AufgabeService _aufgabeService;
+    private readonly ILogger<MainWindowViewModel> _logger;
 
     private ViewModelBase? _currentView;
     private bool _isNavigationExpanded = true;
@@ -25,7 +32,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ViewModelBase? CurrentView
     {
         get => _currentView;
-        private set => SetProperty(ref _currentView, value);
+        private set => SetProperty(ref _currentView, value, () => OnPropertyChanged(nameof(IsDashboardVisible)));
     }
 
     /// <summary>Gibt an, ob die Navigation aufgeklappt ist.</summary>
@@ -34,6 +41,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _isNavigationExpanded;
         set => SetProperty(ref _isNavigationExpanded, value);
     }
+
+    /// <summary>Aktuell aktive Aufgaben (Status Gestartet oder Wartend) für die Seitenleisten-Anzeige.</summary>
+    public ObservableCollection<Aufgabe> AktiveAufgabenListe { get; } = new();
+
+    /// <summary>Gibt an, ob aktuell das Dashboard angezeigt wird.</summary>
+    public bool IsDashboardVisible => CurrentView is DashboardViewModel;
 
     /// <summary>Navigiert zum Dashboard.</summary>
     public ICommand NavigateToDashboardCommand { get; }
@@ -50,18 +63,29 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>Klappt die Navigation ein oder aus.</summary>
     public ICommand ToggleNavigationCommand { get; }
 
+    /// <summary>Navigiert zur Aufgabendetailansicht einer aktiven Aufgabe.</summary>
+    public ICommand NavigateZuAufgabeCommand { get; }
+
     /// <inheritdoc cref="MainWindowViewModel"/>
-    public MainWindowViewModel(DarkModeService darkModeService, IServiceProvider serviceProvider)
+    public MainWindowViewModel(
+        DarkModeService darkModeService,
+        IServiceProvider serviceProvider,
+        AufgabeService aufgabeService,
+        ILogger<MainWindowViewModel> logger)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
+        _aufgabeService = aufgabeService;
+        _logger = logger;
 
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
         NavigateToProjectListCommand = new RelayCommand(NavigateToProjectList);
         NavigateToSettingsCommand = new RelayCommand(NavigateToSettings);
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
+        NavigateZuAufgabeCommand = new RelayCommand<Guid>(NavigateZuAufgabe);
 
         NavigateToDashboard();
+        _ = AktiveAufgabenAktualisierenAsync();
     }
 
     private DashboardViewModel? _dashboardViewModel;
@@ -71,6 +95,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _dashboardViewModel ??= _serviceProvider.GetRequiredService<DashboardViewModel>();
         CurrentView = _dashboardViewModel;
         Title = "Softwareschmiede – Dashboard";
+        _ = AktiveAufgabenAktualisierenAsync();
     }
 
     private ProjectListViewModel? _projectListViewModel;
@@ -89,6 +114,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
         CurrentView = _projectListViewModel;
         Title = "Softwareschmiede – Projekte";
+        _ = AktiveAufgabenAktualisierenAsync();
     }
 
     private SettingsViewModel? _settingsViewModel;
@@ -98,5 +124,33 @@ public sealed class MainWindowViewModel : ViewModelBase
         _settingsViewModel ??= _serviceProvider.GetRequiredService<SettingsViewModel>();
         CurrentView = _settingsViewModel;
         Title = "Softwareschmiede – Einstellungen";
+        _ = AktiveAufgabenAktualisierenAsync();
+    }
+
+    /// <summary>Lädt die aktuell aktiven Aufgaben und aktualisiert die Seitenleisten-Anzeige.</summary>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public async Task AktiveAufgabenAktualisierenAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
+            AktiveAufgabenListe.ReplaceAll(aufgaben);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Aktualisieren der aktiven Aufgaben in der Seitenleiste.");
+        }
+    }
+
+    private void NavigateZuAufgabe(Guid aufgabeId)
+    {
+        var viewModel = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
+        viewModel.ZurueckAction = NavigateToDashboard;
+        viewModel.AufgabeId = aufgabeId;
+        CurrentView = viewModel;
     }
 }

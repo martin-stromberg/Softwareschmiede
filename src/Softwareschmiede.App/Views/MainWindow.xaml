@@ -79,6 +79,25 @@
                     </StackPanel>
                 </Button>
 
+                <!-- Separator -->
+                <Border Height="1"
+                        Background="{DynamicResource BorderBrush}"
+                        Margin="8,8" />
+
+                <!-- Sektion: Aktive Aufgaben -->
+                <TextBlock Text="Aktive Aufgaben"
+                           FontSize="11"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Margin="8,8,8,4"
+                           Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+
+                <ScrollViewer MaxHeight="300"
+                              VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <ItemsControl ItemsSource="{Binding AktiveAufgabenListe}"
+                                  ItemTemplate="{StaticResource AktiveAufgabeCardTemplate}" />
+                </ScrollViewer>
+
                 <!-- Spacer -->
                 <Grid Height="Auto" />
 

@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.App.Converters;
 
@@ -75,6 +78,36 @@ public sealed class NullOrEmptyToVisibilityConverter : IValueConverter
         if (value is null) return Visibility.Collapsed;
         if (value is string s) return string.IsNullOrEmpty(s) ? Visibility.Collapsed : Visibility.Visible;
         return Visibility.Visible;
+    }
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Konvertiert eine <see cref="Aufgabe"/> in einen KI-Ausführungsstatus-String.</summary>
+[ValueConversion(typeof(Aufgabe), typeof(string))]
+public sealed class KiAusfuehrungsStatusConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is not Aufgabe aufgabe)
+            return string.Empty;
+
+        if (aufgabe.AktiveRunId != null
+            && aufgabe.LastHeartbeatUtc != null
+            && DateTimeOffset.UtcNow - aufgabe.LastHeartbeatUtc.Value < TimeSpan.FromMinutes(AufgabeRecoveryService.HeartbeatTimeoutMinutes))
+        {
+            return "▶ Läuft";
+        }
+
+        if (aufgabe.Status == AufgabeStatus.Wartend)
+        {
+            return "⏸ Wartet";
+        }
+
+        return "✓ Bereit";
     }
 
     /// <inheritdoc/>

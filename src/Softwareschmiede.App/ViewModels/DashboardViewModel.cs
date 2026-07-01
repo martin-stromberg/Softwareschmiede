@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.App.Extensions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 
@@ -64,6 +65,9 @@ public sealed class DashboardViewModel : ViewModelBase
     /// <summary>Liste der zuletzt aktiven Projekte.</summary>
     public ObservableCollection<Projekt> LetzteProjects { get; } = new();
 
+    /// <summary>Liste der aktuell aktiven Aufgaben (Status Gestartet oder Wartend).</summary>
+    public ObservableCollection<Aufgabe> AktiveAufgabenListe { get; } = new();
+
     /// <summary>Lädt die Dashboard-Daten neu.</summary>
     public ICommand LadenCommand { get; }
 
@@ -105,6 +109,9 @@ public sealed class DashboardViewModel : ViewModelBase
             var (aktiveCount, wartendCount) = await _aufgabeService.GetAktiveUndWartendeCountAsync(ct);
             AktiveAufgaben = aktiveCount;
             WartendAufgaben = wartendCount;
+
+            var aktiveAufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
+            AktiveAufgabenListe.ReplaceAll(aktiveAufgaben);
         }
         catch (OperationCanceledException)
         {

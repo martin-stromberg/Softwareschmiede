@@ -4,6 +4,8 @@ Aufgaben sind die Arbeitseinheiten der Softwareschmiede. Jede Aufgabe beschreibt
 
 Die Aufgabendetailansicht bietet ein Ribbon-Menü für schnellen Zugriff auf Aktionen (Speichern, Löschen, Starten, Beenden, Plugin ändern) und zeigt je nach Status unterschiedliche Inhalte: Edit-Panel zum Bearbeiten von Titel und Anforderung (Status: Neu), CLI-Panel mit eingebettetem Terminalfenster (Status: Gestartet/Wartend), oder Diff-Panel zur Anzeige von Änderungen (Status: Beendet). Beim Prozessstart werden automatisch eine lokale `issue.md` mit der Aufgabenbeschreibung und ein `.gitignore`-Eintrag für diese Datei erstellt.
 
+Die Navigationsmenü-Seitenleiste zeigt bis zu 20 derzeit aktive Aufgaben als Kacheln mit Titel und KI-Ausführungsstatus an, um schnellen Zugriff auf laufende Arbeiten zu ermöglichen. Das Dashboard zeigt die gleiche Aufgabenliste an; die Menüsektion wird automatisch verborgen wenn das Dashboard aktiv ist, um Redundanz zu vermeiden.
+
 ## Inhalt
 
 - [Beschreibung](beschreibung.md)
