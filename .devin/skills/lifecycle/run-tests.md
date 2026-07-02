@@ -12,7 +12,7 @@ Prüfe die vorhandenen Projektdateien und leite daraus den passenden Befehl ab:
 
 | Datei vorhanden | Test-Befehl | Coverage-Befehl |
 |-----------------|-------------|-----------------|
-| `*.sln` oder `*.csproj` | `dotnet test --no-build` | `dotnet test --no-build --collect:"XPlat Code Coverage"` |
+| `*.sln` oder `*.csproj` | `dotnet build && dotnet test --no-build` | `dotnet build && dotnet test --no-build --collect:"XPlat Code Coverage"` |
 | `package.json` mit `scripts.test` | `npm test -- --passWithNoTests` | `npm test -- --passWithNoTests --coverage` |
 | `pytest.ini`, `pyproject.toml`, `setup.cfg` oder `conftest.py` | `pytest -v` | `pytest -v --cov --cov-report=term-missing` |
 | `pom.xml` | `mvn test -q` | `mvn test jacoco:report -q` (nur wenn Jacoco konfiguriert) |
@@ -21,6 +21,8 @@ Prüfe die vorhandenen Projektdateien und leite daraus den passenden Befehl ab:
 | `go.mod` | `go test ./...` | `go test -cover ./...` |
 
 Ist kein Test-Runner erkennbar, gib im Ergebnis Status `Kein Test-Runner gefunden` aus und brich ab.
+
+**Wichtig bei `dotnet`-Projekten:** Führe vor jedem `dotnet test` zwingend einen vorausgehenden `dotnet build` der gesamten Solution aus (nicht nur eines Einzelprojekts) und stelle sicher, dass dieser mit 0 Fehlern durchläuft, bevor `--no-build` verwendet wird. Ein übersprungener oder unvollständiger Build (z. B. nur ein Testprojekt statt der ganzen Solution, oder ein Build während noch ein `testhost`-Prozess Dateien blockiert) führt bei UI-Automatisierungstests (z. B. FlaUI/WPF-E2E-Tests) zu irreführenden Fehlern wie „Element wurde nicht gefunden" oder einem vermeintlich fehlenden „.NET Desktop Runtime", die wie Test-Flakiness aussehen, aber tatsächlich Build-Artefakte betreffen. Während der Testausführung dürfen keine Codeänderungen am Projekt vorgenommen werden.
 
 ## Schritt 2: Tests ausführen
 

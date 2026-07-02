@@ -16,6 +16,7 @@
             <converters:NullOrEmptyToVisibilityConverter x:Key="NullOrEmptyToVisibilityConverter" />
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
             <converters:UnassignedRepositoriesConverter x:Key="UnassignedRepositoriesConverter" />
+            <converters:KiAusfuehrungsStatusConverter x:Key="KiAusfuehrungsStatusConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

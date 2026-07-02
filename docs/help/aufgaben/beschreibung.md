@@ -6,6 +6,19 @@ Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optio
 
 ## Funktionsweise
 
+### Aktive Aufgaben im Navigationsmenü
+
+Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `Wartend`) in der linken Navigationsseitenleiste an. Diese Funktion ermöglicht schnellen Zugriff auf laufende Arbeiten:
+
+- **Seitenleisten-Anzeige:** Unterhalb der bestehenden Navigationseinträge (Dashboard, Projekte) wird eine neue Sektion „Aktive Aufgaben" angezeigt. Diese Sektion enthält bis zu 20 aktive Aufgaben als gerahmte Kacheln.
+- **Kachel-Inhalte:** Jede Kachel zeigt den Aufgabentitel und den aktuellen KI-Ausführungsstatus:
+  - `▶ Läuft` — `AktiveRunId` ist gesetzt und `LastHeartbeatUtc` ist jünger als 5 Minuten
+  - `⏸ Wartet` — Status ist `Wartend` (Rate-Limit erreicht)
+  - `✓ Bereit` — Keine aktive Ausführung erkannt (Fallback)
+- **Navigation:** Ein Navigations-Button (→) auf jeder Kachel ermöglicht den direkten Zugriff auf die Aufgabendetailansicht.
+- **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — keine doppelte Anzeige.
+- **Auto-Aktualisierung:** Die Liste wird bei Navigation zu anderen Views (Projekte, Einstellungen) automatisch aktualisiert.
+
 ### Navigation zwischen Projekt und Aufgabe
 
 Die Aufgabendetailansicht ist eine vollständige, fensterumfassende Ansicht, nicht mehr inline in die Projektdetailansicht eingebettet:

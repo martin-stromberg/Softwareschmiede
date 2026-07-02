@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
@@ -10,6 +11,13 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service für Aufgabenverwaltung (CRUD + Lebenszyklus).</summary>
 public sealed class AufgabeService
 {
+    // AktivOderWartendStatus ist die einzige Quelle der Wahrheit für die Regel "Aufgabe ist aktiv oder
+    // wartend" (siehe AufgabeStatusExtensions.IstAktivOderWartend). Für EF-Core-Queries wird die Array-
+    // Variante referenziert (Contains wird nach SQL IN übersetzt); außerhalb von Queries wird direkt
+    // AufgabeStatus.IstAktivOderWartend() verwendet (z. B. in DeleteAsync).
+    private static readonly Expression<Func<Aufgabe, bool>> IstAktivOderWartendPredicate =
+        a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status);
+
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AufgabeService> _logger;
 
@@ -48,7 +56,7 @@ public sealed class AufgabeService
     {
         var counts = await _db.Aufgaben
             .AsNoTracking()
-            .Where(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
+            .Where(IstAktivOderWartendPredicate)
             .GroupBy(a => a.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
@@ -275,7 +283,7 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.Wartend)
+        if (aufgabe.Status.IstAktivOderWartend())
         {
             throw new InvalidOperationException(
                 $"Aufgabe {id} kann nicht gelöscht werden, da sie aktiv ist (Status: {aufgabe.Status}). Bitte zuerst abbrechen oder abschließen.");
@@ -453,6 +461,20 @@ public sealed class AufgabeService
 
         var ageMinutes = (int)(DateTimeOffset.UtcNow - aufgabe.LastHeartbeatUtc.Value).TotalMinutes;
         return ageMinutes;
+    }
+
+    /// <summary>Gibt alle aktiven Aufgaben (Status Gestartet oder Wartend) zurück, sortiert nach letzter Aktivität.</summary>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    /// <returns>Die aktiven Aufgaben, absteigend nach letzter Aktivität sortiert (maximal 20).</returns>
+    public async Task<List<Aufgabe>> GetAktiveAufgabenAsync(CancellationToken ct = default)
+    {
+        return await _db.Aufgaben
+            .AsNoTracking()
+            .Include(a => a.Projekt)
+            .Where(IstAktivOderWartendPredicate)
+            .OrderByDescending(a => a.LastHeartbeatUtc ?? a.ErstellungsDatum)
+            .Take(20)
+            .ToListAsync(ct);
     }
 
     private static void ValidateStatusTransition(AufgabeStatus current, AufgabeStatus next)

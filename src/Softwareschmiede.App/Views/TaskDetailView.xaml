@@ -205,6 +205,7 @@
                 <Grid Grid.Row="1">
                     <!-- TerminalControl (CLI-Fenster, sichtbar wenn IsInfoViewVisible=false) -->
                     <controls:TerminalControl x:Name="TerminalConsole"
+                                              AutomationProperties.Name="TerminalConsole"
                                               Visibility="{Binding IsInfoViewVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
 
                     <!-- Info-Panel (sichtbar wenn IsInfoViewVisible=true) -->

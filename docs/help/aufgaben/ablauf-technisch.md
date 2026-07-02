@@ -4,6 +4,8 @@
 
 Der Entwicklungsprozess wird durch `EntwicklungsprozessService.ProzessStartenAsync` eingeleitet. Das CLI des KI-Tools wird als nativer Prozess gestartet und via Win32 `SetParent` in die WPF-Aufgabendetailansicht eingebettet. `KiAusfuehrungsService` verwaltet den Prozess-Lifecycle als Singleton.
 
+Die Seitenleisten-Anzeige aktiver Aufgaben wird durch `MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` verwaltet, die `AufgabeService.GetAktiveAufgabenAsync()` aufruft und die `AktiveAufgabenListe` ObservableCollection befüllt. Das Dashboard zeigt dieselbe Liste über `DashboardViewModel.AktiveAufgabenListe` an.
+
 ## Ablauf
 
 ### Navigieren zu Aufgabendetail aus Projektdetail
@@ -270,6 +272,100 @@ flowchart TD
     
     SHOW_PROJECT --> END[Projektdetailansicht aktiv]
 ```
+
+## Seitenleisten-Anzeige aktiver Aufgaben
+
+Dieser Ablauf zeigt, wie aktive Aufgaben in der Navigationsseitenleiste und im Dashboard angezeigt werden.
+
+### Abruf aktiver Aufgaben
+
+Beteiligte Komponenten:
+- `AufgabeService.GetAktiveAufgabenAsync()` — Filtert und sortiert aktive Aufgaben
+- `MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` — Ruft Service auf und befüllt UI-Collection
+- `DashboardViewModel.LadenAsync()` — Befüllt Dashboard-Liste
+- `MainWindowViewModel.AktiveAufgabenListe` — ObservableCollection für Seitenleiste
+- `DashboardViewModel.AktiveAufgabenListe` — ObservableCollection für Dashboard
+
+Ablauf in `AufgabeService.GetAktiveAufgabenAsync()`:
+1. Filtert Aufgaben mit `Status == AufgabeStatus.Gestartet || Status == AufgabeStatus.Wartend`
+2. Sortiert absteigend nach `LastHeartbeatUtc ?? ErstellungsDatum` (neueste zuerst)
+3. Begrenzt auf maximal 20 Ergebnisse
+4. Verwendet `AsNoTracking()` für Performance
+5. Gibt `List<Aufgabe>` zurück
+
+### Seitenleisten-Rendering (MainWindow.xaml)
+
+Beteiligte Komponenten:
+- `MainWindow.xaml` — Seitenleiste mit `ItemsControl` für aktive Aufgaben
+- `MainWindowViewModel.AktiveAufgabenListe` — Binding-Quelle
+- `MainWindowViewModel.IsDashboardVisible` — computed Property, steuert Sichtbarkeit
+- `KiAusfuehrungsStatusConverter` — Konvertiert `Aufgabe` zu Status-String
+- `App.xaml` — DataTemplate `AktiveAufgabeCardTemplate` definiert Kachel-Layout
+
+Ablauf:
+1. `MainWindowViewModel` Constructor ruft `AktiveAufgabenAktualisierenAsync()` auf
+2. Service wird aufgerufen, aktive Aufgaben werden abgerufen
+3. `AktiveAufgabenListe.ReplaceAll(aufgaben)` füllt die Collection
+4. Seitenleiste bindet auf `AktiveAufgabenListe` mit `ItemsControl`
+5. Für jede Aufgabe wird `AktiveAufgabeCardTemplate` DataTemplate angewendet:
+   - `TextBlock` zeigt `Titel` (mit Ellipsis bei Überlauf)
+   - `TextBlock` zeigt Status via `KiAusfuehrungsStatusConverter`
+   - `Button` führt `NavigateZuAufgabeCommand` aus mit `CommandParameter={Binding Id}`
+6. Sichtbarkeit gesteuert durch `IsDashboardVisible`:
+   - Wenn `CurrentView is DashboardViewModel`: `Visibility=Collapsed`
+   - Sonst: `Visibility=Visible`
+
+Trigger zur Aktualisierung:
+- `MainWindowViewModel.NavigateToDashboard()` ruft `AktiveAufgabenAktualisierenAsync()` auf
+- `MainWindowViewModel.NavigateToProjectList()` ruft `AktiveAufgabenAktualisierenAsync()` auf
+- `MainWindowViewModel.NavigateToSettings()` ruft `AktiveAufgabenAktualisierenAsync()` auf
+
+### Dashboard-Rendering (DashboardView.xaml)
+
+Ablauf:
+1. `DashboardViewModel.LadenAsync()` wird ausgelöst (z.B. via `LadenCommand`)
+2. Bestehende Logik für Projekte, Recovery, Statistik-Zähler bleibt unverändert
+3. Neue Zeile: `AufgabeService.GetAktiveAufgabenAsync()` wird aufgerufen
+4. `AktiveAufgabenListe.ReplaceAll(aufgaben)` füllt die Collection
+5. Dashboard bindet auf `AktiveAufgabenListe` mit `ItemsControl`
+6. Gleiches `AktiveAufgabeCardTemplate` wird verwendet wie in Seitenleiste
+7. Abschnitt ist immer sichtbar wenn auf Dashboard
+
+### KI-Ausführungsstatus-Konvertierung
+
+Beteiligte Komponenten:
+- `KiAusfuehrungsStatusConverter : IValueConverter` — Konvertiert `Aufgabe` zu Status-String
+- Referenz: `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (standardmäßig 5 Minuten)
+
+Konvertierungs-Logik in `Convert()`:
+1. Input-Check: Ist Wert vom Typ `Aufgabe`? Sonst `string.Empty` zurückgeben
+2. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
+   - Output: `"▶ Läuft"`
+3. Wenn `Status == AufgabeStatus.Wartend`:
+   - Output: `"⏸ Wartet"`
+4. Sonst (Default):
+   - Output: `"✓ Bereit"`
+5. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
+
+### Navigation zu Aufgabendetail aus aktiver Aufgabe
+
+Ausgelöst durch Klick auf den Navigation-Button (→) einer aktiven Aufgabenkachel.
+
+Beteiligte Komponenten:
+- Aufgabenkachel-Template mit Button: `Command="{Binding DataContext.NavigateZuAufgabeCommand, RelativeSource={RelativeSource AncestorType=Window}}"`
+- `MainWindowViewModel.NavigateZuAufgabeCommand` — `RelayCommand<Guid>`
+- `MainWindowViewModel.NavigateZuAufgabe(Guid aufgabeId)` — Erstellt `TaskDetailViewModel`
+
+Ablauf:
+1. Benutzer klickt Navigation-Button auf Aufgabenkachel
+2. `NavigateZuAufgabeCommand.Execute(aufgabeId)` wird aufgerufen
+3. `NavigateZuAufgabe(aufgabeId)` wird ausgeführt:
+   - Neue `TaskDetailViewModel`-Instanz wird aus DI-Container erstellt: `_serviceProvider.GetRequiredService<TaskDetailViewModel>()`
+   - `TaskDetailViewModel.ZurueckAction = NavigateToDashboard` wird gesetzt
+   - `TaskDetailViewModel.AufgabeId = aufgabeId` wird gesetzt (triggert `LadenAsync()`)
+   - `MainWindowViewModel.CurrentView = viewModel` wird gesetzt → navigiert zu `TaskDetailView`
+4. `IsDashboardVisible` wird neu berechnet (Wert ändert sich zu `false`)
+5. Seitenleisten-Sektion wird ausgeblendet durch Visibility-Binding
 
 ## Fehlerbehandlung
 

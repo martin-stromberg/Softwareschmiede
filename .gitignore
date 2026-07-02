@@ -379,3 +379,4 @@ FodyWeavers.xsd
 *.claude.task.md.bak
 *launchSettings.json
 /.softwareschmiede/copilot-runtime
+issue.md

@@ -1,0 +1,86 @@
+<UserControl x:Class="Softwareschmiede.App.Controls.ActiveTasksListControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <DataTemplate x:Key="AufgabenKachelInhaltTemplate">
+            <StackPanel>
+                <TextBlock Text="{Binding Titel}"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Projekt.Name}"
+                           FontSize="11"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,2,0,0" />
+                <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
+                           FontSize="11"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Margin="0,4,0,0" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="AufgabenKachelMitNavigationButtonTemplate">
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="4,4,4,4"
+                    Padding="10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ContentPresenter Grid.Column="0"
+                                       Content="{Binding}"
+                                       ContentTemplate="{StaticResource AufgabenKachelInhaltTemplate}" />
+
+                    <Button Grid.Column="1"
+                            Content="→"
+                            AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeNavigieren:{0}}"
+                            Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding Id}"
+                            Padding="6,3"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            FontSize="13"
+                            VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="AufgabenKachelVollflaechigKlickbarTemplate">
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,12"
+                    Padding="16"
+                    Cursor="Hand">
+                <Border.InputBindings>
+                    <MouseBinding MouseAction="LeftClick"
+                                  Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  CommandParameter="{Binding Id}" />
+                </Border.InputBindings>
+                <ContentPresenter Content="{Binding}"
+                                   ContentTemplate="{StaticResource AufgabenKachelInhaltTemplate}" />
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ItemsControl ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=UserControl}}">
+        <ItemsControl.Style>
+            <Style TargetType="ItemsControl">
+                <Setter Property="ItemTemplate" Value="{StaticResource AufgabenKachelMitNavigationButtonTemplate}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding ShowNavigationButton, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                        <Setter Property="ItemTemplate" Value="{StaticResource AufgabenKachelVollflaechigKlickbarTemplate}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ItemsControl.Style>
+    </ItemsControl>
+</UserControl>

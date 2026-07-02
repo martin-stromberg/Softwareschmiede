@@ -15,7 +15,8 @@ public sealed class AufgabeRecoveryService
     private readonly IRunningAutomationStatusSource _runningStatusSource;
     private readonly ILogger<AufgabeRecoveryService> _logger;
 
-    private const int HeartbeatTimeoutMinutes = 5;
+    /// <summary>Schwelle in Minuten, ab der ein Heartbeat als abgelaufen gilt (Recovery-Kandidat bzw. KI-Status "nicht mehr aktiv").</summary>
+    public const int HeartbeatTimeoutMinutes = 5;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="AufgabeRecoveryService"/>.</summary>
     public AufgabeRecoveryService(
@@ -39,7 +40,7 @@ public sealed class AufgabeRecoveryService
 
         var kandidaten = await _db.Aufgaben
             .AsNoTracking()
-            .Where(a => (a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
+            .Where(a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status)
                 && a.LastHeartbeatUtc != null
                 && a.LastHeartbeatUtc < cutoff)
             .Select(a => a.Id)
@@ -199,5 +200,5 @@ public sealed class AufgabeRecoveryService
             reasonCode);
 
     internal static bool IstRecoveryStatus(AufgabeStatus status)
-        => status is AufgabeStatus.Gestartet or AufgabeStatus.Wartend;
+        => status.IstAktivOderWartend();
 }
