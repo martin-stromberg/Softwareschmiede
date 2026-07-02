@@ -40,6 +40,7 @@
 
                     <Button Grid.Column="1"
                             Content="→"
+                            AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeNavigieren:{0}}"
                             Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             CommandParameter="{Binding Id}"
                             Padding="6,3"

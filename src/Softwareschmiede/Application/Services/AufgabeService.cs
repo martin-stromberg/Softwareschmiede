@@ -11,8 +11,12 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service für Aufgabenverwaltung (CRUD + Lebenszyklus).</summary>
 public sealed class AufgabeService
 {
+    // AktivOderWartendStatus ist die einzige Quelle der Wahrheit für die Regel "Aufgabe ist aktiv oder
+    // wartend" (siehe AufgabeStatusExtensions.IstAktivOderWartend). Für EF-Core-Queries wird die Array-
+    // Variante referenziert (Contains wird nach SQL IN übersetzt); außerhalb von Queries wird direkt
+    // AufgabeStatus.IstAktivOderWartend() verwendet (z. B. in DeleteAsync).
     private static readonly Expression<Func<Aufgabe, bool>> IstAktivOderWartendPredicate =
-        a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend;
+        a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status);
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AufgabeService> _logger;
@@ -279,7 +283,7 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
-        if (aufgabe.Status is AufgabeStatus.Gestartet or AufgabeStatus.Wartend)
+        if (aufgabe.Status.IstAktivOderWartend())
         {
             throw new InvalidOperationException(
                 $"Aufgabe {id} kann nicht gelöscht werden, da sie aktiv ist (Status: {aufgabe.Status}). Bitte zuerst abbrechen oder abschließen.");

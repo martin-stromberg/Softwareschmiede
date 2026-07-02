@@ -98,8 +98,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (_dashboardViewModel is null)
         {
             _dashboardViewModel = _serviceProvider.GetRequiredService<DashboardViewModel>();
-            _dashboardViewModel.AktiveAufgabenListe = AktiveAufgabenListe;
-            _dashboardViewModel.NavigateZuAufgabeAction = NavigateZuAufgabe;
+            _dashboardViewModel.Initialize(AktiveAufgabenListe, NavigateZuAufgabe);
         }
         CurrentView = _dashboardViewModel;
         Title = "Softwareschmiede – Dashboard";
@@ -140,6 +139,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
             AktiveAufgabenListe.ReplaceAll(aufgaben);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

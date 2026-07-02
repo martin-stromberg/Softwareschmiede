@@ -45,22 +45,22 @@ public sealed class DashboardViewModelTests : IDisposable
     private DashboardViewModel CreateSut() =>
         new(_projektService, _aufgabeService, _recoveryService, NullLogger<DashboardViewModel>.Instance);
 
-    /// <summary>AktiveAufgabenListe kann von außen gesetzt werden, um die gemeinsame Datenquelle des MainWindowViewModel zu übernehmen.</summary>
+    /// <summary>Initialize setzt AktiveAufgabenListe auf die übergebene Instanz, um die gemeinsame Datenquelle des MainWindowViewModel zu übernehmen.</summary>
     [Fact]
-    public void AktiveAufgabenListe_ShouldReturnAssignedInstance_WhenSetExternally()
+    public void Initialize_ShouldSetAktiveAufgabenListeToProvidedInstance_WhenCalled()
     {
         // Arrange
         var sut = CreateSut();
         var geteilteListe = new ObservableCollection<Aufgabe>();
 
         // Act
-        sut.AktiveAufgabenListe = geteilteListe;
+        sut.Initialize(geteilteListe, _ => { });
 
         // Assert
         sut.AktiveAufgabenListe.Should().BeSameAs(geteilteListe);
     }
 
-    /// <summary>LadenAsync lädt aktive Aufgaben nicht mehr selbst, sondern lässt die von außen gesetzte AktiveAufgabenListe unverändert (einzige gemeinsame Datenquelle im MainWindowViewModel).</summary>
+    /// <summary>LadenAsync lädt aktive Aufgaben nicht mehr selbst, sondern lässt die über Initialize gesetzte AktiveAufgabenListe unverändert (einzige gemeinsame Datenquelle im MainWindowViewModel).</summary>
     [Fact]
     public async Task LadenAsync_ShouldNotModifyAktiveAufgabenListe_WhenCalled()
     {
@@ -69,7 +69,7 @@ public sealed class DashboardViewModelTests : IDisposable
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
         var sut = CreateSut();
         var geteilteListe = new ObservableCollection<Aufgabe>();
-        sut.AktiveAufgabenListe = geteilteListe;
+        sut.Initialize(geteilteListe, _ => { });
 
         // Act
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
@@ -79,14 +79,14 @@ public sealed class DashboardViewModelTests : IDisposable
         sut.AktiveAufgabenListe.Should().BeEmpty();
     }
 
-    /// <summary>NavigateZuAufgabeCommand delegiert an die vom MainWindowViewModel gesetzte NavigateZuAufgabeAction.</summary>
+    /// <summary>NavigateZuAufgabeCommand delegiert an die über Initialize gesetzte NavigateZuAufgabeAction.</summary>
     [Fact]
     public void NavigateZuAufgabeCommand_ShouldInvokeNavigateZuAufgabeAction_WhenExecuted()
     {
         // Arrange
         var sut = CreateSut();
         Guid? aufgerufeneAufgabeId = null;
-        sut.NavigateZuAufgabeAction = id => aufgerufeneAufgabeId = id;
+        sut.Initialize(new ObservableCollection<Aufgabe>(), id => aufgerufeneAufgabeId = id);
         var aufgabeId = Guid.NewGuid();
 
         // Act
@@ -96,7 +96,7 @@ public sealed class DashboardViewModelTests : IDisposable
         aufgerufeneAufgabeId.Should().Be(aufgabeId);
     }
 
-    /// <summary>NavigateZuAufgabeCommand wirft keine Ausnahme, wenn keine NavigateZuAufgabeAction gesetzt wurde.</summary>
+    /// <summary>NavigateZuAufgabeCommand wirft keine Ausnahme, wenn Initialize noch nicht aufgerufen wurde.</summary>
     [Fact]
     public void NavigateZuAufgabeCommand_ShouldNotThrow_WhenNavigateZuAufgabeActionNotSet()
     {

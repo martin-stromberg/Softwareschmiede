@@ -40,7 +40,7 @@ public sealed class AufgabeRecoveryService
 
         var kandidaten = await _db.Aufgaben
             .AsNoTracking()
-            .Where(a => (a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
+            .Where(a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status)
                 && a.LastHeartbeatUtc != null
                 && a.LastHeartbeatUtc < cutoff)
             .Select(a => a.Id)
@@ -200,5 +200,5 @@ public sealed class AufgabeRecoveryService
             reasonCode);
 
     internal static bool IstRecoveryStatus(AufgabeStatus status)
-        => status is AufgabeStatus.Gestartet or AufgabeStatus.Wartend;
+        => status.IstAktivOderWartend();
 }
