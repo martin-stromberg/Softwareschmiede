@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:Softwareschmiede.App.Views"
         xmlns:vm="clr-namespace:Softwareschmiede.App.ViewModels"
+        xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
         Title="{Binding Title}"
         Width="1280" Height="800"
         MinWidth="900" MinHeight="600"
@@ -79,6 +80,20 @@
                     </StackPanel>
                 </Button>
 
+                <Button Command="{Binding NavigateToSettingsCommand}"
+                        AutomationProperties.Name=" Einstellungen"
+                        Margin="4,2"
+                        Padding="8,8"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="⚙" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text=" Einstellungen" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
                 <!-- Separator -->
                 <Border Height="1"
                         Background="{DynamicResource BorderBrush}"
@@ -94,26 +109,9 @@
                 <ScrollViewer MaxHeight="300"
                               VerticalScrollBarVisibility="Auto"
                               Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                    <ItemsControl ItemsSource="{Binding AktiveAufgabenListe}"
-                                  ItemTemplate="{StaticResource AktiveAufgabeCardTemplate}" />
+                    <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
+                                                      NavigateCommand="{Binding NavigateZuAufgabeCommand}" />
                 </ScrollViewer>
-
-                <!-- Spacer -->
-                <Grid Height="Auto" />
-
-                <Button Command="{Binding NavigateToSettingsCommand}"
-                        AutomationProperties.Name=" Einstellungen"
-                        Margin="4,2"
-                        Padding="8,8"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="⚙" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text=" Einstellungen" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
             </StackPanel>
         </Border>
 

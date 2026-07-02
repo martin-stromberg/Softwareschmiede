@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
-using Softwareschmiede.App.Extensions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 
@@ -20,6 +19,7 @@ public sealed class DashboardViewModel : ViewModelBase
     private int _wartendAufgaben;
     private bool _isLoading;
     private string? _fehlerMeldung;
+    private ObservableCollection<Aufgabe> _aktiveAufgabenListe = new();
 
     /// <summary>Anzahl aller Projekte.</summary>
     public int ProjektAnzahl
@@ -65,8 +65,18 @@ public sealed class DashboardViewModel : ViewModelBase
     /// <summary>Liste der zuletzt aktiven Projekte.</summary>
     public ObservableCollection<Projekt> LetzteProjects { get; } = new();
 
-    /// <summary>Liste der aktuell aktiven Aufgaben (Status Gestartet oder Wartend).</summary>
-    public ObservableCollection<Aufgabe> AktiveAufgabenListe { get; } = new();
+    /// <summary>Liste der aktuell aktiven Aufgaben (Status Gestartet oder Wartend). Wird vom MainWindowViewModel als gemeinsame Datenquelle gesetzt.</summary>
+    public ObservableCollection<Aufgabe> AktiveAufgabenListe
+    {
+        get => _aktiveAufgabenListe;
+        set => SetProperty(ref _aktiveAufgabenListe, value);
+    }
+
+    /// <summary>Delegat zur Navigation zu einer aktiven Aufgabe, wird vom MainWindowViewModel gesetzt.</summary>
+    public Action<Guid>? NavigateZuAufgabeAction { get; set; }
+
+    /// <summary>Navigiert zur Aufgabendetailansicht einer aktiven Aufgabe.</summary>
+    public ICommand NavigateZuAufgabeCommand { get; }
 
     /// <summary>Lädt die Dashboard-Daten neu.</summary>
     public ICommand LadenCommand { get; }
@@ -84,6 +94,7 @@ public sealed class DashboardViewModel : ViewModelBase
         _logger = logger;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
+        NavigateZuAufgabeCommand = new RelayCommand<Guid>(id => NavigateZuAufgabeAction?.Invoke(id));
         RecoveryKandidaten.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HatRecoveryKandidaten));
     }
 
@@ -109,9 +120,6 @@ public sealed class DashboardViewModel : ViewModelBase
             var (aktiveCount, wartendCount) = await _aufgabeService.GetAktiveUndWartendeCountAsync(ct);
             AktiveAufgaben = aktiveCount;
             WartendAufgaben = wartendCount;
-
-            var aktiveAufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
-            AktiveAufgabenListe.ReplaceAll(aktiveAufgaben);
         }
         catch (OperationCanceledException)
         {

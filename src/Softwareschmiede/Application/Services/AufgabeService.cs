@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
@@ -10,6 +11,9 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Service für Aufgabenverwaltung (CRUD + Lebenszyklus).</summary>
 public sealed class AufgabeService
 {
+    private static readonly Expression<Func<Aufgabe, bool>> IstAktivOderWartendPredicate =
+        a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend;
+
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AufgabeService> _logger;
 
@@ -48,7 +52,7 @@ public sealed class AufgabeService
     {
         var counts = await _db.Aufgaben
             .AsNoTracking()
-            .Where(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
+            .Where(IstAktivOderWartendPredicate)
             .GroupBy(a => a.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(ct);
@@ -462,7 +466,8 @@ public sealed class AufgabeService
     {
         return await _db.Aufgaben
             .AsNoTracking()
-            .Where(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend)
+            .Include(a => a.Projekt)
+            .Where(IstAktivOderWartendPredicate)
             .OrderByDescending(a => a.LastHeartbeatUtc ?? a.ErstellungsDatum)
             .Take(20)
             .ToListAsync(ct);

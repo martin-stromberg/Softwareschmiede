@@ -10,7 +10,7 @@
     <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj" />
   </Folder>
   <Project Path="src/Softwareschmiede.App/Softwareschmiede.App.csproj">
-    <Build Solution="Debug|*" Project="false" />
+    <Build Solution="Debug|*" Project="true" />
   </Project>
   <Project Path="src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj" />
   <Project Path="src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj" />

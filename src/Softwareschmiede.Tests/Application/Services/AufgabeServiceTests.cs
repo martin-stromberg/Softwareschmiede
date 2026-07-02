@@ -466,6 +466,23 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().HaveCount(20);
     }
 
+    /// <summary>GetAktiveAufgabenAsync lädt das zugehörige Projekt mit, damit der Projektname ohne Nachladen angezeigt werden kann.</summary>
+    [Fact]
+    public async Task GetAktiveAufgabenAsync_ShouldIncludeProjekt_WhenCalled()
+    {
+        // Arrange
+        _db.Aufgaben.Add(CreateAufgabeDirekt("Aufgabe mit Projekt", AufgabeStatus.Gestartet));
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetAktiveAufgabenAsync();
+
+        // Assert
+        result.Should().ContainSingle();
+        result[0].Projekt.Should().NotBeNull();
+        result[0].Projekt.Name.Should().Be("Testprojekt");
+    }
+
     private Aufgabe CreateAufgabeDirekt(
         string titel,
         AufgabeStatus status,

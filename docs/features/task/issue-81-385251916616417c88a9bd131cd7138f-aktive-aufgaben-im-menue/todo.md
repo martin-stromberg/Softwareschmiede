@@ -21,6 +21,7 @@ Branch: `task/issue-81-385251916616417c88a9bd131cd7138f-aktive-aufgaben-im-menue
 | [x] | 8a | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
 | [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
-| [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
+| [x] | 10 (Fortsetzung 1) | Nacharbeiten Runde 1: 3 Kundenrückmeldungen umgesetzt, Code-Review-Befunde konsolidiert | Codeänderungen, `review-code.md`, `test-results.md` |
+| [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`: neue Kundenrückmeldung zum Aufgabenwechsel + 3 Code-Review-Befunde) | `continue-done.md` |
 | [ ] | – | Feature-Verzeichnis löschen | – |
 | [ ] | – | Commit durchführen | – |

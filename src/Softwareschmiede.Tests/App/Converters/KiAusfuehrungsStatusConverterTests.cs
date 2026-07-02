@@ -47,7 +47,7 @@ public sealed class KiAusfuehrungsStatusConverterTests
 
     /// <summary>Convert gibt "✓ Bereit" zurück, wenn keine aktive Ausführung erkennbar ist.</summary>
     [Fact]
-    public void Convert_ShouldReturnBereitOrStatusFallback_WhenNoActiveRunOrOldHeartbeat()
+    public void Convert_ShouldReturnBereitString_WhenNoActiveRunOrHeartbeatExpired()
     {
         var aufgabe = new Aufgabe
         {

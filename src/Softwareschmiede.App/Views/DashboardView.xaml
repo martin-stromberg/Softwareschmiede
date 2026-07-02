@@ -65,8 +65,9 @@
                        Foreground="{DynamicResource PrimaryTextBrush}"
                        Margin="0,0,0,8" />
 
-            <ItemsControl ItemsSource="{Binding AktiveAufgabenListe}"
-                          ItemTemplate="{StaticResource AktiveAufgabeCardTemplate}" />
+            <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
+                                              NavigateCommand="{Binding NavigateZuAufgabeCommand}"
+                                              ShowNavigationButton="False" />
         </StackPanel>
 
         <!-- Recovery-Banner -->

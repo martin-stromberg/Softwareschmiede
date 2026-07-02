@@ -116,4 +116,33 @@ public sealed class MainWindowViewModelTests : IDisposable
         sut.CurrentView.Should().BeOfType<TaskDetailViewModel>();
         ((TaskDetailViewModel)sut.CurrentView!).AufgabeId.Should().Be(aufgabe.Id);
     }
+
+    /// <summary>NavigateToDashboard teilt die AktiveAufgabenListe mit dem DashboardViewModel, statt eine eigene Abfrage im Dashboard auszulösen (einzige gemeinsame Datenquelle).</summary>
+    [Fact]
+    public void NavigateToDashboard_ShouldShareAktiveAufgabenListeWithDashboardViewModel_WhenCalled()
+    {
+        // Arrange & Act (Konstruktor navigiert bereits zum Dashboard)
+        var sut = CreateSut();
+
+        // Assert
+        var dashboardViewModel = (DashboardViewModel)sut.CurrentView!;
+        dashboardViewModel.AktiveAufgabenListe.Should().BeSameAs(sut.AktiveAufgabenListe);
+    }
+
+    /// <summary>NavigateToDashboard setzt die NavigateZuAufgabeAction des DashboardViewModel, sodass dessen NavigateZuAufgabeCommand zur Aufgabendetailansicht navigiert (Delegate-Muster statt versteckter Kopplung).</summary>
+    [Fact]
+    public async Task NavigateToDashboard_ShouldWireNavigateZuAufgabeActionOnDashboardViewModel_WhenCalled()
+    {
+        // Arrange
+        var sut = CreateSut();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe für Dashboard-Navigation", null);
+        var dashboardViewModel = (DashboardViewModel)sut.CurrentView!;
+
+        // Act
+        ((RelayCommand<Guid>)dashboardViewModel.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
+
+        // Assert
+        sut.CurrentView.Should().BeOfType<TaskDetailViewModel>();
+        ((TaskDetailViewModel)sut.CurrentView!).AufgabeId.Should().Be(aufgabe.Id);
+    }
 }

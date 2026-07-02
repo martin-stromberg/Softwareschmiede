@@ -32,7 +32,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ViewModelBase? CurrentView
     {
         get => _currentView;
-        private set => SetProperty(ref _currentView, value, () => OnPropertyChanged(nameof(IsDashboardVisible)));
+        private set => SetProperty(ref _currentView, value, () =>
+        {
+            OnPropertyChanged(nameof(IsDashboardVisible));
+            _ = AktiveAufgabenAktualisierenAsync();
+        });
     }
 
     /// <summary>Gibt an, ob die Navigation aufgeklappt ist.</summary>
@@ -85,17 +89,20 @@ public sealed class MainWindowViewModel : ViewModelBase
         NavigateZuAufgabeCommand = new RelayCommand<Guid>(NavigateZuAufgabe);
 
         NavigateToDashboard();
-        _ = AktiveAufgabenAktualisierenAsync();
     }
 
     private DashboardViewModel? _dashboardViewModel;
 
     private void NavigateToDashboard()
     {
-        _dashboardViewModel ??= _serviceProvider.GetRequiredService<DashboardViewModel>();
+        if (_dashboardViewModel is null)
+        {
+            _dashboardViewModel = _serviceProvider.GetRequiredService<DashboardViewModel>();
+            _dashboardViewModel.AktiveAufgabenListe = AktiveAufgabenListe;
+            _dashboardViewModel.NavigateZuAufgabeAction = NavigateZuAufgabe;
+        }
         CurrentView = _dashboardViewModel;
         Title = "Softwareschmiede – Dashboard";
-        _ = AktiveAufgabenAktualisierenAsync();
     }
 
     private ProjectListViewModel? _projectListViewModel;
@@ -114,7 +121,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
         CurrentView = _projectListViewModel;
         Title = "Softwareschmiede – Projekte";
-        _ = AktiveAufgabenAktualisierenAsync();
     }
 
     private SettingsViewModel? _settingsViewModel;
@@ -124,7 +130,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         _settingsViewModel ??= _serviceProvider.GetRequiredService<SettingsViewModel>();
         CurrentView = _settingsViewModel;
         Title = "Softwareschmiede – Einstellungen";
-        _ = AktiveAufgabenAktualisierenAsync();
     }
 
     /// <summary>Lädt die aktuell aktiven Aufgaben und aktualisiert die Seitenleisten-Anzeige.</summary>
@@ -135,10 +140,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
             AktiveAufgabenListe.ReplaceAll(aufgaben);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {
