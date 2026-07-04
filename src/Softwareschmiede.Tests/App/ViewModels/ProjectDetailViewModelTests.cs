@@ -185,6 +185,26 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         callbackAufgerufen.Should().BeTrue();
     }
 
+    /// <summary>Der ProjektId-Setter löst LadenAsync per SafeFireAndForget aus, ohne dass der Aufrufer den Task awaiten muss.</summary>
+    [Fact]
+    public async Task ProjektId_Setter_UsesFireAndForgetSafely()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("FireAndForget-Projekt", null);
+        var sut = CreateSut();
+
+        // Act: ProjektId-Setter löst SafeFireAndForget(LadenAsync) aus, ohne explizites Awaiten von LadenCommand
+        sut.ProjektId = projekt.Id;
+
+        // Assert
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.Projekt == null)
+            await Task.Delay(50);
+
+        sut.Projekt.Should().NotBeNull("der ProjektId-Setter muss LadenAsync per SafeFireAndForget auslösen");
+        sut.Projekt!.Name.Should().Be("FireAndForget-Projekt");
+    }
+
     /// <summary>RepositoryZuweisenAsync ruft AddRepositoryAsync auf und aktualisiert SelectedRepository, wenn der Dialog bestätigt wird.</summary>
     [Fact]
     public async Task RepositoryZuweisenAsync_Success_RuftAddRepositoryAsyncAufUndAktualisiertViewModel()

@@ -1,6 +1,10 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Terminal;
 using Softwareschmiede.Infrastructure.Terminal;
 
@@ -9,9 +13,12 @@ namespace Softwareschmiede.App.Controls;
 /// <summary>WPF-Control, das eine <see cref="PseudoConsoleSession"/> rendert und Tastatureingaben weiterleitet.</summary>
 public sealed class TerminalControl : FrameworkElement
 {
+    private readonly ILogger<TerminalControl> _logger =
+        App.Services?.GetService<ILogger<TerminalControl>>() ?? NullLogger<TerminalControl>.Instance;
     private TerminalBuffer? _buffer;
     private CancellationTokenSource? _readCts;
     private volatile AnsiSequenceParser _parser = new();
+    private Task? _readLoopTask;
     private static readonly Typeface ConsolasTypeface = new("Consolas");
     private const double FontSize = 13.0;
     private double _cellWidth;
@@ -89,7 +96,8 @@ public sealed class TerminalControl : FrameworkElement
 
         var cts = new CancellationTokenSource();
         _readCts = cts;
-        _ = Task.Run(() => ReadLoopAsync(session, _buffer, cts.Token));
+        _readLoopTask = Task.Run(() => ReadLoopAsync(session, _buffer, cts.Token));
+        _readLoopTask.SafeFireAndForget(_logger, "TerminalControl.ReadLoopAsync");
 
         // Sofort rendern, damit vorhandener Bufferinhalt sichtbar wird ohne auf neue Ausgabe warten.
         _ = Dispatcher.InvokeAsync(InvalidateVisual);
@@ -111,8 +119,9 @@ public sealed class TerminalControl : FrameworkElement
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger.LogWarning(ex, "Fehler beim Lesen aus dem Terminal-Output-Stream");
                     break;
                 }
 
@@ -130,6 +139,10 @@ public sealed class TerminalControl : FrameworkElement
         }
         catch (OperationCanceledException)
         {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unerwarteter Fehler in Terminal-Lesevorgang");
         }
     }
 
@@ -221,12 +234,7 @@ public sealed class TerminalControl : FrameworkElement
         var bytes = KeyToVt100Encoder.Encode(e);
         if (bytes != null && Session?.InputStream != null)
         {
-            try
-            {
-                Session.InputStream.Write(bytes);
-                Session.MarkInputActivity();
-            }
-            catch { }
+            WriteToInputStream(bytes);
             e.Handled = true;
         }
 
@@ -239,16 +247,26 @@ public sealed class TerminalControl : FrameworkElement
         if (!string.IsNullOrEmpty(e.Text) && Session?.InputStream != null)
         {
             var bytes = KeyToVt100Encoder.EncodeText(e.Text);
-            try
-            {
-                Session.InputStream.Write(bytes);
-                Session.MarkInputActivity();
-            }
-            catch { }
+            WriteToInputStream(bytes);
             e.Handled = true;
         }
 
         base.OnTextInput(e);
+    }
+
+    /// <summary>Schreibt Bytes in den Input-Stream der aktuellen Session und protokolliert Schreibfehler statt sie zu verschlucken.</summary>
+    /// <param name="bytes">Die zu schreibenden Bytes.</param>
+    private void WriteToInputStream(byte[] bytes)
+    {
+        try
+        {
+            Session!.InputStream!.Write(bytes);
+            Session.MarkInputActivity();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Schreiben in den Terminal-Input-Stream");
+        }
     }
 
     /// <inheritdoc/>

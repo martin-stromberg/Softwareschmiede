@@ -44,7 +44,7 @@ Beteiligte Komponenten:
 
 1. `TaskDetailView` setzt `TerminalConsole.Session = session`
 2. `TerminalControl.OnSessionChanged` initialisiert `TerminalBuffer(cols, rows)` mit aktuellen Pixel-Dimensionen
-3. Task `ReadLoopAsync` wird gestartet; Schleife:
+3. Task `ReadLoopAsync` wird gestartet und in `_readLoopTask` gespeichert; zusätzlich überwacht via `_readLoopTask.SafeFireAndForget(_logger, "TerminalControl.ReadLoopAsync")` (siehe [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)); Schleife:
    - `await session.OutputStream.ReadAsync(buffer)` liest bytes
    - `foreach (var evt in _parser.Parse(bytes))` zerlegt bytes
    - `_buffer.Apply(evt)` aktualisiert Zustand
@@ -156,3 +156,4 @@ sequenceDiagram
 | Unvollständige ANSI-Sequenz über Paket-Grenzen | `AnsiSequenceParser` speichert Zustand; nächstes Paket setzt Verarbeitung fort |
 | `ResizePseudoConsole` schlägt fehl | Rückgabewert `false`; Buffer wird trotzdem angepasst, ConPTY-Größe stimmt nicht mit Buffer überein (seltener Fall) |
 | `ReadLoopAsync` bei Prozessende | EOF wird gelesen; Schleife terminiert ordnungsgemäß; View zeigt finalen Zustand |
+| Unerwartete Exception in `ReadLoopAsync` | Generisches `catch (Exception)` protokolliert den Fehler und beendet die Schleife geordnet, statt sie unbehandelt zu lassen |

@@ -62,7 +62,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 _ladenCts?.Cancel();
                 _ladenCts?.Dispose();
                 _ladenCts = new CancellationTokenSource();
-                _ = LadenAsync(_ladenCts.Token);
+                LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "TaskDetailViewModel.LadenAsync");
             }
         }
     }
@@ -604,14 +604,21 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         _dispatcherInvoke(() =>
         {
-            IsCliRunning = status == CliProcessStatus.Gestartet;
-            if (status != CliProcessStatus.Gestartet)
+            try
             {
-                AttachCliStatusSession(null);
-                CliStatusText = status == CliProcessStatus.Fehler
-                    ? "CLI-Status: Fehler"
-                    : "CLI inaktiv";
-                CliGestoppt?.Invoke();
+                IsCliRunning = status == CliProcessStatus.Gestartet;
+                if (status != CliProcessStatus.Gestartet)
+                {
+                    AttachCliStatusSession(null);
+                    CliStatusText = status == CliProcessStatus.Fehler
+                        ? "CLI-Status: Fehler"
+                        : "CLI inaktiv";
+                    CliGestoppt?.Invoke();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Fehler beim Verarbeiten des CLI-Status-Wechsels für Aufgabe {AufgabeId}.", aufgabeId);
             }
         });
     }
