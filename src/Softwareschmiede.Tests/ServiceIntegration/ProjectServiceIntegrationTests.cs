@@ -48,7 +48,7 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
         await _projektService.CreateAsync("Projekt B", null);
 
         var alle = await _projektService.GetAllAsync();
-        alle.Count.Should().BeGreaterOrEqualTo(2);
+        alle.Count.Should().BeGreaterThanOrEqualTo(2);
     }
 
     /// <summary><summary>Aufgabe_KannInProjektGeladen_Werden.</summary>.</summary>

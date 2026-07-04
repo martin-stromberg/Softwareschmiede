@@ -21,6 +21,9 @@ public sealed partial class App : System.Windows.Application
 {
     private IHost? _host;
 
+    /// <summary>Service Locator für WPF-Code-behind-Klassen (Controls/Views), die von XAML ohne Konstruktor-Injection erzeugt werden.</summary>
+    internal static IServiceProvider? Services { get; private set; }
+
     /// <inheritdoc/>
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -37,6 +40,10 @@ public sealed partial class App : System.Windows.Application
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14)
             .CreateLogger();
+
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         try
         {
@@ -63,7 +70,16 @@ public sealed partial class App : System.Windows.Application
 
         await _host.StartAsync();
 
-        _host.Services.GetRequiredService<CliProcessManager>();
+        Services = _host.Services;
+
+        try
+        {
+            _host.Services.GetRequiredService<CliProcessManager>();
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "CliProcessManager konnte nicht initialisiert werden. Die Anwendung läuft ohne CLI-Funktionalität weiter.");
+        }
 
         using (var scope = _host.Services.CreateScope())
         {
@@ -71,8 +87,32 @@ public sealed partial class App : System.Windows.Application
             await db.Database.MigrateAsync();
         }
 
-        var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-        mainWindow.Show();
+        try
+        {
+            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+            mainWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "MainWindow konnte nicht angezeigt werden.");
+        }
+    }
+
+    private static void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+    {
+        Log.Logger.Error(e.Exception, "Unbehandelte Exception im UI-Thread.");
+        e.Handled = true;
+    }
+
+    private static void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        Log.Logger.Error(e.ExceptionObject as Exception, "Unbehandelte Exception außerhalb des UI-Threads.");
+    }
+
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        Log.Logger.Error(e.Exception, "Unbeobachtete Task-Exception.");
+        e.SetObserved();
     }
 
     /// <inheritdoc/>

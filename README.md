@@ -59,7 +59,7 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-07-01**
+Stand: **2026-07-04**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -76,6 +76,7 @@ Stand: **2026-07-01**
 | **Automatische issue.md-Dateierstellung beim Repository-Setup** | ✅ Implementiert | Beim Repository-Klon werden automatisch `issue.md` mit Aufgabendaten und `.gitignore`-Eintrag erstellt; `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`; graceful degradation bei Fehlern; Tests implementiert |
 | **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung, CLI-Laufzeitstatus in der Fußzeile (`Ausführung läuft`/`Wartet auf Eingabe`); Voraussetzung: Windows 10 Build 17763+ |
 | **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`** |
+| **Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget)** | ✅ Implementiert | Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs`; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` für alle Fire-and-Forget-Aufrufe; konsolidierter, try-catch-geschützter `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start); Heartbeat-Aktualisierung pro Aufgabe über eigenes `SemaphoreSlim` in `CliProcessManager` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` mit vollständigem Exception-Handling und überwachtem Hintergrund-Task; Startfehler von `CliProcessManager`-Initialisierung und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -819,7 +820,8 @@ Softwareschmiede/                            # Solution Root
 │   ├── Softwareschmiede/                    # Blazor Server Hauptprojekt (Host)
 │   │   ├── Application/
 │   │   │   └── Services/                    # EntwicklungsprozessService, ProjektService,
-│   │   │                                    # AufgabeService, ProtokollService, ...
+│   │   │                                    # AufgabeService, ProtokollService,
+│   │   │                                    # AsyncTaskExtensions (SafeFireAndForget), ...
 │   │   ├── Domain/
 │   │   │   ├── Entities/                    # Projekt, Aufgabe, Protokolleintrag, ...
 │   │   │   ├── Interfaces/                  # IPluginManager, ...
@@ -973,6 +975,14 @@ public interface IKiPlugin : IPlugin { /* AI operations */ }
 - `NavigateZuAufgabeCommand` nutzt Callbacks zur fensterübergreifenden Navigation zwischen Projekt- und Aufgabendetail (Presentation-Layer Orchestrierung).
 - `IsDashboardVisible` (computed Property) steuert die Sichtbarkeit der Seitenleisten-Sektion über XAML-Binding mit `InvertedBoolToVisibilityConverter`.
 
+### Architekturbezug: Absturzstabilisierung (Stabilität & Fehlerbehandlung)
+
+- `App.OnStartup()` registriert vor dem Aufruf von `StartupAsync()` drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`), die ausschließlich über `Log.Logger` protokollieren; `DispatcherUnhandledException` setzt zusätzlich `e.Handled = true`, `UnobservedTaskException` ruft `e.SetObserved()` auf.
+- `AsyncTaskExtensions.SafeFireAndForget(this Task, ILogger, string)` (`src/Softwareschmiede/Application/Services/AsyncTaskExtensions.cs`) kapselt alle bewusst nicht abgewarteten Aufrufe; ein `ContinueWith`-Callback loggt Fehler (`LogError`) bzw. Abbrüche (`LogInformation`), ohne die Exception zum Aufrufer zu propagieren.
+- `CliProcessManager` verwaltet pro Aufgabe ein eigenes `SemaphoreSlim` in einem `ConcurrentDictionary<Guid, SemaphoreSlim>` statt einer einzigen klassenweiten Sperre — Heartbeat-Updates unabhängiger Aufgaben blockieren sich dadurch nicht mehr gegenseitig, überlappende Timer-Ticks derselben Aufgabe werden weiterhin serialisiert.
+- `KiAusfuehrungsService` kapselt die Verarbeitung des `Process.Exited`-Events (klassischer und ConPTY-basierter CLI-Start) in einer zentralen, try-catch-geschützten Methode, damit ein Fehler bei einem Abonnenten nicht die Statusbenachrichtigung der übrigen Abonnenten verhindert.
+- `App.StartupAsync()` sichert `GetRequiredService<CliProcessManager>()` und `mainWindow.Show()` jeweils mit eigenem try-catch ab, sodass ein Fehler in einem der beiden Schritte nicht zum Abbruch des gesamten Anwendungsstarts führt.
+
 ---
 
 ## 🧪 Tests
@@ -1051,6 +1061,13 @@ Feature-spezifische Testartefakte:
   - ViewModel-Tests: `MainWindowViewModelTests` — Properties (`AktiveAufgaben`, `IsDashboardVisible`), `AktiveAufgabenAktualisierenAsync()`, `NavigateZuAufgabeCommand`
   - ViewModel-Tests: `DashboardViewModelTests` — `AktiveAufgabenListe` Befüllung in `LadenAsync()`
   - E2E-Tests: Menü-Anzeige, Navigation zu Aufgabendetail, Sichtbarkeits-Toggle (Dashboard-abhängig), Status-Anzeige
+- Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget, Prozess-Handler-Härtung):
+  - Neue Testklasse `AppTests` (`src/Softwareschmiede.Tests/App/AppTests.cs`): `DispatcherUnhandledException_Handler_LogsAndHandlesException()`, `UnhandledException_Handler_Logs()`, `UnobservedTaskException_Handler_LogsAndSetsObserved()`
+  - Neue Testklasse `AsyncTaskExtensionsTests` (`src/Softwareschmiede.Tests/Application/Services/AsyncTaskExtensionsTests.cs`): `SafeFireAndForget_LogsErrorOnTaskException()`, `SafeFireAndForget_LogsInfoOnTaskCancellation()`, `SafeFireAndForget_DoesNotLogErrorOrInfo_OnSuccessfulTask()`
+  - Neue Testklasse `CliProcessManagerTests` (`src/Softwareschmiede.Tests/Application/Services/CliProcessManagerTests.cs`): `AktualisierungAsync_WithConcurrentTimerTicks_Serializes()`, `AktualisierungAsync_WithDifferentAufgaben_DoesNotSerializeAcrossTasks()`
+  - Neue Testklasse `TerminalControlTests` (`src/Softwareschmiede.Tests/App/Controls/TerminalControlTests.cs`): `ReadLoopAsync_WithException_LogsAndDoesNotThrow()`, `OnSessionChanged_StoresReadLoopTask()`, `OnSessionChanged_ReadLoopThrows_LogsErrorViaInjectedLogger()`, `OnTextInput_WriteThrows_LogsWarning()`
+  - Erweiterung `KiAusfuehrungsServiceTests` um `ProcessExited_SubscriberThrows_LogsAndDoesNotCrash()` und `ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash()`
+  - Erweiterung `MainWindowViewModelTests` um `CurrentView_Setter_UsesFireAndForgetSafely()`, `ProjectDetailViewModelTests` um `ProjektId_Setter_UsesFireAndForgetSafely()`, `TaskDetailViewModelTests` um `AufgabeId_Setter_UsesFireAndForgetSafely()`
 
 ---
 
@@ -1076,9 +1093,10 @@ Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügba
 
 ## 📝 Changelog
 
-Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen.
+Es gibt aktuell keine separate `CHANGELOG.md`. Änderungen werden über Git-Historie und Pull Requests nachvollzogen. Ergänzend wird lokal eine `changes.log` im Projektstamm mit stichwortartigen Änderungsvermerken je Aufgabe geführt (aktuell nicht versioniert, siehe `*.log`-Regel in `.gitignore`).
 
 Zuletzt dokumentiert (README-/Doku-Update):
+- **Beseitigung von Fehlerpotentialen (Absturzstabilisierung):** Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs` registriert und loggen alle unbehandelten Fehler zentral über Serilog; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` sichert alle Fire-and-Forget-Aufrufe (Heartbeat-Updates, verzögertes Senden von CLI-Befehlen, Laden von Projekten/Aufgaben, Terminal-Lesevorgang) gegen unbeobachtete Exceptions ab; `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start) konsolidiert und vollständig try-catch-geschützt; `CliProcessManager` serialisiert Heartbeat-Updates nun pro Aufgabe über ein eigenes `SemaphoreSlim` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` um generisches Exception-Handling und überwachten Hintergrund-Task erweitert; Startfehler von `CliProcessManager` und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts; neue fachliche Dokumentation unter `docs/help/stabilitaet/`; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-07-04**)
 - **Issue 81: Aktive Aufgaben im Menü (in Arbeit):** Neue Seitenleisten-Sektion in der WPF-Desktopanwendung zeigt aktive Aufgaben (Status `Gestartet` oder `Wartend`) als gerahmte Kacheln mit Titel und dynamischem KI-Ausführungsstatus an; `KiAusfuehrungsStatusConverter` bestimmt Status basierend auf `AktiveRunId` und `LastHeartbeatUtc` (< 5 Min = "Läuft", Wartend = "Wartet"); neue Service-Methode `AufgabeService.GetAktiveAufgabenAsync()` filtert und sortiert Aufgaben nach Aktivität; erweiterte ViewModels mit Properties (`AktiveAufgaben`, `IsDashboardVisible`) und Commands (`NavigateZuAufgabeCommand`); Seitenleisten-Sektion automatisch verborgen wenn Dashboard aktiv; Dashboard zeigt gleiche Liste ohne Höhenlimit; XAML-Erweiterungen in MainWindow und DashboardView; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-07-01**)
 - **Automatische issue.md-Dateierstellung beim Repository-Setup (implementiert ✅):** Beim Repository-Klon wird automatisch eine `issue.md`-Datei mit Aufgabendaten (Titel, ID, Branch, Datum, Anforderungsbeschreibung) im Markdown-Format erstellt; `.gitignore` wird automatisch um den Eintrag `issue.md` erweitert (mit Duplikatsprüfung); Fallback-Text bei leerer Anforderung; Fehlerbehandlung mit Logging (graceful degradation); Neue Methoden `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`, Integration in `ProzessStartenAsync`; Unit-Tests für alle Szenarien (erfolgreiche Erstellung, Fallback-Text, Duplikatsprüfung, Fehlerbehandlung); Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-30**)
 - **Repository-Suggestion-Panel (in Arbeit):** Neues Panel auf der Projektübersichtsseite mit Vorschlägen unzugeordneter Repositories aus allen Git-Plugins, sortiert nach letzter Aktivität mit relativer Datumsformatierung; Doppelklick erstellt neues Projekt mit automatischer Repository-Zuordnung; Echtzeit-Updates beim Laden und nach Rückkehr von Projektdetail; Fehlerrobustheit bei Plugin-Ausfällen; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-26**)
@@ -1269,6 +1287,8 @@ Zuletzt dokumentiert (README-/Doku-Update):
 | [Testlücken: Issue-/Branch-/PR-Linking](docs/tests/testluecken-issue-branch-pr-linking.md) | Dokumentation des geschlossenen Lückenstands für das Linking-Feature |
 | [Testplan: Plugin-Klassenbibliotheken](docs/tests/testplan-plugin-klassenbibliotheken-github-und-copilot.md) | Abgedeckte Testbereiche für Plugin-Discovery, Build-Kopie und Laufzeitverhalten |
 | [Testlücken: Plugin-Klassenbibliotheken](docs/tests/testluecken-plugin-klassenbibliotheken-github-und-copilot.md) | Aktueller Stand der offenen Testlücken für das Plugin-Feature |
+| [Anforderungen: Beseitigung von Fehlerpotentialen (Absturzstabilisierung)](docs/features/task/f78a2ed88da84da28f3e5c34724b5aec-beseitigung-von-fehlerpotentia/requirement.md) | Fachliche Anforderungsanalyse zu 19 identifizierten Fehlerquellen für unkontrollierte Abstürze der WPF-Anwendung während der CLI-Ausführung |
+| [Plan: Beseitigung von Fehlerpotentialen (Absturzstabilisierung)](docs/features/task/f78a2ed88da84da28f3e5c34724b5aec-beseitigung-von-fehlerpotentia/plan.md) | Umsetzungsplan mit Designentscheidungen (globale Exception-Handler, `SafeFireAndForget`, Heartbeat-Concurrency-Schutz pro Aufgabe, abgesicherte `Process.Exited`-Handler), Programmabläufen, neuen Klassen und Testabdeckung |
 
 ---
 

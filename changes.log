@@ -1,0 +1,8 @@
+## 2026-07-04 — Beseitigung von Fehlerpotentialen (Absturzstabilisierung)
+
+- Drei globale Exception-Handler abgesichert: `Application.DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException` und `TaskScheduler.UnobservedTaskException` werden nun in `App.xaml.cs` registriert, loggen alle unbehandelten Fehler und verhindern so unkontrollierte Programmabstürze im UI-Thread.
+- Neue Erweiterungsmethode `SafeFireAndForget` (`AsyncTaskExtensions`) sorgt dafür, dass Fehler in bewusst nicht abgewarteten Hintergrund-Aufgaben (Heartbeat-Updates, verzögertes Senden von CLI-Befehlen, Laden von Projekten/Aufgaben, Terminal-Lesevorgang) geloggt statt stillschweigend verschluckt werden.
+- Der `Process.Exited`-Handler für CLI-Prozesse (`KiAusfuehrungsService`) wurde konsolidiert und vollständig gegen Fehler abgesichert, damit ein Problem beim Beenden eines Prozesses (z. B. beim Aufräumen der Terminal-Sitzung) nicht mehr die Statusbenachrichtigung anderer Aufgaben blockiert.
+- Heartbeat-Aktualisierungen laufender Aufgaben verwenden nun pro Aufgabe eine eigene Sperre (`CliProcessManager`), damit sich unabhängige Aufgaben beim periodischen Fortschritts-Update nicht mehr gegenseitig blockieren können.
+- Fehler beim Schreiben oder Lesen im eingebetteten Terminal (`TerminalControl`) werden jetzt protokolliert statt ignoriert, und der Lesevorgang wird zusätzlich auf unbeobachtete Fehler überwacht.
+- Startfehler der CLI-Verwaltung oder des Hauptfensters führen nicht mehr zum Abbruch des gesamten Anwendungsstarts, sondern werden geloggt; die Anwendung läuft nach Möglichkeit ohne die betroffene Funktion weiter.

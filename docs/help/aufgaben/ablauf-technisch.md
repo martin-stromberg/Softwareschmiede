@@ -382,3 +382,5 @@ Ablauf:
 | Prozess beendet sich unerwartet | `Process.Exited`-Event; `IsCliRunning = false`; Heartbeat bleibt als letzter Wert |
 | Heartbeat > 5 Min, kein Prozess | Recovery-Kandidat; Banner auf Dashboard |
 | Zweiter CLI-Start für gleiche Aufgabe | `KiAusfuehrungsService` gibt vorhandenes Handle zurück (kein doppelter Start) |
+| Fehler innerhalb des `Process.Exited`-Handlers (z. B. Dispose-Fehler) | `KiAusfuehrungsService.HandleProcessExited` fängt den gesamten Handler-Body ab und loggt; Anwendung stürzt nicht ab (Details: [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
+| Überlappende Heartbeat-Ticks derselben Aufgabe | `CliProcessManager` serialisiert pro Aufgabe über ein eigenes `SemaphoreSlim`; Heartbeats anderer Aufgaben bleiben unbeeinflusst |

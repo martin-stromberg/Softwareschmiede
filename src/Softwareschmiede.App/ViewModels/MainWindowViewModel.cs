@@ -35,7 +35,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         private set => SetProperty(ref _currentView, value, () =>
         {
             OnPropertyChanged(nameof(IsDashboardVisible));
-            _ = AktiveAufgabenAktualisierenAsync();
+            AktiveAufgabenAktualisierenAsync().SafeFireAndForget(_logger, "MainWindowViewModel.AktiveAufgabenAktualisierenAsync");
         });
     }
 

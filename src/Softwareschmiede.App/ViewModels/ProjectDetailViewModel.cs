@@ -62,7 +62,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 _ladenCts?.Cancel();
                 _ladenCts?.Dispose();
                 _ladenCts = new CancellationTokenSource();
-                _ = LadenAsync(_ladenCts.Token);
+                LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "ProjectDetailViewModel.LadenAsync");
             }
         }
     }

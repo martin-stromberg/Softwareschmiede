@@ -165,6 +165,26 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.AufgabeBranchName.Should().Be("feature/login-fix");
     }
 
+    // --- AufgabeId-Setter: Fire-and-Forget ---
+
+    /// <summary>Der AufgabeId-Setter löst LadenAsync per SafeFireAndForget aus, ohne dass der Aufrufer den Task awaiten muss.</summary>
+    [Fact]
+    public async Task AufgabeId_Setter_UsesFireAndForgetSafely()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+
+        // Act: AufgabeId-Setter löst SafeFireAndForget(LadenAsync) aus, ohne explizites Awaiten von LadenCommand
+        sut.AufgabeId = aufgabe.Id;
+
+        // Assert
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.Aufgabe == null)
+            await Task.Delay(50);
+
+        sut.Aufgabe.Should().NotBeNull("der AufgabeId-Setter muss LadenAsync per SafeFireAndForget auslösen");
+    }
+
     // --- ShowEditPanel, ShowCliPanel, ShowDiffPanel ---
 
     /// <summary>ShowEditPanel ist true wenn Status=Neu.</summary>

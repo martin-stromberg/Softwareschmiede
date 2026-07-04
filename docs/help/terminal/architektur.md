@@ -222,8 +222,10 @@ ViewModel.PseudoConsoleSessionGestartet += session =>
 | Prozess startet nicht | Win32-Fehler wird geloggt; Status `Fehler` |
 | Ausgabe-Pipe schließt vorzeitig | `ReadLoopAsync` endet; Buffer bleibt sichtbar |
 | Resize-API schlägt fehl | Rückgabewert ignoriert; Konsole läuft mit alter Größe weiter |
-| `InputStream.WriteAsync` schlägt fehl | Fehler wird geloggt; Tastatureingabe verloren |
+| `InputStream.WriteAsync` schlägt fehl (`OnPreviewKeyDown`/`OnTextInput`) | Fehler wird per `LogWarning` protokolliert statt verschluckt; Tastatureingabe geht verloren, Steuerung bleibt bedienbar |
 | ANSI-Parser-Fehler | Fehlerhafte Sequenzen werden ignoriert; Zustand bleibt konsistent |
+| Unerwartete Exception in `ReadLoopAsync` (außerhalb `ReadAsync`, z. B. in `_parser.Parse`/`buffer.Apply`) | Generisches `catch (Exception)` protokolliert den Fehler (`LogError "Unerwarteter Fehler in Terminal-Lesevorgang"`); Leseschleife endet geordnet statt die Anwendung zu gefährden |
+| `ReadLoopAsync`-Task selbst wirft unbeobachtet | `OnSessionChanged` speichert den Task in `_readLoopTask` und überwacht ihn zusätzlich mit `SafeFireAndForget(_logger, "TerminalControl.ReadLoopAsync")` (siehe [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
 
 ## Skalierung und Zuverlässigkeit
 

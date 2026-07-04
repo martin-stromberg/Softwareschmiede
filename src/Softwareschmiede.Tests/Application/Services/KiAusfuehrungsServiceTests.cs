@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
@@ -158,5 +159,79 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         completed.Should().Be(fehlerSignal.Task, "der Exited-Handler sollte trotz disposed ScopeFactory ausgelöst werden, ohne die Anwendung zum Absturz zu bringen");
 
         statusEvents.Should().Contain(CliProcessStatus.Fehler);
+    }
+
+    /// <summary>
+    /// Wenn ein Abonnent von CliProcessStatusChanged im Exited-Handler von StartCliAsync eine Exception
+    /// wirft, muss diese geloggt werden, ohne die Multicast-Kette oder die Anwendung zum Absturz zu bringen.
+    /// </summary>
+    [Fact]
+    public async Task ProcessExited_SubscriberThrows_LogsAndDoesNotCrash()
+    {
+        await AssertSubscriberExceptionIsLoggedAsync(
+            (sut, aufgabeId, plugin) => sut.StartCliAsync(aufgabeId, plugin, Path.GetTempPath()),
+            TimeSpan.FromSeconds(10));
+    }
+
+    /// <summary>
+    /// Wenn ein Abonnent von CliProcessStatusChanged im ConPTY-Exited-Handler von StartWithPseudoConsoleAsync
+    /// eine Exception wirft, muss diese geloggt werden, ohne die Anwendung zum Absturz zu bringen.
+    /// </summary>
+    [Fact]
+    public async Task ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash()
+    {
+        await AssertSubscriberExceptionIsLoggedAsync(
+            (sut, aufgabeId, plugin) => sut.StartWithPseudoConsoleAsync(aufgabeId, plugin, Path.GetTempPath()),
+            TimeSpan.FromSeconds(15));
+    }
+
+    /// <summary>
+    /// Gemeinsames Setup für <see cref="ProcessExited_SubscriberThrows_LogsAndDoesNotCrash"/> und
+    /// <see cref="ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash"/>: Erstellt Mocks für Logger,
+    /// ScopeFactory und Plugin, registriert einen Subscriber, der im Exited-Handler eine Exception wirft,
+    /// ruft den übergebenen Start-Vorgang auf und verifiziert, dass die Exception geloggt wird.
+    /// </summary>
+    /// <param name="startAsync">Der auszuführende Start-Aufruf (StartCliAsync oder StartWithPseudoConsoleAsync).</param>
+    /// <param name="timeout">Maximale Wartezeit auf das Logging der Exception.</param>
+    private static async Task AssertSubscriberExceptionIsLoggedAsync(
+        Func<KiAusfuehrungsService, Guid, IKiPlugin, Task> startAsync,
+        TimeSpan timeout)
+    {
+        var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        using var sut = new KiAusfuehrungsService(loggerMock.Object, scopeFactoryMock.Object);
+
+        var aufgabeId = Guid.NewGuid();
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        var errorLogged = new TaskCompletionSource();
+        loggerMock
+            .Setup(l => l.Log(
+                It.Is<LogLevel>(lvl => lvl == LogLevel.Error),
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.Is<Exception?>(e => e is InvalidOperationException),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
+            .Callback(() => errorLogged.TrySetResult());
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            // Nur beim Exited-Handler werfen (Gestoppt/Fehler), nicht beim initialen Gestartet-Event,
+            // das außerhalb des try-catch-geschützten Exited-Handlers liegt.
+            if (status != CliProcessStatus.Gestartet)
+                throw new InvalidOperationException("Simulierter Subscriber-Fehler");
+        };
+
+        await startAsync(sut, aufgabeId, pluginMock.Object);
+
+        var finished = await Task.WhenAny(errorLogged.Task, Task.Delay(timeout));
+        finished.Should().Be(errorLogged.Task, "der Exited-Handler muss die Exception des werfenden Subscribers loggen, statt die Anwendung abstürzen zu lassen");
     }
 }
