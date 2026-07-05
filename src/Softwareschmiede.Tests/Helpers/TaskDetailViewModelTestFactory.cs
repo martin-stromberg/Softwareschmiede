@@ -20,7 +20,7 @@ public static class TaskDetailViewModelTestFactory
     {
         var dialogServiceMock = new Mock<IDialogService>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        var kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+        var kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
         var protokollService = new ProtokollService(db, NullLogger<ProtokollService>.Instance);
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);

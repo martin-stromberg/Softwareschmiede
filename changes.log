@@ -1,3 +1,11 @@
+## 2026-07-05 — Parallele CLI-Ausführungen ohne Blockade bei Navigation
+
+- ReadLoop-Entkopplung vom UI-Lebenszyklus: Die Terminal-Leseschleife (`ReadLoopAsync`) läuft nun in `PseudoConsoleSession` ab Konstruktion bis `Dispose()`, unabhängig davon, ob ein `TerminalControl` gebunden ist oder der Anwender zu anderer Aufgabenseite navigiert.
+- BufferChanged-Event für UI-Updates: `TerminalControl` ist reiner Renderer und abonniert nur `PseudoConsoleSession.BufferChanged` zur Anzeige-Aktualisierung; keine eigene ReadLoop-Verwaltung mehr.
+- Parallele Prozessausführung ermöglicht: Mehrere CLI-Prozesse können unabhängig voneinander weiterlaufen und Ausgabe puffern, auch wenn ihre Aufgabenseite nicht sichtbar ist — Pipe-Blockade bei Navigation behoben.
+- Session-Dispose mit Graceful-Shutdown: `PseudoConsoleSession.Dispose()` cancelled ReadLoop über `_readCts`, wartet mit 5-Sekunden-Timeout auf Task-Ende, schließt danach Streams sauber.
+- TerminalControl-Cleanup: Unloaded-Handler entfernt; `OnSessionChanged()` registriert/deregistriert nur `BufferChanged`-Event-Handler, keine ReadLoop-Verwaltung.
+
 ## 2026-07-04 — Beseitigung von Fehlerpotentialen (Absturzstabilisierung)
 
 - Drei globale Exception-Handler abgesichert: `Application.DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException` und `TaskScheduler.UnobservedTaskException` werden nun in `App.xaml.cs` registriert, loggen alle unbehandelten Fehler und verhindern so unkontrollierte Programmabstürze im UI-Thread.

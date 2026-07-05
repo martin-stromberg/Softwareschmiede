@@ -29,6 +29,13 @@ public sealed partial class TaskDetailView : UserControl
         };
     }
 
+    /// <summary>Reagiert auf einen DataContext-Wechsel und bindet die Session der neuen (oder keiner)
+    /// Aufgabe an <see cref="TerminalControl"/>. Das Setzen von <c>TerminalConsole.Session</c> löst
+    /// intern <c>TerminalControl.OnSessionChanged()</c> aus, welches den <c>BufferChanged</c>-Handler der
+    /// alten Session deregistriert und ggf. den der neuen Session registriert (kein Verhaltensunterschied
+    /// zu vorher, da <c>TerminalControl</c> die Leseschleife nicht mehr selbst besitzt — siehe Issue-86).</summary>
+    /// <param name="sender">Die auslösende <see cref="TaskDetailView"/>-Instanz.</param>
+    /// <param name="e">Die alte und neue DataContext-Instanz.</param>
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (ReferenceEquals(_subscribedViewModel, e.NewValue))

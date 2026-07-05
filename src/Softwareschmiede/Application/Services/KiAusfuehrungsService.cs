@@ -16,15 +16,18 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 {
     private readonly ConcurrentDictionary<Guid, CliProcessHandle> _handles = new();
     private readonly ILogger<KiAusfuehrungsService> _logger;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly IServiceScopeFactory _scopeFactory;
     private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
     /// <param name="logger">Logger-Instanz.</param>
+    /// <param name="loggerFactory">Factory zum Erzeugen kategoriespezifischer Logger (z. B. für <see cref="PseudoConsoleSession"/>).</param>
     /// <param name="scopeFactory">Factory für DI-Scopes (wird für Fehler-Persistierung verwendet).</param>
-    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, IServiceScopeFactory scopeFactory)
+    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
+        _loggerFactory = loggerFactory;
         _scopeFactory = scopeFactory;
     }
 
@@ -497,7 +500,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 bufferSize: 4096,
                 isAsync: false);
 
-            return new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream);
+            return new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream, _loggerFactory.CreateLogger<PseudoConsoleSession>());
         }
         catch (Exception ex)
         {

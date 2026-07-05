@@ -59,7 +59,7 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-07-04**
+Stand: **2026-07-05**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -77,6 +77,7 @@ Stand: **2026-07-04**
 | **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung, CLI-Laufzeitstatus in der Fußzeile (`Ausführung läuft`/`Wartet auf Eingabe`); Voraussetzung: Windows 10 Build 17763+ |
 | **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`** |
 | **Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget)** | ✅ Implementiert | Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs`; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` für alle Fire-and-Forget-Aufrufe; konsolidierter, try-catch-geschützter `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start); Heartbeat-Aktualisierung pro Aufgabe über eigenes `SemaphoreSlim` in `CliProcessManager` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` mit vollständigem Exception-Handling und überwachtem Hintergrund-Task; Startfehler von `CliProcessManager`-Initialisierung und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts |
+| **Issue 86: Parallele CLI-Ausführungen ohne Blockade bei verborgener Aufgabenseite** | ✅ Implementiert | Entkopplung der ReadLoop vom `TerminalControl`-Lebenszyklus: `PseudoConsoleSession` verwaltet die Leseschleife unabhängig und feuert `BufferChanged`-Events. `TerminalControl` wird zu reinem Renderer, der Events abonniert statt ReadLoop zu steuern. CLI-Prozesse laufen parallel weiter, auch wenn ihre Aufgabenseite nicht angezeigt wird. Betroffene Komponenten: `TerminalControl` (Unloaded-Handler entfernt, Event-Binding hinzugefügt), `PseudoConsoleSession` (ReadLoop ab Konstruktion aktiv), `KiAusfuehrungsService` (Cleanup-Logik angepasst). Unit-Tests für parallele Sessions, View-Wechsel und Session-Cleanup vorhanden; Details siehe [docs/help/terminal](docs/help/terminal/index.md) |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -443,6 +444,60 @@ Die Aufgabendetailansicht nutzt **Windows Pseudo Console (ConPTY) API** zur dire
 | `Wartend` | Rate-Limit erkannt oder Prompt-Vorschlag gespeichert |
 | `Beendet` | Aufgabe abgeschlossen oder fehlgeschlagen |
 | `Archiviert` | Aufgabe archiviert |
+
+#### Issue 86: Parallele CLI-Ausführungen ohne Blockade
+
+**Entkopplung der Leseschleife vom Terminal-Control-Lebenszyklus für echte Parallelisierung mehrerer KI-Prozesse:**
+
+Die Aufgabendetailansicht unterstützt die gleichzeitige Ausführung mehrerer CLI-Prozesse ohne gegenseitige Blockade, auch wenn nur eine Aufgabenseite sichtbar ist.
+
+**Architektur-Änderungen:**
+
+- **ReadLoop in Service-Layer:** Die `PseudoConsoleSession` verwaltet die Leseschleife (`ReadLoopAsync`) unabhängig ab Konstruktion bis `Dispose()`. Sie läuft völlig unabhängig vom `TerminalControl`-Lebenszyklus.
+- **Event-basiertes UI-Update:** `TerminalControl` ist jetzt reiner Renderer – es abonniert das `BufferChanged`-Event der Session und ruft `InvalidateVisual()` auf, statt die ReadLoop selbst zu steuern.
+- **Entfernte Blockierung bei View-Wechsel:** Der `Unloaded`-Handler in `TerminalControl` wurde entfernt; ReadLoop wird nicht mehr bei Control-Unload abgebrochen.
+- **Puffer-Erhalt:** Der `TerminalBuffer` bleibt in der Session persistent, auch wenn die Aufgabenseite verborgen ist. Navigation zurück zur Aufgabe zeigt die komplette Ausgabe-Historie ohne Lücken.
+
+**Verhalten:**
+
+- **Während View sichtbar:** `TerminalControl` rendert den Buffer in Echtzeit, während `PseudoConsoleSession.ReadLoopAsync()` parallel neue Ausgabe verarbeitet
+- **Bei View-Wechsel:** Alte Session's ReadLoop läuft asynchron weiter im Hintergrund; neue Session beginnt zu rendern
+- **Bei Rückkehr:** Buffer-Inhalt ist vollständig erhalten; Anwender sieht keine Ausgabe-Lücken
+- **Mehrere parallele CLI-Prozesse:** Alle Sessions laufen gleichzeitig, jede mit eigener ReadLoop und eigenem Buffer, ohne sich zu blockieren
+
+**Betroffene Komponenten:**
+
+- `TerminalControl` (`src/Softwareschmiede.App/Controls/TerminalControl.cs`):
+  - Unloaded-Handler und ReadLoop-Logik entfernt
+  - Neue Event-Handler: `OnBufferChanged()` abonniert `session.BufferChanged`
+  - `OnSessionChanged()` registriert/deregistriert Event-Handler je nach Session-Wechsel
+
+- `PseudoConsoleSession` (`src/Softwareschmiede/Infrastructure/Terminal/PseudoConsoleSession.cs`):
+  - Neue Felder: `_readCts` (CancellationTokenSource), `_readLoopTask` (Task-Referenz)
+  - Neues Event: `BufferChanged` – wird nach jeder Buffer-Update gefeuert
+  - `ReadLoopAsync()` läuft im Konstruktor als Background-Task
+  - `Dispose()` cancelled ReadLoop sauber (mit Timeout)
+
+- `KiAusfuehrungsService` (Cleanup-Logik angepasst):
+  - `HandleProcessExited()` disposed Session vollständig vor Entfernung
+  - `Dispose()` cancelt alle aktiven ReadLoops beim App-Shutdown
+
+**Beispiel-Szenario:**
+
+1. Aufgabe A startet CLI mit langer laufendem Prozess (z. B. `claude` Editor)
+2. Anwender wechselt zu Aufgabe B und startet dort auch einen CLI-Prozess
+3. Aufgabe A's ReadLoop läuft weiter asynchron, obwohl Aufgabe B angezeigt wird
+4. Beide Prozesse produzieren Ausgabe parallel, ohne sich zu blockieren
+5. Anwender navigiert zurück zu Aufgabe A
+6. Aufgabe A's Buffer ist vollständig erhalten, keine Ausgabe-Lücke
+
+**Testing:**
+
+- Unit-Tests für `TerminalControl` Event-Binding, Session-Wechsel und parallele Sessions ohne Buffer-Interferenz (`TerminalControlTests`)
+- Unit-Tests für `PseudoConsoleSession` ReadLoop-Lebenszyklus, Exception-Handling und Dispose-Verhalten (`PseudoConsoleSessionTests`)
+- Unit-Tests für `KiAusfuehrungsService` Session-Cleanup bei Prozess-Ende und Service-Shutdown (`KiAusfuehrungsServiceTests`)
+
+**Dokumentation:** siehe [docs/help/terminal](docs/help/terminal/index.md) und [docs/help/stabilitaet](docs/help/stabilitaet/index.md)
 
 ### 🎨 Branding & UI-Assets
 - Anwendung nutzt ein dediziertes SVG-Favicon `favicon-hammer-pick.svg` (gekreuzter Hammer/Pickel) aus `src/Softwareschmiede/wwwroot/`

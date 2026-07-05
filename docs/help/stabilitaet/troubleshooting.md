@@ -84,9 +84,9 @@
 
 **Symptom:** Das Terminal-Fenster friert ein, aktualisiert sich aber nicht mehr; der zugehörige Prozess läuft laut Task-Manager weiter.
 
-**Ursache:** `TerminalControl.ReadLoopAsync` hat eine unerwartete Exception geworfen (z. B. beim Parsen einer ANSI-Sequenz) und die Leseschleife wurde beendet. Der Fehler wird als „Unerwarteter Fehler in Terminal-Lesevorgang" geloggt.
+**Ursache:** `PseudoConsoleSession.ReadLoopAsync` hat eine unerwartete Exception geworfen (z. B. beim Parsen einer ANSI-Sequenz) und die Leseschleife der Sitzung wurde beendet. Der Fehler wird als „Unerwarteter Fehler im Terminal-Lesevorgang der Sitzung." geloggt. Da die Leseschleife seit der Behebung von Issue-86 in der `PseudoConsoleSession` selbst läuft (nicht mehr im `TerminalControl`), reicht ein bloßes Schließen und erneutes Öffnen der Aufgabendetailansicht nicht mehr aus, um sie neu zu starten — das Control bindet dabei lediglich erneut an dieselbe (bereits beendete) Leseschleife.
 
 **Lösung:**
-1. Im Log nach „Unerwarteter Fehler in Terminal-Lesevorgang" bzw. „Fehler beim Lesen aus dem Terminal-Output-Stream" suchen.
-2. Aufgabendetailansicht schließen und erneut öffnen — dies startet einen neuen `ReadLoopAsync`-Task für die bestehende Session.
+1. Im Log nach „Unerwarteter Fehler im Terminal-Lesevorgang der Sitzung." bzw. „Fehler beim Lesen aus dem Terminal-Output-Stream der Sitzung." suchen.
+2. CLI-Prozess stoppen und neu starten — dies erzeugt eine neue `PseudoConsoleSession` mit einer neuen Leseschleife.
 3. Bei wiederholtem Auftreten den Stacktrace an das Entwicklungsteam melden.

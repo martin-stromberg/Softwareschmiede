@@ -19,7 +19,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>
