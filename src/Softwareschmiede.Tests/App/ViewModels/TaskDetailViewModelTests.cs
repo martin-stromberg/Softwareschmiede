@@ -34,7 +34,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
 
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
 
         _kiPluginMock = new Mock<IKiPlugin>();
         _kiPluginMock.SetupGet(p => p.PluginName).Returns("Test KI");

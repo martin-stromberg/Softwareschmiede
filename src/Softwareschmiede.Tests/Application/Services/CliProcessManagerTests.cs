@@ -18,7 +18,7 @@ public sealed class CliProcessManagerTests : IDisposable
     public CliProcessManagerTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
         _sut = new CliProcessManager(_kiService, scopeFactoryMock.Object, NullLogger<CliProcessManager>.Instance);
     }
 

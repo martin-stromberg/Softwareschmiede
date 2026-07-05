@@ -40,7 +40,7 @@ Beteiligte Komponenten:
 - `AsyncTaskExtensions.SafeFireAndForget(this Task task, ILogger logger, string operationName)`
 
 Ablauf:
-1. Eine Codestelle löst einen asynchronen Aufruf aus, dessen Ergebnis nicht abgewartet werden soll (z. B. `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.SendCommandDelayedAsync`/`PersistFehlgeschlagenAsync`, die `CurrentView`-/`ProjektId`-/`AufgabeId`-Setter der ViewModels, `TerminalControl.ReadLoopAsync`, `ProjectDetailView.IssueDoubleClick`).
+1. Eine Codestelle löst einen asynchronen Aufruf aus, dessen Ergebnis nicht abgewartet werden soll (z. B. `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.SendCommandDelayedAsync`/`PersistFehlgeschlagenAsync`, die `CurrentView`-/`ProjektId`-/`AufgabeId`-Setter der ViewModels, `ProjectDetailView.IssueDoubleClick`). `PseudoConsoleSession.ReadLoopAsync` bildet eine Ausnahme: Sie fängt alle Exceptions bereits intern ab und läuft als eigenständiger, ab Konstruktion gestarteter Hintergrund-Task (`_readLoopTask`), unabhängig vom UI-Lebenszyklus.
 2. Statt `_ = task;` wird `task.SafeFireAndForget(_logger, "Bezeichnung")` aufgerufen.
 3. `SafeFireAndForget` registriert `task.ContinueWith(...)` auf `TaskScheduler.Default` (läuft also nicht zwingend auf dem UI-Thread):
    - Ist der Task fehlgeschlagen (`t.IsFaulted`): `logger.LogError(t.Exception, "Unerwarteter Fehler in {OperationName}", operationName)`.
@@ -98,12 +98,19 @@ Ablauf (`CreatePseudoConsoleSession`):
 
 `StartPseudoConsoleProcess` selbst räumt bei einem fehlgeschlagenen Prozessstart ebenfalls auf: Schlägt `PseudoConsoleProcessStarter.Start` fehl, wird `pseudoConsole.Dispose()` aufgerufen; schlägt die Ermittlung des `Process`-Objekts über `Process.GetProcessById` fehl, werden sowohl das native Prozess-Handle (`PseudoConsoleNativeMethods.CloseHandle`) als auch die PseudoConsole geschlossen, bevor die Exception weitergegeben wird.
 
-### 7. Überwachter Terminal-Lesevorgang
+### 7. Überwachter Terminal-Lesevorgang (parallele CLI-Ausführungen)
 
-Dieser Schritt betrifft `TerminalControl` und ist im Detail in der [Terminal-Integration-Dokumentation](../terminal/ablauf-technisch.md) beschrieben. Zusammengefasst:
+Dieser Schritt betrifft `PseudoConsoleSession` und ist im Detail in der [Terminal-Integration-Dokumentation](../terminal/ablauf-technisch.md) beschrieben. Zusammengefasst:
 
-- `OnSessionChanged` speichert den gestarteten Lese-Task in `_readLoopTask` und überwacht ihn zusätzlich mit `_readLoopTask.SafeFireAndForget(_logger, "TerminalControl.ReadLoopAsync")`.
+- Die Leseschleife (`ReadLoopAsync`) läuft in `PseudoConsoleSession` selbst, gestartet im Konstruktor und in `_readLoopTask` gespeichert — unabhängig davon, ob ein `TerminalControl` gebunden ist. Dadurch laufen mehrere CLI-Prozesse parallel weiter, auch wenn ihre Aufgabenseite nicht angezeigt wird (Issue-86).
 - `ReadLoopAsync` fängt neben `OperationCanceledException` zusätzlich generische `Exception`en ab, protokolliert sie (`LogError`/`LogWarning`) und beendet die Leseschleife geordnet, statt die Exception unbehandelt zu lassen.
+- `PseudoConsoleSession.Dispose()` beendet die Leseschleife nach folgendem Verfahren:
+  1. `_readCts.Cancel()` wird aufgerufen, um den CancellationToken zu setzen
+  2. `OutputStream.Dispose()` wird aufgerufen — dies ist **kritisch**, da ein blockierter nativer Read (in `ReadLoopAsync`) sonst nur auf den CancellationToken warten würde. Durch das Schließen des Streams endet der Read sofort mit einem I/O-Fehler.
+  3. `_readLoopTask.Wait(5 Sekunden)` wartet mit Timeout auf Beendigung der ReadLoop
+  4. Danach werden `InputStream`, `_runtimeStatusTimer`, `PseudoConsole` und `Process` disposed
+  5. Dies stellt sicher, dass keine verwaisten Leseschleifen zurückbleiben und alle Ressourcen korrekt freigegeben werden.
+- `TerminalControl` ist reiner Renderer: Es abonniert `PseudoConsoleSession.BufferChanged` und ruft bei jedem Ereignis `Dispatcher.InvokeAsync(InvalidateVisual)` auf, besitzt aber keine eigene Leseschleife mehr.
 
 ## Diagramm
 

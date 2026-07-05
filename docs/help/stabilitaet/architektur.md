@@ -8,7 +8,8 @@
 | `AsyncTaskExtensions` | Statische Utility-Klasse | `Softwareschmiede.Application.Services` | Stellt `SafeFireAndForget(Task, ILogger, string)` bereit — zentrale Fehlerbehandlung für alle Fire-and-Forget-Aufrufe |
 | `KiAusfuehrungsService` | Singleton-Service | `Softwareschmiede.Application.Services` | Verwaltet CLI-Prozesse; `HandleProcessExited` bündelt die geschützte Exited-Handler-Logik für klassischen und ConPTY-Start; `CreatePseudoConsoleSession`/`StartPseudoConsoleProcess` kapseln die native Ressourcen-Erstellung inkl. Cleanup |
 | `CliProcessManager` | Singleton-Service | `Softwareschmiede.Application.Services` | Heartbeat-Timer pro Aufgabe mit eigenem `SemaphoreSlim`; `OnCliProcessStatusChanged` als geschützter Event-Abonnent |
-| `TerminalControl` | WPF `FrameworkElement` | `Softwareschmiede.App.Controls` | Überwachter `ReadLoopAsync`-Task (`_readLoopTask`) mit generischem Exception-Handling |
+| `PseudoConsoleSession` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Überwachter `ReadLoopAsync`-Task (`_readLoopTask`), läuft ab Konstruktion bis `Dispose()` unabhängig vom UI-Lebenszyklus (Issue-86), mit generischem Exception-Handling |
+| `TerminalControl` | WPF `FrameworkElement` | `Softwareschmiede.App.Controls` | Reiner Renderer; abonniert `PseudoConsoleSession.BufferChanged`, besitzt keine eigene Leseschleife |
 | `ProjectDetailView` | WPF Code-behind | `Softwareschmiede.App.Views` | `IssueDoubleClick` als geschützter UI-Event-Handler mit `SafeFireAndForget` |
 | `MainWindowViewModel`, `ProjectDetailViewModel`, `TaskDetailViewModel` | ViewModels | `Softwareschmiede.App.ViewModels` | Fire-and-Forget-Ladevorgänge in Property-Settern (`CurrentView`, `ProjektId`, `AufgabeId`) über `SafeFireAndForget` abgesichert |
 | Serilog (`Log.Logger`) | Logging-Infrastruktur | `App.xaml.cs` | Zentrale Senke für alle Fehlerprotokolle (Konsole + tägliche Rolling-Datei, 14 Tage Aufbewahrung) |
@@ -25,9 +26,13 @@ App.OnStartup
        ├─ try/catch: GetRequiredService<CliProcessManager>()  → Log.Logger
        └─ try/catch: mainWindow.Show()                        → Log.Logger
 
-CliProcessManager / KiAusfuehrungsService / ViewModels / TerminalControl / ProjectDetailView
+CliProcessManager / KiAusfuehrungsService / ViewModels / ProjectDetailView
   └─ Fire-and-Forget-Aufruf.SafeFireAndForget(_logger, "Bezeichnung")
        └─ ContinueWith (TaskScheduler.Default) → ILogger<T> → Serilog
+
+PseudoConsoleSession.ReadLoopAsync
+  └─ läuft ab Konstruktion bis Dispose() unabhängig vom TerminalControl-Lebenszyklus
+       └─ internes try-catch (OperationCanceledException / Exception) → ILogger → Serilog
 
 KiAusfuehrungsService.StartCliAsync / StartWithPseudoConsoleAsync
   └─ process.Exited += (_,_) => HandleProcessExited(...)
@@ -52,7 +57,7 @@ graph TD
     E[CliProcessManager] -->|SafeFireAndForget| F[AsyncTaskExtensions]
     G[KiAusfuehrungsService] -->|SafeFireAndForget| F
     H[ViewModels: MainWindow/ProjectDetail/TaskDetail] -->|SafeFireAndForget| F
-    I[TerminalControl.ReadLoopAsync] -->|SafeFireAndForget| F
+    I[PseudoConsoleSession.ReadLoopAsync\nlaeuft unabhaengig vom TerminalControl] -->|internes try-catch| L
     J[ProjectDetailView.IssueDoubleClick] -->|SafeFireAndForget| F
 
     G -->|Process.Exited| K[HandleProcessExited\ntry-catch]

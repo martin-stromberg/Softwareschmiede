@@ -17,7 +17,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public KiAusfuehrungsServiceTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+        _sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>
@@ -129,7 +129,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             .Setup(f => f.CreateScope())
             .Throws(() => new ObjectDisposedException("IServiceProvider"));
 
-        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
@@ -199,7 +199,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        using var sut = new KiAusfuehrungsService(loggerMock.Object, scopeFactoryMock.Object);
+        using var sut = new KiAusfuehrungsService(loggerMock.Object, NullLoggerFactory.Instance, scopeFactoryMock.Object);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
@@ -233,5 +233,84 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         var finished = await Task.WhenAny(errorLogged.Task, Task.Delay(timeout));
         finished.Should().Be(errorLogged.Task, "der Exited-Handler muss die Exception des werfenden Subscribers loggen, statt die Anwendung abstürzen zu lassen");
+    }
+
+    /// <summary>Beendet der CLI-Prozess einer ConPTY-Sitzung (hier über <see cref="KiAusfuehrungsService.StopCliAsync"/>),
+    /// muss <see cref="KiAusfuehrungsService.HandleProcessExited"/> die zugehörige <see cref="PseudoConsoleSession"/>
+    /// disposen (Leseschleife wird abgebrochen, Streams werden geschlossen), bevor das Handle aus <c>_handles</c>
+    /// entfernt wird.</summary>
+    [Fact]
+    public async Task KiAusfuehrungsService_HandleProcessExited_DisposesSession()
+    {
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+
+        var aufgabeId = Guid.NewGuid();
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var session = sut.GetPseudoConsoleSession(aufgabeId);
+        session.Should().NotBeNull("StartWithPseudoConsoleAsync muss eine PseudoConsoleSession im Handle hinterlegen");
+
+        var gestoppt = new TaskCompletionSource();
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            if (status == CliProcessStatus.Gestoppt)
+                gestoppt.TrySetResult();
+        };
+
+        await sut.StopCliAsync(aufgabeId);
+
+        var finished = await Task.WhenAny(gestoppt.Task, Task.Delay(TimeSpan.FromSeconds(15)));
+        finished.Should().Be(gestoppt.Task, "StopCliAsync muss letztlich zu HandleProcessExited und damit zum Gestoppt-Status führen");
+
+        AssertSessionDisposed(session!, "HandleProcessExited muss die PseudoConsoleSession disposen");
+        sut.GetPseudoConsoleSession(aufgabeId).Should().BeNull("nach HandleProcessExited darf das Handle nicht mehr in _handles vorhanden sein");
+    }
+
+    /// <summary>Ruft man <see cref="KiAusfuehrungsService.Dispose"/> auf, während noch eine ConPTY-Sitzung läuft,
+    /// müssen deren Prozess beendet und die zugehörige <see cref="PseudoConsoleSession"/> disposed werden (Leseschleife
+    /// abgebrochen, Streams geschlossen) — keine verwaisten Leseschleifen nach dem Beenden des Service.</summary>
+    [Fact]
+    public async Task KiAusfuehrungsService_Dispose_CancelsAllSessions()
+    {
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+
+        var aufgabeId = Guid.NewGuid();
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var session = sut.GetPseudoConsoleSession(aufgabeId);
+        session.Should().NotBeNull("StartWithPseudoConsoleAsync muss eine PseudoConsoleSession im Handle hinterlegen");
+
+        sut.Dispose();
+
+        AssertSessionDisposed(session!, "KiAusfuehrungsService.Dispose() muss alle noch laufenden PseudoConsoleSession-Instanzen disposen");
+    }
+
+    /// <summary>Prüft anhand beobachtbaren Verhaltens, dass <paramref name="session"/> disposed wurde: Nach
+    /// <see cref="Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession.Dispose"/> ist der Input-Stream
+    /// geschlossen, ein Schreibversuch muss daher eine <see cref="ObjectDisposedException"/> werfen.</summary>
+    /// <param name="session">Die Sitzung, deren Dispose-Zustand geprüft wird.</param>
+    /// <param name="because">Begründung für die Assertion, falls sie fehlschlägt.</param>
+    private static void AssertSessionDisposed(Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession session, string because)
+    {
+        var act = () => session.InputStream.WriteByte(0);
+        act.Should().Throw<ObjectDisposedException>(because);
     }
 }

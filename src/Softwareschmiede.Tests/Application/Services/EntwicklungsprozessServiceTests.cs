@@ -42,7 +42,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
 
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiAusfuehrungsService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, scopeFactoryMock.Object);
+        _kiAusfuehrungsService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
 
         _sut = new EntwicklungsprozessService(
             _aufgabeService,

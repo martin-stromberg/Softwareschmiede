@@ -1414,7 +1414,7 @@ public sealed class AufgabeDetailFolgePromptTests : IDisposable
         SetInjectedProperty(sut, "PluginSelection", pluginSelectionService);
         SetInjectedProperty(sut, "AufgabeService", aufgabeService);
         SetInjectedProperty(sut, "EntwicklungsprozessService", entwicklungsprozessService);
-        SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, new Mock<IServiceScopeFactory>().Object));
+        SetInjectedProperty(sut, "KiAusfuehrungsService", new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, new Mock<IServiceScopeFactory>().Object));
         SetInjectedProperty(sut, "GitService", gitService);
         SetInjectedProperty(sut, "GitWorkspaceBrowserService", workspaceBrowserServiceMock.Object);
         SetInjectedProperty(sut, "ProtokollService", protokollService);

@@ -30,26 +30,40 @@ Beteiligte Komponenten:
 7. Event `CliProcessStatusChanged(Gestartet)` wird gefeuert
 8. Event `PseudoConsoleSessionGestartet(session)` wird an `TaskDetailViewModel` propagiert
 
-### 2. Terminal-Rendering-Loop
+### 2. Terminal-Rendering-Loop (Leseschleife läuft in der Session, nicht im Control)
+
+Seit der Behebung von Issue-86 (parallele CLI-Ausführungen) läuft die Leseschleife nicht mehr im
+`TerminalControl`, sondern in `PseudoConsoleSession` selbst — ab Konstruktion der Session bis zu ihrem
+`Dispose()`, unabhängig davon, ob überhaupt ein `TerminalControl` gebunden ist. Dadurch laufen mehrere
+CLI-Prozesse parallel weiter und puffern ihre Ausgabe, auch wenn die zugehörige Aufgabenseite gerade nicht
+angezeigt wird. `TerminalControl` ist ein reiner Renderer: Es abonniert `PseudoConsoleSession.BufferChanged`
+und zeichnet bei jedem Ereignis den aktuellen Bufferinhalt neu.
 
 Beteiligte Komponenten:
 - `TaskDetailView.xaml.cs` — empfängt `OnPseudoConsoleSessionGestartet(session)`
 - `TerminalControl.Session` — DependencyProperty, triggert `OnSessionChanged`
-- `TerminalControl.ReadLoopAsync` — liest bytes aus `session.OutputStream`
+- `PseudoConsoleSession.ReadLoopAsync` — liest bytes aus `OutputStream`, läuft ab Konstruktion der Session
 - `AnsiSequenceParser.Parse` — zerlegt Bytes in `TerminalEvent`-Instanzen
 - `TerminalBuffer.Apply` — wendet Events auf Grid an (Schreiben, Cursor-Bewegung, Farben, Erase)
-- `TerminalControl.OnRender` — rendert `TerminalBuffer`-Inhalt per `DrawingContext`
+- `PseudoConsoleSession.BufferChanged` — Event, das nach jeder verarbeiteten Ausgabe gefeuert wird
+- `TerminalControl.OnBufferChanged` / `TerminalControl.OnRender` — rendert `TerminalBuffer`-Inhalt per `DrawingContext`
 
 **Detailschritte:**
 
-1. `TaskDetailView` setzt `TerminalConsole.Session = session`
-2. `TerminalControl.OnSessionChanged` initialisiert `TerminalBuffer(cols, rows)` mit aktuellen Pixel-Dimensionen
-3. Task `ReadLoopAsync` wird gestartet und in `_readLoopTask` gespeichert; zusätzlich überwacht via `_readLoopTask.SafeFireAndForget(_logger, "TerminalControl.ReadLoopAsync")` (siehe [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)); Schleife:
-   - `await session.OutputStream.ReadAsync(buffer)` liest bytes
+1. `PseudoConsoleSession`-Konstruktor legt den `Buffer` an und startet `ReadLoopAsync()` als Hintergrund-Task (`_readLoopTask`), unabhängig vom UI-Lebenszyklus.
+2. `TaskDetailView` setzt `TerminalConsole.Session = session`.
+3. `TerminalControl.OnSessionChanged`:
+   - Deregistriert den `BufferChanged`-Handler der zuvor gebundenen Session (falls vorhanden).
+   - Übernimmt `session.Buffer` als eigene `_buffer`-Referenz und passt dessen Größe an die aktuellen Pixel-Dimensionen an.
+   - Registriert `OnBufferChanged` auf `session.BufferChanged`.
+   - Ruft `InvalidateVisual()` für die initiale Darstellung des bereits vorhandenen Bufferinhalts auf.
+4. In `PseudoConsoleSession.ReadLoopAsync` (läuft unabhängig weiter, auch ohne gebundenes Control):
+   - `await OutputStream.ReadAsync(buffer)` liest bytes
    - `foreach (var evt in _parser.Parse(bytes))` zerlegt bytes
-   - `_buffer.Apply(evt)` aktualisiert Zustand
-   - `Dispatcher.InvokeAsync(InvalidateVisual)` triggert Redraw
-4. `TerminalControl.OnRender(DrawingContext dc)`:
+   - `Buffer.Apply(evt)` aktualisiert Zustand
+   - `BufferChanged?.Invoke(this, EventArgs.Empty)` benachrichtigt ein ggf. gebundenes `TerminalControl`
+5. `TerminalControl.OnBufferChanged` ruft `Dispatcher.InvokeAsync(InvalidateVisual)` auf.
+6. `TerminalControl.OnRender(DrawingContext dc)`:
    - Misst Zellenbreite/-höhe aus Schriftgröße (Consolas 13pt)
    - Iteriert über sichtbare Zeilen in `_buffer`
    - Zeichnet Hintergrund-Rechtecke für jede Zelle
@@ -102,13 +116,11 @@ Beteiligte Komponenten:
 **Detailschritte:**
 
 1. Prozess endet → `process.Exited` wird ausgelöst
-2. `KiAusfuehrungsService.Exited`-Handler wird aufgerufen
+2. `KiAusfuehrungsService.HandleProcessExited`-Handler wird aufgerufen
 3. `CliProcessStatusChanged(aufgabeId, Gestoppt|Fehler)` wird gefeuert
-4. `PseudoConsoleSession` schließt Output-Pipe
-5. `ReadLoopAsync` liest EOF auf Output-Pipe → Schleife endet
-6. `InvalidateVisual` zeigt finalen Buffer-Zustand
-7. `TaskDetailViewModel.OnCliProcessStatusChanged` setzt `IsCliRunning = false`
-8. Bei Cleanup: `CliProcessHandle.Dispose` ruft `PseudoConsoleSession.Dispose` auf → Pipes und HPCON geschlossen
+4. `TaskDetailViewModel.OnCliProcessStatusChanged` setzt `IsCliRunning = false`; `TaskDetailView` setzt `TerminalControl.Session = null`, wodurch der `BufferChanged`-Handler deregistriert wird
+5. `PseudoConsoleSession.Dispose()` bricht die Leseschleife ab (`_readCts.Cancel()`), wartet mit Timeout auf `_readLoopTask` und schließt danach Input-/Output-Pipe und die PseudoConsole
+6. `ReadLoopAsync` beendet sich (durch Abbruch oder EOF auf der Output-Pipe) — läuft bis dahin unabhängig davon weiter, ob ein `TerminalControl` gebunden war
 
 ## Diagramm
 
@@ -130,22 +142,25 @@ sequenceDiagram
     SVC->>WIN32: CreatePseudoConsole(...)
     SVC->>WIN32: CreateProcess(psi, pseudoConsole)
     SVC->>SESSION: new PseudoConsoleSession(...)
+    activate SESSION
+    SESSION->>SESSION: ReadLoopAsync() (Hintergrund-Task, startet sofort)
     SVC-->>VM: PseudoConsoleSessionGestartet(session)
     VM-->>VIEW: OnPseudoConsoleSessionGestartet(session)
     VIEW->>CTRL: Session = session
-    CTRL->>CTRL: ReadLoopAsync()
-    par ReadLoop
-        CTRL->>SESSION: OutputStream.ReadAsync()
-        SESSION-->>CTRL: bytes
-        CTRL->>PARSER: Parse(bytes)
-        PARSER-->>CTRL: TerminalEvents
-        CTRL->>BUF: Apply(event)
-        CTRL->>CTRL: InvalidateVisual()
+    CTRL->>SESSION: BufferChanged += OnBufferChanged
+    par ReadLoop (läuft unabhängig vom Control weiter)
+        SESSION->>SESSION: OutputStream.ReadAsync()
+        SESSION->>PARSER: Parse(bytes)
+        PARSER-->>SESSION: TerminalEvents
+        SESSION->>BUF: Apply(event)
+        SESSION->>CTRL: BufferChanged
     and Rendering
+        CTRL->>CTRL: OnBufferChanged() -> InvalidateVisual()
         CTRL->>CTRL: OnRender(DrawingContext)
         CTRL->>BUF: Read cells, cursor
         CTRL->>CTRL: DrawRectangle, FormattedText
     end
+    deactivate SESSION
 ```
 
 ## Fehlerbehandlung
@@ -155,5 +170,6 @@ sequenceDiagram
 | `CreatePseudoConsole` schlägt fehl | `InvalidOperationException` propagiert; UI zeigt Fehlermeldung im Fehler-Banner |
 | Unvollständige ANSI-Sequenz über Paket-Grenzen | `AnsiSequenceParser` speichert Zustand; nächstes Paket setzt Verarbeitung fort |
 | `ResizePseudoConsole` schlägt fehl | Rückgabewert `false`; Buffer wird trotzdem angepasst, ConPTY-Größe stimmt nicht mit Buffer überein (seltener Fall) |
-| `ReadLoopAsync` bei Prozessende | EOF wird gelesen; Schleife terminiert ordnungsgemäß; View zeigt finalen Zustand |
+| `ReadLoopAsync` bei Prozessende | EOF wird gelesen; Schleife terminiert ordnungsgemäß; Buffer bleibt im letzten Zustand erhalten |
 | Unerwartete Exception in `ReadLoopAsync` | Generisches `catch (Exception)` protokolliert den Fehler und beendet die Schleife geordnet, statt sie unbehandelt zu lassen |
+| `TerminalControl` nicht gebunden, während Prozess Ausgabe produziert | `ReadLoopAsync` liest und puffert die Ausgabe trotzdem weiter im `Buffer` der Session; `BufferChanged` wird gefeuert, hat aber keinen Abonnenten — kein Datenverlust, sobald wieder ein Control bindet |

@@ -17,10 +17,42 @@ Koordiniert einen Pseudo Console-Prozess, Input-Pipe und Output-Pipe.
 | `Process` | `System.Diagnostics.Process` | Der laufende Prozess (read-only) |
 | `InputStream` | `System.IO.Stream` | Pipe zum Schreiben von Tastatureingaben (read-only) |
 | `OutputStream` | `System.IO.Stream` | Pipe zum Lesen der Prozess-Ausgabe (read-only) |
+| `Buffer` | `TerminalBuffer` | Der Terminal-Buffer der Sitzung; wird bereits bei Konstruktion angelegt und von der internen Leseschleife befüllt, unabhängig davon, ob ein `TerminalControl` gebunden ist (read-only) |
+| `RuntimeStatus` | `CliRuntimeStatus` | Der aktuelle Betriebszustand der CLI (`Inaktiv`, `Laeuft`, `WartetAufEingabe`). Wird alle 1 Sekunde neu bewertet basierend auf Prozess-Zustand und I/O-Aktivität (read-only) |
+
+### Events
+
+#### `BufferChanged`
+
+Wird nach jeder erfolgreichen Verarbeitung eines Ausgabe-Chunks durch die interne Leseschleife (`ReadLoopAsync`) ausgelöst. Die Leseschleife läuft ab Konstruktion der Session bis zu ihrem `Dispose()` unabhängig vom Lebenszyklus eines gebundenen `TerminalControl` — mehrere CLI-Prozesse können dadurch parallel weiterlaufen und puffern, auch wenn ihre Aufgabenseite gerade nicht angezeigt wird (Issue-86).
+
+**Typ:** `EventHandler?`
+
+**Beispiel:**
+```csharp
+session.BufferChanged += (_, _) => Dispatcher.InvokeAsync(InvalidateVisual);
+```
+
+#### `RuntimeStatusChanged`
+
+Wird ausgelöst, wenn sich der Betriebszustand der CLI ändert (z.B. von `Laeuft` zu `WartetAufEingabe` oder `Inaktiv`). Dies ermöglicht der UI, visuelle Indikatoren wie "CLI wird ausgeführt" oder "CLI wartet auf Eingabe" anzuzeigen.
+
+**Typ:** `EventHandler<CliRuntimeStatusChangedEventArgs>`
+
+**EventArgs:** `Status` (vom Typ `CliRuntimeStatus`)
+
+**Beispiel:**
+```csharp
+session.RuntimeStatusChanged += (_, args) =>
+{
+    if (args.Status == CliRuntimeStatus.WartetAufEingabe)
+        StatusBar.Text = "Warte auf Eingabe...";
+};
+```
 
 ### Methoden
 
-#### `ResizeAsync(int cols, int rows)`
+#### `Resize(int cols, int rows)`
 
 Ändert die Größe der Pseudo Console und des zugrunde liegenden Terminal-Puffers.
 
@@ -28,16 +60,35 @@ Koordiniert einen Pseudo Console-Prozess, Input-Pipe und Output-Pipe.
 - `cols`: Neue Spaltenanzahl (muss > 0 sein)
 - `rows`: Neue Zeilenanzahl (muss > 0 sein)
 
-**Rückgabe:** `Task` (asynchron, für Konsistenz; ConPTY-Resize ist synchron)
+**Rückgabe:** `bool` — `true` wenn erfolgreich, `false` bei Fehler (z.B. ungültige Parameter)
 
 **Beispiel:**
 ```csharp
-await session.ResizeAsync(120, 30); // 120 Spalten x 30 Zeilen
+if (session.Resize(120, 30))
+    Console.WriteLine("Resized to 120x30");
+```
+
+#### `MarkOutputActivity()`
+
+Meldet, dass die CLI Ausgabe produziert hat. Setzt intern `RuntimeStatus` auf `Laeuft` (falls nicht bereits). Wird automatisch von der Leseschleife aufgerufen, kann aber auch manuell aufgerufen werden, um Aktivität zu signalisieren.
+
+**Beispiel:**
+```csharp
+session.MarkOutputActivity();
+```
+
+#### `MarkInputActivity()`
+
+Meldet, dass eine Benutzereingabe versendet wurde. Setzt intern `RuntimeStatus` auf `Laeuft` (falls nicht bereits). Kann manuell aufgerufen werden, wenn Eingaben außerhalb der Standard-Keyboard-Handler versendet werden.
+
+**Beispiel:**
+```csharp
+session.MarkInputActivity();
 ```
 
 #### `Dispose()`
 
-Schließt alle Ressourcen: HPCON-Handle, Input-Pipe, Output-Pipe. Der Prozess wird **nicht** beendet (muss über `Process.Kill()` manuell beendet werden, falls erforderlich).
+Schließt alle Ressourcen: HPCON-Handle, Input-Pipe, Output-Pipe. Bricht die interne Leseschleife (`ReadLoopAsync`) ab, wartet mit 5-Sekunden-Timeout auf deren Beendigung und schließt danach die Streams. Der Prozess wird **nicht** beendet (muss über `Process.Kill()` manuell beendet werden, falls erforderlich).
 
 **Beispiel:**
 ```csharp
@@ -70,7 +121,7 @@ Die aktive `PseudoConsoleSession` zum Rendern.
 
 **Standard:** `null`
 
-**Beschreibung:** Wenn gesetzt, startet `TerminalControl` eine Read-Loop aus `Session.OutputStream`, parst ANSI-Events und rendert den Buffer. Beim Wechsel zu einer neuen Session wird die alte Schleife abgebrochen.
+**Beschreibung:** Wenn gesetzt, abonniert `TerminalControl` das `BufferChanged`-Event der Session und rendert deren `Buffer`. Die Leseschleife selbst läuft unabhängig vom Control in `PseudoConsoleSession` — sie startet bei der Konstruktion der Session und läuft weiter, auch wenn keine oder eine andere Session gebunden ist (parallele CLI-Ausführungen, Issue-86). Beim Wechsel zu einer neuen Session wird nur der `BufferChanged`-Handler der alten Session deregistriert, nicht deren Leseschleife.
 
 **Beispiel (Code-Behind):**
 ```csharp
@@ -84,7 +135,7 @@ TerminalConsole.Session = pseudoConsoleSession;
 
 ### Ereignisse
 
-Das Control erbt von `FrameworkElement`. Terminal-spezifische Events sind nicht exposiert; die Read-Loop läuft im Hintergrund.
+Das Control erbt von `FrameworkElement`. Terminal-spezifische Events sind nicht exposiert; das Control abonniert intern lediglich `PseudoConsoleSession.BufferChanged`, dessen Leseschleife im Hintergrund der Session läuft.
 
 ### Rendering
 
@@ -297,10 +348,25 @@ buffer.Apply(new TextWrittenEvent("World"));
 - `CursorRow`: Cursor-Zeile (0-basiert)
 - `CursorCol`: Cursor-Spalte (0-basiert)
 
+## Enums
+
+### `CliRuntimeStatus`
+
+Betriebszustand einer aktiven CLI-Sitzung:
+
+| Wert | Beschreibung |
+|------|--------------|
+| `Inaktiv` | Kein laufender CLI-Prozess ist aktiv. |
+| `Laeuft` | Die CLI läuft und hat kürzlich Ausgabe oder Eingabe verarbeitet. |
+| `WartetAufEingabe` | Die CLI läuft, erzeugt aber seit längerer Zeit (Standard: 4 Sekunden) keine Ausgabe und wartet vermutlich auf Benutzereingabe. |
+
+Der Status wird automatisch alle 1 Sekunde neu bewertet und das `RuntimeStatusChanged`-Event wird ausgelöst, falls sich der Status geändert hat.
+
 ## Konstanten
 
 | Konstante | Wert | Beschreibung |
 |-----------|------|--------------|
 | `TerminalBuffer.MaxScrollbackLines` | 1000 | Maximale Scrollback-Puffer-Größe in Zeilen |
 | `TerminalControl.FontSize` | 13.0 | Schriftgröße (Punkt) für Rendering |
+| `PseudoConsoleSession.ReadLoopShutdownTimeout` | 5 Sekunden | Maximale Wartezeit beim Beenden der Leseschleife in `Dispose()` |
 | `AnsiSequenceParser` | — | Kein Schwellenwert; alle Standard-Sequenzen werden geparst |

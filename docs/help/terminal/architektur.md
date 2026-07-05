@@ -6,7 +6,7 @@
 
 | Komponente | Typ | Lage | Rolle |
 |------------|-----|------|-------|
-| `PseudoConsoleSession` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Koordiniert Prozess, ConPTY und Pipes |
+| `PseudoConsoleSession` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Koordiniert Prozess, ConPTY und Pipes; betreibt die Leseschleife (`ReadLoopAsync`) ab Konstruktion bis `Dispose()` unabhängig vom UI-Lebenszyklus (Issue-86) und feuert `BufferChanged` |
 | `PseudoConsole` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | HPCON-Wrapper; Größenänderungen |
 | `PseudoConsoleProcessStarter` | Statische Klasse | `Softwareschmiede.Infrastructure.Terminal` | Win32-Prozessstart mit ConPTY |
 | `PseudoConsoleNativeMethods` | Statische Klasse | `Softwareschmiede.Infrastructure.Terminal` | P/Invoke-Deklarationen |
@@ -14,7 +14,7 @@
 | `TerminalCell` | Record Struct | `Softwareschmiede.Domain.Terminal` | Einzelne Zelle (Zeichen, Farben, Attribute) |
 | `TerminalEvent` + Subklassen | Record Klassen | `Softwareschmiede.Domain.Terminal` | Parser-Ergebnis-Hierarchie |
 | `AnsiSequenceParser` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | VT100/ANSI-Zustandsmaschine |
-| `TerminalControl` | FrameworkElement | `Softwareschmiede.App.Controls` | WPF-Rendering und Tastaturhandling |
+| `TerminalControl` | FrameworkElement | `Softwareschmiede.App.Controls` | Reiner Renderer: WPF-Rendering und Tastaturhandling; abonniert `PseudoConsoleSession.BufferChanged`, besitzt keine eigene Leseschleife |
 | `KeyToVt100Encoder` | Statische Klasse | `Softwareschmiede.App.Controls` | WPF Key → VT100-Byte-Konversion |
 | `KiAusfuehrungsService` | Service | `Softwareschmiede.Application.Services` | Prozess-Lifecycle-Management |
 | `TaskDetailViewModel` | ViewModel | `Softwareschmiede.App.ViewModels` | Event-Propagation |
@@ -80,17 +80,26 @@ KiAusfuehrungsService.StartWithPseudoConsoleAsync()
 
 ### 2. Output-Rendering
 
+Die Leseschleife (`ReadLoopAsync`) läuft in `PseudoConsoleSession` selbst — gestartet im Konstruktor der
+Session und beendet erst in `PseudoConsoleSession.Dispose()`. Sie läuft unabhängig davon, ob ein
+`TerminalControl` gebunden ist, damit mehrere CLI-Prozesse parallel weiterlaufen können, auch wenn ihre
+Aufgabenseite gerade nicht angezeigt wird (Issue-86). `TerminalControl` ist reiner Renderer und abonniert
+lediglich das `BufferChanged`-Event der Session.
+
 ```
 PseudoConsoleSession.OutputStream (Pipe)
-  ↓ async bytes gelesen in ReadLoopAsync
+  ↓ async bytes gelesen in PseudoConsoleSession.ReadLoopAsync (läuft ab Session-Konstruktion)
 AnsiSequenceParser.Parse(bytes)
   ↓ zerlegt bytes in Events
 [TextWrittenEvent, CursorMovedEvent, ColorChangedEvent, ...]
   ↓ jedes Event wird angewendet auf
-TerminalBuffer.Apply(event)
+PseudoConsoleSession.Buffer.Apply(event)
   ↓ aktualisiert Grid[row,col], CursorRow, CursorCol, Attribute
-  ↓ Schleife nach jedem Batch
-TerminalControl.InvalidateVisual()
+  ↓ nach jedem Chunk
+PseudoConsoleSession.BufferChanged-Event
+  ↓ (falls ein TerminalControl gebunden ist)
+TerminalControl.OnBufferChanged()
+  ↓ Dispatcher.InvokeAsync(InvalidateVisual)
   ↓ triggert WPF-Render-Cycle
 TerminalControl.OnRender(DrawingContext)
   ↓ liest aktuelle Grid-Zellen + Cursor
@@ -189,9 +198,11 @@ TerminalBuffer.Resize(newCols, newRows)
 
 Zentrale Lifecycle-Klasse:
 - Erstellt `PseudoConsoleSession` und `CliProcessHandle`
-- Verwaltet aktive Prozesse in Dictionary `_handles`
+- Verwaltet aktive Prozesse in Dictionary `_handles`, solange der zugehörige Prozess läuft — unabhängig davon, ob die Aufgabenseite angezeigt wird (parallele CLI-Ausführungen, Issue-86)
 - Propagiert Status-Änderungen via `CliProcessStatusChanged`-Event
-- `GetPseudoConsoleSession(aufgabeId)` ermöglicht später Zugriff auf Session für Resize/Stop
+- `GetPseudoConsoleSession(aufgabeId)` ermöglicht Zugriff auf die Session unabhängig vom View-Lebenszyklus (z. B. für Resize/Stop oder erneutes Binden an ein `TerminalControl`)
+- `HandleProcessExited()` muss zuverlässig aufgerufen werden (über `Process.Exited`), damit `PseudoConsoleSession.Dispose()` die Leseschleife der Sitzung beendet und das Handle aus `_handles` entfernt wird
+- `Dispose()` muss beim App-Shutdown aufgerufen werden, damit alle noch laufenden Sessions (und deren Leseschleifen) sauber beendet werden; dies geschieht automatisch, da `KiAusfuehrungsService` als Singleton im DI-Container registriert ist und beim Beenden des Hosts (`App.OnExit` → `_host.Dispose()`) disposed wird
 
 ### TaskDetailViewModel
 
@@ -220,12 +231,12 @@ ViewModel.PseudoConsoleSessionGestartet += session =>
 |---|---|
 | `CreatePseudoConsole` schlägt fehl | `InvalidOperationException` mit HRESULT → UI-Fehler-Banner |
 | Prozess startet nicht | Win32-Fehler wird geloggt; Status `Fehler` |
-| Ausgabe-Pipe schließt vorzeitig | `ReadLoopAsync` endet; Buffer bleibt sichtbar |
+| Ausgabe-Pipe schließt vorzeitig | `ReadLoopAsync` (in `PseudoConsoleSession`) endet; Buffer bleibt im letzten Zustand erhalten |
 | Resize-API schlägt fehl | Rückgabewert ignoriert; Konsole läuft mit alter Größe weiter |
 | `InputStream.WriteAsync` schlägt fehl (`OnPreviewKeyDown`/`OnTextInput`) | Fehler wird per `LogWarning` protokolliert statt verschluckt; Tastatureingabe geht verloren, Steuerung bleibt bedienbar |
 | ANSI-Parser-Fehler | Fehlerhafte Sequenzen werden ignoriert; Zustand bleibt konsistent |
-| Unerwartete Exception in `ReadLoopAsync` (außerhalb `ReadAsync`, z. B. in `_parser.Parse`/`buffer.Apply`) | Generisches `catch (Exception)` protokolliert den Fehler (`LogError "Unerwarteter Fehler in Terminal-Lesevorgang"`); Leseschleife endet geordnet statt die Anwendung zu gefährden |
-| `ReadLoopAsync`-Task selbst wirft unbeobachtet | `OnSessionChanged` speichert den Task in `_readLoopTask` und überwacht ihn zusätzlich mit `SafeFireAndForget(_logger, "TerminalControl.ReadLoopAsync")` (siehe [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
+| Unerwartete Exception in `PseudoConsoleSession.ReadLoopAsync` (außerhalb `ReadAsync`, z. B. in `_parser.Parse`/`Buffer.Apply`) | Generisches `catch (Exception)` protokolliert den Fehler (`LogError "Unerwarteter Fehler im Terminal-Lesevorgang der Sitzung."`); Leseschleife endet geordnet statt die Anwendung zu gefährden |
+| `TerminalControl` nicht (mehr) gebunden, während Prozess Ausgabe produziert | Die Leseschleife der Session läuft unabhängig weiter und puffert die Ausgabe in `Buffer`; `BufferChanged` wird gefeuert, hat aber keinen Abonnenten — kein Datenverlust (parallele CLI-Ausführungen, Issue-86) |
 
 ## Skalierung und Zuverlässigkeit
 

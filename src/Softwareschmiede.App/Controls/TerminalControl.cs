@@ -4,21 +4,20 @@ using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Terminal;
 using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App.Controls;
 
-/// <summary>WPF-Control, das eine <see cref="PseudoConsoleSession"/> rendert und Tastatureingaben weiterleitet.</summary>
+/// <summary>WPF-Control, das eine <see cref="PseudoConsoleSession"/> rendert und Tastatureingaben weiterleitet.
+/// Reiner Renderer: Die Leseschleife läuft unabhängig vom Control-Lebenszyklus in der <see cref="PseudoConsoleSession"/>
+/// selbst; das Control abonniert lediglich deren <see cref="PseudoConsoleSession.BufferChanged"/>-Event.</summary>
 public sealed class TerminalControl : FrameworkElement
 {
     private readonly ILogger<TerminalControl> _logger =
         App.Services?.GetService<ILogger<TerminalControl>>() ?? NullLogger<TerminalControl>.Instance;
     private TerminalBuffer? _buffer;
-    private CancellationTokenSource? _readCts;
-    private volatile AnsiSequenceParser _parser = new();
-    private Task? _readLoopTask;
+    private PseudoConsoleSession? _currentSession;
     private static readonly Typeface ConsolasTypeface = new("Consolas");
     private const double FontSize = 13.0;
     private double _cellWidth;
@@ -48,12 +47,6 @@ public sealed class TerminalControl : FrameworkElement
     {
         Focusable = true;
         MeasureCellSize();
-        Unloaded += (_, _) =>
-        {
-            _readCts?.Cancel();
-            _readCts?.Dispose();
-            _readCts = null;
-        };
     }
 
     private static void OnSessionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -64,9 +57,10 @@ public sealed class TerminalControl : FrameworkElement
 
     private void OnSessionChanged(PseudoConsoleSession? session)
     {
-        _readCts?.Cancel();
-        _readCts?.Dispose();
-        _readCts = null;
+        if (_currentSession != null)
+            _currentSession.BufferChanged -= OnBufferChanged;
+
+        _currentSession = session;
 
         if (session == null)
         {
@@ -79,71 +73,20 @@ public sealed class TerminalControl : FrameworkElement
         var cols = CalculateCols();
         var rows = CalculateRows();
 
-        if (session.Buffer != null)
-        {
-            // Bestehenden Buffer wiederverwenden: Bildschirminhalt bleibt erhalten wenn der
-            // Anwender zur Aufgabe zurücknavigiert, ohne dass neue Ausgabe eintreffen muss.
-            _buffer = session.Buffer;
-            _buffer.Resize(cols, rows);
-        }
-        else
-        {
-            _buffer = new TerminalBuffer(cols, rows);
-            session.Buffer = _buffer;
-            // Parser zurücksetzen: neue Session, kein Zustandsrest der alten Session.
-            _parser = new AnsiSequenceParser();
-        }
+        // Bestehenden Buffer der Sitzung wiederverwenden: Bildschirminhalt bleibt erhalten, wenn der
+        // Anwender zur Aufgabe zurücknavigiert, ohne dass neue Ausgabe eintreffen muss.
+        _buffer = session.Buffer;
+        _buffer.Resize(cols, rows);
 
-        var cts = new CancellationTokenSource();
-        _readCts = cts;
-        _readLoopTask = Task.Run(() => ReadLoopAsync(session, _buffer, cts.Token));
-        _readLoopTask.SafeFireAndForget(_logger, "TerminalControl.ReadLoopAsync");
+        session.BufferChanged += OnBufferChanged;
 
         // Sofort rendern, damit vorhandener Bufferinhalt sichtbar wird ohne auf neue Ausgabe warten.
         _ = Dispatcher.InvokeAsync(InvalidateVisual);
     }
 
-    private async Task ReadLoopAsync(PseudoConsoleSession session, TerminalBuffer buffer, CancellationToken ct)
+    private void OnBufferChanged(object? sender, EventArgs e)
     {
-        var data = new byte[4096];
-        try
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                int bytesRead;
-                try
-                {
-                    bytesRead = await session.OutputStream.ReadAsync(data, ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Fehler beim Lesen aus dem Terminal-Output-Stream");
-                    break;
-                }
-
-                if (bytesRead == 0)
-                    break;
-
-                session.MarkOutputActivity();
-
-                var events = _parser.Parse(data.AsSpan(0, bytesRead));
-                foreach (var evt in events)
-                    buffer.Apply(evt);
-
-                await Dispatcher.InvokeAsync(InvalidateVisual);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unerwarteter Fehler in Terminal-Lesevorgang");
-        }
+        _ = Dispatcher.InvokeAsync(InvalidateVisual);
     }
 
     /// <inheritdoc/>

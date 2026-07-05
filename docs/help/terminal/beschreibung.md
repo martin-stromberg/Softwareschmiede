@@ -8,20 +8,23 @@ Das Terminal-System ermöglicht die direkte, interaktive Bedienung von KI-CLI-To
 
 ## Funktionsweise
 
-Das System nutzt Windows Pseudo Console (ConPTY) API zum Starten des CLI-Prozesses. Der Prozess-Output wird als Byte-Stream aus einer anonymen Pipe gelesen und durch den `AnsiSequenceParser` in strukturierte Terminal-Ereignisse (Text, Cursor-Bewegung, Farben, Erase-Befehle) zerlegt. Ein `TerminalBuffer` verwaltet einen 2D-Grid aus `TerminalCell`-Objekten mit Zeichen, Farben und Text-Attributen. Das `TerminalControl` rendert diesen Buffer per `DrawingContext` mit monospace-Schriftart; Tastatureingaben werden durch `KeyToVt100Encoder` in VT100-Escape-Sequenzen konvertiert und in die Prozess-Input-Pipe geschrieben.
+Das System nutzt Windows Pseudo Console (ConPTY) API zum Starten des CLI-Prozesses. Der Prozess-Output wird als Byte-Stream aus einer anonymen Pipe gelesen und durch den `AnsiSequenceParser` in strukturierte Terminal-Ereignisse (Text, Cursor-Bewegung, Farben, Erase-Befehle) zerlegt. Ein `TerminalBuffer` verwaltet einen 2D-Grid aus `TerminalCell`-Objekten mit Zeichen, Farben und Text-Attributen. Das `TerminalControl` ist ein reiner Renderer, der den `TerminalBuffer` per `DrawingContext` mit monospace-Schriftart darstellt; Tastatureingaben werden durch `KeyToVt100Encoder` in VT100-Escape-Sequenzen konvertiert und in die Prozess-Input-Pipe geschrieben.
 
-Die Aufgabendetailansicht zeigt den Laufzeitstatus der CLI in der Fusszeile. `PseudoConsoleSession` verfolgt dafuer die letzte Ausgabe- und Eingabeaktivitaet: Frische I/O-Aktivitaet wird als laufende Ausfuehrung angezeigt; bleibt Ausgabe bei weiterhin laufendem Prozess aus, wird nach kurzer Zeit "Wartet auf Eingabe" angezeigt.
+Die Leseschleife läuft unabhängig vom `TerminalControl`-Lebenszyklus in `PseudoConsoleSession` selbst — von der Session-Konstruktion bis zur Dispose — damit mehrere CLI-Prozesse parallel weiterlaufen können, auch wenn ihre Aufgabenseite nicht angezeigt wird (Issue-86).
+
+Die Aufgabendetailansicht zeigt den Laufzeitstatus der CLI in der Fusszeile. `PseudoConsoleSession` verfolgt dafür die letzte Ausgabe- und Eingabeaktivität: Frische I/O-Aktivität wird als laufende Ausführung angezeigt (`Laeuft`); bleibt Ausgabe bei weiterhin laufendem Prozess aus, wird nach kurzer Zeit "Wartet auf Eingabe" angezeigt (`WartetAufEingabe`).
 
 ### Prozess-Lifecycle
 
 1. `KiAusfuehrungsService.StartWithPseudoConsoleAsync` erstellt eine Pseudo Console mit `CreatePseudoConsole` API.
 2. Der CLI-Prozess wird via `PseudoConsoleProcessStarter.Start` mit Prozess-Attribut-Liste gestartet.
-3. `PseudoConsoleSession` koordiniert Prozess, Input-Pipe und Output-Pipe.
-4. `TaskDetailViewModel.PseudoConsoleSessionGestartet`-Event propagiert die Session an `TaskDetailView`.
-5. `TerminalControl.Session`-Property wird gesetzt; Control startet Read-Loop aus Output-Pipe.
-6. `AnsiSequenceParser.Parse` zerlegt eingehende Bytes; `TerminalBuffer.Apply` wendet Events an.
-7. `TerminalControl.OnRender` rendert `TerminalBuffer`-Inhalt per `DrawingContext`.
-8. `TaskDetailViewModel.CliStatusText` aktualisiert die Fusszeile bei Laufzeitstatus-Aenderungen der Session.
+3. `PseudoConsoleSession` wird erstellt und koordiniert Prozess, Input-Pipe und Output-Pipe. Im Konstruktor wird sofort die `ReadLoopAsync`-Leseschleife als Background-Task gestartet, unabhängig davon, ob ein `TerminalControl` gebunden ist.
+4. Die Leseschleife läuft kontinuierlich: `AnsiSequenceParser.Parse` zerlegt eingehende Bytes; `TerminalBuffer.Apply` wendet Events an; `BufferChanged`-Event wird nach jeder erfolgreichen Chunk-Verarbeitung gefeuert.
+5. `TaskDetailViewModel.PseudoConsoleSessionGestartet`-Event propagiert die Session an `TaskDetailView`.
+6. `TerminalControl.Session`-Property wird gesetzt; Control abonniert das `BufferChanged`-Event der Session.
+7. `TerminalControl.OnBufferChanged` wird aufgerufen, wenn neue Ausgabe verarbeitet wurde, und triggert `InvalidateVisual()`.
+8. `TerminalControl.OnRender` rendert aktuellen `TerminalBuffer`-Inhalt per `DrawingContext`.
+9. `TaskDetailViewModel.CliStatusText` aktualisiert die Fusszeile bei Laufzeitstatus-Änderungen der Session (Event `RuntimeStatusChanged`).
 
 ### Größenanpassung
 

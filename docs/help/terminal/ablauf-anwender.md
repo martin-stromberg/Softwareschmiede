@@ -50,3 +50,15 @@ Das CLI hat seine Arbeit verrichtet und wird beendet. Der Anwender kann anschlie
 - **Volle Farbe:** Das Terminal unterstützt ANSI 3-bit-, 8-bit- und 24-bit-Farben. Farbige CLI-Ausgaben werden korrekt dargestellt.
 - **Scroll-History:** Die letzten 1000 Zeilen bleiben im Speicher. Ältere Zeilen werden verworfen.
 - **Tastatur-Direktweitergabe:** Tastatureingaben werden nicht gepuffert, sondern unmittelbar an den Prozess weitergeleitet.
+
+## Parallele Ausführung mehrerer CLIs
+
+Die Softwareschmiede unterstützt die parallele Ausführung mehrerer CLI-Prozesse:
+
+1. **CLI startet und läuft weiter:** Das CLI läuft unabhängig davon weiter, ob Sie seine Aufgabenseite gerade anzeigen oder zu einer anderen Aufgabe navigieren.
+2. **Navigation zwischen Aufgaben:** Wenn Sie während eines laufenden CLIs zu einer anderen Aufgabe wechseln, wird dessen Terminal nicht mehr angezeigt, **das CLI läuft aber im Hintergrund weiter** und produziert Ausgabe.
+3. **Rückkehr zur Aufgabe:** Wenn Sie zur ursprünglichen Aufgabe zurückkehren, sehen Sie:
+   - Die komplette Ausgabe-Historie seit Start (keine Lücke)
+   - Den aktuellen Zustand des Terminals mit allen neuesten Ausgaben
+
+> **Hinweis:** Dies ermöglicht Ihnen, mehrere lange laufende CLI-Prozesse parallel zu starten und zwischen ihnen zu navigieren, ohne dass eine Blockade entsteht. Jedes CLI läuft eigenständig weiter und puffert seine Ausgabe unabhängig von der UI-Anzeige.

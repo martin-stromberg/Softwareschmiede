@@ -18,7 +18,7 @@ Der Heartbeat-Mechanismus, der den Bearbeitungsfortschritt periodisch in der Dat
 
 Beim Aufbau der ConPTY-Ein-/Ausgabe-Streams (`CreatePseudoConsoleSession`) werden bei einem Fehler bereits erzeugte `FileStream`-Instanzen sauber freigegeben, statt native Handles offen zu lassen.
 
-Im `TerminalControl` wird der Lesevorgang aus dem ConPTY-Output-Stream (`ReadLoopAsync`) zusätzlich von einem generischen `catch (Exception)` abgesichert; der zugehörige Hintergrund-Task wird in `_readLoopTask` gespeichert und über `SafeFireAndForget` überwacht, sodass auch dort unbeobachtete Fehler protokolliert werden.
+In `PseudoConsoleSession` wird der Lesevorgang aus dem ConPTY-Output-Stream (`ReadLoopAsync`) zusätzlich von einem generischen `catch (Exception)` abgesichert; der zugehörige Hintergrund-Task wird in `_readLoopTask` gespeichert. Die Leseschleife läuft ab Konstruktion der Session bis zu ihrem `Dispose()` unabhängig davon, ob ein `TerminalControl` gebunden ist (parallele CLI-Ausführungen, Issue-86) — `TerminalControl` ist reiner Renderer und abonniert lediglich das `BufferChanged`-Event der Session.
 
 ## Beispiele
 

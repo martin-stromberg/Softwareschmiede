@@ -1,12 +1,20 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Domain.Terminal;
 
 namespace Softwareschmiede.Infrastructure.Terminal;
 
 /// <summary>Koordiniert eine laufende Pseudo-Console-Sitzung bestehend aus <see cref="PseudoConsole"/>,
-/// <see cref="Process"/>, Eingabe- und Ausgabe-Stream.</summary>
+/// <see cref="Process"/>, Eingabe- und Ausgabe-Stream. Betreibt die Leseschleife (<see cref="ReadLoopAsync"/>)
+/// ab Konstruktion bis <see cref="Dispose"/> unabhängig vom Lebenszyklus eines anzeigenden Controls, damit
+/// mehrere CLI-Prozesse parallel weiterlaufen können, auch wenn ihre Aufgabenseite nicht angezeigt wird.</summary>
 public sealed class PseudoConsoleSession : IDisposable
 {
+    private const int DefaultCols = 220;
+    private const int DefaultRows = 50;
+    private static readonly TimeSpan ReadLoopShutdownTimeout = TimeSpan.FromSeconds(5);
+
     private readonly PseudoConsole _pseudoConsole;
     private readonly Process _process;
     private readonly TimeProvider _timeProvider;
@@ -14,6 +22,10 @@ public sealed class PseudoConsoleSession : IDisposable
     private readonly TimeSpan _waitingThreshold;
     private readonly DateTimeOffset _startedUtc;
     private readonly object _runtimeStatusLock = new();
+    private readonly ILogger _logger;
+    private readonly AnsiSequenceParser _parser = new();
+    private readonly CancellationTokenSource _readCts = new();
+    private readonly Task _readLoopTask;
     private bool _disposed;
     private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Laeuft;
     private DateTimeOffset? _lastOutputUtc;
@@ -43,17 +55,22 @@ public sealed class PseudoConsoleSession : IDisposable
     /// <summary>Wird ausgelöst, wenn sich der Laufzeitstatus der CLI ändert.</summary>
     public event EventHandler<CliRuntimeStatusChangedEventArgs>? RuntimeStatusChanged;
 
-    /// <summary>Der Terminal-Buffer dieser Sitzung. Wird von <c>TerminalControl</c> gesetzt und
-    /// bei erneuter Anzeige wiederverwendet, damit der Bildschirminhalt erhalten bleibt.</summary>
-    public TerminalBuffer? Buffer { get; set; }
+    /// <summary>Der Terminal-Buffer dieser Sitzung. Wird bereits bei Konstruktion angelegt und von der
+    /// Leseschleife dieser Sitzung befüllt, unabhängig davon, ob ein <c>TerminalControl</c> gebunden ist.</summary>
+    public TerminalBuffer Buffer { get; } = new(DefaultCols, DefaultRows);
 
-    /// <summary>Erstellt eine neue <see cref="PseudoConsoleSession"/>.</summary>
+    /// <summary>Wird nach jeder erfolgreichen Verarbeitung eines Ausgabe-Chunks durch die Leseschleife ausgelöst,
+    /// damit ein gebundenes <c>TerminalControl</c> seine Anzeige aktualisieren kann.</summary>
+    public event EventHandler? BufferChanged;
+
+    /// <summary>Erstellt eine neue <see cref="PseudoConsoleSession"/> und startet sofort die Leseschleife.</summary>
     /// <param name="pseudoConsole">Die zugehörige Pseudo Console.</param>
     /// <param name="process">Der gestartete Prozess.</param>
     /// <param name="inputStream">Schreibbarer Stream für Eingaben an den Prozess.</param>
     /// <param name="outputStream">Lesbarer Stream für die Prozessausgabe.</param>
-    internal PseudoConsoleSession(PseudoConsole pseudoConsole, Process process, Stream inputStream, Stream outputStream)
-        : this(pseudoConsole, process, inputStream, outputStream, TimeProvider.System, TimeSpan.FromSeconds(4))
+    /// <param name="logger">Logger für Fehler- und Diagnosemeldungen der Leseschleife (optional).</param>
+    internal PseudoConsoleSession(PseudoConsole pseudoConsole, Process process, Stream inputStream, Stream outputStream, ILogger? logger = null)
+        : this(pseudoConsole, process, inputStream, outputStream, TimeProvider.System, TimeSpan.FromSeconds(4), logger)
     {
     }
 
@@ -63,7 +80,8 @@ public sealed class PseudoConsoleSession : IDisposable
         Stream inputStream,
         Stream outputStream,
         TimeProvider timeProvider,
-        TimeSpan waitingThreshold)
+        TimeSpan waitingThreshold,
+        ILogger? logger = null)
     {
         _pseudoConsole = pseudoConsole;
         _process = process;
@@ -72,7 +90,9 @@ public sealed class PseudoConsoleSession : IDisposable
         _timeProvider = timeProvider;
         _waitingThreshold = waitingThreshold;
         _startedUtc = _timeProvider.GetUtcNow();
+        _logger = logger ?? NullLogger.Instance;
         _runtimeStatusTimer = new Timer(_ => RefreshRuntimeStatus(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        _readLoopTask = Task.Run(() => ReadLoopAsync(_readCts.Token));
     }
 
     /// <summary>Meldet gelesene Ausgabe der CLI an die Status-Erkennung.</summary>
@@ -111,11 +131,67 @@ public sealed class PseudoConsoleSession : IDisposable
             return;
         _disposed = true;
 
-        try { InputStream.Dispose(); } catch { }
+        try { _readCts.Cancel(); } catch { }
+        // OutputStream vor dem Warten schließen: Ein bereits blockierter, nicht kooperativ abbrechbarer
+        // nativer Read (siehe ReadLoopAsync) wird dadurch sofort mit einem I/O-Fehler beendet, statt sich
+        // ausschließlich auf _readCts.Cancel() zu verlassen, das einen laufenden Read nicht unterbricht.
         try { OutputStream.Dispose(); } catch { }
+        try { _readLoopTask.Wait(ReadLoopShutdownTimeout); } catch { }
+        try { _readCts.Dispose(); } catch { }
+        try { InputStream.Dispose(); } catch { }
         try { _runtimeStatusTimer.Dispose(); } catch { }
         try { _pseudoConsole.Dispose(); } catch { }
         try { _process.Dispose(); } catch { }
+    }
+
+    /// <summary>
+    /// Kontinuierliche Leseschleife: liest Bytes aus <see cref="OutputStream"/>, parsed sie mit
+    /// <see cref="AnsiSequenceParser"/>, wendet die daraus resultierenden Ereignisse auf <see cref="Buffer"/> an
+    /// und löst danach <see cref="BufferChanged"/> aus. Läuft unabhängig davon, ob ein <c>TerminalControl</c>
+    /// gebunden ist, bis <paramref name="ct"/> abgebrochen wird oder der Output-Stream endet.
+    /// </summary>
+    /// <param name="ct">Abbruch-Token, das bei <see cref="Dispose"/> ausgelöst wird.</param>
+    private async Task ReadLoopAsync(CancellationToken ct)
+    {
+        var data = new byte[4096];
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                int bytesRead;
+                try
+                {
+                    bytesRead = await OutputStream.ReadAsync(data, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Fehler beim Lesen aus dem Terminal-Output-Stream der Sitzung.");
+                    break;
+                }
+
+                if (bytesRead == 0)
+                    break;
+
+                MarkOutputActivity();
+
+                var events = _parser.Parse(data.AsSpan(0, bytesRead));
+                foreach (var evt in events)
+                    Buffer.Apply(evt);
+
+                BufferChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unerwarteter Fehler im Terminal-Lesevorgang der Sitzung.");
+        }
     }
 
     private void RefreshRuntimeStatus()
