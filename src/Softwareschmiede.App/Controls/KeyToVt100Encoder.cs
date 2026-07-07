@@ -52,4 +52,36 @@ internal static class KeyToVt100Encoder
     /// <returns>Die UTF-8-kodierten Bytes.</returns>
     internal static byte[] EncodeText(string text)
         => Encoding.UTF8.GetBytes(text);
+
+    /// <summary>Kodiert Zwischenablage-Text für die CLI-Eingabe: Zeilenumbrüche (<c>\n</c>, <c>\r\n</c>, <c>\r</c>)
+    /// werden einheitlich zu <c>\r</c> (CR) normalisiert, das Ergebnis wird als UTF-8 kodiert.</summary>
+    /// <param name="text">Der zu kodierende Zwischenablage-Text, oder <see langword="null"/>.</param>
+    /// <returns>Die UTF-8-kodierten, newline-normalisierten Bytes, oder ein leeres Array bei <see langword="null"/> oder leerem Text.</returns>
+    internal static byte[] EncodeClipboardText(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return [];
+
+        var normalized = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            switch (c)
+            {
+                case '\r':
+                    normalized.Append('\r');
+                    if (i + 1 < text.Length && text[i + 1] == '\n')
+                        i++;
+                    break;
+                case '\n':
+                    normalized.Append('\r');
+                    break;
+                default:
+                    normalized.Append(c);
+                    break;
+            }
+        }
+
+        return Encoding.UTF8.GetBytes(normalized.ToString());
+    }
 }

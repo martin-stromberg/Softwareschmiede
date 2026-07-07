@@ -169,6 +169,89 @@ Unterstützte Tasten:
 
 Das Control triggert automatisch `Session.ResizeAsync()` bei Layout-Änderungen. Die neuen Spalten- und Zeilenzahlen werden aus verfügbaren Pixeln und Zellengröße berechnet.
 
+### Clipboard-Paste-Support
+
+Das Control fängt `Ctrl+V`-Eingaben ab und verarbeitet sie über die neuen privaten Methoden `GetClipboardText()` und `ReadClipboardAndInsertAsync()`. Dies ermöglicht die direkte Einfügung von Zwischenablage-Text in die CLI.
+
+**Verhalten:**
+- `Ctrl+V` wird von `OnPreviewKeyDown` abgefangen
+- Text wird aus `System.Windows.Clipboard.GetText()` gelesen
+- Text wird via `KeyToVt100Encoder.EncodeClipboardText(text)` normalisiert und kodiert
+- Normalisierte Bytes werden asynchron in `Session.InputStream` geschrieben
+- `Session.MarkInputActivity()` wird aufgerufen
+- Fehler werden per `ILogger` protokolliert, blockieren nicht
+
+## KeyToVt100Encoder
+
+Statische Klasse zur Konvertierung von Tastaturereignissen und Text in VT100-Byte-Sequenzen.
+
+### Methoden (öffentlich)
+
+#### `Encode(KeyEventArgs e)`
+
+Konvertiert ein WPF-Tastaturereignis in eine VT100-Byte-Sequenz.
+
+**Parameter:**
+- `e`: Das WPF-Tastaturereignis
+
+**Rückgabe:** `byte[]?` — VT100-Byte-Sequenz, oder `null` wenn das Zeichen über `TextInput` übermittelt werden soll
+
+**Unterstützte Tasten:**
+- Ctrl+A bis Ctrl+Z: ASCII-Kontrollcodes (0x01–0x1A)
+- Enter: `0x0D` (CR)
+- Backspace: `0x7F` (DEL)
+- Tab: `0x09`
+- Escape: `0x1B`
+- Pfeiltasten: `\x1b[A`, `\x1b[B`, `\x1b[C`, `\x1b[D`
+- F1–F12: `\x1b[11~` bis `\x1b[24~`
+- Delete: `\x1b[3~`
+- Pos1/Ende/PgUp/PgDn: entsprechende Escape-Sequenzen
+
+**Beispiel:**
+```csharp
+var bytes = KeyToVt100Encoder.Encode(keyEventArgs);
+if (bytes != null)
+    await session.InputStream.WriteAsync(bytes);
+```
+
+#### `EncodeText(string text)`
+
+Kodiert normalen Text als UTF-8-Byte-Array.
+
+**Parameter:**
+- `text`: Der zu kodierende Text
+
+**Rückgabe:** `byte[]` — UTF-8-kodierte Bytes
+
+**Beispiel:**
+```csharp
+var bytes = KeyToVt100Encoder.EncodeText("Hello");
+```
+
+#### `EncodeClipboardText(string? text)`
+
+Kodiert Zwischenablage-Text für die CLI-Eingabe: Zeilenumbrüche werden einheitlich normalisiert, das Ergebnis wird als UTF-8 kodiert.
+
+**Parameter:**
+- `text`: Der zu kodierende Zwischenablage-Text (oder `null`)
+
+**Rückgabe:** `byte[]` — UTF-8-kodierte, newline-normalisierte Bytes, oder leeres Array bei `null`/leerem Text
+
+**Newline-Normalisierung:**
+- `\n` (LF) → `\r` (CR)
+- `\r\n` (CRLF) → `\r` (CR) — das `\n` wird übersprungen
+- `\r` (CR) → `\r` (CR) — bleibt unverändert
+
+**Hintergrund:** Windows-CLIs erwarten `\r` (Carriage Return) als Zeilenumbruch-Zeichen; Multi-line-Text aus der Zwischenablage kann aber verschiedene Newline-Formate haben (LF von Unix, CRLF von Windows). Diese Methode normalisiert alle Varianten zu `\r`, um Kompatibilität zu gewährleisten.
+
+**Beispiel:**
+```csharp
+var textWithUnixNewlines = "line1\nline2\nline3";
+var bytes = KeyToVt100Encoder.EncodeClipboardText(textWithUnixNewlines);
+// Ergebnis: UTF-8-Bytes von "line1\rline2\rline3"
+await session.InputStream.WriteAsync(bytes);
+```
+
 ## KiAusfuehrungsService
 
 Zentrale Service-Klasse für Prozess-Lifecycle.
@@ -340,6 +423,30 @@ buffer.Apply(new TextWrittenEvent("World"));
 - `rows`: Neue Zeilenanzahl
 
 **Thread-Sicherheit:** Intern synchronisiert
+
+#### `GetSnapshot()`
+
+Erstellt einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock. Wird von Render-Operationen genutzt, um Race Conditions zwischen paralleler Buffer-Aktualisierung und Lesezugriffen zu vermeiden.
+
+**Rückgabe:** `TerminalBufferSnapshot` (Record mit Grid-Kopie, Rows, Cols, CursorRow, CursorCol)
+
+**Thread-Sicherheit:** Intern synchronisiert; der Snapshot ist konsistent unter dem Lock erstellt
+
+**Beispiel:**
+```csharp
+var snapshot = buffer.GetSnapshot();
+var gridCopy = snapshot.Grid;
+var cursorRow = snapshot.CursorRow;
+// Render-Operationen ohne Lock-Contention
+for (var r = 0; r < snapshot.Rows; r++)
+{
+    for (var c = 0; c < snapshot.Cols; c++)
+    {
+        var cell = gridCopy[r, c];
+        // Zeichne Zelle
+    }
+}
+```
 
 #### Eigenschaften (read-only)
 

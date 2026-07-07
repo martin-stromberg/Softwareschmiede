@@ -30,7 +30,7 @@ Beteiligte Komponenten:
 7. Event `CliProcessStatusChanged(Gestartet)` wird gefeuert
 8. Event `PseudoConsoleSessionGestartet(session)` wird an `TaskDetailViewModel` propagiert
 
-### 2. Terminal-Rendering-Loop (Leseschleife läuft in der Session, nicht im Control)
+### 2. Terminal-Rendering-Loop mit Buffer-Snapshot (Leseschleife läuft in der Session, nicht im Control)
 
 Seit der Behebung von Issue-86 (parallele CLI-Ausführungen) läuft die Leseschleife nicht mehr im
 `TerminalControl`, sondern in `PseudoConsoleSession` selbst — ab Konstruktion der Session bis zu ihrem
@@ -39,14 +39,17 @@ CLI-Prozesse parallel weiter und puffern ihre Ausgabe, auch wenn die zugehörige
 angezeigt wird. `TerminalControl` ist ein reiner Renderer: Es abonniert `PseudoConsoleSession.BufferChanged`
 und zeichnet bei jedem Ereignis den aktuellen Bufferinhalt neu.
 
+**Stabilisierung durch Snapshot:** Um Race Conditions zwischen paralleler Ausgabe und Rendering zu vermeiden, erstellt `TerminalControl.OnRender()` einen konsistenten Snapshot des Buffer-Zustands über `TerminalBuffer.GetSnapshot()`, die unter einem einzigen Lock Grid, Cursor und Größe kopiert. Dies verhindert, dass Render-Operationen durch gleichzeitige Buffer-Updates gestört werden.
+
 Beteiligte Komponenten:
 - `TaskDetailView.xaml.cs` — empfängt `OnPseudoConsoleSessionGestartet(session)`
 - `TerminalControl.Session` — DependencyProperty, triggert `OnSessionChanged`
 - `PseudoConsoleSession.ReadLoopAsync` — liest bytes aus `OutputStream`, läuft ab Konstruktion der Session
 - `AnsiSequenceParser.Parse` — zerlegt Bytes in `TerminalEvent`-Instanzen
-- `TerminalBuffer.Apply` — wendet Events auf Grid an (Schreiben, Cursor-Bewegung, Farben, Erase)
+- `TerminalBuffer.Apply` — wendet Events auf Grid an (Schreiben, Cursor-Bewegung, Farben, Erase), synchronisiert via `lock`
+- `TerminalBuffer.GetSnapshot()` — erstellt konsistenten Snapshot unter Lock für sichere Render-Operationen
 - `PseudoConsoleSession.BufferChanged` — Event, das nach jeder verarbeiteten Ausgabe gefeuert wird
-- `TerminalControl.OnBufferChanged` / `TerminalControl.OnRender` — rendert `TerminalBuffer`-Inhalt per `DrawingContext`
+- `TerminalControl.OnBufferChanged` / `TerminalControl.OnRender` — rendert über Snapshot-Daten per `DrawingContext`
 
 **Detailschritte:**
 
@@ -65,10 +68,11 @@ Beteiligte Komponenten:
 5. `TerminalControl.OnBufferChanged` ruft `Dispatcher.InvokeAsync(InvalidateVisual)` auf.
 6. `TerminalControl.OnRender(DrawingContext dc)`:
    - Misst Zellenbreite/-höhe aus Schriftgröße (Consolas 13pt)
-   - Iteriert über sichtbare Zeilen in `_buffer`
+   - **Neu:** Ruft `buffer.GetSnapshot()` auf, um einen konsistenten Snapshot unter Lock zu erhalten
+   - Iteriert über sichtbare Zeilen im Snapshot-Grid
    - Zeichnet Hintergrund-Rechtecke für jede Zelle
    - Zeichnet Vordergrund-Text (`FormattedText`) mit Font-Attributen
-   - Rendert Cursor-Rechteck bei `CursorRow`/`CursorCol`
+   - Rendert Cursor-Rechteck bei Snapshot-CursorRow/CursorCol
 
 ### 3. Tastatureingabe
 
@@ -88,7 +92,29 @@ Beteiligte Komponenten:
    - Enter: `\r`
 3. Bytes werden asynchron in `session.InputStream` geschrieben
 
-### 4. ConPTY-Resize
+### 4. Clipboard-Paste-Eingabe (Ctrl+V)
+
+Beteiligte Komponenten:
+- `TerminalControl.OnPreviewKeyDown` — fängt Tastaturereignisse ab
+- `KeyToVt100Encoder.EncodeClipboardText` — normalisiert und kodiert Clipboard-Text
+- `System.Windows.Clipboard` — WPF-API zum Zwischenablage-Zugriff
+- `PseudoConsoleSession.InputStream` — Pipe zum Schreiben
+
+**Detailschritte:**
+
+1. Benutzer drückt `Ctrl+V` auf fokussiertem `TerminalControl`
+2. `TerminalControl.OnPreviewKeyDown` prüft: `e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) != 0`
+3. Wenn erfüllt: `e.Handled = true`, `ReadClipboardAndInsertAsync()` wird aufgerufen
+4. In `ReadClipboardAndInsertAsync()`:
+   - `GetClipboardText()` liest `System.Windows.Clipboard.GetText()` (mit Fehlerbehandlung: Return `string.Empty` bei Fehler)
+   - Falls Text nicht leer: `KeyToVt100Encoder.EncodeClipboardText(text)` normalisiert und kodiert den Text
+     - Zeilenumbrüche: `\n` → `\r`, `\r\n` → `\r`, `\r` → `\r` (Windows-CLI-Standard)
+     - Ergebnis: UTF-8-kodierte Bytes
+   - Bytes werden asynchron via `await Session.InputStream.WriteAsync(bytes)` geschrieben
+   - `Session.MarkInputActivity()` wird aufgerufen, um Runtime-Status zu aktualisieren
+   - Bei Exception: Error wird geloggt (`_logger.LogWarning`), Tastatureingabe läuft weiter
+
+### 5. ConPTY-Resize
 
 Beteiligte Komponenten:
 - `TerminalControl.SizeChanged` — Layout-Änderungen
@@ -105,7 +131,7 @@ Beteiligte Komponenten:
 4. `PseudoConsole.Resize(cols, rows)` ruft `ResizePseudoConsole(hpcon, size)` auf
 5. `TerminalBuffer.Resize(newCols, newRows)` passt Grid an (erhält sichtbare Zeilen, trunciert wenn nötig)
 
-### 5. Prozessende
+### 6. Prozessende
 
 Beteiligte Komponenten:
 - `Process.Exited` — Win32-Event

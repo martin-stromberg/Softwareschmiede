@@ -279,4 +279,28 @@ public sealed class TerminalBuffer
 
     private static int Clamp(int value, int min, int max)
         => value < min ? min : value > max ? max : value;
+
+    /// <summary>Gibt einen unter einem einzigen Lock erstellten, konsistenten Snapshot des aktuellen
+    /// Buffer-Zustands zurück. Wird von Render-Operationen genutzt, um Race Conditions zwischen paralleler
+    /// Buffer-Aktualisierung und Lesezugriffen über mehrere Einzelaufrufe hinweg zu vermeiden.</summary>
+    /// <returns>Ein konsistenter <see cref="TerminalBufferSnapshot"/> des aktuellen Buffer-Zustands.</returns>
+    public TerminalBufferSnapshot GetSnapshot()
+    {
+        lock (_lock)
+        {
+            var gridCopy = new TerminalCell[_rows, _cols];
+            Array.Copy(_grid, gridCopy, _grid.Length);
+            return new TerminalBufferSnapshot(gridCopy, _rows, _cols, _cursorRow, _cursorCol);
+        }
+    }
 }
+
+/// <summary>Konsistenter Snapshot des Zustands eines <see cref="TerminalBuffer"/>, unter einem einzigen Lock
+/// erstellt über <see cref="TerminalBuffer.GetSnapshot"/>.</summary>
+/// <param name="Grid">Kopie des Zellen-Grids zum Snapshot-Zeitpunkt.</param>
+/// <param name="Rows">Zeilenanzahl des Buffers zum Snapshot-Zeitpunkt.</param>
+/// <param name="Cols">Spaltenanzahl des Buffers zum Snapshot-Zeitpunkt.</param>
+/// <param name="CursorRow">Cursor-Zeile zum Snapshot-Zeitpunkt.</param>
+/// <param name="CursorCol">Cursor-Spalte zum Snapshot-Zeitpunkt.</param>
+/// <returns>Eine neue <see cref="TerminalBufferSnapshot"/>-Instanz.</returns>
+public sealed record TerminalBufferSnapshot(TerminalCell[,] Grid, int Rows, int Cols, int CursorRow, int CursorCol);

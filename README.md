@@ -59,7 +59,7 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-07-05**
+Stand: **2026-07-07**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -78,6 +78,7 @@ Stand: **2026-07-05**
 | **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`** |
 | **Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget)** | ✅ Implementiert | Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs`; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` für alle Fire-and-Forget-Aufrufe; konsolidierter, try-catch-geschützter `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start); Heartbeat-Aktualisierung pro Aufgabe über eigenes `SemaphoreSlim` in `CliProcessManager` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` mit vollständigem Exception-Handling und überwachtem Hintergrund-Task; Startfehler von `CliProcessManager`-Initialisierung und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts |
 | **Issue 86: Parallele CLI-Ausführungen ohne Blockade bei verborgener Aufgabenseite** | ✅ Implementiert | Entkopplung der ReadLoop vom `TerminalControl`-Lebenszyklus: `PseudoConsoleSession` verwaltet die Leseschleife unabhängig und feuert `BufferChanged`-Events. `TerminalControl` wird zu reinem Renderer, der Events abonniert statt ReadLoop zu steuern. CLI-Prozesse laufen parallel weiter, auch wenn ihre Aufgabenseite nicht angezeigt wird. Betroffene Komponenten: `TerminalControl` (Unloaded-Handler entfernt, Event-Binding hinzugefügt), `PseudoConsoleSession` (ReadLoop ab Konstruktion aktiv), `KiAusfuehrungsService` (Cleanup-Logik angepasst). Unit-Tests für parallele Sessions, View-Wechsel und Session-Cleanup vorhanden; Details siehe [docs/help/terminal](docs/help/terminal/index.md) |
+| **Issue 85: CLI-Konsole optimieren — Buffer-Stabilitäts-Fix und Clipboard-Paste** | ✅ Implementiert | Neue Methode `TerminalBuffer.GetSnapshot()` für konsistentes Rendering unter Lock zur Vermeidung von Race Conditions bei paralleler CLI-Ausgabe. Clipboard-Paste-Unterstützung (Ctrl+V) mit neuer `KeyToVt100Encoder.EncodeClipboardText()`-Methode und Tastaturhandling in `TerminalControl`. Betroffene Komponenten: `TerminalBuffer`, `TerminalControl`, `KeyToVt100Encoder`. Unit-Tests für Thread-Sicherheit, Clipboard-Encoding und Keyboard-Input vorhanden; Details siehe [docs/help/terminal/beschreibung.md](docs/help/terminal/beschreibung.md) |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ⚠️ Teilweise | Build/Test lokal dokumentiert; automatisierte Release-Pipeline offen |
 
@@ -498,6 +499,49 @@ Die Aufgabendetailansicht unterstützt die gleichzeitige Ausführung mehrerer CL
 - Unit-Tests für `KiAusfuehrungsService` Session-Cleanup bei Prozess-Ende und Service-Shutdown (`KiAusfuehrungsServiceTests`)
 
 **Dokumentation:** siehe [docs/help/terminal](docs/help/terminal/index.md) und [docs/help/stabilitaet](docs/help/stabilitaet/index.md)
+
+#### Issue 85: CLI-Konsole optimieren — Buffer-Stabilitäts-Fix und Clipboard-Paste
+
+**Verbesserung der Terminal-Rendering-Stabilität und Hinzufügung der Clipboard-Paste-Funktionalität:**
+
+Die Terminal-Integration wurde mit zwei kritischen Verbesserungen erweitert:
+
+**1. Buffer-Stabilitäts-Optimierung via Snapshot:**
+
+- **Problem:** Bei schnellen, aufeinanderfolgenden CLI-Ausgaben (insbesondere bei parallelen Prozessen) entstanden Race Conditions zwischen `PseudoConsoleSession.ReadLoopAsync()` (schreibender Thread) und `TerminalControl.OnRender()` (lesender UI-Thread), was zu Ausgabe-Vermischung oder Überschreibungen führte.
+
+- **Lösung:** Neue Methode `TerminalBuffer.GetSnapshot()` erstellt unter einem einzelnen Lock einen konsistenten Snapshot des aktuellen Buffer-Zustands (Grid-Kopie, Cursor-Position, Größe). `TerminalControl.OnRender()` nutzt diesen Snapshot, um alle Render-Operationen mit konsistenten Daten durchzuführen — Lock-Contention ist minimal und Race Conditions sind eliminiert.
+
+- **Betroffene Komponenten:**
+  - `TerminalBuffer` (`src/Softwareschmiede/Domain/Terminal/TerminalBuffer.cs`): neue Methode `GetSnapshot()`
+  - `TerminalControl.OnRender()` nutzt `TerminalBuffer.GetSnapshot()` statt direkter Grid-Zugriffe
+
+**2. Clipboard-Paste-Funktionalität (Ctrl+V):**
+
+- **Feature:** Benutzer können mit **Ctrl+V** Text aus der Windows-Zwischenablage direkt in die CLI einfügen — keine manuelle Eingabe mehr nötig.
+
+- **Implementierung:**
+  - `KeyToVt100Encoder.EncodeClipboardText(string text)` – neue statische Methode zur Konvertierung von Clipboard-Text zu UTF-8-Bytes
+    - Alle Newline-Varianten (`\n`, `\r\n`, `\r`) werden einheitlich zu `\r` (Carriage Return) normalisiert für Windows-CLI-Kompatibilität
+  - `TerminalControl.OnPreviewKeyDown()` – erweitert um Prüfung auf `Ctrl+V` (`e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) != 0`)
+  - `TerminalControl.ReadClipboardAndInsertAsync()` – neue private Methode zum asynchronen Lesen der Zwischenablage und Schreiben in `session.InputStream`
+  - `TerminalControl.GetClipboardText()` – Hilfsmethode für sicheren Clipboard-Zugriff mit Exception-Handling
+
+- **Fehlerbehandlung:**
+  - Clipboard-Zugriff-Fehler werden geloggt statt abgebrochen (z. B. wenn Clipboard leer oder nicht zugänglich)
+  - Große Paste-Operationen laufen asynchron über `WriteAsync()` ohne UI-Blockade
+
+- **Betroffene Komponenten:**
+  - `KeyToVt100Encoder` (`src/Softwareschmiede.App/Controls/KeyToVt100Encoder.cs`)
+  - `TerminalControl` (`src/Softwareschmiede.App/Controls/TerminalControl.cs`)
+
+**Testing:**
+
+- Unit-Tests für `KeyToVt100Encoder.EncodeClipboardText()` – Single-line, Multi-line, Unicode, Sonderzeichen, Leerstring
+- Unit-Tests für `TerminalControl` – Ctrl+V Handling, Clipboard-Fehler, InputStream-Write, Activity-Tracking
+- Unit-Tests für `TerminalBuffer` – Thread-Sicherheit von parallelen `Apply()` + `GetSnapshot()` Zugriffe
+
+**Dokumentation:** siehe [docs/help/terminal/beschreibung.md](docs/help/terminal/beschreibung.md)
 
 ### 🎨 Branding & UI-Assets
 - Anwendung nutzt ein dediziertes SVG-Favicon `favicon-hammer-pick.svg` (gekreuzter Hammer/Pickel) aus `src/Softwareschmiede/wwwroot/`

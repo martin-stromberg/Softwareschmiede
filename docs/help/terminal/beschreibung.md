@@ -36,9 +36,18 @@ Das `TerminalControl` passt Spalten- und Zeilenanzahl automatisch an verfügbare
 - Codex CLI mit voller Farbunterstützung (SGR 3-bit, 8-bit, 24-bit) interaktiv nutzen.
 - Tastatureingaben (Pfeiltasten, F1–F12, Ctrl+C) funktionieren nativ ohne Verzögerung.
 
+### Neuerungen: Buffer-Stabilitäts-Optimierung und Clipboard-Paste
+
+Das Terminal-System wurde mit zwei Verbesserungen erweitert:
+
+1. **Buffer-Snapshot für stabiles Rendering:** Die Rendering-Engine nutzt jetzt `TerminalBuffer.GetSnapshot()`, eine Methode, die einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock erstellt. Dies verhindert Race Conditions zwischen paralleler CLI-Ausgabe und gleichzeitigen Render-Operationen — die Ausgabe bleibt stabil und vermischt sich nicht mehr bei schnellen, aufeinanderfolgenden CLI-Ausgaben.
+
+2. **Clipboard-Paste-Support:** Benutzer können nun mit **Ctrl+V** Text aus der Zwischenablage direkt in die CLI einfügen. Die Text-Eingabe wird zeilenweise normalisiert (alle Newline-Varianten → `\r`) und als UTF-8 kodiert, um mit Windows-Standard-Clipboard-Verhalten kompatibel zu sein.
+
 ## Einschränkungen
 
 - `CreatePseudoConsole` ist erst ab Windows 10 Build 17763 verfügbar. Das Projekt zielt auf `net10.0-windows10.0.17763.0`, daher ist das kein praktisches Risiko.
 - Scrollback-Puffer ist auf 1000 Zeilen begrenzt; ältere Zeilen gehen verloren.
 - Mouse-Tracking-Sequenzen werden nicht unterstützt (nicht erforderlich für Standard-CLI-Verwendung).
 - OSC-Sequenzen (z. B. Fenstertitel-Setzung) werden verworfen.
+- Clipboard-Paste ist auf System.Windows.Clipboard beschränkt (WPF-Standard) — andere Quellen von Zwischenablage-Daten werden nicht unterstützt.
