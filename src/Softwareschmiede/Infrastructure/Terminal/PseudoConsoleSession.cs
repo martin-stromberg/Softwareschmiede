@@ -13,7 +13,6 @@ public sealed class PseudoConsoleSession : IDisposable
 {
     private const int DefaultCols = 220;
     private const int DefaultRows = 50;
-    private static readonly TimeSpan ReadLoopShutdownTimeout = TimeSpan.FromSeconds(5);
 
     private readonly PseudoConsole _pseudoConsole;
     private readonly Process _process;
@@ -26,7 +25,7 @@ public sealed class PseudoConsoleSession : IDisposable
     private readonly AnsiSequenceParser _parser = new();
     private readonly CancellationTokenSource _readCts = new();
     private readonly Task _readLoopTask;
-    private bool _disposed;
+    private int _disposed;
     private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Laeuft;
     private DateTimeOffset? _lastOutputUtc;
     private DateTimeOffset? _lastInputUtc;
@@ -127,17 +126,38 @@ public sealed class PseudoConsoleSession : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (_disposed)
+        // Atomarer Check-and-Set statt eines einfachen bool-Felds: Process.Exited-Handler (Hintergrundthread)
+        // und ein expliziter Aufrufer (z. B. KiAusfuehrungsService.Dispose() beim App-Shutdown) können diese
+        // Methode gleichzeitig aufrufen. Ohne Interlocked könnten beide Threads den Check bestehen, bevor einer
+        // das Flag setzt, und dadurch die nativen ConPTY-/Pipe-Handles doppelt freigeben.
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
             return;
-        _disposed = true;
 
         try { _readCts.Cancel(); } catch { }
-        // OutputStream vor dem Warten schließen: Ein bereits blockierter, nicht kooperativ abbrechbarer
+        // OutputStream vor dem Beenden schließen: Ein bereits blockierter, nicht kooperativ abbrechbarer
         // nativer Read (siehe ReadLoopAsync) wird dadurch sofort mit einem I/O-Fehler beendet, statt sich
         // ausschließlich auf _readCts.Cancel() zu verlassen, das einen laufenden Read nicht unterbricht.
         try { OutputStream.Dispose(); } catch { }
-        try { _readLoopTask.Wait(ReadLoopShutdownTimeout); } catch { }
-        try { _readCts.Dispose(); } catch { }
+        // Bewusst kein synchrones _readLoopTask.Wait(...) hier: Dispose() wird u. a. aus dem Process.Exited-
+        // Handler auf einem ThreadPool-Thread aufgerufen. Bei vielen gleichzeitigen Sitzungen (parallele
+        // CLI-Ausführung) blockiert ein solches Wait() genau die ThreadPool-Threads, die auch zum Fortsetzen
+        // der eigenen Leseschleife benötigt werden – das führt unter ThreadPool-Druck zu mehrsekündigen
+        // Verzögerungen bis hin zu Timeouts (siehe Dispose_ReadLoopNeverCompletes_ReturnsPromptlyWithoutWaiting).
+        // OutputStream ist bereits geschlossen und der Read entsprechend bereits am Beenden; die Schleife läuft
+        // asynchron aus, ohne dass Dispose() darauf warten muss.
+        // _readCts erst verwerfen, nachdem die Leseschleife tatsächlich beendet ist (nicht blockierend über eine
+        // Continuation): Ein sofortiges Dispose des CTS, während die Schleife die Cancellation noch verarbeitet,
+        // kann zu einer unerwarteten Exception im laufenden Read führen.
+        _readLoopTask.ContinueWith(
+            t =>
+            {
+                if (t.IsFaulted)
+                    _logger.LogWarning(t.Exception, "Unerwarteter Fehler beim asynchronen Beenden der Leseschleife nach Dispose().");
+                try { _readCts.Dispose(); } catch { }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
         try { InputStream.Dispose(); } catch { }
         try { _runtimeStatusTimer.Dispose(); } catch { }
         try { _pseudoConsole.Dispose(); } catch { }
@@ -196,7 +216,7 @@ public sealed class PseudoConsoleSession : IDisposable
 
     private void RefreshRuntimeStatus()
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposed) != 0)
             return;
 
         DateTimeOffset? lastOutputUtc;

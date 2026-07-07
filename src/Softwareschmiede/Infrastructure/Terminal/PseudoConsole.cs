@@ -5,7 +5,7 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 /// <summary>Kapselt einen Windows Pseudo Console (HPCON) Handle und die zugehörigen Pipe-Handles.</summary>
 internal sealed class PseudoConsole : IDisposable
 {
-    private bool _disposed;
+    private int _disposed;
 
     /// <summary>Der HPCON-Handle der Pseudo Console.</summary>
     internal IntPtr Handle { get; }
@@ -68,9 +68,11 @@ internal sealed class PseudoConsole : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (_disposed)
+        // Atomarer Check-and-Set: PseudoConsoleSession.Dispose() kann von mehreren Threads gleichzeitig
+        // aufgerufen werden (siehe dortiger Kommentar). Ohne Interlocked würden beide Threads den Check
+        // bestehen und die nativen ConPTY-/Pipe-Handles doppelt schließen.
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
             return;
-        _disposed = true;
 
         ClosePseudoConsole(Handle);
         CloseHandle(InputWritePipe);

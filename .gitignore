@@ -380,3 +380,4 @@ FodyWeavers.xsd
 *launchSettings.json
 /.softwareschmiede/copilot-runtime
 issue.md
+/test-results/

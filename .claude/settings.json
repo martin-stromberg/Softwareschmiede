@@ -104,6 +104,8 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(*dotnet test*)",
+            "statusMessage": "Building solution before dotnet test...",
             "command": "dotnet build || echo 'BUILD FAILED - fix before running tests'"
           }
         ]
