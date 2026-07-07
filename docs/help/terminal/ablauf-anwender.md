@@ -34,8 +34,11 @@ Unterstützte Eingaben:
 - Ctrl+C zum Abbrechen
 - Enter zum Ausführen
 - Backspace und Delete zum Löschen
+- **Ctrl+V zum Einfügen aus der Zwischenablage** — Text wird zeilenweise eingefügt
 
 Die Ansicht passt sich automatisch bei Größenänderungen an; das Terminal wird neu dimensioniert.
+
+> **Hinweis zur Zwischenablage-Einfügung:** Wenn Sie `Ctrl+V` drücken, wird der gesamte Text aus der Windows-Zwischenablage eingefügt. Multi-line-Text wird automatisch normalisiert: Alle Zeilenumbrüche (`\n`, `\r\n`, `\r`) werden als `\r` (Carriage Return) eingefügt, was dem Windows-CLI-Standard entspricht.
 
 ### 4. CLI beenden
 

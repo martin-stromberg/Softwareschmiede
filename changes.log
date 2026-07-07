@@ -1,3 +1,11 @@
+## 2026-07-07 — CLI-Konsole optimieren: Buffer-Stabilisierung und Clipboard-Paste
+
+- Buffer-Snapshot für stabilere Rendering: Neue Methode `TerminalBuffer.GetSnapshot()` erstellt unter einem Lock einen konsistenten Snapshot des Buffer-Zustands (Grid-Kopie, Cursor, Größe), um Race Conditions zwischen paralleler Ausgabe und Rendering zu vermeiden.
+- Clipboard-Paste-Eingabe (Ctrl+V): Neue Unterstützung für Zwischenablage-Text-Einfügung — Benutzer können mit `Ctrl+V` Text aus der Zwischenablage in die CLI einfügen.
+- Neue Methode `KeyToVt100Encoder.EncodeClipboardText()`: Konvertiert Clipboard-Text zu UTF-8-Bytes mit einheitlicher Newline-Normalisierung (`\n`, `\r\n`, `\r` → `\r`), um CLI-Kompatibilität zu gewährleisten.
+- Erweiterte Tastaturunterstützung in `TerminalControl`: `OnPreviewKeyDown` prüft auf `Ctrl+V` und ruft `ReadClipboardAndInsertAsync()` auf; neue Hilfsmethoden `GetClipboardText()` und `WriteToInputStreamAsync()` mit robuster Fehlerbehandlung.
+- Rendering-Optimierung: `TerminalControl.OnRender()` nutzt jetzt `GetSnapshot()` statt direkter Zugriffe auf Buffer-Zellen, um Lock-Contention zu reduzieren und Race Conditions zu verhindern.
+
 ## 2026-07-05 — Parallele CLI-Ausführungen ohne Blockade bei Navigation
 
 - ReadLoop-Entkopplung vom UI-Lebenszyklus: Die Terminal-Leseschleife (`ReadLoopAsync`) läuft nun in `PseudoConsoleSession` ab Konstruktion bis `Dispose()`, unabhängig davon, ob ein `TerminalControl` gebunden ist oder der Anwender zu anderer Aufgabenseite navigiert.

@@ -13,7 +13,7 @@ namespace Softwareschmiede.Tests.App.Controls;
 /// <summary>Unit-Tests für TerminalControl: Tastatureingabe-Fehlerbehandlung und BufferChanged-Bindung an
 /// die Session (Issue-86, parallele CLI-Ausführungen — die Leseschleife läuft in <see cref="PseudoConsoleSession"/>,
 /// TerminalControl ist reiner Renderer).</summary>
-public sealed class TerminalControlTests
+public sealed partial class TerminalControlTests
 {
     /// <summary>
     /// Schreibt der Anwender Text, während die Pipe zum CLI-Prozess bereits geschlossen ist (z. B. weil der

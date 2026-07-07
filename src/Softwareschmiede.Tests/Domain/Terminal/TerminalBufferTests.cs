@@ -128,4 +128,87 @@ public sealed class TerminalBufferTests
         sut.Cols.Should().Be(5);
         sut.Rows.Should().Be(10);
     }
+
+    /// <summary>Parallele Apply()- und GetRow()-Zugriffe aus mehreren Threads führen zu keiner Exception und
+    /// liefern stets einen intern konsistenten Buffer-Zustand (keine Race Condition).</summary>
+    [Fact]
+    public void Buffer_ParallelApplyAndRead_NoRaceCondition()
+    {
+        var sut = new TerminalBuffer(80, 24);
+        var stop = new CancellationTokenSource();
+        Exception? readerException = null;
+
+        var writer = Task.Run(() =>
+        {
+            for (var i = 0; i < 2000; i++)
+                sut.Apply(new TextWrittenEvent("X"));
+        });
+
+        var reader = Task.Run(() =>
+        {
+            try
+            {
+                while (!stop.IsCancellationRequested)
+                {
+                    _ = sut.GetRow(0);
+                    _ = sut.CursorRow;
+                    _ = sut.CursorCol;
+                }
+            }
+            catch (Exception ex)
+            {
+                readerException = ex;
+            }
+        });
+
+        writer.Wait(TimeSpan.FromSeconds(10));
+        stop.Cancel();
+        reader.Wait(TimeSpan.FromSeconds(10));
+
+        readerException.Should().BeNull("parallele Lesezugriffe während laufender Apply()-Aufrufe dürfen zu keiner Exception führen");
+    }
+
+    /// <summary>GetSnapshot() liefert unter parallelen Apply()-Aufrufen stets einen intern konsistenten
+    /// Zustand: Grid-Größe und Cursor-Position im Snapshot passen stets zusammen.</summary>
+    [Fact]
+    public void Buffer_GetSnapshot_ReturnsConsistentState()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        var stop = new CancellationTokenSource();
+        Exception? readerException = null;
+
+        var writer = Task.Run(() =>
+        {
+            for (var i = 0; i < 500; i++)
+            {
+                sut.Resize(10 + (i % 3), 5 + (i % 3));
+                sut.Apply(new TextWrittenEvent("Y"));
+            }
+        });
+
+        var reader = Task.Run(() =>
+        {
+            try
+            {
+                while (!stop.IsCancellationRequested)
+                {
+                    var snapshot = sut.GetSnapshot();
+                    snapshot.Grid.GetLength(0).Should().Be(snapshot.Rows);
+                    snapshot.Grid.GetLength(1).Should().Be(snapshot.Cols);
+                    snapshot.CursorRow.Should().BeInRange(0, snapshot.Rows - 1);
+                    snapshot.CursorCol.Should().BeInRange(0, snapshot.Cols, "CursorCol kann durch deferred line-wrap kurzzeitig auf Cols stehen");
+                }
+            }
+            catch (Exception ex)
+            {
+                readerException = ex;
+            }
+        });
+
+        writer.Wait(TimeSpan.FromSeconds(10));
+        stop.Cancel();
+        reader.Wait(TimeSpan.FromSeconds(10));
+
+        readerException.Should().BeNull("GetSnapshot() muss auch unter parallelen Apply()/Resize()-Aufrufen einen intern konsistenten Zustand liefern");
+    }
 }

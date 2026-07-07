@@ -100,22 +100,23 @@ public sealed class TerminalControl : FrameworkElement
 
         MeasureCellSize();
 
-        var rows = buffer.Rows;
-        var cols = buffer.Cols;
-        var cursorRow = buffer.CursorRow;
-        var cursorCol = buffer.CursorCol;
+        var snapshot = buffer.GetSnapshot();
+        var rows = snapshot.Rows;
+        var cols = snapshot.Cols;
+        var cursorRow = snapshot.CursorRow;
+        var cursorCol = snapshot.CursorCol;
+        var grid = snapshot.Grid;
 
         for (var r = 0; r < rows; r++)
         {
-            var cells = buffer.GetRow(r);
             var y = r * _cellHeight;
 
             var bgStart = 0;
-            while (bgStart < cells.Length)
+            while (bgStart < cols)
             {
-                var bgColor = cells[bgStart].Background;
+                var bgColor = grid[r, bgStart].Background;
                 var bgEnd = bgStart + 1;
-                while (bgEnd < cells.Length && cells[bgEnd].Background == bgColor)
+                while (bgEnd < cols && grid[r, bgEnd].Background == bgColor)
                     bgEnd++;
 
                 if (bgColor != System.Drawing.Color.Black)
@@ -127,9 +128,9 @@ public sealed class TerminalControl : FrameworkElement
                 bgStart = bgEnd;
             }
 
-            for (var c = 0; c < cells.Length; c++)
+            for (var c = 0; c < cols; c++)
             {
-                var cell = cells[c];
+                var cell = grid[r, c];
                 if (cell.Character == ' ' || cell.Character == '\0')
                     continue;
 
@@ -174,6 +175,17 @@ public sealed class TerminalControl : FrameworkElement
     /// <inheritdoc/>
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            if (Session?.InputStream != null)
+            {
+                e.Handled = true;
+                _ = ReadClipboardAndInsertAsync();
+            }
+
+            return;
+        }
+
         var bytes = KeyToVt100Encoder.Encode(e);
         if (bytes != null && Session?.InputStream != null)
         {
@@ -264,5 +276,51 @@ public sealed class TerminalControl : FrameworkElement
     {
         var h = ActualHeight > 0 ? ActualHeight : 50 * 16;
         return Math.Max(1, (int)(h / _cellHeight));
+    }
+
+    /// <summary>Liest den Text aus der Zwischenablage, kodiert ihn für die CLI und schreibt ihn in den
+    /// Input-Stream der aktuellen Session. Fehler beim Zwischenablage-Zugriff, Kodieren oder Schreiben werden
+    /// abgefangen und protokolliert, statt das Control zu beeinträchtigen.</summary>
+    private async Task ReadClipboardAndInsertAsync()
+    {
+        var text = GetClipboardText();
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        var bytes = KeyToVt100Encoder.EncodeClipboardText(text);
+        await WriteToInputStreamAsync(bytes, "Fehler beim Einfügen aus der Zwischenablage in den Terminal-Input-Stream").ConfigureAwait(false);
+    }
+
+    /// <summary>Schreibt Bytes asynchron in den Input-Stream der aktuellen Session und protokolliert Schreibfehler
+    /// statt sie zu verschlucken. Wartet mit <c>ConfigureAwait(false)</c>, damit ein synchron blockierender Aufrufer
+    /// (z. B. in Tests) nicht durch die Erfassung des UI-SynchronizationContext blockiert.</summary>
+    /// <param name="bytes">Die zu schreibenden Bytes.</param>
+    /// <param name="errorMessage">Die Log-Nachricht bei einem Schreibfehler.</param>
+    private async Task WriteToInputStreamAsync(byte[] bytes, string errorMessage)
+    {
+        try
+        {
+            await Session!.InputStream!.WriteAsync(bytes).ConfigureAwait(false);
+            Session.MarkInputActivity();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, errorMessage);
+        }
+    }
+
+    /// <summary>Liest den aktuellen Text aus der Windows-Zwischenablage.</summary>
+    /// <returns>Der gelesene Text, oder <see cref="string.Empty"/> wenn keine Textdaten vorhanden sind oder der Zugriff fehlschlägt.</returns>
+    private string GetClipboardText()
+    {
+        try
+        {
+            return System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText() : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Lesen aus der Zwischenablage");
+            return string.Empty;
+        }
     }
 }

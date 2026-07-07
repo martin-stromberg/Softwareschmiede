@@ -181,6 +181,31 @@ public sealed class PseudoConsoleSessionTests
             "dass Dispose() trotzdem sofort zurückkehrt statt darauf zu warten");
     }
 
+    /// <summary><see cref="PseudoConsoleSession.BufferChanged"/> wird erst gefeuert, nachdem die Leseschleife
+    /// alle Events des gelesenen Chunks bereits auf <see cref="PseudoConsoleSession.Buffer"/> angewendet hat
+    /// (kritischer Synchronisierungs-Fix): Zum Zeitpunkt des Events muss der neue Bufferinhalt bereits
+    /// sichtbar sein, damit ein lauschendes <c>TerminalControl</c> beim Neuzeichnen keinen veralteten
+    /// Zustand liest.</summary>
+    [Fact]
+    public void ReadLoopAsync_BufferChangedFiredAfterBufferUpdated()
+    {
+        using var session = CreateSession(new FixedContentStream("HELLO"));
+        char? characterAtEventTime = null;
+        var bufferChanged = new ManualResetEventSlim(false);
+
+        session.BufferChanged += (_, _) =>
+        {
+            characterAtEventTime = session.Buffer.GetRow(0)[0].Character;
+            bufferChanged.Set();
+        };
+
+        bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+            "BufferChanged muss nach Verarbeitung der gelesenen Ausgabe gefeuert werden");
+        characterAtEventTime.Should().Be(
+            'H',
+            "der Bufferinhalt muss zum Zeitpunkt des BufferChanged-Events bereits vollständig angewendet sein");
+    }
+
     private static Task GetReadLoopTask(PseudoConsoleSession session)
     {
         var field = typeof(PseudoConsoleSession).GetField("_readLoopTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -314,6 +339,41 @@ public sealed class PseudoConsoleSessionTests
             _unblockSignal.TrySetException(new IOException("Simulierter Pipe-Fehler durch Schließen des Handles."));
             base.Dispose(disposing);
         }
+    }
+
+    /// <summary>Stream, der beim ersten Lesevorgang einen festen Inhalt liefert und danach das Stream-Ende
+    /// (0 Bytes) meldet.</summary>
+    private sealed class FixedContentStream : Stream
+    {
+        private readonly byte[] _content;
+        private bool _served;
+
+        public FixedContentStream(string content)
+        {
+            _content = System.Text.Encoding.ASCII.GetBytes(content);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => 0;
+        public override long Position { get; set; }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_served)
+                return new ValueTask<int>(0);
+
+            _served = true;
+            _content.CopyTo(buffer);
+            return new ValueTask<int>(_content.Length);
+        }
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     /// <summary>Stream, dessen Lesevorgang niemals zurückkehrt — auch nicht nach <see cref="Dispose(bool)"/> —
