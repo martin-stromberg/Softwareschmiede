@@ -1,3 +1,11 @@
+## 2026-07-08 — CI/CD-Release-Pipeline mit Semantic Release und GitHub Actions
+
+- Neuer GitHub-Actions-Workflow `.github/workflows/release.yml`: Job `release` erstellt bei jedem Push auf `main` automatisch eine versionierte GitHub-Release inkl. `release.zip`-Anhang, basierend auf Semantic Release (Conventional Commits).
+- Manueller Tag-Override: Job `release-manual-tag` erstellt bei Push eines Tags im Format `vX.Y.Z` direkt ein GitHub-Release mit dieser Version, unabhängig von der automatischen Commit-Analyse.
+- Gemeinsame Composite Action `.github/actions/build-and-package`: Führt `dotnet publish` für `Softwareschmiede.App.csproj` aus, prüft das Ergebnis auf Vollständigkeit (Publish-Guard) und verpackt es als `release.zip`.
+- Absicherung gegen parallele Läufe (`concurrency`-Guard) und auf Commit-SHA gepinnte Fremd-Actions (`cycjimmy/semantic-release-action`, `softprops/action-gh-release`).
+- Neue Dokumentation: `docs/CI_CD.md` (Workflow-Schritte, Troubleshooting, Recovery-Verfahren) und `CONTRIBUTING.md` (Commit-Konventionen, Anleitung zum manuellen Tag-Override) — reine Entwickler-/Maintainer-Dokumentation; kein Eintrag unter `docs/help/`, da das Feature kein Anwender-sichtbares Verhalten innerhalb der Softwareschmiede-Anwendung selbst hat.
+
 ## 2026-07-07 — CLI-Konsole optimieren: Buffer-Stabilisierung und Clipboard-Paste
 
 - Buffer-Snapshot für stabilere Rendering: Neue Methode `TerminalBuffer.GetSnapshot()` erstellt unter einem Lock einen konsistenten Snapshot des Buffer-Zustands (Grid-Kopie, Cursor, Größe), um Race Conditions zwischen paralleler Ausgabe und Rendering zu vermeiden.
