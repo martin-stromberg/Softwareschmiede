@@ -1,0 +1,77 @@
+name: Release & Publish
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+# Verhindert parallele Release-Laeufe (z. B. schneller Merge nach main + manueller Tag-Push
+# kurz danach): Semantic Release berechnet die naechste Version aus dem zuletzt existierenden
+# Tag und pusht Commit+Tag zurueck nach main - ohne Serialisierung droht ein Wettlauf mit
+# doppelt vergebenen Versionen oder fehlschlagenden Git-Pushes.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Normalfall: Push/Merge auf main. Semantic Release wertet die Commits seit dem letzten
+  # Tag aus, bestimmt die naechste Version, erstellt Tag/Release/Notes und laedt release.zip hoch.
+  release:
+    if: startsWith(github.ref, 'refs/heads/')
+    # Softwareschmiede.App ist eine WPF-Anwendung (net10.0-windows, UseWPF=true) und kann
+    # nur auf einem Windows-Runner gebaut und publiziert werden.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and package
+        uses: ./.github/actions/build-and-package
+
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@16ca923e6ccbb50770c415a0ccd43709a8c5f7a4 # v4.2.2
+        with:
+          semantic_version: 21.x
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Manueller Override: Ein Tag im Format vX.Y.Z wurde bewusst gepusht (git tag vX.Y.Z && git push origin vX.Y.Z).
+  # Ein Tag-Push loest keinen "push: branches: [main]"-Trigger aus, daher baut dieser eigene Job
+  # Release Notes, Release und ZIP-Upload direkt fuer den gepushten Tag - unabhaengig von Commit-Typen
+  # und ohne semantic-release-Versionsberechnung.
+  release-manual-tag:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build and package
+        uses: ./.github/actions/build-and-package
+
+      - name: Create GitHub Release for manual tag
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

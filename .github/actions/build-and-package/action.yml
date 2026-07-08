@@ -1,0 +1,37 @@
+name: Build and package
+description: >
+  Stellt das .NET-10-SDK bereit, restored, published die Softwareschmiede.App (WPF)
+  im Release-Modus und packt das Ergebnis als release.zip. Wird von den Jobs `release`
+  und `release-manual-tag` in release.yml gemeinsam genutzt, um Divergenz zwischen
+  den identischen Build-Schritten zu vermeiden.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+      shell: pwsh
+
+    - name: Publish
+      run: dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release -o publish/
+      shell: pwsh
+
+    - name: Verify publish output
+      run: |
+        if (-not (Test-Path 'publish/Softwareschmiede.App.exe')) {
+          throw "publish/ ist unvollstaendig: Softwareschmiede.App.exe fehlt."
+        }
+        $pluginDlls = Get-ChildItem -Path 'publish/plugins' -Filter '*.dll' -Recurse -ErrorAction SilentlyContinue
+        if (-not $pluginDlls -or $pluginDlls.Count -eq 0) {
+          throw "publish/plugins enthaelt keine Plugin-DLLs."
+        }
+      shell: pwsh
+
+    - name: Create Release ZIP
+      run: Compress-Archive -Path publish/* -DestinationPath release.zip -Force
+      shell: pwsh

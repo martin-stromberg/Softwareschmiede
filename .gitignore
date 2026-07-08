@@ -370,7 +370,6 @@ FodyWeavers.xsd
 /src/Softwareschmiede/agent-packages/*
 /.github/agents
 /.github/tools
-/.github/workflows
 *.copilot.task.md
 *.copilot.context.md
 *.copilot.task.md.bak

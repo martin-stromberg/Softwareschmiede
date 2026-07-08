@@ -97,4 +97,13 @@
     <Copy SourceFiles="@(KiSimulatorPluginArtifacts)" DestinationFolder="$(OutDir)plugins\Softwareschmiede.Plugin.KiSimulator" SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- dotnet publish kopiert Build-Outputs anhand von MSBuild-Item-Listen, nicht 1:1 aus $(OutDir);
+       der plugins\-Ordner aus CopyPluginsToOutput landet daher ohne diesen Schritt nicht im Publish-Verzeichnis. -->
+  <Target Name="CopyPluginsToPublishOutput" AfterTargets="Publish">
+    <ItemGroup>
+      <PluginPublishArtifacts Include="$(OutDir)plugins\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PluginPublishArtifacts)" DestinationFolder="$(PublishDir)plugins\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
