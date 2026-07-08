@@ -98,6 +98,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(c => c.StartScriptRelativePath)
                 .IsRequired()
                 .HasMaxLength(512);
+            e.Property(c => c.WorkingDirectoryRelativePath)
+                .IsRequired(false)
+                .HasMaxLength(512);
             e.HasIndex(c => c.GitRepositoryId).IsUnique();
         });
 

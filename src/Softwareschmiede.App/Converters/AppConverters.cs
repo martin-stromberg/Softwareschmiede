@@ -55,6 +55,19 @@ public sealed class BoolToWidthConverter : IValueConverter
         => value is double d && d > CollapsedWidth;
 }
 
+/// <summary>Kehrt einen Boolean-Wert um.</summary>
+[ValueConversion(typeof(bool), typeof(bool))]
+public sealed class InverseBoolConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is false;
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is false;
+}
+
 /// <summary>Konvertiert einen inversen Boolean-Wert in <see cref="Visibility"/>.</summary>
 [ValueConversion(typeof(bool), typeof(Visibility))]
 public sealed class InverseBoolToVisibilityConverter : IValueConverter

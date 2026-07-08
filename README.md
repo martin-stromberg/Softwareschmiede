@@ -71,10 +71,11 @@ Stand: **2026-07-08**
 | Standardplugin-Mechanik | ✅ Implementiert | Auflösung: explizite Auswahl → gespeichertes Standardplugin → Fallback |
 | Folgeanweisungen mit Kontextsteuerung | ✅ Implementiert | Kontext mitgeben / ignorieren / neu beginnen |
 | Lokale Deploymentfähigkeit | ✅ Implementiert | Windows-zentrierter Betrieb, lokale SQLite + Credential Store |
-| Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart |
+| Repository-Startskript mit freier Portzuweisung | ✅ Implementiert | Repositorybezogene Startkonfiguration, Portreservierung und PowerShell-Skriptlauf beim Prozessstart; optional in konfiguriertem Unterverzeichnis des Repositories |
 | Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview | ✅ Implementiert | Branch-Commits relativ zur Basisreferenz (`origin/HEAD` inkl. Fallback), lazy Commit-Dateibaum und commit-spezifische Vorschau mit Retry-/Hint-Handling |
 | Diff-Funktionalität (`/api/diff`) | ✅ Implementiert | `DiffController` + `DiffService` inkl. Persistenz, Statistik und Cache-Invalidierung |
 | **Automatische issue.md-Dateierstellung beim Repository-Setup** | ✅ Implementiert | Beim Repository-Klon werden automatisch `issue.md` mit Aufgabendaten und `.gitignore`-Eintrag erstellt; `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`; graceful degradation bei Fehlern; Tests implementiert |
+| **Arbeitsverzeichnis für KI-Ausführung (Issue #98)** | ✅ Implementiert | Repository-Startskript kann in konfigurierbarem Unterverzeichnis ausgeführt werden; UI-Dialog mit Verzeichnisstruktur-Vorschau; `WorkingDirectoryRelativePath` in `RepositoryStartKonfiguration`; `DirectoryStructureBrowserService` mit Caching; Path-Traversal-Sicherheit; E2E-Tests implementiert |
 | **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung, CLI-Laufzeitstatus in der Fußzeile (`Ausführung läuft`/`Wartet auf Eingabe`); Voraussetzung: Windows 10 Build 17763+ |
 | **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`** |
 | **Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget)** | ✅ Implementiert | Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs`; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` für alle Fire-and-Forget-Aufrufe; konsolidierter, try-catch-geschützter `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start); Heartbeat-Aktualisierung pro Aufgabe über eigenes `SemaphoreSlim` in `CliProcessManager` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` mit vollständigem Exception-Handling und überwachtem Hintergrund-Task; Startfehler von `CliProcessManager`-Initialisierung und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts |
@@ -98,6 +99,21 @@ Stand: **2026-07-08**
 - **Graceful Degradation:** Fehler bei der Datei-Erstellung oder `.gitignore`-Anpassung unterbrechen den Prozessstart nicht; sie werden nur geloggt
 - **Betroffene Komponenten:** Neue private Methoden `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`; Integration in `ProzessStartenAsync` mit Try-Catch-Fehlerbehandlung
 - **Tests:** Unit-Tests für Datei-Erstellung, Fallback-Text, `.gitignore`-Anpassung, Duplikatsprüfung und Fehlerbehandlung; Integrationstests für den Prozessablauf
+
+#### Arbeitsverzeichnis für KI-Ausführung (Issue #98, implementiert ✅)
+
+**Konfigurierbare Arbeitsverzeichnisse für Repository-Startskripte in Monorepos und Monolithen:**
+
+- **Relative Pfadkonfiguration:** Für jedes Repository-Startskript kann ein Arbeitsverzeichnis relativ zum Repository-Root definiert werden (z. B. `"backend"`, `"apps/cli"`, `"."` für Root)
+- **UI-Dialog mit Vorschau:** Bei der Repository-Zuweisung werden die verfügbaren Verzeichnisse aus dem externen Repository vorgeladen und als ComboBox angezeigt
+- **Verzeichnisstruktur-Abruf:** Neue `DirectoryStructureBrowserService` mit konfigurierbarem Abruf (Default 2 Ebenen) und Memory-Cache (5 Min TTL)
+- **Path-Traversal-Sicherheit:** Validierung gegen `../../../etc`-Pfade mittels `Path.GetFullPath()` und `StartsWith()`-Checks
+- **Fehlerrobustheit:** Falls Verzeichnisabruf fehlschlägt, wird Root (`"."`) als Fallback verwendet; existierende Verzeichnisse müssen nach Klon vorhanden sein
+- **CLI-Ausführung:** `KiAusfuehrungsService` löst das effektive Arbeitsverzeichnis auf und übergibt es dem Prozess-Starter als Working Directory
+- **Datenbankschema:** Neue nullable Spalte `WorkingDirectoryRelativePath` in `RepositoryStartKonfiguration`
+- **Konfiguration:** Neue `appsettings`-Einträge `DirectoryStructureCacheDurationSeconds` (300), `DirectoryStructureMaxDepth` (2), `DirectoryStructureEnabled` (true)
+- **Betroffene Komponenten:** `RepositoryStartKonfiguration`, `KiAusfuehrungsService`, `DirectoryStructureBrowserService`, `RepositoryAssignViewModel`, `RepositoryAssignDialog.xaml`
+- **Tests:** Unit-Tests für Pfad-Auflösung, Path-Traversal-Prevention, Verzeichnis-Validierung, Caching-Verhalten; E2E-Tests für Dialog und CLI-Prozessausführung
 
 **Beispiel-Dateiinhalt (`issue.md`):**
 
@@ -670,6 +686,28 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 - Exit-Codes: `0` (Erfolg), `10` (launchSettings fehlt), `11` (JSON/Profil ungültig), `12` (Port ungültig/belegt), `13` (Write-Fehler), `99` (unerwartet).
 - Detailvertrag: [docs/api/start-ps1-visual-studio-freier-http-port.md](docs/api/start-ps1-visual-studio-freier-http-port.md)
 
+### Arbeitsverzeichnis für Repository-Startskripte
+
+Für Monorepos und Monolithen können Sie ein Unterverzeichnis definieren, in dem das Repository-Startskript ausgeführt werden soll:
+
+1. **Projekt öffnen** → **Repository zuweisen** oder **Bestehendes Repository auswählen**
+2. Im **Repository-Zuweisungs-Dialog** wird nach der Auswahl eines Repositories die **Verzeichnisstruktur** automatisch vorgeladen
+3. **Arbeitsverzeichnis wählen:**
+   - **`"."` (Standard)** — Startskript läuft im Repository-Root
+   - Oder ein spezifisches Unterverzeichnis (z. B. `"backend"`, `"apps/cli"`)
+4. **Zuweisung speichern** — Das Arbeitsverzeichnis wird persistiert
+5. **KI-Ausführung** — Das Startskript und alle folgenden Operationen laufen im angegebenen Verzeichnis
+
+**Fehlbehandlung:**
+- Falls das angegebene Verzeichnis nach dem Klon nicht existiert, wird ein Fehler mit aussagekräftiger Meldung angezeigt
+- Path-Traversal-Versuche (z. B. `"../../../etc"`) werden aus Sicherheitsgründen blockiert
+- Bei Offline-Repositories wird nur das Root-Verzeichnis `"."` angeboten
+
+**Konfigurierbare Einstellungen** (in `appsettings.json`):
+- `DirectoryStructureMaxDepth` (int, Default: 2) — Maximale Verzeichnis-Tiefe beim Abruf
+- `DirectoryStructureCacheDurationSeconds` (int, Default: 300) — Cache-Dauer für Verzeichnisstrukturen
+- `DirectoryStructureEnabled` (bool, Default: true) — Aktiviert/deaktiviert die Voraus-Ladung
+
 ### LocalDirectoryPlugin & WorkspaceMode
 
 - Für lokale Quellordner kann in den Einstellungen als SCM-Plugin **Local Directory** gewählt werden.
@@ -852,6 +890,31 @@ LocalDirectoryPlugin-spezifische Einstellungen werden ebenfalls über das Plugin
 Hinweise:
 - Ein plugin-spezifisches `WorkingDirectory`-Setting existiert nicht; der Zielpfad wird aus `repositories.workdir` + `softwareschmiede/<aufgabeId>` gebildet.
 - Bei ungültigem gespeichertem `WorkspaceMode` fällt das Plugin zur Laufzeit auf `SeparateWorkingDirectory` zurück.
+
+### Verzeichnisstruktur-Abruf für Repository-Arbeitsverzeichnisse
+
+Die Verzeichnisstruktur-Abfrage beim Repository-Dialog wird über folgende `appsettings.json`-Einträge gesteuert:
+
+| Schlüssel | Typ | Default | Bedeutung |
+|-----------|-----|---------|-----------|
+| `DirectoryStructureEnabled` | bool | `true` | Aktiviert/deaktiviert die automatische Verzeichnisstruktur-Voraus-Ladung im Repository-Dialog |
+| `DirectoryStructureMaxDepth` | int | `2` | Maximale Verzeichnis-Tiefe beim Abruf (z. B. `2` = Root + 1 Ebene + 1 Ebene) |
+| `DirectoryStructureCacheDurationSeconds` | int | `300` | Cache-Dauer für abgerufene Verzeichnisstrukturen in Sekunden (5 Minuten) |
+
+**Beispiel-Konfiguration in `appsettings.json`:**
+
+```json
+{
+  "DirectoryStructureEnabled": true,
+  "DirectoryStructureMaxDepth": 3,
+  "DirectoryStructureCacheDurationSeconds": 600
+}
+```
+
+**Verhalten:**
+- Falls `DirectoryStructureEnabled = false`: Dialog zeigt nur Root-Verzeichnis `"."` an
+- Der Cache wird pro Repository-URL gepuffert und nach Ablauf der TTL verworfen
+- Bei fehlgeschlagenem Abruf wird automatisch Root `"."` als Fallback verwendet
 
 ### Git-Workflow-Fallback im separaten Arbeitsverzeichnis
 

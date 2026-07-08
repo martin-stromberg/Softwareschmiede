@@ -13,6 +13,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Titel -->
@@ -84,8 +85,32 @@
             </StackPanel>
         </Border>
 
+        <!-- Arbeitsverzeichnis-Auswahl -->
+        <StackPanel Grid.Row="3" Margin="0,12,0,0">
+            <TextBlock Text="Arbeitsverzeichnis im Repository"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource PrimaryTextBrush}"
+                       Margin="0,0,0,8" />
+
+            <ComboBox ItemsSource="{Binding AvailableWorkingDirectories}"
+                      SelectedItem="{Binding SelectedWorkingDirectory, Mode=TwoWay}"
+                      IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
+                      Background="{DynamicResource BackgroundBrush}"
+                      Padding="8,6" />
+
+            <TextBlock Text="Wird geladen…"
+                       Foreground="{DynamicResource SecondaryTextBrush}"
+                       Visibility="{Binding IsLoadingDirectoryStructure, Converter={StaticResource BoolToVisibilityConverter}}"
+                       Margin="0,4,0,0" />
+
+            <TextBlock Text="Hinweis: '.' bedeutet Wurzelverzeichnis des Repositories"
+                       FontSize="11"
+                       Foreground="{DynamicResource SecondaryTextBrush}"
+                       Margin="0,4,0,0" />
+        </StackPanel>
+
         <!-- Buttons -->
-        <StackPanel Grid.Row="3"
+        <StackPanel Grid.Row="4"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">

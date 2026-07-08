@@ -380,12 +380,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
 
             if (confirmed && vm.SelectedRepository is { } repo && vm.SelectedScmPlugin is { } scmPlugin)
             {
-                await _projektService.AddRepositoryAsync(
+                var gitRepository = await _projektService.AddRepositoryAsync(
                     _projektId,
                     scmPlugin.PluginPrefix,
                     repo.Url,
                     repo.Name,
                     ct);
+
+                await _projektService.SaveRepositoryWorkingDirectoryAsync(gitRepository.Id, vm.SelectedWorkingDirectory, ct);
 
                 if (!_disposed && !ct.IsCancellationRequested)
                     await LadenAsync(ct);

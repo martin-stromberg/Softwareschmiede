@@ -289,6 +289,47 @@ public sealed class ProjektService
             .FirstOrDefaultAsync(config => config.GitRepositoryId == repositoryId, ct);
     }
 
+    /// <summary>
+    /// Speichert das relative Arbeitsverzeichnis für ein Repository (z. B. bei der Zuweisung zu einem Projekt).
+    /// <c>null</c> oder <c>"."</c> werden als Repository-Root behandelt und als <c>null</c> persistiert.
+    /// Eine bereits vorhandene Startkonfiguration (Startskript) bleibt dabei unverändert.
+    /// </summary>
+    /// <param name="repositoryId">ID des Repositories.</param>
+    /// <param name="workingDirectoryRelativePath">Relativer Pfad zum Arbeitsverzeichnis, oder <c>null</c>/<c>"."</c> für das Repository-Root.</param>
+    public async Task SaveRepositoryWorkingDirectoryAsync(Guid repositoryId, string? workingDirectoryRelativePath, CancellationToken ct = default)
+    {
+        var normalized = string.IsNullOrWhiteSpace(workingDirectoryRelativePath) || workingDirectoryRelativePath == "."
+            ? null
+            : workingDirectoryRelativePath;
+
+        var repository = await _db.GitRepositories
+            .Include(r => r.StartKonfiguration)
+            .FirstOrDefaultAsync(r => r.Id == repositoryId, ct)
+            ?? throw new InvalidOperationException($"Repository {repositoryId} nicht gefunden.");
+
+        if (repository.StartKonfiguration is null && normalized is null)
+        {
+            return;
+        }
+
+        var configuration = repository.StartKonfiguration ?? new RepositoryStartKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            GitRepositoryId = repositoryId
+        };
+
+        configuration.WorkingDirectoryRelativePath = normalized;
+
+        if (repository.StartKonfiguration is null)
+        {
+            _db.Add(configuration);
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Arbeitsverzeichnis für Repository {RepositoryId} gespeichert: {WorkingDirectory}", repositoryId, normalized ?? ".");
+    }
+
     private static Dictionary<string, string> NormalizeFieldValues(IReadOnlyDictionary<string, string> fieldValues)
     {
         var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

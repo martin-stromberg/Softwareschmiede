@@ -246,6 +246,48 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         sut.SelectedRepository.Should().NotBeNull();
     }
 
+    /// <summary>RepositoryZuweisenAsync persistiert das im Dialog ausgewählte Arbeitsverzeichnis.</summary>
+    [Fact]
+    public async Task RepositoryZuweisenAsync_Success_PersistiertAusgewaehltesArbeitsverzeichnis()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Repository-Arbeitsverzeichnis-Projekt", null);
+
+        var testRepo = new AvailableRepository("test-repo", DateTime.UtcNow, "test/repo", "https://github.com/test/repo-workdir");
+
+        var pluginMock = new Mock<IGitPlugin>();
+        pluginMock.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        pluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
+
+        var repositoryAssignVm = new RepositoryAssignViewModel(NullLogger<RepositoryAssignViewModel>.Instance);
+        repositoryAssignVm.SelectedRepository = testRepo;
+        repositoryAssignVm.SelectedScmPlugin = pluginMock.Object;
+        repositoryAssignVm.SelectedWorkingDirectory = "backend";
+
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(RepositoryAssignViewModel)))
+            .Returns(repositoryAssignVm);
+
+        _dialogServiceMock
+            .Setup(d => d.RepositoryZuweisenDialog(It.IsAny<RepositoryAssignViewModel>()))
+            .Returns(true);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Act
+        await ((AsyncRelayCommand)sut.RepositoryZuweisenCommand).ExecuteAsync();
+
+        // Assert
+        var detail = await _projektService.GetDetailAsync(projekt.Id);
+        var repository = detail!.Repositories.Single();
+        var startKonfiguration = await _projektService.GetRepositoryStartKonfigurationAsync(repository.Id);
+
+        startKonfiguration.Should().NotBeNull();
+        startKonfiguration!.WorkingDirectoryRelativePath.Should().Be("backend");
+    }
+
     /// <summary>RepositoryOeffnenCommand hat CanExecute false, wenn kein Repository geladen ist.</summary>
     [Fact]
     public void RepositoryOeffnenCommand_CanExecuteFalse_OhneRepository()

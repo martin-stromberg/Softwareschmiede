@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
@@ -11,12 +12,17 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
 {
     private readonly ILogger<RepositoryAssignViewModel> _logger;
     private readonly IPluginManager? _pluginManager;
+    private readonly DirectoryStructureBrowserService? _directoryStructureService;
     private AvailableRepository? _selectedRepository;
     private bool _isLoading;
     private ObservableCollection<IGitPlugin> _availableScmPlugins = new();
     private IGitPlugin? _selectedScmPlugin;
     private bool _hasScmPlugins;
     private CancellationTokenSource? _reloadCts;
+    private ObservableCollection<string> _availableWorkingDirectories = new();
+    private string? _selectedWorkingDirectory;
+    private bool _isLoadingDirectoryStructure;
+    private CancellationTokenSource? _dirStructureCts;
 
     /// <summary>Wird ausgelöst wenn der Dialog geschlossen werden soll. Parameter: true = bestätigt, false = abgebrochen.</summary>
     public event EventHandler<bool>? CloseRequested;
@@ -28,7 +34,7 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     public AvailableRepository? SelectedRepository
     {
         get => _selectedRepository;
-        set => SetProperty(ref _selectedRepository, value);
+        set => SetProperty(ref _selectedRepository, value, OnSelectedRepositoryChanged);
     }
 
     /// <summary>Gibt an, ob Daten geladen werden.</summary>
@@ -59,6 +65,27 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _hasScmPlugins, value);
     }
 
+    /// <summary>Verfügbare Arbeitsverzeichnisse des ausgewählten Repositories.</summary>
+    public ObservableCollection<string> AvailableWorkingDirectories
+    {
+        get => _availableWorkingDirectories;
+        private set => SetProperty(ref _availableWorkingDirectories, value);
+    }
+
+    /// <summary>Vom Benutzer ausgewähltes Arbeitsverzeichnis (relativer Pfad, <c>"."</c> = Repository-Root).</summary>
+    public string? SelectedWorkingDirectory
+    {
+        get => _selectedWorkingDirectory;
+        set => SetProperty(ref _selectedWorkingDirectory, value);
+    }
+
+    /// <summary>Gibt an, ob die Verzeichnisstruktur des ausgewählten Repositories gerade geladen wird.</summary>
+    public bool IsLoadingDirectoryStructure
+    {
+        get => _isLoadingDirectoryStructure;
+        private set => SetProperty(ref _isLoadingDirectoryStructure, value);
+    }
+
     /// <summary>Bestätigt die Auswahl und schließt den Dialog.</summary>
     public ICommand BestaetigenCommand { get; }
 
@@ -68,11 +95,18 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     /// <summary>Der laufende Reload-Task; nur für Tests.</summary>
     internal Task? CurrentReloadTask { get; private set; }
 
+    /// <summary>Der laufende Directory-Struktur-Lade-Task; nur für Tests.</summary>
+    internal Task? CurrentLoadDirectoryStructureTask { get; private set; }
+
     /// <inheritdoc cref="RepositoryAssignViewModel"/>
-    public RepositoryAssignViewModel(ILogger<RepositoryAssignViewModel> logger, IPluginManager? pluginManager = null)
+    public RepositoryAssignViewModel(
+        ILogger<RepositoryAssignViewModel> logger,
+        IPluginManager? pluginManager = null,
+        DirectoryStructureBrowserService? directoryStructureService = null)
     {
         _logger = logger;
         _pluginManager = pluginManager;
+        _directoryStructureService = directoryStructureService;
 
         BestaetigenCommand = new RelayCommand(
             () => CloseRequested?.Invoke(this, true),
@@ -125,6 +159,8 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     {
         _reloadCts?.Cancel();
         _reloadCts?.Dispose();
+        _dirStructureCts?.Cancel();
+        _dirStructureCts?.Dispose();
     }
 
     private async Task ReloadRepositoriesForSelectedPlugin(CancellationToken ct)
@@ -159,6 +195,54 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         {
             if (!ct.IsCancellationRequested)
                 IsLoading = false;
+        }
+    }
+
+    private void OnSelectedRepositoryChanged()
+    {
+        SelectedWorkingDirectory = null;
+        _dirStructureCts?.Cancel();
+        _dirStructureCts?.Dispose();
+        _dirStructureCts = new CancellationTokenSource();
+        CurrentLoadDirectoryStructureTask = LoadDirectoryStructureAsync(_dirStructureCts.Token);
+    }
+
+    private async Task LoadDirectoryStructureAsync(CancellationToken ct)
+    {
+        if (_directoryStructureService == null || SelectedScmPlugin == null || SelectedRepository == null)
+        {
+            AvailableWorkingDirectories.Clear();
+            return;
+        }
+
+        try
+        {
+            IsLoadingDirectoryStructure = true;
+            var directories = await _directoryStructureService.GetDirectoriesAsync(SelectedScmPlugin, SelectedRepository.Url, ct);
+            ct.ThrowIfCancellationRequested();
+
+            AvailableWorkingDirectories.Clear();
+            AvailableWorkingDirectories.Add(".");
+            foreach (var dir in directories)
+                AvailableWorkingDirectories.Add(dir);
+
+            SelectedWorkingDirectory = ".";
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Abgebrochen durch Repository-/Plugin-Wechsel — kein Fehler
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Laden der Verzeichnisstruktur.");
+            AvailableWorkingDirectories.Clear();
+            AvailableWorkingDirectories.Add(".");
+            SelectedWorkingDirectory = ".";
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+                IsLoadingDirectoryStructure = false;
         }
     }
 }

@@ -106,4 +106,11 @@ public interface IGitPlugin : IPlugin
     /// <summary>Liefert die für dieses Plugin verfügbaren Repositories aus der externen Quelle.</summary>
     /// <param name="ct">Cancellation Token.</param>
     Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default);
+
+    /// <summary>Ruft die Verzeichnisstruktur eines externen Repositories ab (bis zu einer bestimmten Tiefe).</summary>
+    /// <param name="repositoryUrl">URL des Repositories.</param>
+    /// <param name="maxDepth">Maximale Tiefe der abgerufenen Verzeichnisstruktur.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(GetRepositoryStructureAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 }

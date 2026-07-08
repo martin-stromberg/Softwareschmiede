@@ -245,6 +245,37 @@ public sealed class GitOrchestrationService
         return Regex.IsMatch(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
+    /// <summary>
+    /// Validiert nach einem erfolgreichen Git-Klon, dass das in <paramref name="startConfig"/> konfigurierte
+    /// Arbeitsverzeichnis innerhalb des geklonten Repositories existiert.
+    /// </summary>
+    /// <param name="clonePath">Pfad zum geklonten Repository (Repository-Root).</param>
+    /// <param name="startConfig">Optionale Startkonfiguration des Repositories (z. B. Arbeitsverzeichnis).</param>
+    public Task ValidateWorkingDirectoryAfterCloneAsync(string clonePath, RepositoryStartKonfiguration? startConfig)
+    {
+        if (startConfig?.WorkingDirectoryRelativePath is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            var effectiveWorkdir = WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory(clonePath, startConfig.WorkingDirectoryRelativePath);
+            WorkingDirectoryResolver.ValidateWorkingDirectory(effectiveWorkdir, clonePath);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or DirectoryNotFoundException)
+        {
+            _logger.LogError(
+                ex,
+                "Arbeitsverzeichnis '{WorkingDirectoryRelativePath}' konnte nach dem Klon von '{ClonePath}' nicht validiert werden.",
+                startConfig.WorkingDirectoryRelativePath,
+                clonePath);
+            throw;
+        }
+
+        return Task.CompletedTask;
+    }
+
     /// <summary>Ermittelt die Repository-ID aus der Aufgabe oder dem zugehörigen Projekt.</summary>
     private async Task<string> ResolveRepositoryIdAsync(Aufgabe aufgabe, CancellationToken ct)
     {

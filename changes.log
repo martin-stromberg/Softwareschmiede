@@ -1,3 +1,15 @@
+## 2026-07-08 — Arbeitsverzeichnis-Auswahl für KI-Ausführung
+
+- Feature: Repository-Auswahl-Dialog erweitert um Arbeitsverzeichnis-Auswahl — Benutzer können beim Zuweisen eines Repositories ein Unterverzeichnis als Startpunkt für die CLI-Ausführung auswählen.
+- Neue Entity-Property: `RepositoryStartKonfiguration.WorkingDirectoryRelativePath` speichert den relativen Pfad zum Arbeitsverzeichnis persistiert in der Datenbank.
+- Service-Komponente `DirectoryStructureBrowserService` ruft die Verzeichnisstruktur externer Repositories über das Git-Plugin ab (mit 5-Minuten-Caching).
+- Path-Traversal-Sicherung: `WorkingDirectoryResolver` validiert, dass der aufgelöste absolute Pfad innerhalb des Repository-Roots liegt.
+- UI-Komponente `RepositoryAssignViewModel` erweitert um `AvailableWorkingDirectories`, `SelectedWorkingDirectory` und `IsLoadingDirectoryStructure`.
+- RepositoryAssignDialog.xaml erweitert um ComboBox für Arbeitsverzeichnis-Auswahl und Lade-Indikator.
+- CLI-Start: `KiAusfuehrungsService.StartCliAsync()` und `StartWithPseudoConsoleAsync()` verwenden das konfigurierte Arbeitsverzeichnis statt Repository-Root.
+- Fehler-Behandlung: Bekannte Einschränkung — Kein Git-Plugin implementiert aktuell `IGitPlugin.GetRepositoryStructureAsync()`, daher zeigt der Dialog nur "." (Repository-Root) an; die Infrastruktur ist aber bereit für die Implementierung in Plugins.
+- Bestehende Konfigurationen ohne `WorkingDirectoryRelativePath` werden weiterhin als Repository-Root (`null`) behandelt — volle Abwärtskompatibilität.
+
 ## 2026-07-08 — CI/CD-Release-Pipeline mit Semantic Release und GitHub Actions
 
 - Neuer GitHub-Actions-Workflow `.github/workflows/release.yml`: Job `release` erstellt bei jedem Push auf `main` automatisch eine versionierte GitHub-Release inkl. `release.zip`-Anhang, basierend auf Semantic Release (Conventional Commits).

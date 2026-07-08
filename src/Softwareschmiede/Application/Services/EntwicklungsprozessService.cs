@@ -132,7 +132,14 @@ public sealed class EntwicklungsprozessService
             }
 
             var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
-            await _options.KiAusfuehrungsService.StartWithPseudoConsoleAsync(aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct);
+
+            RepositoryStartKonfiguration? startConfig = null;
+            if (aufgabe.GitRepositoryId is { } repositoryId && _options.ProjektService is not null)
+            {
+                startConfig = await _options.ProjektService.GetRepositoryStartKonfigurationAsync(repositoryId, ct);
+            }
+
+            await _options.KiAusfuehrungsService.StartWithPseudoConsoleAsync(aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct, startConfig);
         }
         catch (OperationCanceledException)
         {

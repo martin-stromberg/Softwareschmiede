@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Softwareschmiede.Infrastructure.Data;
 
@@ -10,9 +11,11 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Migrations
 {
     [DbContext(typeof(SoftwareschmiededDbContext))]
-    partial class SoftwareschmiededDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260708181234_202607080001_AddWorkingDirectoryToRepositoryStartKonfiguration")]
+    partial class _202607080001_AddWorkingDirectoryToRepositoryStartKonfiguration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");

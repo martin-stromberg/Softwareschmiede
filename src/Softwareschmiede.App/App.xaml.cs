@@ -151,6 +151,10 @@ public sealed partial class App : System.Windows.Application
         services.AddDbContext<SoftwareschmiededDbContext>(options =>
             options.UseSqlite($"Data Source={dbPath}"));
 
+        services.AddMemoryCache();
+        services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
+        services.AddSingleton<DirectoryStructureBrowserService>();
+
         // Domain Services
         services.AddScoped<AufgabeService>();
         services.AddScoped<ProjektService>();
