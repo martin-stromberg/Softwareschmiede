@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.0.0...v1.0.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* pull-requests-Berechtigung fuer Release-Workflow ergaenzen ([4b4ef25](https://github.com/martin-stromberg/Softwareschmiede/commit/4b4ef2522e66e0681e240716a74ba5a30bd1d3b9))
+
 # 1.0.0 (2026-07-08)
 
 
