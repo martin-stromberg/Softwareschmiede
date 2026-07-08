@@ -7,6 +7,11 @@ on:
 
 permissions:
   contents: write
+  # Der "success"-Schritt von @semantic-release/github listet die Commits verknuepfter PRs auf
+  # (GET /pulls/{number}/commits), um sie zu kommentieren. Ohne pull-requests: read schlaegt
+  # dieser Schritt mit 403 "Resource not accessible by integration" fehl (Release selbst war
+  # davon nicht betroffen, nur die abschliessende PR-Benachrichtigung).
+  pull-requests: read
 
 # Verhindert parallele Release-Laeufe (z. B. schneller Merge nach main + manueller Tag-Push
 # kurz danach): Semantic Release berechnet die naechste Version aus dem zuletzt existierenden
