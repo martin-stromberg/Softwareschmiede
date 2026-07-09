@@ -1,3 +1,17 @@
+# [1.1.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.0.1...v1.1.0) (2026-07-09)
+
+
+### Bug Fixes
+
+* Arbeitsverzeichnis-Aufloesung im InSourceDirectory-Modus und Remote-Verzeichnisstruktur fuer GitHub/BitBucket (Issue [#98](https://github.com/martin-stromberg/Softwareschmiede/issues/98)) ([5299724](https://github.com/martin-stromberg/Softwareschmiede/commit/5299724033dfee4417d7f9cc16b169e1a8cf2d1c))
+* dispatch repository structure lookup ([add392d](https://github.com/martin-stromberg/Softwareschmiede/commit/add392d065a174698b3a0e0403cd39df75ed7597))
+
+
+### Features
+
+* Arbeitsverzeichnis nachtraeglich bearbeitbar, Verzeichnisstruktur-Abruf implementiert (Issue [#98](https://github.com/martin-stromberg/Softwareschmiede/issues/98)) ([46ea76c](https://github.com/martin-stromberg/Softwareschmiede/commit/46ea76ce58a3ab93cd30927e51da86f745a7292b))
+* konfigurierbares Arbeitsverzeichnis fuer KI-Ausfuehrung ([3f0bd9c](https://github.com/martin-stromberg/Softwareschmiede/commit/3f0bd9c105b7e5308af3bd90d9f8f318526925b3))
+
 ## [1.0.1](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.0.0...v1.0.1) (2026-07-08)
 
 
