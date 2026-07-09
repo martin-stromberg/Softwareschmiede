@@ -686,6 +686,10 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return "main";
     }
 
+    // GetRepositoryStructureAsync wird bewusst nicht überschrieben: GetAvailableRepositoriesAsync liefert
+    // ausschließlich Remote-URLs (kein garantierter lokaler Klon-Pfad), daher bleibt die Default-Implementierung
+    // aus IGitPlugin (NotSupportedException) unverändert bestehen.
+
     private static void UpdateNetrcEntry(string netrcPath, string host, string user, string appPassword)
     {
         var existingContent = File.Exists(netrcPath) ? File.ReadAllText(netrcPath) : string.Empty;

@@ -11,11 +11,15 @@ namespace Softwareschmiede.Application.Services;
 /// <param name="ProjektService">Optionaler Dienst zum Auflösen von Projekt-Repositories.</param>
 /// <param name="RepositoryStartskriptService">Optionaler Dienst zum Ausführen von Repository-Startskripten.</param>
 /// <param name="KiAusfuehrungsService">Optionaler Dienst zum Starten der KI-CLI.</param>
+/// <param name="GitOrchestrationService">
+/// Optionaler Dienst zur Validierung des konfigurierten Arbeitsverzeichnisses direkt nach dem Git-Klon.
+/// </param>
 /// <returns>Eine neue Instanz mit den angegebenen optionalen Abhängigkeiten.</returns>
 public sealed record EntwicklungsprozessServiceOptions(
     ProjektService? ProjektService = null,
     RepositoryStartskriptService? RepositoryStartskriptService = null,
-    KiAusfuehrungsService? KiAusfuehrungsService = null);
+    KiAusfuehrungsService? KiAusfuehrungsService = null,
+    GitOrchestrationService? GitOrchestrationService = null);
 
 /// <summary>
 /// Koordiniert Git-Repository-Setup für Aufgaben und Rate-Limit-Marker-Erkennung.
@@ -91,6 +95,12 @@ public sealed class EntwicklungsprozessService
         var repository = await ResolveRepositoryAsync(aufgabe, repositoryUrl, ct);
         var gitPlugin = await ResolvePluginAsync(repository, selectedScmPluginPrefix, aufgabeId, ct);
         var lokalerKlonPfad = await PrepareCloneDirectoryAsync(gitPlugin, repository.RepositoryUrl, aufgabeId, ct);
+
+        if (_options.GitOrchestrationService is not null)
+        {
+            await _options.GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(lokalerKlonPfad, repository.StartKonfiguration);
+        }
+
         var (branchName, nutzeExistierendenBranch) = await SetupBranchAsync(gitPlugin, repository.RepositoryUrl, lokalerKlonPfad, basisBranchName, aufgabe, ct);
         await FinalizeStartAsync(aufgabeId, aufgabe, repository, lokalerKlonPfad, branchName, nutzeExistierendenBranch, ct);
 

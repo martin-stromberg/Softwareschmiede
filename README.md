@@ -106,14 +106,17 @@ Stand: **2026-07-08**
 
 - **Relative Pfadkonfiguration:** Für jedes Repository-Startskript kann ein Arbeitsverzeichnis relativ zum Repository-Root definiert werden (z. B. `"backend"`, `"apps/cli"`, `"."` für Root)
 - **UI-Dialog mit Vorschau:** Bei der Repository-Zuweisung werden die verfügbaren Verzeichnisse aus dem externen Repository vorgeladen und als ComboBox angezeigt
-- **Verzeichnisstruktur-Abruf:** Neue `DirectoryStructureBrowserService` mit konfigurierbarem Abruf (Default 2 Ebenen) und Memory-Cache (5 Min TTL)
-- **Path-Traversal-Sicherheit:** Validierung gegen `../../../etc`-Pfade mittels `Path.GetFullPath()` und `StartsWith()`-Checks
+- **Nachträgliches Bearbeiten:** Neuer Dialog „Arbeitsverzeichnis bearbeiten" (Ribbon-Button „Arbeitsverzeichnis" auf der Projektdetailseite) erlaubt die Änderung des Arbeitsverzeichnisses eines bereits zugewiesenen Repositories, ohne dieses neu zuzuweisen — siehe `ArbeitsverzeichnisBearbeitenDialog`/`ArbeitsverzeichnisBearbeitenViewModel`
+- **Verzeichnisstruktur-Abruf:** `IGitPlugin.GetRepositoryStructureAsync()` (Default-Implementierung wirft `NotSupportedException`) ist für `LocalDirectoryPlugin` vollständig implementiert (rekursiv bis konfigurierbarer Tiefe, `.git`-Ausschluss, Reparse-Point-Schutz); Remote-Provider (GitHub, BitBucket) fallen bewusst auf Root (`"."`) zurück. `DirectoryStructureBrowserService` cacht Ergebnisse (Default 2 Ebenen, 5 Min TTL)
+- **Path-Traversal-Sicherheit:** Validierung gegen `../../../etc`-Pfade sowie Sibling-Präfix-Escapes (z. B. `"task-1"` vs. `"task-12"`) mittels `Path.GetFullPath()`-Normalisierung und Root-Präfix-Check in `WorkingDirectoryResolver`
 - **Fehlerrobustheit:** Falls Verzeichnisabruf fehlschlägt, wird Root (`"."`) als Fallback verwendet; existierende Verzeichnisse müssen nach Klon vorhanden sein
+- **Frühe Validierung nach Klon:** `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` prüft direkt nach dem Git-Klon (vor Branch-Erstellung), ob das konfigurierte Arbeitsverzeichnis existiert — liefert ein früheres, klareres Fehlerbild als erst beim CLI-Start
 - **CLI-Ausführung:** `KiAusfuehrungsService` löst das effektive Arbeitsverzeichnis auf und übergibt es dem Prozess-Starter als Working Directory
 - **Datenbankschema:** Neue nullable Spalte `WorkingDirectoryRelativePath` in `RepositoryStartKonfiguration`
 - **Konfiguration:** Neue `appsettings`-Einträge `DirectoryStructureCacheDurationSeconds` (300), `DirectoryStructureMaxDepth` (2), `DirectoryStructureEnabled` (true)
-- **Betroffene Komponenten:** `RepositoryStartKonfiguration`, `KiAusfuehrungsService`, `DirectoryStructureBrowserService`, `RepositoryAssignViewModel`, `RepositoryAssignDialog.xaml`
-- **Tests:** Unit-Tests für Pfad-Auflösung, Path-Traversal-Prevention, Verzeichnis-Validierung, Caching-Verhalten; E2E-Tests für Dialog und CLI-Prozessausführung
+- **Betroffene Komponenten:** `RepositoryStartKonfiguration`, `KiAusfuehrungsService`, `GitOrchestrationService`, `DirectoryStructureBrowserService`, `RepositoryAssignViewModel`, `RepositoryAssignDialog.xaml`, `ArbeitsverzeichnisBearbeitenViewModel`, `ArbeitsverzeichnisBearbeitenDialog.xaml`, `LocalDirectoryPlugin`
+- **Tests:** Unit-Tests für Pfad-Auflösung, Path-Traversal-Prevention, Verzeichnis-Validierung, Caching-Verhalten, Verzeichnisstruktur-Abruf (inkl. Abbruch während Traversierung); E2E-Tests für Dialog und CLI-Prozessausführung
+- **Bekannte Einschränkung:** Für `LocalDirectoryPlugin` im Workspace-Modus „Im Quellverzeichnis arbeiten" (`InSourceDirectory`) wird ein konfiguriertes Arbeitsunterverzeichnis derzeit nicht zuverlässig aufgelöst (betrifft nur diese spezielle Kombination); siehe Projekt-internes Nacharbeiten-Dokument zu Issue #98 für die geplante Lösung
 
 **Beispiel-Dateiinhalt (`issue.md`):**
 
@@ -698,10 +701,20 @@ Für Monorepos und Monolithen können Sie ein Unterverzeichnis definieren, in de
 4. **Zuweisung speichern** — Das Arbeitsverzeichnis wird persistiert
 5. **KI-Ausführung** — Das Startskript und alle folgenden Operationen laufen im angegebenen Verzeichnis
 
+**Nachträglich ändern:** Auf der Projektdetailseite über den Ribbon-Button **„Arbeitsverzeichnis"**
+(Gruppe „Repository", nur aktiv bei ausgewähltem Repository) kann das Arbeitsverzeichnis eines bereits
+zugewiesenen Repositories jederzeit angepasst werden, ohne die Zuweisung selbst zu wiederholen.
+
 **Fehlbehandlung:**
-- Falls das angegebene Verzeichnis nach dem Klon nicht existiert, wird ein Fehler mit aussagekräftiger Meldung angezeigt
+- Das konfigurierte Verzeichnis wird direkt nach dem Klon geprüft (vor Branch-Erstellung/Startskript) und
+  zusätzlich erneut beim CLI-Start; existiert es nicht, wird ein Fehler mit aussagekräftiger Meldung angezeigt
 - Path-Traversal-Versuche (z. B. `"../../../etc"`) werden aus Sicherheitsgründen blockiert
 - Bei Offline-Repositories wird nur das Root-Verzeichnis `"."` angeboten
+- **Bekannte Einschränkung:** Im `LocalDirectoryPlugin`-Workspace-Modus `InSourceDirectory` (siehe unten)
+  wird ein konfiguriertes Unterverzeichnis derzeit nicht zuverlässig gefunden, da die Validierung gegen das
+  (in diesem Modus nur als Zeiger dienende) Klon-Zielverzeichnis statt gegen den tatsächlichen Quellordner
+  prüft. Betrifft ausschließlich diese Kombination aus lokalem Quellverzeichnis-Modus + Unterverzeichnis
+  ungleich `"."`.
 
 **Konfigurierbare Einstellungen** (in `appsettings.json`):
 - `DirectoryStructureMaxDepth` (int, Default: 2) — Maximale Verzeichnis-Tiefe beim Abruf

@@ -68,7 +68,7 @@ Beim Ändern des `SelectedRepository` wird die folgende Sequenz ausgelöst:
 
 **Fehlerbehandlung:** Falls Abruf fehlschlägt (z. B. Private Repository ohne Auth), wird ein Fehler geloggt; die Collection wird geleert, aber `"."` wird dennoch angezeigt, sodass der Benutzer mindestens den Root wählen kann.
 
-**Einschränkung:** Sofern das Git-Plugin die Methode `IGitPlugin.GetRepositoryStructureAsync()` nicht implementiert, wird `NotSupportedException` geworfen und nur `"."` angezeigt. Dies ist die aktuelle Situation — die Infrastruktur ist bereit, sobald Plugins die Methode implementieren.
+**Einschränkung:** Die Unterverzeichnis-Auswahl steht aktuell nur für lokale Verzeichnis-Repositories (`LocalDirectoryPlugin`) tatsächlich zur Verfügung, da dieses Plugin `IGitPlugin.GetRepositoryStructureAsync()` implementiert. Remote-Provider-Plugins (GitHub, BitBucket) behalten bewusst die `NotSupportedException`-Default-Implementierung des Interfaces, weil `GetAvailableRepositoriesAsync()` bei ihnen nur Remote-URLs ohne garantierten lokalen Klon-Pfad liefert. Für über GitHub/BitBucket zugewiesene Repositories wird die `NotSupportedException` von `DirectoryStructureBrowserService` abgefangen, sodass nur `"."` (Root) auswählbar ist.
 
 ### Verwendung des Arbeitsverzeichnisses
 
@@ -77,7 +77,9 @@ Das ausgewählte `SelectedWorkingDirectory` wird mit der `RepositoryStartKonfigu
 - Path-Traversal-Angriffe zu verhindern (Validierung, dass normalisierter Pfad innerhalb normalisierten Roots liegt)
 - Existenz des Zielverzeichnisses zu prüfen
 
-Der resultierende Pfad wird an `KiAusfuehrungsService.StartCliAsync()` / `StartWithPseudoConsoleAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben.
+Der resultierende Pfad wird an `KiAusfuehrungsService.StartCliAsync()` / `StartWithPseudoConsoleAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben. Zusätzlich validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` das konfigurierte Arbeitsverzeichnis bereits direkt nach dem Git-Klon (aufgerufen aus `EntwicklungsprozessService.ProzessStartenAsync`), sodass ein fehlendes oder ungültiges Verzeichnis früher und mit einem klareren Fehlerbild erkannt wird als erst beim CLI-Start.
+
+Das einmal zugewiesene Arbeitsverzeichnis kann jederzeit nachträglich geändert werden, ohne das Repository neu zuzuweisen — siehe [Dialog „Arbeitsverzeichnis bearbeiten"](dialog-arbeitsverzeichnis-bearbeiten.md).
 
 ## Szenarios
 

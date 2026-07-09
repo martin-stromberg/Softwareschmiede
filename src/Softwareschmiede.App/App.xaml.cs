@@ -160,6 +160,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ProjektService>();
         services.AddScoped<ProtokollService>();
         services.AddScoped<RepositoryStartskriptService>();
+        services.AddScoped<GitOrchestrationService>();
         services.AddScoped<EntwicklungsprozessService>(sp => new EntwicklungsprozessService(
             sp.GetRequiredService<AufgabeService>(),
             sp.GetRequiredService<ProtokollService>(),
@@ -169,7 +170,8 @@ public sealed partial class App : System.Windows.Application
             new EntwicklungsprozessServiceOptions(
                 ProjektService: sp.GetRequiredService<ProjektService>(),
                 RepositoryStartskriptService: sp.GetRequiredService<RepositoryStartskriptService>(),
-                KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>()),
+                KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>(),
+                GitOrchestrationService: sp.GetRequiredService<GitOrchestrationService>()),
             sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
         services.AddScoped<BenachrichtigungsService>();
         services.AddScoped<BenachrichtigungsEinstellungenService>();
@@ -211,6 +213,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<ProjectListViewModel>();
         services.AddTransient<ProjectDetailViewModel>();
         services.AddTransient<RepositoryAssignViewModel>();
+        services.AddTransient<ArbeitsverzeichnisBearbeitenViewModel>();
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<IssueSelectionDialogViewModel>();

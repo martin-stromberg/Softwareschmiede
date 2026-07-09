@@ -53,6 +53,12 @@ public sealed class DirectoryStructureBrowserService
             _cache.Set(cacheKey, directories, TimeSpan.FromSeconds(_options.CacheDurationSeconds));
             return directories;
         }
+        catch (OperationCanceledException)
+        {
+            // Abbruch (z. B. durch Repository-/Plugin-Wechsel in der UI) ist kein Fehler und muss
+            // an den Aufrufer durchgereicht werden, statt als Warnung geloggt und geschluckt zu werden.
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Fehler beim Laden der Verzeichnisstruktur für {RepositoryUrl}.", repositoryUrl);

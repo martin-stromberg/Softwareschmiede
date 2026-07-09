@@ -74,6 +74,10 @@
                                                         ButtonText="Öffnen"
                                                         AutomationName="Öffnen"
                                                         ButtonCommand="{Binding RepositoryOeffnenCommand}" />
+                            <controls:RibbonSmallButton ButtonIcon="📂"
+                                                        ButtonText="Arbeitsverzeichnis"
+                                                        AutomationName="ArbeitsverzeichnisBearbeiten"
+                                                        ButtonCommand="{Binding ArbeitsverzeichnisBearbeitenCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>

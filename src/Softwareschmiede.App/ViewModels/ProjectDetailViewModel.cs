@@ -189,6 +189,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet das Repository im Browser.</summary>
     public ICommand RepositoryOeffnenCommand { get; }
 
+    /// <summary>Öffnet den Dialog zur nachträglichen Bearbeitung des Arbeitsverzeichnisses des zugewiesenen Repositories.</summary>
+    public ICommand ArbeitsverzeichnisBearbeitenCommand { get; }
+
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
         ProjektService projektService,
@@ -216,6 +219,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         FilterCommand = new RelayCommand(() => IsFilterOverlayVisible = !IsFilterOverlayVisible);
         RepositoryZuweisenCommand = new AsyncRelayCommand(RepositoryZuweisenAsync, () => _projektId != Guid.Empty);
         RepositoryOeffnenCommand = new RelayCommand(RepositoryOeffnen, () => _selectedRepository != null);
+        ArbeitsverzeichnisBearbeitenCommand = new AsyncRelayCommand(ArbeitsverzeichnisBearbeitenAsync, () => _selectedRepository != null);
         AufgabeAusIssueErstellenCommand = new AsyncRelayCommand<Issue>(AufgabeAusIssueErstellenAsync);
     }
 
@@ -424,6 +428,45 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Öffnen der Repository-URL.");
+            SetFehler(ex);
+        }
+    }
+
+    private async Task ArbeitsverzeichnisBearbeitenAsync(CancellationToken ct)
+    {
+        if (_selectedRepository == null)
+            return;
+
+        var repository = _selectedRepository;
+
+        try
+        {
+            var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
+                .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+
+            var vm = _serviceProvider.GetRequiredService<ArbeitsverzeichnisBearbeitenViewModel>();
+            await vm.LadenAsync(gitPlugin, repository.RepositoryUrl, repository.StartKonfiguration?.WorkingDirectoryRelativePath, ct);
+
+            var confirmed = _dialogService.ArbeitsverzeichnisBearbeitenDialog(vm);
+
+            if (_disposed || ct.IsCancellationRequested)
+                return;
+
+            if (confirmed)
+            {
+                await _projektService.SaveRepositoryWorkingDirectoryAsync(repository.Id, vm.SelectedWorkingDirectory, ct);
+
+                if (!_disposed && !ct.IsCancellationRequested)
+                    await LadenAsync(ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Bearbeiten des Arbeitsverzeichnisses für Repository {RepositoryId}.", repository.Id);
             SetFehler(ex);
         }
     }

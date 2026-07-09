@@ -215,34 +215,24 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        try
-        {
-            IsLoadingDirectoryStructure = true;
-            var directories = await _directoryStructureService.GetDirectoriesAsync(SelectedScmPlugin, SelectedRepository.Url, ct);
-            ct.ThrowIfCancellationRequested();
+        var directories = await DirectoryStructureLoadHelper.LoadWithLoadingStateAsync(
+            _directoryStructureService,
+            SelectedScmPlugin,
+            SelectedRepository.Url,
+            _logger,
+            isLoading => IsLoadingDirectoryStructure = isLoading,
+            ct);
 
-            AvailableWorkingDirectories.Clear();
-            AvailableWorkingDirectories.Add(".");
-            foreach (var dir in directories)
-                AvailableWorkingDirectories.Add(dir);
+        if (directories is null)
+        {
+            // Abgebrochen durch Repository-/Plugin-Wechsel — kein Fehler, bisheriger Zustand bleibt unverändert.
+            return;
+        }
 
-            SelectedWorkingDirectory = ".";
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Abgebrochen durch Repository-/Plugin-Wechsel — kein Fehler
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Fehler beim Laden der Verzeichnisstruktur.");
-            AvailableWorkingDirectories.Clear();
-            AvailableWorkingDirectories.Add(".");
-            SelectedWorkingDirectory = ".";
-        }
-        finally
-        {
-            if (!ct.IsCancellationRequested)
-                IsLoadingDirectoryStructure = false;
-        }
+        AvailableWorkingDirectories.Clear();
+        foreach (var dir in directories)
+            AvailableWorkingDirectories.Add(dir);
+
+        SelectedWorkingDirectory = ".";
     }
 }

@@ -596,4 +596,7 @@ password {token}
         return "main";
     }
 
+    // GetRepositoryStructureAsync wird bewusst nicht überschrieben: GetAvailableRepositoriesAsync liefert
+    // ausschließlich Remote-URLs (kein garantierter lokaler Klon-Pfad), daher bleibt die Default-Implementierung
+    // aus IGitPlugin (NotSupportedException) unverändert bestehen.
 }

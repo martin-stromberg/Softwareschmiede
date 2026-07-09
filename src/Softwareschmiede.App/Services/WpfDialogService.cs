@@ -36,6 +36,17 @@ public sealed class WpfDialogService : IDialogService
         });
 
     /// <inheritdoc/>
+    public bool ArbeitsverzeichnisBearbeitenDialog(ArbeitsverzeichnisBearbeitenViewModel viewModel)
+        => System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            var dialog = new ArbeitsverzeichnisBearbeitenDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            return dialog.ShowDialog() == true;
+        });
+
+    /// <inheritdoc/>
     public Task<PluginSelectionResult> ShowPluginSelectionDialogAsync(
         IEnumerable<string> availablePlugins,
         string? currentSelection,
