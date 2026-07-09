@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
@@ -77,6 +78,30 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         paths.Should().NotContain("backend/src/too-deep");
         paths.Should().NotContain("backend/README.md");
         result.Should().OnlyContain(e => e.IsDirectory);
+    }
+
+    /// <summary>
+    /// Regressionstest: Der produktive Aufruf kann über die gemeinsame Plugin-Basisklasse laufen. In diesem Fall
+    /// muss die GitHub-Implementierung verwendet werden und nicht der NotSupported-Fallback der Basisklasse.
+    /// </summary>
+    [Fact]
+    public async Task GetRepositoryStructureAsync_ShouldDispatchGitHubImplementation_WhenCalledViaBaseClass()
+    {
+        SetupDefaultBranch();
+        const string treeJson = """{ "tree": [ { "path": "src", "type": "tree" } ] }""";
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(args => args.Any(a => a == "repos/owner/repo/git/trees/main?recursive=1")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, treeJson, string.Empty));
+
+        GitPluginBase<GitHubPlugin> plugin = _sut;
+
+        var result = await plugin.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2);
+
+        result.Select(e => e.Path).Should().Contain("src");
     }
 
     /// <summary>Wenn der gh-Aufruf fehlschlägt, wird eine leere Liste zurückgegeben statt einer Exception.</summary>

@@ -693,7 +693,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// entsprechende Self-Hosted-Variante) — ein lokaler Klon ist dafür nicht erforderlich. Ergebnisseiten
     /// werden über den <c>next</c>-Link paginiert durchlaufen.
     /// </remarks>
-    public async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
+    public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
         string repositoryUrl,
         int maxDepth = 2,
         CancellationToken ct = default)

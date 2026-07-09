@@ -603,7 +603,7 @@ password {token}
     /// erforderlich. Damit ist eine Unterverzeichnis-Auswahl bereits vor dem Klon möglich (Hauptanwendungsfall
     /// der Arbeitsverzeichnis-Auswahl).
     /// </remarks>
-    public async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
+    public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
         string repositoryUrl,
         int maxDepth = 2,
         CancellationToken ct = default)
