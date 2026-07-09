@@ -41,6 +41,10 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin
         => throw new NotSupportedException($"'{nameof(MergeToSourceAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 
     /// <inheritdoc/>
+    public virtual Task<string> ResolveEffectiveRepositoryPathAsync(string localPath, CancellationToken ct = default)
+        => Task.FromResult(localPath);
+
+    /// <inheritdoc/>
     public virtual async Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default)
     {
         var result = await RunGitAsync(["checkout", "-b", branchName], localPath, ct);

@@ -251,17 +251,22 @@ public sealed class GitOrchestrationService
     /// </summary>
     /// <param name="clonePath">Pfad zum geklonten Repository (Repository-Root).</param>
     /// <param name="startConfig">Optionale Startkonfiguration des Repositories (z. B. Arbeitsverzeichnis).</param>
-    public Task ValidateWorkingDirectoryAfterCloneAsync(string clonePath, RepositoryStartKonfiguration? startConfig)
+    /// <param name="gitPlugin">
+    /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde (für die Auflösung des
+    /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus,
+    /// wo <paramref name="clonePath"/> nur eine Pointer-Datei enthält). Bleibt <paramref name="gitPlugin"/>
+    /// <c>null</c>, verhält sich die Methode wie zuvor und verwendet <paramref name="clonePath"/> unverändert.
+    /// </param>
+    public async Task ValidateWorkingDirectoryAfterCloneAsync(string clonePath, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin = null)
     {
         if (startConfig?.WorkingDirectoryRelativePath is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         try
         {
-            var effectiveWorkdir = WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory(clonePath, startConfig.WorkingDirectoryRelativePath);
-            WorkingDirectoryResolver.ValidateWorkingDirectory(effectiveWorkdir, clonePath);
+            await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(clonePath, startConfig, gitPlugin, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or DirectoryNotFoundException)
         {
@@ -272,8 +277,6 @@ public sealed class GitOrchestrationService
                 clonePath);
             throw;
         }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>Ermittelt die Repository-ID aus der Aufgabe oder dem zugehörigen Projekt.</summary>

@@ -68,7 +68,13 @@ Beim Ändern des `SelectedRepository` wird die folgende Sequenz ausgelöst:
 
 **Fehlerbehandlung:** Falls Abruf fehlschlägt (z. B. Private Repository ohne Auth), wird ein Fehler geloggt; die Collection wird geleert, aber `"."` wird dennoch angezeigt, sodass der Benutzer mindestens den Root wählen kann.
 
-**Einschränkung:** Die Unterverzeichnis-Auswahl steht aktuell nur für lokale Verzeichnis-Repositories (`LocalDirectoryPlugin`) tatsächlich zur Verfügung, da dieses Plugin `IGitPlugin.GetRepositoryStructureAsync()` implementiert. Remote-Provider-Plugins (GitHub, BitBucket) behalten bewusst die `NotSupportedException`-Default-Implementierung des Interfaces, weil `GetAvailableRepositoriesAsync()` bei ihnen nur Remote-URLs ohne garantierten lokalen Klon-Pfad liefert. Für über GitHub/BitBucket zugewiesene Repositories wird die `NotSupportedException` von `DirectoryStructureBrowserService` abgefangen, sodass nur `"."` (Root) auswählbar ist.
+**Unterstützte Repository-Quellen:** Die Unterverzeichnis-Auswahl funktioniert für alle drei mitgelieferten SCM-Plugins, jeweils rein remote (ohne dass vorher geklont werden muss):
+
+- **`LocalDirectoryPlugin`:** Liest die Verzeichnisstruktur direkt vom lokalen Dateisystem (rekursiv bis `MaxDepth`).
+- **`GitHubPlugin`:** Ruft die Struktur des Standard-Branches über die GitHub Git-Trees-API ab (`gh api repos/{owner}/{repo}/git/trees/{branch}?recursive=1`). Bei sehr großen Repositories (API-Limit ca. 100.000 Einträge/7 MB) kann die Antwort als `truncated` markiert sein; die Anwendung protokolliert dies als Warnung, zeigt aber weiterhin die ermittelten Verzeichnisse an.
+- **`BitbucketPlugin`:** Ruft die Struktur über die Bitbucket-REST-API ab. Im Cloud-Modus über die Source-API (`GET /2.0/repositories/{workspace}/{repo_slug}/src/{branch}/`, paginiert über den `next`-Link, mit rekursivem `max_depth`-Parameter). Im Self-Hosted-Modus (Bitbucket Server/Data Center) über die `browse`-API, die anders als die Cloud-API keine rekursive Tiefenabfrage kennt — die Anwendung baut die Struktur daher levelweise über mehrere API-Aufrufe auf (begrenzt auf `MaxDepth` Ebenen und max. 500 Verzeichnisse pro Ebene als Guardrail).
+
+Kann die Repository-ID nicht aus der URL ermittelt werden oder schlägt der API-Aufruf fehl (z. B. fehlende Berechtigung, nicht erreichbare Instanz), wird ein Fehler protokolliert und `DirectoryStructureBrowserService` liefert eine leere Liste — der Benutzer kann in diesem Fall nur `"."` (Root) wählen, der Dialog bleibt aber vollständig funktionsfähig.
 
 ### Verwendung des Arbeitsverzeichnisses
 

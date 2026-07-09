@@ -906,6 +906,10 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         File.WriteAllText(Path.Combine(normalizedRequested, WorkspacePointerFileName), normalizedResolved);
     }
 
+    /// <inheritdoc/>
+    public override Task<string> ResolveEffectiveRepositoryPathAsync(string localPath, CancellationToken ct = default)
+        => Task.FromResult(ResolveWorkspacePath(localPath));
+
     private string ResolveWorkspacePath(string localPath)
     {
         var normalized = ResolveAndNormalizePath(localPath);

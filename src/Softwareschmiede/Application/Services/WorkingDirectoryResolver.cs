@@ -1,4 +1,5 @@
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Interfaces;
 
 namespace Softwareschmiede.Application.Services;
 
@@ -14,18 +15,40 @@ public static class WorkingDirectoryResolver
     /// Ermittelt das effektive Arbeitsverzeichnis aus Repository-Root und optionaler Startkonfiguration,
     /// inklusive Path-Traversal-Prüfung und Existenz-Validierung, sofern ein Unterverzeichnis konfiguriert ist.
     /// </summary>
-    /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis (Root).</param>
+    /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis (Root), wie er z. B. beim Klon angegeben wurde.</param>
     /// <param name="startConfig">Optionale Startkonfiguration mit dem relativen Arbeitsverzeichnis-Pfad.</param>
+    /// <param name="gitPlugin">
+    /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde. Wird genutzt, um
+    /// <paramref name="localRepoPath"/> vor der Kombination mit dem relativen Arbeitsverzeichnis-Pfad über
+    /// <see cref="IGitPlugin.ResolveEffectiveRepositoryPathAsync"/> in den tatsächlichen Repository-Pfad
+    /// aufzulösen (relevant z. B. für <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus, wo
+    /// <paramref name="localRepoPath"/> nur eine Pointer-Datei enthält). Bleibt <paramref name="gitPlugin"/>
+    /// <c>null</c>, verhält sich die Methode wie zuvor und verwendet <paramref name="localRepoPath"/> unverändert.
+    /// </param>
+    /// <param name="ct">Cancellation Token.</param>
     /// <returns>Das effektive Arbeitsverzeichnis (Repository-Root, falls kein Unterverzeichnis konfiguriert ist).</returns>
-    public static string DetermineEffectiveWorkingDirectory(string localRepoPath, RepositoryStartKonfiguration? startConfig)
+    public static async Task<string> DetermineEffectiveWorkingDirectoryAsync(
+        string localRepoPath,
+        RepositoryStartKonfiguration? startConfig,
+        IGitPlugin? gitPlugin = null,
+        CancellationToken ct = default)
     {
+        // Fällt auf localRepoPath zurück, wenn kein Plugin übergeben wurde oder das Plugin (z. B. ein in Tests
+        // nicht vollständig konfiguriertes Mock-Objekt ohne CallBase) null/leer liefert. Ein produktives Plugin
+        // ohne Override liefert dank der Default-Implementierung in IGitPlugin ohnehin localPath unverändert
+        // zurück; dieser Fallback macht die Auflösung zusätzlich robust gegen unvollständige Test-Doubles.
+        var resolvedByPlugin = gitPlugin is null
+            ? null
+            : await gitPlugin.ResolveEffectiveRepositoryPathAsync(localRepoPath, ct).ConfigureAwait(false);
+        var repositoryRoot = string.IsNullOrWhiteSpace(resolvedByPlugin) ? localRepoPath : resolvedByPlugin;
+
         if (startConfig?.WorkingDirectoryRelativePath is null)
         {
-            return localRepoPath;
+            return repositoryRoot;
         }
 
-        var effectiveWorkdir = ResolveEffectiveWorkingDirectory(localRepoPath, startConfig.WorkingDirectoryRelativePath);
-        ValidateWorkingDirectory(effectiveWorkdir, localRepoPath);
+        var effectiveWorkdir = ResolveEffectiveWorkingDirectory(repositoryRoot, startConfig.WorkingDirectoryRelativePath);
+        ValidateWorkingDirectory(effectiveWorkdir, repositoryRoot);
         return effectiveWorkdir;
     }
 

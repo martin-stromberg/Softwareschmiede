@@ -107,16 +107,15 @@ Stand: **2026-07-08**
 - **Relative Pfadkonfiguration:** Für jedes Repository-Startskript kann ein Arbeitsverzeichnis relativ zum Repository-Root definiert werden (z. B. `"backend"`, `"apps/cli"`, `"."` für Root)
 - **UI-Dialog mit Vorschau:** Bei der Repository-Zuweisung werden die verfügbaren Verzeichnisse aus dem externen Repository vorgeladen und als ComboBox angezeigt
 - **Nachträgliches Bearbeiten:** Neuer Dialog „Arbeitsverzeichnis bearbeiten" (Ribbon-Button „Arbeitsverzeichnis" auf der Projektdetailseite) erlaubt die Änderung des Arbeitsverzeichnisses eines bereits zugewiesenen Repositories, ohne dieses neu zuzuweisen — siehe `ArbeitsverzeichnisBearbeitenDialog`/`ArbeitsverzeichnisBearbeitenViewModel`
-- **Verzeichnisstruktur-Abruf:** `IGitPlugin.GetRepositoryStructureAsync()` (Default-Implementierung wirft `NotSupportedException`) ist für `LocalDirectoryPlugin` vollständig implementiert (rekursiv bis konfigurierbarer Tiefe, `.git`-Ausschluss, Reparse-Point-Schutz); Remote-Provider (GitHub, BitBucket) fallen bewusst auf Root (`"."`) zurück. `DirectoryStructureBrowserService` cacht Ergebnisse (Default 2 Ebenen, 5 Min TTL)
+- **Verzeichnisstruktur-Abruf:** `IGitPlugin.GetRepositoryStructureAsync()` ist für alle drei mitgelieferten SCM-Plugins implementiert — `LocalDirectoryPlugin` (rekursiv bis konfigurierbarer Tiefe, `.git`-Ausschluss, Reparse-Point-Schutz), `GitHubPlugin` (remote über die GitHub Git-Trees-API, `gh api repos/{owner}/{repo}/git/trees/{branch}?recursive=1`, kein lokaler Klon nötig, Warnung bei `truncated`-Antworten) und `BitbucketPlugin` (remote über die Bitbucket-REST-API; Cloud rekursiv über die Source-API mit `next`-Link-Pagination, Self-Hosted levelweise über die `browse`-API mangels rekursivem Tiefen-Parameter). `DirectoryStructureBrowserService` cacht Ergebnisse (Default 2 Ebenen, 5 Min TTL)
 - **Path-Traversal-Sicherheit:** Validierung gegen `../../../etc`-Pfade sowie Sibling-Präfix-Escapes (z. B. `"task-1"` vs. `"task-12"`) mittels `Path.GetFullPath()`-Normalisierung und Root-Präfix-Check in `WorkingDirectoryResolver`
-- **Fehlerrobustheit:** Falls Verzeichnisabruf fehlschlägt, wird Root (`"."`) als Fallback verwendet; existierende Verzeichnisse müssen nach Klon vorhanden sein
+- **Fehlerrobustheit:** Falls Verzeichnisabruf fehlschlägt (fehlende Berechtigung, nicht parsbare Repository-URL, API-Fehler), wird Root (`"."`) als Fallback verwendet; existierende Verzeichnisse müssen nach Klon vorhanden sein
 - **Frühe Validierung nach Klon:** `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` prüft direkt nach dem Git-Klon (vor Branch-Erstellung), ob das konfigurierte Arbeitsverzeichnis existiert — liefert ein früheres, klareres Fehlerbild als erst beim CLI-Start
-- **CLI-Ausführung:** `KiAusfuehrungsService` löst das effektive Arbeitsverzeichnis auf und übergibt es dem Prozess-Starter als Working Directory
+- **CLI-Ausführung:** `KiAusfuehrungsService` löst das effektive Arbeitsverzeichnis auf und übergibt es dem Prozess-Starter als Working Directory. Dabei wird der tatsächliche Repository-Pfad zuerst über `IGitPlugin.ResolveEffectiveRepositoryPathAsync(...)` aufgelöst (relevant für `LocalDirectoryPlugin` im Workspace-Modus `InSourceDirectory`, wo der Klon-Pfad nur eine Pointer-Datei auf das tatsächliche Quellverzeichnis enthält), bevor der relative Arbeitsverzeichnis-Pfad kombiniert wird
 - **Datenbankschema:** Neue nullable Spalte `WorkingDirectoryRelativePath` in `RepositoryStartKonfiguration`
 - **Konfiguration:** Neue `appsettings`-Einträge `DirectoryStructureCacheDurationSeconds` (300), `DirectoryStructureMaxDepth` (2), `DirectoryStructureEnabled` (true)
-- **Betroffene Komponenten:** `RepositoryStartKonfiguration`, `KiAusfuehrungsService`, `GitOrchestrationService`, `DirectoryStructureBrowserService`, `RepositoryAssignViewModel`, `RepositoryAssignDialog.xaml`, `ArbeitsverzeichnisBearbeitenViewModel`, `ArbeitsverzeichnisBearbeitenDialog.xaml`, `LocalDirectoryPlugin`
-- **Tests:** Unit-Tests für Pfad-Auflösung, Path-Traversal-Prevention, Verzeichnis-Validierung, Caching-Verhalten, Verzeichnisstruktur-Abruf (inkl. Abbruch während Traversierung); E2E-Tests für Dialog und CLI-Prozessausführung
-- **Bekannte Einschränkung:** Für `LocalDirectoryPlugin` im Workspace-Modus „Im Quellverzeichnis arbeiten" (`InSourceDirectory`) wird ein konfiguriertes Arbeitsunterverzeichnis derzeit nicht zuverlässig aufgelöst (betrifft nur diese spezielle Kombination); siehe Projekt-internes Nacharbeiten-Dokument zu Issue #98 für die geplante Lösung
+- **Betroffene Komponenten:** `RepositoryStartKonfiguration`, `KiAusfuehrungsService`, `GitOrchestrationService`, `DirectoryStructureBrowserService`, `RepositoryAssignViewModel`, `RepositoryAssignDialog.xaml`, `ArbeitsverzeichnisBearbeitenViewModel`, `ArbeitsverzeichnisBearbeitenDialog.xaml`, `LocalDirectoryPlugin`, `GitHubPlugin`, `BitbucketPlugin`, `IGitPlugin.ResolveEffectiveRepositoryPathAsync`
+- **Tests:** Unit-Tests für Pfad-Auflösung, Path-Traversal-Prevention, Verzeichnis-Validierung, Caching-Verhalten, Verzeichnisstruktur-Abruf (inkl. Abbruch während Traversierung, GitHub/BitBucket-Remote-Abruf mit gemocktem `ICliRunner`); Regressionstests für `LocalDirectoryPlugin` im `InSourceDirectory`-Modus gegen `KiAusfuehrungsService`/`GitOrchestrationService`; E2E-Tests für Dialog und CLI-Prozessausführung
 
 **Beispiel-Dateiinhalt (`issue.md`):**
 
@@ -709,12 +708,11 @@ zugewiesenen Repositories jederzeit angepasst werden, ohne die Zuweisung selbst 
 - Das konfigurierte Verzeichnis wird direkt nach dem Klon geprüft (vor Branch-Erstellung/Startskript) und
   zusätzlich erneut beim CLI-Start; existiert es nicht, wird ein Fehler mit aussagekräftiger Meldung angezeigt
 - Path-Traversal-Versuche (z. B. `"../../../etc"`) werden aus Sicherheitsgründen blockiert
-- Bei Offline-Repositories wird nur das Root-Verzeichnis `"."` angeboten
-- **Bekannte Einschränkung:** Im `LocalDirectoryPlugin`-Workspace-Modus `InSourceDirectory` (siehe unten)
-  wird ein konfiguriertes Unterverzeichnis derzeit nicht zuverlässig gefunden, da die Validierung gegen das
-  (in diesem Modus nur als Zeiger dienende) Klon-Zielverzeichnis statt gegen den tatsächlichen Quellordner
-  prüft. Betrifft ausschließlich diese Kombination aus lokalem Quellverzeichnis-Modus + Unterverzeichnis
-  ungleich `"."`.
+- Bei Repositories, deren Verzeichnisstruktur nicht ermittelt werden kann (z. B. fehlende Berechtigung,
+  nicht erreichbare Remote-API), wird nur das Root-Verzeichnis `"."` angeboten
+- Im `LocalDirectoryPlugin`-Workspace-Modus `InSourceDirectory` (siehe unten) wird ein konfiguriertes
+  Unterverzeichnis korrekt gegen den tatsächlichen Quellordner geprüft, nicht gegen das in diesem Modus nur
+  als Zeiger dienende Klon-Zielverzeichnis (`IGitPlugin.ResolveEffectiveRepositoryPathAsync(...)`)
 
 **Konfigurierbare Einstellungen** (in `appsettings.json`):
 - `DirectoryStructureMaxDepth` (int, Default: 2) — Maximale Verzeichnis-Tiefe beim Abruf

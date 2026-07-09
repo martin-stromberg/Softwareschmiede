@@ -98,7 +98,7 @@ public sealed class EntwicklungsprozessService
 
         if (_options.GitOrchestrationService is not null)
         {
-            await _options.GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(lokalerKlonPfad, repository.StartKonfiguration);
+            await _options.GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(lokalerKlonPfad, repository.StartKonfiguration, gitPlugin);
         }
 
         var (branchName, nutzeExistierendenBranch) = await SetupBranchAsync(gitPlugin, repository.RepositoryUrl, lokalerKlonPfad, basisBranchName, aufgabe, ct);
@@ -143,13 +143,17 @@ public sealed class EntwicklungsprozessService
 
             var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
 
-            RepositoryStartKonfiguration? startConfig = null;
-            if (aufgabe.GitRepositoryId is { } repositoryId && _options.ProjektService is not null)
-            {
-                startConfig = await _options.ProjektService.GetRepositoryStartKonfigurationAsync(repositoryId, ct);
-            }
+            // Dieselbe Repository-/Plugin-Auflösung wie beim Klon (ResolveRepositoryAsync/ResolvePluginAsync in
+            // ProzessStartenAsync) wiederverwenden, statt über aufgabe.GitRepositoryId zu gehen: Dieses Feld wird
+            // von der App aktuell nie gesetzt (Aufgaben werden ohne explizite Repository-Zuordnung angelegt,
+            // siehe AufgabeService.CreateAsync); ein Lookup darüber würde startConfig/gitPlugin immer auf null
+            // auflösen, obwohl ProzessStartenAsync zuvor dieselbe Aufgabe erfolgreich anhand des einzigen aktiven
+            // Projekt-Repositories aufgelöst hat.
+            var repository = await ResolveRepositoryAsync(aufgabe, repositoryUrl, ct);
+            var gitPlugin = await ResolvePluginAsync(repository, null, aufgabeId, ct);
 
-            await _options.KiAusfuehrungsService.StartWithPseudoConsoleAsync(aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct, startConfig);
+            await _options.KiAusfuehrungsService.StartWithPseudoConsoleAsync(
+                aufgabeId, kiPlugin, aufgabe.LokalerKlonPfad, null, ct, repository.StartKonfiguration, gitPlugin);
         }
         catch (OperationCanceledException)
         {

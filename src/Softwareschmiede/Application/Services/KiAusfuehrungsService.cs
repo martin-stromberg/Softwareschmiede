@@ -78,6 +78,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
     /// <param name="ct">Abbruch-Token.</param>
     /// <param name="startConfig">Optionale Startkonfiguration des Repositories (z. B. Arbeitsverzeichnis).</param>
+    /// <param name="gitPlugin">
+    /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde (für die Auflösung des
+    /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
+    /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public async Task<CliProcessHandle> StartCliAsync(
         Guid aufgabeId,
@@ -85,7 +89,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
-        RepositoryStartKonfiguration? startConfig = null)
+        RepositoryStartKonfiguration? startConfig = null,
+        IGitPlugin? gitPlugin = null)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -103,7 +108,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 }
             }
 
-            var effectiveWorkdir = WorkingDirectoryResolver.DetermineEffectiveWorkingDirectory(localRepoPath, startConfig);
+            var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
             var psi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
 
@@ -162,6 +167,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
     /// <param name="ct">Abbruch-Token.</param>
     /// <param name="startConfig">Optionale Startkonfiguration des Repositories (z. B. Arbeitsverzeichnis).</param>
+    /// <param name="gitPlugin">
+    /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde (für die Auflösung des
+    /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
+    /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public async Task<CliProcessHandle> StartWithPseudoConsoleAsync(
         Guid aufgabeId,
@@ -169,7 +178,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         string localRepoPath,
         string? optionalParameters = null,
         CancellationToken ct = default,
-        RepositoryStartKonfiguration? startConfig = null)
+        RepositoryStartKonfiguration? startConfig = null,
+        IGitPlugin? gitPlugin = null)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -187,7 +197,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 }
             }
 
-            var effectiveWorkdir = WorkingDirectoryResolver.DetermineEffectiveWorkingDirectory(localRepoPath, startConfig);
+            var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
 
             // Plugin-Befehl ermitteln (FileName + Arguments) — wird nach cmd.exe-Start in die Konsole gesendet.
             var pluginPsi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);

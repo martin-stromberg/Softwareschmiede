@@ -103,20 +103,18 @@ für dieses Repository verwendet:
    Unterverzeichnis im geklonten Repository existiert — liefert bei einem Problem ein frühes, klares
    Fehlerbild direkt nach dem Klon, noch bevor Branch-Erstellung oder Repository-Startskript versucht
    werden.
-2. Beim CLI-Start ermittelt `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectory(...)` (genutzt von
-   `KiAusfuehrungsService`) erneut den effektiven Pfad und prüft dessen Existenz.
+2. Beim CLI-Start ermittelt `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(...)` (genutzt
+   von `KiAusfuehrungsService`) erneut den effektiven Pfad und prüft dessen Existenz.
 
 Siehe [Repository-Auswahl-Dialog](dialog-repository-auswahl.md#verwendung-des-arbeitsverzeichnisses) für
 Details zur Path-Traversal-Prävention und Fehlerbehandlung.
 
-> **Bekannte Einschränkung:** Für Repositories, die über das `LocalDirectoryPlugin` im
-> Workspace-Modus „Im Quellverzeichnis arbeiten" (`InSourceDirectory`) betrieben werden, wird ein
-> konfiguriertes Arbeitsunterverzeichnis aktuell **nicht zuverlässig gefunden** — sowohl die
-> Klon-Validierung als auch die CLI-Start-Validierung prüfen den Pfad gegen das (im
-> `InSourceDirectory`-Modus nur als Zeiger dienende) Klon-Zielverzeichnis statt gegen den tatsächlichen
-> Quellordner. Betroffen sind ausschließlich lokale Repositories in diesem speziellen Workspace-Modus in
-> Kombination mit einem gewählten Unterverzeichnis ungleich `"."`. Details und geplante Lösung siehe
-> Projekt-internes Nacharbeiten-Dokument zu Issue #98.
+Für Repositories, die über das `LocalDirectoryPlugin` im Workspace-Modus „Im Quellverzeichnis arbeiten"
+(`InSourceDirectory`) betrieben werden, wird das konfigurierte Arbeitsunterverzeichnis korrekt gegen den
+tatsächlichen Quellordner aufgelöst (nicht gegen das im `InSourceDirectory`-Modus nur als Zeiger dienende
+Klon-Zielverzeichnis): Sowohl `GitOrchestrationService` als auch `KiAusfuehrungsService` lösen den
+tatsächlichen Repository-Pfad zuerst über `IGitPlugin.ResolveEffectiveRepositoryPathAsync(...)` auf, bevor
+der relative Arbeitsverzeichnis-Pfad kombiniert wird.
 
 ## Unterschiede zum Repository-Auswahl-Dialog
 

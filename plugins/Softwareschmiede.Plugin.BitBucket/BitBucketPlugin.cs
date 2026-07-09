@@ -686,9 +686,366 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         return "main";
     }
 
-    // GetRepositoryStructureAsync wird bewusst nicht überschrieben: GetAvailableRepositoriesAsync liefert
-    // ausschließlich Remote-URLs (kein garantierter lokaler Klon-Pfad), daher bleibt die Default-Implementierung
-    // aus IGitPlugin (NotSupportedException) unverändert bestehen.
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Ruft die Verzeichnisstruktur des Standard-Branches rein remote über die Bitbucket-Source-API ab
+    /// (<c>GET /2.0/repositories/{workspace}/{repo_slug}/src/{branch}/?max_depth={maxDepth}</c> bzw. die
+    /// entsprechende Self-Hosted-Variante) — ein lokaler Klon ist dafür nicht erforderlich. Ergebnisseiten
+    /// werden über den <c>next</c>-Link paginiert durchlaufen.
+    /// </remarks>
+    public async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
+        string repositoryUrl,
+        int maxDepth = 2,
+        CancellationToken ct = default)
+    {
+        var repositoryId = TryExtractRepositoryId(repositoryUrl);
+        if (repositoryId is null)
+        {
+            _logger.LogWarning(
+                "Verzeichnisstruktur konnte nicht ermittelt werden: Repository-ID konnte nicht aus '{RepositoryUrl}' extrahiert werden.",
+                repositoryUrl);
+            return [];
+        }
+
+        var branch = await GetDefaultBranchAsync(repositoryUrl, ct);
+        var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
+
+        // Cloud- und Self-Hosted-API haben unterschiedliche Response-Schemata (Cloud: flache "values"-Liste mit
+        // "next"-Link und rekursivem "max_depth"-Query-Parameter; Self-Hosted/Server: pro Verzeichnisebene ein
+        // eigener "browse"-Aufruf mit verschachtelten "children.values" und "isLastPage"/"nextPageStart" statt
+        // eines Link-Headers) — daher zwei getrennte Implementierungen statt eines gemeinsamen Parsers.
+        return hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase)
+            ? await GetSelfHostedRepositoryStructureAsync(repositoryId, branch, maxDepth, ct)
+            : await GetCloudRepositoryStructureAsync(repositoryId, branch, maxDepth, ct);
+    }
+
+    /// <summary>Ruft die Verzeichnisstruktur über die Bitbucket-Cloud-Source-API ab (paginiert über den <c>next</c>-Link).</summary>
+    /// <param name="repositoryId">Repository-ID im Format <c>workspace/repo_slug</c>.</param>
+    /// <param name="branch">Der Branch, dessen Verzeichnisstruktur ermittelt werden soll.</param>
+    /// <param name="maxDepth">Maximale Verzeichnistiefe, bis zu der Einträge berücksichtigt werden.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Die gefundenen Verzeichniseinträge.</returns>
+    private async Task<IEnumerable<RepositoryDirectoryEntry>> GetCloudRepositoryStructureAsync(
+        string repositoryId, string branch, int maxDepth, CancellationToken ct)
+    {
+        var entries = new List<RepositoryDirectoryEntry>();
+        var nextUrl = $"{GetBitbucketApiBaseUrl()}/2.0/repositories/{repositoryId}/src/{Uri.EscapeDataString(branch)}/?max_depth={maxDepth}&pagelen=100";
+        var pageCount = 0;
+        const int maxPages = 50;
+
+        while (!string.IsNullOrEmpty(nextUrl) && pageCount < maxPages)
+        {
+            ct.ThrowIfCancellationRequested();
+            pageCount++;
+
+            var result = await _cliRunner.RunAsync(
+                "curl",
+                ["-s", ..GetCurlAuthArgs(), nextUrl],
+                null,
+                null,
+                ct);
+
+            if (!result.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Bitbucket Source-API fehlgeschlagen für {RepositoryId} (Branch {Branch}): {StdErr}",
+                    repositoryId,
+                    branch,
+                    result.StdErr);
+                break;
+            }
+
+            nextUrl = ParseCloudSourcePage(result.StdOut, maxDepth, repositoryId, entries);
+        }
+
+        if (pageCount >= maxPages && !string.IsNullOrEmpty(nextUrl))
+        {
+            _logger.LogWarning(
+                "Bitbucket Cloud Source-API-Pagination für {RepositoryId} nach {MaxPages} Seiten abgebrochen — die ermittelte Verzeichnisstruktur ist ggf. unvollständig.",
+                repositoryId,
+                maxPages);
+        }
+
+        return entries;
+    }
+
+    /// <summary>
+    /// Parst eine Seite der Bitbucket-Cloud-Source-API-Antwort, fügt Verzeichniseinträge zu
+    /// <paramref name="entries"/> hinzu und liefert die <c>next</c>-Seiten-URL zurück (oder <c>null</c>, wenn
+    /// dies die letzte Seite war).
+    /// </summary>
+    /// <param name="json">Die JSON-Antwort der Bitbucket-Cloud-Source-API.</param>
+    /// <param name="maxDepth">Maximale Verzeichnistiefe, bis zu der Einträge berücksichtigt werden.</param>
+    /// <param name="repositoryId">Repository-ID (für Log-Meldungen).</param>
+    /// <param name="entries">Liste, der die gefundenen Verzeichniseinträge hinzugefügt werden.</param>
+    /// <returns>Die URL der nächsten Seite, oder <c>null</c> wenn keine weitere Seite existiert.</returns>
+    private string? ParseCloudSourcePage(string json, int maxDepth, string repositoryId, List<RepositoryDirectoryEntry> entries)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (HasBitbucketErrors(doc.RootElement, out var errorMsg))
+            {
+                _logger.LogWarning("Bitbucket API-Fehler beim Laden der Verzeichnisstruktur für {RepositoryId}: {Error}", repositoryId, errorMsg);
+                return null;
+            }
+
+            if (doc.RootElement.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var entry in values.EnumerateArray())
+                {
+                    var type = entry.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null;
+                    if (type != "commit_directory")
+                    {
+                        continue;
+                    }
+
+                    var path = entry.TryGetProperty("path", out var pathEl) ? pathEl.GetString() : null;
+                    if (string.IsNullOrEmpty(path))
+                    {
+                        continue;
+                    }
+
+                    if (path.Count(c => c == '/') + 1 <= maxDepth)
+                    {
+                        entries.Add(new RepositoryDirectoryEntry(path, true));
+                    }
+                }
+            }
+
+            return doc.RootElement.TryGetProperty("next", out var nextEl) && nextEl.ValueKind == JsonValueKind.String
+                ? nextEl.GetString()
+                : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Parsen der Bitbucket-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Ruft die Verzeichnisstruktur über die Bitbucket-Server/Data-Center-("Self-Hosted")-Browse-API ab. Diese
+    /// API listet — anders als die Cloud-API — pro Aufruf nur eine Verzeichnisebene und kennt keinen
+    /// rekursiven <c>max_depth</c>-Parameter; daher wird die Struktur breitensuchend (level-by-level) über
+    /// mehrere <c>browse</c>-Aufrufe aufgebaut, bis <paramref name="maxDepth"/> erreicht ist.
+    /// </summary>
+    /// <param name="repositoryId">Repository-ID im Format <c>projectKey/repoSlug</c>.</param>
+    /// <param name="branch">Der Branch, dessen Verzeichnisstruktur ermittelt werden soll.</param>
+    /// <param name="maxDepth">Maximale Verzeichnistiefe, bis zu der Einträge berücksichtigt werden.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Die gefundenen Verzeichniseinträge.</returns>
+    private async Task<IEnumerable<RepositoryDirectoryEntry>> GetSelfHostedRepositoryStructureAsync(
+        string repositoryId, string branch, int maxDepth, CancellationToken ct)
+    {
+        const int maxDirectoriesPerLevel = 500;
+
+        var entries = new List<RepositoryDirectoryEntry>();
+        var currentLevelPaths = new List<string> { string.Empty };
+
+        for (var depth = 1; depth <= maxDepth && currentLevelPaths.Count > 0; depth++)
+        {
+            var nextLevelPaths = new List<string>();
+
+            foreach (var parentPath in currentLevelPaths)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var childDirectoryNames = await FetchSelfHostedDirectoryChildrenAsync(repositoryId, branch, parentPath, ct);
+                foreach (var name in childDirectoryNames)
+                {
+                    var childPath = string.IsNullOrEmpty(parentPath) ? name : $"{parentPath}/{name}";
+                    entries.Add(new RepositoryDirectoryEntry(childPath, true));
+                    nextLevelPaths.Add(childPath);
+                }
+
+                if (nextLevelPaths.Count >= maxDirectoriesPerLevel)
+                {
+                    _logger.LogWarning(
+                        "Self-Hosted-Verzeichnisstruktur für {RepositoryId} auf {Limit} Verzeichnisse pro Ebene begrenzt — die ermittelte Struktur ist ggf. unvollständig.",
+                        repositoryId,
+                        maxDirectoriesPerLevel);
+                    break;
+                }
+            }
+
+            currentLevelPaths = nextLevelPaths;
+        }
+
+        return entries;
+    }
+
+    /// <summary>
+    /// Ruft die direkten Unterverzeichnis-Namen (nicht vollständige Pfade) eines Verzeichnisses über die
+    /// Self-Hosted-Browse-API ab, paginiert über <c>isLastPage</c>/<c>nextPageStart</c>.
+    /// </summary>
+    /// <param name="repositoryId">Repository-ID im Format <c>projectKey/repoSlug</c>.</param>
+    /// <param name="branch">Der Branch, dessen Verzeichnisstruktur ermittelt werden soll.</param>
+    /// <param name="relativePath">Relativer Pfad des zu durchsuchenden Verzeichnisses (leer für das Repository-Root).</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Die Namen der direkten Unterverzeichnisse.</returns>
+    private async Task<List<string>> FetchSelfHostedDirectoryChildrenAsync(
+        string repositoryId, string branch, string relativePath, CancellationToken ct)
+    {
+        var names = new List<string>();
+        var start = 0;
+        var isLastPage = false;
+
+        while (!isLastPage)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var url = BuildSelfHostedBrowseUrl(repositoryId, branch, relativePath, start);
+            var result = await _cliRunner.RunAsync("curl", ["-s", ..GetCurlAuthArgs(), url], null, null, ct);
+
+            if (!result.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "Bitbucket Self-Hosted Browse-API fehlgeschlagen für {RepositoryId} (Pfad '{Path}'): {StdErr}",
+                    repositoryId,
+                    relativePath,
+                    result.StdErr);
+                return names;
+            }
+
+            var (pageIsLast, nextStart) = ParseSelfHostedBrowsePage(result.StdOut, repositoryId, names);
+            isLastPage = pageIsLast || nextStart is null || nextStart <= start;
+            start = nextStart ?? start;
+        }
+
+        return names;
+    }
+
+    /// <summary>
+    /// Parst eine Seite der Bitbucket-Server-Browse-API-Antwort (verschachteltes <c>children.values</c>-Schema,
+    /// abweichend vom Cloud-Schema) und fügt gefundene Verzeichnisnamen zu <paramref name="directoryNames"/> hinzu.
+    /// </summary>
+    /// <param name="json">Die JSON-Antwort der Self-Hosted-Browse-API.</param>
+    /// <param name="repositoryId">Repository-ID (für Log-Meldungen).</param>
+    /// <param name="directoryNames">Liste, der die gefundenen Verzeichnisnamen hinzugefügt werden.</param>
+    /// <returns>Ob dies die letzte Seite war, sowie der Start-Index der nächsten Seite (falls vorhanden).</returns>
+    private (bool IsLastPage, int? NextStart) ParseSelfHostedBrowsePage(string json, string repositoryId, List<string> directoryNames)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (HasBitbucketErrors(doc.RootElement, out var errorMsg))
+            {
+                _logger.LogWarning("Bitbucket API-Fehler beim Laden der Verzeichnisstruktur für {RepositoryId}: {Error}", repositoryId, errorMsg);
+                return (true, null);
+            }
+
+            if (!doc.RootElement.TryGetProperty("children", out var children) || children.ValueKind != JsonValueKind.Object)
+            {
+                return (true, null);
+            }
+
+            if (children.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var entry in values.EnumerateArray())
+                {
+                    var type = entry.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null;
+                    if (!string.Equals(type, "DIRECTORY", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var name = entry.TryGetProperty("path", out var pathEl) && pathEl.TryGetProperty("name", out var nameEl)
+                        ? nameEl.GetString()
+                        : null;
+
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        directoryNames.Add(name);
+                    }
+                }
+            }
+
+            var isLastPage = !children.TryGetProperty("isLastPage", out var lastPageEl) || lastPageEl.ValueKind != JsonValueKind.False;
+            int? nextStart = children.TryGetProperty("nextPageStart", out var nextStartEl) && nextStartEl.ValueKind == JsonValueKind.Number
+                ? nextStartEl.GetInt32()
+                : null;
+
+            return (isLastPage, nextStart);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Parsen der Bitbucket-Self-Hosted-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
+            return (true, null);
+        }
+    }
+
+    /// <summary>Baut die Browse-API-URL für Bitbucket Server/Data Center (Self-Hosted) für ein Verzeichnis auf einem Branch.</summary>
+    /// <param name="repositoryId">Repository-ID im Format <c>projectKey/repoSlug</c>.</param>
+    /// <param name="branch">Der Branch, dessen Verzeichnisstruktur ermittelt werden soll.</param>
+    /// <param name="relativePath">Relativer Pfad des zu durchsuchenden Verzeichnisses (leer für das Repository-Root).</param>
+    /// <param name="start">Start-Index für Pagination (0 für die erste Seite).</param>
+    /// <returns>Die vollständige Self-Hosted-Browse-API-URL.</returns>
+    private string BuildSelfHostedBrowseUrl(string repositoryId, string branch, string relativePath, int start)
+    {
+        var parts = repositoryId.Split('/', 2);
+        var projectKey = parts.Length > 0 ? parts[0] : repositoryId;
+        var repoSlug = parts.Length > 1 ? parts[1] : repositoryId;
+        var pathSuffix = string.IsNullOrEmpty(relativePath) ? string.Empty : $"/{relativePath}";
+        var query = $"at={Uri.EscapeDataString(branch)}";
+        if (start > 0)
+        {
+            query += $"&start={start}";
+        }
+
+        return $"{GetBitbucketApiBaseUrl()}/rest/api/1.0/projects/{projectKey}/repos/{repoSlug}/browse{pathSuffix}?{query}";
+    }
+
+    /// <summary>
+    /// Extrahiert die Repository-ID (<c>workspace/repo_slug</c> bzw. <c>projectKey/repoSlug</c>) aus einer
+    /// Bitbucket-Repository-URL. Liefert <c>null</c> statt zu werfen, wenn die URL nicht geparst werden kann.
+    /// </summary>
+    /// <param name="repositoryUrl">Die zu parsende Bitbucket-Repository-URL.</param>
+    /// <returns>Die Repository-ID, oder <c>null</c> wenn die URL nicht erkannt wurde.</returns>
+    private static string? TryExtractRepositoryId(string repositoryUrl)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryUrl))
+        {
+            return null;
+        }
+
+        Uri uri;
+        try
+        {
+            uri = new Uri(repositoryUrl);
+        }
+        catch (UriFormatException)
+        {
+            return null;
+        }
+
+        var path = uri.AbsolutePath.Trim('/');
+        if (path.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+        {
+            path = path[..^4];
+        }
+
+        // Self-Hosted Browser-/SCM-URL: /projects/KEY/repos/SLUG[/...] bzw. /scm/KEY/SLUG[.git]
+        var projectsMatch = System.Text.RegularExpressions.Regex.Match(
+            path, @"^projects/([^/]+)/repos/([^/]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (projectsMatch.Success)
+        {
+            return $"{projectsMatch.Groups[1].Value}/{projectsMatch.Groups[2].Value}";
+        }
+
+        var scmMatch = System.Text.RegularExpressions.Regex.Match(
+            path, @"^scm/([^/]+)/([^/]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (scmMatch.Success)
+        {
+            return $"{scmMatch.Groups[1].Value}/{scmMatch.Groups[2].Value}";
+        }
+
+        // Cloud-URL: /workspace/repo_slug[/...]
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length >= 2 ? $"{segments[0]}/{segments[1]}" : null;
+    }
 
     private static void UpdateNetrcEntry(string netrcPath, string host, string user, string appPassword)
     {
