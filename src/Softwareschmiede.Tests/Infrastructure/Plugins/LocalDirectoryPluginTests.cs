@@ -237,6 +237,81 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
+    /// <summary>
+    /// CloneRepositoryAsync_ShouldPreserveEmptySubdirectory_WhenSourceContainsOne.
+    /// Regressionstest für Issue #98 (Arbeitsverzeichnis-Auswahl): Ein leeres Unterverzeichnis im
+    /// Quellordner (z. B. ein noch leeres, aber als Arbeitsverzeichnis konfiguriertes Verzeichnis) muss
+    /// auch dann im Klon-Ziel existieren, wenn es keine Dateien enthält. Zuvor kopierte
+    /// <c>CopyDirectoryForSyncAsync</c> ausschließlich Dateien, wodurch rein leere Verzeichnisse beim
+    /// Sync verloren gingen.
+    /// </summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldPreserveEmptySubdirectory_WhenSourceContainsOne()
+    {
+        var sourceDir = Directory.CreateTempSubdirectory().FullName;
+        var targetDir = Directory.CreateTempSubdirectory().FullName;
+        Directory.Delete(targetDir, recursive: true);
+        await File.WriteAllTextAsync(Path.Combine(sourceDir, "readme.txt"), "base");
+        Directory.CreateDirectory(Path.Combine(sourceDir, "backend"));
+
+        var cli = new Mock<ICliRunner>(MockBehavior.Strict);
+        cli.SetupSequence(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "rev-parse", "--is-inside-work-tree" })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "not a git repository"))
+            .ReturnsAsync(new CliResult(0, "true", string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "init" })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "Initialized empty Git repository", string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "config", "user.name", "Softwareschmiede" })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "config", "user.email", "noreply@softwareschmiede.local" })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "add", "." })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "commit", "-m", "Initial workspace snapshot" })),
+                targetDir,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "[master (root-commit)] Initial workspace snapshot", string.Empty));
+
+        var store = new Mock<ICredentialStore>();
+        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.WorkspaceMode")).Returns("SeparateWorkingDirectory");
+        store.Setup(s => s.GetCredential("LocalDirectoryPlugin.SourceDirectory")).Returns(sourceDir);
+        var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        await sut.CloneRepositoryAsync(string.Empty, targetDir);
+
+        File.Exists(Path.Combine(targetDir, "readme.txt")).Should().BeTrue();
+        Directory.Exists(Path.Combine(targetDir, "backend")).Should().BeTrue(
+            "ein leeres Unterverzeichnis im Quellordner muss beim Klon/Sync gespiegelt werden");
+        cli.VerifyAll();
+    }
+
     /// <summary><summary>CloneRepositoryAsync_ShouldUseRequestedTargetDirectory_WhenWorkingDirectorySettingExists.</summary>.</summary>
     [Fact]
     /// <summary>CloneRepositoryAsync_ShouldUseRequestedTargetDirectory_WhenWorkingDirectorySettingExists.</summary>

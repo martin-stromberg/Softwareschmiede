@@ -12,6 +12,9 @@ public sealed class RepositoryStartKonfiguration
     /// <summary>Relativer Pfad zum Startskript im Repository.</summary>
     public string StartScriptRelativePath { get; set; } = string.Empty;
 
+    /// <summary>Relativer Pfad zum Arbeitsverzeichnis innerhalb des Repositories; <c>null</c> bedeutet Repository-Root.</summary>
+    public string? WorkingDirectoryRelativePath { get; set; }
+
     /// <summary>Gibt an, ob die Startkonfiguration aktiv verwendet wird.</summary>
     public bool Aktiv { get; set; } = true;
 

@@ -285,6 +285,85 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         return Task.FromResult<IEnumerable<AvailableRepository>>(dirs);
     }
 
+    /// <inheritdoc/>
+    public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(repositoryUrl) || !Directory.Exists(repositoryUrl))
+        {
+            return Enumerable.Empty<RepositoryDirectoryEntry>();
+        }
+
+        var rootPath = ResolveAndNormalizePath(repositoryUrl);
+
+        return await Task.Run(
+            () =>
+            {
+                var entries = new List<RepositoryDirectoryEntry>();
+                CollectDirectoryEntries(rootPath, rootPath, depth: 0, maxDepth, entries, ct);
+                return (IEnumerable<RepositoryDirectoryEntry>)entries;
+            },
+            ct);
+    }
+
+    private void CollectDirectoryEntries(
+        string rootPath,
+        string currentPath,
+        int depth,
+        int maxDepth,
+        List<RepositoryDirectoryEntry> entries,
+        CancellationToken ct)
+    {
+        if (depth >= maxDepth)
+        {
+            return;
+        }
+
+        List<string> directories;
+        try
+        {
+            directories = Directory.EnumerateDirectories(currentPath).ToList();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            _logger.LogWarning(ex, "Zugriff auf Verzeichnis '{Path}' verweigert, wird übersprungen.", currentPath);
+            return;
+        }
+
+        foreach (var directory in directories)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                if (IsReparsePoint(directory))
+                {
+                    continue;
+                }
+
+                var relative = Path.GetRelativePath(rootPath, directory);
+                if (ShouldSkipRelativePath(relative))
+                {
+                    continue;
+                }
+
+                entries.Add(new RepositoryDirectoryEntry(relative.Replace(Path.DirectorySeparatorChar, '/'), IsDirectory: true));
+                CollectDirectoryEntries(rootPath, directory, depth + 1, maxDepth, entries, ct);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                _logger.LogWarning(ex, "Zugriff auf Verzeichnis '{Path}' verweigert, wird übersprungen.", directory);
+            }
+        }
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        var attributes = File.GetAttributes(path);
+        return (attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint;
+    }
+
     private NotSupportedException BuildNotSupported(string methodName)
         => new($"LocalDirectoryPlugin unterstützt '{methodName}' nicht, da keine Remote-Provider-Funktionen verfügbar sind.");
 
@@ -573,23 +652,35 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
             $"Quellverzeichnis für Workspace '{normalizedWorkspace}' konnte nicht aufgelöst werden.");
     }
 
-    private async Task CopyDirectoryForSyncAsync(string sourcePath, string destinationPath, bool overwriteFiles, CancellationToken ct)
+    private Task CopyDirectoryForSyncAsync(string sourcePath, string destinationPath, bool overwriteFiles, CancellationToken ct)
     {
-        foreach (var file in EnumerateFilesForSync(sourcePath))
+        foreach (var entry in EnumerateEntriesForSync(sourcePath))
         {
             ct.ThrowIfCancellationRequested();
-            var relativePath = Path.GetRelativePath(sourcePath, file);
+            var relativePath = Path.GetRelativePath(sourcePath, entry.Path);
             if (ShouldSkipRelativePath(relativePath))
             {
                 continue;
             }
 
+            if (entry.IsDirectory)
+            {
+                // Verzeichnis auch dann im Ziel anlegen, wenn es (noch) keine Dateien enthält — sonst geht
+                // ein leeres, aber z. B. als Arbeitsverzeichnis konfiguriertes Unterverzeichnis beim
+                // Klon/Sync verloren, obwohl es im Quellverzeichnis existiert.
+                var destinationDirectory = CombineAndValidatePath(destinationPath, relativePath);
+                Directory.CreateDirectory(destinationDirectory);
+                continue;
+            }
+
             var destinationFile = CombineAndValidatePath(destinationPath, relativePath);
-            var destinationDirectory = Path.GetDirectoryName(destinationFile)
+            var destinationFileDirectory = Path.GetDirectoryName(destinationFile)
                 ?? throw new InvalidOperationException($"Ungültiger Zielpfad '{destinationFile}'.");
-            Directory.CreateDirectory(destinationDirectory);
-            File.Copy(file, destinationFile, overwrite: overwriteFiles);
+            Directory.CreateDirectory(destinationFileDirectory);
+            File.Copy(entry.Path, destinationFile, overwrite: overwriteFiles);
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task ApplyDeletedFilesToSourceAsync(string workspacePath, string sourcePath, CancellationToken ct)
@@ -656,7 +747,17 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         return deletedPaths;
     }
 
-    private static IEnumerable<string> EnumerateFilesForSync(string rootPath)
+    /// <summary>
+    /// Traversiert <paramref name="rootPath"/> rekursiv und liefert sowohl Verzeichnisse als auch Dateien
+    /// (Verzeichnisse werden mitgeliefert, damit <see cref="CopyDirectoryForSyncAsync"/> auch leere
+    /// Unterverzeichnisse im Ziel spiegeln kann, nicht nur solche mit Dateiinhalt).
+    /// </summary>
+    /// <param name="rootPath">Wurzelverzeichnis, ab dem traversiert wird.</param>
+    /// <returns>
+    /// Eine Sequenz aus Einträgen, die jeweils angeben, ob es sich um ein Verzeichnis oder eine Datei
+    /// handelt, sowie den absoluten Pfad des Eintrags.
+    /// </returns>
+    private static IEnumerable<(bool IsDirectory, string Path)> EnumerateEntriesForSync(string rootPath)
     {
         var directories = new Stack<string>();
         directories.Push(rootPath);
@@ -674,12 +775,13 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
                 }
 
                 directories.Push(directory);
+                yield return (true, directory);
             }
 
             foreach (var file in Directory.EnumerateFiles(current))
             {
                 EnsureNotReparsePoint(file);
-                yield return file;
+                yield return (false, file);
             }
         }
     }
@@ -803,6 +905,10 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         Directory.CreateDirectory(normalizedRequested);
         File.WriteAllText(Path.Combine(normalizedRequested, WorkspacePointerFileName), normalizedResolved);
     }
+
+    /// <inheritdoc/>
+    public override Task<string> ResolveEffectiveRepositoryPathAsync(string localPath, CancellationToken ct = default)
+        => Task.FromResult(ResolveWorkspacePath(localPath));
 
     private string ResolveWorkspacePath(string localPath)
     {

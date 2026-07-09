@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Terminal;
@@ -76,13 +77,20 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
     /// <param name="ct">Abbruch-Token.</param>
+    /// <param name="startConfig">Optionale Startkonfiguration des Repositories (z. B. Arbeitsverzeichnis).</param>
+    /// <param name="gitPlugin">
+    /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde (für die Auflösung des
+    /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
+    /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public async Task<CliProcessHandle> StartCliAsync(
         Guid aufgabeId,
         IKiPlugin kiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        RepositoryStartKonfiguration? startConfig = null,
+        IGitPlugin? gitPlugin = null)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -100,7 +108,9 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 }
             }
 
-            var psi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct).ConfigureAwait(false);
+            var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
+
+            var psi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
 
             // Sicherstellen, dass der vollständige PATH des aktuellen Prozesses übergeben wird.
             // Bei UseShellExecute=false wird nur der Prozess-PATH genutzt — der kann bei WPF-Apps
@@ -156,13 +166,20 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis.</param>
     /// <param name="optionalParameters">Optionale zusätzliche Parameter für den CLI-Start.</param>
     /// <param name="ct">Abbruch-Token.</param>
+    /// <param name="startConfig">Optionale Startkonfiguration des Repositories (z. B. Arbeitsverzeichnis).</param>
+    /// <param name="gitPlugin">
+    /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde (für die Auflösung des
+    /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus).
+    /// </param>
     /// <returns>Das <see cref="CliProcessHandle"/> des gestarteten Prozesses.</returns>
     public async Task<CliProcessHandle> StartWithPseudoConsoleAsync(
         Guid aufgabeId,
         IKiPlugin kiPlugin,
         string localRepoPath,
         string? optionalParameters = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        RepositoryStartKonfiguration? startConfig = null,
+        IGitPlugin? gitPlugin = null)
     {
         await _startLock.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -180,11 +197,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 }
             }
 
+            var effectiveWorkdir = await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(localRepoPath, startConfig, gitPlugin, ct).ConfigureAwait(false);
+
             // Plugin-Befehl ermitteln (FileName + Arguments) — wird nach cmd.exe-Start in die Konsole gesendet.
-            var pluginPsi = await kiPlugin.StartCliAsync(localRepoPath, optionalParameters, ct).ConfigureAwait(false);
+            var pluginPsi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
             var pluginCommand = BuildCliCommand(pluginPsi);
 
-            var (process, session) = StartPseudoConsoleProcess(aufgabeId, localRepoPath, pluginCommand);
+            var (process, session) = StartPseudoConsoleProcess(aufgabeId, effectiveWorkdir, pluginCommand);
 
             var handle = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session };
 
@@ -231,13 +250,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// Event-Wiring, verzögertes Senden) beschränken kann.
     /// </summary>
     /// <param name="aufgabeId">ID der Aufgabe (für Logging).</param>
-    /// <param name="localRepoPath">Pfad zum lokalen Repository-Verzeichnis (Arbeitsverzeichnis von cmd.exe).</param>
+    /// <param name="effectiveWorkingDirectory">Effektives Arbeitsverzeichnis von cmd.exe (Repository-Root oder konfiguriertes Unterverzeichnis).</param>
     /// <param name="pluginCommand">Der später an cmd.exe zu sendende Plugin-Befehl (nur für Logging verwendet).</param>
     /// <returns>Den gestarteten <see cref="Process"/> und die zugehörige <see cref="PseudoConsoleSession"/>.</returns>
-    private (Process Process, PseudoConsoleSession Session) StartPseudoConsoleProcess(Guid aufgabeId, string localRepoPath, string pluginCommand)
+    private (Process Process, PseudoConsoleSession Session) StartPseudoConsoleProcess(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand)
     {
-        var workingDir = !string.IsNullOrEmpty(localRepoPath) && Directory.Exists(localRepoPath)
-            ? localRepoPath
+        var workingDir = !string.IsNullOrEmpty(effectiveWorkingDirectory) && Directory.Exists(effectiveWorkingDirectory)
+            ? effectiveWorkingDirectory
             : Path.GetTempPath();
         var psi = new System.Diagnostics.ProcessStartInfo
         {
@@ -587,6 +606,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             ? fileName
             : $"{fileName} {psi.Arguments}";
     }
+
 }
 
 /// <summary>Handle auf einen laufenden CLI-Prozess.</summary>

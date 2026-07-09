@@ -32,7 +32,9 @@
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
 | `GitRepositoryId` | `Guid` | FK → GitRepository |
-| `Befehl` | `string` | Ausführbarer Befehl (z.B. `npm install`) |
+| `StartScriptRelativePath` | `string` | Relativer Pfad zum Startskript im Repository (z.B. `scripts/setup.sh`, `npm install`) |
+| `WorkingDirectoryRelativePath` | `string?` | Optionaler relativer Pfad zum Arbeitsverzeichnis innerhalb des Repositories; `null` = Repository-Root |
+| `Aktiv` | `bool` | Ob die Startkonfiguration aktiv verwendet wird |
 
 ## Beziehungen
 
@@ -56,7 +58,9 @@ erDiagram
     RepositoryStartKonfiguration {
         Guid Id
         Guid GitRepositoryId
-        string Befehl
+        string StartScriptRelativePath
+        string WorkingDirectoryRelativePath
+        bool Aktiv
     }
     Projekt ||--o{ GitRepository : "hat"
     GitRepository ||--o| RepositoryStartKonfiguration : "hat"

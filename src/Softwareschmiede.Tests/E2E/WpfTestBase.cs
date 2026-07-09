@@ -4,6 +4,8 @@ using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Input;
 using FlaUI.UIA3;
+using Microsoft.EntityFrameworkCore;
+using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -30,6 +32,14 @@ public abstract class WpfTestBase : IDisposable
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
     private readonly string _testDbPath;
+
+    /// <summary>
+    /// Pfad zur SQLite-Testdatenbank des laufenden App-Prozesses. Ermöglicht Tests, Vorbedingungen
+    /// direkt in der Datenbank zu hinterlegen, die über die UI (noch) nicht abbildbar sind
+    /// (z. B. ein vorkonfiguriertes Arbeitsverzeichnis, solange kein Plugin die Verzeichnisstruktur-
+    /// Vorschau unterstützt).
+    /// </summary>
+    protected string TestDbPath => _testDbPath;
 
     /// <summary>Gibt den FlaUI-Automatisierungskontext zurück.</summary>
     /// <exception cref="InvalidOperationException">Wird geworfen, wenn <see cref="LaunchApp"/> noch nicht aufgerufen wurde.</exception>
@@ -83,6 +93,18 @@ public abstract class WpfTestBase : IDisposable
         Thread.Sleep(2000);
 
         return _application;
+    }
+
+    /// <summary>
+    /// Öffnet einen <see cref="SoftwareschmiededDbContext"/> gegen die SQLite-Testdatenbank des laufenden
+    /// App-Prozesses (<see cref="TestDbPath"/>). Für Testvorbedingungen, die über die UI nicht abbildbar sind.
+    /// </summary>
+    protected SoftwareschmiededDbContext OpenTestDbContext()
+    {
+        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+            .UseSqlite($"Data Source={_testDbPath}")
+            .Options;
+        return new SoftwareschmiededDbContext(options);
     }
 
     /// <inheritdoc/>

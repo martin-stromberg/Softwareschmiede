@@ -618,6 +618,92 @@ public sealed class ProjektServiceTests : IDisposable
         updated.Aktiv.Should().BeFalse();
     }
 
+    /// <summary>SaveRepositoryWorkingDirectoryAsync erstellt eine neue Startkonfiguration mit dem angegebenen Arbeitsverzeichnis.</summary>
+    [Fact]
+    public async Task SaveRepositoryWorkingDirectoryAsync_ShouldCreateConfiguration_WhenRepositoryExists()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit Arbeitsverzeichnis", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/workdir",
+            "test/workdir");
+
+        // Act
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend");
+
+        // Assert
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        persisted.Should().NotBeNull();
+        persisted!.WorkingDirectoryRelativePath.Should().Be("backend");
+    }
+
+    /// <summary>SaveRepositoryWorkingDirectoryAsync persistiert "." als null (Repository-Root).</summary>
+    [Fact]
+    public async Task SaveRepositoryWorkingDirectoryAsync_ShouldNormalizeDotToNull()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit Root-Arbeitsverzeichnis", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/workdir-root",
+            "test/workdir-root");
+
+        // Act
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend");
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, ".");
+
+        // Assert
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        persisted.Should().NotBeNull();
+        persisted!.WorkingDirectoryRelativePath.Should().BeNull();
+    }
+
+    /// <summary>SaveRepositoryWorkingDirectoryAsync legt keine Startkonfiguration an, wenn Root ausgewählt ist und noch keine existiert.</summary>
+    [Fact]
+    public async Task SaveRepositoryWorkingDirectoryAsync_ShouldNotCreateConfiguration_WhenRootAndNoneExists()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt ohne Startkonfiguration bei Root", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/workdir-noop",
+            "test/workdir-noop");
+
+        // Act
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, null);
+
+        // Assert
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        persisted.Should().BeNull();
+    }
+
+    /// <summary>SaveRepositoryWorkingDirectoryAsync lässt eine bestehende Startskript-Konfiguration unverändert.</summary>
+    [Fact]
+    public async Task SaveRepositoryWorkingDirectoryAsync_ShouldPreserveExistingStartScript()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit Startskript und Arbeitsverzeichnis", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/workdir-script",
+            "test/workdir-script");
+        await _sut.SaveRepositoryStartKonfigurationAsync(repository.Id, "scripts/start.ps1", true);
+
+        // Act
+        await _sut.SaveRepositoryWorkingDirectoryAsync(repository.Id, "backend");
+
+        // Assert
+        var persisted = await _sut.GetRepositoryStartKonfigurationAsync(repository.Id);
+        persisted.Should().NotBeNull();
+        persisted!.StartScriptRelativePath.Should().Be("scripts/start.ps1");
+        persisted.WorkingDirectoryRelativePath.Should().Be("backend");
+    }
+
     /// <summary>GetRepositoryStartKonfigurationAsync gibt null zurück, wenn keine Konfiguration existiert.</summary>
     [Fact]
     public async Task GetRepositoryStartKonfigurationAsync_ShouldReturnNull_WhenNoConfigurationExists()

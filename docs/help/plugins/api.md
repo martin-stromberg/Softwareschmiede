@@ -29,6 +29,7 @@ SCM-Operationen auf einem lokalen Repository-Klon.
 | `PullAsync` | `localPath`, `ct` | `Task` | Änderungen vom Remote holen |
 | `CreatePullRequestAsync` | `repositoryId`, `branchName`, `title`, `body`, `ct` | `Task<PullRequest>` | Pull Request erstellen |
 | `ResetAsync` | `localPath`, `resetType`, `targetRef?`, `ct` | `Task` | Git-Reset ausführen |
+| `GetRepositoryStructureAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<IEnumerable<RepositoryDirectoryEntry>>` | Verzeichnisstruktur des Repositories abrufen (für die Arbeitsverzeichnis-Auswahl im UI). Default-Implementierung wirft `NotSupportedException`; aktuell nur von `LocalDirectoryPlugin` implementiert (rekursiv bis `maxDepth`, `.git`-Verzeichnis wird ausgeschlossen). Remote-Provider-Plugins (`GitHubPlugin`, `BitBucketPlugin`) nutzen bewusst die Default-Implementierung, siehe [Repository-Auswahl-Dialog](../projekte/dialog-repository-auswahl.md#technische-details-zur-verzeichnisstruktur-ladung). |
 
 ---
 
@@ -87,3 +88,10 @@ Abstrakte Basisklasse für CLI-basierte KI-Plugins (`ClaudeCliPlugin`, `GitHubCo
 |-------------|-----|--------------|
 | `Bestanden` | `bool` | `true` wenn alle Tests bestanden |
 | `Ergebnisse` | `IReadOnlyList<TestErgebnisInfo>` | Einzelne Testergebnisse |
+
+### `RepositoryDirectoryEntry`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Path` | `string` | Relativer Pfad des Verzeichnisses innerhalb des Repositories, `/`-getrennt |
+| `IsDirectory` | `bool` | Aktuell immer `true` — Datei-Einträge sind für die Arbeitsverzeichnis-Auswahl nicht relevant |

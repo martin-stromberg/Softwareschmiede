@@ -724,7 +724,60 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>ValidateWorkingDirectoryAfterCloneAsync wirft eine Exception, wenn das konfigurierte Arbeitsverzeichnis nach dem Klon nicht existiert.</summary>
+    [Fact]
+    public async Task ValidateWorkingDirectoryAfterClone_ShouldThrowWhenDirectoryNotFound()
+    {
+        var clonePath = Path.Combine(Path.GetTempPath(), "swst-clone-tests-" + Guid.NewGuid());
+        Directory.CreateDirectory(clonePath);
+        try
+        {
+            var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "does-not-exist" };
+
+            var act = () => _sut.ValidateWorkingDirectoryAfterCloneAsync(clonePath, startConfig);
+
+            await act.Should().ThrowAsync<DirectoryNotFoundException>();
+        }
+        finally
+        {
+            Directory.Delete(clonePath, recursive: true);
+        }
+    }
+
+    /// <summary>ValidateWorkingDirectoryAfterCloneAsync protokolliert einen Fehler, wenn das Arbeitsverzeichnis nicht validiert werden kann.</summary>
+    [Fact]
+    public async Task ValidateWorkingDirectoryAfterClone_ShouldLogError()
+    {
+        var clonePath = Path.Combine(Path.GetTempPath(), "swst-clone-tests-" + Guid.NewGuid());
+        Directory.CreateDirectory(clonePath);
+        try
+        {
+            var loggerMock = new Mock<ILogger<GitOrchestrationService>>();
+            var sut = CreateSutWithPlugins(_gitPluginMock, loggerMock);
+            var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "does-not-exist" };
+
+            var act = () => sut.ValidateWorkingDirectoryAfterCloneAsync(clonePath, startConfig);
+
+            await act.Should().ThrowAsync<DirectoryNotFoundException>();
+            loggerMock.Verify(
+                l => l.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.Is<Exception?>(e => e is DirectoryNotFoundException),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
+        }
+        finally
+        {
+            Directory.Delete(clonePath, recursive: true);
+        }
+    }
+
     private GitOrchestrationService CreateSutWithPlugins(Mock<IGitPlugin> defaultPlugin, params Mock<IGitPlugin>[] additionalPlugins)
+        => CreateSutWithPlugins(defaultPlugin, null, additionalPlugins);
+
+    private GitOrchestrationService CreateSutWithPlugins(Mock<IGitPlugin> defaultPlugin, Mock<ILogger<GitOrchestrationService>>? loggerMock, params Mock<IGitPlugin>[] additionalPlugins)
     {
         var plugins = new List<IGitPlugin> { defaultPlugin.Object };
         plugins.AddRange(additionalPlugins.Select(plugin => plugin.Object));
@@ -747,7 +800,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             _protokollService,
             defaultPlugin.Object,
             pluginSelectionService,
-            new Mock<ILogger<GitOrchestrationService>>().Object);
+            (loggerMock ?? new Mock<ILogger<GitOrchestrationService>>()).Object);
     }
 
     private static Mock<IGitPlugin> CreateGitPluginMock(string pluginName, string pluginPrefix)

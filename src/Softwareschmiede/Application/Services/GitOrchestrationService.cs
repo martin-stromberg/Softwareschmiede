@@ -245,6 +245,40 @@ public sealed class GitOrchestrationService
         return Regex.IsMatch(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
+    /// <summary>
+    /// Validiert nach einem erfolgreichen Git-Klon, dass das in <paramref name="startConfig"/> konfigurierte
+    /// Arbeitsverzeichnis innerhalb des geklonten Repositories existiert.
+    /// </summary>
+    /// <param name="clonePath">Pfad zum geklonten Repository (Repository-Root).</param>
+    /// <param name="startConfig">Optionale Startkonfiguration des Repositories (z. B. Arbeitsverzeichnis).</param>
+    /// <param name="gitPlugin">
+    /// Optionales Git-Plugin, das zum Klonen des Repositories verwendet wurde (für die Auflösung des
+    /// tatsächlichen Repository-Pfads, z. B. bei <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus,
+    /// wo <paramref name="clonePath"/> nur eine Pointer-Datei enthält). Bleibt <paramref name="gitPlugin"/>
+    /// <c>null</c>, verhält sich die Methode wie zuvor und verwendet <paramref name="clonePath"/> unverändert.
+    /// </param>
+    public async Task ValidateWorkingDirectoryAfterCloneAsync(string clonePath, RepositoryStartKonfiguration? startConfig, IGitPlugin? gitPlugin = null)
+    {
+        if (startConfig?.WorkingDirectoryRelativePath is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(clonePath, startConfig, gitPlugin, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or DirectoryNotFoundException)
+        {
+            _logger.LogError(
+                ex,
+                "Arbeitsverzeichnis '{WorkingDirectoryRelativePath}' konnte nach dem Klon von '{ClonePath}' nicht validiert werden.",
+                startConfig.WorkingDirectoryRelativePath,
+                clonePath);
+            throw;
+        }
+    }
+
     /// <summary>Ermittelt die Repository-ID aus der Aufgabe oder dem zugehörigen Projekt.</summary>
     private async Task<string> ResolveRepositoryIdAsync(Aufgabe aufgabe, CancellationToken ct)
     {

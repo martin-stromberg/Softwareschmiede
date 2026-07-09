@@ -106,4 +106,24 @@ public interface IGitPlugin : IPlugin
     /// <summary>Liefert die für dieses Plugin verfügbaren Repositories aus der externen Quelle.</summary>
     /// <param name="ct">Cancellation Token.</param>
     Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default);
+
+    /// <summary>Ruft die Verzeichnisstruktur eines externen Repositories ab (bis zu einer bestimmten Tiefe).</summary>
+    /// <param name="repositoryUrl">URL des Repositories.</param>
+    /// <param name="maxDepth">Maximale Tiefe der abgerufenen Verzeichnisstruktur.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(GetRepositoryStructureAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
+
+    /// <summary>
+    /// Löst den tatsächlichen Repository-Pfad für einen lokalen Pfad auf (z. B. Klon- oder Arbeitsverzeichnis-Pfad).
+    /// Für die meisten Plugins (GitHub, BitBucket, <c>LocalDirectoryPlugin</c> im <c>SeparateWorkingDirectory</c>-Modus)
+    /// ist dies der übergebene Pfad unverändert. Plugins mit indirektem Workspace-Mapping (z. B.
+    /// <c>LocalDirectoryPlugin</c> im <c>InSourceDirectory</c>-Modus, wo <paramref name="localPath"/> nur eine
+    /// Pointer-Datei auf das tatsächliche Quellverzeichnis enthält) überschreiben diese Methode.
+    /// </summary>
+    /// <param name="localPath">Lokaler Pfad, wie er z. B. beim Klon angegeben wurde.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Den tatsächlichen, aufgelösten Repository-Pfad.</returns>
+    Task<string> ResolveEffectiveRepositoryPathAsync(string localPath, CancellationToken ct = default)
+        => Task.FromResult(localPath);
 }

@@ -295,6 +295,37 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     }
 
     /// <summary>
+    /// Szenario: Repository-Zuweisungsdialog öffnen und Arbeitsverzeichnis-Auswahl prüfen.
+    /// Prüft: Label und ComboBox für die Arbeitsverzeichnis-Auswahl sind im Dialog vorhanden.
+    /// </summary>
+    [Fact]
+    public void RepositoryZuweisenDialog_ArbeitsverzeichnisAuswahl_IstVorhanden_E2E()
+    {
+        var mainWindow = StartAndNavigateToProjects();
+        CreateAndOpenProject(mainWindow, "Arbeitsverzeichnis-Test");
+
+        // "Zuweisen"-Button im Ribbon klicken
+        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
+        zuweisenButton.AsButton().Click();
+
+        // RepositoryAssignDialog erscheint als separates Fenster
+        var dialog = WaitForWindow("Repository zuweisen", Short);
+        Assert.NotNull(dialog);
+
+        // Label "Arbeitsverzeichnis im Repository" ist vorhanden
+        var label = WaitForElement(dialog, cf => cf.ByName("Arbeitsverzeichnis im Repository"), Short);
+        Assert.NotNull(label);
+
+        // Zweite ComboBox (Arbeitsverzeichnis-Auswahl) ist zusätzlich zur Plugin-Auswahl vorhanden
+        var comboBoxen = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.ComboBox));
+        Assert.True(comboBoxen.Length >= 2, "RepositoryAssignDialog muss zusätzlich zur Plugin-Auswahl eine ComboBox für die Arbeitsverzeichnis-Auswahl enthalten.");
+
+        // Dialog schließen
+        var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
+        abbrechenButton.AsButton().Click();
+    }
+
+    /// <summary>
     /// Szenario: Repository öffnen.
     /// Prüft: "Öffnen"-Button existiert in der Detailansicht.
     /// (Tatsächliches Browser-Öffnen ist im E2E nicht zuverlässig prüfbar.)

@@ -198,6 +198,138 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         updatedAufgabe!.Status.Should().Be(AufgabeStatus.Neu);
     }
 
+    /// <summary>
+    /// ProzessStartenUndCliStartenAsync übergibt dem KI-Plugin das konfigurierte Arbeitsunterverzeichnis
+    /// (aus der RepositoryStartKonfiguration), statt den Repository-Root zu verwenden.
+    /// </summary>
+    [Fact]
+    public async Task ProzessStartenUndCliStartenAsync_ShouldUseConfiguredWorkingDirectory_WhenStartConfigHasWorkingDirectory()
+    {
+        // Arrange
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "https://github.com/test/repo-workdir",
+            RepositoryName = "repo-workdir",
+            Aktiv = true
+        };
+        repository.StartKonfiguration = new RepositoryStartKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            WorkingDirectoryRelativePath = "backend",
+            Aktiv = true,
+            GitRepository = repository
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Start mit Arbeitsverzeichnis", null, repository.Id);
+
+        var clonePath = SetupCloneWithDirectoryCreation();
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string path, CancellationToken _) =>
+            {
+                Directory.CreateDirectory(Path.Combine(path, "backend"));
+                return Task.CompletedTask;
+            });
+
+        string? usedPath = null;
+        _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string?, CancellationToken>((path, _, _) => usedPath = path)
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _arbeitsverzeichnisResolverMock.Object,
+            new EntwicklungsprozessServiceOptions(ProjektService: projektService, KiAusfuehrungsService: _kiAusfuehrungsService),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        try
+        {
+            // Act
+            await sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, repository.RepositoryUrl, null, "Softwareschmiede.TestKi");
+
+            // Assert
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
+            usedPath.Should().Be(Path.Combine(updatedAufgabe.LokalerKlonPfad!, "backend"));
+        }
+        finally
+        {
+            await _kiAusfuehrungsService.StopCliAsync(aufgabe.Id);
+            DeleteDirectoryIfExists(clonePath);
+        }
+    }
+
+    /// <summary>
+    /// ProzessStartenUndCliStartenAsync bricht mit Rollback ab, wenn das konfigurierte Arbeitsverzeichnis
+    /// nach dem Klon nicht existiert.
+    /// </summary>
+    [Fact]
+    public async Task ProzessStartenUndCliStartenAsync_ShouldRollback_WhenConfiguredWorkingDirectoryMissing()
+    {
+        // Arrange
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "https://github.com/test/repo-workdir-missing",
+            RepositoryName = "repo-workdir-missing",
+            Aktiv = true
+        };
+        repository.StartKonfiguration = new RepositoryStartKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            WorkingDirectoryRelativePath = "does-not-exist",
+            Aktiv = true,
+            GitRepository = repository
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Start mit fehlendem Arbeitsverzeichnis", null, repository.Id);
+
+        var clonePath = SetupCloneWithDirectoryCreation();
+
+        var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _arbeitsverzeichnisResolverMock.Object,
+            new EntwicklungsprozessServiceOptions(ProjektService: projektService, KiAusfuehrungsService: _kiAusfuehrungsService),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        try
+        {
+            // Act
+            var act = () => sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, repository.RepositoryUrl, null, "Softwareschmiede.TestKi");
+
+            // Assert
+            await act.Should().ThrowAsync<DirectoryNotFoundException>();
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            updatedAufgabe!.Status.Should().Be(AufgabeStatus.Neu);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(clonePath);
+        }
+    }
+
     /// <summary>ProzessStartenAsync blockiert den Start nicht, wenn das Repository-Startskript fehlschlägt.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldContinue_WhenRepositoryStartScriptFails()

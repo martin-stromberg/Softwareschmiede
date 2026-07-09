@@ -596,4 +596,140 @@ password {token}
         return "main";
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Ruft die Verzeichnisstruktur des Standard-Branches rein remote über die GitHub Git-Trees-API ab
+    /// (<c>gh api repos/{owner}/{repo}/git/trees/{branch}?recursive=1</c>) — ein lokaler Klon ist dafür nicht
+    /// erforderlich. Damit ist eine Unterverzeichnis-Auswahl bereits vor dem Klon möglich (Hauptanwendungsfall
+    /// der Arbeitsverzeichnis-Auswahl).
+    /// </remarks>
+    public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
+        string repositoryUrl,
+        int maxDepth = 2,
+        CancellationToken ct = default)
+    {
+        var repositoryId = TryExtractRepositoryId(repositoryUrl);
+        if (repositoryId is null)
+        {
+            _logger.LogWarning(
+                "Verzeichnisstruktur konnte nicht ermittelt werden: Repository-ID konnte nicht aus '{RepositoryUrl}' extrahiert werden.",
+                repositoryUrl);
+            return [];
+        }
+
+        var branch = await GetDefaultBranchAsync(repositoryUrl, ct);
+
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            ["api", $"repos/{repositoryId}/git/trees/{branch}?recursive=1"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning(
+                "gh api git/trees fehlgeschlagen für {RepositoryId} (Branch {Branch}): {StdErr}",
+                repositoryId,
+                branch,
+                result.StdErr);
+            return [];
+        }
+
+        return ParseRepositoryTree(result.StdOut, maxDepth, repositoryId);
+    }
+
+    private IEnumerable<RepositoryDirectoryEntry> ParseRepositoryTree(string json, int maxDepth, string repositoryId)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("truncated", out var truncatedEl) &&
+                truncatedEl.ValueKind == JsonValueKind.True)
+            {
+                _logger.LogWarning(
+                    "GitHub Git-Trees-API-Antwort für {RepositoryId} ist abgeschnitten (truncated=true) — bei sehr großen Repositories ist die ermittelte Verzeichnisstruktur ggf. unvollständig.",
+                    repositoryId);
+            }
+
+            if (!doc.RootElement.TryGetProperty("tree", out var treeEl) || treeEl.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            return treeEl.EnumerateArray()
+                .Where(entry => entry.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "tree")
+                .Select(entry => entry.TryGetProperty("path", out var pathEl) ? pathEl.GetString() : null)
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Select(path => path!)
+                .Where(path => path.Count(c => c == '/') + 1 <= maxDepth)
+                .Select(path => new RepositoryDirectoryEntry(path, true))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Parsen der GitHub-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Extrahiert die Repository-ID (<c>owner/repo</c>) aus einer GitHub-Repository-URL. Unterstützt HTTPS-
+    /// (<c>https://github.com/owner/repo(.git)?</c>) und SSH-URLs (<c>git@github.com:owner/repo(.git)?</c>).
+    /// Liefert <c>null</c> statt zu werfen, wenn die URL nicht geparst werden kann.
+    /// </summary>
+    /// <param name="repositoryUrl">Die zu parsende GitHub-Repository-URL (HTTPS oder SSH).</param>
+    /// <returns>Die Repository-ID im Format <c>owner/repo</c>, oder <c>null</c> wenn die URL nicht erkannt wurde.</returns>
+    private static string? TryExtractRepositoryId(string repositoryUrl)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryUrl))
+        {
+            return null;
+        }
+
+        var url = repositoryUrl.EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+            ? repositoryUrl[..^4]
+            : repositoryUrl;
+
+        if (!url.Contains("://", StringComparison.Ordinal))
+        {
+            // SCP-/SSH-Format: git@github.com:owner/repo
+            var colonIndex = url.IndexOf(':');
+            if (colonIndex < 0 || colonIndex >= url.Length - 1)
+            {
+                return null;
+            }
+
+            var repositoryPath = url[(colonIndex + 1)..];
+            var slashIndex = repositoryPath.IndexOf('/');
+            if (slashIndex <= 0 || slashIndex >= repositoryPath.Length - 1)
+            {
+                return null;
+            }
+
+            return $"{repositoryPath[..slashIndex]}/{repositoryPath[(slashIndex + 1)..]}";
+        }
+
+        // HTTPS-Format: https://github.com/owner/repo[.git][/][?query][#fragment]. Uri.AbsolutePath
+        // normalisiert Trailing-Slashes weg und ignoriert Query-String/Fragment, statt sie fälschlich
+        // in "owner"/"repo" einzumischen (siehe TryExtractRepositoryId in BitbucketPlugin für dasselbe Muster).
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 2)
+        {
+            return null;
+        }
+
+        var owner = segments[0];
+        var repo = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+            ? segments[1][..^4]
+            : segments[1];
+
+        return string.IsNullOrEmpty(owner) || string.IsNullOrEmpty(repo) ? null : $"{owner}/{repo}";
+    }
 }
