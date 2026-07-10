@@ -1,0 +1,12 @@
+{
+  "name": "track_usage",
+  "description": "Speichert Token-Usage und Kosten in einer Datei",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "step": { "type": "string" },
+      "usage": { "type": "object" }
+    },
+    "required": ["step", "usage"]
+  }
+}

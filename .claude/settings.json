@@ -94,6 +94,22 @@
             "type": "command",
             "statusMessage": "Checking C# projects to start...",
             "command": "pwsh -NoProfile -File .claude/hooks/test-csharp-startup.ps1"
+          },
+          {
+            "type": "command",
+            "statusMessage": "Logging token usage...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/log_token_usage.py\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Logging subagent token usage...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/log_token_usage.py\""
           }
         ]
       }
@@ -104,9 +120,9 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(*dotnet test*)",
-            "statusMessage": "Building solution before dotnet test...",
-            "command": "dotnet build || echo 'BUILD FAILED - fix before running tests'"
+	    "if": "Bash(*dotnet test*)",
+	    "statusMessage": "Building solution before dotnet test...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/build_before_test.py\""
           }
         ]
       }
@@ -159,6 +175,11 @@
             "type": "command",
             "statusMessage": "Checking NuGet package versions...",
             "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_nuget_versions.py\""
+          },
+          {
+            "type": "command",
+            "statusMessage": "Checking for NotImplementedException/throw-only stubs...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/check_no_notimplemented.py\""
           }
         ]
       }

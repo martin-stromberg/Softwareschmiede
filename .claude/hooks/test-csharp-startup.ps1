@@ -1,8 +1,55 @@
 [CmdletBinding()]
 param()
 
+# Am Git-Repo-Root verankern, damit der Build-Lock (siehe unten) exakt
+# denselben Pfad trifft wie dotnet_lock.py (PreToolUse-Hook vor "dotnet test").
+try {
+    $repoRoot = (git rev-parse --show-toplevel 2>$null)
+    if ($repoRoot) { Set-Location $repoRoot }
+} catch {}
+
 $WorkDir    = $PWD
 $TimeoutSec = 30
+
+# ---- Lock: verhindert, dass dieser Stop-Hook (Build + Start-Smoke-Test)
+# gleichzeitig mit einem "dotnet test"-Lauf (build_before_test.py) in
+# dieselben obj/bin-Ordner schreibt. Sonst koennen z.B. WPF-Projekte ein
+# unvollstaendiges runtimeconfig.json bekommen ("Desktop Runtime nicht
+# gefunden" bei E2E-Tests, nur manchmal, je nach Timing).
+$LockDir      = Join-Path $WorkDir '.claude\.locks\dotnet-build.lock'
+$LockTimeout  = 120
+$LockStaleSec = 300
+
+function Enter-DotnetBuildLock {
+    $parent = Split-Path $LockDir -Parent
+    if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($LockTimeout)
+    while ($true) {
+        try {
+            New-Item -ItemType Directory -Path $LockDir -ErrorAction Stop | Out-Null
+            Set-Content -Path (Join-Path $LockDir 'owner.txt') -Value "pid=$PID time=$(Get-Date -Format o)"
+            return $true
+        } catch {
+            if (Test-Path $LockDir) {
+                $age = ((Get-Date) - (Get-Item $LockDir).CreationTime).TotalSeconds
+                if ($age -gt $LockStaleSec) {
+                    Remove-Item $LockDir -Recurse -Force -ErrorAction SilentlyContinue
+                    continue
+                }
+            }
+            if ([DateTime]::UtcNow -ge $deadline) {
+                Write-Host "[dotnet-lock] Timeout beim Warten auf den Build-Lock - fahre ohne Lock fort." -ForegroundColor Yellow
+                return $false
+            }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
+function Exit-DotnetBuildLock {
+    Remove-Item $LockDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 function Get-RunnableProjects {
     param([string]$Dir)
@@ -139,7 +186,12 @@ Write-Host ""
 Write-Host "=== C# Starttest === ($names)"
 Write-Host ""
 
-$results = $projects | ForEach-Object { Test-Startup -Project $_ }
+$gotLock = Enter-DotnetBuildLock
+try {
+    $results = $projects | ForEach-Object { Test-Startup -Project $_ }
+} finally {
+    if ($gotLock) { Exit-DotnetBuildLock }
+}
 
 foreach ($r in $results) {
     if ($r.Success) {
