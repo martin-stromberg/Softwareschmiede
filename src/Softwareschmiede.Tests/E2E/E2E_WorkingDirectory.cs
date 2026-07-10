@@ -43,6 +43,18 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
     /// Szenario: Konfiguriertes Arbeitsverzeichnis existiert nach dem Start nicht im Repository.
     /// Erwartung: Fehlerbanner erscheint, CLI startet nicht.
     /// </summary>
+    /// <remarks>
+    /// Regressionsabdeckung für den Fix in <see cref="WpfTestBase.WaitForElement"/>: Dieser Test
+    /// wartet selbst auf das Element "FehlerMeldung" (Zeile unten), das zugleich die proaktive
+    /// Fail-Fast-Diagnose in <c>WaitForElement</c> auslöst. Vor dem Fix führte das dazu, dass der Test
+    /// fälschlich mit einer <see cref="InvalidOperationException"/> statt mit dem erwarteten Treffer
+    /// abbrach (nicht-atomare UI-Automation-Aufrufe, siehe Doku an <c>WaitForElement</c>). Ein isolierter
+    /// Unit-Test für <c>WaitForElement</c> selbst ist nicht sinnvoll möglich: <c>AutomationElement</c> und
+    /// <c>ConditionFactory</c> sind eng an eine echte, native UI-Automation-Instanz (FlaUI/UIA3, COM-basiert)
+    /// gekoppelt und bieten keine Testschnittstellen/-doubles für eine In-Memory-Simulation. Die Verifikation
+    /// erfolgt daher über diesen und den analogen Path-Traversal-Test (beide mehrfach wiederholt grün, siehe
+    /// continue.md).
+    /// </remarks>
     [Fact]
     public async Task AufgabeStarten_MitFehlendemArbeitsverzeichnis_ZeigtFehler_E2E()
     {
