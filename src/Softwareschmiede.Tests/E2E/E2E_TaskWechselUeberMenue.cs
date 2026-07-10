@@ -152,6 +152,42 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
                 return pid;
             Thread.Sleep(200);
         }
-        throw new TimeoutException("TerminalConsole zeigte innerhalb des Timeouts keine Prozess-ID (HelpText) an.");
+        throw new TimeoutException(
+            "TerminalConsole zeigte innerhalb des Timeouts keine Prozess-ID (HelpText) an. "
+            + $"Vorhandene Descendants von mainWindow: {BeschreibeDescendants(mainWindow)}");
+    }
+
+    /// <summary>Listet zu Diagnosezwecken ControlType und Name aller Nachfahren eines Elements auf
+    /// (z. B. für die Fehlermeldung eines TimeoutException, um zu sehen, welche Elemente statt des
+    /// erwarteten tatsächlich im Automation-Baum vorhanden sind). Einzelne Elemente, deren Eigenschaften
+    /// nicht mehr abrufbar sind (z. B. bereits entfernt), werden übersprungen statt die Diagnose selbst
+    /// scheitern zu lassen.</summary>
+    /// <param name="parent">Das Element, dessen Nachfahren aufgelistet werden.</param>
+    /// <returns>Kommagetrennte Liste aus "ControlType:'Name'" je Nachfahre.</returns>
+    private static string BeschreibeDescendants(AutomationElement parent)
+    {
+        try
+        {
+            var descendants = parent.FindAllDescendants();
+            var beschreibungen = new List<string>(descendants.Length);
+            foreach (var element in descendants)
+            {
+                try
+                {
+                    beschreibungen.Add($"{element.ControlType}:'{element.Name}'");
+                }
+                catch
+                {
+                    // Element nicht mehr abrufbar (z. B. bereits aus dem Baum entfernt) — überspringen.
+                }
+            }
+            return beschreibungen.Count == 0
+                ? "(keine)"
+                : $"[{beschreibungen.Count}] {string.Join(", ", beschreibungen)}";
+        }
+        catch (Exception ex)
+        {
+            return $"(Descendants-Abfrage fehlgeschlagen: {ex.Message})";
+        }
     }
 }
