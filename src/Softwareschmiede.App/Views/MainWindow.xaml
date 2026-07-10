@@ -41,79 +41,87 @@
                 BorderThickness="0,0,1,0"
                 Width="{Binding IsNavigationExpanded, Converter={StaticResource BoolToWidthConverter}}"
                 MinWidth="48">
-            <StackPanel>
-                <!-- Toggle Navigation -->
-                <Button Content="☰"
-                        Command="{Binding ToggleNavigationCommand}"
-                        Margin="8,8,8,16"
-                        Padding="8,4"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        HorizontalAlignment="Left"
-                        FontSize="16" />
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <!-- Navigation Items -->
-                <Button Command="{Binding NavigateToDashboardCommand}"
-                        AutomationProperties.Name="Dashboard"
-                        Margin="4,2"
-                        Padding="8,8"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="⊞" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text=" Dashboard" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
+                <StackPanel Grid.Row="0">
+                    <!-- Toggle Navigation -->
+                    <Button Content="☰"
+                            Command="{Binding ToggleNavigationCommand}"
+                            Margin="8,8,8,16"
+                            Padding="8,4"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Left"
+                            FontSize="16" />
 
-                <Button Command="{Binding NavigateToProjectListCommand}"
-                        AutomationProperties.Name=" Projekte"
-                        Margin="4,2"
-                        Padding="8,8"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="📁" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text=" Projekte" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
+                    <!-- Navigation Items -->
+                    <Button Command="{Binding NavigateToDashboardCommand}"
+                            AutomationProperties.Name="Dashboard"
+                            Margin="4,2"
+                            Padding="8,8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⊞" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text=" Dashboard" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
 
-                <Button Command="{Binding NavigateToSettingsCommand}"
-                        AutomationProperties.Name=" Einstellungen"
-                        Margin="4,2"
-                        Padding="8,8"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Left">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="⚙" FontSize="16" VerticalAlignment="Center" />
-                        <TextBlock Text=" Einstellungen" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
+                    <Button Command="{Binding NavigateToProjectListCommand}"
+                            AutomationProperties.Name=" Projekte"
+                            Margin="4,2"
+                            Padding="8,8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📁" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text=" Projekte" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
 
-                <!-- Separator -->
-                <Border Height="1"
-                        Background="{DynamicResource BorderBrush}"
-                        Margin="8,8" />
+                    <Button Command="{Binding NavigateToSettingsCommand}"
+                            AutomationProperties.Name=" Einstellungen"
+                            Margin="4,2"
+                            Padding="8,8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚙" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text=" Einstellungen" Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
 
-                <!-- Sektion: Aktive Aufgaben -->
-                <TextBlock Text="Aktive Aufgaben"
-                           FontSize="11"
-                           Foreground="{DynamicResource SecondaryTextBrush}"
-                           Margin="8,8,8,4"
-                           Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                    <!-- Separator -->
+                    <Border Height="1"
+                            Background="{DynamicResource BorderBrush}"
+                            Margin="8,8" />
 
-                <ScrollViewer MaxHeight="300"
+                    <!-- Sektion: Aktive Aufgaben -->
+                    <TextBlock Text="Aktive Aufgaben"
+                               FontSize="11"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               Margin="8,8,8,4"
+                               Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
                               Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                     <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
                                                       NavigateCommand="{Binding NavigateZuAufgabeCommand}" />
                 </ScrollViewer>
-            </StackPanel>
+            </Grid>
         </Border>
 
         <!-- Inhaltsbereich -->
