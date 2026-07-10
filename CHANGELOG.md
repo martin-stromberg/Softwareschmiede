@@ -1,3 +1,11 @@
+# [1.4.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.3.0...v1.4.0) (2026-07-10)
+
+
+### Features
+
+* korrigiere aufgabenliste im programmmenue ([1f83b83](https://github.com/martin-stromberg/Softwareschmiede/commit/1f83b83ad1a3876fa1ffd830bd6baccc9c9cc221))
+* lasse aufgabenliste im menue wachsen ([31fc93d](https://github.com/martin-stromberg/Softwareschmiede/commit/31fc93d659eed8a086cdd6f6e79b98076b55e6fe))
+
 # [1.3.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.2.0...v1.3.0) (2026-07-10)
 
 
