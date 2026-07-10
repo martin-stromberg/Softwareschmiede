@@ -154,6 +154,21 @@ public abstract class WpfTestBase : IDisposable
     /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> gefunden wird.
     /// Wirft <see cref="TimeoutException"/>, wenn das Element nicht innerhalb von <paramref name="timeout"/> erscheint.
     /// </summary>
+    /// <remarks>
+    /// Als Fail-Fast-Diagnose wird bei jeder Polling-Iteration zusätzlich nach einem Fehlerbanner
+    /// ("FehlerMeldung") gesucht: Tests, die auf ein *anderes* Element warten, sollen sofort mit einer
+    /// aussagekräftigen Meldung abbrechen, statt erst nach Ablauf des vollen Timeouts. Da die Suche nach
+    /// <paramref name="conditionFunc"/> und die Suche nach "FehlerMeldung" zwei separate, nicht-atomare
+    /// UI-Automation-Aufrufe sind, kann es vorkommen, dass der erste Aufruf ein gerade erst erscheinendes
+    /// Element knapp verpasst, während der zweite (Millisekunden später) es bereits findet. Für Aufrufer,
+    /// deren <paramref name="conditionFunc"/> selbst auf "FehlerMeldung" zielt (z. B. Fehlerfall-Tests, die
+    /// genau dieses Element als Erfolgskriterium erwarten), würde das fälschlich als Abbruchgrund statt als
+    /// gefundenes Zielelement gewertet. Deshalb wird die Zielsuche unmittelbar vor dem Werfen der Exception
+    /// erneut versucht: Ist "FehlerMeldung" tatsächlich das gesuchte Zielelement, ist es zu diesem Zeitpunkt
+    /// im Automation-Baum bereits vorhanden (der Fehlerbanner-Check hat es ja soeben gefunden) und die
+    /// erneute Zielsuche liefert es als regulären Treffer zurück. Zielt <paramref name="conditionFunc"/> auf
+    /// ein anderes Element, bleibt die erneute Suche erfolglos und die Fail-Fast-Diagnose greift wie bisher.
+    /// </remarks>
     protected static AutomationElement WaitForElement(
         AutomationElement parent,
         Func<ConditionFactory, ConditionBase> conditionFunc,
@@ -168,8 +183,17 @@ public abstract class WpfTestBase : IDisposable
 
             var fehlerMeldung = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
             if (fehlerMeldung is not null)
+            {
+                // Letzter Versuch: Falls conditionFunc selbst auf "FehlerMeldung" zielt, ist das
+                // Element inzwischen sicher auffindbar (siehe Erklärung oben) und der Aufruf soll
+                // regulär mit diesem Treffer zurückkehren statt in den Fehlerpfad zu laufen.
+                element = parent.FindFirstDescendant(conditionFunc);
+                if (element is not null)
+                    return element;
+
                 throw new InvalidOperationException(
                     $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetFehlerText(fehlerMeldung)}");
+            }
 
             Thread.Sleep(200);
         }
