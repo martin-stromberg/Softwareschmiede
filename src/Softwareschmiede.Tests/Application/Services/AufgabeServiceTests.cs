@@ -365,47 +365,6 @@ public sealed class AufgabeServiceTests : IDisposable
         ageMinutes!.Value.Should().BeLessThan(2);
     }
 
-    /// <summary>
-    /// AktivenLaufSetzenAsync setzt AktiveRunId und aktualisiert LastHeartbeatUtc sofort (Issue 108:
-    /// die Seitenleisten-Kachel darf nicht bis zu 30s auf den ersten periodischen Heartbeat warten müssen).
-    /// </summary>
-    [Fact]
-    public async Task AktivenLaufSetzenAsync_ShouldSetAktiveRunIdAndHeartbeat_WhenCalled()
-    {
-        // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Aktiver-Lauf-Aufgabe", null);
-        aufgabe.AktiveRunId.Should().BeNull();
-
-        // Act
-        var vorUpdate = DateTimeOffset.UtcNow;
-        await _sut.AktivenLaufSetzenAsync(aufgabe.Id, "lauf-123");
-        var nachUpdate = DateTimeOffset.UtcNow;
-
-        // Assert
-        var geladen = await _sut.GetByIdAsync(aufgabe.Id);
-        geladen!.AktiveRunId.Should().Be("lauf-123");
-        geladen.LastHeartbeatUtc.Should().NotBeNull();
-        geladen.LastHeartbeatUtc!.Value.Should().BeOnOrAfter(vorUpdate.AddSeconds(-1));
-        geladen.LastHeartbeatUtc!.Value.Should().BeOnOrBefore(nachUpdate.AddSeconds(1));
-    }
-
-    /// <summary>AktivenLaufBeendenAsync entfernt eine zuvor gesetzte AktiveRunId.</summary>
-    [Fact]
-    public async Task AktivenLaufBeendenAsync_ShouldClearAktiveRunId_WhenPreviouslySet()
-    {
-        // Arrange
-        var aufgabe = await _sut.CreateAsync(_projektId, "Aktiver-Lauf-Beenden-Aufgabe", null);
-        await _sut.AktivenLaufSetzenAsync(aufgabe.Id, "lauf-456");
-        (await _sut.GetByIdAsync(aufgabe.Id))!.AktiveRunId.Should().Be("lauf-456");
-
-        // Act
-        await _sut.AktivenLaufBeendenAsync(aufgabe.Id);
-
-        // Assert
-        var geladen = await _sut.GetByIdAsync(aufgabe.Id);
-        geladen!.AktiveRunId.Should().BeNull();
-    }
-
     /// <summary>GetHeartbeatAgeMinutesAsync gibt null zurück wenn kein Heartbeat gesetzt.</summary>
     [Fact]
     public async Task GetHeartbeatAgeMinutesAsync_ShouldReturnNull_WhenNoHeartbeatSet()

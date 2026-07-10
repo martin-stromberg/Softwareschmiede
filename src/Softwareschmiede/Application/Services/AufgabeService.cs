@@ -463,6 +463,9 @@ public sealed class AufgabeService
 
         aufgabe.AktiveRunId = laufId;
         aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
+        // LaufStatus startet mit Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start),
+        // damit die Kachel unmittelbar "▶ Läuft" statt eines veralteten Werts eines vorherigen Laufs zeigt.
+        aufgabe.LaufStatus = AufgabeLaufStatus.Laeuft;
         await _db.SaveChangesAsync(ct);
     }
 
@@ -479,6 +482,34 @@ public sealed class AufgabeService
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         aufgabe.AktiveRunId = null;
+        // LaufStatus gehört nur zu einem aktiven Lauf (siehe AktivenLaufSetzenAsync) — beim Beenden
+        // entfernen, damit kein veralteter Substatus eines beendeten Laufs zurückbleibt.
+        aufgabe.LaufStatus = null;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Aktualisiert den Laufzeit-Substatus (<see cref="Aufgabe.LaufStatus"/>) einer Aufgabe mit aktivem Lauf.
+    /// Wird von <c>CliProcessManager</c> aufgerufen, sobald <c>PseudoConsoleSession.RuntimeStatusChanged</c>
+    /// meldet, dass die CLI zwischen "arbeitet" und "wartet auf Eingabe" gewechselt hat, damit
+    /// <c>KiAusfuehrungsStatusConverter</c> zwischen "▶ Läuft" und "⏸ Wartet" unterscheiden kann, während der
+    /// CLI-Prozess noch lebt (Issue 108, Folgefehler des Rückwegs Läuft → Wartet).
+    /// </summary>
+    /// <param name="id">ID der Aufgabe.</param>
+    /// <param name="laufStatus">Neuer Laufzeit-Substatus.</param>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public async Task AktualisiereLaufStatusAsync(Guid id, AufgabeLaufStatus laufStatus, CancellationToken ct = default)
+    {
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        // Nur relevant, solange ein aktiver Lauf bekannt ist. Ist AktiveRunId zwischenzeitlich entfernt
+        // worden (Prozess bereits beendet, Event kam verspätet), soll kein neuer Substatus mehr gesetzt
+        // werden, damit LaufStatus nicht nach einem AktivenLaufBeendenAsync erneut aufgefüllt wird.
+        if (aufgabe.AktiveRunId is null)
+            return;
+
+        aufgabe.LaufStatus = laufStatus;
         await _db.SaveChangesAsync(ct);
     }
 
