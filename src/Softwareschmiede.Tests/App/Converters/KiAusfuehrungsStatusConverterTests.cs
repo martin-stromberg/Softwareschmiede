@@ -45,6 +45,63 @@ public sealed class KiAusfuehrungsStatusConverterTests
         result.Should().Be("⏸ Wartet");
     }
 
+    /// <summary>
+    /// Regressionstest (Issue 108, Folgefehler des Rückwegs Läuft → Wartet): Auch während ein CLI-Prozess
+    /// noch läuft (<see cref="Aufgabe.AktiveRunId"/> gesetzt, Heartbeat aktuell) muss die Kachel auf
+    /// "⏸ Wartet" umschalten, sobald der persistierte Laufzeit-Substatus <see cref="AufgabeLaufStatus.WartetAufEingabe"/>
+    /// meldet, dass die CLI auf Benutzereingabe wartet. Vor dem Fix konnte der Converter diesen Zustand
+    /// strukturell nicht erkennen, weil ihm der Substatus nie zur Verfügung stand — er zeigte fälschlich
+    /// dauerhaft "▶ Läuft", solange der Prozess lebte.
+    /// </summary>
+    [Fact]
+    public void Convert_ShouldReturnWartetString_WhenAktiveRunIdPresentAndLaufStatusIstWartetAufEingabe()
+    {
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Laufende, aber wartende Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AktiveRunId = "run-3",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            LaufStatus = AufgabeLaufStatus.WartetAufEingabe
+        };
+
+        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("⏸ Wartet");
+    }
+
+    /// <summary>
+    /// Ist der Laufzeit-Substatus explizit <see cref="AufgabeLaufStatus.Laeuft"/> (oder null, z. B. beim
+    /// klassischen Start ohne ConPTY-Sitzung), muss weiterhin "▶ Läuft" angezeigt werden — die Erweiterung
+    /// um den Substatus darf das bisherige Verhalten für den Normalfall nicht verändern.
+    /// </summary>
+    [Fact]
+    public void Convert_ShouldReturnLaeuftString_WhenAktiveRunIdPresentAndLaufStatusIstLaeuftOderNull()
+    {
+        var aufgabeMitLaeuft = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Laufende Aufgabe (explizit Laeuft)",
+            Status = AufgabeStatus.Gestartet,
+            AktiveRunId = "run-4",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            LaufStatus = AufgabeLaufStatus.Laeuft
+        };
+        var aufgabeOhneLaufStatus = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Laufende Aufgabe (kein Substatus bekannt)",
+            Status = AufgabeStatus.Gestartet,
+            AktiveRunId = "run-5",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            LaufStatus = null
+        };
+
+        _sut.Convert(aufgabeMitLaeuft, typeof(string), null!, CultureInfo.InvariantCulture).Should().Be("▶ Läuft");
+        _sut.Convert(aufgabeOhneLaufStatus, typeof(string), null!, CultureInfo.InvariantCulture).Should().Be("▶ Läuft");
+    }
+
     /// <summary>Convert gibt "✓ Bereit" zurück, wenn keine aktive Ausführung erkennbar ist.</summary>
     [Fact]
     public void Convert_ShouldReturnBereitString_WhenNoActiveRunOrHeartbeatExpired()

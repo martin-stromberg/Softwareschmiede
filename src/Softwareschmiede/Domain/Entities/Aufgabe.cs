@@ -50,6 +50,15 @@ public sealed class Aufgabe
     /// <summary>Optional: Zeitstempel des letzten Heartbeats einer Ausführung.</summary>
     public DateTimeOffset? LastHeartbeatUtc { get; set; }
 
+    /// <summary>
+    /// Optional: Laufzeit-Substatus der aktiven CLI-Ausführung (nur relevant, solange
+    /// <see cref="AktiveRunId"/> gesetzt ist). Wird von <c>CliProcessManager</c> anhand des
+    /// <c>PseudoConsoleSession.RuntimeStatusChanged</c>-Ereignisses aktualisiert, damit die Seitenleisten-/
+    /// Dashboard-Kachel (<c>KiAusfuehrungsStatusConverter</c>) zwischen "▶ Läuft" und "⏸ Wartet"
+    /// unterscheiden kann, während der CLI-Prozess noch lebt. Null, solange kein aktiver Lauf bekannt ist.
+    /// </summary>
+    public AufgabeLaufStatus? LaufStatus { get; set; }
+
     /// <summary>Concurrency-Token für Recovery-relevante Statusänderungen.</summary>
     public int RecoveryVersion { get; set; }
 

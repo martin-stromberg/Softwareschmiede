@@ -112,7 +112,12 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
             && aufgabe.LastHeartbeatUtc != null
             && DateTimeOffset.UtcNow - aufgabe.LastHeartbeatUtc.Value < TimeSpan.FromMinutes(AufgabeRecoveryService.HeartbeatTimeoutMinutes))
         {
-            return "▶ Läuft";
+            // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
+            // persistiert über CliProcessManager/AufgabeService.AktualisiereLaufStatusAsync). Ohne diesen
+            // Substatus (null, z. B. beim klassischen Start ohne ConPTY) bleibt es beim bisherigen "▶ Läuft".
+            return aufgabe.LaufStatus == AufgabeLaufStatus.WartetAufEingabe
+                ? "⏸ Wartet"
+                : "▶ Läuft";
         }
 
         if (aufgabe.Status == AufgabeStatus.Wartend)

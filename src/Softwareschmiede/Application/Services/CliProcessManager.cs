@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Application.Services;
 
@@ -16,6 +18,13 @@ public sealed class CliProcessManager : IDisposable
 
     private readonly ConcurrentDictionary<Guid, Timer> _heartbeatTimers = new();
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
+
+    // Hält pro Aufgabe die PseudoConsoleSession und den dafür registrierten Event-Handler, damit
+    // RuntimeStatusChanged beim Stopp/Fehler wieder sauber abgemeldet werden kann (siehe
+    // UnsubscribeRuntimeStatus). Ohne dieses Tracking müsste GetPseudoConsoleSession(aufgabeId) erneut
+    // abgefragt werden — das Handle ist zu diesem Zeitpunkt aber bereits aus KiAusfuehrungsService._handles
+    // entfernt (siehe HandleProcessExited), sodass die Session dort nicht mehr auffindbar wäre.
+    private readonly ConcurrentDictionary<Guid, (PseudoConsoleSession Session, EventHandler<CliRuntimeStatusChangedEventArgs> Handler)> _runtimeStatusSubscriptions = new();
 
     // Ein Semaphore pro Aufgabe statt eines einzelnen klassenweiten Semaphores: verhindert nur das
     // Überlappen von Timer-Ticks derselben Aufgabe, ohne die Heartbeat-Updates unabhängiger Aufgaben
@@ -118,10 +127,17 @@ public sealed class CliProcessManager : IDisposable
             {
                 case CliProcessStatus.Gestartet:
                     StartHeartbeat(aufgabeId);
+                    // AktiveRunId muss sofort persistiert werden (nicht erst beim ersten periodischen
+                    // Heartbeat nach 30s) — sonst zeigt die Seitenleisten-Kachel (KiAusfuehrungsStatusConverter,
+                    // Issue 108) für bis zu 30s nach dem Start weiterhin "✓ Bereit" statt "▶ Läuft" an.
+                    AktivenLaufSetzenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufSetzenAsync");
+                    SubscribeRuntimeStatus(aufgabeId);
                     break;
                 case CliProcessStatus.Gestoppt:
                 case CliProcessStatus.Fehler:
                     StopHeartbeat(aufgabeId);
+                    UnsubscribeRuntimeStatus(aufgabeId);
+                    AktivenLaufBeendenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufBeendenAsync");
                     break;
             }
         }
@@ -132,6 +148,103 @@ public sealed class CliProcessManager : IDisposable
             // Abonnent (TaskDetailViewModel.OnCliProcessStatusChanged) nicht mehr benachrichtigt.
             _logger.LogError(ex, "Fehler bei der Verarbeitung des CLI-Prozess-Status {Status} für Aufgabe {AufgabeId}.", status, aufgabeId);
         }
+    }
+
+    /// <summary>
+    /// Setzt <see cref="Domain.Entities.Aufgabe.AktiveRunId"/> und aktualisiert den Heartbeat sofort,
+    /// sobald ein CLI-Prozess gestartet wurde (siehe <see cref="AufgabeService.AktivenLaufSetzenAsync"/>).
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess gestartet wurde.</param>
+    private async Task AktivenLaufSetzenAsync(Guid aufgabeId)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+        await aufgabeService.AktivenLaufSetzenAsync(aufgabeId, Guid.NewGuid().ToString("N")).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Entfernt <see cref="Domain.Entities.Aufgabe.AktiveRunId"/>, sobald der CLI-Prozess einer Aufgabe
+    /// beendet wurde (regulär oder mit Fehler; siehe <see cref="AufgabeService.AktivenLaufBeendenAsync"/>).
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
+    private async Task AktivenLaufBeendenAsync(Guid aufgabeId)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+        await aufgabeService.AktivenLaufBeendenAsync(aufgabeId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Abonniert <see cref="PseudoConsoleSession.RuntimeStatusChanged"/> für die ConPTY-Sitzung einer
+    /// gerade gestarteten Aufgabe (sofern vorhanden — beim klassischen, nicht-ConPTY-Start existiert keine
+    /// Sitzung), damit Wechsel zwischen "arbeitet" und "wartet auf Eingabe" über
+    /// <see cref="AufgabeService.AktualisiereLaufStatusAsync"/> persistiert werden (Issue 108, Folgefehler
+    /// des Rückwegs Läuft → Wartet: dieser Substatus wurde vorher ausschließlich lokal in der
+    /// <see cref="PseudoConsoleSession"/> gehalten und nie an die Datenbank weitergereicht).
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess gestartet wurde.</param>
+    private void SubscribeRuntimeStatus(Guid aufgabeId)
+    {
+        // Defensive Bereinigung einer eventuell noch vorhandenen alten Registrierung (z. B. wenn ein
+        // Gestoppt-Event für einen vorherigen Lauf derselben Aufgabe ausblieb) — verhindert doppelte
+        // Event-Registrierungen und einen dadurch überzähligen Persistierungsaufruf pro Statuswechsel.
+        UnsubscribeRuntimeStatus(aufgabeId);
+
+        var session = _kiService.GetPseudoConsoleSession(aufgabeId);
+        if (session is null)
+        {
+            // Klassischer Start ohne ConPTY: keine Sitzung, also kein Laufzeit-Substatus verfügbar.
+            // KiAusfuehrungsStatusConverter fällt in diesem Fall auf das bisherige Verhalten zurück
+            // (LaufStatus bleibt null → "▶ Läuft", solange AktiveRunId gesetzt und Heartbeat aktuell ist).
+            return;
+        }
+
+        EventHandler<CliRuntimeStatusChangedEventArgs> handler = (_, e) =>
+            OnRuntimeStatusChanged(aufgabeId, e.Status);
+
+        session.RuntimeStatusChanged += handler;
+        _runtimeStatusSubscriptions[aufgabeId] = (session, handler);
+    }
+
+    /// <summary>Meldet die Event-Registrierung aus <see cref="SubscribeRuntimeStatus"/> wieder ab.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
+    private void UnsubscribeRuntimeStatus(Guid aufgabeId)
+    {
+        if (_runtimeStatusSubscriptions.TryRemove(aufgabeId, out var subscription))
+        {
+            subscription.Session.RuntimeStatusChanged -= subscription.Handler;
+        }
+    }
+
+    /// <summary>
+    /// Übersetzt einen <see cref="CliRuntimeStatus"/>-Wechsel der <see cref="PseudoConsoleSession"/> in den
+    /// Domain-Substatus <see cref="AufgabeLaufStatus"/> und persistiert ihn. <see cref="CliRuntimeStatus.Inaktiv"/>
+    /// wird ignoriert: Das Beenden des Laufs (inkl. Zurücksetzen von <see cref="Domain.Entities.Aufgabe.LaufStatus"/>)
+    /// übernimmt bereits <see cref="AktivenLaufBeendenAsync"/> über das separate <see cref="CliProcessStatus.Gestoppt"/>-
+    /// bzw. <see cref="CliProcessStatus.Fehler"/>-Ereignis.
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe, deren Laufzeit-Substatus sich geändert hat.</param>
+    /// <param name="status">Der neue Laufzeitstatus der CLI-Sitzung.</param>
+    private void OnRuntimeStatusChanged(Guid aufgabeId, CliRuntimeStatus status)
+    {
+        if (status == CliRuntimeStatus.Inaktiv)
+            return;
+
+        var laufStatus = status == CliRuntimeStatus.WartetAufEingabe
+            ? AufgabeLaufStatus.WartetAufEingabe
+            : AufgabeLaufStatus.Laeuft;
+
+        AktualisiereLaufStatusAsync(aufgabeId, laufStatus).SafeFireAndForget(_logger, "CliProcessManager.AktualisiereLaufStatusAsync");
+    }
+
+    /// <summary>Persistiert einen geänderten Laufzeit-Substatus über <see cref="AufgabeService.AktualisiereLaufStatusAsync"/>.</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="laufStatus">Neuer Laufzeit-Substatus.</param>
+    private async Task AktualisiereLaufStatusAsync(Guid aufgabeId, AufgabeLaufStatus laufStatus)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+        await aufgabeService.AktualisiereLaufStatusAsync(aufgabeId, laufStatus).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -152,5 +265,12 @@ public sealed class CliProcessManager : IDisposable
         }
 
         _updateSemaphores.Clear();
+
+        foreach (var (session, handler) in _runtimeStatusSubscriptions.Values)
+        {
+            session.RuntimeStatusChanged -= handler;
+        }
+
+        _runtimeStatusSubscriptions.Clear();
     }
 }

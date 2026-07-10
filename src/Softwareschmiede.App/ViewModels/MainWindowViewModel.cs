@@ -1,25 +1,35 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Extensions;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Interfaces;
 
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für das Hauptfenster: Navigation und Dark-Mode-Toggle.</summary>
-public sealed class MainWindowViewModel : ViewModelBase
+public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
+    private const int AktualisierungsIntervallSekunden = 5;
+    private const string AktiveAufgabenAktualisierenKontext = "MainWindowViewModel.AktiveAufgabenAktualisierenAsync";
+
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
     private readonly AufgabeService _aufgabeService;
     private readonly ILogger<MainWindowViewModel> _logger;
+    private readonly IRunningAutomationStatusSource _runningStatusSource;
+    private readonly Action<Action> _dispatcherInvoke;
+    private readonly DispatcherTimer _aktualisierungsTimer;
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
     private ViewModelBase? _currentView;
     private bool _isNavigationExpanded = true;
     private string _title = "Softwareschmiede";
+    private bool _disposed;
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
     public string Title
@@ -35,7 +45,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         private set => SetProperty(ref _currentView, value, () =>
         {
             OnPropertyChanged(nameof(IsDashboardVisible));
-            AktiveAufgabenAktualisierenAsync().SafeFireAndForget(_logger, "MainWindowViewModel.AktiveAufgabenAktualisierenAsync");
+            AktiveAufgabenImHintergrundAktualisieren();
         });
     }
 
@@ -75,18 +85,31 @@ public sealed class MainWindowViewModel : ViewModelBase
         DarkModeService darkModeService,
         IServiceProvider serviceProvider,
         AufgabeService aufgabeService,
-        ILogger<MainWindowViewModel> logger)
+        ILogger<MainWindowViewModel> logger,
+        IRunningAutomationStatusSource runningStatusSource,
+        Action<Action>? dispatcherInvoke = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
         _aufgabeService = aufgabeService;
         _logger = logger;
+        _runningStatusSource = runningStatusSource;
+        _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
         NavigateToProjectListCommand = new RelayCommand(NavigateToProjectList);
         NavigateToSettingsCommand = new RelayCommand(NavigateToSettings);
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
         NavigateZuAufgabeCommand = new RelayCommand<Guid>(NavigateZuAufgabe);
+
+        _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
+
+        _aktualisierungsTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(AktualisierungsIntervallSekunden)
+        };
+        _aktualisierungsTimer.Tick += OnAktualisierungsTimerTick;
+        _aktualisierungsTimer.Start();
 
         NavigateToDashboard();
     }
@@ -135,6 +158,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
     public async Task AktiveAufgabenAktualisierenAsync(CancellationToken ct = default)
     {
+        if (!await _refreshGate.WaitAsync(0, ct))
+            return;
+
         try
         {
             var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
@@ -148,6 +174,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             _logger.LogWarning(ex, "Fehler beim Aktualisieren der aktiven Aufgaben in der Seitenleiste.");
         }
+        finally
+        {
+            _refreshGate.Release();
+        }
     }
 
     private void NavigateZuAufgabe(Guid aufgabeId)
@@ -156,5 +186,37 @@ public sealed class MainWindowViewModel : ViewModelBase
         viewModel.ZurueckAction = NavigateToDashboard;
         viewModel.AufgabeId = aufgabeId;
         CurrentView = viewModel;
+    }
+
+    private void OnRunningCountChanged(int previousCount, int currentCount)
+    {
+        _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
+    }
+
+    private void OnAktualisierungsTimerTick(object? sender, EventArgs e)
+    {
+        AktiveAufgabenImHintergrundAktualisieren();
+    }
+
+    private void AktiveAufgabenImHintergrundAktualisieren()
+    {
+        AktiveAufgabenAktualisierenAsync().SafeFireAndForget(_logger, AktiveAufgabenAktualisierenKontext);
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+
+        _aktualisierungsTimer.Stop();
+        _aktualisierungsTimer.Tick -= OnAktualisierungsTimerTick;
+        _runningStatusSource.RunningCountChanged -= OnRunningCountChanged;
+
+        // _refreshGate wird bewusst nicht disposed: Ein noch laufender Fire-and-Forget-Refresh
+        // (Timer-Tick oder RunningCountChanged kurz vor dem Schließen) würde in seinem finally-Block
+        // sonst auf ein bereits entsorgtes Semaphore treffen (ObjectDisposedException). Reine
+        // WaitAsync(0)/Release()-Nutzung ohne Zugriff auf AvailableWaitHandle benötigt kein Dispose.
     }
 }

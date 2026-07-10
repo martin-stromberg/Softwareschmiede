@@ -168,8 +168,17 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     [Fact]
     public async Task ProcessExited_SubscriberThrows_LogsAndDoesNotCrash()
     {
+        // Klassischer Pfad: der Plugin-ProcessStartInfo wird direkt als der überwachte Prozess gestartet
+        // ("cmd.exe /c exit 0" terminiert diesen Prozess sofort selbst).
         await AssertSubscriberExceptionIsLoggedAsync(
             (sut, aufgabeId, plugin) => sut.StartCliAsync(aufgabeId, plugin, Path.GetTempPath()),
+            new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            },
             TimeSpan.FromSeconds(10));
     }
 
@@ -180,8 +189,19 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     [Fact]
     public async Task ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash()
     {
+        // ConPTY-Pfad: der überwachte Prozess ist die dauerhafte, interaktive äußere cmd.exe-Shell; der
+        // Plugin-Befehl wird lediglich als Text in deren Eingabe getippt (SendCommandDelayedAsync). Ein
+        // getipptes "cmd.exe /c exit 0" würde nur einen verschachtelten Unterprozess starten und beenden,
+        // ohne dass die äußere Shell selbst terminiert. Nur ein direktes "exit"-Kommando beendet die Shell.
         await AssertSubscriberExceptionIsLoggedAsync(
             (sut, aufgabeId, plugin) => sut.StartWithPseudoConsoleAsync(aufgabeId, plugin, Path.GetTempPath()),
+            new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "exit",
+                Arguments = "0",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            },
             TimeSpan.FromSeconds(15));
     }
 
@@ -192,9 +212,12 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// ruft den übergebenen Start-Vorgang auf und verifiziert, dass die Exception geloggt wird.
     /// </summary>
     /// <param name="startAsync">Der auszuführende Start-Aufruf (StartCliAsync oder StartWithPseudoConsoleAsync).</param>
+    /// <param name="pluginProcessStartInfo">Der vom gemockten Plugin gelieferte Befehl, der den überwachten Prozess
+    /// (klassisch) bzw. die getippte Konsoleneingabe (ConPTY) tatsächlich beendet.</param>
     /// <param name="timeout">Maximale Wartezeit auf das Logging der Exception.</param>
     private static async Task AssertSubscriberExceptionIsLoggedAsync(
         Func<KiAusfuehrungsService, Guid, IKiPlugin, Task> startAsync,
+        System.Diagnostics.ProcessStartInfo pluginProcessStartInfo,
         TimeSpan timeout)
     {
         var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
@@ -204,13 +227,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = "/c exit 0",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
+            .ReturnsAsync(pluginProcessStartInfo);
 
         var errorLogged = new TaskCompletionSource();
         loggerMock

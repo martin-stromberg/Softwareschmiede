@@ -55,6 +55,8 @@ public sealed partial class MainWindow : Window
             _logger.LogWarning(ex, "Fenstergeometrie konnte nicht gespeichert werden.");
         }
 
+        (DataContext as IDisposable)?.Dispose();
+
         base.OnClosed(e);
     }
 

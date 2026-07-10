@@ -85,6 +85,11 @@ Ablauf:
    - `IKiPlugin.StartCliAsync` liefert `ProcessStartInfo`
    - `Process.Start()` startet den nativen Prozess
    - Event `CliProcessStatusChanged` → `IsCliRunning = true`
+   - `CliProcessManager.OnCliProcessStatusChanged` (ebenfalls auf das Event abonniert) startet den
+     30s-Heartbeat-Timer **und** persistiert sofort `Aufgabe.AktiveRunId` (neue Lauf-ID) sowie
+     `Aufgabe.LastHeartbeatUtc` über `AufgabeService.AktivenLaufSetzenAsync` — dadurch zeigt die
+     Seitenleisten-Kachel (siehe „KI-Ausführungsstatus-Konvertierung") sofort `"▶ Läuft"`, ohne auf den
+     ersten periodischen Heartbeat warten zu müssen
 9. Fenster wird eingebettet (siehe Abschnitt „Fenster einbetten")
 10. UI zeigt CLI-Panel mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
 11. Bei Fehler (Klone fehlgeschlagen, CLI-Start fehlgeschlagen): Fehler wird angezeigt, Status bleibt `Neu`, Rollback des Klonverzeichnisses falls nötig
@@ -199,8 +204,11 @@ Ablauf:
 ### 6. Prozess beendet sich
 
 - `Process.Exited`-Event wird ausgelöst
-- `KiAusfuehrungsService.CliProcessStatusChanged` → `CliProcessStatus.Gestoppt`
+- `KiAusfuehrungsService.CliProcessStatusChanged` → `CliProcessStatus.Gestoppt` (oder `Fehler`)
 - `TaskDetailViewModel.OnCliProcessStatusChanged` → `IsCliRunning = false`
+- `CliProcessManager.OnCliProcessStatusChanged` stoppt den Heartbeat-Timer **und** entfernt
+  `Aufgabe.AktiveRunId` über `AufgabeService.AktivenLaufBeendenAsync` — die Seitenleisten-Kachel zeigt
+  daraufhin wieder `"✓ Bereit"` (nicht mehr `"▶ Läuft"`), auch wenn `Aufgabe.Status` noch `Gestartet` bleibt
 - Anwender kann Status manuell auf `Beendet` setzen oder via `AufgabeAbschliessenCommand`
 
 ### 7. Aufgabe abschließen (`AbschliessenAsync`)
@@ -319,6 +327,93 @@ Trigger zur Aktualisierung:
 - `MainWindowViewModel.NavigateToDashboard()` ruft `AktiveAufgabenAktualisierenAsync()` auf
 - `MainWindowViewModel.NavigateToProjectList()` ruft `AktiveAufgabenAktualisierenAsync()` auf
 - `MainWindowViewModel.NavigateToSettings()` ruft `AktiveAufgabenAktualisierenAsync()` auf
+- Neu: `IRunningAutomationStatusSource.RunningCountChanged`-Event (bei Prozess-Start/-Stopp)
+- Neu: `DispatcherTimer.Tick` (alle 5 Sekunden, Fallback für Heartbeat-Änderungen)
+
+### Automatische Statusaktualisierung bei Prozess-Änderungen (Event-Pfad)
+
+Ausgelöst durch `IRunningAutomationStatusSource.RunningCountChanged`, das von `KiAusfuehrungsService` auslöst wird, wenn ein CLI-Prozess startet oder stoppt.
+
+Beteiligte Komponenten:
+- `MainWindowViewModel` — Event-Handler `OnRunningCountChanged`, Dispatcher-Marshalling
+- `IRunningAutomationStatusSource` — Interface für Prozess-Status-Events (bereits als Singleton in DI registriert)
+- `KiAusfuehrungsService` — Startet/stoppt CLI-Prozesse und löst das Event aus
+- `AufgabeService.GetAktiveAufgabenAsync()` — Ruft aktive Aufgaben ab
+- `ObservableCollectionExtensions.ReplaceAll()` — Ersetzt die Collection mit neuen Aufgaben
+
+Ablauf:
+1. CLI-Prozess wird gestartet oder gestoppt
+2. `KiAusfuehrungsService` ruft intern `RaiseRunningCountChanged()` auf (möglicherweise aus dem `Process.Exited`-Hintergrund-Thread)
+3. Das registrierte Event `IRunningAutomationStatusSource.RunningCountChanged` wird ausgelöst mit vorherigem und aktuellem Prozess-Zähler
+4. `MainWindowViewModel.OnRunningCountChanged(previousCount, currentCount)` wird aufgerufen
+5. Der Handler marshallt über `_dispatcherInvoke` auf den UI-Thread (um Thread-Sicherheit zu gewährleisten)
+6. `AktiveAufgabenImHintergrundAktualisieren()` wird per `SafeFireAndForget` aufgerufen
+7. `AktiveAufgabenAktualisierenAsync()` betritt den `SemaphoreSlim`-Re-Entrancy-Schutz:
+   - Falls bereits eine Aktualisierung läuft (WaitAsync mit Timeout=0 scheitert), wird die neue Anfrage übersprungen (Skip-if-busy)
+   - Sonst: `AufgabeService.GetAktiveAufgabenAsync()` wird aufgerufen, aktive Aufgaben werden abgerufen
+8. `AktiveAufgabenListe.ReplaceAll(aufgaben)` ersetzt die Collection vollständig
+9. WPF bewertet die neuen `Aufgabe`-Instanzen neu:
+   - `KiAusfuehrungsStatusConverter` wird erneut aufgerufen für jede Aufgabe
+   - Status-String wird neu berechnet (▶ Läuft, ⏸ Wartet, oder ✓ Bereit)
+   - Seitenleiste und Dashboard zeigen den aktualisierten Status an (gemeinsame Collection)
+
+### Periodische Statusaktualisierung (Timer-Fallback, alle 5 Sekunden)
+
+Ausgelöst durch `DispatcherTimer.Tick` im `MainWindowViewModel`, die unabhängig vom `RunningCountChanged`-Event läuft.
+
+Beteiligte Komponenten:
+- `MainWindowViewModel._aktualisierungsTimer` — `DispatcherTimer` mit Intervall = 5 Sekunden
+- `MainWindowViewModel.OnAktualisierungsTimerTick` — Timer-Tick-Handler
+- Gleiche Service-Kette wie oben (Event-Pfad ab Schritt 6)
+
+Ablauf:
+1. Timer löst zyklisch `Tick` auf dem UI-Thread aus (alle 5 Sekunden)
+2. `MainWindowViewModel.OnAktualisierungsTimerTick(object? sender, EventArgs e)` wird aufgerufen
+3. `AktiveAufgabenImHintergrundAktualisieren()` wird per `SafeFireAndForget` aufgerufen
+4. Weitere Schritte wie oben (ab Schritt 7 im Event-Pfad)
+
+**Zweck des Fallback-Timers:** Der Event-Pfad erkennt nur Start/Stopp von Prozessen. Diese Timer-basierte Aktualisierung fängt Statusänderungen ohne Event ab:
+- **Rate-Limit-Übergang:** Status wechselt von `Gestartet` zu `Wartend`, wenn die KI ein Rate-Limit erkennt (kein Event hierfür)
+- **Heartbeat-Ablauf:** Status wechselt von `Läuft` zu `Bereit`, wenn `LastHeartbeatUtc` älter als 5 Minuten wird (passiert automatisch, kein Event)
+- **Routinerefresh:** Kontinuierliches Vorrücken von `LastHeartbeatUtc` wird erfasst
+
+### Übergangsanimation bei Statuswechsel
+
+Ausgelöst, wenn `AktiveAufgabenListe.ReplaceAll()` neue `Aufgabe`-Instanzen in die Collection einfügt und WPF die UI-Elemente neu rendert.
+
+Beteiligte Komponenten:
+- `ActiveTasksListControl.xaml` — `ItemsControl` mit Status-`TextBlock`, Attached Behavior `StatusUebergangsAnimation.Status`
+- `StatusUebergangsAnimation` — Static class mit Attached Property und `PropertyChangedCallback`
+- `StatusAenderungsErkennung` — Merkt je `Aufgabe.Id` den zuletzt beobachteten Status
+- `KiAusfuehrungsStatusConverter` — Bindet an das Attached Property
+- `DoubleAnimation` — Opacity-Fade-Animation auf `UIElement.OpacityProperty`
+
+Ablauf:
+1. Nach einem Refresh (Event-Pfad oder Timer-Pfad) wird `AktiveAufgabenListe.ReplaceAll(aufgaben)` aufgerufen
+2. WPF ItemsControl regeneriert die Item-Container; für jede `Aufgabe` wird ein neuer Status-`TextBlock` erzeugt
+3. Binding `{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}` wird ausgewertet
+4. Der neue Wert wird in das Attached Property `StatusUebergangsAnimation.Status` geschrieben
+5. `StatusUebergangsAnimation.OnStatusChanged()` Callback wird aufgerufen mit:
+   - `d`: Ziel-Element (`TextBlock`)
+   - `e.NewValue`: Neuer Status-String (z. B. `"▶ Läuft"`)
+6. Callback prüft: Ist `d` ein `FrameworkElement` und ist `DataContext` eine `Aufgabe`? Sonst abbrechen.
+7. Callback registriert eine Unloaded-Bereinigung (nur beim ersten Mal), um die Erkennung aus dem Speicher zu entfernen, wenn das Element entladen wird
+8. Callback fragt `StatusAenderungsErkennung.HatSichGeaendert(aufgabe.Id, neuerStatus)` ab:
+   - **Erste Beobachtung** (Status noch nicht für diese `Id` gemerkt): `false` → keine Animation
+   - **Gleicher Status wie zuletzt** (Routine-Refresh alle 5 s ohne echten Wechsel): `false` → keine Animation
+   - **Neuer Status** (echter Wechsel, z. B. von `"✓ Bereit"` zu `"▶ Läuft"`): `true` → Animation wird ausgelöst
+9. Bei `true` wird eine neue `DoubleAnimation` konstruiert:
+   - `From = 0.3`, `To = 1.0` (Opacity-Fade)
+   - `Duration = 250 ms` (kurz und unauffällig)
+   - `EasingFunction = QuadraticEase` mit `EasingMode = EaseOut` (sanfte Beschleunigung)
+10. Animation wird auf dem `TextBlock` mit `BeginAnimation(UIElement.OpacityProperty, animation)` gestartet
+11. Visuelles Ergebnis: Status-Text fades von gedimmt (0.3) auf vollständige Opazität (1.0) — hebt den Wechsel dezent hervor
+12. `AutomationProperties.Name` und `AutomationProperties.HelpText` bleiben während der Animation auslesbar und beeinflussen sie nicht
+
+**Wichtig:** Die Erkennung ist `aufgabe.Id`-gekeyted, nicht element-gekeyted. Dadurch wird sichergestellt, dass:
+- Animation feuert nur bei echtem Statuswechsel der Aufgabe
+- Routine-Refreshs alle 5 Sekunden (ohne Wechsel) triggern keine Animation
+- Eine Aufgabe, die von der Liste entfernt und später wieder hinzugefügt wird, als neuer Eintrag erkannt wird (neue Baseline)
 
 ### Dashboard-Rendering (DashboardView.xaml)
 
@@ -384,3 +479,7 @@ Ablauf:
 | Zweiter CLI-Start für gleiche Aufgabe | `KiAusfuehrungsService` gibt vorhandenes Handle zurück (kein doppelter Start) |
 | Fehler innerhalb des `Process.Exited`-Handlers (z. B. Dispose-Fehler) | `KiAusfuehrungsService.HandleProcessExited` fängt den gesamten Handler-Body ab und loggt; Anwendung stürzt nicht ab (Details: [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
 | Überlappende Heartbeat-Ticks derselben Aufgabe | `CliProcessManager` serialisiert pro Aufgabe über ein eigenes `SemaphoreSlim`; Heartbeats anderer Aufgaben bleiben unbeeinflusst |
+| Event-Handler wird aus dem `Process.Exited`-Hintergrund-Thread ausgelöst | `MainWindowViewModel.OnRunningCountChanged` marshallt via `_dispatcherInvoke` auf den UI-Thread; kein Zugriff auf UI-Elements ohne Marshalling |
+| Überlappende Event- und Timer-Aktualisierungen | `SemaphoreSlim(1,1)` in `AktiveAufgabenAktualisierenAsync()` mit `WaitAsync(0)` (non-blocking) überspringt neue Anfragen während eine Aktualisierung läuft — keine DbContext-Konflikte, aber auch keine "schwebenden" Anfragen-Queue |
+| DispatcherTimer läuft weiter, obwohl Fenster geschlossen | `MainWindowViewModel.Dispose()` wird in `MainWindow.OnClosed` aufgerufen; Timer wird gestoppt und Event-Handler abgemeldet — wichtig für App-Lifecycle |
+| Statuserkennung speichert Einträge ohne Limit | Pro aktiver Aufgabe wird ein Eintrag in `StatusAenderungsErkennung._letzterStatus` erstellt; maximal ~20 gleichzeitig aktive Aufgaben; Speicher-Overhead ist vernachlässigbar; Einträge werden nicht bereinigt, aber Speicher wird bei App-Shutdown freigegeben |

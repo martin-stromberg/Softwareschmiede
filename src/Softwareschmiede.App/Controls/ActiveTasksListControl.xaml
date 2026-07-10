@@ -1,6 +1,7 @@
 <UserControl x:Class="Softwareschmiede.App.Controls.ActiveTasksListControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:Softwareschmiede.App.Behaviors">
     <UserControl.Resources>
         <DataTemplate x:Key="AufgabenKachelInhaltTemplate">
             <StackPanel>
@@ -17,7 +18,10 @@
                 <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
                            FontSize="11"
                            Foreground="{DynamicResource SecondaryTextBrush}"
-                           Margin="0,4,0,0" />
+                           Margin="0,4,0,0"
+                           AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeStatus:{0}}"
+                           AutomationProperties.HelpText="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
+                           behaviors:StatusUebergangsAnimation.Status="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}" />
             </StackPanel>
         </DataTemplate>
 
