@@ -19,7 +19,7 @@ public sealed class DashboardViewModel : ViewModelBase
     private int _wartendAufgaben;
     private bool _isLoading;
     private string? _fehlerMeldung;
-    private ObservableCollection<Aufgabe> _aktiveAufgabenListe = new();
+    private ObservableCollection<AktiveAufgabePanelItem> _aktiveAufgabenListe = new();
 
     /// <summary>Anzahl aller Projekte.</summary>
     public int ProjektAnzahl
@@ -66,7 +66,7 @@ public sealed class DashboardViewModel : ViewModelBase
     public ObservableCollection<Projekt> LetzteProjects { get; } = new();
 
     /// <summary>Liste der aktuell aktiven Aufgaben (Status Gestartet oder Wartend). Wird vom MainWindowViewModel über <see cref="Initialize"/> als gemeinsame Datenquelle gesetzt.</summary>
-    public ObservableCollection<Aufgabe> AktiveAufgabenListe
+    public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe
     {
         get => _aktiveAufgabenListe;
         private set => SetProperty(ref _aktiveAufgabenListe, value);
@@ -139,7 +139,7 @@ public sealed class DashboardViewModel : ViewModelBase
     /// <summary>Verdrahtet die vom MainWindowViewModel bereitgestellte gemeinsame Aufgabenliste und die Navigationsaktion, statt sie über extern beschreibbare Properties zu setzen.</summary>
     /// <param name="aktiveAufgabenListe">Die gemeinsame Datenquelle für aktive Aufgaben, die auch das MainWindowViewModel für die Seitenleiste verwendet.</param>
     /// <param name="navigateZuAufgabeAction">Der Delegat, der die Navigation zur Aufgabendetailansicht auslöst.</param>
-    public void Initialize(ObservableCollection<Aufgabe> aktiveAufgabenListe, Action<Guid> navigateZuAufgabeAction)
+    public void Initialize(ObservableCollection<AktiveAufgabePanelItem> aktiveAufgabenListe, Action<Guid> navigateZuAufgabeAction)
     {
         AktiveAufgabenListe = aktiveAufgabenListe;
         NavigateZuAufgabeAction = navigateZuAufgabeAction;

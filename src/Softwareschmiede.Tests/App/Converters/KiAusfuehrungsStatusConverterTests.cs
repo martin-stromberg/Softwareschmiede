@@ -1,6 +1,7 @@
 using System.Globalization;
 using FluentAssertions;
 using Softwareschmiede.App.Converters;
+using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 
@@ -120,7 +121,26 @@ public sealed class KiAusfuehrungsStatusConverterTests
         result.Should().Be("✓ Bereit");
     }
 
-    /// <summary>Convert gibt einen leeren String zurück, wenn kein Aufgabe-Objekt übergeben wird.</summary>
+    /// <summary>Convert unterstützt das Sidebar-Panel-Item mit denselben Statusdaten wie Aufgabe.</summary>
+    [Fact]
+    public void Convert_ShouldReturnLaeuftString_WhenPanelItemHasActiveRunAndHeartbeatRecent()
+    {
+        var item = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Sidebar-Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AktiveRunId = "run-panel",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-10),
+            LaufStatus = AufgabeLaufStatus.Laeuft
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("▶ Läuft");
+    }
+
+    /// <summary>Convert gibt einen leeren String zurück, wenn kein unterstütztes Objekt übergeben wird.</summary>
     [Fact]
     public void Convert_ShouldReturnEmptyString_WhenValueIsNotAufgabe()
     {

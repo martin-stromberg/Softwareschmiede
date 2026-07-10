@@ -50,6 +50,9 @@ public sealed class Aufgabe
     /// <summary>Optional: Zeitstempel des letzten Heartbeats einer Ausführung.</summary>
     public DateTimeOffset? LastHeartbeatUtc { get; set; }
 
+    /// <summary>Optional: Zeitstempel des letzten echten CLI-Prozessstarts.</summary>
+    public DateTimeOffset? LetzterCliStartUtc { get; set; }
+
     /// <summary>
     /// Optional: Laufzeit-Substatus der aktiven CLI-Ausführung (nur relevant, solange
     /// <see cref="AktiveRunId"/> gesetzt ist). Wird von <c>CliProcessManager</c> anhand des

@@ -11,10 +11,12 @@ Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optio
 Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `Wartend`) in der linken Navigationsseitenleiste an. Diese Funktion ermöglicht schnellen Zugriff auf laufende Arbeiten:
 
 - **Seitenleisten-Anzeige:** Unterhalb der bestehenden Navigationseinträge (Dashboard, Projekte) wird eine neue Sektion „Aktive Aufgaben" angezeigt. Diese Sektion enthält bis zu 20 aktive Aufgaben als gerahmte Kacheln.
-- **Kachel-Inhalte:** Jede Kachel zeigt den Aufgabentitel und den aktuellen KI-Ausführungsstatus:
+- **Kachel-Inhalte:** Jede Kachel zeigt den Aufgabentitel, den Projektnamen, das SCM-/SCI-Plugin, das KI-Plugin und den aktuellen KI-Ausführungsstatus:
   - `▶ Läuft` — `AktiveRunId` ist gesetzt und `LastHeartbeatUtc` ist jünger als 5 Minuten
   - `⏸ Wartet` — Status ist `Wartend` (Rate-Limit erreicht)
   - `✓ Bereit` — Keine aktive Ausführung erkannt (Fallback)
+- **Aktive Markierung:** Wenn im Inhaltsbereich eine Aufgabe geöffnet ist, wird genau diese Aufgabe in der Seitenleiste hervorgehoben.
+- **Stabile Sortierung:** Die Aufgaben werden absteigend nach `LetzterCliStartUtc` sortiert. Dieser Zeitstempel wird nur beim echten CLI-Prozessstart aktualisiert, nicht beim Anzeigen einer bereits laufenden Hintergrundaufgabe. Für ältere Aufgaben ohne Wert wird auf `ErstellungsDatum`, danach Titel und ID zurückgefallen.
 - **Navigation:** Ein Navigations-Button (→) auf jeder Kachel ermöglicht den direkten Zugriff auf die Aufgabendetailansicht.
 - **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — keine doppelte Anzeige.
 - **Automatische Statusaktualisierung:** Der Aufgabenstatus wird ohne manuelles Neuladen aktualisiert:

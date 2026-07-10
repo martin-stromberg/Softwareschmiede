@@ -161,27 +161,29 @@ issue.md
 - Unit-Tests für Service-Methode, ViewModel und Converter
 - E2E-Tests für Repository-Vorschläge, Sortierung, Datumsformatierung und Projekt-Schnellerstellung
 
-#### Issue 81: Aktive Aufgaben im Menü (in Arbeit)
+#### Issue 81/111: Aktive Aufgaben im Menü (implementiert ✅)
 
 **Anzeige aktiver Aufgaben in der Navigations-Seitenleiste der WPF-Desktopanwendung:**
 
-- **Aktive Aufgaben anzeigen:** Aufgaben mit Status `Gestartet` oder `Wartend` werden in der Seitenleiste als gerahmte Kacheln mit Aufgabentitel und KI-Ausführungsstatus angezeigt
+- **Aktive Aufgaben anzeigen:** Aufgaben mit Status `Gestartet` oder `Wartend` werden in der Seitenleiste als gerahmte Kacheln mit Aufgabentitel, Projekt, SCM-/SCI-Plugin, KI-Plugin und KI-Ausführungsstatus angezeigt
 - **KI-Ausführungsstatus:** Dynamische Status-Anzeige basierend auf `AktiveRunId` und `LastHeartbeatUtc`:
   - "▶ Läuft" — wenn aktive Run vorhanden und letzter Heartbeat < 5 Minuten
   - "⏸ Wartet" — wenn Status `Wartend`
   - "✓ Bereit" oder Status-String als Fallback
 - **Seitenleisten-Sektion:** Neue Sektion unterhalb der Navigationseinträge (Dashboard, Projekte, Einstellungen) mit Scroll-Begrenzer (MaxHeight 300px) zur Anzeige mehrerer Aufgaben
 - **Dashboard-abhängige Sichtbarkeit:** Sektion wird automatisch ausgeblendet wenn Dashboard aktiv ist, um Redundanz zu vermeiden
+- **Aktive Markierung:** Wenn im Inhaltsbereich eine Aufgabe geöffnet ist, wird genau diese Aufgabe in der Seitenleiste hervorgehoben
 - **Navigation zu Aufgabendetail:** Pfeil-Button auf jeder Kachel ermöglicht Direktzugriff auf Aufgabendetailansicht
 - **Dashboard-Integration:** Dashboard zeigt dieselbe Aufgabenliste ohne Höhenbeschränkung (volle Länge)
-- **Sortierung:** Aufgaben nach letzter Aktivität sortiert (nach `LastHeartbeatUtc` absteigend, mit Fallback auf `ErstellungsDatum`)
+- **Sortierung:** Aufgaben sind stabil nach letztem echten CLI-Start sortiert (`LetzterCliStartUtc` absteigend, Fallback auf `ErstellungsDatum`, Titel und ID). Das erneute Anzeigen einer laufenden Hintergrundaufgabe verändert diese Reihenfolge nicht.
 - **On-Demand Aktualisierung:** Liste wird bei Navigation und Aufgabe-Laden aktualisiert
 
 **Betroffene Komponenten und Änderungen:**
 
-- `KiAusfuehrungsStatusConverter` – neuer Value Converter für Status-String-Berechnung (IValueConverter)
-- `AufgabeService.GetAktiveAufgabenAsync(CancellationToken)` – neue Service-Methode zum Filtern und Sortieren aktiver Aufgaben
-- `MainWindowViewModel.AktiveAufgaben` – neue Property (ObservableCollection<Aufgabe>, read-only)
+- `KiAusfuehrungsStatusConverter` – Value Converter für Status-String-Berechnung aus `Aufgabe` oder `AktiveAufgabePanelItem`
+- `AufgabeService.GetAktiveAufgabenAsync(CancellationToken)` – Service-Methode zum Filtern und Sortieren aktiver Aufgaben nach letztem CLI-Start
+- `Aufgabe.LetzterCliStartUtc` – neuer persistierter Zeitstempel für den letzten echten CLI-Prozessstart
+- `MainWindowViewModel.AktiveAufgabenListe` – Property mit `ObservableCollection<AktiveAufgabePanelItem>` für Sidebar- und Dashboard-Kacheln
 - `MainWindowViewModel.IsDashboardVisible` – neue computed Property für Dashboard-Sichtbarkeits-Logik
 - `MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` – neue Methode zum Abrufen und Befüllen der Collection
 - `MainWindowViewModel.NavigateZuAufgabeCommand` – neuer AsyncRelayCommand<Guid> zur Navigation zur Aufgabendetail

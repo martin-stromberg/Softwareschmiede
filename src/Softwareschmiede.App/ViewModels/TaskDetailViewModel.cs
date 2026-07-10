@@ -139,8 +139,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public bool KannCliStoppen => _isCliRunning;
 
     /// <summary>Gibt an, ob die CLI neu gestartet werden kann (Status Gestartet/Wartend, aber kein Prozess läuft).</summary>
-    public bool KannCliNeuStarten => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Gestartet
-        or Domain.Enums.AufgabeStatus.Wartend
+    public bool KannCliNeuStarten => (_aufgabe?.Status is Domain.Enums.AufgabeStatus.Gestartet
+        or Domain.Enums.AufgabeStatus.Wartend)
         && !_isCliRunning;
 
     /// <summary>Gewähltes KI-Plugin (Prefix).</summary>
