@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows.Input;
 using System.Windows.Interop;
 using FlaUI.Core.WindowsAPI;
@@ -211,11 +212,67 @@ public sealed partial class TerminalControlTests
 
         using (FlaUI.Core.Input.Keyboard.Pressing([VirtualKeyShort.CONTROL]))
         {
-            Thread.Sleep(30);
+            WaitForControlModifier(TimeSpan.FromSeconds(2));
             method.Invoke(control, [args]);
         }
 
         return args;
+    }
+
+    /// <summary>Pumpt die Win32-Nachrichtenwarteschlange dieses Threads, bis <see cref="Keyboard.Modifiers"/>
+    /// die per <see cref="FlaUI.Core.Input.Keyboard.Pressing"/> simulierte Strg-Taste als gedrückt meldet,
+    /// oder das Timeout abläuft. Hintergrund: WPF ermittelt <c>Keyboard.Modifiers</c> über den
+    /// <b>synchronen</b> Win32-Tastaturzustand (<c>GetKeyState</c>), der für einen Thread erst aktualisiert
+    /// wird, sobald dieser die zugehörige Eingabenachricht aus seiner Warteschlange entnimmt.
+    /// <see cref="RunOnSta"/> startet keine Nachrichtenschleife (kein <c>Dispatcher.Run()</c>); ein reines
+    /// <c>Thread.Sleep</c> reicht daher nicht aus und führt zu einem flakigen Test, bei dem <c>Keyboard.Modifiers</c>
+    /// weiterhin <c>None</c> meldet, obwohl <c>SendInput</c> Strg bereits gedrückt hat.</summary>
+    /// <param name="timeout">Maximale Wartezeit, bevor die Pumpe ohne erkannten Strg-Modifier abbricht.</param>
+    private static void WaitForControlModifier(TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            while (NativeMessagePump.PeekMessage(out var msg, IntPtr.Zero, 0, 0, NativeMessagePump.PM_REMOVE))
+            {
+                NativeMessagePump.TranslateMessage(ref msg);
+                NativeMessagePump.DispatchMessage(ref msg);
+            }
+
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+                return;
+
+            Thread.Sleep(5);
+        }
+    }
+
+    /// <summary>Minimaler nativer Nachrichtenpumpen-Helper für Tests, die auf per <c>SendInput</c> simulierte
+    /// Tastatureingaben angewiesen sind, aber (wie <see cref="RunOnSta"/>) keinen echten WPF-<c>Dispatcher.Run()</c>
+    /// betreiben.</summary>
+    private static class NativeMessagePump
+    {
+        public const uint PM_REMOVE = 0x0001;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MSG
+        {
+            public IntPtr hwnd;
+            public uint message;
+            public IntPtr wParam;
+            public IntPtr lParam;
+            public uint time;
+            public int ptX;
+            public int ptY;
+        }
+
+        [DllImport("user32.dll")]
+        public static extern bool PeekMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
+
+        [DllImport("user32.dll")]
+        public static extern bool TranslateMessage(ref MSG lpMsg);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr DispatchMessage(ref MSG lpMsg);
     }
 
     private static void InvokeReadClipboardAndInsertAsync(TerminalControl control)
