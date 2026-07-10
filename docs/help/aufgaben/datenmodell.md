@@ -21,6 +21,7 @@
 | `AbschlussDatum` | `DateTimeOffset?` | Abschlusszeitpunkt |
 | `AktiveRunId` | `string?` | Run-ID eines laufenden KI-Prozesses |
 | `LastHeartbeatUtc` | `DateTimeOffset?` | Letzter Heartbeat-Zeitstempel |
+| `LetzterCliStartUtc` | `DateTimeOffset?` | Zeitpunkt des letzten echten CLI-Prozessstarts; dient als stabile Sortiergrundlage fuer aktive Aufgabenlisten |
 | `RecoveryVersion` | `int` | Concurrency-Token für Recovery |
 | `VorschlagPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
 | `VorschlagAusfuehrenAbUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |

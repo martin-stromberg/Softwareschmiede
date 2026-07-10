@@ -7,6 +7,7 @@ using Softwareschmiede.App.Extensions;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 
 namespace Softwareschmiede.App.ViewModels;
@@ -22,6 +23,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly AufgabeService _aufgabeService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
+    private readonly IPluginManager? _pluginManager;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
@@ -57,7 +59,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Aktuell aktive Aufgaben (Status Gestartet oder Wartend) für die Seitenleisten-Anzeige.</summary>
-    public ObservableCollection<Aufgabe> AktiveAufgabenListe { get; } = new();
+    public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe { get; } = new();
 
     /// <summary>Gibt an, ob aktuell das Dashboard angezeigt wird.</summary>
     public bool IsDashboardVisible => CurrentView is DashboardViewModel;
@@ -94,6 +96,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _aufgabeService = aufgabeService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
+        _pluginManager = serviceProvider.GetService<IPluginManager>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
@@ -164,7 +167,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
-            AktiveAufgabenListe.ReplaceAll(aufgaben);
+            AktiveAufgabenListe.ReplaceAll(aufgaben.Select(MapAktiveAufgabePanelItem));
         }
         catch (OperationCanceledException)
         {
@@ -186,6 +189,46 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         viewModel.ZurueckAction = NavigateToDashboard;
         viewModel.AufgabeId = aufgabeId;
         CurrentView = viewModel;
+    }
+
+    private AktiveAufgabePanelItem MapAktiveAufgabePanelItem(Aufgabe aufgabe)
+    {
+        return new AktiveAufgabePanelItem
+        {
+            Id = aufgabe.Id,
+            Titel = aufgabe.Titel,
+            ProjektName = aufgabe.Projekt?.Name ?? string.Empty,
+            ScmPluginName = ResolvePluginName(PluginType.SourceCodeManagement, aufgabe.GitRepository?.PluginTyp),
+            KiPluginName = ResolvePluginName(PluginType.DevelopmentAutomation, aufgabe.KiPluginPrefix),
+            Status = aufgabe.Status,
+            AktiveRunId = aufgabe.AktiveRunId,
+            LastHeartbeatUtc = aufgabe.LastHeartbeatUtc,
+            LaufStatus = aufgabe.LaufStatus,
+            LetzterCliStartUtc = aufgabe.LetzterCliStartUtc,
+            IsAktiv = GetAktiveAufgabeId() == aufgabe.Id
+        };
+    }
+
+    private string? ResolvePluginName(PluginType pluginType, string? pluginPrefix)
+    {
+        if (string.IsNullOrWhiteSpace(pluginPrefix))
+        {
+            return null;
+        }
+
+        var plugins = pluginType == PluginType.SourceCodeManagement
+            ? _pluginManager?.GetSourceCodeManagementPlugins().Cast<IPlugin>()
+            : _pluginManager?.GetDevelopmentAutomationPlugins().Cast<IPlugin>();
+
+        return plugins?.FirstOrDefault(p => string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase))?.PluginName
+            ?? pluginPrefix;
+    }
+
+    private Guid? GetAktiveAufgabeId()
+    {
+        return CurrentView is TaskDetailViewModel { AufgabeId: var aufgabeId } && aufgabeId != Guid.Empty
+            ? aufgabeId
+            : null;
     }
 
     private void OnRunningCountChanged(int previousCount, int currentCount)

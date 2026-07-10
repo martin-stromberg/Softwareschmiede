@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -98,29 +99,38 @@ public sealed class NullOrEmptyToVisibilityConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Konvertiert eine <see cref="Aufgabe"/> in einen KI-Ausführungsstatus-String.</summary>
-[ValueConversion(typeof(Aufgabe), typeof(string))]
+/// <summary>Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in einen KI-Ausführungsstatus-String.</summary>
+[ValueConversion(typeof(object), typeof(string))]
 public sealed class KiAusfuehrungsStatusConverter : IValueConverter
 {
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        if (value is not Aufgabe aufgabe)
-            return string.Empty;
+        var status = value switch
+        {
+            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus),
+            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus),
+            _ => null
+        };
 
-        if (aufgabe.AktiveRunId != null
-            && aufgabe.LastHeartbeatUtc != null
-            && DateTimeOffset.UtcNow - aufgabe.LastHeartbeatUtc.Value < TimeSpan.FromMinutes(AufgabeRecoveryService.HeartbeatTimeoutMinutes))
+        if (status is null)
+        {
+            return string.Empty;
+        }
+
+        if (status.AktiveRunId != null
+            && status.LastHeartbeatUtc != null
+            && DateTimeOffset.UtcNow - status.LastHeartbeatUtc.Value < TimeSpan.FromMinutes(AufgabeRecoveryService.HeartbeatTimeoutMinutes))
         {
             // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
             // persistiert über CliProcessManager/AufgabeService.AktualisiereLaufStatusAsync). Ohne diesen
             // Substatus (null, z. B. beim klassischen Start ohne ConPTY) bleibt es beim bisherigen "▶ Läuft".
-            return aufgabe.LaufStatus == AufgabeLaufStatus.WartetAufEingabe
+            return status.LaufStatus == AufgabeLaufStatus.WartetAufEingabe
                 ? "⏸ Wartet"
                 : "▶ Läuft";
         }
 
-        if (aufgabe.Status == AufgabeStatus.Wartend)
+        if (status.Status == AufgabeStatus.Wartend)
         {
             return "⏸ Wartet";
         }
@@ -131,4 +141,10 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
     /// <inheritdoc/>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
+
+    private sealed record StatusDaten(
+        AufgabeStatus Status,
+        string? AktiveRunId,
+        DateTimeOffset? LastHeartbeatUtc,
+        AufgabeLaufStatus? LaufStatus);
 }

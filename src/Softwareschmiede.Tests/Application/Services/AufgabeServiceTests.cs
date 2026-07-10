@@ -357,6 +357,7 @@ public sealed class AufgabeServiceTests : IDisposable
         geladen!.LastHeartbeatUtc.Should().NotBeNull();
         geladen.LastHeartbeatUtc!.Value.Should().BeOnOrAfter(vorUpdate.AddSeconds(-1));
         geladen.LastHeartbeatUtc!.Value.Should().BeOnOrBefore(nachUpdate.AddSeconds(1));
+        geladen.LetzterCliStartUtc.Should().BeNull("ein Heartbeat ist kein echter CLI-Start");
 
         // Alter ist 0 Minuten (frischer Heartbeat)
         var ageMinutes = await _sut.GetHeartbeatAgeMinutesAsync(aufgabe.Id);
@@ -430,24 +431,53 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().OnlyContain(a => a.Status == AufgabeStatus.Gestartet || a.Status == AufgabeStatus.Wartend);
     }
 
-    /// <summary>GetAktiveAufgabenAsync sortiert nach LastHeartbeatUtc absteigend, mit Fallback auf ErstellungsDatum.</summary>
+    /// <summary>GetAktiveAufgabenAsync sortiert nach LetzterCliStartUtc absteigend, mit Fallback auf ErstellungsDatum.</summary>
     [Fact]
-    public async Task GetAktiveAufgabenAsync_ShouldSortByLastHeartbeatDescThenByErstellungsDatum_WhenCalled()
+    public async Task GetAktiveAufgabenAsync_ShouldSortByLetzterCliStartDescThenByErstellungsDatum_WhenCalled()
     {
         // Arrange
         var jetzt = DateTimeOffset.UtcNow;
-        var mitAltemHeartbeat = CreateAufgabeDirekt("Alter Heartbeat", AufgabeStatus.Gestartet, erstellungsDatum: jetzt.AddHours(-3), lastHeartbeatUtc: jetzt.AddMinutes(-10));
-        var mitNeuemHeartbeat = CreateAufgabeDirekt("Neuer Heartbeat", AufgabeStatus.Wartend, erstellungsDatum: jetzt.AddHours(-2), lastHeartbeatUtc: jetzt.AddMinutes(-1));
-        var ohneHeartbeat = CreateAufgabeDirekt("Ohne Heartbeat", AufgabeStatus.Gestartet, erstellungsDatum: jetzt.AddMinutes(-5), lastHeartbeatUtc: null);
+        var alterStart = CreateAufgabeDirekt("Alter Start", AufgabeStatus.Gestartet, erstellungsDatum: jetzt.AddHours(-3), letzterCliStartUtc: jetzt.AddMinutes(-10));
+        var neuerStart = CreateAufgabeDirekt("Neuer Start", AufgabeStatus.Wartend, erstellungsDatum: jetzt.AddHours(-2), letzterCliStartUtc: jetzt.AddMinutes(-1));
+        var ohneStart = CreateAufgabeDirekt("Ohne Start", AufgabeStatus.Gestartet, erstellungsDatum: jetzt.AddMinutes(-5), letzterCliStartUtc: null);
 
-        _db.Aufgaben.AddRange(mitAltemHeartbeat, mitNeuemHeartbeat, ohneHeartbeat);
+        _db.Aufgaben.AddRange(alterStart, neuerStart, ohneStart);
         await _db.SaveChangesAsync();
 
         // Act
         var result = await _sut.GetAktiveAufgabenAsync();
 
         // Assert
-        result.Select(a => a.Id).Should().ContainInOrder(mitNeuemHeartbeat.Id, ohneHeartbeat.Id, mitAltemHeartbeat.Id);
+        result.Select(a => a.Id).Should().ContainInOrder(neuerStart.Id, ohneStart.Id, alterStart.Id);
+    }
+
+    /// <summary>GetAktiveAufgabenAsync bleibt stabil, wenn nur Heartbeats unterschiedlich sind.</summary>
+    [Fact]
+    public async Task GetAktiveAufgabenAsync_ShouldIgnoreLastHeartbeatForSorting_WhenLetzterCliStartExists()
+    {
+        // Arrange
+        var jetzt = DateTimeOffset.UtcNow;
+        var a = CreateAufgabeDirekt(
+            "A alter Heartbeat",
+            AufgabeStatus.Gestartet,
+            erstellungsDatum: jetzt.AddHours(-2),
+            lastHeartbeatUtc: jetzt,
+            letzterCliStartUtc: jetzt.AddMinutes(-20));
+        var b = CreateAufgabeDirekt(
+            "B neuerer Start",
+            AufgabeStatus.Gestartet,
+            erstellungsDatum: jetzt.AddHours(-1),
+            lastHeartbeatUtc: jetzt.AddHours(-1),
+            letzterCliStartUtc: jetzt.AddMinutes(-5));
+
+        _db.Aufgaben.AddRange(a, b);
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetAktiveAufgabenAsync();
+
+        // Assert
+        result.Select(x => x.Id).Should().ContainInOrder(b.Id, a.Id);
     }
 
     /// <summary>GetAktiveAufgabenAsync begrenzt die Ergebnisse auf maximal 20 Einträge.</summary>
@@ -483,18 +513,49 @@ public sealed class AufgabeServiceTests : IDisposable
         result[0].Projekt.Name.Should().Be("Testprojekt");
     }
 
+    /// <summary>GetAktiveAufgabenAsync lädt das zugehörige GitRepository für die SCM-Plugin-Anzeige mit.</summary>
+    [Fact]
+    public async Task GetAktiveAufgabenAsync_ShouldIncludeGitRepository_WhenCalled()
+    {
+        // Arrange
+        var repositoryId = Guid.NewGuid();
+        _db.GitRepositories.Add(new GitRepository
+        {
+            Id = repositoryId,
+            ProjektId = _projektId,
+            RepositoryName = "repo",
+            RepositoryUrl = "https://example.invalid/repo.git",
+            PluginTyp = "Softwareschmiede.GitHub",
+            Aktiv = true
+        });
+        _db.Aufgaben.Add(CreateAufgabeDirekt("Aufgabe mit Repository", AufgabeStatus.Gestartet, gitRepositoryId: repositoryId));
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetAktiveAufgabenAsync();
+
+        // Assert
+        result.Should().ContainSingle();
+        result[0].GitRepository.Should().NotBeNull();
+        result[0].GitRepository!.PluginTyp.Should().Be("Softwareschmiede.GitHub");
+    }
+
     private Aufgabe CreateAufgabeDirekt(
         string titel,
         AufgabeStatus status,
         DateTimeOffset? erstellungsDatum = null,
-        DateTimeOffset? lastHeartbeatUtc = null) => new()
+        DateTimeOffset? lastHeartbeatUtc = null,
+        DateTimeOffset? letzterCliStartUtc = null,
+        Guid? gitRepositoryId = null) => new()
     {
         Id = Guid.NewGuid(),
         ProjektId = _projektId,
+        GitRepositoryId = gitRepositoryId,
         Titel = titel,
         Status = status,
         ErstellungsDatum = erstellungsDatum ?? DateTimeOffset.UtcNow,
-        LastHeartbeatUtc = lastHeartbeatUtc
+        LastHeartbeatUtc = lastHeartbeatUtc,
+        LetzterCliStartUtc = letzterCliStartUtc
     };
 
     private static DiffResult CreateDiffResult(Guid aufgabeId, string filePath, DateTimeOffset generatedAt)

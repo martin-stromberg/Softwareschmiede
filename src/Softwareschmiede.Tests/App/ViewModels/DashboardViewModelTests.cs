@@ -51,7 +51,7 @@ public sealed class DashboardViewModelTests : IDisposable
     {
         // Arrange
         var sut = CreateSut();
-        var geteilteListe = new ObservableCollection<Aufgabe>();
+        var geteilteListe = new ObservableCollection<AktiveAufgabePanelItem>();
 
         // Act
         sut.Initialize(geteilteListe, _ => { });
@@ -68,7 +68,7 @@ public sealed class DashboardViewModelTests : IDisposable
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Zu startende Aufgabe", null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
         var sut = CreateSut();
-        var geteilteListe = new ObservableCollection<Aufgabe>();
+        var geteilteListe = new ObservableCollection<AktiveAufgabePanelItem>();
         sut.Initialize(geteilteListe, _ => { });
 
         // Act
@@ -86,7 +86,7 @@ public sealed class DashboardViewModelTests : IDisposable
         // Arrange
         var sut = CreateSut();
         Guid? aufgerufeneAufgabeId = null;
-        sut.Initialize(new ObservableCollection<Aufgabe>(), id => aufgerufeneAufgabeId = id);
+        sut.Initialize(new ObservableCollection<AktiveAufgabePanelItem>(), id => aufgerufeneAufgabeId = id);
         var aufgabeId = Guid.NewGuid();
 
         // Act

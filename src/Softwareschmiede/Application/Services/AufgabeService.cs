@@ -448,10 +448,9 @@ public sealed class AufgabeService
 
     /// <summary>
     /// Markiert eine Aufgabe als aktuell aktiv ausgeführt: setzt <see cref="Aufgabe.AktiveRunId"/> auf die
-    /// übergebene Lauf-ID und aktualisiert <see cref="Aufgabe.LastHeartbeatUtc"/> sofort auf den aktuellen
-    /// Zeitpunkt. Wird von <c>CliProcessManager</c> beim Start eines CLI-Prozesses aufgerufen, damit der
-    /// KI-Ausführungsstatus (siehe <c>KiAusfuehrungsStatusConverter</c>) sofort "▶ Läuft" anzeigt, ohne auf
-    /// den ersten periodischen Heartbeat (30s) warten zu müssen.
+    /// übergebene Lauf-ID, aktualisiert <see cref="Aufgabe.LastHeartbeatUtc"/> für den Laufstatus und
+    /// speichert <see cref="Aufgabe.LetzterCliStartUtc"/> als Zeitstempel des echten CLI-Prozessstarts.
+    /// Wird von <c>CliProcessManager</c> beim Start eines CLI-Prozesses aufgerufen.
     /// </summary>
     /// <param name="id">ID der Aufgabe.</param>
     /// <param name="laufId">Eindeutige ID des aktiven Laufs.</param>
@@ -461,8 +460,10 @@ public sealed class AufgabeService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
+        var now = DateTimeOffset.UtcNow;
         aufgabe.AktiveRunId = laufId;
-        aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
+        aufgabe.LastHeartbeatUtc = now;
+        aufgabe.LetzterCliStartUtc = now;
         // LaufStatus startet mit Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start),
         // damit die Kachel unmittelbar "▶ Läuft" statt eines veralteten Werts eines vorherigen Laufs zeigt.
         aufgabe.LaufStatus = AufgabeLaufStatus.Laeuft;
@@ -530,16 +531,19 @@ public sealed class AufgabeService
         return ageMinutes;
     }
 
-    /// <summary>Gibt alle aktiven Aufgaben (Status Gestartet oder Wartend) zurück, sortiert nach letzter Aktivität.</summary>
+    /// <summary>Gibt alle aktiven Aufgaben (Status Gestartet oder Wartend) zurück, sortiert nach letztem CLI-Start.</summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    /// <returns>Die aktiven Aufgaben, absteigend nach letzter Aktivität sortiert (maximal 20).</returns>
+    /// <returns>Die aktiven Aufgaben, absteigend nach letztem CLI-Start sortiert (maximal 20).</returns>
     public async Task<List<Aufgabe>> GetAktiveAufgabenAsync(CancellationToken ct = default)
     {
         return await _db.Aufgaben
             .AsNoTracking()
             .Include(a => a.Projekt)
+            .Include(a => a.GitRepository)
             .Where(IstAktivOderWartendPredicate)
-            .OrderByDescending(a => a.LastHeartbeatUtc ?? a.ErstellungsDatum)
+            .OrderByDescending(a => a.LetzterCliStartUtc ?? a.ErstellungsDatum)
+            .ThenBy(a => a.Titel)
+            .ThenBy(a => a.Id)
             .Take(20)
             .ToListAsync(ct);
     }

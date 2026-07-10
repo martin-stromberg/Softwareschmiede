@@ -315,12 +315,12 @@ public sealed class AufgabeServiceTests
 
     /// <summary>
     /// Testet, dass GetAktiveAufgabenAsync gegen eine echte SQLite-Datenbank absteigend nach
-    /// LastHeartbeatUtc (Fallback ErstellungsDatum) sortiert. Regressionstest für die
+    /// LetzterCliStartUtc (Fallback ErstellungsDatum) sortiert. Regressionstest für die
     /// COALESCE-basierte Sortierung, die bei der reinen InMemory-Provider-Testabdeckung
     /// nicht gegen die tatsächliche SQL-Übersetzung geprüft wird.
     /// </summary>
     [Fact]
-    public async Task GetAktiveAufgabenAsync_ShouldSortByLastHeartbeatDescThenByErstellungsDatum_WhenUsingSqlite()
+    public async Task GetAktiveAufgabenAsync_ShouldSortByLetzterCliStartDescThenByErstellungsDatum_WhenUsingSqlite()
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
@@ -329,42 +329,45 @@ public sealed class AufgabeServiceTests
 
         var jetzt = DateTimeOffset.UtcNow;
 
-        var mitAltemHeartbeat = new Softwareschmiede.Domain.Entities.Aufgabe
+        var mitAltemStart = new Softwareschmiede.Domain.Entities.Aufgabe
         {
             Id = Guid.NewGuid(),
             ProjektId = projektId,
-            Titel = "Alter Heartbeat",
+            Titel = "Alter Start",
             Status = AufgabeStatus.Gestartet,
             ErstellungsDatum = jetzt.AddHours(-3),
-            LastHeartbeatUtc = jetzt.AddMinutes(-10)
+            LastHeartbeatUtc = jetzt,
+            LetzterCliStartUtc = jetzt.AddMinutes(-10)
         };
-        var mitNeuemHeartbeat = new Softwareschmiede.Domain.Entities.Aufgabe
+        var mitNeuemStart = new Softwareschmiede.Domain.Entities.Aufgabe
         {
             Id = Guid.NewGuid(),
             ProjektId = projektId,
-            Titel = "Neuer Heartbeat",
+            Titel = "Neuer Start",
             Status = AufgabeStatus.Wartend,
             ErstellungsDatum = jetzt.AddHours(-2),
-            LastHeartbeatUtc = jetzt.AddMinutes(-1)
+            LastHeartbeatUtc = jetzt.AddHours(-1),
+            LetzterCliStartUtc = jetzt.AddMinutes(-1)
         };
-        var ohneHeartbeat = new Softwareschmiede.Domain.Entities.Aufgabe
+        var ohneStart = new Softwareschmiede.Domain.Entities.Aufgabe
         {
             Id = Guid.NewGuid(),
             ProjektId = projektId,
-            Titel = "Ohne Heartbeat",
+            Titel = "Ohne Start",
             Status = AufgabeStatus.Gestartet,
             ErstellungsDatum = jetzt.AddMinutes(-5),
-            LastHeartbeatUtc = null
+            LastHeartbeatUtc = null,
+            LetzterCliStartUtc = null
         };
 
-        db.Context.Aufgaben.AddRange(mitAltemHeartbeat, mitNeuemHeartbeat, ohneHeartbeat);
+        db.Context.Aufgaben.AddRange(mitAltemStart, mitNeuemStart, ohneStart);
         await db.Context.SaveChangesAsync();
 
         // Act
         var result = await service.GetAktiveAufgabenAsync();
 
         // Assert
-        result.Select(a => a.Id).Should().ContainInOrder(mitNeuemHeartbeat.Id, ohneHeartbeat.Id, mitAltemHeartbeat.Id);
+        result.Select(a => a.Id).Should().ContainInOrder(mitNeuemStart.Id, ohneStart.Id, mitAltemStart.Id);
     }
 
     /// <summary>

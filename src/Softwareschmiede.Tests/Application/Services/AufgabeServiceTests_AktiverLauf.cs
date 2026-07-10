@@ -44,7 +44,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     public void Dispose() => _db.Dispose();
 
     /// <summary>
-    /// AktivenLaufSetzenAsync setzt AktiveRunId und aktualisiert LastHeartbeatUtc sofort (Issue 108:
+    /// AktivenLaufSetzenAsync setzt AktiveRunId, LastHeartbeatUtc und LetzterCliStartUtc sofort (Issue 108:
     /// die Seitenleisten-Kachel darf nicht bis zu 30s auf den ersten periodischen Heartbeat warten müssen).
     /// Setzt außerdem LaufStatus auf Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start).
     /// </summary>
@@ -66,6 +66,9 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         geladen.LastHeartbeatUtc.Should().NotBeNull();
         geladen.LastHeartbeatUtc!.Value.Should().BeOnOrAfter(vorUpdate.AddSeconds(-1));
         geladen.LastHeartbeatUtc!.Value.Should().BeOnOrBefore(nachUpdate.AddSeconds(1));
+        geladen.LetzterCliStartUtc.Should().NotBeNull();
+        geladen.LetzterCliStartUtc!.Value.Should().BeOnOrAfter(vorUpdate.AddSeconds(-1));
+        geladen.LetzterCliStartUtc!.Value.Should().BeOnOrBefore(nachUpdate.AddSeconds(1));
         geladen.LaufStatus.Should().Be(AufgabeLaufStatus.Laeuft);
     }
 

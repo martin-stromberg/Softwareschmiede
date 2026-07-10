@@ -21,6 +21,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock;
+    private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly Guid _projektId = new Guid("22222222-2222-2222-2222-222222222222");
 
     /// <summary>MainWindowViewModelTests.</summary>
@@ -30,6 +31,9 @@ public sealed class MainWindowViewModelTests : IDisposable
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
+        _pluginManagerMock = new Mock<IPluginManager>();
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
 
         _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
         {
@@ -50,6 +54,9 @@ public sealed class MainWindowViewModelTests : IDisposable
         _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
             .Returns(() => TaskDetailViewModelTestFactory.Create(_db, _aufgabeService));
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(IPluginManager)))
+            .Returns(_pluginManagerMock.Object);
     }
 
     /// <summary>Dispose.</summary>
@@ -158,6 +165,171 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert
         var dashboardViewModel = (DashboardViewModel)sut.CurrentView!;
         dashboardViewModel.AktiveAufgabenListe.Should().BeSameAs(sut.AktiveAufgabenListe);
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync markiert genau die aktuell angezeigte Aufgabe als aktiv.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMarkCurrentTaskAsActive_WhenTaskDetailIsCurrentView()
+    {
+        // Arrange
+        var erste = await _aufgabeService.CreateAsync(_projektId, "Erste Aufgabe", null);
+        var zweite = await _aufgabeService.CreateAsync(_projektId, "Zweite Aufgabe", null);
+        await _aufgabeService.StartenAsync(erste.Id, "feature/erste", "/tmp/erste");
+        await _aufgabeService.StartenAsync(zweite.Id, "feature/zweite", "/tmp/zweite");
+        var sut = CreateSut();
+
+        // Act
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(zweite.Id);
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.IsAktiv);
+        sut.AktiveAufgabenListe.Single(a => a.IsAktiv).Id.Should().Be(zweite.Id);
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync wechselt die aktive Markierung nach Navigation zu einer anderen Aufgabe.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMoveActiveMarker_WhenNavigatingToAnotherTask()
+    {
+        // Arrange
+        var erste = await _aufgabeService.CreateAsync(_projektId, "Erste Aufgabe", null);
+        var zweite = await _aufgabeService.CreateAsync(_projektId, "Zweite Aufgabe", null);
+        await _aufgabeService.StartenAsync(erste.Id, "feature/erste", "/tmp/erste");
+        await _aufgabeService.StartenAsync(zweite.Id, "feature/zweite", "/tmp/zweite");
+        var sut = CreateSut();
+
+        // Act
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(erste.Id);
+        await sut.AktiveAufgabenAktualisierenAsync();
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(zweite.Id);
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.IsAktiv);
+        sut.AktiveAufgabenListe.Single(a => a.IsAktiv).Id.Should().Be(zweite.Id);
+        sut.AktiveAufgabenListe.Single(a => a.Id == erste.Id).IsAktiv.Should().BeFalse();
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync behaelt die aktive Markierung auch nach erneutem Laden der Liste.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldKeepActiveMarker_WhenListIsRefreshed()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Refresh-Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/refresh", "/tmp/refresh");
+        var sut = CreateSut();
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.IsAktiv);
+        sut.AktiveAufgabenListe.Single(a => a.IsAktiv).Id.Should().Be(aufgabe.Id);
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync markiert keine Aufgabe aktiv, wenn keine Aufgabendetailansicht angezeigt wird.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldNotMarkAnyTaskActive_WhenCurrentViewIsDashboard()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Dashboard-Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dashboard", "/tmp/dashboard");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        sut.AktiveAufgabenListe.Should().NotContain(a => a.IsAktiv);
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync löst SCM- und KI-Plugin-Anzeigenamen pro Aufgabe auf.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldResolvePluginNamesPerTask_WhenPrefixesAreKnown()
+    {
+        // Arrange
+        var scmPlugin = new Mock<IGitPlugin>();
+        scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
+        scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
+        scmPlugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        var kiPlugin = new Mock<IKiPlugin>();
+        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        kiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin.Object]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+
+        var repositoryId = Guid.NewGuid();
+        _db.GitRepositories.Add(new Softwareschmiede.Domain.Entities.GitRepository
+        {
+            Id = repositoryId,
+            ProjektId = _projektId,
+            RepositoryName = "repo",
+            RepositoryUrl = "https://example.invalid/repo.git",
+            PluginTyp = "Softwareschmiede.GitHub",
+            Aktiv = true
+        });
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Plugin-Aufgabe", null, repositoryId);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.Codex");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/plugin", "/tmp/plugin");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var item = sut.AktiveAufgabenListe.Should().ContainSingle().Subject;
+        item.ScmPluginName.Should().Be("GitHub");
+        item.KiPluginName.Should().Be("Codex");
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync fällt bei unbekannten Plugin-Prefixen auf den gespeicherten Prefix zurück.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldFallbackToStoredPrefix_WhenPluginIsUnknown()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Fallback-Aufgabe", null);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Unbekannt.KI");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/fallback", "/tmp/fallback");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var item = sut.AktiveAufgabenListe.Should().ContainSingle().Subject;
+        item.KiPluginName.Should().Be("Unbekannt.KI");
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync nutzt bei fehlenden gespeicherten Plugin-Prefixen keinen globalen Default.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldNotUseGlobalDefaults_WhenPluginPrefixesAreMissing()
+    {
+        // Arrange
+        var scmPlugin = new Mock<IGitPlugin>();
+        scmPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
+        scmPlugin.SetupGet(p => p.PluginName).Returns("GitHub");
+        scmPlugin.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        var kiPlugin = new Mock<IKiPlugin>();
+        kiPlugin.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.Codex");
+        kiPlugin.SetupGet(p => p.PluginName).Returns("Codex");
+        kiPlugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin.Object]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin.Object]);
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Ohne Prefix", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/ohne-prefix", "/tmp/ohne-prefix");
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var item = sut.AktiveAufgabenListe.Should().ContainSingle().Subject;
+        item.ScmPluginName.Should().BeNull();
+        item.KiPluginName.Should().BeNull();
     }
 
     /// <summary>NavigateToDashboard setzt die NavigateZuAufgabeAction des DashboardViewModel, sodass dessen NavigateZuAufgabeCommand zur Aufgabendetailansicht navigiert (Delegate-Muster statt versteckter Kopplung).</summary>

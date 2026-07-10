@@ -10,11 +10,23 @@
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource PrimaryTextBrush}"
                            TextTrimming="CharacterEllipsis" />
-                <TextBlock Text="{Binding Projekt.Name}"
+                <TextBlock Text="{Binding ProjektName}"
                            FontSize="11"
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            TextTrimming="CharacterEllipsis"
                            Margin="0,2,0,0" />
+                <TextBlock Text="{Binding ScmPluginName, StringFormat=SCM: {0}}"
+                           FontSize="10"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextTrimming="CharacterEllipsis"
+                           Visibility="{Binding ScmPluginName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                           Margin="0,4,0,0" />
+                <TextBlock Text="{Binding KiPluginName, StringFormat=KI: {0}}"
+                           FontSize="10"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextTrimming="CharacterEllipsis"
+                           Visibility="{Binding KiPluginName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                           Margin="0,1,0,0" />
                 <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
                            FontSize="11"
                            Foreground="{DynamicResource SecondaryTextBrush}"
@@ -26,12 +38,23 @@
         </DataTemplate>
 
         <DataTemplate x:Key="AufgabenKachelMitNavigationButtonTemplate">
-            <Border Background="{DynamicResource SurfaceBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
+            <Border BorderThickness="1"
                     CornerRadius="8"
                     Margin="4,4,4,4"
-                    Padding="10">
+                    Padding="10"
+                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}"
+                    AutomationProperties.HelpText="{Binding IsAktiv, StringFormat=Aktiv:{0}}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsAktiv}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -57,13 +80,24 @@
         </DataTemplate>
 
         <DataTemplate x:Key="AufgabenKachelVollflaechigKlickbarTemplate">
-            <Border Background="{DynamicResource SurfaceBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
+            <Border BorderThickness="1"
                     CornerRadius="8"
                     Margin="0,0,0,12"
                     Padding="16"
-                    Cursor="Hand">
+                    Cursor="Hand"
+                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}"
+                    AutomationProperties.HelpText="{Binding IsAktiv, StringFormat=Aktiv:{0}}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsAktiv}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Border.InputBindings>
                     <MouseBinding MouseAction="LeftClick"
                                   Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"

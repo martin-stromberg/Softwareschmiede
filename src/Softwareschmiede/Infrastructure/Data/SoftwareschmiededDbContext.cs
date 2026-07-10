@@ -119,6 +119,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.LastHeartbeatUtc).HasConversion(
                 v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
                 v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(a => a.LetzterCliStartUtc).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
             e.Property(a => a.LaufStatus).HasConversion<string>();
             e.Property(a => a.VorschlagAusfuehrenAbUtc).HasConversion(
                 v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
