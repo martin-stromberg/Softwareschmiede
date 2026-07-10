@@ -183,7 +183,8 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <!-- Titel -->
@@ -195,39 +196,81 @@
                                    Margin="0,0,0,12" />
 
                         <!-- Aufgabenliste -->
-                        <ListBox Grid.Row="1"
-                                 AutomationProperties.Name="AufgabenListe"
-                                 ItemsSource="{Binding GefilterteAufgaben}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 MaxHeight="400">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="8,4">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition />
-                                            <RowDefinition />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0"
-                                                   Text="{Binding Titel}"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding Status}"
-                                                   FontSize="11"
-                                                   Foreground="{DynamicResource SecondaryTextBrush}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="AutomationProperties.Name" Value="{Binding Titel}" />
-                                    <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                        </ListBox>
+                        <Grid Grid.Row="1" AutomationProperties.Name="AufgabenListe">
+                            <ListBox AutomationProperties.Name="OffeneAufgabenListe"
+                                     ItemsSource="{Binding NichtBeendeteAufgaben}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     MaxHeight="320">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="8,4">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition />
+                                                <RowDefinition />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0"
+                                                       Text="{Binding Titel}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding Status}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Titel}" />
+                                        <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </Grid>
+
+                        <Expander Grid.Row="2"
+                                  Header="Beendete Aufgaben"
+                                  IsExpanded="False"
+                                  AutomationProperties.Name="BeendeteAufgabenExpander"
+                                  Foreground="{DynamicResource PrimaryTextBrush}"
+                                  Margin="0,12,0,0">
+                            <ListBox AutomationProperties.Name="BeendeteAufgabenListe"
+                                     ItemsSource="{Binding BeendeteAufgaben}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     MaxHeight="240"
+                                     Margin="0,8,0,0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="8,4">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition />
+                                                <RowDefinition />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0"
+                                                       Text="{Binding Titel}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding Status}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Titel}" />
+                                        <EventSetter Event="MouseDoubleClick" Handler="AufgabeDoubleClick" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </Expander>
                     </Grid>
                 </Border>
 

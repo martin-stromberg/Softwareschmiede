@@ -434,6 +434,105 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         sut.Aufgaben.Should().ContainSingle(a => a.Id == aufgabe2.Id && a.Titel == "Aufgabe 2");
     }
 
+    /// <summary>LadenAsync trennt nicht beendete und beendete Aufgaben nach Status.</summary>
+    [Fact]
+    public async Task LadenAsync_TrenntNichtBeendeteUndBeendeteAufgaben()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Status-Trennung-Projekt", null);
+        var neu = await _aufgabeService.CreateAsync(projekt.Id, "Neu", null);
+        var gestartet = await _aufgabeService.CreateAsync(projekt.Id, "Gestartet", null);
+        var wartend = await _aufgabeService.CreateAsync(projekt.Id, "Wartend", null);
+        var beendet = await _aufgabeService.CreateAsync(projekt.Id, "Beendet", null);
+        var archiviert = await _aufgabeService.CreateAsync(projekt.Id, "Archiviert", null);
+
+        await _aufgabeService.StatusSetzenAsync(gestartet.Id, AufgabeStatus.Gestartet);
+        await _aufgabeService.StatusSetzenAsync(wartend.Id, AufgabeStatus.Wartend);
+        await _aufgabeService.StatusSetzenAsync(beendet.Id, AufgabeStatus.Beendet);
+        await _aufgabeService.StatusSetzenAsync(archiviert.Id, AufgabeStatus.Archiviert);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        // Act
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert
+        sut.NichtBeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([neu.Id, gestartet.Id, wartend.Id]);
+        sut.BeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([beendet.Id]);
+        sut.NichtBeendeteAufgaben.Should().NotContain(a => a.Id == archiviert.Id);
+        sut.BeendeteAufgaben.Should().NotContain(a => a.Id == archiviert.Id);
+    }
+
+    /// <summary>LadenAsync befüllt bei einem Projekt ohne Aufgaben leere getrennte Listen.</summary>
+    [Fact]
+    public async Task LadenAsync_LeeresProjekt_HatLeereGetrennteAufgabenlisten()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Leeres-Projekt", null);
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        // Act
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert
+        sut.NichtBeendeteAufgaben.Should().BeEmpty();
+        sut.BeendeteAufgaben.Should().BeEmpty();
+    }
+
+    /// <summary>LadenAsync befüllt bei nur beendeten Aufgaben ausschließlich die beendete Liste.</summary>
+    [Fact]
+    public async Task LadenAsync_NurBeendeteAufgaben_FuelltNurBeendeteListe()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Nur-Beendete-Projekt", null);
+        var beendet1 = await _aufgabeService.CreateAsync(projekt.Id, "Beendet 1", null);
+        var beendet2 = await _aufgabeService.CreateAsync(projekt.Id, "Beendet 2", null);
+
+        await _aufgabeService.StatusSetzenAsync(beendet1.Id, AufgabeStatus.Beendet);
+        await _aufgabeService.StatusSetzenAsync(beendet2.Id, AufgabeStatus.Beendet);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        // Act
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        // Assert
+        sut.NichtBeendeteAufgaben.Should().BeEmpty();
+        sut.BeendeteAufgaben.Select(a => a.Id).Should().BeEquivalentTo([beendet1.Id, beendet2.Id]);
+    }
+
+    /// <summary>ReloadAufgabenListAsync aktualisiert die getrennten Listen nach einem Statuswechsel.</summary>
+    [Fact]
+    public async Task ReloadAufgabenList_AktualisiertGetrennteListenBeiStatuswechsel()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Reload-Status-Projekt", null);
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Statuswechsel", null);
+
+        TaskDetailViewModel? navigiertesViewModel = null;
+        var sut = CreateSut(navigateToTaskViewCallback: vm => navigiertesViewModel = vm);
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
+            .Returns(() => CreateTaskDetailViewModel());
+
+        sut.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+        await _aufgabeService.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Beendet);
+
+        // Act
+        await navigiertesViewModel!.AufgabeListeAktualisierenCallback!.Invoke();
+
+        // Assert
+        sut.Aufgaben.Should().ContainSingle(a => a.Id == aufgabe.Id);
+        sut.NichtBeendeteAufgaben.Should().NotContain(a => a.Id == aufgabe.Id);
+        sut.BeendeteAufgaben.Should().ContainSingle(a => a.Id == aufgabe.Id);
+    }
+
     // --- Issue-Laden ---
 
     private static Issue ErstelleIssue(int nummer = 1, string titel = "Issue-Titel")

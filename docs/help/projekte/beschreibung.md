@@ -31,7 +31,7 @@ Die Projektdetailansicht ist das zentrale Bearbeitungswerkzeug für Projekte und
 
 **Inhalts-Kacheln:**
 - **Projekt-Kachel** (oben, immer sichtbar): Zeigt das Projektsymbol (📁), einen bearbeitbaren Projektnamen und eine bearbeitbare Projektbeschreibung. Der Name ist Pflichtfeld und das „Speichern"-Button wird deaktiviert, solange das Feld leer ist.
-- **Aufgaben-Kachel** (unten, nur bei bestehendem Projekt): Listet alle Aufgaben des Projekts mit Titel und Status auf. Doppelklick öffnet die Aufgabendetailansicht inline; das Filter-Overlay ermöglicht die Einschränkung auf aktive oder archivierte Aufgaben.
+- **Aufgaben-Kachel** (unten, nur bei bestehendem Projekt): Listet die Aufgaben des Projekts mit Titel und Status auf. Nicht beendete Aufgaben werden direkt sichtbar angezeigt. Beendete Aufgaben befinden sich in einem separaten, beim Öffnen der Projektdetailansicht zugeklappten Register und können bei Bedarf aufgeklappt werden. Doppelklick auf eine Aufgabe öffnet die Aufgabendetailansicht; das Filter-Overlay ermöglicht weiterhin die Einschränkung der geladenen Aufgaben nach Status.
 
 ### Repositories
 

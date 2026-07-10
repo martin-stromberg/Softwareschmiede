@@ -94,6 +94,12 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gefilterte Aufgaben (entsprechend AufgabenFilter).</summary>
     public ObservableCollection<Aufgabe> GefilterteAufgaben { get; } = new();
 
+    /// <summary>Nicht beendete Aufgaben der Projektdetailansicht.</summary>
+    public ObservableCollection<Aufgabe> NichtBeendeteAufgaben { get; } = new();
+
+    /// <summary>Beendete Aufgaben der Projektdetailansicht.</summary>
+    public ObservableCollection<Aufgabe> BeendeteAufgaben { get; } = new();
+
     /// <summary>Bearbeitbarer Projektname.</summary>
     public string ProjektName
     {
@@ -128,7 +134,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         set
         {
             if (SetProperty(ref _aufgabenFilter, value))
-                AktualisiereGefilterteAufgaben();
+                AktualisiereAufgabenAnsichten();
         }
     }
 
@@ -238,7 +244,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             Aufgaben.Clear();
             foreach (var aufgabe in aufgaben)
                 Aufgaben.Add(aufgabe);
-            AktualisiereGefilterteAufgaben();
+            AktualisiereAufgabenAnsichten();
 
             if (Projekt != null)
             {
@@ -279,7 +285,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 ct);
 
             Aufgaben.Add(aufgabe);
-            AktualisiereGefilterteAufgaben();
+            AktualisiereAufgabenAnsichten();
 
             OeffneAufgabe(aufgabe.Id);
         }
@@ -488,7 +494,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
 
         ReplaceOrAddAufgabe(aktualisiert);
-        AktualisiereGefilterteAufgaben();
+        AktualisiereAufgabenAnsichten();
     }
 
     private void ReplaceOrAddAufgabe(Aufgabe aufgabe)
@@ -504,7 +510,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         Aufgaben.Add(aufgabe);
     }
 
-    private void AktualisiereGefilterteAufgaben()
+    private void AktualisiereAufgabenAnsichten()
     {
         GefilterteAufgaben.Clear();
         var quelle = _aufgabenFilter switch
@@ -515,6 +521,23 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         };
         foreach (var aufgabe in quelle)
             GefilterteAufgaben.Add(aufgabe);
+
+        NichtBeendeteAufgaben.Clear();
+        BeendeteAufgaben.Clear();
+        foreach (var aufgabe in Aufgaben)
+        {
+            switch (aufgabe.Status)
+            {
+                case AufgabeStatus.Neu:
+                case AufgabeStatus.Gestartet:
+                case AufgabeStatus.Wartend:
+                    NichtBeendeteAufgaben.Add(aufgabe);
+                    break;
+                case AufgabeStatus.Beendet:
+                    BeendeteAufgaben.Add(aufgabe);
+                    break;
+            }
+        }
     }
 
     private async Task LadenIssuesAsync(CancellationToken ct)
@@ -583,7 +606,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 IssueVorschlaege.Remove(zuEntfernen);
 
             Aufgaben.Add(aufgabe);
-            AktualisiereGefilterteAufgaben();
+            AktualisiereAufgabenAnsichten();
         }
         catch (OperationCanceledException)
         {

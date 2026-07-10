@@ -1,6 +1,9 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
+using Microsoft.Extensions.Logging.Abstractions;
+using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -196,6 +199,54 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
+    }
+
+    /// <summary>
+    /// Szenario: Projektdetailansicht trennt offene und beendete Aufgaben.
+    /// Prueft: Offene Aufgaben sind direkt sichtbar, beendete Aufgaben erst nach Aufklappen des Expanders.
+    /// </summary>
+    [Fact]
+    public async Task Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E()
+    {
+        var app = LaunchApp();
+        var mainWindow = app.GetMainWindow(Automation, Long)!;
+
+        var projektName = "Archivierte-Aufgaben-E2E";
+        var offeneAufgabeTitel = "Offene Aufgabe E2E";
+        var beendeteAufgabeTitel = "Beendete Aufgabe E2E";
+
+        await using (var db = OpenTestDbContext())
+        {
+            var projektService = new ProjektService(db, NullLogger<ProjektService>.Instance);
+            var aufgabeService = new AufgabeService(db, NullLogger<AufgabeService>.Instance);
+
+            var projekt = await projektService.CreateAsync(projektName, null);
+            await aufgabeService.CreateAsync(projekt.Id, offeneAufgabeTitel, null);
+            var beendeteAufgabe = await aufgabeService.CreateAsync(projekt.Id, beendeteAufgabeTitel, null);
+            await aufgabeService.StatusSetzenAsync(beendeteAufgabe.Id, AufgabeStatus.Beendet);
+        }
+
+        NavigateToProjecten(mainWindow);
+        OpenProject(mainWindow, projektName);
+
+        var offeneAufgabenListe = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
+        Assert.NotNull(offeneAufgabenListe);
+
+        var offeneItems = offeneAufgabenListe.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+        Assert.Contains(offeneItems, item => item.Name == offeneAufgabeTitel);
+        Assert.DoesNotContain(offeneItems, item => item.Name == beendeteAufgabeTitel);
+
+        var beendeteAufgabenExpander = WaitForElement(mainWindow, cf => cf.ByName("BeendeteAufgabenExpander"), Short);
+        Assert.NotNull(beendeteAufgabenExpander);
+        Assert.Equal(ExpandCollapseState.Collapsed, beendeteAufgabenExpander.Patterns.ExpandCollapse.Pattern.ExpandCollapseState);
+
+        beendeteAufgabenExpander.Patterns.ExpandCollapse.Pattern.Expand();
+
+        var beendeteAufgabenListe = WaitForElement(beendeteAufgabenExpander, cf => cf.ByName("BeendeteAufgabenListe"), Short);
+        Assert.NotNull(beendeteAufgabenListe);
+
+        var beendeteItems = beendeteAufgabenListe.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+        Assert.Contains(beendeteItems, item => item.Name == beendeteAufgabeTitel);
     }
 
     /// <summary>
