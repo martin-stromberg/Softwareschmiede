@@ -1,3 +1,11 @@
+# [1.3.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.2.0...v1.3.0) (2026-07-10)
+
+
+### Features
+
+* beendete aufgaben in projektdetail trennen ([43dc04c](https://github.com/martin-stromberg/Softwareschmiede/commit/43dc04c345214a036c463f42557db500c49c80cc))
+* Programmsymbol (Hammer-Icon) fuer Executable, Taskleiste und Fenstertitel ([64a5de1](https://github.com/martin-stromberg/Softwareschmiede/commit/64a5de1ded55dc645197f9568ee1a26955a70af6))
+
 # [1.2.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.1.0...v1.2.0) (2026-07-10)
 
 
