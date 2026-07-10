@@ -1,3 +1,20 @@
+# [1.2.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.1.0...v1.2.0) (2026-07-10)
+
+
+### Bug Fixes
+
+* ConPTY-Subscriber-Exception-Test wartet nie auf echten Prozess-Exit ([7f11896](https://github.com/martin-stromberg/Softwareschmiede/commit/7f11896c973530fb3842cbd0dd380b618823a1c7))
+* E2E-Tests mit erwarteter Fehlermeldung meldeten Fehler als Fehler. ([20f40da](https://github.com/martin-stromberg/Softwareschmiede/commit/20f40da44956c90cd04ae58729a2d8976cd264b9))
+* Flakiness in Clipboard-Paste-Tests durch fehlende Message-Pump beheben ([633c193](https://github.com/martin-stromberg/Softwareschmiede/commit/633c193e451d2db32bebfe103b4d5bb700ccb734))
+* Kachel zeigte weiterhin "Laeuft" statt "Wartet auf Eingabe" (Issue 108) ([2b2143d](https://github.com/martin-stromberg/Softwareschmiede/commit/2b2143d666d47e50783c0682b881667a8c73b785))
+* Seitenleisten-Kachel zeigte trotz laufender CLI weiterhin "Bereit" (Issue 108) ([e1fa9f9](https://github.com/martin-stromberg/Softwareschmiede/commit/e1fa9f98e68ed29a5a9c83ed638a2dcd498f5b37))
+* TerminalControl gibt AutomationProperties.Name/HelpText nicht an UI Automation weiter ([c92989a](https://github.com/martin-stromberg/Softwareschmiede/commit/c92989aae6fbd2d6f93e571d3c22517c220eb9c4))
+
+
+### Features
+
+* Arbeitsstatus in Aufgabenliste automatisch aktualisieren ([aa3e034](https://github.com/martin-stromberg/Softwareschmiede/commit/aa3e034bea7600e16ca72787730b6f0af7683a97))
+
 # [1.1.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.0.1...v1.1.0) (2026-07-09)
 
 
