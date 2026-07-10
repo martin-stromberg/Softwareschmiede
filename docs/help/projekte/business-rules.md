@@ -78,6 +78,24 @@
 
 **Umsetzung:** `ProjectDetailViewModel.AufgabenFilter` wird als Property gespeichert, aber nicht in der Datenbank persistiert; beim Laden des Projekts wird der Filter immer auf `AufgabenFilterTyp.Alle` zurückgesetzt
 
+## Aufgabenanzeige nach Abschlussstatus
+
+**Beschreibung:** Die Projektdetailansicht trennt Aufgaben nach Abschlussstatus, damit laufende Arbeit direkt sichtbar bleibt und abgeschlossene Arbeit die Ansicht nicht dominiert.
+
+**Bedingungen:**
+- Aufgabe hat Status `Neu`, `Gestartet` oder `Wartend`: nicht beendete Aufgabe
+- Aufgabe hat Status `Beendet`: beendete Aufgabe
+- Aufgabe hat Status `Archiviert`: nicht Teil der offenen oder beendeten Projektdetail-Aufgabenlisten
+
+**Verhalten:**
+- Nicht beendete Aufgaben werden in der Aufgaben-Kachel direkt sichtbar angezeigt.
+- Beendete Aufgaben werden im Register „Beendete Aufgaben" angezeigt.
+- Das Register „Beendete Aufgaben" ist beim Öffnen der Projektdetailansicht initial zugeklappt.
+- Das Register bleibt auch bei leerer Liste vorhanden und kann aufgeklappt werden.
+- Die Trennung basiert auf dem Aufgabenstatus und ersetzt nicht den flüchtigen Aufgabenfilter.
+
+**Umsetzung:** `ProjectDetailViewModel` baut aus der geladenen Aufgabenquelle getrennte Collections für nicht beendete und beendete Aufgaben auf; `ProjectDetailView.xaml` bindet diese an die direkt sichtbare Aufgabenliste und den Expander für beendete Aufgaben.
+
 ## Fokusmanagement in Projekt-Kachel
 
 **Beschreibung:** Der Fokus wird automatisch auf das Projek**t-Name-Textfeld gesetzt.

@@ -122,6 +122,13 @@ Die neue Aufgabe wird in der Aufgaben-Kachel angezeigt und kann bearbeitet werde
 ### Voraussetzungen
 - Sie haben ein Projekt mit Aufgaben geöffnet (Projektdetailansicht sichtbar).
 
+### Darstellung
+
+Die Aufgaben-Kachel trennt offene und beendete Aufgaben:
+- Nicht beendete Aufgaben sind direkt in der Aufgabenliste sichtbar.
+- Beendete Aufgaben liegen im Register „Beendete Aufgaben".
+- Das Register „Beendete Aufgaben" ist beim Öffnen der Projektdetailansicht zugeklappt und kann bei Bedarf aufgeklappt werden.
+
 ### Schritte
 
 1. Klicken Sie auf den „Filter"-Button im Ribbon-Menü (Gruppe „Aufgaben").
@@ -144,8 +151,9 @@ Der gewählte Filter-Status bleibt aktiv und die Aufgabenliste wird entsprechend
 
 ### Schritte
 
-1. Doppelklicken Sie auf eine Aufgabe in der Aufgaben-Kachel, oder
-2. Wählen Sie eine Aufgabe aus und drücken Sie Enter.
+1. Doppelklicken Sie auf eine nicht beendete Aufgabe in der direkt sichtbaren Aufgabenliste, oder
+2. klappen Sie bei Bedarf das Register „Beendete Aufgaben" auf und doppelklicken Sie dort auf eine beendete Aufgabe, oder
+3. Wählen Sie eine Aufgabe aus und drücken Sie Enter.
 
 ### Ergebnis
 Die Aufgabendetailansicht öffnet sich und zeigt alle Informationen und Optionen für die Aufgabe.

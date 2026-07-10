@@ -487,7 +487,7 @@ Die erweiterte Projektdetailansicht (`ProjectDetailView.xaml`) bietet eine volls
   - **Aufgaben:** Neue Aufgabe anlegen, Status-Filter für Aufgabenliste
   - **Repository:** Zuweisen von Repositories, Öffnen im Browser
 - **Projekt-Kachel:** Anzeige und Bearbeitung von Projektsymbol (📁), Titel und Beschreibung
-- **Aufgaben-Kachel:** Filterbare Liste der Aufgaben des Projekts (Filter: Alle, Aktiv, Archiviert)
+- **Aufgaben-Kachel:** Nicht beendete Aufgaben sind direkt sichtbar; beendete Aufgaben stehen getrennt in einem initial zugeklappten Expander/Register
 - **Repository-Zuweisungs-Dialog:** Wahl und Zuweisung aus bestehenden Repositories (`RepositoryAssignDialog`, `RepositoryAssignViewModel`)
 - **Konsistente UX:** Ansicht für Projektanlage und -bearbeitung (Status "Neu" bei Anlage, bearbeitbare Felder)
 - **Validierung:** Projektname erforderlich, max. 100 Zeichen; Beschreibung max. 500 Zeichen
