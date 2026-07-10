@@ -446,6 +446,42 @@ public sealed class AufgabeService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Markiert eine Aufgabe als aktuell aktiv ausgeführt: setzt <see cref="Aufgabe.AktiveRunId"/> auf die
+    /// übergebene Lauf-ID und aktualisiert <see cref="Aufgabe.LastHeartbeatUtc"/> sofort auf den aktuellen
+    /// Zeitpunkt. Wird von <c>CliProcessManager</c> beim Start eines CLI-Prozesses aufgerufen, damit der
+    /// KI-Ausführungsstatus (siehe <c>KiAusfuehrungsStatusConverter</c>) sofort "▶ Läuft" anzeigt, ohne auf
+    /// den ersten periodischen Heartbeat (30s) warten zu müssen.
+    /// </summary>
+    /// <param name="id">ID der Aufgabe.</param>
+    /// <param name="laufId">Eindeutige ID des aktiven Laufs.</param>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public async Task AktivenLaufSetzenAsync(Guid id, string laufId, CancellationToken ct = default)
+    {
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        aufgabe.AktiveRunId = laufId;
+        aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Markiert eine Aufgabe als nicht mehr aktiv ausgeführt: entfernt <see cref="Aufgabe.AktiveRunId"/>.
+    /// Wird von <c>CliProcessManager</c> aufgerufen, sobald der zugehörige CLI-Prozess beendet wurde
+    /// (regulär oder mit Fehler), damit der KI-Ausführungsstatus nicht länger "▶ Läuft" anzeigt.
+    /// </summary>
+    /// <param name="id">ID der Aufgabe.</param>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public async Task AktivenLaufBeendenAsync(Guid id, CancellationToken ct = default)
+    {
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        aufgabe.AktiveRunId = null;
+        await _db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Gibt die Minuten seit dem letzten Heartbeat zurück (null wenn kein Heartbeat gesetzt).</summary>
     public async Task<int?> GetHeartbeatAgeMinutesAsync(Guid id, CancellationToken ct = default)
     {

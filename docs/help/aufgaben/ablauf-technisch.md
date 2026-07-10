@@ -85,6 +85,11 @@ Ablauf:
    - `IKiPlugin.StartCliAsync` liefert `ProcessStartInfo`
    - `Process.Start()` startet den nativen Prozess
    - Event `CliProcessStatusChanged` → `IsCliRunning = true`
+   - `CliProcessManager.OnCliProcessStatusChanged` (ebenfalls auf das Event abonniert) startet den
+     30s-Heartbeat-Timer **und** persistiert sofort `Aufgabe.AktiveRunId` (neue Lauf-ID) sowie
+     `Aufgabe.LastHeartbeatUtc` über `AufgabeService.AktivenLaufSetzenAsync` — dadurch zeigt die
+     Seitenleisten-Kachel (siehe „KI-Ausführungsstatus-Konvertierung") sofort `"▶ Läuft"`, ohne auf den
+     ersten periodischen Heartbeat warten zu müssen
 9. Fenster wird eingebettet (siehe Abschnitt „Fenster einbetten")
 10. UI zeigt CLI-Panel mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
 11. Bei Fehler (Klone fehlgeschlagen, CLI-Start fehlgeschlagen): Fehler wird angezeigt, Status bleibt `Neu`, Rollback des Klonverzeichnisses falls nötig
@@ -199,8 +204,11 @@ Ablauf:
 ### 6. Prozess beendet sich
 
 - `Process.Exited`-Event wird ausgelöst
-- `KiAusfuehrungsService.CliProcessStatusChanged` → `CliProcessStatus.Gestoppt`
+- `KiAusfuehrungsService.CliProcessStatusChanged` → `CliProcessStatus.Gestoppt` (oder `Fehler`)
 - `TaskDetailViewModel.OnCliProcessStatusChanged` → `IsCliRunning = false`
+- `CliProcessManager.OnCliProcessStatusChanged` stoppt den Heartbeat-Timer **und** entfernt
+  `Aufgabe.AktiveRunId` über `AufgabeService.AktivenLaufBeendenAsync` — die Seitenleisten-Kachel zeigt
+  daraufhin wieder `"✓ Bereit"` (nicht mehr `"▶ Läuft"`), auch wenn `Aufgabe.Status` noch `Gestartet` bleibt
 - Anwender kann Status manuell auf `Beendet` setzen oder via `AufgabeAbschliessenCommand`
 
 ### 7. Aufgabe abschließen (`AbschliessenAsync`)

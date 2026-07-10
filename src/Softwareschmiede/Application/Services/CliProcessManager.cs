@@ -118,10 +118,15 @@ public sealed class CliProcessManager : IDisposable
             {
                 case CliProcessStatus.Gestartet:
                     StartHeartbeat(aufgabeId);
+                    // AktiveRunId muss sofort persistiert werden (nicht erst beim ersten periodischen
+                    // Heartbeat nach 30s) — sonst zeigt die Seitenleisten-Kachel (KiAusfuehrungsStatusConverter,
+                    // Issue 108) für bis zu 30s nach dem Start weiterhin "✓ Bereit" statt "▶ Läuft" an.
+                    AktivenLaufSetzenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufSetzenAsync");
                     break;
                 case CliProcessStatus.Gestoppt:
                 case CliProcessStatus.Fehler:
                     StopHeartbeat(aufgabeId);
+                    AktivenLaufBeendenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufBeendenAsync");
                     break;
             }
         }
@@ -132,6 +137,30 @@ public sealed class CliProcessManager : IDisposable
             // Abonnent (TaskDetailViewModel.OnCliProcessStatusChanged) nicht mehr benachrichtigt.
             _logger.LogError(ex, "Fehler bei der Verarbeitung des CLI-Prozess-Status {Status} für Aufgabe {AufgabeId}.", status, aufgabeId);
         }
+    }
+
+    /// <summary>
+    /// Setzt <see cref="Domain.Entities.Aufgabe.AktiveRunId"/> und aktualisiert den Heartbeat sofort,
+    /// sobald ein CLI-Prozess gestartet wurde (siehe <see cref="AufgabeService.AktivenLaufSetzenAsync"/>).
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess gestartet wurde.</param>
+    private async Task AktivenLaufSetzenAsync(Guid aufgabeId)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+        await aufgabeService.AktivenLaufSetzenAsync(aufgabeId, Guid.NewGuid().ToString("N")).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Entfernt <see cref="Domain.Entities.Aufgabe.AktiveRunId"/>, sobald der CLI-Prozess einer Aufgabe
+    /// beendet wurde (regulär oder mit Fehler; siehe <see cref="AufgabeService.AktivenLaufBeendenAsync"/>).
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
+    private async Task AktivenLaufBeendenAsync(Guid aufgabeId)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+        await aufgabeService.AktivenLaufBeendenAsync(aufgabeId).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>

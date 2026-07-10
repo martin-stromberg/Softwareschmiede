@@ -7,12 +7,19 @@ namespace Softwareschmiede.Tests.E2E;
 /// (Issue 108), ohne dass der Benutzer die Ansicht manuell neu laden muss.
 ///
 /// Der Status ("▶ Läuft"/"⏸ Wartet"/"✓ Bereit") wird vom <c>KiAusfuehrungsStatusConverter</c> aus
-/// <c>AktiveRunId</c> und <c>LastHeartbeatUtc</c> der Aufgabe berechnet. Diese Werte werden testweise
-/// direkt in der SQLite-Testdatenbank des laufenden App-Prozesses gesetzt (analog zum bestehenden Muster
-/// <see cref="WpfTestBase.OpenTestDbContext"/>), um den Heartbeat-Ablauf zu simulieren, ohne auf einen
-/// echten KI-Prozess angewiesen zu sein. Dieser Weg durchläuft ausschließlich den periodischen
-/// Timer-Fallback aus MainWindowViewModel (kein CliProcessStatusChanged-Event), da die Datenbankänderung
-/// nicht über den laufenden CLI-Prozess ausgelöst wird.
+/// <c>AktiveRunId</c> und <c>LastHeartbeatUtc</c> der Aufgabe berechnet. Dieser Test startet und stoppt
+/// einen echten CLI-Prozess (KiSimulator-Plugin) und prüft, dass die Seitenleisten-Kachel dem tatsächlichen
+/// Produktivpfad folgt: <c>CliProcessManager</c> setzt/entfernt <c>AktiveRunId</c> beim
+/// <c>CliProcessStatusChanged</c>-Event (Start/Stopp), <c>MainWindowViewModel</c> lädt daraufhin
+/// (event-getrieben oder über den periodischen Timer-Fallback) die aktiven Aufgaben neu.
+///
+/// Hinweis zu einer früheren Fassung dieses Tests: Sie simulierte den Heartbeat direkt in der Datenbank
+/// (<c>AktiveRunId</c>/<c>LastHeartbeatUtc</c> per SQL gesetzt), statt einen echten CLI-Prozess zu nutzen.
+/// Dadurch deckte der Test ausschließlich den Timer-Fallback ab, nicht aber, ob ein echter CLI-Start
+/// tatsächlich <c>AktiveRunId</c> setzt. Produktivcode hat <c>AktiveRunId</c> nirgends gesetzt (Issue-108-
+/// Kundenrückmeldung: Fußzeile zeigte "Ausführung läuft", Seitenleisten-Kachel blieb bei "✓ Bereit") — der
+/// Test war also grün, obwohl das reale Verhalten fehlerhaft war. Seit der Behebung (siehe
+/// <c>CliProcessManager.OnCliProcessStatusChanged</c>) prüft dieser Test den echten Start-/Stopp-Pfad.
 ///
 /// Voraussetzungen:
 /// - Windows-Desktop-Session (kein Headless-CI)
@@ -28,10 +35,11 @@ public sealed class E2E_ArbeitsstatusAktualisierung : WpfTestBase
     private const string AufgabenTitel = "Neue Aufgabe";
 
     /// <summary>
-    /// Szenario: Eine Aufgabe wird gestartet. Ihr Heartbeat wird direkt in der Datenbank auf "aktiv" gesetzt
-    /// (simuliert einen laufenden KI-Prozess) — die Seitenleisten-Kachel muss automatisch, ohne manuelles
-    /// Neuladen der Ansicht, auf "▶ Läuft" wechseln. Wird der Heartbeat anschließend wieder entfernt
-    /// (simuliert CLI-Stopp), wechselt die Kachel automatisch zurück auf "✓ Bereit".
+    /// Szenario: Eine Aufgabe wird über den echten Produktivpfad gestartet (KiSimulator-CLI-Prozess). Erst
+    /// mit dem Start wechselt die Aufgabe von Status "Neu" (in der Seitenleiste nicht gelistet) auf
+    /// "Gestartet" — die Seitenleisten-Kachel muss dabei automatisch, ohne manuelles Neuladen der Ansicht,
+    /// "▶ Läuft" anzeigen. Wird der CLI-Prozess über den Stoppen-Button beendet, wechselt die Kachel
+    /// automatisch auf "✓ Bereit".
     /// </summary>
     [Fact]
     public void SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E()
@@ -41,32 +49,20 @@ public sealed class E2E_ArbeitsstatusAktualisierung : WpfTestBase
         var mainWindow = SetupProjectMitNeuerAufgabe("ArbeitsstatusAktualisierung-Repo", "ArbeitsstatusAktualisierung-Projekt");
 
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
-        // Baseline: kein aktiver Heartbeat gesetzt → Statuskachel zeigt "✓ Bereit"
-        WaitForStatusHelpText(mainWindow, "✓ Bereit", Medium);
-
-        // Heartbeat direkt in der Datenbank aktivieren (simuliert laufenden KI-Prozess), ohne die
-        // Ansicht manuell neu zu laden.
-        SetzeHeartbeatInDatenbank(aktiv: true);
-
-        // Assert: Kachel wechselt automatisch auf "▶ Läuft" (Timer-Fallback, kein manuelles Neuladen)
+        // Assert: Kachel erscheint automatisch mit "▶ Läuft", sobald der echte CLI-Prozess läuft — ohne
+        // manuelles Neuladen der Ansicht (CliProcessManager.OnCliProcessStatusChanged setzt AktiveRunId
+        // beim Gestartet-Event; vor dem Fix für Issue 108 wurde AktiveRunId nirgends im Produktivcode
+        // gesetzt, sodass die Kachel fälschlich dauerhaft "✓ Bereit" gezeigt hätte).
         WaitForStatusHelpText(mainWindow, "▶ Läuft", Medium);
 
-        // Heartbeat wieder entfernen (simuliert CLI-Stopp/Heartbeat-Ablauf)
-        SetzeHeartbeatInDatenbank(aktiv: false);
+        stoppenButton.AsButton().Click();
+        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
-        // Assert: Kachel wechselt automatisch zurück auf "✓ Bereit"
+        // Assert: Kachel wechselt automatisch zurück auf "✓ Bereit", nachdem der CLI-Prozess beendet wurde
+        // (CliProcessManager entfernt AktiveRunId beim Gestoppt-Event).
         WaitForStatusHelpText(mainWindow, "✓ Bereit", Medium);
-    }
-
-    private void SetzeHeartbeatInDatenbank(bool aktiv)
-    {
-        using var db = OpenTestDbContext();
-        var aufgabe = db.Aufgaben.Single(a => a.Titel == AufgabenTitel);
-        aufgabe.AktiveRunId = aktiv ? "e2e-simulierter-run" : null;
-        aufgabe.LastHeartbeatUtc = aktiv ? DateTimeOffset.UtcNow : null;
-        db.SaveChanges();
     }
 
     /// <summary>
