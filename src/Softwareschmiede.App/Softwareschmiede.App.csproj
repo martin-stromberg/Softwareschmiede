@@ -19,9 +19,14 @@
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>CS1591</WarningsAsErrors>
+    <ApplicationIcon>images\Softwareschmiede.ico</ApplicationIcon>
   </PropertyGroup>
 
-  <ItemGroup>    
+  <ItemGroup>
+    <Resource Include="images\Softwareschmiede.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Softwareschmiede\Softwareschmiede.csproj" />
     <ProjectReference Include="..\Softwareschmiede.Plugin.Contracts\Softwareschmiede.Plugin.Contracts.csproj" />
     <!-- Plugin-Projekte als Build-Abhängigkeit ohne Assembly-Referenz, damit ihre DLLs vor dem CopyPluginsToOutput-Target vorliegen -->

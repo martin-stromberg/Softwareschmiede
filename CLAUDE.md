@@ -1,6 +1,7 @@
 ## Testing 
 - Always run a full build before running tests. Never use --no-build. If E2E or unit tests fail, verify the build succeeded first before diagnosing as flakiness or pre-existing failures.
 - This project requires .NET Desktop workload to run tests. Verify the correct test configuration before running; do not repeatedly retry a config the user has already flagged as broken.
+- When a WPF E2E test fails with "element not found" / timeout in `WpfTestBase.WaitForElement` or `WaitWhileMainHandleIsMissing`, do NOT default to "environment flakiness / no interactive desktop session" as the explanation. First check the launched app's own log file (`src/Softwareschmiede.App/bin/<Config>/<TargetFramework>/logs/softwareschmiede-*.log` of the test run's process) for a startup exception (e.g. `[ERR] MainWindow konnte nicht angezeigt werden.`). A crash during `App.xaml.cs` startup (e.g. XamlParseException from a bad resource path) looks identical from the test's perspective to a genuinely missing/slow window, but has a completely different, fixable root cause. Only fall back to the "no interactive session" explanation once the app log confirms the window/process actually started cleanly and no exception was thrown.
 
 
 ## Sub-Agent / Lifecycle Workflow section

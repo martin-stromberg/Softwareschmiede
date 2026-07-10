@@ -1,3 +1,11 @@
+## 2026-07-10 — Programmsymbol hinzufügen
+
+- Feature: Anwendung zeigt Hammer-Symbol im Windows-Explorer, in der Taskleiste und im Fenster-Titel an — visuelle Markenidentität der Softwareschmiede wird konsistent sichtbar.
+- Icon-Asset: Multi-Resolution-`.ico`-Datei (`src/Softwareschmiede.App/images/Softwareschmiede.ico`) mit Auflösungen 16x16, 32x32, 64x64, 256x256 eingebettet; enthält Hammer-/Spitzhacken-Symbol auf dunklem Kreis.
+- Build-Konfiguration: `<ApplicationIcon>images\Softwareschmiede.ico</ApplicationIcon>` in `Softwareschmiede.App.csproj` bindet Icon automatisch in die `.exe`-Datei ein (MSBuild-Integration).
+- UI-Integration: `Window.Icon="/images/Softwareschmiede.ico"` in `MainWindow.xaml` setzt das Symbol explizit für Titelleiste und Taskleisten-Vorschau; `<Resource>`-Item in csproj macht die `.ico` als WPF-Pack-Resource verfügbar.
+- Reine Asset- und Konfigurationsänderung ohne Code-Logik, Datenmodell-Änderungen oder neue Tests.
+
 ## 2026-07-10 — Arbeitsstatus in Aufgabenliste automatisch aktualisieren
 
 - Feature: Automatische Statusaktualisierung der aktiven Aufgaben in Seitenleiste und Dashboard ohne manuelles Neuladen — der KI-Ausführungsstatus (▶ Läuft, ⏸ Wartet, ✓ Bereit) wird sofort bei Prozess-Start/-Stopp aktualisiert und periodisch auf Heartbeat-Ablauf geprüft.

@@ -7,6 +7,10 @@
 - [Aufgaben & KI-Entwicklungsprozess](aufgaben/index.md) — Aufgaben sind die Arbeitseinheiten der Softwareschmiede. Der optimierte Aufgabenworkflow kombiniert Repository-Klone und CLI-Start in einem Schritt über einen einzelnen „Starten"-Button; die KI-Plugin-Auswahl erfolgt per Dialog mit optionaler Speicherung als Projekt-Standard. Die Aufgabendetailansicht mit Ribbon-Menü bietet umfassende Verwaltung mit Status-abhängigem Content-Switching (Edit-, CLI-, Diff-Panels), eingebettetem Terminalfenster, Info-Toggle und automatischem CLI-Neustart. Die Navigationsmenü-Seitenleiste zeigt aktive Aufgaben als Kacheln mit KI-Ausführungsstatus an; der Status wird automatisch aktualisiert, ohne dass der Benutzer die Ansicht neu laden muss, und wird bei echten Statuswechseln mit dezenter Fade-Animation hervorgehoben. Dies ermöglicht schnellen Zugriff auf laufende Arbeiten mit durchgehend aktuellem Status.
 - [Projekte](projekte/index.md) — Projekte sind die zentrale Organisationseinheit; jedes Projekt fasst ein oder mehrere Git-Repositories sowie zugehörige Aufgaben zusammen. Ein Suggestions-Panel auf der Projektübersicht zeigt unzugeordnete Repositories aus allen SCM-Plugins und ermöglicht schnelle Projekterstellung. Die Projektdetailansicht bietet umfassende Verwaltung mit Ribbon-Menü, Bearbeitung und Repository-Management.
 
+## Anwendung
+
+- [Programmsymbol](anwendung/index.md) — Visuelles Markenidentitäts-Symbol (Hammer-/Spitzhacken) der Softwareschmiede, angezeigt im Windows-Explorer, in der Taskleiste und im Fenster-Titel.
+
 ## Benutzeroberfläche
 
 - [Terminal-Integration](terminal/index.md) — KI-CLI-Tools (Claude, Codex, GitHub Copilot) werden über Windows Pseudo Console (ConPTY) gestartet und direkt in der WPF-Aufgabendetailansicht gerendert. Der VT100/ANSI-Output wird mit voller Farbunterstützung in einem benutzerdefinierten Control angezeigt; Tastatureingaben werden nativ an den Prozess weitergeleitet.

@@ -5,6 +5,7 @@
         xmlns:vm="clr-namespace:Softwareschmiede.App.ViewModels"
         xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
         Title="{Binding Title}"
+        Icon="/images/Softwareschmiede.ico"
         Width="1280" Height="800"
         MinWidth="900" MinHeight="600"
         Background="{DynamicResource BackgroundBrush}">
