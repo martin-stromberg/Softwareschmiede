@@ -1,3 +1,13 @@
+## 2026-07-10 — Arbeitsstatus in Aufgabenliste automatisch aktualisieren
+
+- Feature: Automatische Statusaktualisierung der aktiven Aufgaben in Seitenleiste und Dashboard ohne manuelles Neuladen — der KI-Ausführungsstatus (▶ Läuft, ⏸ Wartet, ✓ Bereit) wird sofort bei Prozess-Start/-Stopp aktualisiert und periodisch auf Heartbeat-Ablauf geprüft.
+- Hybrid-Aktualisierungsstrategie: Event-basierte Sofortreaktion auf `IRunningAutomationStatusSource.RunningCountChanged` (Prozess-Start/-Stopp) kombiniert mit `DispatcherTimer`-Fallback (5 Sekunden) zur Erkennung von Rate-Limit-Übergängen und Heartbeat-Ablauf.
+- Neue Klasse `StatusAenderungsErkennung`: Merkt je `Aufgabe.Id` den letzten beobachteten Status und erkennt echte Statuswechsel, um Übergangsanimationen nur beim echten Wechsel auszulösen.
+- Neue Klasse `StatusUebergangsAnimation` (Attached Behavior): Startet dezente Opacity-Fade-Animation (0.3→1.0, 250 ms, EaseOut) auf dem Status-`TextBlock` nur bei echtem Statuswechsel, nicht bei jedem UI-Refresh.
+- Erweiterte `MainWindowViewModel`: Event-Handler `OnRunningCountChanged`, `DispatcherTimer` mit 5-Sekunden-Intervall, `SemaphoreSlim`-Re-Entrancy-Schutz für `AktiveAufgabenAktualisierenAsync()`, `IDisposable`-Implementierung für saubere Ressourcen-Freigabe.
+- `MainWindow.OnClosed`: Ruft `(DataContext as IDisposable)?.Dispose()` auf, um Timer und Event-Handler sauber abzumelden.
+- `ActiveTasksListControl.xaml`: Status-`TextBlock` mit `AutomationProperties.Name/HelpText` für E2E-Test-Zuverlässigkeit; Attached Property `StatusUebergangsAnimation.Status` zum Triggern von Übergängen.
+
 ## 2026-07-08 — Arbeitsverzeichnis-Auswahl für KI-Ausführung
 
 - Feature: Repository-Auswahl-Dialog erweitert um Arbeitsverzeichnis-Auswahl — Benutzer können beim Zuweisen eines Repositories ein Unterverzeichnis als Startpunkt für die CLI-Ausführung auswählen.

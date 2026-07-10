@@ -17,7 +17,10 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
   - `✓ Bereit` — Keine aktive Ausführung erkannt (Fallback)
 - **Navigation:** Ein Navigations-Button (→) auf jeder Kachel ermöglicht den direkten Zugriff auf die Aufgabendetailansicht.
 - **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — keine doppelte Anzeige.
-- **Auto-Aktualisierung:** Die Liste wird bei Navigation zu anderen Views (Projekte, Einstellungen) automatisch aktualisiert.
+- **Automatische Statusaktualisierung:** Der Aufgabenstatus wird ohne manuelles Neuladen aktualisiert:
+  - **Sofortreaktion auf Prozess-Änderungen:** Wenn eine Aufgabe gestartet oder beendet wird, wird die Seitenleiste sofort aktualisiert.
+  - **Periodische Überprüfung:** Alle 5 Sekunden wird der Status neu abgerufen, um Rate-Limit-Übergänge (▶ Läuft → ⏸ Wartet) und Heartbeat-Ablauf (▶ Läuft → ✓ Bereit nach 5 Minuten ohne Aktivität) zu erkennen.
+  - **Visuelle Übergangsanimation:** Wenn der Status einer Aufgabe sich ändert, wird ein dezenter Opacity-Fade (250 ms) auf dem Status-Text angezeigt, um den Wechsel hervorzuheben.
 
 ### Navigation zwischen Projekt und Aufgabe
 

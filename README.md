@@ -60,7 +60,7 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-07-08**
+Stand: **2026-07-10**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -79,6 +79,7 @@ Stand: **2026-07-08**
 | **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung, CLI-Laufzeitstatus in der Fußzeile (`Ausführung läuft`/`Wartet auf Eingabe`); Voraussetzung: Windows 10 Build 17763+ |
 | **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff) vollständig implementiert mit neuen Commands (Speichern/Löschen/Toggle) und CanExecute-Validierung, ConPTY-Terminal für KI-CLI-Prozesse**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`** |
 | **Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget)** | ✅ Implementiert | Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs`; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` für alle Fire-and-Forget-Aufrufe; konsolidierter, try-catch-geschützter `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start); Heartbeat-Aktualisierung pro Aufgabe über eigenes `SemaphoreSlim` in `CliProcessManager` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` mit vollständigem Exception-Handling und überwachtem Hintergrund-Task; Startfehler von `CliProcessManager`-Initialisierung und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts |
+| **Issue 108: Automatische Statusaktualisierung aktiver Aufgaben** | ✅ Implementiert | Seitenleisten- und Dashboard-Aufgabenlisten zeigen KI-Ausführungsstatus (▶ Läuft, ⏸ Wartet, ✓ Bereit) in Echtzeit an. Hybrid-Mechanismus: `IRunningAutomationStatusSource.RunningCountChanged`-Event für Sofortaktualisierung bei Prozess-Start/-Stopp, `DispatcherTimer` (5 s Intervall) als Fallback für Heartbeat-Ablauf und Rate-Limit-Übergänge. `SemaphoreSlim`-Re-Entrancy-Schutz verhindert DbContext-Konflikte. `StatusAenderungsErkennung` nutzt `Aufgabe.Id`-Keying, um Übergangsanimation nur bei echtem Statuswechsel auszulösen (dezente Opacity-Fade). `StatusUebergangsAnimation` als Attached Behavior mit in Code konstruiertem DoubleAnimation (250 ms EaseOut). E2E-Tests mit FlaUI über `AutomationProperties.HelpText`. |
 | **Issue 86: Parallele CLI-Ausführungen ohne Blockade bei verborgener Aufgabenseite** | ✅ Implementiert | Entkopplung der ReadLoop vom `TerminalControl`-Lebenszyklus: `PseudoConsoleSession` verwaltet die Leseschleife unabhängig und feuert `BufferChanged`-Events. `TerminalControl` wird zu reinem Renderer, der Events abonniert statt ReadLoop zu steuern. CLI-Prozesse laufen parallel weiter, auch wenn ihre Aufgabenseite nicht angezeigt wird. Betroffene Komponenten: `TerminalControl` (Unloaded-Handler entfernt, Event-Binding hinzugefügt), `PseudoConsoleSession` (ReadLoop ab Konstruktion aktiv), `KiAusfuehrungsService` (Cleanup-Logik angepasst). Unit-Tests für parallele Sessions, View-Wechsel und Session-Cleanup vorhanden; Details siehe [docs/help/terminal](docs/help/terminal/index.md) |
 | **Issue 85: CLI-Konsole optimieren — Buffer-Stabilitäts-Fix und Clipboard-Paste** | ✅ Implementiert | Neue Methode `TerminalBuffer.GetSnapshot()` für konsistentes Rendering unter Lock zur Vermeidung von Race Conditions bei paralleler CLI-Ausgabe. Clipboard-Paste-Unterstützung (Ctrl+V) mit neuer `KeyToVt100Encoder.EncodeClipboardText()`-Methode und Tastaturhandling in `TerminalControl`. Betroffene Komponenten: `TerminalBuffer`, `TerminalControl`, `KeyToVt100Encoder`. Unit-Tests für Thread-Sicherheit, Clipboard-Encoding und Keyboard-Input vorhanden; Details siehe [docs/help/terminal/beschreibung.md](docs/help/terminal/beschreibung.md) |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
@@ -191,6 +192,44 @@ issue.md
 - `App.xaml` – KiAusfuehrungsStatusConverter registriert als XAML-Ressource
 - Unit-Tests für Service-Methode, Converter, ViewModels und Commands
 - E2E-Tests für Menü-Anzeige, Navigation, Sichtbarkeits-Toggle und Status-Anzeige
+
+#### Issue 108: Automatische Statusaktualisierung aktiver Aufgaben (implementiert ✅)
+
+**Echtzeitstatus-Updates für aktive Aufgaben ohne manuelles Neuladen:**
+
+Die in der Navigations-Seitenleiste und im Dashboard angezeigten aktiven Aufgaben zeigen ihren aktuellen KI-Ausführungsstatus stets mit aktuellen Symbolen (▶ Läuft, ⏸ Wartet, ✓ Bereit) an. Die Anzeige aktualisiert sich automatisch, ohne dass der Benutzer die Ansicht manuell neu laden muss.
+
+**Aktualisierungsmechanismus (Hybrid-Ansatz):**
+
+- **Event-getriebene Sofortaktualisierung:** Das `IRunningAutomationStatusSource.RunningCountChanged`-Event wird bei Prozess-Start oder -Stopp ausgelöst. Ein Handler im `MainWindowViewModel` marshallt auf den UI-Thread und aktualisiert die `AktiveAufgabenListe`.
+- **Timer-Fallback (5-Sekunden-Intervall):** Ein `DispatcherTimer` triggert zyklisch die Aktualisierung, um Status-Übergänge zu erfassen, die kein Event auslösen:
+  - Heartbeat-Ablauf: Nach 5 Minuten ohne Heartbeat wechselt Status von "▶ Läuft" zu "✓ Bereit"
+  - Rate-Limit-Übergang: Status-Wechsel von "Gestartet" zu "Wartend"
+- **Re-Entrancy-Schutz:** Ein `SemaphoreSlim(1,1)` mit nicht-blockierendem `Wait(0)` verhindert überlappende DbContext-Zugriffe; bei bereits laufender Aktualisierung wird die Anfrage ignoriert (kein Queueing).
+- **Collection-Update:** Die bestehende `AktiveAufgabenListe` wird via `ObservableCollectionExtensions.ReplaceAll()` vollständig neu befüllt, wodurch die Bindings aller `Aufgabe`-Instanzen erzwungen werden.
+
+**Übergangsanimation bei echtem Statuswechsel:**
+
+- **Wechsel-Erkennung:** Die Klasse `StatusAenderungsErkennung` merkt sich je `Aufgabe.Id` den letzten beobachteten Status-Text. Nur bei tatsächlicher Änderung wird die Animation ausgelöst (kein Flackern bei Routine-Refreshs).
+- **Attached Behavior:** `StatusUebergangsAnimation` als Static Class mit Attached Property `Status` (string). Der `PropertyChangedCallback` startet eine dezente Opacity-Fade-`DoubleAnimation` (250 ms, `0.3 → 1.0`, `EaseOut`-Easing).
+- **Keine Layout-Verschiebung:** Die Animation ändert nur die Opazität, nicht die Position oder Größe des Status-`TextBlock`.
+
+**Betroffene Komponenten und Änderungen:**
+
+- `MainWindowViewModel` – neue Parameter (`IRunningAutomationStatusSource runningStatusSource`, optionaler `Action<Action> dispatcherInvoke`), Felder (`DispatcherTimer`, `SemaphoreSlim _refreshGate`), Handler (`OnRunningCountChanged`, `OnAktualisierungsTimerTick`), `IDisposable`-Implementierung
+- `MainWindow.xaml.cs` – Code-behind ruft `(DataContext as IDisposable)?.Dispose()` in `OnClosed` auf
+- `StatusAenderungsErkennung` – neue POCO-Klasse mit `Dictionary<Guid,string?>` und Methode `HatSichGeaendert(Guid, string?)` (unit-testbar, keine WPF-Abhängigkeit)
+- `StatusUebergangsAnimation` – neuer Static class (Attached Behavior) mit `Status`-Property und `PropertyChangedCallback` für Animation-Auslösung
+- `ActiveTasksListControl.xaml` – Status-`TextBlock` erhält `AutomationProperties.Name` (Bezeichner) und `AutomationProperties.HelpText` (Converter-Ergebnis) für E2E-Testbarkeit, sowie `StatusUebergangsAnimation.Status`-Binding
+
+**Ressource-Freigabe:**
+
+Bei `MainWindow.Close` wird das ViewModel disposed, was den Timer stoppt, den Event-Handler abmeldet und den `SemaphoreSlim` freigibt (idempotent über `_disposed`-Flag).
+
+**Tests:**
+
+- Unit-Tests: `StatusAenderungsErkennung` (Erstbeobachtung, unverändert, Wechsel, mehrere Ids), `MainWindowViewModel` (Event-Neuladen, Re-Entrancy-Skip, Dispose-Abmeldung)
+- E2E-Tests: Aufgabe starten → Statuswechsel in Seitenleiste ohne Neuladen wird über `AutomationProperties.HelpText` verifiziert
 
 #### Feature 72: Aufgabenworkflow Optimierung (in Arbeit)
 

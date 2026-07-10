@@ -292,19 +292,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _pluginManager = pluginManager;
         _serviceProvider = serviceProvider;
         _logger = logger;
-        // Dispatcher einmalig bei der Konstruktion erfassen, damit kein späterer Zugriff auf
-        // Application.Current nötig ist (kann beim Shutdown null sein).
-        if (dispatcherInvoke != null)
-        {
-            _dispatcherInvoke = dispatcherInvoke;
-        }
-        else
-        {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            _dispatcherInvoke = dispatcher != null
-                ? (Action<Action>)(action => dispatcher.Invoke(action))
-                : (Action<Action>)(action => action());
-        }
+        _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
 
