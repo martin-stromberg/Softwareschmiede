@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
@@ -88,6 +89,14 @@ public sealed class TerminalControl : FrameworkElement
     {
         _ = Dispatcher.InvokeAsync(InvalidateVisual);
     }
+
+    /// <summary>TerminalControl leitet direkt von <see cref="FrameworkElement"/> ab, dessen Standard-Implementierung
+    /// von <c>OnCreateAutomationPeer</c> <c>null</c> zurückgibt — ohne diesen Override erzeugt WPF keinen
+    /// AutomationPeer, wodurch weder <c>AutomationProperties.Name</c> noch <c>HelpText</c> an UI-Automation-Clients
+    /// (z. B. FlaUI in E2E-Tests) durchgereicht werden, obwohl beide in XAML/Code-behind gesetzt sind.</summary>
+    /// <returns>Ein <see cref="FrameworkElementAutomationPeer"/>, der Name und HelpText aus den angehängten
+    /// <c>AutomationProperties</c> liest.</returns>
+    protected override AutomationPeer OnCreateAutomationPeer() => new FrameworkElementAutomationPeer(this);
 
     /// <inheritdoc/>
     protected override void OnRender(DrawingContext dc)
