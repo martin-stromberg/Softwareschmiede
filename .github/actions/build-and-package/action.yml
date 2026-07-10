@@ -21,10 +21,22 @@ runs:
       run: dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release -o publish/
       shell: pwsh
 
+    - name: Rename executable for release
+      # Der Dev-/Test-Build (bin/Debug/.../Softwareschmiede.App.exe) und veroeffentlichte Releases
+      # sollen unterschiedliche Prozessnamen tragen: Diese Anwendung wird mit sich selbst
+      # weiterentwickelt (eine installierte Release-Kopie hostet haeufig die laufende
+      # Claude-Code-Session). Teilen sich Dev-Build und Release denselben Namen, kann
+      # Tooling (Build-Lock-Aufloesung, Testaufraeumen, taskkill-artige Logik), das nach
+      # "Softwareschmiede.App.exe" sucht, versehentlich die Release-/Host-Instanz statt einer
+      # verwaisten Testinstanz treffen. Der Rename passiert bewusst erst hier im Publish-Schritt,
+      # nicht ueber <AssemblyName> im csproj, damit der lokale Dev-Build unveraendert bleibt.
+      run: Rename-Item -Path 'publish/Softwareschmiede.App.exe' -NewName 'Softwareschmiede.exe'
+      shell: pwsh
+
     - name: Verify publish output
       run: |
-        if (-not (Test-Path 'publish/Softwareschmiede.App.exe')) {
-          throw "publish/ ist unvollstaendig: Softwareschmiede.App.exe fehlt."
+        if (-not (Test-Path 'publish/Softwareschmiede.exe')) {
+          throw "publish/ ist unvollstaendig: Softwareschmiede.exe fehlt."
         }
         $pluginDlls = Get-ChildItem -Path 'publish/plugins' -Filter '*.dll' -Recurse -ErrorAction SilentlyContinue
         if (-not $pluginDlls -or $pluginDlls.Count -eq 0) {
