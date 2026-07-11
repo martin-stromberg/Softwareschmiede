@@ -25,9 +25,10 @@ public sealed class E2E_AutoStartCli : WpfTestBase
     /// automatisch neu gestartet und eingebettet (Stoppen-Button erscheint wieder ohne manuellen Klick
     /// auf "Starten" oder "Plugin ändern").
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("AutoStartCli-Repo", "AutoStartCli-Projekt");

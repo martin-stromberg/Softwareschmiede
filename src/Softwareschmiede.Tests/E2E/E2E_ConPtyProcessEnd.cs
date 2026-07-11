@@ -21,9 +21,10 @@ public sealed class E2E_ConPtyProcessEnd : WpfTestBase
     /// Der Stoppen-Button verschwindet und der Starten-Button erscheint wieder nicht
     /// (Status bleibt Gestartet, kein Rollback).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void ConPtyProcessEnd_NachStoppen_IsCliRunningFalse_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ConPtyEnd-Repo", "ConPtyEnd-Projekt");

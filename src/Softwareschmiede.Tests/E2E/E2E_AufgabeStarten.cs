@@ -25,9 +25,11 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
     /// Nach Korrektur der Einstellung gelingt der zweite Versuch: Repository wird geklont,
     /// Status wechselt auf "Gestartet" und die CLI wird gestartet (CLI-Panel mit Stoppen-Button sichtbar).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void AufgabeStarten_KlontRepositoryUndStartetCli_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
+
         var mainWindow = SetupProjectMitNeuerAufgabe("AufgabeStarten-Repo", "AufgabeStarten-Projekt");
 
         // Erster Versuch: ConfirmGitInitInSourceDirectory ist nicht gesetzt → Fehlermeldung erwartet

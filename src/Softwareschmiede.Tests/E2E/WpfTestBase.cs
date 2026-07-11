@@ -474,6 +474,29 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
+    /// Überspringt den aufrufenden Test (via <c>Assert.Skip</c>), wenn ConPTY-Kindprozesse in dieser
+    /// Ausführungsumgebung nicht isoliert an die Pseudo-Konsole angebunden werden (siehe
+    /// <see cref="ConPtyEnvironmentProbe"/>). Betrifft alle Tests, die über einen CLI-Prozess
+    /// (ConPTY, z. B. via <see cref="StartenUndPluginWaehlen"/>) sichtbare Terminal-Ausgabe erwarten -
+    /// ohne funktionierende Konsolen-Isolation scheitern sie sonst mit einem nichtssagenden
+    /// <see cref="TimeoutException"/> statt mit einer erklärenden Meldung. Muss als erste Zeile des
+    /// jeweiligen Testkörpers aufgerufen werden, vor jedem App-Start.
+    /// Erfordert, dass die aufrufende Testmethode mit <c>[SkippableFact]</c> (statt <c>[Fact]</c>)
+    /// annotiert ist (Paket <c>Xunit.SkippableFact</c>) - nur damit erzeugt <c>Skip.If</c> ein
+    /// echtes "Skipped"-Ergebnis statt eines fehlschlagenden Tests.
+    /// </summary>
+    protected static void SkipWennConPtyNichtVerfuegbar()
+    {
+        Skip.If(
+            !ConPtyEnvironmentProbe.IsAvailable,
+            "ConPTY-Konsolen-Isolation ist in dieser Ausführungsumgebung nicht verfügbar " +
+            "(Kindprozess wird nicht an die Pseudo-Konsole, sondern an eine Ambient-Konsole " +
+            "mit sofortigem EOF gebunden - bekannte Sandbox-Limitation, siehe " +
+            "docs/features/task/issue-114-.../e2e-timeout-analyse.md). " +
+            "Funktioniert z. B. in Visual Studio / einer echten interaktiven Desktop-Session.");
+    }
+
+    /// <summary>
     /// Klickt den "Starten"-Button und bedient den anschließend erscheinenden Plugin-Auswahl-Dialog:
     /// wählt das angegebene KI-Plugin aus und bestätigt mit "OK".
     /// </summary>

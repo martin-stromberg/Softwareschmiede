@@ -24,9 +24,10 @@ public sealed class E2E_PluginSelectionDialog : WpfTestBase
     /// Prüft: Dialog erscheint mit Dropdown der verfügbaren KI-Plugins; nach Auswahl und OK
     /// wird der kombinierte Start-Ablauf fortgesetzt (CLI startet).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void StartenOhneGespeichertesPlugin_ZeigtPluginAuswahlDialog_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginDialog-Repo", "PluginDialog-Projekt");

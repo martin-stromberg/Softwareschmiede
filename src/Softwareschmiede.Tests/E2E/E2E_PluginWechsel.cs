@@ -22,9 +22,10 @@ public sealed class E2E_PluginWechsel : WpfTestBase
     /// Dialog ein anderes Plugin gewählt. Prüft: Der laufende CLI-Prozess wird gestoppt und mit dem
     /// neuen Plugin neu gestartet (CLI-Panel bleibt nach dem Wechsel sichtbar, Status bleibt "Gestartet").
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginWechsel-Repo", "PluginWechsel-Projekt");

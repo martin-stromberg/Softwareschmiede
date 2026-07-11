@@ -41,9 +41,10 @@ public sealed class E2E_ArbeitsstatusAktualisierung : WpfTestBase
     /// "▶ Läuft" anzeigen. Wird der CLI-Prozess über den Stoppen-Button beendet, wechselt die Kachel
     /// automatisch auf "✓ Bereit".
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ArbeitsstatusAktualisierung-Repo", "ArbeitsstatusAktualisierung-Projekt");

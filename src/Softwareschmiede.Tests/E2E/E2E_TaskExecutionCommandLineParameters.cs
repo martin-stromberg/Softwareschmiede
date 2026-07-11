@@ -16,9 +16,11 @@ public sealed class E2E_TaskExecutionCommandLineParameters : WpfTestBase
     /// Speichert CommandLineParameters für das Codex-Plugin im Credential Store, startet dann eine
     /// Aufgabe mit dem KI Simulator und prüft, dass die Aufgabe trotzdem korrekt startet.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
+
         new WindowsCredentialStore().SetCredential(
             "Softwareschmiede.Codex.CommandLineParameters", "--test-regression-flag");
         ConfirmLocalDirectoryGitInitInSourceDirectory();

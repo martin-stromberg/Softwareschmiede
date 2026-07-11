@@ -19,9 +19,10 @@ public sealed class E2E_ConPtyTerminalStart : WpfTestBase
     /// Stoppen-Button erscheinen (IsCliRunning=true), was bestätigt, dass
     /// PseudoConsoleSessionGestartet gefeuert wurde und die Session nicht null ist.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void ConPtyStart_ZeigtTerminalPanelMitStoppenButton_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ConPty-Repo", "ConPty-Projekt");

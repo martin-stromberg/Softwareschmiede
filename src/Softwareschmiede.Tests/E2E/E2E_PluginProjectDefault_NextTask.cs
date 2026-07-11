@@ -24,9 +24,11 @@ public sealed class E2E_PluginProjectDefault_NextTask : WpfTestBase
     /// neu erstellte Aufgabe desselben Projekts wird gestartet, ohne dass der Plugin-Auswahl-Dialog
     /// erscheint; die CLI startet direkt mit dem gespeicherten Plugin.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void ZweiteAufgabeImProjekt_UebernimmtGespeichertenProjektStandardOhneDialog_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
+
         var mainWindow = SetupProjectMitNeuerAufgabe(
             "PluginProjectDefaultNext-Repo",
             "PluginProjectDefaultNext-Projekt",
