@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Text;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly KiAusfuehrungsService _kiService;
     private readonly EntwicklungsprozessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
+    private readonly PromptVorlagenService _promptVorlagenService;
+    private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService;
     private readonly IDialogService _dialogService;
     private readonly IPluginManager _pluginManager;
     private readonly IServiceProvider _serviceProvider;
@@ -44,6 +47,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private string _cliStatusText = "CLI inaktiv";
     private PseudoConsoleSession? _cliStatusSession;
+    private PromptVorlage? _selectedPromptVorlage;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -122,6 +126,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             SetProperty(ref _isCliRunning, value);
             OnPropertyChanged(nameof(KannCliStoppen));
             OnPropertyChanged(nameof(KannCliNeuStarten));
+            OnPropertyChanged(nameof(KannPromptVorlageSenden));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
@@ -164,6 +169,25 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Verfügbare KI-Plugin-Prefixe.</summary>
     /// <value>Die Liste der verfügbaren KI-Plugin-Prefixe.</value>
     public ObservableCollection<string> VerfuegbareKiPlugins { get; } = new();
+
+    /// <summary>Verfügbare Promptvorlagen.</summary>
+    public ObservableCollection<PromptVorlage> PromptVorlagen { get; } = new();
+
+    /// <summary>Aktuell gewählte Promptvorlage im Ribbon.</summary>
+    public PromptVorlage? SelectedPromptVorlage
+    {
+        get => _selectedPromptVorlage;
+        set
+        {
+            if (!SetProperty(ref _selectedPromptVorlage, value) || value is null)
+                return;
+
+            PromptVorlageAuswaehlenCommand.Execute(value);
+        }
+    }
+
+    /// <summary>Gibt an, ob eine Promptvorlage an die laufende CLI gesendet werden kann.</summary>
+    public bool KannPromptVorlageSenden => _isCliRunning && PromptVorlagen.Count > 0;
 
     /// <summary>Steuert Sichtbarkeit zwischen Info-Panel und CLI-Fenster; Initial = false (CLI sichtbar).</summary>
     public bool IsInfoViewVisible
@@ -255,6 +279,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
     public ICommand IssueBrowserOeffnenCommand { get; }
 
+    /// <summary>Sendet die gewählte Promptvorlage an die laufende CLI.</summary>
+    public ICommand PromptVorlageAuswaehlenCommand { get; }
+
     /// <summary>Wird gefeuert, wenn eine neue <see cref="PseudoConsoleSession"/> gestartet wurde. Löst weiterhin
     /// das Binden von <c>TerminalControl.Session</c> in <c>TaskDetailView</c> aus, unabhängig davon, ob die
     /// Leseschleife der Session bereits vor der UI-Bindung läuft (parallele CLI-Ausführungen, Issue-86).</summary>
@@ -277,6 +304,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         KiAusfuehrungsService kiService,
         EntwicklungsprozessService entwicklungsprozessService,
         PluginSelectionService pluginSelectionService,
+        PromptVorlagenService promptVorlagenService,
+        PromptVorlagenPlatzhalterService promptVorlagenPlatzhalterService,
         IDialogService dialogService,
         IPluginManager pluginManager,
         IServiceProvider serviceProvider,
@@ -288,6 +317,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _kiService = kiService;
         _entwicklungsprozessService = entwicklungsprozessService;
         _pluginSelectionService = pluginSelectionService;
+        _promptVorlagenService = promptVorlagenService;
+        _promptVorlagenPlatzhalterService = promptVorlagenPlatzhalterService;
         _dialogService = dialogService;
         _pluginManager = pluginManager;
         _serviceProvider = serviceProvider;
@@ -310,6 +341,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IssueBrowserOeffnenCommand = new RelayCommand(
             IssueBrowserOeffnen,
             () => CurrentIssueReferenz?.IssueUrl != null);
+        PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
+            PromptVorlageAuswaehlenAsync,
+            vorlage => vorlage is not null && KannPromptVorlageSenden);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -335,6 +369,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 Protokolleintraege.Add(eintrag);
 
             await LadeVerfuegbarePluginsAsync(ct);
+            await LadePromptVorlagenAsync(ct);
 
             // Unmittelbar vor dem Auto-Restart nochmals live prüfen, ob der Prozess läuft.
             // Verhindert doppelten CLI-Start, wenn der Prozess nach dem Starten extrem schnell
@@ -375,6 +410,37 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogWarning(ex, "KI-Plugin-Liste konnte nicht geladen werden.");
         }
+    }
+
+    private async Task LadePromptVorlagenAsync(CancellationToken ct)
+    {
+        var vorlagen = await _promptVorlagenService.GetAllAsync(ct);
+        PromptVorlagen.Clear();
+        foreach (var vorlage in vorlagen)
+            PromptVorlagen.Add(vorlage);
+
+        OnPropertyChanged(nameof(KannPromptVorlageSenden));
+    }
+
+    private async Task PromptVorlageAuswaehlenAsync(PromptVorlage? vorlage, CancellationToken ct)
+    {
+        if (vorlage is null || string.IsNullOrWhiteSpace(vorlage.Prompttext))
+            return;
+
+        var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
+        if (session is null || !_isCliRunning)
+            return;
+
+        var prompt = _promptVorlagenPlatzhalterService.Resolve(vorlage.Prompttext, _aufgabe);
+        if (string.IsNullOrWhiteSpace(prompt))
+            return;
+
+        var bytes = Encoding.UTF8.GetBytes(prompt + Environment.NewLine);
+        await session.InputStream.WriteAsync(bytes, ct);
+        await session.InputStream.FlushAsync(ct);
+        session.MarkInputActivity();
+
+        SelectedPromptVorlage = null;
     }
 
     private async Task CliStoppenAsync(CancellationToken ct)

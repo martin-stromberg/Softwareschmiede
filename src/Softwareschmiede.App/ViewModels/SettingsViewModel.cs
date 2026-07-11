@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
@@ -16,7 +17,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly DarkModeService _darkModeService;
     private readonly IPluginManager _pluginManager;
     private readonly PluginSettingsService _pluginSettingsService;
+    private readonly PromptVorlagenService _promptVorlagenService;
     private readonly ILogger<SettingsViewModel> _logger;
+    private readonly List<Guid> _geloeschtePromptVorlagenIds = [];
 
     private string? _arbeitsverzeichnis;
     private string _designMode;
@@ -109,6 +112,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _selectedKiPluginSettings, value);
     }
 
+    /// <summary>Editierbare Promptvorlagen.</summary>
+    public ObservableCollection<PromptVorlageEntry> PromptVorlagen { get; } = [];
+
     /// <summary>Lädt alle Einstellungen.</summary>
     public ICommand LadenCommand { get; }
 
@@ -124,6 +130,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Wird ausgelöst wenn der Nutzer ein KI-Plugin wählt. Lädt die Einstellungsgruppen des Plugins.</summary>
     public ICommand KiPluginSelectedCommand { get; }
 
+    /// <summary>Fügt eine neue Promptvorlage hinzu.</summary>
+    public ICommand PromptVorlageHinzufuegenCommand { get; }
+
+    /// <summary>Entfernt eine Promptvorlage aus der Liste.</summary>
+    public ICommand PromptVorlageLoeschenCommand { get; }
+
     /// <inheritdoc cref="SettingsViewModel"/>
     public SettingsViewModel(
         AppEinstellungService einstellungService,
@@ -131,6 +143,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         DarkModeService darkModeService,
         IPluginManager pluginManager,
         PluginSettingsService pluginSettingsService,
+        PromptVorlagenService promptVorlagenService,
         ILogger<SettingsViewModel> logger)
     {
         _einstellungService = einstellungService;
@@ -138,6 +151,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _darkModeService = darkModeService;
         _pluginManager = pluginManager;
         _pluginSettingsService = pluginSettingsService;
+        _promptVorlagenService = promptVorlagenService;
         _logger = logger;
 
         _designMode = darkModeService.Current;
@@ -156,6 +170,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (plugin is not null)
                 LoadKiPluginSettings(plugin);
         });
+        PromptVorlageHinzufuegenCommand = new RelayCommand(PromptVorlageHinzufuegen);
+        PromptVorlageLoeschenCommand = new RelayCommand<PromptVorlageEntry>(PromptVorlageLoeschen, entry => entry is not null);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -193,6 +209,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 ?? KiPlugins.FirstOrDefault();
             if (defaultKiPluginObj is not null)
                 LoadKiPluginSettings(defaultKiPluginObj);
+
+            await LadePromptVorlagenAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -227,6 +245,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _arbeitsverzeichnisService.SaveArbeitsverzeichnisAsync(_arbeitsverzeichnis, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultScmPluginKey, _defaultScmPlugin?.PluginName, ct);
+            await SpeicherePromptVorlagenAsync(ct);
 
             try
             {
@@ -298,7 +317,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private bool ValidierePflichtfelder()
     {
         return ValidierePflichtfelderFuerSettings(_selectedScmPluginSettings)
-            && ValidierePflichtfelderFuerSettings(_selectedKiPluginSettings);
+            && ValidierePflichtfelderFuerSettings(_selectedKiPluginSettings)
+            && ValidierePromptVorlagen();
     }
 
     private bool ValidierePflichtfelderFuerSettings(IReadOnlyList<PluginSettingGroupEntry> settings)
@@ -335,11 +355,120 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         return true;
     }
 
+    private async Task LadePromptVorlagenAsync(CancellationToken ct)
+    {
+        var vorlagen = await _promptVorlagenService.GetAllAsync(ct);
+        PromptVorlagen.Clear();
+        _geloeschtePromptVorlagenIds.Clear();
+
+        foreach (var vorlage in vorlagen)
+        {
+            PromptVorlagen.Add(new PromptVorlageEntry(
+                vorlage.Id,
+                vorlage.Name,
+                vorlage.Prompttext,
+                false));
+        }
+    }
+
+    private async Task SpeicherePromptVorlagenAsync(CancellationToken ct)
+    {
+        foreach (var id in _geloeschtePromptVorlagenIds)
+            await _promptVorlagenService.DeleteAsync(id, ct);
+
+        foreach (var entry in PromptVorlagen)
+        {
+            if (entry.IsNeu)
+            {
+                await _promptVorlagenService.CreateAsync(entry.Name, entry.Prompttext, ct);
+            }
+            else
+            {
+                await _promptVorlagenService.UpdateAsync(entry.Id, entry.Name, entry.Prompttext, ct);
+            }
+        }
+
+        _geloeschtePromptVorlagenIds.Clear();
+        await LadePromptVorlagenAsync(ct);
+    }
+
+    private bool ValidierePromptVorlagen()
+    {
+        foreach (var vorlage in PromptVorlagen)
+        {
+            if (string.IsNullOrWhiteSpace(vorlage.Name))
+            {
+                FehlerMeldung = "Der Name einer Promptvorlage darf nicht leer sein.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(vorlage.Prompttext))
+            {
+                FehlerMeldung = $"Der Prompttext der Vorlage '{vorlage.Name}' darf nicht leer sein.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void PromptVorlageHinzufuegen()
+    {
+        PromptVorlagen.Add(new PromptVorlageEntry(Guid.NewGuid(), "Neue Promptvorlage", string.Empty, true));
+    }
+
+    private void PromptVorlageLoeschen(PromptVorlageEntry? entry)
+    {
+        if (entry is null)
+            return;
+
+        if (!entry.IsNeu)
+            _geloeschtePromptVorlagenIds.Add(entry.Id);
+
+        PromptVorlagen.Remove(entry);
+    }
+
     private void OnDarkModeChanged(string mode) => DesignMode = mode;
 
     /// <inheritdoc/>
     public void Dispose()
     {
         _darkModeService.ModeChanged -= OnDarkModeChanged;
+    }
+}
+
+/// <summary>Editierbarer Eintrag fuer eine Promptvorlage in den Einstellungen.</summary>
+public sealed class PromptVorlageEntry : ViewModelBase
+{
+    private string _name;
+    private string _prompttext;
+
+    /// <inheritdoc cref="PromptVorlageEntry"/>
+    public PromptVorlageEntry(Guid id, string name, string prompttext, bool isNeu)
+    {
+        Id = id;
+        _name = name;
+        _prompttext = prompttext;
+        IsNeu = isNeu;
+    }
+
+    /// <summary>ID der Promptvorlage.</summary>
+    public Guid Id { get; }
+
+    /// <summary>Gibt an, ob der Eintrag noch nicht persistiert ist.</summary>
+    public bool IsNeu { get; }
+
+    /// <summary>Anzeigename.</summary>
+    public string Name
+    {
+        get => _name;
+        set => SetProperty(ref _name, value);
+    }
+
+    /// <summary>Prompttext.</summary>
+    public string Prompttext
+    {
+        get => _prompttext;
+        set => SetProperty(ref _prompttext, value);
     }
 }

@@ -71,6 +71,20 @@
                                                         AutomationName="CliStoppen"
                                                         ButtonCommand="{Binding CliStoppenCommand}"
                                                         Visibility="{Binding IsCliRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <StackPanel Margin="12,0,0,0"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="Promptvorlage"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Margin="0,0,0,2" />
+                                <ComboBox ItemsSource="{Binding PromptVorlagen}"
+                                          SelectedItem="{Binding SelectedPromptVorlage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          DisplayMemberPath="Name"
+                                          AutomationProperties.Name="PromptVorlagenAuswahl"
+                                          Width="220"
+                                          IsEnabled="{Binding KannPromptVorlageSenden}"
+                                          Padding="6,4" />
+                            </StackPanel>
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>

@@ -78,6 +78,34 @@
 
 > **Hinweis:** Speichern Sie den API-Schlüssel an einem sicheren Ort. Die Anwendung speichert ihn verschlüsselt im Windows Credential Store, Sie können ihn aber nicht später abrufen.
 
+## Promptvorlagen (Registerkarte)
+
+### Promptvorlage anlegen
+
+1. Öffnen Sie die Registerkarte **Promptvorlagen**
+2. Klicken Sie auf **Hinzufügen**
+3. Geben Sie einen **Namen** und den **Prompttext** ein
+4. Klicken Sie **Speichern**
+
+### Promptvorlage bearbeiten oder löschen
+
+1. Öffnen Sie die Registerkarte **Promptvorlagen**
+2. Ändern Sie Name oder Prompttext direkt in der Liste
+3. Klicken Sie **Löschen**, wenn eine Vorlage entfernt werden soll
+4. Klicken Sie **Speichern**, um die Änderungen dauerhaft zu übernehmen
+
+### Platzhalter verwenden
+
+Prompttexte können Platzhalter enthalten:
+
+| Platzhalter | Bedeutung |
+|-------------|-----------|
+| `%ProjectName%` | Name des aktuellen Projekts |
+| `%TaskName%` | Name der aktuellen Aufgabe |
+| `%RepositoryUrl%` | URL des zugewiesenen Repositories |
+
+Die Platzhalter werden erst beim Versand aus der Aufgabendetailansicht ersetzt.
+
 ## Speichern und Verwerfen
 
 ### Alle Einstellungen speichern

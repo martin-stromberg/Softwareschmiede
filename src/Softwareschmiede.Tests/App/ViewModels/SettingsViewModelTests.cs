@@ -22,6 +22,7 @@ public sealed class SettingsViewModelTests : IDisposable
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly InMemoryCredentialStoreForSettings _credentialStore;
     private readonly PluginSettingsService _pluginSettingsService;
+    private readonly PromptVorlagenService _promptVorlagenService;
 
     /// <summary>SettingsViewModelTests.</summary>
     public SettingsViewModelTests()
@@ -42,6 +43,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock = new Mock<IPluginManager>();
         _credentialStore = new InMemoryCredentialStoreForSettings();
         _pluginSettingsService = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
+        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -54,6 +56,7 @@ public sealed class SettingsViewModelTests : IDisposable
             _darkModeService,
             _pluginManagerMock.Object,
             _pluginSettingsService,
+            _promptVorlagenService,
             NullLogger<SettingsViewModel>.Instance);
 
     private static Mock<IGitPlugin> CreateScmPluginMock(string pluginName, IReadOnlyList<PluginSettingGroup>? groups = null)
@@ -254,6 +257,63 @@ public sealed class SettingsViewModelTests : IDisposable
 
         var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
         gespeicherterWert.Should().Be("true");
+    }
+
+    /// <summary>LadenAsync lädt Promptvorlagen in die editierbare Collection.</summary>
+    [Fact]
+    public async Task LadenAsync_LaedtPromptVorlagen()
+    {
+        await _promptVorlagenService.CreateAsync("Vorlage", "Text");
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.PromptVorlagen.Should().ContainSingle();
+        sut.PromptVorlagen[0].Name.Should().Be("Vorlage");
+        sut.PromptVorlagen[0].Prompttext.Should().Be("Text");
+    }
+
+    /// <summary>SpeichernAsync persistiert neue und geänderte Promptvorlagen.</summary>
+    [Fact]
+    public async Task SpeichernAsync_SpeichertPromptVorlagen()
+    {
+        await _promptVorlagenService.CreateAsync("Alt", "Alter Text");
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.PromptVorlagen[0].Name = "Neu";
+        sut.PromptVorlagen[0].Prompttext = "Neuer Text";
+        sut.PromptVorlageHinzufuegenCommand.Execute(null);
+        sut.PromptVorlagen[1].Name = "Zweite";
+        sut.PromptVorlagen[1].Prompttext = "Zweiter Text";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        var vorlagen = await _promptVorlagenService.GetAllAsync();
+        vorlagen.Should().HaveCount(2);
+        vorlagen.Should().Contain(v => v.Name == "Neu" && v.Prompttext == "Neuer Text");
+        vorlagen.Should().Contain(v => v.Name == "Zweite" && v.Prompttext == "Zweiter Text");
+    }
+
+    /// <summary>SpeichernAsync validiert leere Promptvorlagenfelder.</summary>
+    [Fact]
+    public async Task SpeichernAsync_ValidiertLeerenPrompttext()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.PromptVorlageHinzufuegenCommand.Execute(null);
+        sut.PromptVorlagen[0].Name = "Vorlage";
+        sut.PromptVorlagen[0].Prompttext = string.Empty;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().Contain("Prompttext");
+        (await _promptVorlagenService.GetAllAsync()).Should().BeEmpty();
     }
 }
 

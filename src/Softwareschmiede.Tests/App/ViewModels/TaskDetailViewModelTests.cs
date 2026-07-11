@@ -22,6 +22,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly KiAusfuehrungsService _kiService;
     private readonly EntwicklungsprozessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
+    private readonly PromptVorlagenService _promptVorlagenService;
+    private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -67,6 +69,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(gitPluginForResolutionMock.Object);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
+        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -125,6 +128,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
             _kiService,
             _entwicklungsprozessService,
             _pluginSelectionService,
+            _promptVorlagenService,
+            _promptVorlagenPlatzhalterService,
             _dialogServiceMock.Object,
             pluginManager,
             serviceProviderObj,
@@ -962,6 +967,36 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeFalse();
+    }
+
+    /// <summary>LadenAsync lädt Promptvorlagen für die Ribbon-Auswahl.</summary>
+    [Fact]
+    public async Task LadenAsync_LaedtPromptVorlagenFuerAuswahl()
+    {
+        await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.PromptVorlagen.Should().ContainSingle();
+        sut.PromptVorlagen[0].Name.Should().Be("Weitermachen");
+    }
+
+    /// <summary>PromptVorlageAuswaehlenCommand bleibt ohne laufende CLI-Session stabil.</summary>
+    [Fact]
+    public async Task PromptVorlageAuswaehlenCommand_OhneLaufendeSession_StuerztNichtAb()
+    {
+        var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        var act = async () => await ((AsyncRelayCommand<PromptVorlage>)sut.PromptVorlageAuswaehlenCommand).ExecuteAsync(vorlage);
+
+        await act.Should().NotThrowAsync();
     }
 
     // --- CanAssignIssue ---
