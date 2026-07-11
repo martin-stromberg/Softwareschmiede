@@ -489,11 +489,11 @@ public abstract class WpfTestBase : IDisposable
     {
         Skip.If(
             !ConPtyEnvironmentProbe.IsAvailable,
-            "ConPTY-Konsolen-Isolation ist in dieser Ausführungsumgebung nicht verfügbar " +
-            "(Kindprozess wird nicht an die Pseudo-Konsole, sondern an eine Ambient-Konsole " +
-            "mit sofortigem EOF gebunden - bekannte Sandbox-Limitation, siehe " +
-            "docs/features/task/issue-114-.../e2e-timeout-analyse.md). " +
-            "Funktioniert z. B. in Visual Studio / einer echten interaktiven Desktop-Session.");
+            "ConPTY-Konsolen-Isolation konnte in dieser Ausführungsumgebung nicht bestätigt werden " +
+            $"(Probe-Ergebnis: {ConPtyEnvironmentProbe.UnavailableReason}). Falls dieser Test auch " +
+            "in einer Umgebung übersprungen wird, in der ConPTY nachweislich funktioniert (z. B. " +
+            "Visual Studio), ist das ein Bug in ConPtyEnvironmentProbe, keine echte " +
+            "Umgebungslimitation - bitte den Probe-Grund oben melden.");
     }
 
     /// <summary>
