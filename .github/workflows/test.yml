@@ -4,7 +4,11 @@ name: Tests
 # nur (siehe dortige Kommentare). Ohne diesen Job war die gesamte Testsuite ausschliesslich durch
 # gelegentliche manuelle Laeufe abgesichert.
 on:
+  # Nur "push" auf main (Merge-Nachkontrolle) + "pull_request" fuer Feature-Branches - nicht beides
+  # fuer denselben Branch, sonst laeuft die ~13-Minuten-Suite doppelt: jeder Push auf einen Branch
+  # mit offenem PR loest sowohl "push" als auch "pull_request: synchronize" aus.
   push:
+    branches: [main]
   pull_request:
     branches: [main]
 

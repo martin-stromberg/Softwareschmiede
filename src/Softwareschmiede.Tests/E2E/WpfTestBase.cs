@@ -20,8 +20,16 @@ public abstract class WpfTestBase : IDisposable
     private const string BuildConfigRelease = "Release";
     private const string TargetFramework = "net10.0-windows10.0.17763.0";
 
-    /// <summary>Kurzes Timeout (10s) für schnell erscheinende UI-Elemente.</summary>
-    protected static readonly TimeSpan Short = TimeSpan.FromSeconds(10);
+    /// <summary>
+    /// Kurzes Timeout (20s) für schnell erscheinende UI-Elemente. War ursprünglich 10s; auf
+    /// windows-latest-CI-Runnern (siehe .github/workflows/test.yml) zeigte sich ein einmaliger
+    /// JIT-/Rendering-Warmup-Effekt bei den ersten Popup-/Dialog-Interaktionen eines Testlaufs
+    /// (ComboBox-Dropdown, MessageBox) - belegt dadurch, dass spätere Tests mit identischen
+    /// UI-Mustern im selben Lauf durchgehend in 6-10s durchliefen, während die ersten 2-3 solcher
+    /// Interaktionen knapp über 10s lagen. 20s deckt diesen einmaligen Warmup-Puffer ab, ohne echte
+    /// künftige Regressionen (die deutlich länger bräuchten) zu maskieren.
+    /// </summary>
+    protected static readonly TimeSpan Short = TimeSpan.FromSeconds(20);
 
     /// <summary>Mittleres Timeout (15s) für UI-Elemente nach asynchronen Operationen.</summary>
     protected static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
