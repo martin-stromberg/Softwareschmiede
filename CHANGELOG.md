@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.5.0...v1.6.0) (2026-07-11)
+
+
+### Features
+
+* Codex-Parameter vor automatischen Defaults schuetzen ([df30074](https://github.com/martin-stromberg/Softwareschmiede/commit/df30074d5d6e2c84341378ef2e9da92bc1dd0fa2))
+
 # [1.5.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.4.0...v1.5.0) (2026-07-11)
 
 
