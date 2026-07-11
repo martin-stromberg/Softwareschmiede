@@ -32,6 +32,12 @@ internal static class PseudoConsoleNativeMethods
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern bool CloseHandle(IntPtr hObject);
 
+    /// <summary>Wert, den <see cref="GetExitCodeProcess"/> liefert, solange der Prozess noch läuft.</summary>
+    internal const uint STILL_ACTIVE = 259;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern bool InitializeProcThreadAttributeList(
         IntPtr lpAttributeList,

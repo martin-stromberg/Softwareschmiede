@@ -8,6 +8,19 @@ Bekannter Haken (nicht fatal): Der Schrittname wird aus dem im Unteragenten-
 Prompt woertlich enthaltenen Kommandonamen (z. B. "/plan") erraten, da Claude
 Code Hooks die Task-Beschreibung nicht mitliefern. Trifft kein bekannter
 Kommandoname zu, wird der agent_type bzw. "orchestrator" verwendet.
+
+Persistenz (Issue-114-Nachtrag): LOG_FILE lag bisher dauerhaft ungetrackt im
+Arbeitsverzeichnis - wird der lokale Checkout/Worktree eines Feature-Branches
+irgendwann geloescht, sind alle bis dahin gesammelten Zeilen unwiederbringlich
+verloren, ohne dass das jemandem auffaellt. Damit das nicht mehr von einem
+Agenten daran "erinnert" werden muss: main() committet die Datei nach jedem
+Schreibvorgang selbst, gescoped exakt auf LOG_FILE (via "git commit -- <pfad>"),
+sodass niemals ungewollt anderer, gerade in Arbeit befindlicher Code mit
+eingesammelt wird. Feuert nur beim "Stop"-Event (Ende des Haupt-Turns), nicht
+bei jedem "SubagentStop" - sonst entstuende bei vielen Unteragenten-Aufrufen
+pro Sitzung eine sehr grosse Zahl von Mini-Commits. Ein Restrisiko bleibt
+dadurch bestehen (Zeilen aus Unteragenten, bevor der naechste Stop feuert),
+ist aber durch die naechste Stop-Auswertung spaetestens abgedeckt.
 """
 import sys
 import json
@@ -133,6 +146,26 @@ def main():
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
+
+    if hook_event_name == "Stop":
+        commit_log_file()
+
+
+def commit_log_file():
+    """Committet ausschliesslich LOG_FILE, unabhaengig vom sonstigen Arbeitsstand.
+    Rein additiv und nie fatal: schlaegt der Commit fehl (z. B. weil ein anderer
+    paralleler Hook-Prozess gerade dasselbe versucht, git-Index-Lock), bleibt die
+    Zeile im Arbeitsverzeichnis stehen und wird beim naechsten Stop-Event erneut
+    zum Commit vorgeschlagen."""
+    try:
+        subprocess.run(["git", "add", "--", LOG_FILE], check=False,
+                        capture_output=True, text=True)
+        subprocess.run(
+            ["git", "commit", "--quiet", "-m", "chore: Token-Verbrauchsprotokoll aktualisieren", "--", LOG_FILE],
+            check=False, capture_output=True, text=True,
+        )
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

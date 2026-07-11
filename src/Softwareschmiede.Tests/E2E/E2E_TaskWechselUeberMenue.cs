@@ -42,9 +42,10 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
     /// Prüft: Danach wird tatsächlich Aufgabe B angezeigt — inklusive der zu Aufgabe B gehörenden CLI
     /// (eigene Prozess-ID), nicht mehr die CLI von Aufgabe A.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var sourceDirectory = CreateLocalSourceDirectory("Wechsel-Repo");

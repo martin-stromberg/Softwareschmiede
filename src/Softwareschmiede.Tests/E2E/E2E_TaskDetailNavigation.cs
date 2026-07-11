@@ -23,10 +23,7 @@ public sealed class E2E_TaskDetailNavigation : WpfTestBase
     [Fact]
     public void AufgabeOeffnen_ZeigtTaskDetailViewFensterumfassend_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Medium)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndOpenProject(mainWindow, "TaskNav-Oeffnen-Test");
+        var mainWindow = StartAndNavigateToProjects("TaskNav-Oeffnen-Test");
 
         // Aufgabe anlegen, damit ein Listeneintrag existiert
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
@@ -37,7 +34,7 @@ public sealed class E2E_TaskDetailNavigation : WpfTestBase
         zurueckInTask.AsButton().Click();
 
         // Aufgabenliste enthält jetzt die Aufgabe; Doppelklick öffnet TaskDetailView erneut
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte mindestens eine Aufgabe enthalten.");
         items[0].DoubleClick();
@@ -57,10 +54,7 @@ public sealed class E2E_TaskDetailNavigation : WpfTestBase
     [Fact]
     public void TaskDetailView_ZeigtKorrekteAufgabendaten_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Medium)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndOpenProject(mainWindow, "TaskNav-Daten-Test");
+        var mainWindow = StartAndNavigateToProjects("TaskNav-Daten-Test");
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
         aufgabeNeuButton.AsButton().Click();
@@ -77,10 +71,7 @@ public sealed class E2E_TaskDetailNavigation : WpfTestBase
     [Fact]
     public void ZurueckButtonInTaskDetail_NavigiertZuProjectDetailView_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Medium)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndOpenProject(mainWindow, "TaskNav-Zurueck-Test");
+        var mainWindow = StartAndNavigateToProjects("TaskNav-Zurueck-Test");
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
         aufgabeNeuButton.AsButton().Click();

@@ -20,16 +20,6 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public sealed class ProjectDetailE2ETests : WpfTestBase
 {
-    private AutomationElement StartAndNavigateToProjects()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        return mainWindow;
-    }
-
-    // -------------------------------------------------------------------------
-
     /// <summary>
     /// Szenario: Projekt anlegen, Neuanlage starten und mit Zurück abbrechen, erstes Projekt öffnen.
     /// Prüft: Nach Abbrechen der Neuanlage ist das erste Projekt noch in der Liste aufrufbar.
@@ -163,9 +153,17 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
         loeschenButton.AsButton().Click();
 
-        // MessageBox "Löschen bestätigen" erscheint als separates Fenster
+        // MessageBox "Löschen bestätigen" erscheint als separates Fenster. Der Titel stammt aus der
+        // Anwendung (App-Ressource, daher sprachunabhängig sprachlich "Löschen bestätigen"), die
+        // Button-Beschriftung "Ja"/"Nein" dagegen wird vom nativen Win32-MessageBox-Control anhand
+        // der Systemsprache des ausführenden Betriebssystems gerendert (System.Windows.MessageBox
+        // erlaubt keine eigenen Button-Texte) - auf einem englischsprachigen CI-Runner (z. B.
+        // windows-latest bei GitHub Actions) heißt der Button "Yes" statt "Ja", wodurch die Suche
+        // nach dem Namen dort unabhängig vom Timeout nie etwas findet. Die Automation-ID des
+        // Ja/Yes-Buttons entspricht dagegen der stabilen, sprachunabhängigen Win32-Dialog-Control-ID
+        // IDYES (6) und funktioniert auf jeder Systemsprache identisch.
         var msgBox = WaitForWindow("Löschen bestätigen", Short);
-        var jaButton = WaitForElement(msgBox, cf => cf.ByName("Ja"), Short);
+        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
         jaButton.AsButton().Click();
 
         // Overlay geschlossen — "Speichern" nicht mehr sichtbar
@@ -196,7 +194,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         zurueckButton.AsButton().Click();
 
         // Aufgabenliste enthält jetzt mindestens eine Aufgabe
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
     }

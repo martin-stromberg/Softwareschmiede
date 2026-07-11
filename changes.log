@@ -1,3 +1,13 @@
+## 2026-07-11 — Tests automatisierbar machen: Log-Diagnose und Build-Hook-Warnung
+
+- **Problem:** E2E-Tests scheitern sporadisch mit zwei Fehlermustern: (1) korruptierte Build-Artefakte durch laufende `Softwareschmiede.App.exe` während Tests (MSB3027-Lock, ".NET Desktop Runtime nicht gefunden") und (2) Startup-Exceptions der App (z. B. `XamlParseException`), die sich im Test nur als "MainWindow nicht gefunden" äußern, ohne tatsächliche Ursache preiszugeben.
+- **Neue reine Hilfsklasse `AppStartupLogInspector`:** Trennt Log-Parse-Logik von FlaUI-/Prozess-Steuerung und macht sie ohne laufende App unit-testbar. Bietet Snapshot von Byte-Offsets (`Snapshot()`), Auslesen neu angehängter Log-Zeilen ab Offset mit `FileShare.ReadWrite` (`GetNewEntries()`), und Filtering von `[ERR]`/`[FTL]`-Zeilen (`CheckAppStartupException()`).
+- **`WpfTestBase`-Erweiterung:** Merkt vor `LaunchApp()` den Byte-Offset der aktuellen App-Log-Datei; prüft nach `WaitWhileMainHandleIsMissing()`, ob Prozess beendet/Fenster fehlt, und wirft bei erkannter Startup-Exception `InvalidOperationException` mit Log-Auszug statt nichtssagender `TimeoutException`. Neue Methoden: `ResolveAppLogDirectory()`, `GetLatestAppLogContent()`, `CheckAppStartupException()`. Neue Felder: `_appLogDirectory`, `_appLogOffset`. `Dispose()` wartet zusätzlich auf vollständigen Prozess-Exit ohne Kill.
+- **Build-Hook `build_before_test.py`-Verbesserung:** Erkennt vor `dotnet build` laufende `Softwareschmiede.App.exe`-Instanzen und warnt deutlich vor möglichen MSB3027/MSB3026-Datei-Locks — beendet Prozess NIEMALS (Self-Hosting-Risiko). Bessere Fehlerbehandlung und Lock-Freigabe bei Build-Fehlern.
+- **Unit-Tests `AppStartupLogInspectorTests`:** Tests gegen synthetische Log-Dateien im Temp-Verzeichnis; prüft Fehler-Signatur-Erkennung, Offset-Abgrenzung, fehlende Verzeichnisse und Mehrfach-Datei-Selektion.
+- **CLAUDE.md-Erweiterung:** Neue umfassende Richtlinien für E2E-Testing (`run_in_background`-Verbot, Build-Lock-Mechanismus, Self-Hosting-Risiko, Log-Diagnose vor Environment-Diagnostik), inklusive detaillierter Dokumentation des Cross-Process-Build-Locks zwischen PreToolUse/PostToolUse-Hooks.
+- Keine Endanwender-Features betroffen — ausschließlich Test-Infrastruktur und Entwickler-Tooling.
+
 ## 2026-07-10 — Programmsymbol hinzufügen
 
 - Feature: Anwendung zeigt Hammer-Symbol im Windows-Explorer, in der Taskleiste und im Fenster-Titel an — visuelle Markenidentität der Softwareschmiede wird konsistent sichtbar.

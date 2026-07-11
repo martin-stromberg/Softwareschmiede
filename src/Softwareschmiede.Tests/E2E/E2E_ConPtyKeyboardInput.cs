@@ -21,9 +21,10 @@ public sealed class E2E_ConPtyKeyboardInput : WpfTestBase
     /// Die Eingabe landet in PseudoConsoleSession.InputStream — verifizierbar durch
     /// das Ausbleiben von Fehlern nach der Eingabe.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ConPtyKbd-Repo", "ConPtyKbd-Projekt");

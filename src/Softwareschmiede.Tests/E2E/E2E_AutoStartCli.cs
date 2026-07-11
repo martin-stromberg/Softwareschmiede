@@ -25,9 +25,10 @@ public sealed class E2E_AutoStartCli : WpfTestBase
     /// automatisch neu gestartet und eingebettet (Stoppen-Button erscheint wieder ohne manuellen Klick
     /// auf "Starten" oder "Plugin ändern").
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("AutoStartCli-Repo", "AutoStartCli-Projekt");
@@ -49,7 +50,7 @@ public sealed class E2E_AutoStartCli : WpfTestBase
         var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         zurueckButton.AsButton().Click();
 
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte die gestartete Aufgabe enthalten.");
         items[0].DoubleClick();

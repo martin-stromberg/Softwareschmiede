@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
@@ -203,14 +204,21 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var pluginPsi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
             var pluginCommand = BuildCliCommand(pluginPsi);
 
-            var (process, session) = StartPseudoConsoleProcess(aufgabeId, effectiveWorkdir, pluginCommand);
+            var (process, session, nativeProcessHandle) = StartPseudoConsoleProcess(aufgabeId, effectiveWorkdir, pluginCommand);
 
-            var handle = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session };
+            var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            // Token sofort abgreifen: Wird er erst später (z. B. beim Fire-and-Forget-Aufruf weiter unten)
+            // von sendCts gelesen, kann ein zwischenzeitlich auf einem anderen Thread ausgelöstes Exited-Event
+            // sendCts bereits disposed haben (siehe CancelAndDisposeConPtyResources) — der Zugriff auf
+            // sendCts.Token würde dann selbst eine ObjectDisposedException werfen. Ein einmal (vor dem Dispose)
+            // abgegriffener CancellationToken bleibt dagegen gültig auswertbar.
+            var sendToken = sendCts.Token;
+            var handle = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session, SendCts = sendCts, NativeProcessHandle = nativeProcessHandle };
 
             // EnableRaisingEvents vor der Handler-Registrierung setzen. So ist sichergestellt, dass
             // das Exited-Event nicht zwischen Prozessstart und Handler-Registrierung verloren geht.
             process.EnableRaisingEvents = true;
-            process.Exited += (_, _) => HandleProcessExited(aufgabeId, process, handle, "ConPTY", () => handle.PseudoConsoleSession?.Dispose());
+            process.Exited += (_, _) => HandleProcessExited(aufgabeId, process, handle, "ConPTY", () => CancelAndDisposeConPtyResources(handle));
 
             _handles[aufgabeId] = handle;
 
@@ -219,7 +227,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // frühzeitig zurückkehren — kein Gestartet-Event für einen bereits beendeten Prozess.
             if (process.HasExited && _handles.TryRemove(aufgabeId, out var earlyExitHandle))
             {
-                earlyExitHandle.PseudoConsoleSession?.Dispose();
+                CancelAndDisposeConPtyResources(earlyExitHandle);
                 RaiseRunningCountChanged();
                 CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
                 return handle;
@@ -232,7 +240,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // Plugin-Befehl verzögert senden: cmd.exe braucht ~200ms bis der Prompt bereit ist.
             if (!string.IsNullOrEmpty(pluginCommand))
             {
-                SendCommandDelayedAsync(session, pluginCommand, aufgabeId, ct).SafeFireAndForget(_logger, "KiAusfuehrungsService.SendCommandDelayedAsync");
+                SendCommandDelayedAsync(session, pluginCommand, aufgabeId, sendToken).SafeFireAndForget(_logger, "KiAusfuehrungsService.SendCommandDelayedAsync");
             }
 
             return handle;
@@ -252,8 +260,8 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="aufgabeId">ID der Aufgabe (für Logging).</param>
     /// <param name="effectiveWorkingDirectory">Effektives Arbeitsverzeichnis von cmd.exe (Repository-Root oder konfiguriertes Unterverzeichnis).</param>
     /// <param name="pluginCommand">Der später an cmd.exe zu sendende Plugin-Befehl (nur für Logging verwendet).</param>
-    /// <returns>Den gestarteten <see cref="Process"/> und die zugehörige <see cref="PseudoConsoleSession"/>.</returns>
-    private (Process Process, PseudoConsoleSession Session) StartPseudoConsoleProcess(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand)
+    /// <returns>Den gestarteten <see cref="Process"/>, die zugehörige <see cref="PseudoConsoleSession"/> und das native Prozess-Handle für eine zuverlässige Exit-Code-Ermittlung.</returns>
+    private (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) StartPseudoConsoleProcess(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand)
     {
         var workingDir = !string.IsNullOrEmpty(effectiveWorkingDirectory) && Directory.Exists(effectiveWorkingDirectory)
             ? effectiveWorkingDirectory
@@ -286,9 +294,9 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         try
         {
             process = Process.GetProcessById(startResult.Pid);
-            // Das von CreateProcess zurückgegebene Win32-Handle schließen; der verwaltete
-            // Process-Handle aus GetProcessById reicht für das weitere Lifecycle-Management.
-            PseudoConsoleNativeMethods.CloseHandle(startResult.ProcessHandle);
+            // Das native Win32-Handle aus CreateProcess bleibt bewusst offen (siehe
+            // CliProcessHandle.NativeProcessHandle) - es wird erst beim endgültigen Aufräumen in
+            // CancelAndDisposeConPtyResources geschlossen, nicht hier.
         }
         catch
         {
@@ -299,7 +307,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
         var session = CreatePseudoConsoleSession(aufgabeId, pseudoConsole, process);
 
-        return (process, session);
+        return (process, session, startResult.ProcessHandle);
     }
 
     /// <summary>Gibt die <see cref="PseudoConsoleSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>
@@ -358,7 +366,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             return null;
         }
 
-        return TryGetExitCode(handle.Process);
+        return TryGetExitCode(handle.Process, handle.NativeProcessHandle);
     }
 
     /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe (für externe Nutzung durch AufgabeService).</summary>
@@ -385,7 +393,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                     handle.Process.Kill(entireProcessTree: true);
                 }
 
-                handle.PseudoConsoleSession?.Dispose();
+                CancelAndDisposeConPtyResources(handle);
                 handle.Process.Dispose();
             }
             catch (Exception)
@@ -460,9 +468,12 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 return;
             }
 
+            // Exit-Code VOR dem Aufräumen ermitteln: CancelAndDisposeConPtyResources (vorAufraeumen)
+            // schließt handle.NativeProcessHandle - danach wäre GetExitCodeProcess nicht mehr möglich.
+            var exitCode = TryGetExitCode(process, handle.NativeProcessHandle);
+
             vorAufraeumen?.Invoke();
 
-            var exitCode = TryGetExitCode(process);
             _logger.LogInformation(
                 "CLI-Prozess ({LogKontext}) für Aufgabe {AufgabeId} beendet (ExitCode: {ExitCode}).",
                 logKontext,
@@ -547,14 +558,44 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private int _previousRunningCount;
     private readonly object _runningCountLock = new();
 
-    private static int? TryGetExitCode(Process process)
+    /// <summary>
+    /// Ermittelt den Exit-Code eines beendeten Prozesses. Beim ConPTY-Start (erkennbar an
+    /// <paramref name="nativeProcessHandle"/> != <see cref="IntPtr.Zero"/>) wird bewusst
+    /// <c>GetExitCodeProcess</c> auf dem nativen Handle genutzt statt <see cref="Process.ExitCode"/>:
+    /// Das <see cref="Process"/>-Objekt stammt dort aus <see cref="Process.GetProcessById(int)"/> und
+    /// kann, wenn dessen PID zwischenzeitlich einem anderen (bereits beendeten) Prozess zugeordnet
+    /// wurde, mit <see cref="InvalidOperationException"/> ("No process is associated with this
+    /// object") fehlschlagen. Das native Handle ist dagegen unabhängig von PID-Wiederverwendung
+    /// eindeutig an den ursprünglichen Prozess gebunden.
+    /// </summary>
+    /// <param name="process">Der Prozess, dessen Exit-Code ermittelt werden soll.</param>
+    /// <param name="nativeProcessHandle">Natives Win32-Handle aus <c>CreateProcess</c> (ConPTY-Start), oder <see cref="IntPtr.Zero"/> beim klassischen Start.</param>
+    /// <returns>Der Exit-Code, oder <c>null</c> wenn der Prozess noch läuft oder nicht ermittelbar ist.</returns>
+    private int? TryGetExitCode(Process process, IntPtr nativeProcessHandle = default)
     {
+        if (nativeProcessHandle != IntPtr.Zero)
+        {
+            if (!PseudoConsoleNativeMethods.GetExitCodeProcess(nativeProcessHandle, out var rawExitCode))
+            {
+                _logger.LogWarning("GetExitCodeProcess für ConPTY-Prozess fehlgeschlagen (Win32-Fehler {Win32Error}).", Marshal.GetLastWin32Error());
+                return null;
+            }
+            return rawExitCode == PseudoConsoleNativeMethods.STILL_ACTIVE ? null : unchecked((int)rawExitCode);
+        }
+
         try
         {
             return process.HasExited ? process.ExitCode : null;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // Bewusst geloggt statt stillschweigend verschluckt: Ein via Process.GetProcessById()
+            // erzeugtes Process-Objekt kann hier InvalidOperationException ("No process is
+            // associated with this object") werfen, wenn die PID zwischenzeitlich einem anderen
+            // (bereits beendeten) Prozess zugeordnet wurde. Das vorherige "return null" verschleierte
+            // diese Fehlerursache und liess einen echten Exit-Code faelschlich wie einen legitimen
+            // "kein Exit-Code" (null) aussehen.
+            _logger.LogWarning(ex, "Exit-Code für CLI-Prozess konnte nicht ermittelt werden.");
             return null;
         }
     }
@@ -587,9 +628,40 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         catch (OperationCanceledException)
         {
         }
+        catch (ObjectDisposedException ex)
+        {
+            _logger.LogDebug(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}, da der Prozess bereits beendet und die Session disposed wurde.", aufgabeId);
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}.", aufgabeId);
+        }
+    }
+
+    /// <summary>
+    /// Storniert den ggf. noch ausstehenden verzögerten Plugin-Befehlsversand (<see cref="SendCommandDelayedAsync"/>)
+    /// und disposed anschließend CancellationTokenSource und <see cref="PseudoConsoleSession"/> des Handles.
+    /// Verhindert, dass nach dem Dispose der Session noch versucht wird, in den bereits geschlossenen
+    /// Input-Stream zu schreiben (Race Condition bei sehr kurzlebigen ConPTY-Kindprozessen).
+    /// </summary>
+    /// <param name="handle">Das Handle, dessen ConPTY-Ressourcen bereinigt werden sollen.</param>
+    private static void CancelAndDisposeConPtyResources(CliProcessHandle handle)
+    {
+        try
+        {
+            handle.SendCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        handle.SendCts?.Dispose();
+        handle.PseudoConsoleSession?.Dispose();
+
+        if (handle.NativeProcessHandle != IntPtr.Zero)
+        {
+            PseudoConsoleNativeMethods.CloseHandle(handle.NativeProcessHandle);
+            handle.NativeProcessHandle = IntPtr.Zero;
         }
     }
 
@@ -632,6 +704,25 @@ public sealed class CliProcessHandle
 
     /// <summary>Die zugehörige <see cref="PseudoConsoleSession"/>, oder null bei klassischem Start.</summary>
     public PseudoConsoleSession? PseudoConsoleSession { get; set; }
+
+    /// <summary>
+    /// Natives Win32-Prozess-Handle aus <c>CreateProcess</c> (nur beim ConPTY-Start gesetzt, sonst
+    /// <see cref="IntPtr.Zero"/>). Wird bewusst offen gehalten statt sofort geschlossen, damit der
+    /// Exit-Code zuverlässig per <c>GetExitCodeProcess</c> gelesen werden kann - im Gegensatz zu
+    /// <see cref="Process.GetProcessById(int)"/>-Objekten, die nach Wiederverwendung der PID durch
+    /// einen anderen (bereits beendeten) Prozess mit <see cref="InvalidOperationException"/>
+    /// ("No process is associated with this object") auf <see cref="Process.HasExited"/>/
+    /// <see cref="Process.ExitCode"/> fehlschlagen koennen. Muss ueber
+    /// <see cref="KiAusfuehrungsService.CancelAndDisposeConPtyResources"/> geschlossen werden.
+    /// </summary>
+    public IntPtr NativeProcessHandle { get; set; }
+
+    /// <summary>
+    /// Koppelt den verzögerten Plugin-Befehlsversand (<see cref="KiAusfuehrungsService.SendCommandDelayedAsync"/>)
+    /// an das Prozess-Lebensende: Wird beim <see cref="Process.Exited"/>-Event storniert, damit kein Zugriff
+    /// auf die bereits disposte <see cref="PseudoConsoleSession"/> erfolgt. Nur beim ConPTY-Start gesetzt.
+    /// </summary>
+    public CancellationTokenSource? SendCts { get; set; }
 
     /// <summary>Erstellt ein neues Handle.</summary>
     /// <param name="aufgabeId">ID der zugehörigen Aufgabe.</param>

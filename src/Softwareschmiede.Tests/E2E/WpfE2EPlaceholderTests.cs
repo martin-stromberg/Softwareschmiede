@@ -47,7 +47,7 @@ public sealed class WpfE2ETests : WpfTestBase
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();
 
-        var aufgabeListe = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(5));
+        var aufgabeListe = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), Short);
         Assert.NotNull(aufgabeListe);
 
         var statusGestartetText = mainWindow.FindFirstDescendant(cf =>
@@ -89,7 +89,7 @@ public sealed class WpfE2ETests : WpfTestBase
         einstellungenButton.AsButton().Click();
 
         // Speichern-Button im Ribbon bestätigt, dass die Einstellungsseite geladen ist
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
         var designComboBoxElement = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
         var designComboBox = designComboBoxElement.AsComboBox();
@@ -106,19 +106,19 @@ public sealed class WpfE2ETests : WpfTestBase
         WaitForSelectedComboBoxItem(designComboBoxElement, neuerWert, Short);
 
         // Einstellungen speichern über Ribbon-Button
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
 
         // Einstellungsseite verlassen und zurückkehren
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(5));
+        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
         dashboardButton.AsButton().Click();
 
         einstellungenButton.Click();
 
         // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short).AsComboBox();
 
         Assert.Equal(neuerWert, designComboBoxNachRueckkehr.SelectedItem?.Name);
@@ -167,7 +167,7 @@ public sealed class WpfE2ETests : WpfTestBase
         einstellungenButton.AsButton().Click();
 
         // Warten bis Einstellungsseite geladen ist
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
         var textBoxen = mainWindow.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit));
         Assert.True(textBoxen.Length > 0, "Kein Textfeld auf der Einstellungsseite gefunden.");
@@ -176,7 +176,7 @@ public sealed class WpfE2ETests : WpfTestBase
         arbeitsverzeichnisBox.Text = @"C:\TestArbeitsverzeichnis";
 
         // Speichern über Ribbon-Button
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
@@ -193,18 +193,18 @@ public sealed class WpfE2ETests : WpfTestBase
         einstellungenButton.AsButton().Click();
 
         // Ribbon-Speichern-Button bestätigt, dass die Einstellungsseite geladen ist
-        var speichernButton1 = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        var speichernButton1 = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         Assert.NotNull(speichernButton1);
 
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(5));
+        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
         dashboardButton.AsButton().Click();
 
-        var projekteKachel = WaitForElement(mainWindow, cf => cf.ByName("Projekte"), TimeSpan.FromSeconds(5));
+        var projekteKachel = WaitForElement(mainWindow, cf => cf.ByName("Projekte"), Short);
         Assert.NotNull(projekteKachel);
 
         einstellungenButton.Click();
 
-        var speichernButton2 = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(5));
+        var speichernButton2 = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         Assert.NotNull(speichernButton2);
     }
 }

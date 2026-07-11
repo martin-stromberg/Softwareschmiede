@@ -22,9 +22,11 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
     /// Szenario: Repository mit konfiguriertem Arbeitsunterverzeichnis wird gestartet.
     /// Erwartung: CLI startet erfolgreich (Stoppen-Button erscheint), kein Fehlerbanner.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
+
         var mainWindow = SetupProjectMitNeuerAufgabe("WorkingDir-Repo", "WorkingDir-Projekt");
 
         await SeedWorkingDirectoryAsync("backend", createSubdirectory: true);

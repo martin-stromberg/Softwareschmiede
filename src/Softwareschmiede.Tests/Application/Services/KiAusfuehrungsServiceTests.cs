@@ -330,4 +330,80 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var act = () => session.InputStream.WriteByte(0);
         act.Should().Throw<ObjectDisposedException>(because);
     }
+
+    /// <summary>
+    /// Regressionstest für die Race Condition zwischen dem verzögerten Plugin-Befehlsversand
+    /// (<c>SendCommandDelayedAsync</c>, 300 ms Verzögerung vor dem Schreiben in den ConPTY-Input-Stream) und
+    /// dem Dispose der <see cref="Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession"/> beim Beenden
+    /// des ConPTY-Kindprozesses: Endet der Prozess (hier deterministisch per <c>Kill</c> erzwungen, statt auf
+    /// das timing-abhängige, nur in bestimmten Umgebungen reproduzierbare frühe ConPTY-Prozessende zu warten),
+    /// bevor die Verzögerung abgelaufen ist, darf kein Zugriff auf den bereits geschlossenen Input-Stream
+    /// erfolgen. Der ausstehende Sendevorgang muss über den mit dem Prozess-Exit verknüpften <c>SendCts</c>
+    /// storniert werden — es darf gar keine <see cref="ObjectDisposedException"/> auftreten (unabhängig vom
+    /// Log-Level, mit dem eine trotzdem auftretende ObjectDisposedException protokolliert würde).
+    /// </summary>
+    [Fact]
+    public async Task StartWithPseudoConsoleAsync_ProzessEndetVorVerzoegertemSenden_KeineWarnungWegenGeschlossenemStream()
+    {
+        var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        using var sut = new KiAusfuehrungsService(loggerMock.Object, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+
+        var aufgabeId = Guid.NewGuid();
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c echo Test",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        // Bewusst auf jedem Log-Level geprüft (nicht nur Warning): Ziel des Fixes ist, dass die
+        // ObjectDisposedException durch die Stornierung gar nicht erst auftritt — nicht nur, dass sie auf
+        // einem anderen Level geloggt würde.
+        var objectDisposedGeloggt = new TaskCompletionSource();
+        loggerMock
+            .Setup(l => l.Log(
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.Is<Exception?>(e => e is ObjectDisposedException),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
+            .Callback(() => objectDisposedGeloggt.TrySetResult());
+
+        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+
+        var exitStatus = new TaskCompletionSource<CliProcessStatus>();
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            if (status != CliProcessStatus.Gestartet)
+                exitStatus.TrySetResult(status);
+        };
+
+        // Prozess deterministisch und sofort beenden, deutlich vor Ablauf der 300ms-Verzögerung in
+        // SendCommandDelayedAsync — reproduziert die Race Condition ohne auf zufälliges, umgebungsabhängiges
+        // frühes ConPTY-Prozessende angewiesen zu sein. In Umgebungen, in denen der ConPTY-Kindprozess
+        // (wie in e2e-timeout-analyse.md dokumentiert) bereits von selbst beendet ist, bevor Kill aufgerufen
+        // wird, ist das Ziel (Prozessende vor Ablauf der Verzögerung) ohnehin schon erreicht.
+        try
+        {
+            if (!handle.Process.HasExited)
+                handle.Process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        var exited = await Task.WhenAny(exitStatus.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        exited.Should().Be(exitStatus.Task, "der Exited-Handler muss nach dem Kill anlaufen und SendCts stornieren");
+
+        // Über die 300ms-Verzögerung hinaus warten: Ohne den Fix hätte SendCommandDelayedAsync jetzt längst
+        // versucht, in den bereits geschlossenen Input-Stream zu schreiben und eine ObjectDisposedException geloggt.
+        var finished = await Task.WhenAny(objectDisposedGeloggt.Task, Task.Delay(TimeSpan.FromSeconds(1)));
+
+        finished.Should().NotBe(objectDisposedGeloggt.Task,
+            "der verzögerte Sendevorgang muss beim Prozess-Exit über SendCts storniert werden, sodass gar keine ObjectDisposedException auftritt");
+    }
 }

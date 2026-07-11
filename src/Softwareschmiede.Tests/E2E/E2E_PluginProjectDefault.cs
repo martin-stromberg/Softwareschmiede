@@ -23,9 +23,10 @@ public sealed class E2E_PluginProjectDefault : WpfTestBase
     /// wird gespeichert, sodass eine nachfolgende Aufgabe im selben Projekt den Dialog nicht mehr zeigt
     /// (siehe <see cref="E2E_PluginProjectDefault_NextTask"/>).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void PluginDialogMitProjektCheckbox_SpeichertProjektStandardUndStartetCli_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginProjectDefault-Repo", "PluginProjectDefault-Projekt");

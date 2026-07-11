@@ -18,9 +18,10 @@ public sealed class E2E_ConPtyResize : WpfTestBase
     /// ResizePseudoConsole wird intern aufgerufen; nach Resize darf kein Fehler-Banner erscheinen.
     /// Der Stoppen-Button muss weiterhin sichtbar sein (CLI noch aktiv).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E()
     {
+        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ConPtyResize-Repo", "ConPtyResize-Projekt");
