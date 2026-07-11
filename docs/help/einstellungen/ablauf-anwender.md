@@ -78,6 +78,16 @@
 
 > **Hinweis:** Speichern Sie den API-Schlüssel an einem sicheren Ort. Die Anwendung speichert ihn verschlüsselt im Windows Credential Store, Sie können ihn aber nicht später abrufen.
 
+### Codex-CLI-Parameter konfigurieren
+
+1. Öffnen Sie die Registerkarte **KI**
+2. Wählen Sie **Codex CLI** als KI-Plugin
+3. Tragen Sie im Feld **CommandLineParameters** nur die zusätzlichen Argumente ein, die Sie beim Start der Codex CLI verwenden möchten, z. B. `--model gpt-5`
+4. Lassen Sie das Feld leer, wenn die Codex CLI ohne zusätzliche Argumente gestartet werden soll
+5. Klicken Sie **Speichern**
+
+Der gespeicherte Wert wird beim nächsten Öffnen unverändert angezeigt. Ein leer gespeichertes Feld bleibt leer; die Anwendung ergänzt für Codex keine automatischen Standardparameter.
+
 ## Promptvorlagen (Registerkarte)
 
 ### Promptvorlage anlegen

@@ -29,8 +29,11 @@ Jedes Register zeigt dynamisch die Einstellungsfelder des gewählten Plugins an.
 - **Ja/Nein:** Kontrollkästchen (CheckBox)
 - **Auswahl:** Dropdown-Liste mit vordefinierten Optionen
 - **Dateipfad:** Textfeld mit Browse-Button zum Auswählen einer Datei
+- **Kommandozeilenparameter:** Textfeld für zusätzliche CLI-Argumente, die beim Start eines CLI-basierten KI-Plugins angehängt werden
 
 Bei jedem Feldtyp wird die Beschreibung des Feldes (falls vom Plugin angegeben) unterhalb des Eingabeelements angezeigt.
+
+Für das Codex-Plugin gilt eine zusätzliche Schutzregel: Der Wert `Softwareschmiede.Codex.CommandLineParameters` wird ausschließlich als Anwenderwert behandelt. Beim Laden wird kein automatisch deklarierter `DefaultValue` in das Feld übernommen. Wenn noch kein Wert gespeichert ist, bleibt das Feld leer. Wenn ein Anwender den Wert bewusst leert und speichert, bleibt auch dieser leere Wert erhalten und automatische Defaults werden weiterhin nicht wieder eingesetzt.
 
 ### Arbeitsverzeichnis
 

@@ -43,10 +43,10 @@ public sealed class PluginSettingEntry : ViewModelBase
     }
 
     /// <inheritdoc cref="PluginSettingEntry"/>
-    public PluginSettingEntry(PluginSettingField field, string? currentValue)
+    public PluginSettingEntry(PluginSettingField field, string? currentValue, bool useDefaultValue = true)
     {
         Field = field;
-        _value = currentValue ?? field.DefaultValue ?? string.Empty;
+        _value = currentValue ?? (useDefaultValue ? field.DefaultValue : null) ?? string.Empty;
         _boolValue = string.Equals(_value, "true", StringComparison.OrdinalIgnoreCase);
     }
 }

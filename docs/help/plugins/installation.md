@@ -9,6 +9,7 @@
 | `LocalDirectoryPlugin` | Git installiert |
 | `ClaudeCliPlugin` | Claude Code CLI (`claude`) installiert; optionaler Anthropic API Key |
 | `GitHubCopilotPlugin` | GitHub Copilot CLI (`copilot`) installiert und eingeloggt |
+| `CodexPlugin` | Codex CLI (`codex`) installiert und eingeloggt |
 | `KiSimulatorPlugin` | Keine — nur für Tests |
 
 ## Plugin-Verzeichnis
@@ -55,6 +56,13 @@ Für detaillierte Anleitung siehe [BitBucket-Plugin — Installation & Konfigura
 | Feld | Beschreibung |
 |------|--------------|
 | Anthropic API Key | Wird als `ANTHROPIC_API_KEY`-Umgebungsvariable übergeben. Optional, wenn Claude CLI bereits über OAuth angemeldet ist. |
+
+**CodexPlugin**
+
+| Feld | Beschreibung |
+|------|--------------|
+| ExecutablePath | Optionaler absoluter Pfad zur `codex`-Executable. Leer bedeutet: `codex` wird über `PATH` aufgelöst. |
+| CommandLineParameters | Optionale zusätzliche Argumente für die Codex CLI. Der Wert wird ausschließlich aus der Anwenderkonfiguration übernommen; automatische Defaults werden für Codex nicht eingetragen. Ein leer gespeicherter Wert bedeutet bewusst: keine zusätzlichen Parameter. |
 
 ## Standard-Plugin festlegen
 

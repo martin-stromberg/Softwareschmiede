@@ -50,7 +50,7 @@ KI-Entwicklungsautomatisierung.
 
 ## `CliKiPluginBase`
 
-Abstrakte Basisklasse für CLI-basierte KI-Plugins (`ClaudeCliPlugin`, `GitHubCopilotPlugin`).
+Abstrakte Basisklasse für CLI-basierte KI-Plugins (`ClaudeCliPlugin`, `GitHubCopilotPlugin`, `CodexPlugin`).
 
 | Member | Beschreibung |
 |--------|--------------|
@@ -61,6 +61,8 @@ Abstrakte Basisklasse für CLI-basierte KI-Plugins (`ClaudeCliPlugin`, `GitHubCo
 | `MarkPromptToIncludeContextFile(prompt)` | Prompt mit `[[INCLUDE_CONTEXT_FILE_REFERENCE]]`-Marker versehen |
 | `UnwrapPromptContextMarker(prompt)` | Marker auslösen, `IncludeContext`-Flag zurückgeben |
 | `EnsureGitignoreEntries(path)` | `.gitignore` um task- und context-Dateimuster ergänzen |
+
+CLI-basierte Plugins können zusätzliche Startargumente über das Feld `CommandLineParameters` beziehen. Für `Softwareschmiede.Codex.CommandLineParameters` gilt: Nur ein gespeicherter Anwenderwert wird verwendet; die Settings-UI übernimmt keinen `DefaultValue` als automatischen Codex-Parameter.
 
 ---
 

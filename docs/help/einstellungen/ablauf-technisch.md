@@ -49,6 +49,7 @@ Auslöser: Plugin-Auswahl wird in ComboBox geändert, oder beim initialen Laden.
      - Für jedes `PluginSettingField` in der Gruppe:
        - `PluginSettingsService.GetValue(plugin, field)` wird aufgerufen → gibt den String-Wert oder `null` zurück
        - Eine neue `PluginSettingEntry` wird erstellt mit dem geladenen Wert
+       - Für `Softwareschmiede.Codex.CommandLineParameters` wird `PluginSettingEntry` ohne Default-Fallback erstellt; ein fehlender Credential wird dadurch als leerer Anwenderwert angezeigt
 5. Die Liste wird in `SelectedScmPluginSettings` oder `SelectedKiPluginSettings` gespeichert
 6. Die Binding-Maschine triggert die XAML-Neurendrung
 
@@ -62,6 +63,7 @@ Beteiligte Komponenten:
 - `PluginSettingsService.GetValue()` — Abruf aus Credential Store
 - `PluginSettingGroupEntry` — Hilfsklasse mit Eigenschaften `GroupName` und `Entries`
 - `PluginSettingEntry` — Hilfsklasse mit Eigenschaften `Field` und `Value` / `BoolValue`
+- `SettingsViewModel.IsCodexCommandLineParameters()` — Codex-spezifische Erkennung für `CommandLineParameters` ohne Default-Fallback
 
 ### 3. Rendering von Plugin-Einstellungen in der XAML
 
@@ -115,6 +117,7 @@ Auslöser: Anwender klickt den Button **Speichern**.
      - Für jede `PluginSettingEntry` in den Einstellungsgruppen:
        - `PluginSettingsService.SetValue(plugin, entry.Field, entry.Value)` wird aufgerufen
        - Bei Boolean-Feldern: `entry.BoolValue` wird als "true"/"false" String gespeichert (Konvertierung erfolgt in `SetValue`)
+       - Bei Codex-`CommandLineParameters`: Auch ein leerer Wert wird gespeichert, damit entfernte Parameter nicht durch spätere Defaults wiederhergestellt werden
    - Analog für KI-Plugins
 6. Weitere Einstellungen speichern:
    - `ArbeitsverzeichnisSettingsService.SaveArbeitsverzeichnisAsync()`
