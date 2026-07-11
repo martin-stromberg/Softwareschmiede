@@ -4,19 +4,23 @@
 
 **Status:** Vollständig umgesetzt
 
-## Finaler Stand (2026-07-11, nach Exit-Code-Fix + ConPTY-Selbsterkennung)
+## Finaler Stand (2026-07-11, nach Exit-Code-Fix + explizitem ConPTY-Skip)
 
-Letzter vollständiger, eigenständig verifizierter Lauf (`dotnet test
+Letzter vollständiger, eigenständig verifizierter Lauf (`dotnet clean` + `dotnet build` +
+`SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 dotnet test
 src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build`, TRX-Ergebnisdatei
-`skip-fix-final.trx`):
+`final-envvar-run.trx`):
 
 - Gesamt: **822**
 - Bestanden: **807**
 - Fehlgeschlagen: **1** (`WpfE2ETests.ProjektErstellen_UndNeueAufgabeAnlegen_E2E` — einmaliger
-  Timing-Flake, betrifft eine von diesem Branch nicht geänderte Testklasse; kein ConPTY-Bezug)
+  Timing-Flake, betrifft eine von diesem Branch nicht geänderte Testklasse; kein ConPTY-Bezug;
+  reproduzierbar auch in einem früheren, unabhängigen Lauf)
 - Übersprungen: **14** (alle ConPTY-abhängig, jeweils mit erklärender Meldung statt opakem
-  Timeout — siehe `ConPtyEnvironmentProbe` in `src/Softwareschmiede.Tests/E2E/`)
-- Gesamtzeit: **3,13 Minuten** (zuvor 8,44 Minuten, da die 14 Tests nicht mehr auf
+  Timeout, nur weil `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` explizit gesetzt war — siehe
+  `ConPtyEnvironmentProbe` in `src/Softwareschmiede.Tests/E2E/` und `CLAUDE.md`, Abschnitt Testing.
+  **Ohne** diese Variable laufen dieselben 14 Tests unverändert echt, z. B. in Visual Studio)
+- Gesamtzeit: **3,23 Minuten** (zuvor 8,44 Minuten, da die 14 Tests nicht mehr auf
   Element-Timeouts warten)
 - Build-Status: ✓ Erfolgreich, 0 Fehler
 

@@ -25,15 +25,25 @@ vertieft:
    `PseudoConsoleProcessStarter.cs`) wurde gegen Microsofts Referenzimplementierung geprüft und ist
    korrekt. Das ist damit eine durch zwei unabhängige Belege gestützte Plattform-/
    Sitzungseinschränkung dieser Sandbox, keine Vermutung mehr.
-3. **Selbsterkennungs-Mechanismus statt statischem Ausschluss** (Commit `509d7cb`): Ein statischer
-   Ausschluss aller/der 14 E2E-Tests hätte sie auch in funktionierenden Umgebungen (Visual Studio)
-   stillgelegt und die Konsolenfunktion dauerhaft ungetestet gelassen. Stattdessen prüft
-   `ConPtyEnvironmentProbe` einmalig pro Testlauf per echtem ConPTY-Sentinel-Test, ob die Isolation
-   in der aktuellen Umgebung funktioniert; die 14 betroffenen Tests sind jetzt `[SkippableFact]`
-   und überspringen sich selbst (`Skip.If`, Paket `Xunit.SkippableFact`) mit erklärender Meldung,
-   wenn nicht. Ergebnis in dieser Sandbox: 14× "Skipped" statt "Failed", Gesamtlaufzeit der Suite
-   sinkt von ~8,4 auf ~3,1 Minuten. In einer Umgebung mit funktionierender ConPTY-Isolation laufen
-   alle 14 Tests unverändert echt.
+3. **Skip-Mechanismus, nach zwei gescheiterten Auto-Erkennungs-Anläufen auf explizite
+   Umgebungsvariable umgestellt** (Commits `509d7cb`, `4c2e2b7`, `586a5b3`, final `731afe0`): Ein
+   statischer Ausschluss aller/der 14 E2E-Tests hätte sie auch in funktionierenden Umgebungen
+   (Visual Studio) stillgelegt und die Konsolenfunktion dauerhaft ungetestet gelassen. Erster
+   Versuch: `ConPtyEnvironmentProbe` prüfte per echtem ConPTY-Sentinel-Test zur Laufzeit, ob die
+   Isolation funktioniert (zuerst aus dem Test-Host heraus, nach einem vom Anwender gemeldeten
+   falschen Negativ dann aus einer echten `Softwareschmiede.App.exe`-Instanz heraus, um den
+   Prozessbaum der echten Anwendung nachzubilden). **Beide Varianten meldeten "nicht verfügbar"
+   auch in Visual Studio**, wo dieselben 14 Tests nachweislich liefen — der verbleibende
+   Unterschied zur echten Anwendung (interaktives `cmd.exe` nach vollständigem WPF-Start vs.
+   `cmd.exe /c` synchron in `App.OnStartup`) ließ sich ohne Zugriff auf eine funktionierende
+   Referenzumgebung nicht weiter eingrenzen. Finale Lösung: keine Auto-Erkennung mehr, sondern die
+   explizite, vom Agenten gesetzte Umgebungsvariable `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` (siehe
+   `CLAUDE.md`, Abschnitt Testing) — die 14 betroffenen Tests sind `[SkippableFact]` und
+   überspringen sich (`Skip.If`, Paket `Xunit.SkippableFact`) nur, wenn diese Variable explizit
+   gesetzt ist. Ergebnis in dieser Sandbox (mit gesetzter Variable): 14× "Skipped" statt "Failed",
+   Gesamtlaufzeit der Suite sinkt von ~8,4 auf ~3,2 Minuten. Ohne die Variable (Standardfall —
+   Visual Studio, jeder menschliche Entwickler, CI sofern nicht explizit anders konfiguriert)
+   laufen alle 14 Tests unverändert echt, ohne jedes Risiko eines falschen Negativs.
 4. **CI-Lücke geschlossen** (Commit `e4bc63e`): Es gab bisher überhaupt keine CI-Pipeline, die
    Tests ausführt (`release.yml` baut/published nur). Neuer Workflow
    `.github/workflows/test.yml` führt `dotnet test` bei jedem Push/PR auf einem
