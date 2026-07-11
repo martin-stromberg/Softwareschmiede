@@ -41,12 +41,13 @@ Die Aufgabendetailansicht ist vollständig vom Projekt getrennt dargestellt:
 
 Navigiere über die Seitenleiste zu **Projekte**, öffne das gewünschte Projekt. Im Ribbon der Projektdetailansicht (Gruppe „Aufgaben") klickst du auf **Neue Aufgabe**:
 
-1. Die Aufgabendetailansicht öffnet sich sofort mit dem **Edit-Panel**.
+1. Die Aufgabendetailansicht öffnet sich sofort in der **Info-Ansicht** mit bearbeitbaren Stammdaten.
 2. Gib einen **Titel** ein (Pflichtfeld).
 3. Optional: Füge eine **Anforderungsbeschreibung** hinzu.
 4. Klicke im Ribbon (Gruppe „Aufgabe") auf **Speichern**.
 
 Die Aufgabe wird in der Datenbank gespeichert, bleibt aber im Status **Neu**.
+Die Titelleiste des Fensters zeigt nach dem Laden den Namen der geöffneten Aufgabe.
 
 > **Hinweis:** Der Titel ist erforderlich, um speichern zu können. Der „Speichern"-Button ist ausgegraut, wenn das Feld leer ist.
 
@@ -54,7 +55,7 @@ Nach dem Speichern können Sie bleiben, um die Aufgabe weiterzubearbeiten, oder 
 
 ### 2. Aufgabe bearbeiten (optional)
 
-Befindest du dich im Status **Neu** oder **Gestartet**, kannst du das Edit-Panel erneut öffnen und Titel oder Anforderungsbeschreibung ändern. Klicke auf **Speichern** im Ribbon, um die Änderungen zu übernehmen.
+Befindest du dich im Status **Neu** oder **Gestartet**, kannst du die **Info-Ansicht** öffnen und Titel oder Anforderungsbeschreibung ändern. Klicke auf **Speichern** im Ribbon, um die Änderungen zu übernehmen.
 
 ### 3. Aufgabe starten (Repository einrichten)
 
@@ -65,30 +66,33 @@ Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 - Eine lokale `issue.md`-Datei wird automatisch erstellt, die die Aufgabebeschreibung enthält (Titel, ID, Branch-Name, Erstellungsdatum, Anforderung).
 - Die `.gitignore`-Datei wird automatisch angepasst, um `issue.md` von der Versionskontrolle auszuschließen.
 - Der Status wechselt auf **Gestartet**.
-- Das **CLI-Panel** wird angezeigt.
+- Die **CLI-Ansicht** wird angezeigt.
 
 > **Hinweis:** Das Arbeitsverzeichnis muss in den Einstellungen konfiguriert sein.
 > 
 > Die `issue.md`-Datei ist eine lokale Datei und wird nicht committet. Sie dient als Referenzmaterial für die KI und den Entwickler während der Aufgabenbearbeitung.
+>
+> Aufgaben, die aus einem Git-Plugin ohne Issue-Bezug erstellt wurden, können ebenfalls gestartet werden. In diesem Fall wird der Aufgabenbranch ohne Issue-Nummer angelegt.
 
 ### 4. CLI starten
 
-Im CLI-Panel (Status **Gestartet** oder höher):
+In der CLI-Ansicht (Status **Gestartet** oder höher):
 
 1. Im Dropdown (Gruppe „CLI") das gewünschte **KI-Plugin** auswählen (z.B. „Claude CLI").
 2. Optional: **CLI-Parameter** eingeben.
 3. Klicke auf **CLI starten**.
 
-Das CLI-Fenster erscheint eingebettet in die Aufgabenansicht. Der Status wechselt auf **In Arbeit**. Die KI ist nun interaktiv bedienbar.
+Das CLI-Fenster erscheint eingebettet in die Aufgabenansicht. Die Aufgabe bleibt im Status **Gestartet** oder **Wartend**, während die laufende CLI über den Laufstatus und den Namen in der Fußzeile erkennbar ist. Die KI ist nun interaktiv bedienbar.
 
-### 5. Zwischen CLI-Fenster und Info-Ansicht umschalten
+### 5. Zwischen Info-, CLI- und Diff-Ansicht wechseln
 
-Im CLI-Panel findest du ein Toggle-Button „Info"/"CLI" in der Leiste über dem Fenster:
+In der Aufgabendetailansicht befindet sich oberhalb des Inhalts eine Ansichtsleiste:
 
-- **CLI:** Zeigt das Terminalfenster des KI-Tools.
-- **Info:** Zeigt Aufgabeeigenschaften (Titel, Status, Beschreibung) und das Protokoll aller bisherigen Einträge.
+- **Info:** Zeigt Aufgabenstammdaten, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Diese Ansicht ist auch bei gestarteten, wartenden und beendeten Aufgaben erreichbar.
+- **CLI:** Zeigt das Terminalfenster des KI-Tools, wenn für die Aufgabe eine CLI-Ausführung verfügbar ist.
+- **Diff:** Zeigt die Änderungen nach Abschluss der Aufgabe, wenn eine Diff-Ansicht verfügbar ist.
 
-Du kannst jederzeit zwischen beiden Ansichten wechseln, ohne den CLI-Prozess zu unterbrechen.
+Du kannst während einer laufenden CLI-Ausführung zur Info-Ansicht wechseln, ohne den CLI-Prozess zu unterbrechen. Während eine CLI läuft, zeigt die Fußzeile den Namen der aktiven CLI. Nach Stop, Fehler oder Ende wird dieser Name entfernt.
 
 ### 6. Mit der KI arbeiten
 
@@ -104,7 +108,7 @@ Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alte
 
 ### 8. Aufgabe abschließen
 
-Im Status **Gestartet**, **In Arbeit** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") auf **Beenden**. Der Status wechselt auf **Beendet**. Das **Diff-Panel** wird angezeigt, das die Änderungen im Repository zeigt.
+Im Status **Gestartet** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") auf **Beenden**. Der Status wechselt auf **Beendet**. Die **Diff-Ansicht** wird angezeigt und zeigt die Änderungen im Repository. Die **Info-Ansicht** bleibt weiterhin auswählbar.
 
 ### 9. Aufgabe löschen
 

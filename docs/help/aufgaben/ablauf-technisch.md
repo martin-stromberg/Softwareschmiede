@@ -26,12 +26,15 @@ Ablauf:
 4. `OeffneAufgabe(id)` wird ausgeführt:
    - Neues `TaskDetailViewModel` wird aus DI-Container erstellt
    - `TaskDetailViewModel.ZurueckAction = () => NavigateBackToProjectCallback?.Invoke()` wird gesetzt
+   - `TaskDetailViewModel.DetailTitelAenderungAction` wird gesetzt, damit der Fenstertitel nach dem Laden auf den Aufgabentitel wechseln kann
    - `TaskDetailViewModel.AufgabeListeAktualisierenCallback = ReloadAufgabenListAsync` wird gesetzt
    - `TaskDetailViewModel.AufgabeId = id` wird gesetzt (triggert Laden)
 5. `NavigateToTaskViewCallback?.Invoke(vm)` wird aufgerufen → `ProjectListViewModel.ZeigeTaskDetailView(vm)`
 6. `ProjectListViewModel.DetailViewModel = vm` wird gesetzt
 7. MainWindow wechselt DataTemplate: `TaskDetailViewModel` → `TaskDetailView` wird gerendert
-8. `ProjectDetailView` wird nicht mehr angezeigt
+8. `TaskDetailViewModel` lädt die Aufgabe und meldet den Titel über `DetailTitelAenderungAction`
+9. `MainWindowViewModel.Title` bzw. der von `ProjectListViewModel` gemeldete Detailtitel wird auf `Softwareschmiede – {Aufgabentitel}` gesetzt
+10. `ProjectDetailView` wird nicht mehr angezeigt
 
 ### Navigieren zurück zur Projektdetailansicht
 
@@ -78,7 +81,7 @@ Ablauf:
 7. `EntwicklungsprozessService.ProzessStartenAsync(aufgabeId, repositoryUrl, basisBranch, gitPlugin)` wird aufgerufen:
    - Arbeitsverzeichnis wird ermittelt
    - Repository wird geklont in `{workdir}/softwareschmiede/{aufgabeId}`
-   - Branch wird erstellt oder checked out
+   - Branch wird erstellt oder checked out; ohne `IssueReferenz` wird ein Branch im Format `task/{aufgabe.Id:N}-{slug}` erzeugt, mit Issue-Nummer im Format `task/issue-{nummer}-{aufgabe.Id:N}-{slug}`
    - Status wird auf `Gestartet` gesetzt (nicht zwischendurch auf andere Status)
 8. `KiAusfuehrungsService.StartCliAsync(aufgabeId, kiPluginPrefix)` wird aufgerufen:
    - KI-Plugin wird geladen
@@ -91,7 +94,7 @@ Ablauf:
      Seitenleisten-Kachel (siehe „KI-Ausführungsstatus-Konvertierung") sofort `"▶ Läuft"`, ohne auf den
      ersten periodischen Heartbeat warten zu müssen
 9. Fenster wird eingebettet (siehe Abschnitt „Fenster einbetten")
-10. UI zeigt CLI-Panel mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
+10. UI wählt die CLI-Ansicht mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
 11. Bei Fehler (Klone fehlgeschlagen, CLI-Start fehlgeschlagen): Fehler wird angezeigt, Status bleibt `Neu`, Rollback des Klonverzeichnisses falls nötig
 
 ### 0.3. Automatische issue.md-Erstellung und .gitignore-Aktualisierung
@@ -120,13 +123,13 @@ Die Dateien `issue.md` und `.gitignore`-Eintrag sind lokale Dateien und gehören
 
 ### 0.5. Aufgabe anlegen und bearbeiten (Status: Neu)
 
-Ausgelöst durch den „Speichern"-Button in der Edit-Panel-Ansicht.
+Ausgelöst durch den „Speichern"-Button in der Info-Ansicht.
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.SpeichernCommand` — Prüft, ob Titel nicht leer und Status ∈ {Neu, Gestartet}
 - `AufgabeService.UpdateAsync` — Speichert `Titel` und `AnforderungsBeschreibung` in der Datenbank
 - `IDialogService` — Zeigt Fehler-Toast bei Validierungsfehlern
-- `TaskDetailView.xaml` — Edit-Panel mit TextBox-Bindungen zu `EditTitel` und `EditAnforderungsBeschreibung`
+- `TaskDetailView.xaml` — Info-Ansicht mit TextBox-Bindungen zu `EditTitel` und `EditAnforderungsBeschreibung`
 
 Ablauf:
 1. Anwender gibt Titel und optional Anforderungsbeschreibung ein
@@ -187,19 +190,42 @@ Beteiligte Komponenten:
 - `NativeMethods.SetParent(handle, _hostHandle)` — bindet das CLI-Fenster an den WPF-Container
 - `NativeMethods.SetWindowLong` — entfernt `WS_CAPTION` und `WS_THICKFRAME` aus dem eingebetteten Fenster
 
-### 5. Info/CLI-Ansicht umschalten
+### 5. Info-, CLI- und Diff-Ansicht wechseln
 
-Ausgelöst durch Toggle-Button im CLI-Panel.
+Ausgelöst durch die Ansichtsleiste in der `TaskDetailView`.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.InfoCliToggleCommand` — Einfacher Toggle-Command
-- `IsInfoViewVisible` Property — Boolean, steuert Sichtbarkeit beider Panels
-- `TaskDetailView.xaml` — Zwei überlagerte Panels mit Visibility-Bindings zu `IsInfoViewVisible`
+- `TaskDetailViewModel.InfoViewCommand` — Wechselt zur Stammdaten-/Info-Ansicht
+- `TaskDetailViewModel.CliViewCommand` — Wechselt zur CLI-Ansicht, wenn `ShowCliPanel` gilt
+- `TaskDetailViewModel.DiffViewCommand` — Wechselt zur Diff-Ansicht, wenn `ShowDiffPanel` gilt
+- `TaskDetailViewModel.IsInfoViewSelected`, `IsCliViewSelected`, `IsDiffViewSelected` — abgeleitete Auswahl-Properties für das aktive Detailpanel
+- `TaskDetailViewModel.IsInfoViewVisible` — Kompatibilitätsproperty, leitet auf die Info-Auswahl weiter
+- `TaskDetailView.xaml` — Gemeinsame Ansichtsleiste und Panel-Sichtbarkeit über die Auswahl-Properties
 
 Ablauf:
-1. Anwender klickt Toggle-Button „Info"/"CLI"
-2. `InfoCliToggleCommand.Execute()` → `IsInfoViewVisible = !IsInfoViewVisible`
-3. ProcessWindowHost und Info-Panel wechseln ihre Sichtbarkeit (nur UI-Zustand, kein Service-Aufruf)
+1. Beim Laden der Aufgabe wählt `TaskDetailViewModel` eine Standardansicht:
+   - Status `Neu`: Info
+   - Status `Gestartet` oder `Wartend`: CLI
+   - Status `Beendet`: Diff, sofern verfügbar, sonst Info
+2. Anwender klickt `Info`, `CLI` oder `Diff` in der Ansichtsleiste
+3. Das jeweilige Command setzt die interne Detailansicht
+4. `TaskDetailViewModel` benachrichtigt `IsInfoViewSelected`, `IsCliViewSelected`, `IsDiffViewSelected`, `ShowInfoPanel`, `ShowCliPanel` und `ShowDiffPanel`
+5. Die XAML blendet das passende Panel ein; der Wechsel ist ein reiner UI-Zustand und startet oder stoppt keine CLI
+
+Die Info-Ansicht ist nicht an den Aufgabenstatus gebunden. Sie bleibt auch bei gestarteten, wartenden und beendeten Aufgaben auswählbar.
+
+### 5.1. Aktiver CLI-Name in der Fußzeile
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.AktiverCliName` — Name des aktuell ausgeführten KI-Plugins für die Fußzeile
+- `TaskDetailViewModel.SetAktiverCliName` und `ResolveKiPluginName` — lösen Pluginname aus Prefix und Pluginliste auf
+- `TaskDetailView.xaml` — bindet die Fußzeile an `AktiverCliName` und zeigt sie nur bei vorhandenem Wert an
+
+Ablauf:
+1. Beim Starten, automatischen Neustarten oder Pluginwechsel wird das tatsächlich verwendete KI-Plugin aufgelöst
+2. `AktiverCliName` wird auf den Pluginnamen gesetzt; wenn kein Name auflösbar ist, dient der Prefix als Fallback
+3. Bei Stop, Fehler oder Prozessende setzt das ViewModel `AktiverCliName = null`
+4. Die Fußzeile zeigt dadurch nur während einer aktiven CLI-Ausführung einen CLI-Namen und behält keine veralteten Werte
 
 ### 6. Prozess beendet sich
 
@@ -247,8 +273,8 @@ flowchart TD
     SHOW_TASK --> LOAD[Aufgabe wird geladen\nAufgabeId triggert LadenAsync]
     LOAD --> STATUS_CHECK{Status?}
     
-    STATUS_CHECK -- Neu --> EDIT_PANEL[Edit-Panel anzeigen\nTitel und Anforderung editierbar]
-    EDIT_PANEL --> C[Titel und Anforderung eingeben]
+    STATUS_CHECK -- Neu --> INFO_NEU[Info-Ansicht anzeigen\nTitel und Anforderung editierbar]
+    INFO_NEU --> C[Titel und Anforderung eingeben]
     C --> D{Speichern klicken}
     D -- Gespeichert --> E[Status bleibt Neu\nAufgabenliste aktualisiert]
     E --> F{Zurück klicken?}
@@ -256,20 +282,22 @@ flowchart TD
     NAVIGATE_BACK --> SHOW_PROJECT[ProjectDetailView wird angezeigt\nTaskDetailView ausgeblendet]
     F -- Nein --> F
     
-    STATUS_CHECK -- Gestartet/InArbeit/Wartend --> CLI_PANEL[CLI-Panel anzeigen\nTerminalfenster eingebettet]
-    CLI_PANEL --> STARTEN{CLI starten klicken?}
+    STATUS_CHECK -- Gestartet/Wartend --> CLI_VIEW[CLI-Ansicht anzeigen\nTerminalfenster eingebettet]
+    CLI_VIEW --> STARTEN{CLI starten klicken?}
     STARTEN -- Ja --> START_CLI[KiPlugin.StartCliAsync\nProcess.Start]
-    START_CLI --> RUNNING[CLI-Prozess läuft\nStatus → InArbeit]
-    RUNNING --> TOGGLE{Info/CLI Toggle?}
-    TOGGLE -- Info --> INFO[Info-Ansicht anzeigen\nAufgabeeigenschaften + Protokoll]
-    TOGGLE -- CLI --> CLI_VIEW[CLI-Fenster anzeigen]
-    INFO --> TOGGLE
-    CLI_VIEW --> TOGGLE
+    START_CLI --> RUNNING[CLI-Prozess läuft\nAktiverCliName gesetzt]
+    RUNNING --> VIEW_SELECT{Ansicht wählen?}
+    VIEW_SELECT -- Info --> INFO[Info-Ansicht anzeigen\nAufgabeneigenschaften + Protokoll]
+    VIEW_SELECT -- CLI --> CLI_VIEW2[CLI-Ansicht anzeigen]
+    VIEW_SELECT -- Diff --> DIFF_OPTIONAL[Diff-Ansicht anzeigen\nfalls verfügbar]
+    INFO --> VIEW_SELECT
+    CLI_VIEW2 --> VIEW_SELECT
+    DIFF_OPTIONAL --> VIEW_SELECT
     RUNNING --> BEENDEN{Beenden klicken?}
     BEENDEN -- Ja --> BEENDET[Status → Beendet]
     BEENDEN -- Nein --> BEENDEN
     
-    STATUS_CHECK -- Beendet --> DIFF_PANEL[Diff-Panel anzeigen\nÄnderungen sichtbar]
+    STATUS_CHECK -- Beendet --> DIFF_PANEL[Diff-Ansicht anzeigen\nÄnderungen sichtbar]
     DIFF_PANEL --> BACK_END{Zurück klicken?}
     BACK_END -- Ja --> NAVIGATE_BACK
     BACK_END -- Nein --> BACK_END
@@ -457,10 +485,13 @@ Ablauf:
 3. `NavigateZuAufgabe(aufgabeId)` wird ausgeführt:
    - Neue `TaskDetailViewModel`-Instanz wird aus DI-Container erstellt: `_serviceProvider.GetRequiredService<TaskDetailViewModel>()`
    - `TaskDetailViewModel.ZurueckAction = NavigateToDashboard` wird gesetzt
-   - `TaskDetailViewModel.AufgabeId = aufgabeId` wird gesetzt (triggert `LadenAsync()`)
+   - `TaskDetailViewModel.DetailTitelAenderungAction` wird gesetzt und aktualisiert den Fenstertitel nur, solange diese Detailansicht noch aktiv ist
+   - `MainWindowViewModel.Title` wird zunächst auf `Softwareschmiede – Aufgabe` gesetzt
    - `MainWindowViewModel.CurrentView = viewModel` wird gesetzt → navigiert zu `TaskDetailView`
-4. `IsDashboardVisible` wird neu berechnet (Wert ändert sich zu `false`)
-5. Seitenleisten-Sektion wird ausgeblendet durch Visibility-Binding
+   - `TaskDetailViewModel.AufgabeId = aufgabeId` wird gesetzt (triggert `LadenAsync()`)
+4. Nach dem Laden meldet `TaskDetailViewModel` den Aufgabentitel; `MainWindowViewModel.Title` wird auf `Softwareschmiede – {Aufgabentitel}` gesetzt
+5. `IsDashboardVisible` wird neu berechnet (Wert ändert sich zu `false`)
+6. Seitenleisten-Sektion wird ausgeblendet durch Visibility-Binding
 
 ## Fehlerbehandlung
 

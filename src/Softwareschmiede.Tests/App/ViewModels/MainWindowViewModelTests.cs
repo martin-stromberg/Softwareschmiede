@@ -20,6 +20,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
+    private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
     private readonly Guid _projektId = new Guid("22222222-2222-2222-2222-222222222222");
@@ -30,6 +31,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         _db = TestDbContextFactory.Create();
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
+        _dialogServiceMock = new Mock<IDialogService>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
         _pluginManagerMock = new Mock<IPluginManager>();
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
@@ -52,6 +54,12 @@ public sealed class MainWindowViewModelTests : IDisposable
             .Setup(sp => sp.GetService(typeof(DashboardViewModel)))
             .Returns(dashboardViewModel);
         _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(ProjectListViewModel)))
+            .Returns(() => CreateProjectListViewModel(projektService));
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(ProjectDetailViewModel)))
+            .Returns(() => CreateProjectDetailViewModel(projektService));
+        _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
             .Returns(() => TaskDetailViewModelTestFactory.Create(_db, _aufgabeService));
         _serviceProviderMock
@@ -73,6 +81,26 @@ public sealed class MainWindowViewModelTests : IDisposable
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
             action => action());
+    }
+
+    private ProjectListViewModel CreateProjectListViewModel(ProjektService projektService)
+    {
+        return new ProjectListViewModel(
+            projektService,
+            _serviceProviderMock.Object,
+            _pluginManagerMock.Object,
+            NullLogger<ProjectListViewModel>.Instance);
+    }
+
+    private ProjectDetailViewModel CreateProjectDetailViewModel(ProjektService projektService)
+    {
+        return new ProjectDetailViewModel(
+            projektService,
+            _aufgabeService,
+            _serviceProviderMock.Object,
+            _dialogServiceMock.Object,
+            _pluginManagerMock.Object,
+            NullLogger<ProjectDetailViewModel>.Instance);
     }
 
     /// <summary>AktiveAufgabenAktualisierenAsync befüllt die AktiveAufgabenListe-Collection.</summary>
@@ -132,6 +160,97 @@ public sealed class MainWindowViewModelTests : IDisposable
         // Assert
         sut.CurrentView.Should().BeOfType<TaskDetailViewModel>();
         ((TaskDetailViewModel)sut.CurrentView!).AufgabeId.Should().Be(aufgabe.Id);
+    }
+
+    /// <summary>NavigateZuAufgabeCommand setzt den Fenstertitel nach dem Laden auf den Aufgabentitel.</summary>
+    [Fact]
+    public async Task NavigateZuAufgabeCommand_ShouldSetTitleToLoadedTaskTitle()
+    {
+        var sut = CreateSut();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Fenstertitel-Aufgabe", null);
+
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.Title != "Softwareschmiede – Fenstertitel-Aufgabe")
+            await Task.Delay(50);
+
+        sut.Title.Should().Be("Softwareschmiede – Fenstertitel-Aufgabe");
+    }
+
+    /// <summary>Eine aus der Projektansicht geöffnete Aufgabe setzt den Fenstertitel nach dem Laden auf den Aufgabentitel.</summary>
+    [Fact]
+    public async Task ProjectTaskNavigation_ShouldSetTitleToLoadedTaskTitle()
+    {
+        var sut = CreateSut();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Projektlisten-Aufgabe", null);
+        var projekt = await _db.Projekte.FindAsync(_projektId);
+
+        sut.NavigateToProjectListCommand.Execute(null);
+        var projectListViewModel = (ProjectListViewModel)sut.CurrentView!;
+        projectListViewModel.SelectedProjekt = projekt;
+        var projectDetailViewModel = (ProjectDetailViewModel)projectListViewModel.DetailViewModel!;
+
+        projectDetailViewModel.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.Title != "Softwareschmiede – Projektlisten-Aufgabe")
+            await Task.Delay(50);
+
+        sut.Title.Should().Be("Softwareschmiede – Projektlisten-Aufgabe");
+    }
+
+    /// <summary>Ein später Detail-Callback aus der Projektansicht darf den Fenstertitel nach Dashboard-Navigation nicht überschreiben.</summary>
+    [Fact]
+    public async Task NavigateToDashboardCommand_ShouldIgnoreLateProjectTaskTitleCallback()
+    {
+        var sut = CreateSut();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Spaeter Projekttitel", null);
+        var projekt = await _db.Projekte.FindAsync(_projektId);
+
+        sut.NavigateToProjectListCommand.Execute(null);
+        var projectListViewModel = (ProjectListViewModel)sut.CurrentView!;
+        projectListViewModel.SelectedProjekt = projekt;
+        var projectDetailViewModel = (ProjectDetailViewModel)projectListViewModel.DetailViewModel!;
+        projectDetailViewModel.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+
+        sut.NavigateToDashboardCommand.Execute(null);
+        projectListViewModel.DetailTitelAenderungAction?.Invoke("Spaeter Projekttitel");
+
+        sut.Title.Should().Be("Softwareschmiede – Dashboard");
+    }
+
+    /// <summary>Beim Wechsel zurück zum Dashboard bleibt kein alter Aufgabentitel stehen.</summary>
+    [Fact]
+    public async Task NavigateToDashboardCommand_ShouldClearPreviousTaskTitle()
+    {
+        var sut = CreateSut();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Alter Aufgabentitel", null);
+
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.Title != "Softwareschmiede – Alter Aufgabentitel")
+            await Task.Delay(50);
+
+        sut.NavigateToDashboardCommand.Execute(null);
+
+        sut.Title.Should().Be("Softwareschmiede – Dashboard");
+    }
+
+    /// <summary>Ein alter Detail-Callback darf den Fenstertitel nach Navigation nicht überschreiben.</summary>
+    [Fact]
+    public async Task NavigateToDashboardCommand_ShouldIgnoreLateTaskTitleCallback()
+    {
+        var sut = CreateSut();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Spaeter Aufgabentitel", null);
+
+        ((RelayCommand<Guid>)sut.NavigateZuAufgabeCommand).Execute(aufgabe.Id);
+        var detailViewModel = (TaskDetailViewModel)sut.CurrentView!;
+
+        sut.NavigateToDashboardCommand.Execute(null);
+        detailViewModel.DetailTitelAenderungAction?.Invoke("Spaeter Aufgabentitel");
+
+        sut.Title.Should().Be("Softwareschmiede – Dashboard");
     }
 
     /// <summary>Der CurrentView-Setter löst AktiveAufgabenAktualisierenAsync per SafeFireAndForget aus, ohne dass der Aufrufer den Task awaiten muss.</summary>

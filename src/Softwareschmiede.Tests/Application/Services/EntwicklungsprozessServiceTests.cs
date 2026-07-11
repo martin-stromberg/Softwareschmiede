@@ -414,6 +414,59 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         updatedAufgabe!.BranchName.Should().StartWith($"task/issue-321-{aufgabe.Id:N}");
     }
 
+    /// <summary>ProzessStartenUndCliStartenAsync startet Aufgaben ohne Issue über das eindeutige Projekt-Repository.</summary>
+    [Fact]
+    public async Task ProzessStartenUndCliStartenAsync_ShouldStartTaskWithoutIssueReference_WhenSingleProjectRepositoryExists()
+    {
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "https://github.com/test/repo-ohne-issue",
+            RepositoryName = "repo-ohne-issue",
+            Aktiv = true
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Issue", "Beschreibung");
+        var cloneBase = SetupCloneWithDirectoryCreation();
+        _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c ping 127.0.0.1 -n 5 > nul",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+        var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
+        var sut = new EntwicklungsprozessService(
+            _aufgabeService,
+            _protokollService,
+            _gitPluginMock.Object,
+            CreatePluginSelectionService(_kiPluginMock.Object),
+            _arbeitsverzeichnisResolverMock.Object,
+            new EntwicklungsprozessServiceOptions(ProjektService: projektService, KiAusfuehrungsService: _kiAusfuehrungsService),
+            new Mock<ILogger<EntwicklungsprozessService>>().Object);
+
+        try
+        {
+            await sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, string.Empty, null, "Softwareschmiede.TestKi");
+
+            var updatedAufgabe = await _aufgabeService.GetDetailAsync(aufgabe.Id);
+            updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
+            updatedAufgabe.IssueReferenz.Should().BeNull();
+            updatedAufgabe.BranchName.Should().StartWith($"task/{aufgabe.Id:N}-aufgabe-ohne-issue");
+            _gitPluginMock.Verify(g => g.CloneRepositoryAsync(repository.RepositoryUrl, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally
+        {
+            await _kiAusfuehrungsService.StopCliAsync(aufgabe.Id);
+            DeleteDirectoryIfExists(cloneBase);
+        }
+    }
+
     /// <summary>ProzessStartenAsync wirft Exception wenn Aufgabe nicht gefunden.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist()

@@ -23,8 +23,46 @@
 - `basisBranchName` leer oder null → immer neuer `task/`-Branch.
 - `basisBranchName` == Hauptbranch → neuer `task/`-Branch (kein direkter Commit auf Main).
 - `basisBranchName` != Hauptbranch → vorhandener Branch wird ausgecheckt.
+- Aufgabe mit `IssueReferenz.IssueNummer` → neuer Branch enthält die Issue-Nummer.
+- Aufgabe ohne `IssueReferenz` → neuer Branch enthält nur Aufgaben-ID und Titel-Slug.
 
 **Umsetzung:** `EntwicklungsprozessService.ProzessStartenAsync` — `nutzeExistierendenBranch`-Flag.
+
+---
+
+## Aufgaben ohne Issue-Bezug
+
+**Beschreibung:** Aufgaben, die aus einem Git-Plugin ohne verknüpftes Issue erstellt wurden, sind start- und ausführbar.
+
+**Bedingungen:**
+- Die Aufgabe hat keine `IssueReferenz`.
+- Ein Repository kann über Aufgaben-, Projekt- oder eindeutigen Projektkontext aufgelöst werden.
+
+**Verhalten:**
+- Der Prozessstart setzt keine Issue-Referenz voraus.
+- Der Branchname wird im Format `task/{aufgabe.Id:N}-{slug}` erzeugt.
+- Die lokale `issue.md` wird weiterhin erstellt; sie enthält die Aufgabenstammdaten und die Anforderungsbeschreibung, aber keine verpflichtende Issue-Verknüpfung.
+- Mehrdeutige Repository-Auflösung bleibt ein Fehlerfall.
+
+**Umsetzung:** `EntwicklungsprozessService.ErstelleTaskBranchName`, `ProzessStartenAsync` und `CreateIssueFileAsync`.
+
+---
+
+## Sichtbarer Aufgabenkontext
+
+**Beschreibung:** Die Aufgabendetailansicht zeigt den Kontext der aktuell geöffneten Aufgabe und der laufenden CLI-Ausführung.
+
+**Bedingungen:**
+- Eine Aufgabe wird in der Detailansicht geladen.
+- Optional läuft eine KI-CLI für diese Aufgabe.
+
+**Verhalten:**
+- Der Fenstertitel wechselt nach dem Laden der Aufgabe auf `Softwareschmiede – {Aufgabentitel}`.
+- Beim Wechsel zu Dashboard, Projektliste oder Einstellungen wird der jeweilige Ansichtstitel gesetzt.
+- Die Fußzeile zeigt den aktiven CLI-Namen nur während einer laufenden CLI-Ausführung.
+- Bei Stop, Fehler oder beendetem Prozess wird der CLI-Name aus der Fußzeile entfernt.
+
+**Umsetzung:** `MainWindowViewModel.Title`, `TaskDetailViewModel.DetailTitelAenderungAction` und `TaskDetailViewModel.AktiverCliName`.
 
 ---
 

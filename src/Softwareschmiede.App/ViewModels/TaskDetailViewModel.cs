@@ -20,6 +20,13 @@ namespace Softwareschmiede.App.ViewModels;
 /// </summary>
 public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 {
+    private enum DetailAnsicht
+    {
+        Info,
+        Cli,
+        Diff
+    }
+
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
     private readonly KiAusfuehrungsService _kiService;
@@ -41,19 +48,23 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _selectedKiPluginPrefix;
     private string? _optionalCliParameters;
     private CancellationTokenSource? _ladenCts;
-    private bool _isInfoViewVisible;
     private string? _editTitel;
     private string? _editAnforderungsBeschreibung;
     private bool _disposed;
     private string _cliStatusText = "CLI inaktiv";
+    private string? _aktiverCliName;
     private PseudoConsoleSession? _cliStatusSession;
     private PromptVorlage? _selectedPromptVorlage;
+    private DetailAnsicht _ausgewaehlteAnsicht = DetailAnsicht.Info;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
 
     /// <summary>Wird nach dem Löschen einer Aufgabe aufgerufen, damit die übergeordnete Ansicht die Liste aktualisiert.</summary>
     public Func<Task>? AufgabeListeAktualisierenCallback { get; set; }
+
+    /// <summary>Wird aufgerufen, wenn sich der Titel der angezeigten Detailaufgabe ändert.</summary>
+    public Action<string?>? DetailTitelAenderungAction { get; set; }
 
     /// <summary>Die ID der angezeigten Aufgabe.</summary>
     public Guid AufgabeId
@@ -90,6 +101,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
             OnPropertyChanged(nameof(CurrentIssueReferenz));
+            OnPropertyChanged(nameof(ShowInfoPanel));
+            WaehleStandardAnsicht();
+            DetailTitelAenderungAction?.Invoke(value?.Titel);
         }
     }
 
@@ -138,6 +152,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         get => _cliStatusText;
         private set => SetProperty(ref _cliStatusText, value);
+    }
+
+    /// <summary>Name der aktuell ausgeführten CLI für die Fußzeile.</summary>
+    public string? AktiverCliName
+    {
+        get => _aktiverCliName;
+        private set => SetProperty(ref _aktiverCliName, value);
     }
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
@@ -189,12 +210,35 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob eine Promptvorlage an die laufende CLI gesendet werden kann.</summary>
     public bool KannPromptVorlageSenden => _isCliRunning && PromptVorlagen.Count > 0;
 
-    /// <summary>Steuert Sichtbarkeit zwischen Info-Panel und CLI-Fenster; Initial = false (CLI sichtbar).</summary>
+    /// <summary>Steuert die Info-Ansicht als Kompatibilitätsschicht für ältere Tests.</summary>
     public bool IsInfoViewVisible
     {
-        get => _isInfoViewVisible;
-        set => SetProperty(ref _isInfoViewVisible, value);
+        get => IsInfoViewSelected;
+        set
+        {
+            if (value)
+            {
+                WaehleAnsicht(DetailAnsicht.Info);
+            }
+            else if (ShowCliPanel)
+            {
+                WaehleAnsicht(DetailAnsicht.Cli);
+            }
+            else if (ShowDiffPanel)
+            {
+                WaehleAnsicht(DetailAnsicht.Diff);
+            }
+        }
     }
+
+    /// <summary>Gibt an, ob die Stammdatenansicht ausgewählt ist.</summary>
+    public bool IsInfoViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Info;
+
+    /// <summary>Gibt an, ob die CLI-Ansicht ausgewählt ist.</summary>
+    public bool IsCliViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Cli;
+
+    /// <summary>Gibt an, ob die Diff-Ansicht ausgewählt ist.</summary>
+    public bool IsDiffViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Diff;
 
     /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
     public string? EditTitel
@@ -223,6 +267,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
     public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
+
+    /// <summary>True wenn die Info-Ansicht angezeigt werden soll.</summary>
+    public bool ShowInfoPanel => IsInfoViewSelected;
 
     /// <summary>CanExecute für SpeichernCommand: Status ∈ {Neu, Gestartet} &amp;&amp; !IsCliRunning &amp;&amp; Titel.Length > 0.</summary>
     public bool KannSpeichern => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Neu or Domain.Enums.AufgabeStatus.Gestartet
@@ -269,6 +316,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Toggled IsInfoViewVisible zwischen Info-Panel und CLI-Fenster.</summary>
     public ICommand InfoCliToggleCommand { get; }
+
+    /// <summary>Wechselt zur Info-Ansicht.</summary>
+    public ICommand InfoViewCommand { get; }
+
+    /// <summary>Wechselt zur CLI-Ansicht.</summary>
+    public ICommand CliViewCommand { get; }
+
+    /// <summary>Wechselt zur Diff-Ansicht.</summary>
+    public ICommand DiffViewCommand { get; }
 
     /// <summary>Navigiert zurück zur vorherigen Ansicht.</summary>
     public ICommand ZurueckCommand { get; }
@@ -339,6 +395,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
         LoeschenCommand = new AsyncRelayCommand(LoeschenAsync, () => KannLoeschen);
         InfoCliToggleCommand = new RelayCommand(InfoCliToggle);
+        InfoViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Info));
+        CliViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Cli), () => ShowCliPanel);
+        DiffViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Diff), () => ShowDiffPanel);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
         IssueBrowserOeffnenCommand = new RelayCommand(
@@ -362,6 +421,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
             IsCliRunning = _kiService.IsRunning(_aufgabeId);
             AttachCliStatusSession(_kiService.GetPseudoConsoleSession(_aufgabeId));
+            await AktualisiereAktivenCliNameAusAufgabeAsync(ct);
 
             EditTitel = Aufgabe?.Titel;
             EditAnforderungsBeschreibung = Aufgabe?.AnforderungsBeschreibung;
@@ -443,7 +503,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         await session.InputStream.FlushAsync(ct);
         session.MarkInputActivity();
 
-        IsInfoViewVisible = false;
+        WaehleAnsicht(DetailAnsicht.Cli);
         SelectedPromptVorlage = null;
         PromptVorlageGesendet?.Invoke();
     }
@@ -458,7 +518,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             await _kiService.StopCliAsync(_aufgabeId, ct);
-            _dispatcherInvoke(() => IsCliRunning = false);
+            _dispatcherInvoke(() =>
+            {
+                IsCliRunning = false;
+                AktiverCliName = null;
+            });
         }
         catch (OperationCanceledException)
         {
@@ -661,6 +725,67 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IsInfoViewVisible = !IsInfoViewVisible;
     }
 
+    private void WaehleStandardAnsicht()
+    {
+        var standardAnsicht = AufgabeStatus switch
+        {
+            Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend => DetailAnsicht.Cli,
+            Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
+            _ => DetailAnsicht.Info
+        };
+
+        WaehleAnsicht(standardAnsicht);
+    }
+
+    private void WaehleAnsicht(DetailAnsicht ansicht)
+    {
+        if (ansicht == DetailAnsicht.Cli && !ShowCliPanel)
+            ansicht = DetailAnsicht.Info;
+        if (ansicht == DetailAnsicht.Diff && !ShowDiffPanel)
+            ansicht = DetailAnsicht.Info;
+
+        if (_ausgewaehlteAnsicht == ansicht)
+            return;
+
+        _ausgewaehlteAnsicht = ansicht;
+        OnPropertyChanged(nameof(IsInfoViewVisible));
+        OnPropertyChanged(nameof(IsInfoViewSelected));
+        OnPropertyChanged(nameof(IsCliViewSelected));
+        OnPropertyChanged(nameof(IsDiffViewSelected));
+        OnPropertyChanged(nameof(ShowInfoPanel));
+    }
+
+    private async Task AktualisiereAktivenCliNameAusAufgabeAsync(CancellationToken ct)
+    {
+        if (!_isCliRunning)
+        {
+            AktiverCliName = null;
+            return;
+        }
+
+        var pluginPrefix = await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
+            _aufgabe?.KiPluginPrefix,
+            _aufgabe?.ProjektId ?? Guid.Empty,
+            ct);
+
+        SetAktiverCliName(pluginPrefix);
+    }
+
+    private void SetAktiverCliName(string? pluginPrefix)
+    {
+        AktiverCliName = ResolveKiPluginName(pluginPrefix);
+    }
+
+    private string? ResolveKiPluginName(string? pluginPrefix)
+    {
+        if (string.IsNullOrWhiteSpace(pluginPrefix))
+            return null;
+
+        return _pluginManager.GetDevelopmentAutomationPlugins()
+            .FirstOrDefault(p => string.Equals(p.PluginPrefix, pluginPrefix, StringComparison.OrdinalIgnoreCase))
+            ?.PluginName ?? pluginPrefix;
+    }
+
     private void OnCliProcessStatusChanged(Guid aufgabeId, CliProcessStatus status)
     {
         if (aufgabeId != _aufgabeId)
@@ -674,6 +799,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 if (status != CliProcessStatus.Gestartet)
                 {
                     AttachCliStatusSession(null);
+                    AktiverCliName = null;
                     CliStatusText = status == CliProcessStatus.Fehler
                         ? "CLI-Status: Fehler"
                         : "CLI inaktiv";
@@ -732,6 +858,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 ct);
 
             await LadenAsync(ct);
+            SetAktiverCliName(pluginPrefix);
 
             var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
             if (session != null)
@@ -746,6 +873,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
+            AktiverCliName = null;
             _logger.LogError(ex, "Fehler beim Starten der Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"Aufgabe konnte nicht gestartet werden: {ex.Message}";
         }
@@ -779,7 +907,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            _dispatcherInvoke(() => IsCliRunning = false);
+            _dispatcherInvoke(() =>
+            {
+                IsCliRunning = false;
+                AktiverCliName = null;
+            });
 
             var lokalerKlonPfad = _aufgabe.LokalerKlonPfad ?? string.Empty;
             await StartCliAndUpdateStateAsync(pluginPrefix, lokalerKlonPfad, _optionalCliParameters, ct);
@@ -790,6 +922,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
+            AktiverCliName = null;
             _logger.LogError(ex, "Fehler beim Neustarten des CLI für Aufgabe {AufgabeId} nach Plugin-Wechsel.", _aufgabeId);
             FehlerMeldung = $"CLI konnte nicht neu gestartet werden: {ex.Message}";
         }
@@ -827,6 +960,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(pluginPrefix, ct);
         IsCliRunning = true;
+        AktiverCliName = ResolveKiPluginName(kiPlugin.PluginPrefix) ?? kiPlugin.PluginName ?? kiPlugin.PluginPrefix;
         try
         {
             var handle = await _kiService.StartWithPseudoConsoleAsync(_aufgabeId, kiPlugin, lokalerKlonPfad, optionalParameters, ct);
@@ -835,6 +969,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             if (!_kiService.IsRunning(_aufgabeId))
             {
                 IsCliRunning = false;
+                AktiverCliName = null;
                 return;
             }
 
@@ -847,6 +982,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         catch
         {
             IsCliRunning = false;
+            AktiverCliName = null;
             throw;
         }
     }

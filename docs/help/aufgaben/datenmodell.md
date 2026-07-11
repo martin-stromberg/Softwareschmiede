@@ -52,11 +52,10 @@
 ```mermaid
 stateDiagram-v2
     [*] --> Neu : Neu angelegt
-    Neu --> ArbeitsverzeichnisEingerichtet : Klon erstellt
-    ArbeitsverzeichnisEingerichtet --> Gestartet : Branch erstellt
-    Gestartet --> InArbeit : CLI gestartet
-    InArbeit --> Wartend : Rate-Limit erkannt
-    InArbeit --> Beendet : CLI beendet / Abschließen
+    Neu --> Gestartet : Repository eingerichtet + CLI gestartet
+    Gestartet --> Wartend : Rate-Limit erkannt
+    Gestartet --> Beendet : Abschließen
+    Wartend --> Beendet : Abschließen
     Wartend --> Gestartet : Recovery (manuell)
     Beendet --> Archiviert : Archivieren
     Neu --> Archiviert : Archivieren

@@ -278,8 +278,11 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 
         PropertyChangedEventHandler propertyChangedHandler = (_, e) =>
         {
-            if (e.PropertyName == nameof(ProjectDetailViewModel.ProjektName))
+            if (e.PropertyName == nameof(ProjectDetailViewModel.ProjektName)
+                && ReferenceEquals(DetailViewModel, viewModel))
+            {
                 DetailTitelAenderungAction?.Invoke(viewModel.ProjektName);
+            }
         };
         viewModel.PropertyChanged += propertyChangedHandler;
 
@@ -319,12 +322,22 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 
     private void ZeigeTaskDetailView(TaskDetailViewModel vm)
     {
+        vm.DetailTitelAenderungAction = detailTitel =>
+        {
+            if (!ReferenceEquals(DetailViewModel, vm))
+                return;
+
+            DetailTitelAenderungAction?.Invoke(string.IsNullOrWhiteSpace(detailTitel) ? "Aufgabe" : detailTitel);
+        };
         DetailViewModel = vm;
+        DetailTitelAenderungAction?.Invoke(string.IsNullOrWhiteSpace(vm.Aufgabe?.Titel) ? "Aufgabe" : vm.Aufgabe.Titel);
     }
 
     private void KehreZuProjectZurueck()
     {
         DetailViewModel = _currentProjectDetailViewModel;
+        if (_currentProjectDetailViewModel is not null)
+            DetailTitelAenderungAction?.Invoke(_currentProjectDetailViewModel.ProjektName);
         _ = LadenRepositorienSuggestionsAsync(CancellationToken.None);
     }
 

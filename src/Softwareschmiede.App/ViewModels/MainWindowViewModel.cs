@@ -139,6 +139,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             _projectListViewModel = _serviceProvider.GetRequiredService<ProjectListViewModel>();
             _projectListViewModel.DetailTitelAenderungAction = detailTitel =>
             {
+                if (!ReferenceEquals(CurrentView, _projectListViewModel))
+                    return;
+
                 Title = string.IsNullOrWhiteSpace(detailTitel)
                     ? "Softwareschmiede – Projekte"
                     : $"Softwareschmiede – {detailTitel}";
@@ -187,8 +190,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         var viewModel = _serviceProvider.GetRequiredService<TaskDetailViewModel>();
         viewModel.ZurueckAction = NavigateToDashboard;
-        viewModel.AufgabeId = aufgabeId;
+        viewModel.DetailTitelAenderungAction = detailTitel =>
+        {
+            if (!ReferenceEquals(CurrentView, viewModel))
+                return;
+
+            Title = string.IsNullOrWhiteSpace(detailTitel)
+                ? "Softwareschmiede – Aufgabe"
+                : $"Softwareschmiede – {detailTitel}";
+        };
+        Title = "Softwareschmiede – Aufgabe";
         CurrentView = viewModel;
+        viewModel.AufgabeId = aufgabeId;
     }
 
     private AktiveAufgabePanelItem MapAktiveAufgabePanelItem(Aufgabe aufgabe)

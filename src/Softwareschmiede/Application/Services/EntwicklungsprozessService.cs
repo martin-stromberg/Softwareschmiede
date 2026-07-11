@@ -142,6 +142,12 @@ public sealed class EntwicklungsprozessService
             }
 
             var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
+            await _aufgabeService.UpdateAsync(
+                aufgabeId,
+                aufgabe.Titel,
+                aufgabe.AnforderungsBeschreibung,
+                kiPlugin.PluginPrefix,
+                ct);
 
             // Dieselbe Repository-/Plugin-Auflösung wie beim Klon (ResolveRepositoryAsync/ResolvePluginAsync in
             // ProzessStartenAsync) wiederverwenden, statt über aufgabe.GitRepositoryId zu gehen: Dieses Feld wird
