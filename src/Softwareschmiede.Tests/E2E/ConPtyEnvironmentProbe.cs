@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Win32.SafeHandles;
-using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -8,44 +6,43 @@ namespace Softwareschmiede.Tests.E2E;
 /// Prüft einmalig pro Testlauf, ob ein per ConPTY gestarteter Kindprozess in dieser
 /// Ausführungsumgebung tatsächlich an die Pseudo-Konsole angebunden wird, statt an eine
 /// Ambient-Konsole mit sofortigem EOF auf stdin zu geraten (siehe
-/// docs/features/task/issue-114-.../e2e-timeout-analyse.md, Abschnitt "Nachtrag Iteration 5":
-/// belegt durch leeren Terminal-Buffer + im rohen Testkonsolen-Output sichtbaren cmd.exe-Prompt).
+/// docs/features/task/issue-114-.../e2e-timeout-analyse.md: belegt durch leeren
+/// Terminal-Buffer + im rohen Testkonsolen-Output sichtbaren cmd.exe-Prompt).
 ///
-/// Startet dazu denselben Codepfad wie <c>KiAusfuehrungsService.StartPseudoConsoleProcess</c>
-/// (PseudoConsole.Create + PseudoConsoleProcessStarter.Start), lässt cmd.exe ein eindeutiges
-/// Sentinel echoen und prüft, ob es im <see cref="PseudoConsoleSession.Buffer"/> ankommt. Kommt es
-/// nicht an, ist ConPTY-Konsolen-Isolation in dieser Umgebung nicht verfügbar - betroffene Tests
-/// sollen sich dann selbst überspringen statt mit einem nichtssagenden Timeout zu scheitern.
-///
-/// Zwei Sicherungen gegen falsch-negative Ergebnisse (beobachtet: Probe meldete in einer
-/// Umgebung "nicht verfügbar", in der die 14 betroffenen Tests zuvor nachweislich liefen):
-/// 1. Zwei Versuche statt einem - ein einzelner kalter/langsamer erster Prozessstart (JIT-Warmup,
-///    Virenscanner-Prüfung der frisch erzeugten cmd.exe, System unter Last durch parallele
-///    Testausführung) darf nicht das Ergebnis für den kompletten Testlauf verfälschen.
-/// 2. Grosszuegiges Timeout (8s statt der urspruenglichen 3s) je Versuch.
-/// Schlaegt die Probe dennoch fehl, wird der tatsaechliche Grund (Exception oder "Timeout ohne
-/// Sentinel") in <see cref="UnavailableReason"/> festgehalten und im Skip-Grund der betroffenen
-/// Tests ausgegeben, statt ihn stillschweigend zu verschlucken.
+/// WICHTIG: Die Probe startet den ConPTY-Testprozess NICHT direkt aus dem Test-Host
+/// (testhost.exe/vstest.console.exe), sondern aus einer echten <c>Softwareschmiede.App.exe</c>-
+/// Instanz heraus (Flag <c>--conpty-probe</c>, siehe App.xaml.cs.RunConPtyProbeAndExit). Ein
+/// erster Versuch, direkt aus dem Test-Host zu pruefen, lieferte in einer Umgebung ein
+/// falsch-negatives Ergebnis (Visual Studio, wo die betroffenen 14 Tests nachweislich liefen) -
+/// vermutlich weil die Prozessbaum-Tiefe fuer Windows' Konsolen-/Session-Vererbung relevant ist:
+/// die echte Anwendung erzeugt den ConPTY-Kindprozess als Enkelkind des Test-Hosts
+/// (Test-Host -> Softwareschmiede.App.exe -> cmd.exe), waehrend ein aus dem Test-Host direkt
+/// gestarteter ConPTY-Kindprozess nur ein Kind ist (Test-Host -> cmd.exe) - ein strukturell
+/// anderer, nicht repraesentativer Codepfad. Die Probe repliziert daher exakt den echten
+/// Prozessbaum.
 /// </summary>
 internal static class ConPtyEnvironmentProbe
 {
-    private const string Sentinel = "CONPTY_PROBE_OK";
+    private const string BuildConfigDebug = "Debug";
+    private const string BuildConfigRelease = "Release";
+    private const string TargetFramework = "net10.0-windows10.0.17763.0";
     private const int Attempts = 2;
-    private static readonly TimeSpan PerAttemptTimeout = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan PerAttemptTimeout = TimeSpan.FromSeconds(25);
 
     private static readonly Lazy<(bool Available, string? Reason)> Result = new(RunProbe);
 
     /// <summary>
     /// <c>true</c>, wenn ConPTY-Kindprozesse in dieser Umgebung nachweislich isoliert laufen
-    /// (Sentinel-Ausgabe kam im Buffer an, in mindestens einem von <see cref="Attempts"/>
-    /// Versuchen); sonst <c>false</c>. Ergebnis wird pro Testlauf gecacht.
+    /// (Sentinel-Ausgabe kam im Buffer der per <c>--conpty-probe</c> gestarteten App-Instanz an,
+    /// in mindestens einem von <see cref="Attempts"/> Versuchen); sonst <c>false</c>. Ergebnis
+    /// wird pro Testlauf gecacht.
     /// </summary>
     internal static bool IsAvailable => Result.Value.Available;
 
     /// <summary>
-    /// Diagnosetext, warum die Probe fehlgeschlagen ist (Exception-Meldung oder "Timeout"), oder
-    /// <c>null</c>, wenn <see cref="IsAvailable"/> <c>true</c> ist. Wird im Skip-Grund der
-    /// betroffenen Tests ausgegeben, damit ein falsch-negatives Ergebnis nachvollziehbar bleibt.
+    /// Diagnosetext, warum die Probe fehlgeschlagen ist, oder <c>null</c>, wenn
+    /// <see cref="IsAvailable"/> <c>true</c> ist. Wird im Skip-Grund der betroffenen Tests
+    /// ausgegeben, damit ein falsch-negatives Ergebnis nachvollziehbar bleibt.
     /// </summary>
     internal static string? UnavailableReason => Result.Value.Reason;
 
@@ -65,55 +62,53 @@ internal static class ConPtyEnvironmentProbe
 
     private static (bool Ok, string Reason) TryOnce()
     {
-        PseudoConsole? pseudoConsole = null;
-        PseudoConsoleSession? session = null;
+        string appExePath;
         try
         {
-            pseudoConsole = PseudoConsole.Create(80, 25);
+            appExePath = ResolveAppExePath();
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Softwareschmiede.App.exe nicht gefunden: {ex.Message}");
+        }
 
+        Process? process = null;
+        try
+        {
             var psi = new ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                Arguments = $"/c echo {Sentinel}",
+                FileName = appExePath,
+                Arguments = "--conpty-probe",
                 UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
             };
 
-            var startResult = PseudoConsoleProcessStarter.Start(psi, pseudoConsole);
+            process = Process.Start(psi);
+            if (process is null)
+                return (false, "Softwareschmiede.App.exe --conpty-probe konnte nicht gestartet werden (Process.Start lieferte null).");
 
-            Process process;
-            try
+            var output = process.StandardOutput.ReadToEnd();
+            var exited = process.WaitForExit((int)PerAttemptTimeout.TotalMilliseconds);
+            if (!exited)
             {
-                process = Process.GetProcessById(startResult.Pid);
-            }
-            catch
-            {
-                PseudoConsoleNativeMethods.CloseHandle(startResult.ProcessHandle);
-                throw;
-            }
-
-            var inputStream = new FileStream(
-                new SafeFileHandle(pseudoConsole.InputWritePipe, ownsHandle: false),
-                FileAccess.Write, bufferSize: 1, isAsync: false);
-            var outputStream = new FileStream(
-                new SafeFileHandle(pseudoConsole.OutputReadPipe, ownsHandle: false),
-                FileAccess.Read, bufferSize: 4096, isAsync: false);
-
-            session = new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream);
-
-            var deadline = DateTime.UtcNow.Add(PerAttemptTimeout);
-            while (DateTime.UtcNow < deadline)
-            {
-                for (var row = 0; row < 5; row++)
-                {
-                    var text = string.Concat(session.Buffer.GetRow(row).Select(c => c.Character));
-                    if (text.Contains(Sentinel, StringComparison.Ordinal))
-                        return (true, "");
-                }
-
-                Thread.Sleep(50);
+                TryKill(process);
+                return (false, $"Timeout nach {PerAttemptTimeout.TotalSeconds}s - Softwareschmiede.App.exe --conpty-probe hat nicht rechtzeitig geantwortet.");
             }
 
-            return (false, $"Timeout nach {PerAttemptTimeout.TotalSeconds}s ohne Sentinel-Ausgabe im Terminal-Buffer.");
+            // Die Ausgabe kann mehrere Zeilen enthalten (siehe App.xaml.cs-Kommentar: die
+            // gestartete cmd.exe kann ihrerseits Text auf denselben, geerbten stdout-Handle
+            // schreiben, falls die ConPTY-Isolation - wie in der urspruenglich untersuchten
+            // Sandbox - nicht funktioniert). Massgeblich ist die letzte "OK"/"FAIL:..."-Zeile.
+            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var resultLine = lines.LastOrDefault(l => l == "OK" || l.StartsWith("FAIL:", StringComparison.Ordinal));
+
+            if (resultLine == "OK")
+                return (true, "");
+            if (resultLine is not null)
+                return (false, resultLine["FAIL:".Length..]);
+
+            return (false, $"Unerwartete/leere Ausgabe von Softwareschmiede.App.exe --conpty-probe: '{output.Trim()}'");
         }
         catch (Exception ex)
         {
@@ -121,8 +116,45 @@ internal static class ConPtyEnvironmentProbe
         }
         finally
         {
-            session?.Dispose();
-            pseudoConsole?.Dispose();
+            process?.Dispose();
         }
+    }
+
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+        }
+    }
+
+    private static string ResolveAppExePath()
+    {
+        var baseDir = AppContext.BaseDirectory;
+
+        var candidates = new[]
+        {
+            Path.GetFullPath(Path.Combine(
+                baseDir, "..", "..", "..", "..",
+                "Softwareschmiede.App", "bin", BuildConfigDebug, TargetFramework,
+                "Softwareschmiede.App.exe")),
+            Path.GetFullPath(Path.Combine(
+                baseDir, "..", "..", "..", "..",
+                "Softwareschmiede.App", "bin", BuildConfigRelease, TargetFramework,
+                "Softwareschmiede.App.exe")),
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        throw new FileNotFoundException(
+            $"Gesuchte Pfade:{Environment.NewLine}{string.Join(Environment.NewLine, candidates)}");
     }
 }
