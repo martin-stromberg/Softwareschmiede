@@ -2,46 +2,41 @@
 
 ## Ergebnis
 
-**Status:** Befunde vorhanden
+**Status:** Keine Befunde
 
 ## Befunde
 
-### `.claude/settings.json`
+Keine offenen Befunde. Der einzige gemeldete Befund (Namenskonvention, minor) wurde nachträglich vom
+Orchestrator direkt behoben:
 
-- **Namenskonventionen und Einheitlichkeit** — Im neu hinzugefügten `PreToolUse`-Hook-Block sind die Zeilen `"if"` und `"statusMessage"` (Zeilen 123–124) mit Tabs eingerückt, während der gesamte Rest der Datei Leerzeichen verwendet. Der parallel aufgebaute `PostToolUse`-Block (Zeilen 136–137) ist demgegenüber durchgehend mit Leerzeichen eingerückt.
+- ~~**Namenskonventionen und Einheitlichkeit** — In `GetNewEntries_LiestNurInhaltNachOffset` (Zeile 55)
+  hält die Variable `var offset = AppStartupLogInspector.Snapshot(_logDirectory);` seit dem Refactoring
+  einen `LogSnapshot` (Dateipfad + Offset), nicht mehr einen `long`-Offset.~~ Behoben: Variable in
+  `snapshot` umbenannt (`src/Softwareschmiede.Tests/E2E/AppStartupLogInspectorTests.cs`, Zeilen 55/59).
+  Build und die betroffenen 31 Tests (`KiAusfuehrungsServiceTests` + `AppStartupLogInspectorTests`)
+  anschließend erneut grün.
 
-  Empfehlung: Die Tab-Einrückung in Zeilen 123–124 durch dieselbe Leerzeichen-Einrückung wie die umgebenden Zeilen ersetzen, damit die Datei einheitlich formatiert ist.
+## Bewertung der Schwerpunkt-Prüfpunkte (keine Befunde)
 
-### `.claude/hooks/dotnet_lock.py` / `.claude/hooks/release_build_lock.py`
+Die folgenden gezielt geprüften Punkte wurden als sauber umgesetzt bewertet und ergaben keine Befunde:
 
-- **Fehlerbehandlung (fehlende Vorbedingungsprüfung vor kritischer Operation)** — `dotnet_lock.release()` (Zeile 82–83) entfernt das Lock-Verzeichnis bedingungslos per `shutil.rmtree`, ohne zu prüfen, ob der aufrufende Prozess das Lock tatsächlich hält (kein Abgleich mit der `owner.txt`). `release_build_lock.py` ruft dies im `PostToolUse` ebenfalls bedingungslos auf. Damit bleibt ein Restfenster der ursprünglich gefixten Race Condition: Erwirbt `build_before_test.py` das Lock nach `TIMEOUT_SECONDS` nicht (`got_lock = False`) und baut ungeschützt weiter, hält zu diesem Zeitpunkt ein anderer Prozess (z. B. der Stop-Hook `test-csharp-startup.ps1`) das Lock. Nach Abschluss von `dotnet test` löscht `release_build_lock.py` dann das fremde Lock des noch laufenden Stop-Hook-Builds — genau die konkurrierende Build-Situation, die der Lock verhindern soll, wird wieder möglich.
+- **`SendCts`-Kopplung race-frei (`KiAusfuehrungsService.cs`)** — `sendToken` wird in `StartWithPseudoConsoleAsync` unmittelbar nach dem Erzeugen des `CancellationTokenSource` (und vor Handler-Registrierung/Veröffentlichung des Handles in `_handles`) abgegriffen; ein `Exited`-Event kann den CTS somit nicht disposen, bevor der Token gültig kopiert ist. `CancelAndDisposeConPtyResources` ruft `Cancel()` stets vor `SendCts.Dispose()` und `PseudoConsoleSession.Dispose()` auf — der Token ist damit garantiert bereits storniert, wenn der Input-Stream geschlossen wird, sodass `SendCommandDelayedAsync` in die `OperationCanceledException`-Behandlung statt in die `ObjectDisposedException`-Behandlung läuft. Das verbleibende schmale Mid-Write-Fenster ist durch den neuen `catch (ObjectDisposedException)` abgedeckt. Nebenläufige Aufrufe (`Dispose()` gegen `Exited`-Handler) sind sicher: `Cancel()` ist gegen `ObjectDisposedException` abgesichert, `CancellationTokenSource.Dispose()` ist idempotent, und `PseudoConsoleSession.Dispose()` ist `Interlocked`-geschützt. Beide Aufrufstellen liegen zudem in `try/catch(Exception)`. Keine neuen Leaks: Der `SendCts` wird in allen Pfaden (Normal-Exit, Früh-Exit, Service-`Dispose`) disposed.
 
-  Empfehlung: In `release()` nur freigeben, wenn das Lock dem eigenen Prozess gehört (z. B. `owner.txt` gegen die eigene PID prüfen), bzw. in `release_build_lock.py` nur freigeben, wenn der zugehörige `build_before_test.py`-Lauf das Lock erworben hatte. Alternativ die bewusste Kopplung „PreToolUse erwirbt / PostToolUse gibt frei" so absichern, dass ein nicht erworbenes Lock nicht fremd freigegeben wird.
+- **Regressionstest deterministisch (`KiAusfuehrungsServiceTests.cs`)** — `StartWithPseudoConsoleAsync_ProzessEndetVorVerzoegertemSenden_...` erzwingt das Prozessende deterministisch per `Kill` bei t≈0, weit vor der 300-ms-Verzögerung; der (ohne Fix) auftretende `ObjectDisposedException`-Logeintrag würde um ~300 ms erfolgen und vom abschließenden 1-s-`WhenAny` sicher erfasst. Kein Timing-Flakiness-Risiko in der Fehlererkennungsrichtung; ohne den Fix schlägt der Test zuverlässig fehl (Mock matcht `e is ObjectDisposedException` auf jedem Log-Level).
 
-### `src/Softwareschmiede.Tests/E2E/WpfTestBase.cs` (`WpfTestBase`)
+- **Vorheriger Befund `WpfTestBase.LaunchApp` behoben** — Bei fehlendem Hauptfenster wird jetzt in beiden Teilfällen eine aussagekräftige `InvalidOperationException` geworfen (mit Log-Auszug bzw. mit Hinweis „keine [ERR]/[FTL]-Zeile gefunden"), statt stillschweigend einen bereits beendeten Prozess an den Aufrufer zurückzugeben. Kein neuer Randfall: Der Erfolgspfad (Fenster vorhanden) bleibt unverändert.
 
-- **Fehlerbehandlung (Diagnose greift nicht in allen Fehlerfällen)** — In `LaunchApp` (Zeilen 97–105) wird die neue Startup-Log-Diagnose nur ausgewertet, wenn `CheckAppStartupException()` einen Treffer liefert. Ist das Hauptfenster nicht verfügbar (`HasExited`/`MainWindowHandle == IntPtr.Zero`), aber im Log steht keine `[ERR]`/`[FTL]`-Zeile (Absturz ohne geloggte Signatur oder reiner Hänger), fällt der Code stillschweigend durch, wartet `Thread.Sleep(2000)` und gibt den bereits beendeten Prozess zurück. Der Aufrufer (`app.GetMainWindow(...)!`) läuft dann wieder in einen unspezifischen Folgefehler (Timeout/NullRef) — also genau den opaken Zustand, den die neue Diagnose eigentlich vermeiden soll.
-
-  Empfehlung: Auch im Fall „Fenster fehlt und keine Startup-Exception gefunden" eine aussagekräftige `InvalidOperationException` werfen (mit Hinweis, dass der Prozess beendet ist bzw. kein `[ERR]/[FTL]` im Log stand), statt einen beendeten Prozess an den Aufrufer zurückzugeben.
-
-### `src/Softwareschmiede.Tests/E2E/AppStartupLogInspector.cs` (`AppStartupLogInspector`)
-
-- **Fehlerbehandlung (Randfall bei Log-Rotation)** — `Snapshot` merkt sich die Länge der zum Snapshot-Zeitpunkt neuesten Log-Datei; `GetNewEntries` wählt jedoch beim späteren Auslesen erneut die *dann* neueste Datei (`FindLatestLogFile`, `OrderByDescending(LastWriteTimeUtc)`). Wird zwischen Snapshot und Auswertung eine neue Log-Datei angelegt (Serilog-Rolling nach Datum/Größe, z. B. Tageswechsel oder neuer Prozess), wird der Byte-Offset der *alten* Datei auf die *neue* Datei angewandt. Ist die neue Datei bereits über den Offset hinaus gewachsen, werden deren erste `offset` Bytes übersprungen — u. U. genau die Startup-`[ERR]`-Zeile, die erkannt werden soll. (Bei kürzerer neuer Datei greift der Reset auf 0 in Zeile 36 korrekt.)
-
-  Empfehlung: In `Snapshot` neben der Länge auch den Dateinamen/-pfad merken und in `GetNewEntries` den Offset nur anwenden, wenn dieselbe Datei ausgewertet wird; bei abweichender (neuer) Datei ab 0 lesen.
+- **Vorheriger Befund `AppStartupLogInspector`-Log-Rotation behoben** — `Snapshot` liefert nun `LogSnapshot(FilePath, Offset)`; `GetNewEntries` wendet den Offset nur bei identischem Dateipfad an (`OrdinalIgnoreCase`) und liest bei Rollover ab Dateianfang. Der Truncation-Guard (`offset <= stream.Length`) und der Null-Pfad-Fall (Snapshot ohne Datei) sind korrekt behandelt und durch Tests (`GetNewEntries_BeiLogRollover_LiestNeueDateiAbAnfang`, `GetNewEntries_OhneRollover_WendetOffsetWeiterhinAn`) abgedeckt.
 
 ## Geprüfte Dateien
 
-- `.claude/hooks/build_before_test.py`
-- `.claude/hooks/release_build_lock.py`
-- `.claude/hooks/dotnet_lock.py` (mitgeprüft als gemeinsame Lock-Implementierung der geänderten Hooks)
-- `.claude/hooks/test-csharp-startup.ps1`
-- `.claude/settings.json`
-- `CLAUDE.md`
+- `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs`
+- `src/Softwareschmiede.Tests/Application/Services/KiAusfuehrungsServiceTests.cs`
 - `src/Softwareschmiede.Tests/E2E/WpfTestBase.cs`
 - `src/Softwareschmiede.Tests/E2E/AppStartupLogInspector.cs`
 - `src/Softwareschmiede.Tests/E2E/AppStartupLogInspectorTests.cs`
-- `src/Softwareschmiede.Tests/E2E/E2E_AutoStartCli.cs`
-- `src/Softwareschmiede.Tests/E2E/E2E_CreateNewTaskNavigation.cs`
-- `src/Softwareschmiede.Tests/E2E/E2E_TaskDetailNavigation.cs`
-- `src/Softwareschmiede.Tests/E2E/ProjectDetailE2ETests.cs`
+- `src/Softwareschmiede/Infrastructure/Terminal/PseudoConsoleSession.cs` (mitgeprüft zur Verifikation der Dispose-Idempotenz)
+
+## Hinweis
+
+Die weiteren im Branch geänderten Dateien (`.claude/hooks/*`, `.claude/settings.json`, E2E-Testdateien außerhalb des Fokus) wurden in diesem Lauf nicht erneut geprüft — sie wurden in `review-code.3.md` bereits behandelt und sind nicht Teil der in diesem Lauf geänderten Dateien.

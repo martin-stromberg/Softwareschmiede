@@ -141,6 +141,84 @@ CLI-Prozess-Ausführung selbst korrekt implementiert ist und reproduzierbar funk
 Sandbox-Restriktion entfällt. Damit ist die Einschränkung als umgebungsabhängig (Sandbox vs.
 Visual-Studio/interaktive Session) bestätigt und nicht als generischer Defekt zu behandeln.
 
+## Nachtrag (Iteration 4): Korrektur zu Ursache 2 — echter, jetzt behobener Race-Condition-Bug
+
+Der Anwender meldete beim Ausführen der ConPTY-E2E-Tests im App-Log eine zusätzliche, bis dahin nicht
+gewürdigte Fehlermeldung:
+
+```
+[09:41:27 WRN] Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe b83c8a7a-...
+System.ObjectDisposedException: Cannot access a closed file.
+   at System.IO.FileStream.WriteAsync(...)
+   at Softwareschmiede.Application.Services.KiAusfuehrungsService.SendCommandDelayedAsync(...)
+```
+
+Die ursprüngliche Einschätzung oben unter "Ursache 2" ("Umgebungslimitation, kein Code-Bug, Produktivcode
+außerhalb des Scopes") war in Bezug auf diese konkrete `ObjectDisposedException` **zu pauschal**. Eine
+erneute Code-Prüfung bestätigte: Es handelt sich um eine echte, reproduzierbare Race Condition in
+`KiAusfuehrungsService`, unabhängig von der Sandbox-Umgebung — und damit sehr wohl um einen fixbaren
+Produktivcode-Bug, keine reine Eigenschaft der Ausführungsumgebung.
+
+**Mechanismus:** `StartWithPseudoConsoleAsync` plant den Versand des Plugin-Befehls per Fire-and-Forget
+über `SendCommandDelayedAsync`, die nach `Task.Delay(300, ct)` in `session.InputStream` schreibt. Der
+`Exited`-Handler für den ConPTY-Kindprozess disposed beim Prozessende synchron die
+`PseudoConsoleSession` (und damit den `InputStream`), ohne den ausstehenden verzögerten Sendevorgang zu
+stornieren. Endet der Kindprozess innerhalb der 300ms-Verzögerung — was in dieser Sandbox-Umgebung
+laut obiger "Ursache 2"-Messung reproduzierbar nach 15–25ms der Fall ist, grundsätzlich aber bei jedem
+schnell endenden/fehlschlagenden Kindprozess in **jeder** Umgebung auftreten kann — greift
+`SendCommandDelayedAsync` nach Ablauf der Verzögerung auf den bereits geschlossenen Stream zu. Die
+Exception wurde zwar abgefangen und geloggt (kein App-Crash), aber der Plugin-Befehl wurde dabei
+stillschweigend **nie** an die Konsole gesendet — eine echte funktionale Lücke, kein reines
+Kosmetik-/Logging-Problem.
+
+**Fix** (`src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs`):
+
+1. `CliProcessHandle` bekommt ein neues `SendCts`-Feld (`CancellationTokenSource?`), das den
+   verzögerten Sendevorgang an das Prozess-Lebensende koppelt.
+2. `StartWithPseudoConsoleAsync` erzeugt direkt nach dem Anlegen von `handle` einen mit dem äußeren
+   `ct` verlinkten `CancellationTokenSource` (`CreateLinkedTokenSource`), setzt ihn auf
+   `handle.SendCts` und greift dessen `.Token` **sofort** in eine lokale Variable ab (nicht erst beim
+   späteren Fire-and-Forget-Aufruf — sonst könnte ein zwischenzeitlich auf einem anderen Thread
+   ausgelöstes `Exited`-Event den `CancellationTokenSource` bereits disposed haben, was den
+   `.Token`-Zugriff selbst mit einer `ObjectDisposedException` hätte scheitern lassen; dieser
+   Sekundärbug wurde während der Implementierung durch einen gezielten Regressionstest aufgedeckt und
+   ebenfalls behoben).
+3. Der neue private Helper `CancelAndDisposeConPtyResources` storniert `handle.SendCts` **vor** dem
+   Dispose der `PseudoConsoleSession` — sowohl im regulären `Exited`-Handler als auch im
+   "früher Exit vor Handler-Registrierung"-Zweig und in `KiAusfuehrungsService.Dispose()`.
+4. `SendCommandDelayedAsync` bekommt einen spezifischen `catch (ObjectDisposedException)`-Block *vor*
+   dem generischen `catch (Exception)`, der auf `LogDebug` statt `LogWarning` loggt — als
+   Restabsicherung für das enge Zeitfenster zwischen Cancel-Aufruf und tatsächlichem Session-Dispose
+   (kein unerwarteter Fehlerzustand mehr, siehe Punkt 1–3).
+
+**Regressionstest:** `KiAusfuehrungsServiceTests.StartWithPseudoConsoleAsync_ProzessEndetVorVerzoegertemSenden_KeineWarnungWegenGeschlossenemStream`
+(`src/Softwareschmiede.Tests/Application/Services/KiAusfuehrungsServiceTests.cs`) erzwingt deterministisch
+(per `Process.Kill`, statt auf das zufällige ConPTY-Frühende zu warten) ein Prozessende deutlich vor
+Ablauf der 300ms-Verzögerung und verifiziert per Logger-Mock, dass **keine** `ObjectDisposedException`
+mehr protokolliert wird (auf keinem Log-Level). Der Test wurde vor dem Fix probeweise gegen die
+unveränderte (Cancel-freie) Implementierung laufen gelassen und schlug dort reproduzierbar fehl — er
+fängt den Bug also tatsächlich ab, statt nur formal zu bestehen.
+
+**Empirische Verifikation nach dem Fix:** `E2E_ConPtyKeyboardInput.ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E`
+wurde vor und nach dem Fix erneut ausgeführt. Vorher (Fix versehentlich unvollständig, siehe
+Sekundärbug in Punkt 2): `System.InvalidOperationException: The CancellationTokenSource has been
+disposed.` — eine vom Fix selbst verursachte Regression, die vor dem Weitermachen behoben wurde. Nach
+dem vollständigen Fix: Test schlägt weiterhin fehl, aber jetzt mit einer reinen
+`System.TimeoutException: Element wurde nicht innerhalb von 15s gefunden.` — **keine**
+`ObjectDisposedException`/Warnung mehr im App-Log. Ein Blick ins App-Log bestätigt: Der ConPTY-Kindprozess
+terminiert weiterhin nach ca. 13ms (`ExitCode: null`), aber die zuvor protokollierte
+`WRN Plugin-Befehl konnte nicht an cmd.exe gesendet werden`-Zeile taucht in diesem Lauf **nicht** mehr auf.
+
+**Fazit, ehrlich eingeordnet:** Der Fix behebt eine echte, reproduzierbare Race Condition und schließt
+einen Funktionsverlust (Befehl wird bei schnellem Prozessende nie gesendet), der auch außerhalb dieser
+Sandbox-Umgebung auftreten kann (z. B. bei einem Plugin, dessen Kommando das Kind-`cmd.exe` sofort mit
+Fehler beendet). Er behebt **nicht** die eigentliche Ursache des schnellen ConPTY-Kindprozess-Endes
+selbst (Exit nach ~15ms, `ExitCode: null`) — dieser Mechanismus wird, wie in "Ursache 2" oben
+hergeleitet, vom Betriebssystem/ConPTY in dieser Sandbox-Umgebung ausgelöst, nicht durch diesen
+Code-Pfad. Die 14 dokumentierten ConPTY-E2E-Tests bleiben deshalb wie erwartet rot — jetzt aber ohne die
+begleitende `ObjectDisposedException`/Warnung, die zuvor fälschlich als Teil derselben Umgebungslimitation
+abgetan wurde, obwohl sie tatsächlich ein eigenständiger, unabhängig fixbarer Bug war.
+
 ## Die zwei fehlgeschlagenen Unit-Tests
 
 - `App.Controls.TerminalControlTests.OnPreviewKeyDown_CtrlV_SetsHandledTrue`
@@ -168,5 +246,6 @@ Anforderung verursacht. Keine Änderung im Rahmen dieser Anforderung vorgenommen
 | # | Fehlerbild | Ursache | Aktion |
 |---|-----------|---------|--------|
 | 3 von 17 E2E | Timeout bei `WaitForElement(..., "AufgabenListe", ...)` | Veraltete AutomationId in 4 Testdateien (Grid statt ListBox, seit Commit `43dc04c`) | **Behoben** — Selektor auf `"OffeneAufgabenListe"` umgestellt |
-| 14 von 17 E2E | Timeout/`NoClickablePointException` nach CLI-Start-Versuch | ConPTY-Kindprozess terminiert in dieser Sandbox-Umgebung reproduzierbar sofort (`ExitCode: null` nach 15–25ms); vom Anwender bestätigt: läuft aus Visual Studio heraus zuverlässig grün | **Nicht behoben** — Umgebungslimitation nur in diesem Sandbox-Kontext, außerhalb Plan-Scope (Produktivcode), hier dokumentiert |
+| 14 von 17 E2E | Timeout/`NoClickablePointException` nach CLI-Start-Versuch | ConPTY-Kindprozess terminiert in dieser Sandbox-Umgebung reproduzierbar sofort (`ExitCode: null` nach 15–25ms); vom Anwender bestätigt: läuft aus Visual Studio heraus zuverlässig grün | **Weiterhin rot** — Umgebungslimitation nur in diesem Sandbox-Kontext, außerhalb Plan-Scope (Produktivcode), hier dokumentiert |
+| Begleitende `ObjectDisposedException`/Warnung bei den 14 ConPTY-Tests | `WRN Plugin-Befehl konnte nicht an cmd.exe gesendet werden` + `ObjectDisposedException` im App-Log (vom Anwender gemeldet) | Echte, jetzt behobene Race Condition in `KiAusfuehrungsService.SendCommandDelayedAsync`/ConPTY-`Exited`-Handler (Session-Dispose ohne Stornierung des verzögerten Sendevorgangs) — siehe Nachtrag oben | **Behoben** (`SendCts`-Kopplung an Prozess-Exit) — die 14 Tests bleiben rot (anderer Mechanismus), aber ohne diese Warnung |
 | 2 Unit-Tests | Clipboard-COMException, ViewModel-Assertion | Vorbestehend/umgebungsbedingt, Dateien nicht von diesem Branch berührt | Keine Änderung nötig |

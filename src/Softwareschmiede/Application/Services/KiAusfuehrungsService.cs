@@ -205,12 +205,19 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
 
             var (process, session) = StartPseudoConsoleProcess(aufgabeId, effectiveWorkdir, pluginCommand);
 
-            var handle = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session };
+            var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            // Token sofort abgreifen: Wird er erst später (z. B. beim Fire-and-Forget-Aufruf weiter unten)
+            // von sendCts gelesen, kann ein zwischenzeitlich auf einem anderen Thread ausgelöstes Exited-Event
+            // sendCts bereits disposed haben (siehe CancelAndDisposeConPtyResources) — der Zugriff auf
+            // sendCts.Token würde dann selbst eine ObjectDisposedException werfen. Ein einmal (vor dem Dispose)
+            // abgegriffener CancellationToken bleibt dagegen gültig auswertbar.
+            var sendToken = sendCts.Token;
+            var handle = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session, SendCts = sendCts };
 
             // EnableRaisingEvents vor der Handler-Registrierung setzen. So ist sichergestellt, dass
             // das Exited-Event nicht zwischen Prozessstart und Handler-Registrierung verloren geht.
             process.EnableRaisingEvents = true;
-            process.Exited += (_, _) => HandleProcessExited(aufgabeId, process, handle, "ConPTY", () => handle.PseudoConsoleSession?.Dispose());
+            process.Exited += (_, _) => HandleProcessExited(aufgabeId, process, handle, "ConPTY", () => CancelAndDisposeConPtyResources(handle));
 
             _handles[aufgabeId] = handle;
 
@@ -219,7 +226,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // frühzeitig zurückkehren — kein Gestartet-Event für einen bereits beendeten Prozess.
             if (process.HasExited && _handles.TryRemove(aufgabeId, out var earlyExitHandle))
             {
-                earlyExitHandle.PseudoConsoleSession?.Dispose();
+                CancelAndDisposeConPtyResources(earlyExitHandle);
                 RaiseRunningCountChanged();
                 CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
                 return handle;
@@ -232,7 +239,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             // Plugin-Befehl verzögert senden: cmd.exe braucht ~200ms bis der Prompt bereit ist.
             if (!string.IsNullOrEmpty(pluginCommand))
             {
-                SendCommandDelayedAsync(session, pluginCommand, aufgabeId, ct).SafeFireAndForget(_logger, "KiAusfuehrungsService.SendCommandDelayedAsync");
+                SendCommandDelayedAsync(session, pluginCommand, aufgabeId, sendToken).SafeFireAndForget(_logger, "KiAusfuehrungsService.SendCommandDelayedAsync");
             }
 
             return handle;
@@ -385,7 +392,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                     handle.Process.Kill(entireProcessTree: true);
                 }
 
-                handle.PseudoConsoleSession?.Dispose();
+                CancelAndDisposeConPtyResources(handle);
                 handle.Process.Dispose();
             }
             catch (Exception)
@@ -587,10 +594,35 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         catch (OperationCanceledException)
         {
         }
+        catch (ObjectDisposedException ex)
+        {
+            _logger.LogDebug(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}, da der Prozess bereits beendet und die Session disposed wurde.", aufgabeId);
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Plugin-Befehl konnte nicht an cmd.exe gesendet werden für Aufgabe {AufgabeId}.", aufgabeId);
         }
+    }
+
+    /// <summary>
+    /// Storniert den ggf. noch ausstehenden verzögerten Plugin-Befehlsversand (<see cref="SendCommandDelayedAsync"/>)
+    /// und disposed anschließend CancellationTokenSource und <see cref="PseudoConsoleSession"/> des Handles.
+    /// Verhindert, dass nach dem Dispose der Session noch versucht wird, in den bereits geschlossenen
+    /// Input-Stream zu schreiben (Race Condition bei sehr kurzlebigen ConPTY-Kindprozessen).
+    /// </summary>
+    /// <param name="handle">Das Handle, dessen ConPTY-Ressourcen bereinigt werden sollen.</param>
+    private static void CancelAndDisposeConPtyResources(CliProcessHandle handle)
+    {
+        try
+        {
+            handle.SendCts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        handle.SendCts?.Dispose();
+        handle.PseudoConsoleSession?.Dispose();
     }
 
     private static string BuildCliCommand(System.Diagnostics.ProcessStartInfo psi)
@@ -632,6 +664,13 @@ public sealed class CliProcessHandle
 
     /// <summary>Die zugehörige <see cref="PseudoConsoleSession"/>, oder null bei klassischem Start.</summary>
     public PseudoConsoleSession? PseudoConsoleSession { get; set; }
+
+    /// <summary>
+    /// Koppelt den verzögerten Plugin-Befehlsversand (<see cref="KiAusfuehrungsService.SendCommandDelayedAsync"/>)
+    /// an das Prozess-Lebensende: Wird beim <see cref="Process.Exited"/>-Event storniert, damit kein Zugriff
+    /// auf die bereits disposte <see cref="PseudoConsoleSession"/> erfolgt. Nur beim ConPTY-Start gesetzt.
+    /// </summary>
+    public CancellationTokenSource? SendCts { get; set; }
 
     /// <summary>Erstellt ein neues Handle.</summary>
     /// <param name="aufgabeId">ID der zugehörigen Aufgabe.</param>

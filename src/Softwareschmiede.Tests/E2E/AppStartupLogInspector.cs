@@ -12,25 +12,37 @@ internal static class AppStartupLogInspector
     /// <summary>
     /// Ermittelt den aktuellen Byte-Offset (Länge) der neuesten Log-Datei in <paramref name="logDirectory"/>.
     /// Dient als Snapshot vor dem App-Start, damit spätere Auswertungen nur neu angehängte Zeilen betrachten.
+    /// Merkt sich zusätzlich den Pfad der zum Snapshot-Zeitpunkt neuesten Datei, damit <see cref="GetNewEntries"/>
+    /// bei einem zwischenzeitlichen Log-Rollover (z. B. Tageswechsel) den Offset nicht fälschlich auf eine
+    /// andere, neu angelegte Datei anwendet.
     /// </summary>
     /// <param name="logDirectory">Verzeichnis mit den App-Log-Dateien.</param>
-    /// <returns>Länge der neuesten Log-Datei in Bytes, oder 0, falls keine Log-Datei existiert.</returns>
-    internal static long Snapshot(string logDirectory)
-        => FindLatestLogFile(logDirectory)?.Length ?? 0;
+    /// <returns>Snapshot aus Dateipfad und Länge der neuesten Log-Datei, oder ein leerer Snapshot, falls keine Log-Datei existiert.</returns>
+    internal static LogSnapshot Snapshot(string logDirectory)
+    {
+        var latestLogFile = FindLatestLogFile(logDirectory);
+        return new LogSnapshot(latestLogFile?.FullName, latestLogFile?.Length ?? 0);
+    }
 
     /// <summary>
-    /// Liest den seit <paramref name="offset"/> angehängten Inhalt der neuesten Log-Datei in
+    /// Liest den seit <paramref name="snapshot"/> angehängten Inhalt der neuesten Log-Datei in
     /// <paramref name="logDirectory"/>. Die Datei wird mit <see cref="FileShare.ReadWrite"/> geöffnet,
-    /// da Serilog sie während des App-Laufs offen hält.
+    /// da Serilog sie während des App-Laufs offen hält. Ist die zum Auswertungszeitpunkt neueste Datei
+    /// eine andere als beim Snapshot (Log-Rollover), wird der Offset ignoriert und ab Dateianfang gelesen,
+    /// da der Offset der alten Datei für die neue Datei keine Aussagekraft hat.
     /// </summary>
     /// <param name="logDirectory">Verzeichnis mit den App-Log-Dateien.</param>
-    /// <param name="offset">Byte-Offset, ab dem gelesen werden soll (siehe <see cref="Snapshot"/>).</param>
-    /// <returns>Seit dem Offset angehängter Inhalt, oder ein leerer String, falls keine Log-Datei existiert oder kein neuer Inhalt vorliegt.</returns>
-    internal static string GetNewEntries(string logDirectory, long offset)
+    /// <param name="snapshot">Der zuvor per <see cref="Snapshot"/> erstellte Snapshot.</param>
+    /// <returns>Seit dem Snapshot angehängter Inhalt, oder ein leerer String, falls keine Log-Datei existiert oder kein neuer Inhalt vorliegt.</returns>
+    internal static string GetNewEntries(string logDirectory, LogSnapshot snapshot)
     {
         var latestLogFile = FindLatestLogFile(logDirectory);
         if (latestLogFile is null)
             return string.Empty;
+
+        var offset = string.Equals(latestLogFile.FullName, snapshot.FilePath, StringComparison.OrdinalIgnoreCase)
+            ? snapshot.Offset
+            : 0;
 
         using var stream = new FileStream(latestLogFile.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         var seekOffset = offset >= 0 && offset <= stream.Length ? offset : 0;
@@ -68,5 +80,28 @@ internal static class AppStartupLogInspector
             .GetFiles(LogFileSearchPattern)
             .OrderByDescending(f => f.LastWriteTimeUtc)
             .FirstOrDefault();
+    }
+}
+
+/// <summary>
+/// Snapshot des Zustands der neuesten App-Log-Datei zu einem Zeitpunkt (Dateipfad und Byte-Offset).
+/// Wird von <see cref="AppStartupLogInspector.Snapshot"/> erzeugt und an <see cref="AppStartupLogInspector.GetNewEntries"/>
+/// übergeben, damit ein zwischenzeitlicher Log-Rollover erkannt werden kann.
+/// </summary>
+internal readonly record struct LogSnapshot
+{
+    /// <summary>Voller Pfad der zum Snapshot-Zeitpunkt neuesten Log-Datei, oder <c>null</c> wenn keine existierte.</summary>
+    public string? FilePath { get; init; }
+
+    /// <summary>Länge der Datei zum Snapshot-Zeitpunkt in Bytes.</summary>
+    public long Offset { get; init; }
+
+    /// <summary>Erstellt einen neuen Snapshot.</summary>
+    /// <param name="filePath">Voller Pfad der zum Snapshot-Zeitpunkt neuesten Log-Datei, oder <c>null</c> wenn keine existierte.</param>
+    /// <param name="offset">Länge der Datei zum Snapshot-Zeitpunkt in Bytes.</param>
+    public LogSnapshot(string? filePath, long offset)
+    {
+        FilePath = filePath;
+        Offset = offset;
     }
 }

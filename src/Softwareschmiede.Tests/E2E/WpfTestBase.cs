@@ -33,7 +33,7 @@ public abstract class WpfTestBase : IDisposable
     private UIA3Automation? _automation;
     private readonly string _testDbPath;
     private string? _appLogDirectory;
-    private long _appLogOffset;
+    private LogSnapshot _appLogSnapshot;
 
     /// <summary>
     /// Pfad zur SQLite-Testdatenbank des laufenden App-Prozesses. Ermöglicht Tests, Vorbedingungen
@@ -88,7 +88,7 @@ public abstract class WpfTestBase : IDisposable
         Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", _testDbPath);
 
         _appLogDirectory = ResolveAppLogDirectory(appPath);
-        _appLogOffset = AppStartupLogInspector.Snapshot(_appLogDirectory);
+        _appLogSnapshot = AppStartupLogInspector.Snapshot(_appLogDirectory);
 
         _automation = new UIA3Automation();
         _application = FlaUI.Core.Application.Launch(appPath);
@@ -102,6 +102,10 @@ public abstract class WpfTestBase : IDisposable
                 throw new InvalidOperationException(
                     $"Die Anwendung wurde gestartet, aber das Hauptfenster ist nicht verfügbar. Log-Auszug:{Environment.NewLine}{startupException}");
             }
+
+            throw new InvalidOperationException(
+                "Die Anwendung wurde gestartet, aber das Hauptfenster ist nicht verfügbar (Prozess bereits beendet oder hängt). " +
+                "Im App-Log wurde keine [ERR]/[FTL]-Zeile gefunden.");
         }
 
         // Kurz warten, bis WPF-Rendering und EF-Migrationen abgeschlossen sind.
@@ -528,7 +532,7 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     /// <returns>Neu angehängter Log-Inhalt, oder ein leerer String, falls kein Log-Verzeichnis bekannt ist oder kein neuer Inhalt vorliegt.</returns>
     protected string GetLatestAppLogContent()
-        => _appLogDirectory is null ? string.Empty : AppStartupLogInspector.GetNewEntries(_appLogDirectory, _appLogOffset);
+        => _appLogDirectory is null ? string.Empty : AppStartupLogInspector.GetNewEntries(_appLogDirectory, _appLogSnapshot);
 
     /// <summary>Prüft die seit dem Start neu angehängten Log-Zeilen auf eine Startup-Fehlersignatur.</summary>
     /// <returns>Diagnosetext der Fehlerzeilen, oder <c>null</c>, falls keine Startup-Exception erkannt wurde.</returns>

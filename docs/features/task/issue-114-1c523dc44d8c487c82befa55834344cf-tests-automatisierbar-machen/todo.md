@@ -21,5 +21,5 @@ Branch: `task/issue-114-1c523dc44d8c487c82befa55834344cf-tests-automatisierbar-m
 | [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
 | [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
-| [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [ ] | – | Feature-Verzeichnis löschen | – (übersprungen: `continue.md` weiterhin vorhanden, verbleibender Punkt ist Umgebungslimitation) |
+| [x] | – | Commit durchführen | – |
