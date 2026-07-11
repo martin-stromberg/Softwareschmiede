@@ -29,7 +29,7 @@ public sealed partial class TerminalControlTests
     /// </summary>
     /// <param name="text">Der in die Zwischenablage zu schreibende Text.</param>
     /// <param name="maxAttempts">Maximale Anzahl an Versuchen, bevor eine Exception weitergereicht wird.</param>
-    private static void SetClipboardTextWithRetry(string text, int maxAttempts = 5)
+    private static void SetClipboardTextWithRetry(string text, int maxAttempts = 10)
     {
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -40,14 +40,14 @@ public sealed partial class TerminalControlTests
             }
             catch (COMException) when (attempt < maxAttempts)
             {
-                Thread.Sleep(50 * attempt);
+                Thread.Sleep(100 * attempt);
             }
         }
     }
 
     /// <summary>Leert die Windows-Zwischenablage mit Retry - Begründung siehe <see cref="SetClipboardTextWithRetry"/>.</summary>
     /// <param name="maxAttempts">Maximale Anzahl an Versuchen, bevor eine Exception weitergereicht wird.</param>
-    private static void ClearClipboardWithRetry(int maxAttempts = 5)
+    private static void ClearClipboardWithRetry(int maxAttempts = 10)
     {
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -58,7 +58,7 @@ public sealed partial class TerminalControlTests
             }
             catch (COMException) when (attempt < maxAttempts)
             {
-                Thread.Sleep(50 * attempt);
+                Thread.Sleep(100 * attempt);
             }
         }
     }

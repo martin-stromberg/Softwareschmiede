@@ -83,6 +83,32 @@ public sealed partial class TaskDetailView : UserControl
     private void SetTerminalSession(PseudoConsoleSession? session)
     {
         TerminalConsole.Session = session;
-        AutomationProperties.SetHelpText(TerminalConsole, session?.Process.Id.ToString() ?? string.Empty);
+        AutomationProperties.SetHelpText(TerminalConsole, TryGetProcessId(session));
+    }
+
+    /// <summary>
+    /// Liest die Prozess-ID einer Sitzung robust aus. <see cref="PseudoConsoleSession.Process"/> stammt
+    /// bei ConPTY-Sitzungen aus <see cref="System.Diagnostics.Process.GetProcessById(int)"/> - ist der
+    /// zugrunde liegende Prozess bereits beendet (z. B. sehr kurzlebige ConPTY-Kindprozesse), kann jeder
+    /// Zugriff darauf mit <see cref="InvalidOperationException"/> ("No process is associated with this
+    /// object") fehlschlagen, siehe KiAusfuehrungsService.TryGetExitCode für denselben Fehlermodus. Da
+    /// dieser Wert nur diagnostisch (E2E-Test-HelpText) ist, darf ein solcher Fehler die UI nicht
+    /// beeinträchtigen.
+    /// </summary>
+    /// <param name="session">Die Sitzung, deren Prozess-ID gelesen werden soll, oder <c>null</c>.</param>
+    /// <returns>Die Prozess-ID als String, oder ein leerer String, wenn keine Sitzung vorhanden ist oder die ID nicht (mehr) gelesen werden kann.</returns>
+    private static string TryGetProcessId(PseudoConsoleSession? session)
+    {
+        if (session is null)
+            return string.Empty;
+
+        try
+        {
+            return session.Process.Id.ToString();
+        }
+        catch (InvalidOperationException)
+        {
+            return string.Empty;
+        }
     }
 }
