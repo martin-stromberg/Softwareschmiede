@@ -36,7 +36,11 @@ public sealed class CodexPluginTests
         settings.Should().Contain(group => group.GroupName == "Ausfuehrung");
         settings.Should().Contain(group => group.GroupName == "CLI-Konfiguration");
         settings.SelectMany(g => g.Fields).Should().Contain(f => f.Key == "ExecutablePath");
-        settings.SelectMany(g => g.Fields).Should().Contain(f => f.Key == "CommandLineParameters");
+        var commandLineParametersField = settings.SelectMany(g => g.Fields)
+            .Should().ContainSingle(f => f.Key == "CommandLineParameters")
+            .Subject;
+        commandLineParametersField.DefaultValue.Should().BeNull();
+        commandLineParametersField.IsRequired.Should().BeFalse();
     }
 
     /// <summary>SupportsSessionContinuation returns false until a stable local CLI pattern exists.</summary>

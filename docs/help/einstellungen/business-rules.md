@@ -39,16 +39,40 @@
 - Beim Plugin-Wechsel: Die neuen Einstellungsgruppen werden via `GetSettingGroups()` abgerufen
   - Für jedes Feld wird der aktuelle Wert via `PluginSettingsService.GetValue()` geladen (falls vorhanden)
   - Die Felder werden in der UI gerendert, basierend auf ihrem `FieldType`
+- Beim Laden von Codex-`CommandLineParameters`: Ein fehlender gespeicherter Wert bleibt leer; ein eventuell deklarierter `DefaultValue` wird nicht als Anwenderwert angezeigt
 - Beim Speichern: Jeder Wert wird validiert, dann via `PluginSettingsService.SetValue()` persistiert
   - Boolean-Werte werden zu "true"/"false" Strings konvertiert
   - Andere Typen werden als String gespeichert
+  - Ein leerer Codex-`CommandLineParameters`-Wert wird gespeichert, damit die Anwenderentscheidung "keine zusätzlichen Parameter" nicht später durch automatische Defaults überschrieben wird
 - Beim Laden: Alle Werte werden als String aus dem Credential Store abgerufen; die UI interpretiert sie basierend auf `FieldType`
 
 **Umsetzung:**
 - `SettingsViewModel.LadePluginEinstellungen()` — Abruf von `GetSettingGroups()` und Wertladung (Zeile 269-279)
 - `SettingsViewModel.SpeicherePluginEinstellungen()` — Speicherung aller Werte (Zeile 281-293)
 - `PluginSettingsService.GetValue()` / `SetValue()` — Interface zu Credential Store
-- Feldtypen: `PluginSettingFieldType` Enum (Text, Secret, Url, Integer, Boolean, Enum, FilePath)
+- `PluginSettingEntry` — übernimmt `DefaultValue` nur, wenn der Aufrufer Defaults für dieses Feld zulässt
+- Feldtypen: `PluginSettingFieldType` Enum (Text, Secret, Url, Integer, Boolean, Enum, FilePath, CommandLineParameters)
+
+## Codex-Kommandozeilenparameter
+
+**Beschreibung:** Das Feld `CommandLineParameters` des Plugins mit Prefix `Softwareschmiede.Codex` beschreibt zusätzliche Argumente für die Codex CLI. Diese Argumente gelten als explizite Anwenderkonfiguration und dürfen nicht automatisch ergänzt, zurückgesetzt oder aus Plugin-Defaults abgeleitet werden.
+
+**Bedingungen:**
+- Das betroffene Plugin hat `PluginPrefix == "Softwareschmiede.Codex"`
+- Das betroffene Feld hat `Key == "CommandLineParameters"`
+- Die Sonderbehandlung gilt nicht für gleichnamige Felder anderer Plugins
+
+**Verhalten:**
+- Ist ein Wert im Credential Store vorhanden, wird exakt dieser Wert in der UI angezeigt und beim CLI-Start verwendet
+- Ist kein Wert gespeichert, bleibt das Feld in der Settings-UI leer
+- Entfernt ein Anwender vorhandene Parameter und speichert, wird der leere Wert als bewusste Anwenderentscheidung persistiert
+- Automatische Defaults oder technisch vermutete Codex-Parameter werden weder angezeigt noch beim Speichern als echter Anwenderwert übernommen
+
+**Umsetzung:**
+- `SettingsViewModel.IsCodexCommandLineParameters()` — erkennt ausschließlich `Softwareschmiede.Codex.CommandLineParameters`
+- `SettingsViewModel.LadePluginEinstellungen()` — übergibt für dieses Feld `useDefaultValue: false`
+- `PluginSettingEntry` — initialisiert den UI-Wert ohne Default-Fallback, wenn `useDefaultValue` deaktiviert ist
+- `CliKiPluginBase.AppendCommandLineParameters()` — hängt nur nicht-leere gespeicherte Credential-Werte an die Prozessargumente an
 
 ## Validierung vor dem Speichern
 

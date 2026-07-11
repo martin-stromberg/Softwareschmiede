@@ -349,6 +349,7 @@ Nach einem erfolgreichen Build (`dotnet build`) ist das Hammer-Symbol sichtbar i
   - `FilePath` → TextBox mit Browse-Button
 - **Globale Dark-Mode-kompatible Styles:** Einheitliche Styles für Label, CheckBox, TextBox und weitere Eingabekomponenten in den Theme-Dictionaries (`DarkTheme.xaml`, `LightTheme.xaml`) mit konsistenten Farben und Hover-/Checked-Zuständen
 - **Plugin-spezifische Einstellungspersistierung:** Alle Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert; Standard-Plugins werden als String-Namen in `AppEinstellung` gespeichert
+- **Codex-CLI-Parameter als Anwenderwert:** `Softwareschmiede.Codex.CommandLineParameters` wird nur aus gespeicherter Anwenderkonfiguration verwendet. Automatische Defaults werden für Codex nicht in die Settings-UI übernommen; ein leer gespeicherter Wert bleibt leer.
 
 #### Feature 72: WPF-Plugin-Verfügbarkeit & Dialog-Erweiterung (implementiert ✅)
 
@@ -425,7 +426,7 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 - **Plugin-Architektur** über `IKiPlugin`-Interface – austauschbar für verschiedene KI-Systeme
 - **GitHub Copilot-Plugin**: KI-Integration via `copilot` CLI
 - **Claude-CLI-Plugin** (`claude-cli-integration`): KI-Integration via `claude` CLI inkl. `ANTHROPIC_API_KEY`-Weitergabe aus dem Windows Credential Store
-- **Codex-CLI-Plugin**: KI-Integration via `codex` CLI mit optional konfigurierbarem Executable-Pfad
+- **Codex-CLI-Plugin**: KI-Integration via `codex` CLI mit optional konfigurierbarem Executable-Pfad und anwenderdefinierten `CommandLineParameters` ohne automatische Default-Übernahme
 - Provider-spezifische Kontext- und Task-Dateien (`*.copilot.context.md`, `*.claude.context.md`, `*.codex.context.md`, `*.copilot-task.md`, `*.claude-task.md`, `*.codex-task.md`)
 - Echtzeit-Streaming der KI-Ausgabe (< 500 ms Latenz pro Stream-Chunk)
 - Sidebar-Footer zeigt live die Anzahl laufender Automatisierungen; optionaler Auto-Shutdown-Toggle erscheint nur bei aktiven Läufen
@@ -918,6 +919,7 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 | `Softwareschmiede.GitHub.Token` | GitHub Personal Access Token |
 | `Softwareschmiede.ClaudeCli.Token` | Anthropic API Key für Claude CLI (`ANTHROPIC_API_KEY`) |
 | `Softwareschmiede.Codex.ExecutablePath` | Optionaler absoluter Pfad zur Codex-CLI |
+| `Softwareschmiede.Codex.CommandLineParameters` | Anwenderdefinierte zusätzliche Codex-CLI-Argumente; keine automatische Default-Übernahme |
 
 ### Weitere Plugin-Konfiguration
 

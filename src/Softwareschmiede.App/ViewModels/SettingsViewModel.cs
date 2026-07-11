@@ -12,6 +12,9 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für die Einstellungsseite.</summary>
 public sealed class SettingsViewModel : ViewModelBase, IDisposable
 {
+    private const string CodexPluginPrefix = "Softwareschmiede.Codex";
+    private const string CommandLineParametersKey = "CommandLineParameters";
+
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
@@ -295,10 +298,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 group.GroupName,
                 group.Fields.Select(field => new PluginSettingEntry(
                     field,
-                    _pluginSettingsService.GetValue(plugin, field)))
+                    _pluginSettingsService.GetValue(plugin, field),
+                    useDefaultValue: !IsCodexCommandLineParameters(plugin, field)))
                 .ToList()))
             .ToList();
     }
+
+    private static bool IsCodexCommandLineParameters(IPlugin plugin, PluginSettingField field) =>
+        string.Equals(plugin.PluginPrefix, CodexPluginPrefix, StringComparison.Ordinal)
+        && string.Equals(field.Key, CommandLineParametersKey, StringComparison.Ordinal);
 
     private void SpeicherePluginEinstellungen(IPlugin? plugin, IReadOnlyList<PluginSettingGroupEntry> settings)
     {

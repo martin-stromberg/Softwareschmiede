@@ -69,11 +69,14 @@ public sealed class SettingsViewModelTests : IDisposable
         return mock;
     }
 
-    private static Mock<IKiPlugin> CreateKiPluginMock(string pluginName, IReadOnlyList<PluginSettingGroup>? groups = null)
+    private static Mock<IKiPlugin> CreateKiPluginMock(
+        string pluginName,
+        IReadOnlyList<PluginSettingGroup>? groups = null,
+        string? pluginPrefix = null)
     {
         var mock = new Mock<IKiPlugin>();
         mock.Setup(p => p.PluginName).Returns(pluginName);
-        mock.Setup(p => p.PluginPrefix).Returns(pluginName.ToLowerInvariant());
+        mock.Setup(p => p.PluginPrefix).Returns(pluginPrefix ?? pluginName.ToLowerInvariant());
         mock.Setup(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
         mock.Setup(p => p.GetSettingGroups()).Returns(groups ?? []);
         return mock;
@@ -217,6 +220,83 @@ public sealed class SettingsViewModelTests : IDisposable
 
         var gespeicherterWert = _pluginSettingsService.GetValue(kiPlugin, field);
         gespeicherterWert.Should().Be("claude-opus");
+    }
+
+    /// <summary>Codex-CommandLineParameters übernehmen keinen automatischen Default als Anwenderwert.</summary>
+    [Fact]
+    public async Task SpeichernAsync_PersistiertKeinenCodexCommandLineDefault_WennKeinAnwenderwertExistiert()
+    {
+        var field = new PluginSettingField(
+            "CommandLineParameters",
+            "Kommandozeilenparameter",
+            PluginSettingFieldType.CommandLineParameters,
+            DefaultValue: "--auto-default");
+        var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
+        var kiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Codex CLI");
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SelectedKiPluginSettings[0].Entries[0].Value.Should().BeEmpty();
+
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters").Should().BeEmpty();
+    }
+
+    /// <summary>Anwenderdefinierte Codex-CommandLineParameters bleiben nach Speichern und Neuladen unverändert.</summary>
+    [Fact]
+    public async Task SpeichernAsync_ErhaeltGeaenderteCodexCommandLineParameters()
+    {
+        var field = new PluginSettingField(
+            "CommandLineParameters",
+            "Kommandozeilenparameter",
+            PluginSettingFieldType.CommandLineParameters,
+            DefaultValue: "--auto-default");
+        var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
+        var kiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Codex CLI");
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.SelectedKiPluginSettings[0].Entries[0].Value = "--user-choice --model custom";
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters")
+            .Should().Be("--user-choice --model custom");
+        sut.SelectedKiPluginSettings[0].Entries[0].Value.Should().Be("--user-choice --model custom");
+    }
+
+    /// <summary>Entfernte Codex-CommandLineParameters bleiben leer und fallen nicht auf Defaults zurück.</summary>
+    [Fact]
+    public async Task SpeichernAsync_ErhaeltLeereCodexCommandLineParameters_NachEntfernung()
+    {
+        var field = new PluginSettingField(
+            "CommandLineParameters",
+            "Kommandozeilenparameter",
+            PluginSettingFieldType.CommandLineParameters,
+            DefaultValue: "--auto-default");
+        var group = new PluginSettingGroup("CLI-Konfiguration", [field]);
+        var kiPlugin = CreateKiPluginMock("Codex CLI", [group], "Softwareschmiede.Codex").Object;
+        _credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "--auto-old");
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Codex CLI");
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.SelectedKiPluginSettings[0].Entries[0].Value = string.Empty;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters").Should().BeEmpty();
+        sut.SelectedKiPluginSettings[0].Entries[0].Value.Should().BeEmpty();
     }
 
     /// <summary>SpeichernAsync zeigt Fehlermeldung wenn Pflichtfeld leer ist und speichert nicht.</summary>
