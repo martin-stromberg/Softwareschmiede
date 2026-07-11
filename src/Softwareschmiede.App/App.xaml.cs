@@ -1,6 +1,4 @@
 using System.IO;
-using System.Linq;
-using System.Threading;
 using System.Windows;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,19 +28,6 @@ public sealed partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-
-        // Diagnosemodus fuer Softwareschmiede.Tests.E2E.ConPtyEnvironmentProbe: Prueft, ob ConPTY-
-        // Kindprozesse isoliert an die Pseudo-Konsole gebunden werden, wenn Softwareschmiede.App.exe
-        // (statt z. B. des Test-Hosts) der unmittelbare Elternprozess ist - genau der Prozessbaum,
-        // den KiAusfuehrungsService.StartPseudoConsoleProcess in der echten Anwendung erzeugt.
-        // Ueberspringt die gesamte restliche Initialisierung (kein Host, keine DB, kein Fenster),
-        // damit das Ergebnis schnell vorliegt und keine Seiteneffekte (Log-Dateien, DB-Migrationen)
-        // entstehen.
-        if (e.Args.Contains("--conpty-probe"))
-        {
-            RunConPtyProbeAndExit();
-            return;
-        }
 
         var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
         Directory.CreateDirectory(logDirectory);
@@ -128,72 +113,6 @@ public sealed partial class App : System.Windows.Application
     {
         Log.Logger.Error(e.Exception, "Unbeobachtete Task-Exception.");
         e.SetObserved();
-    }
-
-    /// <summary>
-    /// Fuehrt den ConPTY-Isolations-Selbsttest fuer <c>--conpty-probe</c> aus (siehe <see cref="OnStartup"/>)
-    /// und beendet den Prozess sofort mit dem Ergebnis auf stdout ("OK" oder "FAIL:&lt;Grund&gt;").
-    /// </summary>
-    private static void RunConPtyProbeAndExit()
-    {
-        var result = RunConPtyProbeOnce();
-        Console.WriteLine(result);
-        Console.Out.Flush();
-        Environment.Exit(0);
-    }
-
-    private static string RunConPtyProbeOnce()
-    {
-        const string sentinel = "CONPTY_PROBE_OK";
-        Softwareschmiede.Infrastructure.Terminal.PseudoConsole? pseudoConsole = null;
-        Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession? session = null;
-        try
-        {
-            pseudoConsole = Softwareschmiede.Infrastructure.Terminal.PseudoConsole.Create(80, 25);
-
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/c echo {sentinel}",
-                UseShellExecute = false,
-            };
-
-            var startResult = Softwareschmiede.Infrastructure.Terminal.PseudoConsoleProcessStarter.Start(psi, pseudoConsole);
-            var process = System.Diagnostics.Process.GetProcessById(startResult.Pid);
-
-            var inputStream = new FileStream(
-                new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.InputWritePipe, ownsHandle: false),
-                FileAccess.Write, bufferSize: 1, isAsync: false);
-            var outputStream = new FileStream(
-                new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.OutputReadPipe, ownsHandle: false),
-                FileAccess.Read, bufferSize: 4096, isAsync: false);
-
-            session = new Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream);
-
-            var deadline = DateTime.UtcNow.AddSeconds(8);
-            while (DateTime.UtcNow < deadline)
-            {
-                for (var row = 0; row < 5; row++)
-                {
-                    var text = string.Concat(session.Buffer.GetRow(row).Select(c => c.Character));
-                    if (text.Contains(sentinel, StringComparison.Ordinal))
-                        return "OK";
-                }
-
-                Thread.Sleep(50);
-            }
-
-            return "FAIL:Timeout nach 8s ohne Sentinel-Ausgabe im Terminal-Buffer.";
-        }
-        catch (Exception ex)
-        {
-            return $"FAIL:{ex.GetType().Name}: {ex.Message}";
-        }
-        finally
-        {
-            session?.Dispose();
-            pseudoConsole?.Dispose();
-        }
     }
 
     /// <inheritdoc/>

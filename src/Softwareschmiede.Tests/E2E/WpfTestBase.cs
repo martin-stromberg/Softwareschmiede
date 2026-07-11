@@ -474,26 +474,20 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Überspringt den aufrufenden Test (via <c>Assert.Skip</c>), wenn ConPTY-Kindprozesse in dieser
-    /// Ausführungsumgebung nicht isoliert an die Pseudo-Konsole angebunden werden (siehe
-    /// <see cref="ConPtyEnvironmentProbe"/>). Betrifft alle Tests, die über einen CLI-Prozess
-    /// (ConPTY, z. B. via <see cref="StartenUndPluginWaehlen"/>) sichtbare Terminal-Ausgabe erwarten -
-    /// ohne funktionierende Konsolen-Isolation scheitern sie sonst mit einem nichtssagenden
-    /// <see cref="TimeoutException"/> statt mit einer erklärenden Meldung. Muss als erste Zeile des
-    /// jeweiligen Testkörpers aufgerufen werden, vor jedem App-Start.
-    /// Erfordert, dass die aufrufende Testmethode mit <c>[SkippableFact]</c> (statt <c>[Fact]</c>)
-    /// annotiert ist (Paket <c>Xunit.SkippableFact</c>) - nur damit erzeugt <c>Skip.If</c> ein
-    /// echtes "Skipped"-Ergebnis statt eines fehlschlagenden Tests.
+    /// Überspringt den aufrufenden Test (via <c>Skip.If</c>), wenn die Umgebungsvariable
+    /// <c>SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1</c> gesetzt ist (siehe
+    /// <see cref="ConPtyEnvironmentProbe"/> und CLAUDE.md, Abschnitt Testing). Betrifft alle Tests,
+    /// die über einen CLI-Prozess (ConPTY, z. B. via <see cref="StartenUndPluginWaehlen"/>)
+    /// sichtbare Terminal-Ausgabe erwarten - ohne funktionierende Konsolen-Isolation scheitern sie
+    /// sonst mit einem nichtssagenden <see cref="TimeoutException"/> statt mit einer erklärenden
+    /// Meldung. Muss als erste Zeile des jeweiligen Testkörpers aufgerufen werden, vor jedem
+    /// App-Start. Erfordert, dass die aufrufende Testmethode mit <c>[SkippableFact]</c> (statt
+    /// <c>[Fact]</c>) annotiert ist (Paket <c>Xunit.SkippableFact</c>) - nur damit erzeugt
+    /// <c>Skip.If</c> ein echtes "Skipped"-Ergebnis statt eines fehlschlagenden Tests.
     /// </summary>
     protected static void SkipWennConPtyNichtVerfuegbar()
     {
-        Skip.If(
-            !ConPtyEnvironmentProbe.IsAvailable,
-            "ConPTY-Konsolen-Isolation konnte in dieser Ausführungsumgebung nicht bestätigt werden " +
-            $"(Probe-Ergebnis: {ConPtyEnvironmentProbe.UnavailableReason}). Falls dieser Test auch " +
-            "in einer Umgebung übersprungen wird, in der ConPTY nachweislich funktioniert (z. B. " +
-            "Visual Studio), ist das ein Bug in ConPtyEnvironmentProbe, keine echte " +
-            "Umgebungslimitation - bitte den Probe-Grund oben melden.");
+        Skip.If(!ConPtyEnvironmentProbe.IsAvailable, ConPtyEnvironmentProbe.UnavailableReason);
     }
 
     /// <summary>
