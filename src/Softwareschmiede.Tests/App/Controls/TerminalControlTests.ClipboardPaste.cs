@@ -15,6 +15,54 @@ namespace Softwareschmiede.Tests.App.Controls;
 /// Tastatur-Handling, Zwischenablage-Zugriff und Schreiben in den Input-Stream der Session.</summary>
 public sealed partial class TerminalControlTests
 {
+    /// <summary>
+    /// Setzt Text in die Windows-Zwischenablage mit Retry: Die Zwischenablage ist eine
+    /// prozessübergreifende, systemweite Ressource ohne Locking-Schutz. Läuft dieses Testprojekt
+    /// parallel zu vielen anderen Tests (voller Suite-Lauf), kann ein anderer Prozess/Thread sie
+    /// transient belegen (<c>CLIPBRD_E_CANT_OPEN</c>). Der Produktivcode (<c>TerminalControl.
+    /// GetClipboardText</c>) fängt einen solchen Fehler bewusst ab und liefert dann einen leeren
+    /// String, was von einem echten "Zwischenablage ist leer" nicht unterscheidbar ist - ein
+    /// isoliert laufender Test sieht dieses Timing-Fenster nie, ein Lauf der vollen Suite gelegentlich
+    /// schon. Ein einzelner fehlgeschlagener Versuch ist daher kein echtes Testergebnis, sondern
+    /// Rauschen; erst wenn auch mehrere Versuche mit Backoff fehlschlagen, wird die Exception
+    /// weitergereicht.
+    /// </summary>
+    /// <param name="text">Der in die Zwischenablage zu schreibende Text.</param>
+    /// <param name="maxAttempts">Maximale Anzahl an Versuchen, bevor eine Exception weitergereicht wird.</param>
+    private static void SetClipboardTextWithRetry(string text, int maxAttempts = 5)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                System.Windows.Clipboard.SetText(text);
+                return;
+            }
+            catch (COMException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(50 * attempt);
+            }
+        }
+    }
+
+    /// <summary>Leert die Windows-Zwischenablage mit Retry - Begründung siehe <see cref="SetClipboardTextWithRetry"/>.</summary>
+    /// <param name="maxAttempts">Maximale Anzahl an Versuchen, bevor eine Exception weitergereicht wird.</param>
+    private static void ClearClipboardWithRetry(int maxAttempts = 5)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                System.Windows.Clipboard.Clear();
+                return;
+            }
+            catch (COMException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(50 * attempt);
+            }
+        }
+    }
+
     /// <summary>Drückt der Anwender <c>Ctrl+V</c>, muss das Tastaturereignis als behandelt markiert werden,
     /// damit es nicht an den bestehenden Tastatur-Encoder weitergereicht wird.</summary>
     [Fact]
@@ -26,7 +74,7 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(new ImmediateEofStream());
             control.Session = session;
 
-            System.Windows.Clipboard.SetText("x");
+            SetClipboardTextWithRetry("x");
 
             var args = InvokeCtrlV(control);
 
@@ -47,7 +95,7 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(inputStream, new ImmediateEofStream());
             control.Session = session;
 
-            System.Windows.Clipboard.SetText("pasted");
+            SetClipboardTextWithRetry("pasted");
 
             InvokeCtrlV(control);
 
@@ -72,7 +120,7 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(inputStream, new ImmediateEofStream());
             control.Session = session;
 
-            System.Windows.Clipboard.SetText("Hi\nThere");
+            SetClipboardTextWithRetry("Hi\nThere");
 
             InvokeReadClipboardAndInsertAsync(control);
 
@@ -92,7 +140,7 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(inputStream, new ImmediateEofStream());
             control.Session = session;
 
-            System.Windows.Clipboard.Clear();
+            ClearClipboardWithRetry();
 
             InvokeReadClipboardAndInsertAsync(control);
 
@@ -114,7 +162,7 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(new WriteThrowingStream(), new ImmediateEofStream());
             control.Session = session;
 
-            System.Windows.Clipboard.SetText("paste-me");
+            SetClipboardTextWithRetry("paste-me");
 
             var act = () => InvokeReadClipboardAndInsertAsync(control);
 
@@ -143,7 +191,7 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(new MemoryStream(), new ImmediateEofStream());
             control.Session = session;
 
-            System.Windows.Clipboard.SetText("x");
+            SetClipboardTextWithRetry("x");
 
             InvokeReadClipboardAndInsertAsync(control);
 
@@ -161,7 +209,7 @@ public sealed partial class TerminalControlTests
         RunOnSta(() =>
         {
             var control = new TerminalControl();
-            System.Windows.Clipboard.SetText("Zwischenablage-Inhalt");
+            SetClipboardTextWithRetry("Zwischenablage-Inhalt");
 
             var result = InvokeGetClipboardText(control);
 
