@@ -1,0 +1,50 @@
+name: Tests
+
+# Bisher gab es keine CI-Pipeline, die "dotnet test" ausfuehrt - release.yml baut/published/released
+# nur (siehe dortige Kommentare). Ohne diesen Job war die gesamte Testsuite (inkl. der ConPTY-
+# abhaengigen E2E-Tests, siehe ConPtyEnvironmentProbe) ausschliesslich durch gelegentliche manuelle
+# Laeufe abgesichert.
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # Softwareschmiede.Tests referenziert Softwareschmiede.App (WPF, net10.0-windows) und faehrt
+    # FlaUI-basierte E2E-UI-Automatisierung - beides erfordert einen Windows-Runner.
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+        shell: pwsh
+
+      - name: Build
+        run: dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore -c Debug
+        shell: pwsh
+
+      - name: Test
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: src/Softwareschmiede.Tests/TestResults/*.trx
+          retention-days: 14
