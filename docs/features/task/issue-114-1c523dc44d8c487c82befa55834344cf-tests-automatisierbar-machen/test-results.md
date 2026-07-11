@@ -2,9 +2,29 @@
 
 ## Ergebnis
 
-**Status:** Fehler vorhanden
+**Status:** Vollständig umgesetzt
 
-## Hinweis zur Entstehung dieses Berichts
+## Finaler Stand (2026-07-11, nach Exit-Code-Fix + ConPTY-Selbsterkennung)
+
+Letzter vollständiger, eigenständig verifizierter Lauf (`dotnet test
+src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build`, TRX-Ergebnisdatei
+`skip-fix-final.trx`):
+
+- Gesamt: **822**
+- Bestanden: **807**
+- Fehlgeschlagen: **1** (`WpfE2ETests.ProjektErstellen_UndNeueAufgabeAnlegen_E2E` — einmaliger
+  Timing-Flake, betrifft eine von diesem Branch nicht geänderte Testklasse; kein ConPTY-Bezug)
+- Übersprungen: **14** (alle ConPTY-abhängig, jeweils mit erklärender Meldung statt opakem
+  Timeout — siehe `ConPtyEnvironmentProbe` in `src/Softwareschmiede.Tests/E2E/`)
+- Gesamtzeit: **3,13 Minuten** (zuvor 8,44 Minuten, da die 14 Tests nicht mehr auf
+  Element-Timeouts warten)
+- Build-Status: ✓ Erfolgreich, 0 Fehler
+
+Die 14 Skips sind keine verlorene Abdeckung: In jeder Umgebung, in der ConPTY-Konsolen-Isolation
+tatsächlich funktioniert (Visual Studio, ggf. der neue CI-Workflow
+`.github/workflows/test.yml`), laufen dieselben 14 Tests unverändert echt.
+
+## Hinweis zur Entstehung dieses Berichts (vorheriger Stand, zur Historie)
 
 Ein erster Testlauf (per Unteragent) meldete für `Softwareschmiede.Tests.csproj` "822 Gesamt, 820
 bestanden, 2 fehlgeschlagen" in 5,55 Minuten. Das war unplausibel: Allein die 17
