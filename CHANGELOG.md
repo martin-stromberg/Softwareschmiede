@@ -1,3 +1,15 @@
+# [1.5.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.4.0...v1.5.0) (2026-07-11)
+
+
+### Bug Fixes
+
+* Fokus nach Promptvorlage auf Konsole setzen ([675bb7b](https://github.com/martin-stromberg/Softwareschmiede/commit/675bb7be6826c150d355472bb0d36144f8213eff))
+
+
+### Features
+
+* Promptvorlagen verwalten und senden ([6f9796d](https://github.com/martin-stromberg/Softwareschmiede/commit/6f9796d96d4c7f14174c7d07bb1fc97004850d6f))
+
 # [1.4.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.3.0...v1.4.0) (2026-07-10)
 
 
