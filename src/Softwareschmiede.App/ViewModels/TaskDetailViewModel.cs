@@ -290,6 +290,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wird gefeuert, wenn der CLI-Prozess der aktuellen Aufgabe beendet wurde.</summary>
     public event Action? CliGestoppt;
 
+    /// <summary>Wird gefeuert, nachdem eine Promptvorlage erfolgreich an die CLI gesendet wurde.</summary>
+    public event Action? PromptVorlageGesendet;
+
     /// <summary>Gibt die aktive <see cref="PseudoConsoleSession"/> für die aktuelle Aufgabe zurück, oder null.
     /// Die Session (und ihre Leseschleife) läuft unabhängig vom Lebenszyklus der View, die diese Methode
     /// aufruft — der zurückgegebene Prozess kann also bereits vor dem Öffnen dieser Aufgabenseite gestartet
@@ -440,7 +443,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         await session.InputStream.FlushAsync(ct);
         session.MarkInputActivity();
 
+        IsInfoViewVisible = false;
         SelectedPromptVorlage = null;
+        PromptVorlageGesendet?.Invoke();
     }
 
     private async Task CliStoppenAsync(CancellationToken ct)

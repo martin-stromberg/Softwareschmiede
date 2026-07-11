@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Infrastructure.Terminal;
 
@@ -48,6 +49,7 @@ public sealed partial class TaskDetailView : UserControl
         {
             vm.PseudoConsoleSessionGestartet += OnPseudoConsoleSessionGestartet;
             vm.CliGestoppt += OnCliGestoppt;
+            vm.PromptVorlageGesendet += OnPromptVorlageGesendet;
             _subscribedViewModel = vm;
 
             SetTerminalSession(vm.GetPseudoConsoleSession());
@@ -65,6 +67,7 @@ public sealed partial class TaskDetailView : UserControl
 
         vm.PseudoConsoleSessionGestartet -= OnPseudoConsoleSessionGestartet;
         vm.CliGestoppt -= OnCliGestoppt;
+        vm.PromptVorlageGesendet -= OnPromptVorlageGesendet;
         vm.Dispose();
     }
 
@@ -76,6 +79,15 @@ public sealed partial class TaskDetailView : UserControl
     private void OnCliGestoppt()
     {
         SetTerminalSession(null);
+    }
+
+    private void OnPromptVorlageGesendet()
+    {
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            TerminalConsole.Focus();
+            Keyboard.Focus(TerminalConsole);
+        }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     /// <summary>Setzt die im TerminalControl angezeigte Sitzung und legt deren Prozess-ID zu Testzwecken als AutomationProperties.HelpText ab (siehe E2E_TaskWechselUeberMenue).</summary>
