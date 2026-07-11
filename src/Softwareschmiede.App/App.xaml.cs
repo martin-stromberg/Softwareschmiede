@@ -85,6 +85,9 @@ public sealed partial class App : System.Windows.Application
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
             await db.Database.MigrateAsync();
+
+            var promptVorlagenService = scope.ServiceProvider.GetRequiredService<PromptVorlagenService>();
+            await promptVorlagenService.EnsureInitialPromptVorlagenAsync();
         }
 
         try
@@ -181,6 +184,8 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<PluginSettingsService>();
         services.AddScoped<PluginSelectionService>();
         services.AddScoped<AufgabeRecoveryService>();
+        services.AddScoped<PromptVorlagenService>();
+        services.AddSingleton<PromptVorlagenPlatzhalterService>();
 
         // Infrastructure Services
         services.AddSingleton<KiAusfuehrungsService>();

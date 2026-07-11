@@ -9,6 +9,7 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 3. **Arbeitsverzeichnis** — Wo geklonte Repositories lokal abgelegt werden
 4. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
 5. **Erscheinungsbild** — Dark Mode ein-/ausschalten
+6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
 
 ## Funktionsweise
 
@@ -44,6 +45,20 @@ Der `KiAufgabenBenachrichtigungsHub` publiziert `KiAufgabenAbschlussEreignis` na
 Der `DarkModeService` wechselt das WPF-`ResourceDictionary` zwischen `LightTheme.xaml` und `DarkTheme.xaml`. Der Wechsel erfolgt sofort ohne Neustart. Die Einstellung wird in der `AppEinstellung`-Tabelle gespeichert und beim nächsten Start automatisch angewendet.
 
 Das Design wird in den Einstellungen über die Dropdown-Liste **Design** (Registerkarte „Allgemein") gesteuert. Verfügbare Optionen sind „Hell" und „Dunkel".
+
+### Promptvorlagen
+
+Auf der Registerkarte **Promptvorlagen** können wiederkehrende Prompts mit Name und Prompttext gepflegt werden. Die Vorlagen werden dauerhaft gespeichert und stehen in der Aufgabendetailansicht im Ribbon der CLI-Gruppe zur Verfügung.
+
+Beim ersten Programmstart legt die Anwendung einmalig drei Standardvorlagen an:
+
+- `Initialanforderung senden`
+- `Weitermachen`
+- `Pullrequest`
+
+Bereits vorhandene oder geänderte Vorlagen werden bei späteren Starts nicht überschrieben.
+
+Prompttexte können die Platzhalter `%ProjectName%`, `%TaskName%` und `%RepositoryUrl%` enthalten. Diese Werte werden direkt vor dem Versand an die laufende CLI durch den aktuellen Aufgaben- und Projektkontext ersetzt. Fehlt ein Wert, wird er leer eingesetzt.
 
 ### Fenstergeometrie
 

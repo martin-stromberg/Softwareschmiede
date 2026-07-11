@@ -346,6 +346,76 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" Margin="0">
+                        <TextBlock Margin="0,0,8,0" Foreground="{DynamicResource SecondaryTextBrush}" Opacity="0.88">⌘</TextBlock>
+                        <TextBlock Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}">Promptvorlagen</TextBlock>
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16" MaxWidth="900" HorizontalAlignment="Left">
+                        <Button Content="Hinzufügen"
+                                AutomationProperties.Name="PromptVorlageHinzufuegen"
+                                Command="{Binding PromptVorlageHinzufuegenCommand}"
+                                Padding="12,6"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,12" />
+
+                        <ItemsControl ItemsSource="{Binding PromptVorlagen}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="12"
+                                            Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="220" />
+                                                <ColumnDefinition Width="16" />
+                                                <ColumnDefinition Width="480" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Name"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                                           Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                         AutomationProperties.Name="PromptVorlageName"
+                                                         Padding="8,6" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Prompttext"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                                           Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding Prompttext, UpdateSourceTrigger=PropertyChanged}"
+                                                         AutomationProperties.Name="PromptVorlagePrompttext"
+                                                         Padding="8,6"
+                                                         MinHeight="72"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         VerticalScrollBarVisibility="Auto" />
+                                            </StackPanel>
+                                            <Button Grid.Column="3"
+                                                    Content="Löschen"
+                                                    AutomationProperties.Name="PromptVorlageLoeschen"
+                                                    Command="{Binding DataContext.PromptVorlageLoeschenCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="12,6"
+                                                    Margin="12,20,0,0"
+                                                    VerticalAlignment="Top" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
     </Grid>
 </UserControl>

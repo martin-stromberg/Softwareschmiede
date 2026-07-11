@@ -27,6 +27,8 @@ public static class TaskDetailViewModelTestFactory
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
+        var promptVorlagenService = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
+        var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
         var entwicklungsprozessService = new EntwicklungsprozessService(
@@ -46,6 +48,8 @@ public static class TaskDetailViewModelTestFactory
             kiService,
             entwicklungsprozessService,
             pluginSelectionService,
+            promptVorlagenService,
+            promptVorlagenPlatzhalterService,
             dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderMock.Object,

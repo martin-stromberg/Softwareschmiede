@@ -36,6 +36,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Globale App-Einstellungen.</summary>
     public DbSet<AppEinstellung> AppEinstellungen => Set<AppEinstellung>();
 
+    /// <summary>Promptvorlagen fuer wiederkehrende CLI-Eingaben.</summary>
+    public DbSet<PromptVorlage> PromptVorlagen => Set<PromptVorlage>();
+
     /// <summary>Benutzerbezogene Benachrichtigungseinstellungen.</summary>
     public DbSet<BenachrichtigungsEinstellung> BenachrichtigungsEinstellungen => Set<BenachrichtigungsEinstellung>();
 
@@ -200,6 +203,24 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.AktualisiertAm).HasConversion(
                 v => v.ToUnixTimeMilliseconds(),
                 v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+        });
+
+        // PromptVorlage
+        modelBuilder.Entity<PromptVorlage>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+            e.Property(p => p.Prompttext)
+                .IsRequired();
+            e.Property(p => p.ErstelltAm).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(p => p.AktualisiertAm).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.HasIndex(p => p.Sortierung);
         });
 
         // BenachrichtigungsEinstellung

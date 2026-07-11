@@ -61,3 +61,14 @@ Bekannte Schlüssel:
 | `PluginPrefix` | `string` | FK → Plugin-Präfix |
 | `FieldKey` | `string` | Einstellungsschlüssel des Felds |
 | `Value` | `string?` | Verschlüsselter Wert (Windows Credential Store) |
+
+### `PromptVorlage`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `Name` | `string` | Anzeigename der Vorlage |
+| `Prompttext` | `string` | Prompt, der an die CLI gesendet wird |
+| `Sortierung` | `int` | Stabile Anzeigenreihenfolge |
+| `ErstelltAm` | `DateTimeOffset` | Erstellungszeitpunkt |
+| `AktualisiertAm` | `DateTimeOffset` | Letzte Änderung |

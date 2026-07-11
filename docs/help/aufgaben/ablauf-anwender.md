@@ -94,6 +94,10 @@ Du kannst jederzeit zwischen beiden Ansichten wechseln, ohne den CLI-Prozess zu 
 
 Das eingebettete CLI-Fenster verhält sich wie ein natives Terminalfenster. Prompts können direkt eingegeben werden. Das Protokoll der Sitzung wird laufend in der Aufgabe gespeichert und ist über die Info-Ansicht einsehbar.
 
+Im Ribbon der Aufgabendetailansicht steht in der Gruppe **CLI** zusätzlich die Auswahl **Promptvorlage** zur Verfügung. Wenn eine CLI läuft, können Sie dort eine in den Einstellungen gepflegte Vorlage auswählen. Die Anwendung ersetzt vor dem Versand die Platzhalter `%ProjectName%`, `%TaskName%` und `%RepositoryUrl%` und sendet den fertigen Prompt sofort mit Zeilenende an die laufende CLI.
+
+> **Hinweis:** Die Auswahl sendet sofort. Falls dem Projekt kein Repository zugewiesen ist, wird `%RepositoryUrl%` durch einen leeren Wert ersetzt.
+
 ### 7. CLI beenden
 
 Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alternativ kannst du im Ribbon (Gruppe „CLI") auf **Stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).
