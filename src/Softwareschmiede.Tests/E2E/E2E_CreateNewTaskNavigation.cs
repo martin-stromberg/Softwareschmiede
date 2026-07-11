@@ -25,10 +25,7 @@ public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
     [Fact]
     public void NeueAufgabeErstellenUndSpeichern_ErscheintInListeUndNavigiertZurueck_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Medium)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndOpenProject(mainWindow, "NeueAufgabe-Speichern-Test");
+        var mainWindow = StartAndNavigateToProjects("NeueAufgabe-Speichern-Test");
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
         aufgabeNeuButton.AsButton().Click();
@@ -59,10 +56,7 @@ public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
     [Fact]
     public void NeueAufgabeAbbrechen_NavigiertZurueckOhneTitelAenderungZuSpeichern_E2E()
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Medium)!;
-        NavigateToProjecten(mainWindow);
-        CreateAndOpenProject(mainWindow, "NeueAufgabe-Abbrechen-Test");
+        var mainWindow = StartAndNavigateToProjects("NeueAufgabe-Abbrechen-Test");
 
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
         aufgabeNeuButton.AsButton().Click();
@@ -85,7 +79,7 @@ public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
         Assert.Null(nichtGespeicherterTitel);
 
         // Die ursprünglich angelegte Aufgabe (Status "Neu") ist weiterhin in der Liste vorhanden
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Short);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Short);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte die angelegte Aufgabe weiterhin enthalten.");
     }

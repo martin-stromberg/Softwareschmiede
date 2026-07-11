@@ -120,14 +120,25 @@
         "hooks": [
           {
             "type": "command",
-	    "if": "Bash(*dotnet test*)",
-	    "statusMessage": "Building solution before dotnet test...",
+            "if": "Bash(*dotnet test*)",
+            "statusMessage": "Building solution before dotnet test...",
             "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/build_before_test.py\""
           }
         ]
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(*dotnet test*)",
+            "statusMessage": "Releasing dotnet build lock...",
+            "command": "pwsh -NoProfile -Command \"Set-Location (git rev-parse --show-toplevel); python .claude/hooks/release_build_lock.py\""
+          }
+        ]
+      },
       {
         "matcher": "Edit|Write",
         "hooks": [

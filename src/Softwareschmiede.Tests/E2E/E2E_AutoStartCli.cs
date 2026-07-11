@@ -49,7 +49,7 @@ public sealed class E2E_AutoStartCli : WpfTestBase
         var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         zurueckButton.AsButton().Click();
 
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte die gestartete Aufgabe enthalten.");
         items[0].DoubleClick();

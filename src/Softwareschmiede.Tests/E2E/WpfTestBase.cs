@@ -32,6 +32,8 @@ public abstract class WpfTestBase : IDisposable
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
     private readonly string _testDbPath;
+    private string? _appLogDirectory;
+    private long _appLogOffset;
 
     /// <summary>
     /// Pfad zur SQLite-Testdatenbank des laufenden App-Prozesses. Ermöglicht Tests, Vorbedingungen
@@ -85,9 +87,22 @@ public abstract class WpfTestBase : IDisposable
         // und sicherzustellen, dass jeder Test seine eigene Datenbankinstanz isoliert benutzt.
         Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", _testDbPath);
 
+        _appLogDirectory = ResolveAppLogDirectory(appPath);
+        _appLogOffset = AppStartupLogInspector.Snapshot(_appLogDirectory);
+
         _automation = new UIA3Automation();
         _application = FlaUI.Core.Application.Launch(appPath);
-        _application.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(30));
+        _application.WaitWhileMainHandleIsMissing(Long);
+
+        if (_application.HasExited || _application.MainWindowHandle == IntPtr.Zero)
+        {
+            var startupException = CheckAppStartupException();
+            if (startupException is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Die Anwendung wurde gestartet, aber das Hauptfenster ist nicht verfügbar. Log-Auszug:{Environment.NewLine}{startupException}");
+            }
+        }
 
         // Kurz warten, bis WPF-Rendering und EF-Migrationen abgeschlossen sind.
         Thread.Sleep(2000);
@@ -110,11 +125,15 @@ public abstract class WpfTestBase : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        var processId = _application?.ProcessId;
+
         try { _application?.Close(); }
         catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Schließen der Anwendung: {ex}"); }
 
         try { _application?.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(5)); }
         catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Warten auf das Schließen des Hauptfensters: {ex}"); }
+
+        WaitForProcessExit(processId);
 
         _automation?.Dispose();
 
@@ -227,7 +246,7 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjecten(AutomationElement mainWindow)
     {
-        var button = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), TimeSpan.FromSeconds(10));
+        var button = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), Short);
         button.AsButton().Click();
     }
 
@@ -255,29 +274,29 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch zurück.</summary>
     protected void CreateProject(AutomationElement mainWindow, string name)
     {
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), TimeSpan.FromSeconds(10));
+        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
         neuButton.AsButton().Click();
 
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), TimeSpan.FromSeconds(10));
+        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
         nameBox.Click();
         Keyboard.Type(name);
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
 
         // Warten bis Overlay geschlossen (Speichern-Button verschwunden)
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(15));
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Medium);
 
         // CreateAsync + Callback-Ausführung abwarten
-        WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(15));
+        WaitForElement(mainWindow, cf => cf.ByName(name), Medium);
     }
 
     /// <summary>Öffnet ein Projekt aus der Liste anhand seines Namens.</summary>
     protected void OpenProject(AutomationElement mainWindow, string name)
     {
-        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), TimeSpan.FromSeconds(10));
+        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), Short);
         projektKachel.Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(15));
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Medium);
     }
 
     /// <summary>Legt ein neues Projekt an, speichert es und öffnet es wieder.</summary>
@@ -285,6 +304,23 @@ public abstract class WpfTestBase : IDisposable
     {
         CreateProject(mainWindow, name);
         OpenProject(mainWindow, name);
+    }
+
+    /// <summary>
+    /// Startet die Anwendung, wartet auf das Hauptfenster und navigiert zur Projektliste.
+    /// Ist <paramref name="projektName"/> angegeben, wird zusätzlich ein Projekt mit diesem Namen
+    /// angelegt und geöffnet.
+    /// </summary>
+    protected AutomationElement StartAndNavigateToProjects(string? projektName = null)
+    {
+        var app = LaunchApp();
+        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        NavigateToProjecten(mainWindow);
+
+        if (projektName is not null)
+            CreateAndOpenProject(mainWindow, projektName);
+
+        return mainWindow;
     }
 
     /// <summary>
@@ -344,27 +380,27 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     protected void ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, string sourceDirectory, bool useInSourceDirectoryMode = true)
     {
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), TimeSpan.FromSeconds(10));
+        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), Short);
         einstellungenButton.AsButton().Click();
 
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
-        var quellcodeTab = WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), TimeSpan.FromSeconds(10));
+        var quellcodeTab = WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), Short);
         quellcodeTab.Click();
 
-        var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), TimeSpan.FromSeconds(10));
+        var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), Short);
         var workspaceMode = useInSourceDirectoryMode ? "InSourceDirectory" : "SeparateWorkingDirectory";
-        SelectComboBoxItemByClick(workspaceModeBox, workspaceMode, TimeSpan.FromSeconds(10));
+        SelectComboBoxItemByClick(workspaceModeBox, workspaceMode, Short);
 
-        var sourceDirectoryBox = WaitForElement(mainWindow, cf => cf.ByName("SourceDirectory"), TimeSpan.FromSeconds(10));
+        var sourceDirectoryBox = WaitForElement(mainWindow, cf => cf.ByName("SourceDirectory"), Short);
         sourceDirectoryBox.AsTextBox().Text = sourceDirectory;
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
 
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
+        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
 
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(10));
+        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
         dashboardButton.AsButton().Click();
     }
 
@@ -374,13 +410,13 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     protected void AssignLocalDirectoryRepository(AutomationElement mainWindow)
     {
-        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), TimeSpan.FromSeconds(10));
+        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
         zuweisenButton.AsButton().Click();
 
-        var dialog = WaitForWindow("Repository zuweisen", TimeSpan.FromSeconds(10));
+        var dialog = WaitForWindow("Repository zuweisen", Short);
 
         AutomationElement[] items = [];
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        var deadline = DateTime.UtcNow + Short;
         while (DateTime.UtcNow < deadline)
         {
             var listBox = dialog.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.List));
@@ -398,7 +434,7 @@ public abstract class WpfTestBase : IDisposable
 
         items[0].Click();
 
-        var zuweisenBestaetigenButton = WaitForElement(dialog, cf => cf.ByName("Zuweisen"), TimeSpan.FromSeconds(10));
+        var zuweisenBestaetigenButton = WaitForElement(dialog, cf => cf.ByName("Zuweisen"), Short);
         zuweisenBestaetigenButton.AsButton().Click();
     }
 
@@ -481,5 +517,44 @@ public abstract class WpfTestBase : IDisposable
         throw new FileNotFoundException(
             $"Softwareschmiede.App.exe wurde nicht gefunden. Bitte zuerst das App-Projekt bauen. " +
             $"Gesuchte Pfade:{Environment.NewLine}{string.Join(Environment.NewLine, candidates)}");
+    }
+
+    private static string ResolveAppLogDirectory(string appExePath)
+        => Path.Combine(Path.GetDirectoryName(appExePath) ?? string.Empty, "logs");
+
+    /// <summary>
+    /// Gibt den seit dem in <see cref="LaunchApp"/> gemerkten Offset angehängten Inhalt der neuesten
+    /// App-Log-Datei zurück.
+    /// </summary>
+    /// <returns>Neu angehängter Log-Inhalt, oder ein leerer String, falls kein Log-Verzeichnis bekannt ist oder kein neuer Inhalt vorliegt.</returns>
+    protected string GetLatestAppLogContent()
+        => _appLogDirectory is null ? string.Empty : AppStartupLogInspector.GetNewEntries(_appLogDirectory, _appLogOffset);
+
+    /// <summary>Prüft die seit dem Start neu angehängten Log-Zeilen auf eine Startup-Fehlersignatur.</summary>
+    /// <returns>Diagnosetext der Fehlerzeilen, oder <c>null</c>, falls keine Startup-Exception erkannt wurde.</returns>
+    protected string? CheckAppStartupException()
+        => AppStartupLogInspector.CheckAppStartupException(GetLatestAppLogContent());
+
+    private static void WaitForProcessExit(int? processId)
+    {
+        if (processId is null)
+            return;
+
+        try
+        {
+            var process = Process.GetProcessById(processId.Value);
+            if (!process.WaitForExit((int)TimeSpan.FromSeconds(10).TotalMilliseconds))
+            {
+                Debug.WriteLine($"WpfTestBase.Dispose: Prozess {processId} ist nach Ablauf des Timeouts weiterhin aktiv.");
+            }
+        }
+        catch (ArgumentException)
+        {
+            // Prozess ist bereits beendet.
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Warten auf den vollständigen Prozess-Exit: {ex}");
+        }
     }
 }

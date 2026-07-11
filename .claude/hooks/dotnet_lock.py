@@ -19,7 +19,6 @@ import os
 import time
 import shutil
 import subprocess
-import contextlib
 
 TIMEOUT_SECONDS = 120
 STALE_SECONDS = 300
@@ -41,17 +40,37 @@ def _lock_dir():
     return os.path.join(_repo_root(), ".claude", ".locks", "dotnet-build.lock")
 
 
-def _try_acquire(lock_dir):
+def _try_acquire(lock_dir, token):
     try:
         os.makedirs(lock_dir)
     except FileExistsError:
         return False
     try:
         with open(os.path.join(lock_dir, "owner.txt"), "w", encoding="utf-8") as f:
-            f.write(f"pid={os.getpid()} time={time.time()}\n")
+            f.write(f"pid={os.getpid()} token={token} time={time.time()}\n")
     except OSError:
         pass
     return True
+
+
+def _is_owner(lock_dir, token):
+    """Prueft, ob der aktuelle Aufrufer den Lock haelt.
+
+    Es wird bewusst NICHT die PID verglichen: build_before_test.py (Erwerb)
+    und release_build_lock.py (Freigabe) sind das PreToolUse/PostToolUse-Paar
+    fuer denselben "dotnet test"-Bash-Aufruf, laufen aber als zwei separate
+    Python-Prozesse mit unterschiedlicher PID. Stattdessen wird der von
+    Claude Code fuer beide Hooks identische "tool_use_id" als Owner-Token
+    verglichen. Fehlt/ist owner.txt nicht lesbar oder kein Token angegeben,
+    wird konservativ False angenommen, um kein fremdes Lock zu loeschen."""
+    if not token:
+        return False
+    try:
+        with open(os.path.join(lock_dir, "owner.txt"), encoding="utf-8") as f:
+            content = f.read()
+    except OSError:
+        return False
+    return f"token={token} " in content
 
 
 def _lock_age(lock_dir):
@@ -61,15 +80,19 @@ def _lock_age(lock_dir):
         return 0
 
 
-def acquire(timeout=TIMEOUT_SECONDS, stale=STALE_SECONDS):
+def acquire(token=None, timeout=TIMEOUT_SECONDS, stale=STALE_SECONDS):
     """Blockiert bis der Lock erworben ist oder timeout ueberschritten wird.
     Gibt True zurueck bei Erfolg, False wenn nach timeout aufgegeben wurde
-    (der Aufrufer laeuft dann ohne Lock weiter statt Claude zu blockieren)."""
+    (der Aufrufer laeuft dann ohne Lock weiter statt Claude zu blockieren).
+
+    `token` identifiziert den Aufrufer fuer eine spaetere release()-Ownership-
+    Pruefung (siehe _is_owner) - z.B. die "tool_use_id" des Bash-Aufrufs, damit
+    ein PostToolUse-Hook gezielt nur sein eigenes Lock freigibt."""
     lock_dir = _lock_dir()
     os.makedirs(os.path.dirname(lock_dir), exist_ok=True)
     deadline = time.time() + timeout
     while True:
-        if _try_acquire(lock_dir):
+        if _try_acquire(lock_dir, token):
             return True
         if _lock_age(lock_dir) > stale:
             shutil.rmtree(lock_dir, ignore_errors=True)
@@ -79,17 +102,11 @@ def acquire(timeout=TIMEOUT_SECONDS, stale=STALE_SECONDS):
         time.sleep(POLL_INTERVAL)
 
 
-def release():
-    shutil.rmtree(_lock_dir(), ignore_errors=True)
-
-
-@contextlib.contextmanager
-def dotnet_build_lock(timeout=TIMEOUT_SECONDS, stale=STALE_SECONDS):
-    """Context-Manager: yield True/False je nachdem ob der Lock erworben wurde."""
-    got = False
-    try:
-        got = acquire(timeout=timeout, stale=stale)
-        yield got
-    finally:
-        if got:
-            release()
+def release(token):
+    """Gibt den Lock nur frei, wenn `token` mit dem beim acquire() hinterlegten
+    Owner-Token uebereinstimmt. Verhindert, dass ein PostToolUse-Release ein
+    fremdes Lock loescht, das gerade ein anderer Prozess haelt (z.B. der
+    Stop-Hook, der nach einem Timeout ohne Lock weitergebaut hat)."""
+    lock_dir = _lock_dir()
+    if _is_owner(lock_dir, token):
+        shutil.rmtree(lock_dir, ignore_errors=True)

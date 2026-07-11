@@ -187,10 +187,19 @@ Write-Host "=== C# Starttest === ($names)"
 Write-Host ""
 
 $gotLock = Enter-DotnetBuildLock
+if (-not $gotLock) {
+    # Lock haelt vermutlich ein laufender "dotnet test"-Lauf (siehe
+    # build_before_test.py / release_build_lock.py, die den Lock ueber die
+    # volle Testlaufzeit halten). Ungeschuetzt weiterzubauen wuerde genau
+    # die obj/bin-Korruption verursachen, die dieser Lock verhindern soll -
+    # daher hier ueberspringen statt "ohne Lock fortfahren".
+    Write-Host "[dotnet-lock] Build-Lock belegt (vermutlich laufender Testlauf) - C#-Starttest wird uebersprungen." -ForegroundColor Yellow
+    exit 0
+}
 try {
     $results = $projects | ForEach-Object { Test-Startup -Project $_ }
 } finally {
-    if ($gotLock) { Exit-DotnetBuildLock }
+    Exit-DotnetBuildLock
 }
 
 foreach ($r in $results) {

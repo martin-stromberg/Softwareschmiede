@@ -20,16 +20,6 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public sealed class ProjectDetailE2ETests : WpfTestBase
 {
-    private AutomationElement StartAndNavigateToProjects()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
-        return mainWindow;
-    }
-
-    // -------------------------------------------------------------------------
-
     /// <summary>
     /// Szenario: Projekt anlegen, Neuanlage starten und mit Zurück abbrechen, erstes Projekt öffnen.
     /// Prüft: Nach Abbrechen der Neuanlage ist das erste Projekt noch in der Liste aufrufbar.
@@ -196,7 +186,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         zurueckButton.AsButton().Click();
 
         // Aufgabenliste enthält jetzt mindestens eine Aufgabe
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("AufgabenListe"), Medium);
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
         var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
     }
