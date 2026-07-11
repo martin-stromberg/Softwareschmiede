@@ -1,3 +1,24 @@
+# [1.8.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.7.0...v1.8.0) (2026-07-11)
+
+
+### Bug Fixes
+
+* CI-Doppellauf vermeiden, UI-Timeout-Warmup-Effekt auf Runnern beheben ([049cead](https://github.com/martin-stromberg/Softwareschmiede/commit/049ceadea3c77434214886062a5e8d9808697065))
+* CI-Testlauf gruen bekommen (ConPTY-Skip, Process.Id-Bug, Clipboard-Retry) ([2a54daa](https://github.com/martin-stromberg/Softwareschmiede/commit/2a54daaaaf24afb29fe44fc403b404b8a2563bdc))
+* Clipboard-Tests robust gegen transiente CLIPBRD_E_CANT_OPEN-Kontention ([7b7e393](https://github.com/martin-stromberg/Softwareschmiede/commit/7b7e3939bbf5a63efd2a3690570466b5a704eaa8))
+* ConPTY-Test-Skip auf explizite Umgebungsvariable statt Auto-Erkennung umgestellt ([731afe0](https://github.com/martin-stromberg/Softwareschmiede/commit/731afe0bfd0f4a0b801fdb4cff6b65cb17e59a74))
+* ConPtyEnvironmentProbe repliziert echten Prozessbaum (App.exe als Elternprozess) ([586a5b3](https://github.com/martin-stromberg/Softwareschmiede/commit/586a5b33c38d02f126fd368e63813e643030a440))
+* ConPtyEnvironmentProbe robuster und diagnostizierbar machen ([4c2e2b7](https://github.com/martin-stromberg/Softwareschmiede/commit/4c2e2b727e14777601f9a6c08579cd4b8514c6c6))
+* Exit-Code fuer ConPTY-Kindprozesse zuverlaessig ermitteln ([8237363](https://github.com/martin-stromberg/Softwareschmiede/commit/82373635809c35e046fdc00ca632f2e9c83786ce))
+* Loeschen-Dialog-Test sprachunabhaengig machen (Root Cause des letzten CI-Fehlschlags) ([0ca1b09](https://github.com/martin-stromberg/Softwareschmiede/commit/0ca1b0956aac0afc1200cfa763905bd12efe6843))
+* Race Condition beim verzögerten ConPTY-Plugin-Befehlsversand behoben ([67f7d53](https://github.com/martin-stromberg/Softwareschmiede/commit/67f7d531892b4618704456ed6e6030e1ca7e401e))
+* Token-Verbrauchsprotokoll dauerhaft persistieren statt zu verlieren ([2736c1a](https://github.com/martin-stromberg/Softwareschmiede/commit/2736c1a404d94eb5948384f09d0649aa3ca16c4b))
+
+
+### Features
+
+* E2E-Test-Diagnose und Build-Lock-Race-Fix fuer automatisierbare Tests ([6680ae0](https://github.com/martin-stromberg/Softwareschmiede/commit/6680ae0b874d3cdce38869b4fd5504c5df837940))
+
 # [1.7.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.6.0...v1.7.0) (2026-07-11)
 
 
