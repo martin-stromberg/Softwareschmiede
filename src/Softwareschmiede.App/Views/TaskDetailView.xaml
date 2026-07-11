@@ -320,8 +320,15 @@
                 <controls:StatusIndicatorControl Grid.Column="0"
                                                  Status="{Binding AufgabeStatus, Mode=OneWay}"
                                                  BranchName="{Binding AufgabeBranchName, Mode=OneWay}" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding CliStatusText}"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           AutomationProperties.Name="CliStatusText" />
                 <TextBlock Grid.Column="2"
-                           Text="{Binding AktiverCliName}"
+                           Text="{Binding AktiverCliName, StringFormat='CLI: {0}'}"
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            FontSize="12"
                            VerticalAlignment="Center"

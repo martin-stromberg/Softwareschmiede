@@ -483,8 +483,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         vm.ZurueckAction = () => NavigateBackToProjectCallback?.Invoke();
         _aktuelleAufgabeId = id;
         vm.AufgabeListeAktualisierenCallback = ReloadAufgabenListAsync;
-        vm.AufgabeId = id;
         NavigateToTaskViewCallback?.Invoke(vm);
+        vm.AufgabeId = id;
     }
 
     private async Task ReloadAufgabenListAsync()
