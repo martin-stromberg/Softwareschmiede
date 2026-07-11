@@ -29,8 +29,9 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
 Die Aufgabendetailansicht ist eine vollständige, fensterumfassende Ansicht, nicht mehr inline in die Projektdetailansicht eingebettet:
 
 - **Aufgabe öffnen:** Doppelklick auf eine Aufgabe in der Aufgaben-Kachel der Projektdetailansicht öffnet die Aufgabendetailansicht. Nicht beendete Aufgaben sind dort direkt sichtbar; beendete Aufgaben liegen im initial zugeklappten Register „Beendete Aufgaben". Die Projektdetailansicht wird ausgeblendet.
+- **Fenstertitel:** Beim Öffnen einer Aufgabe zeigt die Titelleiste zunächst `Softwareschmiede – Aufgabe` und nach dem Laden `Softwareschmiede – {Aufgabentitel}`. Beim Wechsel zurück zu Dashboard, Projekten oder Einstellungen wird der jeweilige Ansichtstitel gesetzt, damit kein alter Aufgabentitel stehen bleibt.
 - **Zurück zur Projektansicht:** Der „Zurück"-Button im Ribbon navigiert zurück zur Projektdetailansicht. Alle Aufgabenänderungen bleiben erhalten.
-- **Neue Aufgabe:** Klick auf „Neue Aufgabe" im Ribbon der Projektdetailansicht erstellt eine neue Aufgabe mit Status „Neu" und öffnet sofort die Aufgabendetailansicht mit dem Edit-Panel.
+- **Neue Aufgabe:** Klick auf „Neue Aufgabe" im Ribbon der Projektdetailansicht erstellt eine neue Aufgabe mit Status „Neu" und öffnet sofort die Aufgabendetailansicht in der Info-Ansicht mit bearbeitbaren Stammdaten.
 - **Aufgabenlisten-Update:** Nach dem Speichern einer Aufgabe wird die Aufgabenliste in der Projektdetailansicht aktualisiert (nur das geänderte Element wird neu geladen, nicht die gesamte Liste).
 
 ### Automatische Aufgabendokumentierung im Repository
@@ -62,22 +63,20 @@ Eine Aufgabe durchläuft folgende Status:
 | `Beendet` | Abgeschlossen (erfolgreich oder mit Fehler) |
 | `Archiviert` | Dauerhaft archiviert |
 
-### Ausführungsansicht (WPF)
+### Aufgabendetailansicht (WPF)
 
-Die WPF-Aufgabendetailansicht (`TaskDetailView`) zeigt unterschiedliche Inhalte je nach Aufgabenstatus:
+Die WPF-Aufgabendetailansicht (`TaskDetailView`) nutzt eine gemeinsame Ansichtsleiste oberhalb des Inhalts. Die verfügbaren Ansichten sind explizit benannt:
 
-#### Edit-Panel (Status: Neu)
-Bearbeitbare Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Wird verwendet, um neue Aufgaben zu erstellen oder bereits erstellte Aufgaben nachträglich anzupassen, bevor sie gestartet werden.
+#### Info-Ansicht
+Zeigt die Stammdaten der Aufgabe, insbesondere Titel, Status, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Bei neuen Aufgaben enthält sie die bearbeitbaren Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Die Info-Ansicht ist unabhängig vom Aufgabenstatus erreichbar, also auch bei gestarteten, wartenden und beendeten Aufgaben.
 
-#### CLI-Panel (Status: Gestartet, Wartend)
-Das Hauptpanel für die aktive Aufgabenbearbeitung. Zwei Anzeigemodi:
-- **CLI-Fenster (Standard):** Das Terminalfenster des KI-Tools wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`).
-- **Info-Ansicht:** Zeigt Aufgabeeigenschaften (Titel, Status, Beschreibung) und das Protokoll mit allen bisherigen Einträgen. Umschaltung via Toggle-Button „Info"/"CLI".
+#### CLI-Ansicht
+Zeigt das Terminalfenster des KI-Tools. Das Fenster wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`). Die CLI-Ansicht wird angeboten, wenn für die Aufgabe eine CLI-Ausführung sinnvoll ist, insbesondere bei gestarteten oder wartenden Aufgaben.
 
-Das Ribbon enthält KI-Plugin-Auswahl, optionale Parameter und „CLI stoppen" Button. Der „Starten"-Button initiiert einen kombinierten Ablauf (Klone + CLI-Start).
+Während eine CLI läuft, zeigt die Fußzeile den Namen des aktiven KI-Plugins bzw. CLI-Plugins an. Wenn keine CLI läuft oder ein Start/Stop fehlschlägt, wird dieser Wert geleert, damit kein veralteter CLI-Name sichtbar bleibt. Der technische Laufstatus bleibt davon getrennt.
 
-#### Diff-Panel (Status: Beendet)
-Zeigt die Änderungen im Git-Arbeitsverzeichnis nach Abschluss der Aufgabe. Aktuell ein Platzhalter; zukünftig wird hier eine visuelle Diff-Darstellung implementiert.
+#### Diff-Ansicht
+Zeigt die Änderungen im Git-Arbeitsverzeichnis nach Abschluss der Aufgabe. Bei beendeten Aufgaben wird die Diff-Ansicht bevorzugt ausgewählt, sofern sie verfügbar ist; die Info-Ansicht bleibt weiterhin auswählbar.
 
 #### Ribbon-Menü
 Aktionsgruppen:
@@ -95,7 +94,7 @@ Erkennt die KI ein Rate-Limit (Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601]]` 
 
 ### Recovery-Mechanismus
 
-Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `InArbeit` oder `Wartend`, deren Heartbeat älter als 5 Minuten ist und für die kein aktiver Prozess läuft. Diese werden im `RecoveryBannerControl` angezeigt. Ein Klick auf „Wiederherstellen" setzt den Status auf `Gestartet` und inkrementiert `RecoveryVersion` (optimistic concurrency).
+Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Gestartet` oder `Wartend`, deren Heartbeat älter als 5 Minuten ist und für die kein aktiver Prozess läuft. Diese werden im `RecoveryBannerControl` angezeigt. Ein Klick auf „Wiederherstellen" setzt den Status auf `Gestartet` und inkrementiert `RecoveryVersion` (optimistic concurrency).
 
 ## Beispiele
 

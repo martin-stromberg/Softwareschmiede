@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using System.Reflection;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
@@ -47,7 +48,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "cmd.exe",
-                Arguments = "/c ping 127.0.0.1 -n 5 > nul",
+                Arguments = "/c ping 127.0.0.1 -n 30 > nul",
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
@@ -524,9 +525,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
     /// <summary>InfoCliToggleCommand toggled IsInfoViewVisible von false auf true.</summary>
     [Fact]
-    public void InfoCliToggleCommand_SetzIsInfoViewVisible_AufTrue_BeiInitialFalse()
+    public async Task InfoCliToggleCommand_SetzIsInfoViewVisible_AufTrue_BeiInitialFalse()
     {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.IsInfoViewVisible.Should().BeFalse();
         sut.InfoCliToggleCommand.Execute(null);
@@ -535,9 +539,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
     /// <summary>InfoCliToggleCommand toggled IsInfoViewVisible von true auf false.</summary>
     [Fact]
-    public void InfoCliToggleCommand_SetzIsInfoViewVisible_AufFalse_BeiTrue()
+    public async Task InfoCliToggleCommand_SetzIsInfoViewVisible_AufFalse_BeiTrue()
     {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         sut.IsInfoViewVisible = true;
 
         sut.InfoCliToggleCommand.Execute(null);
@@ -547,15 +554,65 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
     /// <summary>InfoCliToggleCommand wechselt mehrfach korrekt.</summary>
     [Fact]
-    public void InfoCliToggleCommand_TogglesMehrfach_Korrekt()
+    public async Task InfoCliToggleCommand_TogglesMehrfach_Korrekt()
     {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.InfoCliToggleCommand.Execute(null);
         sut.InfoCliToggleCommand.Execute(null);
         sut.InfoCliToggleCommand.Execute(null);
 
         sut.IsInfoViewVisible.Should().BeTrue();
+    }
+
+    /// <summary>Neue Aufgaben starten in der Info-Ansicht.</summary>
+    [Fact]
+    public async Task LadenAsync_WaehltInfoAnsicht_WhenStatusNeu()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsInfoViewSelected.Should().BeTrue();
+        sut.IsCliViewSelected.Should().BeFalse();
+        sut.IsDiffViewSelected.Should().BeFalse();
+    }
+
+    /// <summary>Gestartete Aufgaben starten in der CLI-Ansicht, Info bleibt auswählbar.</summary>
+    [Fact]
+    public async Task InfoViewCommand_WaehltInfoAnsicht_WhenStatusGestartet()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.IsCliViewSelected.Should().BeTrue();
+
+        sut.InfoViewCommand.Execute(null);
+
+        sut.IsInfoViewSelected.Should().BeTrue();
+    }
+
+    /// <summary>Beendete Aufgaben starten in der Diff-Ansicht, Info bleibt auswählbar.</summary>
+    [Fact]
+    public async Task InfoViewCommand_WaehltInfoAnsicht_WhenStatusBeendet()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Beendet);
+        var sut = CreateSut();
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.IsDiffViewSelected.Should().BeTrue();
+
+        sut.InfoViewCommand.Execute(null);
+
+        sut.IsInfoViewSelected.Should().BeTrue();
     }
 
     // --- EditTitel / EditAnforderungsBeschreibung ---
@@ -754,8 +811,29 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
+        sut.AktiverCliName.Should().Be("Test KI");
         var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         aktualisiert!.Status.Should().Be(AufgabeStatus.Gestartet);
+    }
+
+    /// <summary>CliStoppenCommand leert den aktiven CLI-Namen.</summary>
+    [Fact]
+    public async Task CliStoppenCommand_LeertAktivenCliName()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        sut.AktiverCliName.Should().Be("Test KI");
+
+        await ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+
+        sut.AktiverCliName.Should().BeNull();
     }
 
     /// <summary>
@@ -846,21 +924,53 @@ public sealed class TaskDetailViewModelTests : IDisposable
             "GetPseudoConsoleSession muss die Session zurückgeben damit der Loaded-Handler das TerminalControl verbinden kann");
     }
 
+    /// <summary>Beim Start über Projekt-Default bleibt der CLI-Name nach erneutem Öffnen laufender Aufgaben sichtbar.</summary>
+    [Fact]
+    public async Task NachWiederoeffnen_ZeigtAktivenCliName_WhenStartPluginNurAusProjektDefaultKam()
+    {
+        var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(
+            _projektId,
+            PluginType.DevelopmentAutomation,
+            "Softwareschmiede.TestKi");
+
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var ersteVm = CreateSut();
+        ersteVm.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)ersteVm.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)ersteVm.StartenCommand).ExecuteAsync();
+        ersteVm.AktiverCliName.Should().Be("Test KI");
+        _dialogServiceMock.Verify(d => d.ShowPluginSelectionDialogAsync(
+            It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var aktualisierteAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        aktualisierteAufgabe!.KiPluginPrefix.Should().Be("Softwareschmiede.TestKi");
+
+        ersteVm.Dispose();
+
+        var zweiteVm = CreateSut();
+        zweiteVm.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)zweiteVm.LadenCommand).ExecuteAsync();
+
+        zweiteVm.IsCliRunning.Should().BeTrue();
+        zweiteVm.AktiverCliName.Should().Be("Test KI");
+    }
+
     // --- PluginAendernCommand ---
 
     /// <summary>PluginAendernCommand.CanExecute ist true wenn CLI läuft.</summary>
     [Fact]
     public async Task TestPluginWechselCommand_CanExecute_CliRunning()
     {
-        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        _dialogServiceMock
-            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
-        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        typeof(TaskDetailViewModel)
+            .GetField("_isCliRunning", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(sut, true);
 
         sut.PluginAendernCommand.CanExecute(null).Should().BeTrue();
     }
