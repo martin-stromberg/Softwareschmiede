@@ -1,3 +1,11 @@
+# [1.7.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.6.0...v1.7.0) (2026-07-11)
+
+
+### Features
+
+* Aufgabenansicht Kontextanzeigen korrigieren ([99771f3](https://github.com/martin-stromberg/Softwareschmiede/commit/99771f3625862318622ffe6fc395ae8f1a4b9572))
+* Aufgabenseite optimieren ([d5941f2](https://github.com/martin-stromberg/Softwareschmiede/commit/d5941f2f19be982dc894c6f207ccca9aaa14dbaa))
+
 # [1.6.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.5.0...v1.6.0) (2026-07-11)
 
 
