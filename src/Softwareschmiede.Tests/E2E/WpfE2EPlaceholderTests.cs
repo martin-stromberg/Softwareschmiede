@@ -99,9 +99,11 @@ public sealed class WpfE2ETests : WpfTestBase
             ? "Light"
             : "Dark";
 
-        designComboBoxElement.Click();
-        var neuerEintrag = WaitForElement(Automation.GetDesktop(), cf => cf.ByName(neuerWert), Short);
-        neuerEintrag.Click();
+        // Statt manuell zu öffnen (Click) und den Eintrag über die gesamte Desktop-Automatisierungsstruktur
+        // zu suchen (Automation.GetDesktop() – auf CI-Runnern unzuverlässig, siehe SelectComboBoxItemByClick),
+        // wird hier dieselbe bereits andernorts (z. B. E2E_SettingsKiPluginPersistence) erprobte Hilfsmethode
+        // verwendet, die den Eintrag im Scope der ComboBox selbst sucht und definierte Settle-Pausen einhält.
+        SelectComboBoxItemByClick(designComboBoxElement, neuerWert, Short);
 
         WaitForSelectedComboBoxItem(designComboBoxElement, neuerWert, Short);
 
