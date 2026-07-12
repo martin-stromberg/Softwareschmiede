@@ -27,7 +27,6 @@ public sealed class E2E_PluginSelectionDialog : WpfTestBase
     [SkippableFact]
     public void StartenOhneGespeichertesPlugin_ZeigtPluginAuswahlDialog_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginDialog-Repo", "PluginDialog-Projekt");

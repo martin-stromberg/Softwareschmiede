@@ -21,7 +21,6 @@ public sealed class E2E_ConPtyResize : WpfTestBase
     [SkippableFact]
     public void ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ConPtyResize-Repo", "ConPtyResize-Projekt");

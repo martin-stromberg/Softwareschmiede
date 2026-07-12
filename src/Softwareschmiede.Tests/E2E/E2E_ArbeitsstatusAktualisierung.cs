@@ -44,7 +44,6 @@ public sealed class E2E_ArbeitsstatusAktualisierung : WpfTestBase
     [SkippableFact]
     public void SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ArbeitsstatusAktualisierung-Repo", "ArbeitsstatusAktualisierung-Projekt");

@@ -1,3 +1,11 @@
+## [1.8.1](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.8.0...v1.8.1) (2026-07-12)
+
+
+### Bug Fixes
+
+* ConPTY-E2E-Tests von echtem Kindprozess entkoppeln ([974d178](https://github.com/martin-stromberg/Softwareschmiede/commit/974d178c613b4bb1626d0559c4ffe949be03aaf2))
+* Terminal-Sitzung beim Aufgabenwechsel über Aufgabenliste nicht aktualisiert ([a4e0483](https://github.com/martin-stromberg/Softwareschmiede/commit/a4e0483d5caccdae4f76d1ba889ff691354f18a1))
+
 # [1.8.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.7.0...v1.8.0) (2026-07-11)
 
 

@@ -22,7 +22,6 @@ public sealed class E2E_ConPtyTerminalStart : WpfTestBase
     [SkippableFact]
     public void ConPtyStart_ZeigtTerminalPanelMitStoppenButton_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("ConPty-Repo", "ConPty-Projekt");

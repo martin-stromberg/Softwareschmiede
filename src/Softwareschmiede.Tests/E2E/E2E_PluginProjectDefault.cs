@@ -26,7 +26,6 @@ public sealed class E2E_PluginProjectDefault : WpfTestBase
     [SkippableFact]
     public void PluginDialogMitProjektCheckbox_SpeichertProjektStandardUndStartetCli_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginProjectDefault-Repo", "PluginProjectDefault-Projekt");

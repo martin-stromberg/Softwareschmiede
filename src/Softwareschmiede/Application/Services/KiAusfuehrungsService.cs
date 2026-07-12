@@ -20,17 +20,20 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private readonly ILogger<KiAusfuehrungsService> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IPseudoConsoleProcessLauncher _launcher;
     private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
     /// <param name="logger">Logger-Instanz.</param>
     /// <param name="loggerFactory">Factory zum Erzeugen kategoriespezifischer Logger (z. B. für <see cref="PseudoConsoleSession"/>).</param>
     /// <param name="scopeFactory">Factory für DI-Scopes (wird für Fehler-Persistierung verwendet).</param>
-    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory)
+    /// <param name="launcher">Austauschpunkt für den ConPTY-Prozessstart. Bei <c>null</c> wird <see cref="Win32PseudoConsoleProcessLauncher"/> verwendet.</param>
+    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory, IPseudoConsoleProcessLauncher? launcher = null)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _scopeFactory = scopeFactory;
+        _launcher = launcher ?? new Win32PseudoConsoleProcessLauncher(loggerFactory.CreateLogger<Win32PseudoConsoleProcessLauncher>(), loggerFactory);
     }
 
     /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
@@ -204,7 +207,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var pluginPsi = await kiPlugin.StartCliAsync(effectiveWorkdir, optionalParameters, ct).ConfigureAwait(false);
             var pluginCommand = BuildCliCommand(pluginPsi);
 
-            var (process, session, nativeProcessHandle) = StartPseudoConsoleProcess(aufgabeId, effectiveWorkdir, pluginCommand);
+            var (process, session, nativeProcessHandle) = _launcher.Start(aufgabeId, effectiveWorkdir, pluginCommand);
 
             var sendCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             // Token sofort abgreifen: Wird er erst später (z. B. beim Fire-and-Forget-Aufruf weiter unten)
@@ -249,65 +252,6 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         {
             _startLock.Release();
         }
-    }
-
-    /// <summary>
-    /// Erzeugt die PseudoConsole, startet den zugehörigen <c>cmd.exe</c>-Prozess über die ConPTY-API und
-    /// erstellt die passende <see cref="PseudoConsoleSession"/>. Kapselt die reine Start-Mechanik, damit
-    /// <see cref="StartWithPseudoConsoleAsync"/> sich auf die Orchestrierung (Lock, Idempotenz-Check,
-    /// Event-Wiring, verzögertes Senden) beschränken kann.
-    /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe (für Logging).</param>
-    /// <param name="effectiveWorkingDirectory">Effektives Arbeitsverzeichnis von cmd.exe (Repository-Root oder konfiguriertes Unterverzeichnis).</param>
-    /// <param name="pluginCommand">Der später an cmd.exe zu sendende Plugin-Befehl (nur für Logging verwendet).</param>
-    /// <returns>Den gestarteten <see cref="Process"/>, die zugehörige <see cref="PseudoConsoleSession"/> und das native Prozess-Handle für eine zuverlässige Exit-Code-Ermittlung.</returns>
-    private (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) StartPseudoConsoleProcess(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand)
-    {
-        var workingDir = !string.IsNullOrEmpty(effectiveWorkingDirectory) && Directory.Exists(effectiveWorkingDirectory)
-            ? effectiveWorkingDirectory
-            : Path.GetTempPath();
-        var psi = new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = "cmd.exe",
-            WorkingDirectory = workingDir,
-            UseShellExecute = false,
-            CreateNoWindow = false,
-        };
-        psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-
-        _logger.LogInformation("CLI-Prozess (ConPTY, cmd.exe → {Command}) für Aufgabe {AufgabeId} starten.", pluginCommand, aufgabeId);
-
-        var pseudoConsole = PseudoConsole.Create(220, 50);
-
-        ProcessStartResult startResult;
-        try
-        {
-            startResult = PseudoConsoleProcessStarter.Start(psi, pseudoConsole);
-        }
-        catch
-        {
-            pseudoConsole.Dispose();
-            throw;
-        }
-
-        Process process;
-        try
-        {
-            process = Process.GetProcessById(startResult.Pid);
-            // Das native Win32-Handle aus CreateProcess bleibt bewusst offen (siehe
-            // CliProcessHandle.NativeProcessHandle) - es wird erst beim endgültigen Aufräumen in
-            // CancelAndDisposeConPtyResources geschlossen, nicht hier.
-        }
-        catch
-        {
-            PseudoConsoleNativeMethods.CloseHandle(startResult.ProcessHandle);
-            pseudoConsole.Dispose();
-            throw;
-        }
-
-        var session = CreatePseudoConsoleSession(aufgabeId, pseudoConsole, process);
-
-        return (process, session, startResult.ProcessHandle);
     }
 
     /// <summary>Gibt die <see cref="PseudoConsoleSession"/> für eine Aufgabe zurück, oder null wenn keine vorhanden.</summary>
@@ -502,42 +446,6 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler im Exited-Handler ({LogKontext}) für Aufgabe {AufgabeId}.", logKontext, aufgabeId);
-        }
-    }
-
-    /// <summary>
-    /// Erstellt die Ein-/Ausgabe-Streams und die <see cref="PseudoConsoleSession"/> für einen per ConPTY gestarteten Prozess.
-    /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe (für Logging).</param>
-    /// <param name="pseudoConsole">Die zuvor erstellte <see cref="PseudoConsole"/>.</param>
-    /// <param name="process">Der zugehörige Prozess.</param>
-    /// <returns>Die erstellte <see cref="PseudoConsoleSession"/>.</returns>
-    private PseudoConsoleSession CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process)
-    {
-        System.IO.FileStream? inputStream = null;
-        System.IO.FileStream? outputStream = null;
-        try
-        {
-            inputStream = new System.IO.FileStream(
-                new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.InputWritePipe, ownsHandle: false),
-                System.IO.FileAccess.Write,
-                bufferSize: 1,
-                isAsync: false);
-
-            outputStream = new System.IO.FileStream(
-                new Microsoft.Win32.SafeHandles.SafeFileHandle(pseudoConsole.OutputReadPipe, ownsHandle: false),
-                System.IO.FileAccess.Read,
-                bufferSize: 4096,
-                isAsync: false);
-
-            return new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream, _loggerFactory.CreateLogger<PseudoConsoleSession>());
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Anlegen der PseudoConsoleSession für Aufgabe {AufgabeId}.", aufgabeId);
-            inputStream?.Dispose();
-            outputStream?.Dispose();
-            throw;
         }
     }
 
