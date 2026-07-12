@@ -19,8 +19,6 @@ public sealed class E2E_TaskExecutionCommandLineParameters : WpfTestBase
     [SkippableFact]
     public void AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
-
         new WindowsCredentialStore().SetCredential(
             "Softwareschmiede.Codex.CommandLineParameters", "--test-regression-flag");
         ConfirmLocalDirectoryGitInitInSourceDirectory();

@@ -3,7 +3,7 @@ using static Softwareschmiede.Infrastructure.Terminal.PseudoConsoleNativeMethods
 namespace Softwareschmiede.Infrastructure.Terminal;
 
 /// <summary>Kapselt einen Windows Pseudo Console (HPCON) Handle und die zugehörigen Pipe-Handles.</summary>
-internal sealed class PseudoConsole : IDisposable
+internal sealed class PseudoConsole : IPseudoConsoleHandle
 {
     private int _disposed;
 
@@ -59,7 +59,7 @@ internal sealed class PseudoConsole : IDisposable
     /// <param name="cols">Neue Spaltenanzahl.</param>
     /// <param name="rows">Neue Zeilenanzahl.</param>
     /// <returns><c>true</c>, wenn die Größenänderung erfolgreich war; andernfalls <c>false</c>.</returns>
-    internal bool Resize(short cols, short rows)
+    public bool Resize(short cols, short rows)
     {
         var size = new COORD { X = cols, Y = rows };
         return ResizePseudoConsole(Handle, size) == 0;

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -405,5 +406,48 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
         finished.Should().NotBe(objectDisposedGeloggt.Task,
             "der verzögerte Sendevorgang muss beim Prozess-Exit über SendCts storniert werden, sodass gar keine ObjectDisposedException auftritt");
+    }
+
+    /// <summary>Wird ein <see cref="SimulatedPseudoConsoleProcessLauncher"/> injiziert, muss
+    /// <see cref="KiAusfuehrungsService.StartWithPseudoConsoleAsync"/> ohne echtes ConPTY bis zum Status
+    /// <see cref="CliProcessStatus.Gestartet"/> gelangen (siehe docs/features/e2e-korrektur/requirement.md).</summary>
+    [Fact]
+    public async Task StartWithPseudoConsoleAsync_MitInjiziertemFakeLauncher_ErreichtGestartet()
+    {
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance);
+        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object, launcher);
+
+        var aufgabeId = Guid.NewGuid();
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd",
+                Arguments = "/c echo simuliert",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        var gestartet = new TaskCompletionSource();
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            if (status == CliProcessStatus.Gestartet)
+                gestartet.TrySetResult();
+        };
+
+        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+
+        var finished = await Task.WhenAny(gestartet.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        finished.Should().Be(gestartet.Task, "der simulierte Launcher muss ohne echtes ConPTY bis zum Status Gestartet gelangen");
+
+        try
+        {
+            if (!handle.Process.HasExited)
+                handle.Process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+        }
     }
 }
