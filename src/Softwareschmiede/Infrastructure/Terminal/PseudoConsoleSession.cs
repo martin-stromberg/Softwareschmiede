@@ -273,13 +273,17 @@ public sealed class PseudoConsoleSession : IDisposable
     /// <param name="ct">Abbruch-Token.</param>
     public async Task WritePromptAsync(string prompt, CancellationToken ct)
     {
-        var bytes = Encoding.UTF8.GetBytes(NormalizeToCarriageReturn(prompt) + "\r");
+        var bytes = Encoding.UTF8.GetBytes(NormalizeToCarriageReturn(prompt).TrimEnd('\r') + "\r");
         await InputStream.WriteAsync(bytes, ct);
         await InputStream.FlushAsync(ct);
         MarkInputActivity();
     }
 
-    private static string NormalizeToCarriageReturn(string text)
+    /// <summary>Wandelt alle Zeilenenden (<c>\r\n</c> und alleinstehendes <c>\n</c>) in ein einzelnes <c>\r</c>
+    /// um, wie es ein echter Enter-Tastendruck an die Pseudo Console sendet (siehe <c>KeyToVt100Encoder</c>).</summary>
+    /// <param name="text">Der zu normalisierende Text.</param>
+    /// <returns>Der Text mit ausschließlich <c>\r</c> als Zeilenende.</returns>
+    public static string NormalizeToCarriageReturn(string text)
     {
         var normalized = new StringBuilder(text.Length);
         for (var i = 0; i < text.Length; i++)

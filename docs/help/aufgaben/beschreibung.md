@@ -92,6 +92,7 @@ Die Promptvorlagen-Auswahlbox im Ribbon wird durch zwei Eingabefelder (Stunde un
 - **Zeitgesteuert senden Button:** Nur aktiv, wenn eine Vorlage ausgewählt, die Zeitfelder valide gefüllt und die CLI läuft. Klick plant den Prompt zur angegebenen Uhrzeit.
 - **Zielzeitberechnung:** Die eingegebene Uhrzeit wird als lokale Zeit des Anwenders (via `DateTime.Now`) interpretiert. Liegt die Zielzeit in der Vergangenheit/Gegenwart, wird der Prompt sofort versendet.
 - **Statusanzeige:** Während der Prompt geplant ist, zeigt ein `TextBlock` „Prompt in Wartestellung" mit der Zielzeit im Format `HH:mm`. Nach erfolgreichem Versand oder beim CLI-Stop wird dieser Status automatisch gelöscht.
+- **Statusanzeige in der Seitenleiste:** Solange ein Prompt für eine Aufgabe geplant ist, zeigt auch die Kachel der Aufgabe in der Seitenleisten-Sektion „Aktive Aufgaben" (siehe oben) „⏳ Prompt in Wartestellung" anstelle des üblichen Laufzeitstatus.
 - **Automatische Stornierung:** Beim Wechsel der Aufgabendetailansicht, beim Dispose des ViewModels oder beim Aufgabenabschluss wird der geplante Prompt storniert; der Timer wird abgebrochen.
 - **Keine Persistierung:** Die Planung ist rein sitzungsgebunden. Ein App-Neustart löscht alle geplanten Prompts. Ein Prompt wird **nicht** persistiert und bei Wiederstart automatisch versendet.
 

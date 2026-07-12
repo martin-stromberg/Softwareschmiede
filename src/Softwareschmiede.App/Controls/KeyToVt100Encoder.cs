@@ -1,5 +1,6 @@
 using System.Text;
 using System.Windows.Input;
+using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App.Controls;
 
@@ -62,26 +63,6 @@ internal static class KeyToVt100Encoder
         if (string.IsNullOrEmpty(text))
             return [];
 
-        var normalized = new StringBuilder(text.Length);
-        for (var i = 0; i < text.Length; i++)
-        {
-            var c = text[i];
-            switch (c)
-            {
-                case '\r':
-                    normalized.Append('\r');
-                    if (i + 1 < text.Length && text[i + 1] == '\n')
-                        i++;
-                    break;
-                case '\n':
-                    normalized.Append('\r');
-                    break;
-                default:
-                    normalized.Append(c);
-                    break;
-            }
-        }
-
-        return Encoding.UTF8.GetBytes(normalized.ToString());
+        return Encoding.UTF8.GetBytes(PseudoConsoleSession.NormalizeToCarriageReturn(text));
     }
 }
