@@ -62,3 +62,4 @@ timestamp,branch,step,agent_type,agent_id,input_tokens,output_tokens,cache_creat
 2026-07-11T16:53:15.916005+00:00,task/issue-114-1c523dc44d8c487c82befa55834344cf-tests-automatisierbar-machen,orchestrator,-,-,114388,1747786,23201798,959374476,984438448
 2026-07-11T16:53:20.293448+00:00,task/issue-114-1c523dc44d8c487c82befa55834344cf-tests-automatisierbar-machen,translate-requirements,-,a4ba5e8a4a73cccf3,114388,1747786,23201798,959374476,984438448
 2026-07-12T05:01:46.767400+00:00,e2e-korrektur,orchestrator,-,-,200,104036,510044,7824536,8438816
+2026-07-12T05:19:53.445843+00:00,e2e-korrektur,orchestrator,-,-,576,381964,940918,39227840,40551298
