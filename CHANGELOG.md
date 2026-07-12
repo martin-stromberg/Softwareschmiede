@@ -1,3 +1,17 @@
+# [1.9.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.8.1...v1.9.0) (2026-07-12)
+
+
+### Bug Fixes
+
+* Continue-Aufgaben Zeitgesteuerter Prompt abarbeiten (Layout, Sidebar-Status, Enter-Bug, Review-Befunde) ([1210e1f](https://github.com/martin-stromberg/Softwareschmiede/commit/1210e1f0f423b6b35c718b6667ad085a3077fa58))
+* DarkMode-E2E-Test nutzt fragile Desktop-weite ComboBox-Auswahl statt bewaehrtem Helper ([766f713](https://github.com/martin-stromberg/Softwareschmiede/commit/766f713b5bcaf15c82450c66d5ab6d5d1a675a3d))
+* Kundenrückmeldungen zu Zeitgesteuertem Prompt-Versand beheben ([edac3eb](https://github.com/martin-stromberg/Softwareschmiede/commit/edac3eb782c6d45d905098dde9778b0cebc98194))
+
+
+### Features
+
+* Zeitgesteuerten Prompt-Versand in Aufgabenansicht ergaenzen ([b0e696a](https://github.com/martin-stromberg/Softwareschmiede/commit/b0e696a67e5cd87ed4ac753d9ba8cfb0178dc5fb))
+
 ## [1.8.1](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.8.0...v1.8.1) (2026-07-12)
 
 
