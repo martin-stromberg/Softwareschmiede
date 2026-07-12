@@ -28,7 +28,6 @@ public sealed class E2E_AutoStartCli : WpfTestBase
     [SkippableFact]
     public void AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("AutoStartCli-Repo", "AutoStartCli-Projekt");

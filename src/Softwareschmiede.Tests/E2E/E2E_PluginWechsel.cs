@@ -25,7 +25,6 @@ public sealed class E2E_PluginWechsel : WpfTestBase
     [SkippableFact]
     public void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginWechsel-Repo", "PluginWechsel-Projekt");

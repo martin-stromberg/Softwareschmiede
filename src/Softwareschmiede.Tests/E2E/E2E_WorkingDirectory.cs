@@ -25,8 +25,6 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
     [SkippableFact]
     public async Task AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
-
         var mainWindow = SetupProjectMitNeuerAufgabe("WorkingDir-Repo", "WorkingDir-Projekt");
 
         await SeedWorkingDirectoryAsync("backend", createSubdirectory: true);

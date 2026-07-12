@@ -15,7 +15,7 @@ public sealed class PseudoConsoleSession : IDisposable
     private const int DefaultCols = 220;
     private const int DefaultRows = 50;
 
-    private readonly PseudoConsole _pseudoConsole;
+    private readonly IPseudoConsoleHandle _pseudoConsole;
     private readonly Process _process;
     private readonly TimeProvider _timeProvider;
     private readonly Timer _runtimeStatusTimer;
@@ -69,13 +69,13 @@ public sealed class PseudoConsoleSession : IDisposable
     /// <param name="inputStream">Schreibbarer Stream für Eingaben an den Prozess.</param>
     /// <param name="outputStream">Lesbarer Stream für die Prozessausgabe.</param>
     /// <param name="logger">Logger für Fehler- und Diagnosemeldungen der Leseschleife (optional).</param>
-    internal PseudoConsoleSession(PseudoConsole pseudoConsole, Process process, Stream inputStream, Stream outputStream, ILogger? logger = null)
+    internal PseudoConsoleSession(IPseudoConsoleHandle pseudoConsole, Process process, Stream inputStream, Stream outputStream, ILogger? logger = null)
         : this(pseudoConsole, process, inputStream, outputStream, TimeProvider.System, TimeSpan.FromSeconds(4), logger)
     {
     }
 
     internal PseudoConsoleSession(
-        PseudoConsole pseudoConsole,
+        IPseudoConsoleHandle pseudoConsole,
         Process process,
         Stream inputStream,
         Stream outputStream,

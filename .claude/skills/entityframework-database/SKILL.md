@@ -10,6 +10,7 @@ Ensure database changes are versioned, repeatable, and safe for upgrades of exis
 
 ## Rules
 1. Use EF Core migrations for all schema changes.
+1a. Migrationen ausschließlich per EF-CLI erzeugen: `dotnet ef migrations add <Name> --project <Infrastructure-Projekt> --startup-project <Startup-Projekt>` (Bash-Tool). Migrationsdateien niemals per Write-Tool handschriftlich anlegen — dabei fehlt fast immer die zugehörige `.Designer.cs`-Datei und der `ModelSnapshot` wird nicht aktualisiert. Ein Hook (`check_ef_migration_manual.py`) blockiert handschriftlich per Write erstellte Migrationsdateien. Nach der Generierung dürfen Up/Down per Edit angepasst werden (siehe Workflow Schritt 3).
 2. Do not use EnsureCreated/EnsureDeleted in production startup paths.
 3. Startup initialization must run migrations via MigrateAsync.
 4. Preserve data during upgrades; avoid destructive schema operations unless explicitly approved.
@@ -19,7 +20,7 @@ Ensure database changes are versioned, repeatable, and safe for upgrades of exis
 
 ## Workflow
 1. Update entity/model configuration.
-2. Generate migration in Infrastructure project.
+2. Generate migration via `dotnet ef migrations add <Name> --project <Infrastructure-Projekt> --startup-project <Startup-Projekt>` (Bash) — nie per Write-Tool.
 3. Review generated Up/Down for data safety.
 4. Apply migrations at app startup (or deployment pipeline) using MigrateAsync.
 5. Run automated tests and a local upgrade test against an existing database copy.

@@ -480,7 +480,20 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
             IsCliRunning = _kiService.IsRunning(_aufgabeId);
-            AttachCliStatusSession(_kiService.GetPseudoConsoleSession(_aufgabeId));
+
+            var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
+            AttachCliStatusSession(session);
+            // Explizit erneut auslösen (nicht nur AttachCliStatusSession): Wechselt CurrentView in
+            // MainWindowViewModel/ProjectDetailViewModel zwischen zwei TaskDetailViewModel-Instanzen
+            // desselben Typs, kann TaskDetailView.OnDataContextChanged bereits synchron vor dem Setzen
+            // von AufgabeId gefeuert haben und liest dabei eine veraltete/leere Sitzung. Ohne diesen
+            // erneuten Abgleich bliebe TerminalControl.Session dauerhaft auf der vorherigen Aufgabe
+            // stehen, wenn eine bereits laufende Sitzung wiederangebunden statt neu gestartet wird.
+            if (session is not null)
+                PseudoConsoleSessionGestartet?.Invoke(session);
+            else
+                CliGestoppt?.Invoke();
+
             await AktualisiereAktivenCliNameAusAufgabeAsync(ct);
 
             EditTitel = Aufgabe?.Titel;
