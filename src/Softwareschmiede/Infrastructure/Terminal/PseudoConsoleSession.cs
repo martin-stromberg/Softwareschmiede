@@ -261,15 +261,47 @@ public sealed class PseudoConsoleSession : IDisposable
             RuntimeStatusChanged?.Invoke(this, new CliRuntimeStatusChangedEventArgs(status));
     }
 
-    /// <summary>Schreibt einen Prompt inkl. abschließendem Zeilenumbruch auf <see cref="InputStream"/>, flusht ihn und meldet die Eingabe an die Status-Erkennung.</summary>
+    /// <summary>Schreibt einen Prompt inkl. abschließendem Absenden auf <see cref="InputStream"/>, flusht ihn und
+    /// meldet die Eingabe an die Status-Erkennung. Zeilenumbrüche (im Prompttext sowie der abschließende Submit)
+    /// werden bewusst einheitlich als bloßes <c>\r</c> (CR) übertragen statt als <see cref="Environment.NewLine"/>
+    /// (<c>\r\n</c> unter Windows): Ein echter physischer Tastatur-Enter wird von <c>KeyToVt100Encoder.Encode</c>
+    /// ebenfalls als alleinstehendes <c>0x0D</c> kodiert, und eingefügter Zwischenablage-Text wird von
+    /// <c>KeyToVt100Encoder.EncodeClipboardText</c> aus demselben Grund auf <c>\r</c> normalisiert. Ein
+    /// zusätzliches <c>\n</c> nach dem CR wird von der CLI nicht wie ein normaler Tastatur-Enter interpretiert
+    /// und kann den Submit der Zeile verhindern.</summary>
     /// <param name="prompt">Der zu sendende Prompttext.</param>
     /// <param name="ct">Abbruch-Token.</param>
     public async Task WritePromptAsync(string prompt, CancellationToken ct)
     {
-        var bytes = Encoding.UTF8.GetBytes(prompt + Environment.NewLine);
+        var bytes = Encoding.UTF8.GetBytes(NormalizeToCarriageReturn(prompt) + "\r");
         await InputStream.WriteAsync(bytes, ct);
         await InputStream.FlushAsync(ct);
         MarkInputActivity();
+    }
+
+    private static string NormalizeToCarriageReturn(string text)
+    {
+        var normalized = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            switch (c)
+            {
+                case '\r':
+                    normalized.Append('\r');
+                    if (i + 1 < text.Length && text[i + 1] == '\n')
+                        i++;
+                    break;
+                case '\n':
+                    normalized.Append('\r');
+                    break;
+                default:
+                    normalized.Append(c);
+                    break;
+            }
+        }
+
+        return normalized.ToString();
     }
 }
 

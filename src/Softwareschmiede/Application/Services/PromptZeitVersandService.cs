@@ -47,23 +47,30 @@ public sealed class PromptZeitVersandService
         if (targetTime <= now)
         {
             RemoveEntry(aufgabeId)?.Dispose();
-            await SendPromptAsync(aufgabeId, promptText, CancellationToken.None);
+            await SendPromptAsync(aufgabeId, promptText);
             return;
         }
 
         RemoveEntry(aufgabeId)?.Dispose();
 
         var info = new ScheduledPromptInfo(aufgabeId, promptText, targetTime);
+        // Timer zunächst inaktiv (Timeout.InfiniteTimeSpan) anlegen und erst NACH dem Eintragen in
+        // _scheduledPrompts scharfschalten (timer.Change): Würde der Timer bereits mit der echten
+        // Restlaufzeit erzeugt, könnte sein Callback bei sehr kurzer Restlaufzeit auf einem ThreadPool-Thread
+        // feuern, bevor die nachfolgende Zeile den Eintrag unter _lock einfügt — HandleTimerElapsedAsync fände
+        // dann keinen Eintrag und würde den Prompt kommentarlos nie versenden.
         var timer = _timeProvider.CreateTimer(
             _ => HandleTimerElapsedAsync(aufgabeId).SafeFireAndForget(_logger, "PromptZeitVersandService.HandleTimerElapsedAsync"),
             null,
-            targetTime - now,
+            Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
 
         lock (_lock)
         {
             _scheduledPrompts[aufgabeId] = new ScheduledPromptEntry { Info = info, Timer = timer };
         }
+
+        timer.Change(targetTime - now, Timeout.InfiniteTimeSpan);
     }
 
     /// <summary>Bricht einen für die Aufgabe geplanten Prompt-Versand ab, falls vorhanden.</summary>
@@ -103,10 +110,10 @@ public sealed class PromptZeitVersandService
             entry.Timer.Dispose();
         }
 
-        await SendPromptAsync(aufgabeId, info.PromptText, CancellationToken.None);
+        await SendPromptAsync(aufgabeId, info.PromptText);
     }
 
-    private async Task SendPromptAsync(Guid aufgabeId, string promptText, CancellationToken ct)
+    private async Task SendPromptAsync(Guid aufgabeId, string promptText)
     {
         var session = _kiService.GetPseudoConsoleSession(aufgabeId);
         if (session is null)
@@ -119,11 +126,8 @@ public sealed class PromptZeitVersandService
 
         try
         {
-            await session.WritePromptAsync(promptText, ct);
+            await session.WritePromptAsync(promptText, CancellationToken.None);
             PromptSent?.Invoke(aufgabeId);
-        }
-        catch (OperationCanceledException)
-        {
         }
         catch (ObjectDisposedException ex)
         {

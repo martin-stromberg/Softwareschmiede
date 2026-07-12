@@ -149,7 +149,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
-            OnPropertyChanged(nameof(CanSchedulePrompt));
+            OnPropertyChanged(nameof(KannPromptPlanen));
         }
     }
 
@@ -207,7 +207,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         set
         {
             var geaendert = SetProperty(ref _selectedPromptVorlage, value);
-            OnPropertyChanged(nameof(CanSchedulePrompt));
+            OnPropertyChanged(nameof(KannPromptPlanen));
 
             if (!geaendert || value is null)
                 return;
@@ -226,7 +226,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         set
         {
             SetProperty(ref _scheduledPromptTargetHours, value);
-            OnPropertyChanged(nameof(CanSchedulePrompt));
+            OnPropertyChanged(nameof(KannPromptPlanen));
         }
     }
 
@@ -237,7 +237,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         set
         {
             SetProperty(ref _scheduledPromptTargetMinutes, value);
-            OnPropertyChanged(nameof(CanSchedulePrompt));
+            OnPropertyChanged(nameof(KannPromptPlanen));
         }
     }
 
@@ -256,7 +256,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob die zeitgesteuerte Versendung aktuell geplant werden kann (CLI läuft, Vorlage gewählt, Zeit eingegeben).</summary>
-    public bool CanSchedulePrompt => _isCliRunning
+    public bool KannPromptPlanen => _isCliRunning
         && _selectedPromptVorlage is not null
         && !string.IsNullOrWhiteSpace(_selectedPromptVorlage.Prompttext)
         && (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue);
@@ -465,7 +465,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
-        SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => CanSchedulePrompt);
+        SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
     }
 
     private async Task LadenAsync(CancellationToken ct)

@@ -134,7 +134,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         geaenderteProperties.Should().Contain(nameof(TaskDetailViewModel.ScheduledPromptTargetMinutes));
     }
 
-    /// <summary>Sind beide Zeitfelder leer, ist CanSchedulePrompt false und der Sofortversand über die ComboBox bleibt unverändert möglich.</summary>
+    /// <summary>Sind beide Zeitfelder leer, ist KannPromptPlanen false und der Sofortversand über die ComboBox bleibt unverändert möglich.</summary>
     [Fact]
     public async Task SchedulePrompt_LeereFelder_KeinScheduling()
     {
@@ -147,7 +147,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
 
         sut.SelectedPromptVorlage = vorlage;
 
-        sut.CanSchedulePrompt.Should().BeFalse("beide Zeitfelder sind leer");
+        sut.KannPromptPlanen.Should().BeFalse("beide Zeitfelder sind leer");
         sut.SchedulePromptCommand.CanExecute(null).Should().BeFalse();
     }
 
@@ -239,9 +239,9 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             "beim CLI-Stopp muss der geplante Prompt der Aufgabe im Service storniert werden");
     }
 
-    /// <summary>CanSchedulePrompt hängt auch von IsCliRunning ab; ein Wechsel des CLI-Laufstatus muss daher PropertyChanged für CanSchedulePrompt auslösen.</summary>
+    /// <summary>KannPromptPlanen hängt auch von IsCliRunning ab; ein Wechsel des CLI-Laufstatus muss daher PropertyChanged für KannPromptPlanen auslösen.</summary>
     [Fact]
-    public async Task IsCliRunning_Aendert_LoestCanSchedulePromptPropertyChangedAus()
+    public async Task IsCliRunning_Aendert_LoestKannPromptPlanenPropertyChangedAus()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         var sut = CreateSut();
@@ -254,12 +254,12 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var method = typeof(TaskDetailViewModel).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
         method.Invoke(sut, new object[] { aufgabe.Id, CliProcessStatus.Gestartet });
 
-        geaenderteProperties.Should().Contain(nameof(TaskDetailViewModel.CanSchedulePrompt));
+        geaenderteProperties.Should().Contain(nameof(TaskDetailViewModel.KannPromptPlanen));
     }
 
-    /// <summary>CanSchedulePrompt hängt auch von SelectedPromptVorlage ab; eine geänderte Vorlagenauswahl muss daher PropertyChanged für CanSchedulePrompt auslösen.</summary>
+    /// <summary>KannPromptPlanen hängt auch von SelectedPromptVorlage ab; eine geänderte Vorlagenauswahl muss daher PropertyChanged für KannPromptPlanen auslösen.</summary>
     [Fact]
-    public async Task SelectedPromptVorlage_Aendert_LoestCanSchedulePromptPropertyChangedAus()
+    public async Task SelectedPromptVorlage_Aendert_LoestKannPromptPlanenPropertyChangedAus()
     {
         var vorlage = await _promptVorlagenService.CreateAsync("Weitermachen", "Mach bitte weiter");
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
@@ -273,6 +273,6 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
 
         sut.SelectedPromptVorlage = vorlage;
 
-        geaenderteProperties.Should().Contain(nameof(TaskDetailViewModel.CanSchedulePrompt));
+        geaenderteProperties.Should().Contain(nameof(TaskDetailViewModel.KannPromptPlanen));
     }
 }

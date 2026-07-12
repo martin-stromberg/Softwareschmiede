@@ -117,11 +117,16 @@ public sealed class WpfE2ETests : WpfTestBase
 
         einstellungenButton.Click();
 
-        // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert
+        // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert. SettingsView.Loaded löst
+        // vm.LadenCommand.Execute(null) als Fire-and-Forget aus; DesignMode wird darin erst nach mehreren
+        // vorausgehenden awaits (Arbeitsverzeichnis, Standard-KI-Plugin) neu gesetzt. Ein direktes Assert
+        // unmittelbar nach dem Auffinden der ComboBox liest daher auf langsameren/kalten CI-Runnern
+        // gelegentlich noch den alten Wert, bevor der Reload abgeschlossen ist — deshalb wird hier wie beim
+        // ersten Auswählen oben (Zeile 106) auf den erwarteten Wert gepollt statt einmalig geprüft.
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short).AsComboBox();
+        var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
 
-        Assert.Equal(neuerWert, designComboBoxNachRueckkehr.SelectedItem?.Name);
+        WaitForSelectedComboBoxItem(designComboBoxNachRueckkehr, neuerWert, Short);
     }
 
     /// <summary>Prüft, dass beim sauberen Start kein Recovery-Banner angezeigt wird.</summary>

@@ -21,6 +21,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
     private readonly AufgabeService _aufgabeService;
+    private readonly PromptZeitVersandService _promptZeitVersandService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
     private readonly IPluginManager? _pluginManager;
@@ -87,6 +88,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         DarkModeService darkModeService,
         IServiceProvider serviceProvider,
         AufgabeService aufgabeService,
+        PromptZeitVersandService promptZeitVersandService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
         Action<Action>? dispatcherInvoke = null)
@@ -94,6 +96,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
         _aufgabeService = aufgabeService;
+        _promptZeitVersandService = promptZeitVersandService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
@@ -218,7 +221,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             LastHeartbeatUtc = aufgabe.LastHeartbeatUtc,
             LaufStatus = aufgabe.LaufStatus,
             LetzterCliStartUtc = aufgabe.LetzterCliStartUtc,
-            IsAktiv = GetAktiveAufgabeId() == aufgabe.Id
+            IsAktiv = GetAktiveAufgabeId() == aufgabe.Id,
+            HasScheduledPrompt = _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id) is not null
         };
     }
 

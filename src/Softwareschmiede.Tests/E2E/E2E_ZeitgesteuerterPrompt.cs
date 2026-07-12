@@ -37,7 +37,12 @@ public sealed class E2E_ZeitgesteuerterPrompt : WpfTestBase
         // wodurch die App sofort statt zeitgesteuert versendet und die erwartete Wartestellung-Anzeige ausbleibt.
         // Da dieser E2E-Test die reale Systemuhr nutzt (kein injizierbarer TimeProvider in der App-UI-Schicht),
         // wird die Zielzeit in diesem Fall auf den letztmöglichen Zeitpunkt des heutigen Tages begrenzt.
+        // In der letzten Tagesminute (23:59:00-23:59:59) läge auch diese Begrenzung bereits in der
+        // Vergangenheit, weshalb der Test in diesem terminalen 1-Minuten-Fenster übersprungen wird,
+        // statt eine unerreichbare Zielzeit zu wählen.
         var jetzt = DateTime.Now;
+        Skip.If(jetzt.Hour == 23 && jetzt.Minute >= 59, "Letzte Tagesminute: Mitternachts-Guard würde eine bereits vergangene Zielzeit liefern.");
+
         var zielzeitKandidat = jetzt.AddMinutes(5);
         var zielzeit = zielzeitKandidat.Date == jetzt.Date
             ? zielzeitKandidat
