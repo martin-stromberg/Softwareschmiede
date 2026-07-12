@@ -189,6 +189,8 @@ public sealed partial class App : System.Windows.Application
 
         // Infrastructure Services
         services.AddSingleton<KiAusfuehrungsService>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();

@@ -84,6 +84,19 @@ Aktionsgruppen:
 - **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Plugin ändern (nur bei laufender CLI)
 - **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv)
 
+### Zeitgesteuerter Prompt-Versand
+
+Die Promptvorlagen-Auswahlbox im Ribbon wird durch zwei Eingabefelder (Stunde und Minute) und einen Button „Zeitgesteuert senden" ergänzt. Diese erlauben es, einen aufgelösten Prompt bis zu einer angegebenen Uhrzeit zu planen statt ihn sofort zu versenden:
+
+- **Eingabefelder:** Zwei `TextBox`-Felder für Stunde (0–23) und Minute (0–59). Sind beide leer, wird der Prompt über die ComboBox-Auswahl sofort versendet (bisheriges Verhalten). Sind die Felder befüllt, erfolgt kein Sofortversand.
+- **Zeitgesteuert senden Button:** Nur aktiv, wenn eine Vorlage ausgewählt, die Zeitfelder valide gefüllt und die CLI läuft. Klick plant den Prompt zur angegebenen Uhrzeit.
+- **Zielzeitberechnung:** Die eingegebene Uhrzeit wird als lokale Zeit des Anwenders (via `DateTime.Now`) interpretiert. Liegt die Zielzeit in der Vergangenheit/Gegenwart, wird der Prompt sofort versendet.
+- **Statusanzeige:** Während der Prompt geplant ist, zeigt ein `TextBlock` „Prompt in Wartestellung" mit der Zielzeit im Format `HH:mm`. Nach erfolgreichem Versand oder beim CLI-Stop wird dieser Status automatisch gelöscht.
+- **Automatische Stornierung:** Beim Wechsel der Aufgabendetailansicht, beim Dispose des ViewModels oder beim Aufgabenabschluss wird der geplante Prompt storniert; der Timer wird abgebrochen.
+- **Keine Persistierung:** Die Planung ist rein sitzungsgebunden. Ein App-Neustart löscht alle geplanten Prompts. Ein Prompt wird **nicht** persistiert und bei Wiederstart automatisch versendet.
+
+Der neue `PromptZeitVersandService` (Singleton) verwaltet intern pro Aufgabe einen geplanten Prompt in einer Laufzeit-Warteschlange und einen Timer. Bei Erreichen der Zielzeit ruft der Timer-Callback automatisch `PseudoConsoleSession.WritePromptAsync()` auf und versendet den Prompt. Ist die CLI zwischenzeitlich beendet worden, wird der Prompt still verworfen (nur Log-Warnung, kein UI-Feedback).
+
 ### CLI-Prozess-Management
 
 Der `KiAusfuehrungsService` läuft als Singleton. Er startet und stoppt CLI-Prozesse und gibt Statusänderungen über das `CliProcessStatusChanged`-Event weiter. Für jede Aufgabe kann nur ein CLI-Prozess gleichzeitig laufen.
@@ -98,6 +111,8 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 
 ## Beispiele
 
+### Klassischer Workflow
+
 1. Aufgabe „Login-Bug beheben" im Projekt „Backend-API" anlegen.
 2. In der Aufgabendetailansicht „Starten" klicken.
 3. Falls kein KI-Plugin für das Projekt gespeichert: Dialog zur Plugin-Auswahl wird angezeigt (z.B. Claude CLI).
@@ -106,9 +121,21 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 6. KI bearbeitet den Branch; während der Laufzeit kann das Plugin via „Plugin ändern" gewechselt werden.
 7. Nach Abschluss „Aufgabe abschließen" klicken.
 
+### Zeitgesteuerter Prompt-Versand
+
+1. Aufgabe ist gestartet, CLI läuft.
+2. Im Ribbon-Feld „Zielzeit" 16 als Stunde und 30 als Minute eingeben (16:30 Uhr).
+3. Eine Promptvorlage aus der ComboBox auswählen (z.B. „Fehleranalyse").
+4. Button „Zeitgesteuert senden" klicken.
+5. Status „Prompt in Wartestellung" erscheint mit „16:30" unter dem Button.
+6. Die Zeitfelder werden geleert, die Vorlage wird zurückgesetzt.
+7. Bei Erreichen von 16:30 Uhr wird der Prompt automatisch an die CLI versendet; die Status-Anzeige verschwindet.
+8. Falls die CLI zwischenzeitlich beendet wurde, wird der Prompt still verworfen (ohne Fehlermeldung).
+
 ## Einschränkungen
 
 - Für eine Aufgabe kann immer nur ein CLI-Prozess gleichzeitig aktiv sein.
 - Das CLI-Fenster-Einbetten via `SetParent` funktioniert nur auf Windows; bei Scheitern erscheint das Fenster separat.
 - Die Aufgabenwiederherstellung (Recovery) steht nur zur Verfügung, wenn der letzte Heartbeat älter als 5 Minuten ist.
 - Der Status `Gestartet` bedeutet: Repository geklont und CLI läuft (oder sollte laufen). Wenn die Ansicht eines Status-`Gestartet`-Tasks ohne laufende CLI geöffnet wird, wird die CLI automatisch neu gestartet.
+- Zeitgesteuerter Prompt-Versand: Pro Aufgabe kann maximal ein Prompt gleichzeitig geplant sein; erneutes Planen ersetzt den vorhandenen Eintrag. Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts. Ist die CLI zur Zielzeit nicht mehr aktiv, wird der Prompt still verworfen.

@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Text;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -34,10 +33,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptVorlagenService _promptVorlagenService;
     private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService;
+    private readonly PromptZeitVersandService _promptZeitVersandService;
     private readonly IDialogService _dialogService;
     private readonly IPluginManager _pluginManager;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<TaskDetailViewModel> _logger;
+    private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
 
     private Guid _aufgabeId;
@@ -56,6 +57,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private PseudoConsoleSession? _cliStatusSession;
     private PromptVorlage? _selectedPromptVorlage;
     private DetailAnsicht _ausgewaehlteAnsicht = DetailAnsicht.Info;
+    private int? _scheduledPromptTargetHours;
+    private int? _scheduledPromptTargetMinutes;
+    private string? _scheduledPromptStatus;
+    private string? _scheduledPromptTimeDisplay;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -144,6 +149,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
+            OnPropertyChanged(nameof(CanSchedulePrompt));
         }
     }
 
@@ -200,7 +206,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         get => _selectedPromptVorlage;
         set
         {
-            if (!SetProperty(ref _selectedPromptVorlage, value) || value is null)
+            var geaendert = SetProperty(ref _selectedPromptVorlage, value);
+            OnPropertyChanged(nameof(CanSchedulePrompt));
+
+            if (!geaendert || value is null)
                 return;
 
             PromptVorlageAuswaehlenCommand.Execute(value);
@@ -209,6 +218,48 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Gibt an, ob eine Promptvorlage an die laufende CLI gesendet werden kann.</summary>
     public bool KannPromptVorlageSenden => _isCliRunning && PromptVorlagen.Count > 0;
+
+    /// <summary>Bindung Stunde-Eingabefeld für den zeitgesteuerten Prompt-Versand (null bedeutet leer).</summary>
+    public int? ScheduledPromptTargetHours
+    {
+        get => _scheduledPromptTargetHours;
+        set
+        {
+            SetProperty(ref _scheduledPromptTargetHours, value);
+            OnPropertyChanged(nameof(CanSchedulePrompt));
+        }
+    }
+
+    /// <summary>Bindung Minute-Eingabefeld für den zeitgesteuerten Prompt-Versand (null bedeutet leer).</summary>
+    public int? ScheduledPromptTargetMinutes
+    {
+        get => _scheduledPromptTargetMinutes;
+        set
+        {
+            SetProperty(ref _scheduledPromptTargetMinutes, value);
+            OnPropertyChanged(nameof(CanSchedulePrompt));
+        }
+    }
+
+    /// <summary>Anzeigetext, während ein Prompt zeitgesteuert in Wartestellung ist, oder null.</summary>
+    public string? ScheduledPromptStatus
+    {
+        get => _scheduledPromptStatus;
+        private set => SetProperty(ref _scheduledPromptStatus, value);
+    }
+
+    /// <summary>Zielzeit des geplanten Prompts im Format HH:mm, oder null wenn kein Prompt geplant ist.</summary>
+    public string? ScheduledPromptTimeDisplay
+    {
+        get => _scheduledPromptTimeDisplay;
+        private set => SetProperty(ref _scheduledPromptTimeDisplay, value);
+    }
+
+    /// <summary>Gibt an, ob die zeitgesteuerte Versendung aktuell geplant werden kann (CLI läuft, Vorlage gewählt, Zeit eingegeben).</summary>
+    public bool CanSchedulePrompt => _isCliRunning
+        && _selectedPromptVorlage is not null
+        && !string.IsNullOrWhiteSpace(_selectedPromptVorlage.Prompttext)
+        && (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue);
 
     /// <summary>Steuert die Info-Ansicht als Kompatibilitätsschicht für ältere Tests.</summary>
     public bool IsInfoViewVisible
@@ -338,6 +389,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Sendet die gewählte Promptvorlage an die laufende CLI.</summary>
     public ICommand PromptVorlageAuswaehlenCommand { get; }
 
+    /// <summary>Plant den Versand der aktuell gewählten Promptvorlage zur eingegebenen Zielzeit.</summary>
+    public ICommand SchedulePromptCommand { get; }
+
     /// <summary>Wird gefeuert, wenn eine neue <see cref="PseudoConsoleSession"/> gestartet wurde. Löst weiterhin
     /// das Binden von <c>TerminalControl.Session</c> in <c>TaskDetailView</c> aus, unabhängig davon, ob die
     /// Leseschleife der Session bereits vor der UI-Bindung läuft (parallele CLI-Ausführungen, Issue-86).</summary>
@@ -365,10 +419,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         PluginSelectionService pluginSelectionService,
         PromptVorlagenService promptVorlagenService,
         PromptVorlagenPlatzhalterService promptVorlagenPlatzhalterService,
+        PromptZeitVersandService promptZeitVersandService,
         IDialogService dialogService,
         IPluginManager pluginManager,
         IServiceProvider serviceProvider,
         ILogger<TaskDetailViewModel> logger,
+        TimeProvider timeProvider,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -378,13 +434,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _pluginSelectionService = pluginSelectionService;
         _promptVorlagenService = promptVorlagenService;
         _promptVorlagenPlatzhalterService = promptVorlagenPlatzhalterService;
+        _promptZeitVersandService = promptZeitVersandService;
         _dialogService = dialogService;
         _pluginManager = pluginManager;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
+        _promptZeitVersandService.PromptSent += OnPromptSent;
 
         LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
         CliStoppenCommand = new AsyncRelayCommand(CliStoppenAsync, () => KannCliStoppen);
@@ -406,6 +465,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
+        SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => CanSchedulePrompt);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -490,6 +550,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (vorlage is null || string.IsNullOrWhiteSpace(vorlage.Prompttext))
             return;
 
+        if (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue)
+            return;
+
         var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
         if (session is null || !_isCliRunning)
             return;
@@ -498,10 +561,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(prompt))
             return;
 
-        var bytes = Encoding.UTF8.GetBytes(prompt + Environment.NewLine);
-        await session.InputStream.WriteAsync(bytes, ct);
-        await session.InputStream.FlushAsync(ct);
-        session.MarkInputActivity();
+        await session.WritePromptAsync(prompt, ct);
 
         WaehleAnsicht(DetailAnsicht.Cli);
         SelectedPromptVorlage = null;
@@ -564,6 +624,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
+            _promptZeitVersandService.CancelScheduledPrompt(_aufgabeId);
             await _entwicklungsprozessService.AbschliessenAsync(_aufgabeId, ct);
             await LadenAsync(ct);
         }
@@ -803,6 +864,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                     CliStatusText = status == CliProcessStatus.Fehler
                         ? "CLI-Status: Fehler"
                         : "CLI inaktiv";
+                    _promptZeitVersandService.CancelScheduledPrompt(aufgabeId);
+                    ScheduledPromptStatus = null;
+                    ScheduledPromptTimeDisplay = null;
                     CliGestoppt?.Invoke();
                 }
             }
@@ -821,6 +885,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _disposed = true;
 
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
+        _promptZeitVersandService.PromptSent -= OnPromptSent;
+        _promptZeitVersandService.CancelScheduledPrompt(_aufgabeId);
         AttachCliStatusSession(null);
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
@@ -1045,5 +1111,66 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             CliRuntimeStatus.Inaktiv => "CLI inaktiv",
             _ => "CLI-Status: unbekannt"
         };
+    }
+
+    private async Task SchedulePromptAsync(CancellationToken ct)
+    {
+        if (_selectedPromptVorlage is null || string.IsNullOrWhiteSpace(_selectedPromptVorlage.Prompttext))
+            return;
+
+        if (_scheduledPromptTargetHours is < 0 or > 23)
+        {
+            FehlerMeldung = "Ungültige Stunde (0–23)";
+            return;
+        }
+
+        if (_scheduledPromptTargetMinutes is < 0 or > 59)
+        {
+            FehlerMeldung = "Ungültige Minute (0–59)";
+            return;
+        }
+
+        if (!_scheduledPromptTargetHours.HasValue && !_scheduledPromptTargetMinutes.HasValue)
+            return;
+
+        FehlerMeldung = null;
+
+        var jetzt = _timeProvider.GetLocalNow();
+        var stunde = _scheduledPromptTargetHours ?? 0;
+        var minute = _scheduledPromptTargetMinutes ?? 0;
+        var targetTime = new DateTimeOffset(new DateTime(jetzt.Year, jetzt.Month, jetzt.Day, stunde, minute, 0), jetzt.Offset);
+
+        var prompt = _promptVorlagenPlatzhalterService.Resolve(_selectedPromptVorlage.Prompttext, _aufgabe);
+        if (string.IsNullOrWhiteSpace(prompt))
+            return;
+
+        await _promptZeitVersandService.SchedulePromptAsync(_aufgabeId, prompt, targetTime);
+
+        // targetTime kann bereits erreicht/vergangen sein (z. B. Uhrzeit des heutigen Tages liegt vor "jetzt").
+        // Der Service versendet in diesem Fall sofort statt zu puffern — dann existiert kein Warteschlangeneintrag
+        // mehr, und der "Wartestellung"-Status darf nicht gesetzt werden, da er dem Nutzer sonst einen nicht
+        // (mehr) gepufferten Prompt als wartend anzeigen würde.
+        if (_promptZeitVersandService.GetScheduledPromptStatus(_aufgabeId) is not null)
+        {
+            ScheduledPromptStatus = "Prompt in Wartestellung";
+            ScheduledPromptTimeDisplay = targetTime.ToString("HH:mm");
+        }
+
+        ScheduledPromptTargetHours = null;
+        ScheduledPromptTargetMinutes = null;
+        SelectedPromptVorlage = null;
+    }
+
+    private void OnPromptSent(Guid aufgabeId)
+    {
+        if (aufgabeId != _aufgabeId)
+            return;
+
+        _dispatcherInvoke(() =>
+        {
+            ScheduledPromptStatus = null;
+            ScheduledPromptTimeDisplay = null;
+            WaehleAnsicht(DetailAnsicht.Cli);
+        });
     }
 }

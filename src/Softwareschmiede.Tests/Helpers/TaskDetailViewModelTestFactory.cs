@@ -29,6 +29,7 @@ public static class TaskDetailViewModelTestFactory
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
         var promptVorlagenService = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
         var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
+        var promptZeitVersandService = new PromptZeitVersandService(kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
         var entwicklungsprozessService = new EntwicklungsprozessService(
@@ -50,9 +51,11 @@ public static class TaskDetailViewModelTestFactory
             pluginSelectionService,
             promptVorlagenService,
             promptVorlagenPlatzhalterService,
+            promptZeitVersandService,
             dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProviderMock.Object,
-            NullLogger<TaskDetailViewModel>.Instance);
+            NullLogger<TaskDetailViewModel>.Instance,
+            TimeProvider.System);
     }
 }

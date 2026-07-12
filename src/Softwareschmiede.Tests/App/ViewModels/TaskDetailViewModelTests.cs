@@ -25,6 +25,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly PromptVorlagenService _promptVorlagenService;
     private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
+    private readonly PromptZeitVersandService _promptZeitVersandService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -71,6 +72,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
         _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
+        _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -131,10 +133,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
             _pluginSelectionService,
             _promptVorlagenService,
             _promptVorlagenPlatzhalterService,
+            _promptZeitVersandService,
             _dialogServiceMock.Object,
             pluginManager,
             serviceProviderObj,
-            NullLogger<TaskDetailViewModel>.Instance);
+            NullLogger<TaskDetailViewModel>.Instance,
+            TimeProvider.System);
         vm.ZurueckAction = zurueckAction;
         return vm;
     }

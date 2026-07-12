@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Domain.Terminal;
@@ -258,6 +259,17 @@ public sealed class PseudoConsoleSession : IDisposable
 
         if (changed)
             RuntimeStatusChanged?.Invoke(this, new CliRuntimeStatusChangedEventArgs(status));
+    }
+
+    /// <summary>Schreibt einen Prompt inkl. abschließendem Zeilenumbruch auf <see cref="InputStream"/>, flusht ihn und meldet die Eingabe an die Status-Erkennung.</summary>
+    /// <param name="prompt">Der zu sendende Prompttext.</param>
+    /// <param name="ct">Abbruch-Token.</param>
+    public async Task WritePromptAsync(string prompt, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(prompt + Environment.NewLine);
+        await InputStream.WriteAsync(bytes, ct);
+        await InputStream.FlushAsync(ct);
+        MarkInputActivity();
     }
 }
 
