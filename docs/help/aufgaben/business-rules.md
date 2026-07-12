@@ -125,3 +125,25 @@
 - Danach erfolgt `Directory.Delete(path, recursive: true)`.
 
 **Umsetzung:** `EntwicklungsprozessService.DeleteDirectoryForce` — notwendig für `.git/objects/pack/*.idx`-Dateien unter Windows.
+
+---
+
+## Zeitgesteuerter Prompt-Versand
+
+**Beschreibung:** Pro Aufgabe kann maximal ein Prompt zeitgesteuert geplant sein. Ein erneut geplanter Prompt ersetzt den vorherigen.
+
+**Bedingungen:**
+- Eine CLI für die Aufgabe läuft (`IsCliRunning == true`).
+- Eine Promptvorlage ist ausgewählt.
+- Mindestens eines der Zeitfelder (Stunde oder Minute) ist gesetzt.
+- Die Zeit ist valide (Stunde: 0–23, Minute: 0–59).
+
+**Verhalten:**
+- Liegt die Zielzeit in der Vergangenheit/Gegenwart: Prompt wird sofort versendet (kein Eintrag in der Warteschlange).
+- Liegt die Zielzeit in der Zukunft: Prompt wird gepuffert; ein Timer wird gestartet; bei Fälligkeit wird der Prompt automatisch versendet.
+- Ein bereits geplanter Prompt für dieselbe Aufgabe wird ersetzt (vorheriger Timer wird abgebrochen).
+- Falls die CLI zur Zielzeit nicht mehr aktiv ist, wird der Prompt still verworfen (keine `FehlerMeldung`, nur Log-Warnung).
+- Beim Wechsel der Aufgabendetailansicht, beim `Dispose` des ViewModels oder beim Aufgabenabschluss wird ein geplanter Prompt storniert.
+- Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts.
+
+**Umsetzung:** `PromptZeitVersandService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung und Status-Rendering.

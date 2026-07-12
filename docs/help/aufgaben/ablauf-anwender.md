@@ -102,6 +102,22 @@ Im Ribbon der Aufgabendetailansicht steht in der Gruppe **CLI** zusätzlich die 
 
 > **Hinweis:** Die Auswahl sendet sofort. Falls dem Projekt kein Repository zugewiesen ist, wird `%RepositoryUrl%` durch einen leeren Wert ersetzt.
 
+### 6a. Zeitgesteuerter Prompt-Versand (optional)
+
+Statt einen Prompt sofort zu versenden, kannst du ihn auch für eine später Uhrzeit planen:
+
+1. Im Ribbon (Gruppe „CLI") findest du zwei Eingabefelder: **Zielzeit** (Stunde und Minute).
+2. Gib die Zielzeit ein, zu der der Prompt versendet werden soll (z.B. 16 und 30 für 16:30 Uhr).
+3. Wähle eine Promptvorlage aus dem Dropdown **Promptvorlage**.
+4. Klicke auf **Zeitgesteuert senden** (⏰-Button).
+5. Der Status „Prompt in Wartestellung" mit der Zielzeit (z.B. „16:30") wird angezeigt.
+6. Die Eingabefelder werden geleert, die Vorlagenauswahl wird zurückgesetzt.
+7. Bei Erreichen der Zielzeit wird der Prompt automatisch an die CLI versendet; die Status-Anzeige verschwindet.
+
+> **Hinweis:** Die eingegebene Uhrzeit wird als lokale Zeit deines Computers interpretiert. Liegt die Zielzeit in der Vergangenheit, wird der Prompt sofort versendet. Falls die CLI bis zur Zielzeit beendet wird, kann der Prompt nicht mehr versendet werden — es gibt aber keinen visuellen Fehler.
+>
+> Wenn du einen neuen Prompt zur gleichen oder anderen Uhrzeit planst, wird der vorherige Plan ersetzt.
+
 ### 7. CLI beenden
 
 Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alternativ kannst du im Ribbon (Gruppe „CLI") auf **Stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).

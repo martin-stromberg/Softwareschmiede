@@ -83,6 +83,7 @@ Stand: **2026-07-11**
 | **Issue 108: Automatische Statusaktualisierung aktiver Aufgaben** | ✅ Implementiert | Seitenleisten- und Dashboard-Aufgabenlisten zeigen KI-Ausführungsstatus (▶ Läuft, ⏸ Wartet, ✓ Bereit) in Echtzeit an. Hybrid-Mechanismus: `IRunningAutomationStatusSource.RunningCountChanged`-Event für Sofortaktualisierung bei Prozess-Start/-Stopp, `DispatcherTimer` (5 s Intervall) als Fallback für Heartbeat-Ablauf und Rate-Limit-Übergänge. `SemaphoreSlim`-Re-Entrancy-Schutz verhindert DbContext-Konflikte. `StatusAenderungsErkennung` nutzt `Aufgabe.Id`-Keying, um Übergangsanimation nur bei echtem Statuswechsel auszulösen (dezente Opacity-Fade). `StatusUebergangsAnimation` als Attached Behavior mit in Code konstruiertem DoubleAnimation (250 ms EaseOut). E2E-Tests mit FlaUI über `AutomationProperties.HelpText`. |
 | **Issue 86: Parallele CLI-Ausführungen ohne Blockade bei verborgener Aufgabenseite** | ✅ Implementiert | Entkopplung der ReadLoop vom `TerminalControl`-Lebenszyklus: `PseudoConsoleSession` verwaltet die Leseschleife unabhängig und feuert `BufferChanged`-Events. `TerminalControl` wird zu reinem Renderer, der Events abonniert statt ReadLoop zu steuern. CLI-Prozesse laufen parallel weiter, auch wenn ihre Aufgabenseite nicht angezeigt wird. Betroffene Komponenten: `TerminalControl` (Unloaded-Handler entfernt, Event-Binding hinzugefügt), `PseudoConsoleSession` (ReadLoop ab Konstruktion aktiv), `KiAusfuehrungsService` (Cleanup-Logik angepasst). Unit-Tests für parallele Sessions, View-Wechsel und Session-Cleanup vorhanden; Details siehe [docs/help/terminal](docs/help/terminal/index.md) |
 | **Issue 85: CLI-Konsole optimieren — Buffer-Stabilitäts-Fix und Clipboard-Paste** | ✅ Implementiert | Neue Methode `TerminalBuffer.GetSnapshot()` für konsistentes Rendering unter Lock zur Vermeidung von Race Conditions bei paralleler CLI-Ausgabe. Clipboard-Paste-Unterstützung (Ctrl+V) mit neuer `KeyToVt100Encoder.EncodeClipboardText()`-Methode und Tastaturhandling in `TerminalControl`. Betroffene Komponenten: `TerminalBuffer`, `TerminalControl`, `KeyToVt100Encoder`. Unit-Tests für Thread-Sicherheit, Clipboard-Encoding und Keyboard-Input vorhanden; Details siehe [docs/help/terminal/beschreibung.md](docs/help/terminal/beschreibung.md) |
+| **Issue 122: Zeitgesteuerter Prompt-Versand** | ✅ Implementiert | Neue Funktion in der Aufgabendetailansicht: Benutzer können einen Prompt zeitverzögert versenden. Zwei `TextBox`-Eingabefelder für Stunde (0–23) und Minute (0–59) in der CLI-Ribbon-Gruppe; ist keine Zielzeit angegeben, wird der Prompt sofort versendet (bestehendes Verhalten), ansonsten zeitgesteuert nach `PromptZeitVersandService.SchedulePromptAsync`. Neuer Singleton-Service mit `Dictionary<Guid, ScheduledPromptInfo>` und ereignisgesteuerten pro-Eintrag-Timern (`ITimer` via `TimeProvider.CreateTimer`); Timer-basierte Versendung bei Zielzeit-Erreichen oder sofortiger Versand bei vergangener Zielzeit. Neue ViewModel-Properties: `ScheduledPromptTargetHours`, `ScheduledPromptTargetMinutes`, `ScheduledPromptStatus`, `ScheduledPromptTimeDisplay`, `CanSchedulePrompt`, `SchedulePromptCommand`. Neue `PseudoConsoleSession.WritePromptAsync()` für DRY-Prompt-Logik. Unit-Tests mit `FakeTimeProvider` für deterministische Timer-Tests, E2E-Tests für Happy-Path. Betroffene Komponenten: `PromptZeitVersandService` (neu, Service Layer, Singleton), `ScheduledPromptInfo` (neu, Value Object), `TaskDetailViewModel` (erweitert), `TaskDetailView.xaml` (erweitert), `PseudoConsoleSession` (erweitert), `App.xaml.cs` (DI-Registrierung), Test-NuGet `Microsoft.Extensions.TimeProvider.Testing` hinzugefügt. |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ✅ Implementiert | Automatisierter Release-Workflow (`.github/workflows/release.yml`): Semantic Release (Conventional Commits) bestimmt die Version, `dotnet publish` erstellt den .NET-10-Build, das Ergebnis wird als `release.zip` verpackt und als GitHub-Release veröffentlicht; manueller Tag-Override (`vX.Y.Z`) möglich; Details in [CONTRIBUTING.md](CONTRIBUTING.md) und [docs/CI_CD.md](docs/CI_CD.md) |
 
@@ -281,6 +282,80 @@ Nach einem erfolgreichen Build (`dotnet build`) ist das Hammer-Symbol sichtbar i
 - Windows-Explorer bei der Anzeige der `Softwareschmiede.App.exe`
 - Taskleiste während Laufzeit der Anwendung
 - Fenster-Titelleiste der MainWindow-Instanz
+
+#### Issue 122: Zeitgesteuerter Prompt-Versand (✅)
+
+**Zeitverzögerte Versendung von Prompts an die laufende CLI mit Zielzeitplanung:**
+
+Die Promptvorlagen-Auswahlbox in der Aufgabendetailansicht wird um die Möglichkeit erweitert, einen Prompt zu einer gewählten Uhrzeit automatisch zu versenden. Statt sofort zu versendet, können Benutzer zwei Eingabefelder (Stunde: 0–23, Minute: 0–59) ausfüllen und den Prompt planen.
+
+**Funktionales Verhalten:**
+
+- **Sofortversand (unverändert):** Sind beide Zeitfelder leer, wird der ausgewählte Prompt sofort versendet (bestehendes Verhalten)
+- **Zeitgesteuerte Planung:** Bei Angabe einer Zielzeit wird der Prompt in eine Laufzeit-Warteschlange gepuffert und zum Erreichen der Zielzeit automatisch versendet
+- **Zielzeitberechnung:** Die eingegebene Stunde und Minute werden als lokale Wanduhrzeit interpretiert (via `DateTime.Now`/`DateTimeOffset.Now`); liegt die Zielzeit in der Vergangenheit, wird der Prompt sofort versendet
+- **Statusanzeige:** Während der Wartezeit zeigt ein `TextBlock` den Status „Prompt in Wartestellung" sowie die Zielzeit im Format `HH:mm`
+- **Nur ein Prompt pro Aufgabe:** Wird ein zweiter Prompt für dieselbe Aufgabe geplant, ersetzt er den ersten; der alte Timer wird abgebrochen
+
+**Technische Implementierung:**
+
+- **Neuer Service `PromptZeitVersandService` (Singleton):**
+  - Verwaltet pro Aufgabe maximal einen geplanten Prompt in einem `Dictionary<Guid, ScheduledPromptInfo>`
+  - Nutzt ereignisgesteuerte Timer (`ITimer` via `TimeProvider.CreateTimer`) statt globaler Polling-Schleife — ressourcenschonend und testbar
+  - Öffentliche Methoden: `SchedulePromptAsync(aufgabeId, promptText, targetTime)`, `CancelScheduledPrompt(aufgabeId)`, `GetScheduledPromptStatus(aufgabeId)`
+  - Event `PromptVersendet(aufgabeId)` wird beim erfolgreichen Versand gefeuert (abonniert vom ViewModel zur UI-Aktualisierung)
+  - Fehlerbehandlung: Ist die CLI-Session bei Zielzeit-Erreichen nicht mehr vorhanden, wird der Prompt still verworfen (nur Log-Warnung, kein Event)
+  - Thread-Sicherheit: Dictionary-Zugriffe geschützt durch `lock`
+
+- **Neue `ScheduledPromptInfo`-Record (Value Object):**
+  - Eigenschaften: `AufgabeId` (Guid), `PromptText` (string), `TargetTime` (DateTimeOffset)
+  - Unveränderlich, für Datenaustausch zwischen ViewModel und Service
+
+- **Neue `PseudoConsoleSession.WritePromptAsync()`-Methode:**
+  - Kapselt die Prompt-Schreiblogik (Encoding, `WriteAsync`, `FlushAsync`, `MarkInputActivity`) — verwenden vom Sofort-Versand im ViewModel und vom zeitgesteuerten Versand im Service
+  - Eliminiert Code-Duplikat
+
+- **Erweiterung `TaskDetailViewModel`:**
+  - Neue bindbare Properties: `ScheduledPromptTargetHours` (int?), `ScheduledPromptTargetMinutes` (int?), `ScheduledPromptStatus` (string?), `ScheduledPromptTimeDisplay` (string?)
+  - Neue computed Property `CanSchedulePrompt` (bool): true wenn CLI läuft, Vorlage gewählt, und gültige Zeit eingegeben
+  - Neuer `SchedulePromptCommand` (AsyncRelayCommand) mit CanExecute = `CanSchedulePrompt`
+  - Modifizierte `PromptVorlageAuswaehlenAsync`: Unterscheidung zwischen leeren Feldern (Sofortversand) und befüllten Feldern (kein Sofortversand; ViewModel-Dialog ignorieren)
+  - Private Methode `SchedulePromptAsync`: Validierung (Stunde 0–23, Minute 0–59), Zielzeitberechnung, Platzhalterauflösung, Service-Aufruf, UI-Update
+  - `Dispose`: Storniert geplante Prompts via `_promptZeitVersandService.CancelScheduledPrompt(_aufgabeId)`
+  - Event-Handler für `PromptZeitVersandService.PromptVersendet`: Setzt `ScheduledPromptStatus = null`, wechselt zur CLI-Ansicht, via `_dispatcherInvoke` auf UI-Thread
+
+- **Erweiterung `TaskDetailView.xaml`:**
+  - Zwei `TextBox`-Felder (Stunde, Minute) mit `UpdateSourceTrigger=PropertyChanged` und automatischer Input-Validierung (nur Ziffern)
+  - Button „Zeitgesteuert senden" (Binding auf `SchedulePromptCommand`), deaktiviert wenn `CanSchedulePrompt` false
+  - `TextBlock` für Statusanzeige („Prompt in Wartestellung"), sichtbar nur wenn `ScheduledPromptStatus` nicht null/leer
+
+- **DI-Registrierung (`App.xaml.cs`):**
+  - `services.AddSingleton<PromptZeitVersandService>()` mit Abhängigkeiten `KiAusfuehrungsService`, `TimeProvider.System` (neu registriert falls nötig), `ILogger<PromptZeitVersandService>`
+  - `TaskDetailViewModelTestFactory` erweitert um Übergabe der neuen Service-Instanz
+
+**Testing:**
+
+- **Unit-Tests `PromptZeitVersandServiceTests`:**
+  - Vergangene Zielzeit → sofortiger Versand ohne Timer-Eintrag
+  - Zukünftige Zielzeit → Eintrag in Warteschlange, Status abrufbar
+  - Timer-Fälligkeit (deterministisch mit `FakeTimeProvider.Advance()`) → `WritePromptAsync` aufgerufen, `PromptVersendet` gefeuert
+  - Stornierung → entfernt Eintrag, Timer disposed
+  - Mehrfache Planung → neuer Timer ersetzt alten
+  - Fehlende Session bei Fälligkeit → still verworfen, kein Event
+
+- **Unit-Tests `TaskDetailViewModelTests`:**
+  - Properties binden, PropertyChanged feuert
+  - Leere Zeitfelder → `CanSchedulePrompt` false, Sofortversand unverändert
+  - Gültige Zeitangabe → Service wird aufgerufen, Status = „Prompt in Wartestellung"
+  - Ungültige Eingaben → `FehlerMeldung` gesetzt, kein Scheduling
+  - `Dispose` → ruft `CancelScheduledPrompt` auf
+
+- **E2E-Tests `E2E_ZeitgesteuerterPrompt`:**
+  - Happy-Path: CLI läuft, Zielzeit eingeben, Vorlage wählen, Button klicken → Status-Anzeige sichtbar, kein Fehler-Banner
+
+**NuGet-Abhängigkeit hinzugefügt:**
+
+- `Microsoft.Extensions.TimeProvider.Testing` (für `FakeTimeProvider` in Unit-Tests) in `Softwareschmiede.Tests.csproj`
 
 #### Feature 72: Aufgabenworkflow Optimierung (in Arbeit)
 

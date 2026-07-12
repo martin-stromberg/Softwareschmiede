@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Domain.Terminal;
@@ -258,6 +259,53 @@ public sealed class PseudoConsoleSession : IDisposable
 
         if (changed)
             RuntimeStatusChanged?.Invoke(this, new CliRuntimeStatusChangedEventArgs(status));
+    }
+
+    /// <summary>Schreibt einen Prompt inkl. abschließendem Absenden auf <see cref="InputStream"/>, flusht ihn und
+    /// meldet die Eingabe an die Status-Erkennung. Zeilenumbrüche (im Prompttext sowie der abschließende Submit)
+    /// werden bewusst einheitlich als bloßes <c>\r</c> (CR) übertragen statt als <see cref="Environment.NewLine"/>
+    /// (<c>\r\n</c> unter Windows): Ein echter physischer Tastatur-Enter wird von <c>KeyToVt100Encoder.Encode</c>
+    /// ebenfalls als alleinstehendes <c>0x0D</c> kodiert, und eingefügter Zwischenablage-Text wird von
+    /// <c>KeyToVt100Encoder.EncodeClipboardText</c> aus demselben Grund auf <c>\r</c> normalisiert. Ein
+    /// zusätzliches <c>\n</c> nach dem CR wird von der CLI nicht wie ein normaler Tastatur-Enter interpretiert
+    /// und kann den Submit der Zeile verhindern.</summary>
+    /// <param name="prompt">Der zu sendende Prompttext.</param>
+    /// <param name="ct">Abbruch-Token.</param>
+    public async Task WritePromptAsync(string prompt, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(NormalizeToCarriageReturn(prompt).TrimEnd('\r') + "\r");
+        await InputStream.WriteAsync(bytes, ct);
+        await InputStream.FlushAsync(ct);
+        MarkInputActivity();
+    }
+
+    /// <summary>Wandelt alle Zeilenenden (<c>\r\n</c> und alleinstehendes <c>\n</c>) in ein einzelnes <c>\r</c>
+    /// um, wie es ein echter Enter-Tastendruck an die Pseudo Console sendet (siehe <c>KeyToVt100Encoder</c>).</summary>
+    /// <param name="text">Der zu normalisierende Text.</param>
+    /// <returns>Der Text mit ausschließlich <c>\r</c> als Zeilenende.</returns>
+    public static string NormalizeToCarriageReturn(string text)
+    {
+        var normalized = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            switch (c)
+            {
+                case '\r':
+                    normalized.Append('\r');
+                    if (i + 1 < text.Length && text[i + 1] == '\n')
+                        i++;
+                    break;
+                case '\n':
+                    normalized.Append('\r');
+                    break;
+                default:
+                    normalized.Append(c);
+                    break;
+            }
+        }
+
+        return normalized.ToString();
     }
 }
 

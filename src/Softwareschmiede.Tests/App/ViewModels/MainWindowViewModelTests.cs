@@ -74,10 +74,13 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
+        var kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        var promptZeitVersandService = new PromptZeitVersandService(kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
         return new MainWindowViewModel(
             darkModeService,
             _serviceProviderMock.Object,
             aufgabeService ?? _aufgabeService,
+            promptZeitVersandService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
             action => action());

@@ -37,6 +37,9 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     /// <summary>Zeitstempel des letzten echten CLI-Prozessstarts.</summary>
     public DateTimeOffset? LetzterCliStartUtc { get; init; }
 
+    /// <summary>Gibt an, ob für diese Aufgabe aktuell ein zeitgesteuerter Prompt in der Warteschlange steht.</summary>
+    public bool HasScheduledPrompt { get; init; }
+
     /// <summary>Gibt an, ob diese Aufgabe aktuell im Inhaltsbereich angezeigt wird.</summary>
     public bool IsAktiv
     {

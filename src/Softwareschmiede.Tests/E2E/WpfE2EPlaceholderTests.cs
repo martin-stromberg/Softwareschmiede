@@ -99,9 +99,11 @@ public sealed class WpfE2ETests : WpfTestBase
             ? "Light"
             : "Dark";
 
-        designComboBoxElement.Click();
-        var neuerEintrag = WaitForElement(Automation.GetDesktop(), cf => cf.ByName(neuerWert), Short);
-        neuerEintrag.Click();
+        // Statt manuell zu öffnen (Click) und den Eintrag über die gesamte Desktop-Automatisierungsstruktur
+        // zu suchen (Automation.GetDesktop() – auf CI-Runnern unzuverlässig, siehe SelectComboBoxItemByClick),
+        // wird hier dieselbe bereits andernorts (z. B. E2E_SettingsKiPluginPersistence) erprobte Hilfsmethode
+        // verwendet, die den Eintrag im Scope der ComboBox selbst sucht und definierte Settle-Pausen einhält.
+        SelectComboBoxItemByClick(designComboBoxElement, neuerWert, Short);
 
         WaitForSelectedComboBoxItem(designComboBoxElement, neuerWert, Short);
 
@@ -117,11 +119,16 @@ public sealed class WpfE2ETests : WpfTestBase
 
         einstellungenButton.Click();
 
-        // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert
+        // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert. SettingsView.Loaded löst
+        // vm.LadenCommand.Execute(null) als Fire-and-Forget aus; DesignMode wird darin erst nach mehreren
+        // vorausgehenden awaits (Arbeitsverzeichnis, Standard-KI-Plugin) neu gesetzt. Ein direktes Assert
+        // unmittelbar nach dem Auffinden der ComboBox liest daher auf langsameren/kalten CI-Runnern
+        // gelegentlich noch den alten Wert, bevor der Reload abgeschlossen ist — deshalb wird hier wie beim
+        // ersten Auswählen oben (Zeile 106) auf den erwarteten Wert gepollt statt einmalig geprüft.
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short).AsComboBox();
+        var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
 
-        Assert.Equal(neuerWert, designComboBoxNachRueckkehr.SelectedItem?.Name);
+        WaitForSelectedComboBoxItem(designComboBoxNachRueckkehr, neuerWert, Short);
     }
 
     /// <summary>Prüft, dass beim sauberen Start kein Recovery-Banner angezeigt wird.</summary>

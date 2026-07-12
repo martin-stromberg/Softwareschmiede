@@ -1,3 +1,15 @@
+## 2026-07-12 — Zeitgesteuerter Prompt-Versand
+
+- Neue UI-Felder (Stunde/Minute) im Ribbon der Aufgabendetailansicht zur zeitgesteuerten Planung von Prompts. Ein neuer Button „Zeitgesteuert senden" ermöglicht die Planung des Prompts zur angegebenen Uhrzeit.
+- Neuer `PromptZeitVersandService` als Singleton-Service, der zeitgesteuerte Prompts pro Aufgabe in einer Laufzeit-Warteschlange verwaltet und bei Erreichen der Zielzeit automatisch an die aktive CLI-Session versendet.
+- Statusanzeige „Prompt in Wartestellung" mit Anzeige der Zielzeit (HH:mm Format) während das Scheduling aktiv ist. Status wird automatisch gelöscht nach erfolgreichem Versand oder beim CLI-Stop.
+- Automatische Stornierung geplanter Prompts beim Wechsel der Aufgabendetailansicht, beim Dispose des ViewModels oder beim Aufgabenabschluss.
+- Validierung der Zeitfelder (Stunde 0–23, Minute 0–59); ungültige Eingaben setzen `FehlerMeldung`.
+- Neue Klasse `ScheduledPromptInfo` als unveränderliches Value-Object für die Verwaltung geplanter Prompts.
+- Extraktion von `PseudoConsoleSession.WritePromptAsync(prompt, ct)` als gemeinsame Schreibmethode für sofortigen und zeitgesteuerten Versand.
+- Neue Unit-Tests (`PromptZeitVersandServiceTests`) mit deterministischer Timer-Simulation via `FakeTimeProvider` und `Advance()`.
+- Neue E2E-Tests (`E2E_ZeitgesteuerterPrompt`) zur Verifikation der Benutzeroberfläche und des Happy-Path.
+
 ## 2026-07-11 — Tests automatisierbar machen: Log-Diagnose und Build-Hook-Warnung
 
 - **Problem:** E2E-Tests scheitern sporadisch mit zwei Fehlermustern: (1) korruptierte Build-Artefakte durch laufende `Softwareschmiede.App.exe` während Tests (MSB3027-Lock, ".NET Desktop Runtime nicht gefunden") und (2) Startup-Exceptions der App (z. B. `XamlParseException`), die sich im Test nur als "MainWindow nicht gefunden" äußern, ohne tatsächliche Ursache preiszugeben.

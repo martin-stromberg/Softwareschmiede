@@ -198,6 +198,8 @@ public sealed partial class App : System.Windows.Application
             services.AddSingleton<IPseudoConsoleProcessLauncher, Win32PseudoConsoleProcessLauncher>();
         }
         services.AddSingleton<KiAusfuehrungsService>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();

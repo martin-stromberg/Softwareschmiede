@@ -214,6 +214,92 @@ Ablauf:
 
 Die Info-Ansicht ist nicht an den Aufgabenstatus gebunden. Sie bleibt auch bei gestarteten, wartenden und beendeten Aufgaben auswählbar.
 
+### 5.1. Zeitgesteuerter Prompt-Versand planen
+
+Ausgelöst durch Eingabe einer Zielzeit (Stunde und Minute) sowie Klick auf den Button „Zeitgesteuert senden" im Ribbon der `TaskDetailView`.
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.ScheduledPromptTargetHours`, `ScheduledPromptTargetMinutes` — bindbare int?-Properties für die Zeitfelder
+- `TaskDetailViewModel.CanSchedulePrompt` — Bedingung: CLI läuft, Vorlage gewählt, gültige Zeit eingegeben
+- `TaskDetailViewModel.SchedulePromptCommand` — AsyncRelayCommand zum Planen des Prompts
+- `TaskDetailViewModel.SchedulePromptAsync` — Private Methode mit Validierung und Planungslogik
+- `PromptZeitVersandService.SchedulePromptAsync` — Plant Prompt mit Timer oder sendet sofort
+- `PromptVorlagenPlatzhalterService.Resolve` — Löst Platzhalter im Prompttext auf
+- `PseudoConsoleSession.WritePromptAsync` — Schreibt Prompt auf InputStream
+
+Ablauf:
+1. Anwender trägt Stunde und/oder Minute in die Zeitfelder ein (z.B. 16 und 30)
+2. Anwender wählt eine Promptvorlage aus der ComboBox (z.B. „Fehleranalyse")
+3. Vorlage-ComboBox sendet **nicht** sofort, da Zeitfelder befüllt sind
+4. Anwender klickt Button „Zeitgesteuert senden"
+5. `SchedulePromptCommand.Execute()` wird aufgerufen → `SchedulePromptAsync()` wird ausgeführt
+6. Validierung der Zeitfelder:
+   - Stunde (wenn gesetzt): muss 0–23 sein
+   - Minute (wenn gesetzt): muss 0–59 sein
+   - Mindestens eines der Felder muss gesetzt sein
+   - Falls ungültig: `FehlerMeldung` wird gesetzt, Abbruch
+7. `TargetTime` wird berechnet: heutiges Datum + eingegebene Uhrzeit (lokal via `DateTime.Now`)
+8. Prompt wird aufgelöst via `PromptVorlagenPlatzhalterService.Resolve(_aufgabe)` (benötigt die geladene Aufgabe)
+9. `_promptZeitVersandService.SchedulePromptAsync(aufgabeId, promptText, targetTime)` wird aufgerufen:
+   - Liegt `targetTime` in der Vergangenheit/Gegenwart: `SendPromptAsync()` wird sofort aufgerufen, Prompt versendet, keine Warteschlange
+   - Sonst: `ScheduledPromptInfo` wird im internen Dictionary abgelegt (ersetzt evtl. vorhandenen Eintrag, dessen Timer wird abgebrochen), `ITimer` wird via `TimeProvider.CreateTimer` gestartet mit Restlaufzeit
+10. ViewModel setzt `ScheduledPromptStatus = "Prompt in Wartestellung"` und `ScheduledPromptTimeDisplay = targetTime.ToString("HH:mm")`
+11. Zeitfelder werden geleert (`null`), `SelectedPromptVorlage` wird zurückgesetzt
+12. UI rendert Status-Anzeige mit „Prompt in Wartestellung" und Zielzeit
+
+### 5.2. Automatischer Prompt-Versand bei Erreichen der Zielzeit
+
+Ausgelöst durch Timer-Fälligkeit im `PromptZeitVersandService` für einen geplanten Prompt.
+
+Beteiligte Komponenten:
+- `PromptZeitVersandService._scheduledPrompts` — Dictionary<Guid, ScheduledPromptEntry> mit aktiven Prompts pro Aufgabe
+- `ITimer` — Timer pro Eintrag, erstellt via `TimeProvider.CreateTimer`
+- `PromptZeitVersandService.HandleTimerElapsedAsync` — Callback wird bei Fälligkeit aufgerufen (Thread-Pool-Thread)
+- `PromptZeitVersandService.SendPromptAsync` — Schreibt Prompt an Session oder verwerfen
+- `PromptZeitVersandService.PromptSent` — Event, ausgelöst nach erfolgreichem Versand
+- `KiAusfuehrungsService.GetPseudoConsoleSession` — Holt aktive Session für die Aufgabe
+- `PseudoConsoleSession.WritePromptAsync` — Schreibt Prompt mit Encoding und Flushing
+- `TaskDetailViewModel` — abonniert `PromptSent` Event
+
+Ablauf:
+1. Timer des geplanten Prompts feuert (auf Thread-Pool-Thread)
+2. `HandleTimerElapsedAsync(aufgabeId)` wird aufgerufen
+3. Lock wird akquiriert; Eintrag wird aus Dictionary entfernt; Info gespeichert; Timer disposed
+4. `SendPromptAsync(aufgabeId, promptText, CancellationToken.None)` wird aufgerufen (außerhalb des Locks)
+5. `_kiService.GetPseudoConsoleSession(aufgabeId)` holt die aktive Session:
+   - Session vorhanden: `PseudoConsoleSession.WritePromptAsync(promptText, ct)` wird aufgerufen
+     - Prompt wird zu UTF-8-Bytes + Newline konvertiert
+     - Bytes werden auf `InputStream` geschrieben, Stream wird geflusht
+     - `MarkInputActivity()` wird aufgerufen (Status-Erkennung)
+     - Nach erfolgreicher Schreiboperation: `PromptSent?.Invoke(aufgabeId)` Event wird ausgelöst
+   - Session `null` (CLI zwischenzeitlich beendet oder gewechselt): Log-Warnung wird geschrieben, **kein** Event, **keine** Exception, **kein** `FehlerMeldung` — Prompt wird **still verworfen**
+6. Exceptions (ObjectDisposedException, OperationCanceledException) werden gefangen und geloggt; kein unkontrolliertes Exception-Bubbling
+7. `TaskDetailViewModel` (falls abonniert und aufgabeId trifft zu) empfängt `PromptSent`-Event über `_dispatcherInvoke`:
+   - `ScheduledPromptStatus = null` wird gesetzt
+   - `ScheduledPromptTimeDisplay = null` wird gesetzt
+   - Ansicht wechselt zur CLI via `WaehleAnsicht(DetailAnsicht.Cli)`
+
+### 5.3. Zeitgesteuerte Prompts stornieren
+
+Ausgelöst durch mehrere Ereignisse: Wechsel der Aufgabendetailansicht, Dispose des ViewModels, Aufgabenabschluss, oder wenn Anwender einen neuen Prompt plant (ersetzt den vorhandenen).
+
+Beteiligte Komponenten:
+- `PromptZeitVersandService.CancelScheduledPrompt` — Storniert einen geplanten Prompt
+- `TaskDetailViewModel.Dispose` — ruft `CancelScheduledPrompt` auf
+- `TaskDetailViewModel.AufgabeAbschliessenAsync` — ruft `CancelScheduledPrompt` vor Abschluss auf
+- `TaskDetailViewModel.LadenAsync` — ruft `CancelScheduledPrompt` beim Wechsel der AufgabeId auf
+
+Ablauf beim Stornieren:
+1. `_promptZeitVersandService.CancelScheduledPrompt(aufgabeId)` wird aufgerufen
+2. Lock wird akquiriert; Eintrag wird aus Dictionary entfernt; Timer wird disposed
+3. Bearbeitete Aufgabe: Geplanter Prompt ist damit aus der Warteschlange entfernt und der Timer ist abgebrochen
+4. Falls ViewModel noch aktiv (nicht disposed): `TaskDetailViewModel.ScheduledPromptStatus` soll auf `null` gesetzt werden
+   - **Wichtig:** Das ViewModel abonniert das `PromptSent`-Event; ein stilles Verwerfen macht `ScheduledPromptStatus` nicht automatisch `null`
+   - Daher: Beim Wechsel der `AufgabeId` oder `Dispose` muss das ViewModel selbst die Status-Properties räumen
+
+Zusätzlich:
+- `TaskDetailViewModel.OnCliProcessStatusChanged` — Wenn die CLI stoppt (IsCliRunning → false), wird `ScheduledPromptStatus` und `ScheduledPromptTimeDisplay` auf `null` gesetzt. Dadurch wird eine „verwaiste" Wartestellung entfernt, die durch stilles Verwerfen entstanden wäre.
+
 ### 5.1. Aktiver CLI-Name in der Fußzeile
 
 Beteiligte Komponenten:
