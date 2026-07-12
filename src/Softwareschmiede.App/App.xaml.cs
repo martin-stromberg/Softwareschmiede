@@ -13,6 +13,7 @@ using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Plugins;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App;
 
@@ -188,6 +189,14 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<PromptVorlagenPlatzhalterService>();
 
         // Infrastructure Services
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH")))
+        {
+            services.AddSingleton<IPseudoConsoleProcessLauncher, SimulatedPseudoConsoleProcessLauncher>();
+        }
+        else
+        {
+            services.AddSingleton<IPseudoConsoleProcessLauncher, Win32PseudoConsoleProcessLauncher>();
+        }
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();

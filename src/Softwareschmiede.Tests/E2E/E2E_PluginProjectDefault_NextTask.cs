@@ -27,8 +27,6 @@ public sealed class E2E_PluginProjectDefault_NextTask : WpfTestBase
     [SkippableFact]
     public void ZweiteAufgabeImProjekt_UebernimmtGespeichertenProjektStandardOhneDialog_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
-
         var mainWindow = SetupProjectMitNeuerAufgabe(
             "PluginProjectDefaultNext-Repo",
             "PluginProjectDefaultNext-Projekt",
