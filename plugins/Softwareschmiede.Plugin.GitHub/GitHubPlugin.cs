@@ -608,13 +608,23 @@ password {token}
         int maxDepth = 2,
         CancellationToken ct = default)
     {
+        var result = await GetRepositoryStructureLoadResultAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+        return result.Status == RepositoryStructureLoadStatus.Success ? result.Entries : [];
+    }
+
+    /// <inheritdoc/>
+    public override async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(
+        string repositoryUrl,
+        int maxDepth = 2,
+        CancellationToken ct = default)
+    {
         var repositoryId = TryExtractRepositoryId(repositoryUrl);
         if (repositoryId is null)
         {
             _logger.LogWarning(
                 "Verzeichnisstruktur konnte nicht ermittelt werden: Repository-ID konnte nicht aus '{RepositoryUrl}' extrahiert werden.",
                 repositoryUrl);
-            return [];
+            return RepositoryStructureLoadResult.Failed("Repository-ID konnte nicht aus der URL ermittelt werden.");
         }
 
         var branch = await GetDefaultBranchAsync(repositoryUrl, ct);
@@ -633,10 +643,47 @@ password {token}
                 repositoryId,
                 branch,
                 result.StdErr);
-            return [];
+            return RepositoryStructureLoadResult.Failed(result.StdErr);
         }
 
-        return ParseRepositoryTree(result.StdOut, maxDepth, repositoryId);
+        return ParseRepositoryTreeLoadResult(result.StdOut, maxDepth, repositoryId);
+    }
+
+    private RepositoryStructureLoadResult ParseRepositoryTreeLoadResult(string json, int maxDepth, string repositoryId)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("truncated", out var truncatedEl) &&
+                truncatedEl.ValueKind == JsonValueKind.True)
+            {
+                _logger.LogWarning(
+                    "GitHub Git-Trees-API-Antwort für {RepositoryId} ist abgeschnitten (truncated=true) — bei sehr großen Repositories ist die ermittelte Verzeichnisstruktur ggf. unvollständig.",
+                    repositoryId);
+            }
+
+            if (!doc.RootElement.TryGetProperty("tree", out var treeEl) || treeEl.ValueKind != JsonValueKind.Array)
+            {
+                return RepositoryStructureLoadResult.Failed("GitHub-Antwort enthält keine gültige tree-Liste.");
+            }
+
+            var entries = treeEl.EnumerateArray()
+                .Where(entry => entry.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "tree")
+                .Select(entry => entry.TryGetProperty("path", out var pathEl) ? pathEl.GetString() : null)
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Select(path => path!)
+                .Where(path => path.Count(c => c == '/') + 1 <= maxDepth)
+                .Select(path => new RepositoryDirectoryEntry(path, true))
+                .ToList();
+
+            return RepositoryStructureLoadResult.Success(entries);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Parsen der GitHub-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
+            return RepositoryStructureLoadResult.Failed(ex.Message);
+        }
     }
 
     private IEnumerable<RepositoryDirectoryEntry> ParseRepositoryTree(string json, int maxDepth, string repositoryId)

@@ -14,6 +14,9 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModel : ViewModelBase
     private ObservableCollection<string> _availableWorkingDirectories = new();
     private string? _selectedWorkingDirectory;
     private bool _isLoadingDirectoryStructure;
+    private bool _isWorkingDirectoryManualInput;
+    private string? _workingDirectoryInputText;
+    private string? _workingDirectoryInputError;
 
     /// <summary>Wird ausgelöst wenn der Dialog geschlossen werden soll. Parameter: true = bestätigt, false = abgebrochen.</summary>
     public event EventHandler<bool>? CloseRequested;
@@ -30,6 +33,34 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModel : ViewModelBase
     {
         get => _selectedWorkingDirectory;
         set => SetProperty(ref _selectedWorkingDirectory, value);
+    }
+
+    /// <summary>Gibt an, ob das Arbeitsverzeichnis manuell eingegeben wird.</summary>
+    public bool IsWorkingDirectoryManualInput
+    {
+        get => _isWorkingDirectoryManualInput;
+        private set => SetProperty(ref _isWorkingDirectoryManualInput, value);
+    }
+
+    /// <summary>Manuell eingegebener relativer Arbeitsverzeichnis-Pfad.</summary>
+    public string? WorkingDirectoryInputText
+    {
+        get => _workingDirectoryInputText;
+        set
+        {
+            if (SetProperty(ref _workingDirectoryInputText, value))
+            {
+                ValidateManualWorkingDirectoryInput();
+                RelayCommand.Refresh();
+            }
+        }
+    }
+
+    /// <summary>Validierungsfehler der manuellen Arbeitsverzeichnis-Eingabe.</summary>
+    public string? WorkingDirectoryInputError
+    {
+        get => _workingDirectoryInputError;
+        private set => SetProperty(ref _workingDirectoryInputError, value);
     }
 
     /// <summary>Gibt an, ob die Verzeichnisstruktur gerade geladen wird.</summary>
@@ -56,7 +87,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModel : ViewModelBase
         _logger = logger;
         _directoryStructureService = directoryStructureService;
 
-        BestaetigenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, true));
+        BestaetigenCommand = new RelayCommand(Confirm, CanConfirm);
         AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
     }
 
@@ -74,11 +105,11 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModel : ViewModelBase
 
     private async Task LoadDirectoryStructureAsync(IGitPlugin? gitPlugin, string repositoryUrl, string? currentWorkingDirectory, CancellationToken ct)
     {
-        List<string>? directories = null;
+        WorkingDirectoryLoadResult? loadResult = null;
 
         if (_directoryStructureService != null && gitPlugin != null)
         {
-            directories = await DirectoryStructureLoadHelper.LoadWithLoadingStateAsync(
+            loadResult = await DirectoryStructureLoadHelper.LoadWithLoadingStateAsync(
                 _directoryStructureService,
                 gitPlugin,
                 repositoryUrl,
@@ -86,7 +117,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModel : ViewModelBase
                 isLoading => IsLoadingDirectoryStructure = isLoading,
                 ct);
 
-            if (directories is null)
+            if (loadResult is null)
             {
                 // Erwarteter Abbruch: anders als bei RepositoryAssignViewModel gibt es hier keinen
                 // Folgeaufruf, der den Lade-Status zurücksetzt (LadenAsync wird pro Dialogaufruf nur
@@ -98,11 +129,24 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModel : ViewModelBase
             }
         }
 
-        // Kein Service/Plugin vorhanden (fehlender Kontext, kein Abbruch): auf den Root-Eintrag zurückfallen.
-        directories ??= new List<string> { "." };
+        if (loadResult is null || loadResult.RequiresManualInput)
+        {
+            AvailableWorkingDirectories.Clear();
+            IsWorkingDirectoryManualInput = true;
+            WorkingDirectoryInputText = !string.IsNullOrWhiteSpace(currentWorkingDirectory)
+                ? currentWorkingDirectory
+                : ".";
+            SelectedWorkingDirectory = WorkingDirectoryInputText;
+            ValidateManualWorkingDirectoryInput();
+            RelayCommand.Refresh();
+            return;
+        }
 
+        IsWorkingDirectoryManualInput = false;
+        WorkingDirectoryInputText = null;
+        WorkingDirectoryInputError = null;
         AvailableWorkingDirectories.Clear();
-        foreach (var dir in directories)
+        foreach (var dir in loadResult.WorkingDirectories)
             AvailableWorkingDirectories.Add(dir);
 
         if (!string.IsNullOrWhiteSpace(currentWorkingDirectory)
@@ -113,5 +157,39 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModel : ViewModelBase
         }
 
         SelectedWorkingDirectory = !string.IsNullOrWhiteSpace(currentWorkingDirectory) ? currentWorkingDirectory : ".";
+    }
+
+    private bool CanConfirm()
+        => !IsWorkingDirectoryManualInput || ValidateManualWorkingDirectoryInput();
+
+    private void Confirm()
+    {
+        if (IsWorkingDirectoryManualInput)
+        {
+            if (!WorkingDirectoryInputValidator.TryNormalize(WorkingDirectoryInputText, out var normalized, out var error))
+            {
+                WorkingDirectoryInputError = error;
+                RelayCommand.Refresh();
+                return;
+            }
+
+            WorkingDirectoryInputText = normalized;
+            SelectedWorkingDirectory = normalized;
+        }
+
+        CloseRequested?.Invoke(this, true);
+    }
+
+    private bool ValidateManualWorkingDirectoryInput()
+    {
+        if (!IsWorkingDirectoryManualInput)
+        {
+            WorkingDirectoryInputError = null;
+            return true;
+        }
+
+        var isValid = WorkingDirectoryInputValidator.TryNormalize(WorkingDirectoryInputText, out _, out var error);
+        WorkingDirectoryInputError = error;
+        return isValid;
     }
 }

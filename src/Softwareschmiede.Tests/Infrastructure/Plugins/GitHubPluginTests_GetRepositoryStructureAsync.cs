@@ -122,6 +122,24 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         result.Should().BeEmpty();
     }
 
+    /// <summary>Der Result-Abruf meldet GitHub-API-Fehler als Fehlerstatus.</summary>
+    [Fact]
+    public async Task GetRepositoryStructureLoadResultAsync_ShouldReturnFailed_WhenGhApiFails()
+    {
+        SetupDefaultBranch();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("git/trees/"))),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "HTTP 404: Not Found"));
+
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://github.com/owner/repo", maxDepth: 2);
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
+    }
+
     /// <summary>Eine leere/ungültige Repository-URL, aus der keine Repository-ID extrahiert werden kann, liefert eine leere Liste.</summary>
     [Fact]
     public async Task GetRepositoryStructureAsync_ShouldReturnEmpty_ForUnparsableUrl()

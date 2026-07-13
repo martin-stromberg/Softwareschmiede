@@ -4,7 +4,7 @@
         Title="Repository zuweisen"
         Background="{DynamicResource SurfaceBrush}"
         Width="500"
-        Height="400"
+        Height="430"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
     <Grid Margin="24">
@@ -95,8 +95,21 @@
             <ComboBox ItemsSource="{Binding AvailableWorkingDirectories}"
                       SelectedItem="{Binding SelectedWorkingDirectory, Mode=TwoWay}"
                       IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
+                      Visibility="{Binding IsWorkingDirectoryManualInput, Converter={StaticResource InverseBoolToVisibilityConverter}}"
                       Background="{DynamicResource BackgroundBrush}"
                       Padding="8,6" />
+
+            <TextBox Text="{Binding WorkingDirectoryInputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
+                     Visibility="{Binding IsWorkingDirectoryManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
+                     Background="{DynamicResource BackgroundBrush}"
+                     Foreground="{DynamicResource PrimaryTextBrush}"
+                     Padding="8,6" />
+
+            <TextBlock Text="{Binding WorkingDirectoryInputError}"
+                       Foreground="{DynamicResource ErrorBrush}"
+                       Margin="0,4,0,0"
+                       TextWrapping="Wrap" />
 
             <TextBlock Text="Wird geladen…"
                        Foreground="{DynamicResource SecondaryTextBrush}"

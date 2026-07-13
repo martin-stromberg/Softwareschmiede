@@ -66,10 +66,16 @@ Das Projekt wird gelöscht, die Ansicht kehrt zur Projektübersicht zurück, und
 3. Wählen Sie das gewünschte SCM-Plugin aus der Dropdown-Liste (z.B. „GitHub"). Die Liste wird geladen und zeigt den Plugin-Namen.
 4. Die Liste der verfügbaren Repositories für dieses Plugin wird automatisch gefiltert und angezeigt. Jedes Repository zeigt seinen Namen und seine URL.
 5. Wählen Sie ein Repository aus der Liste durch Anklicken (einfaches Klicken, nicht Doppelklick).
-6. Klicken Sie auf den „Zuweisen"-Button im Dialog. Der Button ist nur aktiviert, wenn ein Repository ausgewählt ist.
+6. Wählen Sie optional ein Arbeitsverzeichnis im Repository:
+   - Wenn die Verzeichnisstruktur geladen werden kann, wählen Sie ein Verzeichnis aus der Dropdown-Liste.
+   - Wenn die Verzeichnisstruktur nicht geladen werden kann, geben Sie einen relativen Pfad manuell in das Textfeld ein.
+   - `"."` bedeutet Repository-Root.
+7. Klicken Sie auf den „Zuweisen"-Button im Dialog. Der Button ist nur aktiviert, wenn ein Repository ausgewählt ist und das Arbeitsverzeichnis gültig ist.
 
 ### Ergebnis
 Das Repository wird dem Projekt zugeordnet. Der Dialog schließt sich, und das Repository steht für Aufgabenstart zur Verfügung.
+
+Das gewählte Arbeitsverzeichnis wird beim Start von Aufgaben als Unterverzeichnis innerhalb des Repositories verwendet. Es kann später über den Ribbon-Button „Arbeitsverzeichnis" geändert werden.
 
 ### Fehlerfälle
 
@@ -82,6 +88,12 @@ Der Dialog zeigt ein Hilfe-Panel mit Text: „Keine SCM-Plugins installiert. Um 
 - Die Repository-Liste ist leer.
 - Der „Zuweisen"-Button ist deaktiviert.
 - Wählen Sie ein anderes Plugin oder erstellen Sie ein Repository für den gewählten Plugin-Typ.
+
+**Fall 3: Arbeitsverzeichnis-Auswahl kann nicht geladen werden**
+- Statt der Dropdown-Liste wird ein Textfeld angezeigt.
+- Geben Sie einen relativen Pfad ein, z. B. `src` oder `backend/api`.
+- Leere Eingaben werden als `"."` behandelt.
+- Absolute Pfade oder Pfade mit `..` werden nicht akzeptiert.
 
 > **Hinweis:** Die Repository-Liste wird sofort aktualisiert, wenn Sie das Plugin wechseln. Sie müssen nicht auf einen Ladesymbol oder Nachricht warten — die Filterung erfolgt im Hintergrund.
 

@@ -288,16 +288,23 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     /// <inheritdoc/>
     public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
     {
+        var result = await GetRepositoryStructureLoadResultAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+        return result.Status == RepositoryStructureLoadStatus.Success ? result.Entries : [];
+    }
+
+    /// <inheritdoc/>
+    public override async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+    {
         ct.ThrowIfCancellationRequested();
 
         if (string.IsNullOrWhiteSpace(repositoryUrl) || !Directory.Exists(repositoryUrl))
         {
-            return Enumerable.Empty<RepositoryDirectoryEntry>();
+            return RepositoryStructureLoadResult.Failed("Das lokale Repository-Verzeichnis existiert nicht.");
         }
 
         var rootPath = ResolveAndNormalizePath(repositoryUrl);
 
-        return await Task.Run(
+        var entries = await Task.Run(
             () =>
             {
                 var entries = new List<RepositoryDirectoryEntry>();
@@ -305,6 +312,8 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
                 return (IEnumerable<RepositoryDirectoryEntry>)entries;
             },
             ct);
+
+        return RepositoryStructureLoadResult.Success(entries);
     }
 
     private void CollectDirectoryEntries(

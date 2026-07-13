@@ -137,6 +137,44 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
         result.Should().BeEmpty();
     }
 
+    /// <summary>Der Result-Abruf meldet Bitbucket-Cloud-API-Fehler als Fehlerstatus.</summary>
+    [Fact]
+    public async Task GetRepositoryStructureLoadResultAsync_ShouldReturnFailed_WhenCloudApiFails()
+    {
+        SetupDefaultBranch();
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "curl",
+                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("/src/main/"))),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "connection failed"));
+
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.org/workspace/repo", maxDepth: 2);
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
+    }
+
+    /// <summary>Ein erfolgreich leerer Bitbucket-Cloud-Abruf bleibt ein Erfolg mit leerer Liste.</summary>
+    [Fact]
+    public async Task GetRepositoryStructureLoadResultAsync_ShouldReturnSuccess_WhenCloudRepositoryHasNoDirectories()
+    {
+        SetupDefaultBranch();
+        const string sourceJson = """{ "values": [] }""";
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "curl",
+                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("/src/main/"))),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, sourceJson, string.Empty));
+
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.org/workspace/repo", maxDepth: 2);
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
+        result.Entries.Should().BeEmpty();
+    }
+
     /// <summary>Ein Bitbucket-API-Fehlerobjekt (<c>errors: [...]</c>) führt zu einer leeren Liste, nicht zu einer Exception.</summary>
     [Fact]
     public async Task GetRepositoryStructureAsync_ShouldReturnEmpty_WhenApiReturnsErrorPayload()
@@ -254,5 +292,26 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
         var result = await _sut.GetRepositoryStructureAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2);
 
         result.Should().BeEmpty();
+    }
+
+    /// <summary>Ein fehlgeschlagener Root-Browse-Aufruf im Self-Hosted-Modus liefert im Result-Pfad Fehlerstatus.</summary>
+    [Fact]
+    public async Task GetRepositoryStructureLoadResultAsync_ShouldReturnFailed_WhenSelfHostedRootBrowseFails()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("SelfHosted");
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl")).Returns("https://bitbucket.example.com");
+        SetupDefaultBranch();
+
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "curl",
+                It.Is<IEnumerable<string>>(args => args.Any(a => a.Contains("/browse"))),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "connection refused"));
+
+        var result = await _sut.GetRepositoryStructureLoadResultAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2);
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
     }
 }

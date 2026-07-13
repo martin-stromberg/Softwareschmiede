@@ -62,6 +62,25 @@
 
 **Umsetzung:** `ProjectDetailViewModel.RepositoryZuweisenAsync()` öffnet `RepositoryAssignDialog` modal und wartet auf Bestätigung; `RepositoryAssignDialog` verwaltet die Auswahl über `RepositoryAssignViewModel`
 
+## Arbeitsverzeichnis im Repository
+
+**Beschreibung:** Ein Projekt-Repository kann mit einem relativen Arbeitsverzeichnis innerhalb des Repositories gespeichert werden.
+
+**Bedingungen:**
+- Benutzer weist ein Repository zu oder bearbeitet das Arbeitsverzeichnis eines bereits zugewiesenen Repositories
+- Die Remote-Verzeichnisstruktur kann erfolgreich geladen werden, oder der Dialog wechselt in den manuellen Eingabemodus
+
+**Verhalten:**
+- Bei erfolgreichem Strukturabruf wird eine Auswahlbox angezeigt. Sie enthält immer `"."` für das Repository-Root und danach die gefundenen Unterverzeichnisse.
+- Ein erfolgreicher leerer Strukturabruf bleibt Auswahlmodus mit nur `"."`.
+- Bei technischem Fehler, deaktiviertem Strukturabruf oder nicht unterstütztem Plugin wird eine manuelle TextBox angezeigt.
+- Im Zuweisungsdialog startet die manuelle Eingabe mit `"."`.
+- Im Bearbeiten-Dialog startet die manuelle Eingabe mit dem aktuell gespeicherten Arbeitsverzeichnis, damit vorhandene Werte nicht verloren gehen.
+- Leere manuelle Eingaben werden als `"."` normalisiert.
+- Absolute Pfade, Pfade mit `..`-Segmenten und Pfade mit ungültigen Zeichen werden abgelehnt.
+
+**Umsetzung:** `DirectoryStructureBrowserService.GetDirectoryLoadResultAsync()` liefert einen `RepositoryStructureLoadResult`; `DirectoryStructureLoadHelper` übersetzt diesen in Auswahlmodus oder manuellen Eingabemodus. `RepositoryAssignViewModel` und `ArbeitsverzeichnisBearbeitenViewModel` synchronisieren gültige manuelle Eingaben nach `SelectedWorkingDirectory`, bevor `ProjektService` speichert.
+
 ## Filter-Status ist flüchtig
 
 **Beschreibung:** Der Aufgabenfilter wird nicht persistiert und wird bei jedem Öffnen der Ansicht zurückgesetzt.

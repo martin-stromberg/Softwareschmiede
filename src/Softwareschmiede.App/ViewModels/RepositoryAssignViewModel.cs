@@ -23,6 +23,9 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     private string? _selectedWorkingDirectory;
     private bool _isLoadingDirectoryStructure;
     private CancellationTokenSource? _dirStructureCts;
+    private bool _isWorkingDirectoryManualInput;
+    private string? _workingDirectoryInputText;
+    private string? _workingDirectoryInputError;
 
     /// <summary>Wird ausgelöst wenn der Dialog geschlossen werden soll. Parameter: true = bestätigt, false = abgebrochen.</summary>
     public event EventHandler<bool>? CloseRequested;
@@ -79,6 +82,34 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _selectedWorkingDirectory, value);
     }
 
+    /// <summary>Gibt an, ob das Arbeitsverzeichnis manuell eingegeben wird.</summary>
+    public bool IsWorkingDirectoryManualInput
+    {
+        get => _isWorkingDirectoryManualInput;
+        private set => SetProperty(ref _isWorkingDirectoryManualInput, value);
+    }
+
+    /// <summary>Manuell eingegebener relativer Arbeitsverzeichnis-Pfad.</summary>
+    public string? WorkingDirectoryInputText
+    {
+        get => _workingDirectoryInputText;
+        set
+        {
+            if (SetProperty(ref _workingDirectoryInputText, value))
+            {
+                ValidateManualWorkingDirectoryInput();
+                RelayCommand.Refresh();
+            }
+        }
+    }
+
+    /// <summary>Validierungsfehler der manuellen Arbeitsverzeichnis-Eingabe.</summary>
+    public string? WorkingDirectoryInputError
+    {
+        get => _workingDirectoryInputError;
+        private set => SetProperty(ref _workingDirectoryInputError, value);
+    }
+
     /// <summary>Gibt an, ob die Verzeichnisstruktur des ausgewählten Repositories gerade geladen wird.</summary>
     public bool IsLoadingDirectoryStructure
     {
@@ -109,8 +140,8 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         _directoryStructureService = directoryStructureService;
 
         BestaetigenCommand = new RelayCommand(
-            () => CloseRequested?.Invoke(this, true),
-            () => _selectedRepository != null);
+            Confirm,
+            CanConfirm);
         AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
     }
 
@@ -201,6 +232,9 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     private void OnSelectedRepositoryChanged()
     {
         SelectedWorkingDirectory = null;
+        IsWorkingDirectoryManualInput = false;
+        WorkingDirectoryInputText = null;
+        WorkingDirectoryInputError = null;
         _dirStructureCts?.Cancel();
         _dirStructureCts?.Dispose();
         _dirStructureCts = new CancellationTokenSource();
@@ -212,10 +246,13 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         if (_directoryStructureService == null || SelectedScmPlugin == null || SelectedRepository == null)
         {
             AvailableWorkingDirectories.Clear();
+            IsWorkingDirectoryManualInput = false;
+            WorkingDirectoryInputText = null;
+            WorkingDirectoryInputError = null;
             return;
         }
 
-        var directories = await DirectoryStructureLoadHelper.LoadWithLoadingStateAsync(
+        var loadResult = await DirectoryStructureLoadHelper.LoadWithLoadingStateAsync(
             _directoryStructureService,
             SelectedScmPlugin,
             SelectedRepository.Url,
@@ -223,16 +260,65 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
             isLoading => IsLoadingDirectoryStructure = isLoading,
             ct);
 
-        if (directories is null)
+        if (loadResult is null)
         {
             // Abgebrochen durch Repository-/Plugin-Wechsel — kein Fehler, bisheriger Zustand bleibt unverändert.
             return;
         }
 
+        if (loadResult.RequiresManualInput)
+        {
+            AvailableWorkingDirectories.Clear();
+            IsWorkingDirectoryManualInput = true;
+            WorkingDirectoryInputText = ".";
+            SelectedWorkingDirectory = ".";
+            ValidateManualWorkingDirectoryInput();
+            RelayCommand.Refresh();
+            return;
+        }
+
+        IsWorkingDirectoryManualInput = false;
+        WorkingDirectoryInputText = null;
+        WorkingDirectoryInputError = null;
         AvailableWorkingDirectories.Clear();
-        foreach (var dir in directories)
+        foreach (var dir in loadResult.WorkingDirectories)
             AvailableWorkingDirectories.Add(dir);
 
         SelectedWorkingDirectory = ".";
+    }
+
+    private bool CanConfirm()
+        => _selectedRepository != null
+            && (!IsWorkingDirectoryManualInput || ValidateManualWorkingDirectoryInput());
+
+    private void Confirm()
+    {
+        if (IsWorkingDirectoryManualInput)
+        {
+            if (!WorkingDirectoryInputValidator.TryNormalize(WorkingDirectoryInputText, out var normalized, out var error))
+            {
+                WorkingDirectoryInputError = error;
+                RelayCommand.Refresh();
+                return;
+            }
+
+            WorkingDirectoryInputText = normalized;
+            SelectedWorkingDirectory = normalized;
+        }
+
+        CloseRequested?.Invoke(this, true);
+    }
+
+    private bool ValidateManualWorkingDirectoryInput()
+    {
+        if (!IsWorkingDirectoryManualInput)
+        {
+            WorkingDirectoryInputError = null;
+            return true;
+        }
+
+        var isValid = WorkingDirectoryInputValidator.TryNormalize(WorkingDirectoryInputText, out _, out var error);
+        WorkingDirectoryInputError = error;
+        return isValid;
     }
 }

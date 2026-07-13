@@ -23,8 +23,11 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
     private static Mock<IGitPlugin> CreatePluginMock(IEnumerable<RepositoryDirectoryEntry> entries)
     {
         var mock = new Mock<IGitPlugin>();
+        mock.Setup(p => p.PluginPrefix).Returns("Test");
         mock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(entries);
+        mock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success(entries));
         return mock;
     }
 
@@ -55,7 +58,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         await sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git");
 
         pluginMock.Verify(
-            p => p.GetRepositoryStructureAsync("https://example.com/repo.git", 3, It.IsAny<CancellationToken>()),
+            p => p.GetRepositoryStructureLoadResultAsync("https://example.com/repo.git", 3, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -71,7 +74,7 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
 
         first.Should().BeEquivalentTo(second);
         pluginMock.Verify(
-            p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -80,12 +83,58 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
     public async Task GetDirectoriesAsync_ShouldHandleErrors_Gracefully()
     {
         var pluginMock = new Mock<IGitPlugin>();
-        pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
+        pluginMock.Setup(p => p.PluginPrefix).Returns("Test");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Failed("Verbindungsfehler"));
         var sut = CreateSut();
 
         var act = () => sut.GetDirectoriesAsync(pluginMock.Object, "https://example.com/repo.git");
 
         (await act.Should().NotThrowAsync()).Which.Should().BeEmpty();
+    }
+
+    /// <summary>Ein leerer erfolgreicher Plugin-Result bleibt ein Erfolg.</summary>
+    [Fact]
+    public async Task GetDirectoryLoadResultAsync_ShouldReturnSuccess_ForEmptyRepository()
+    {
+        var pluginMock = CreatePluginMock([]);
+        var sut = CreateSut();
+
+        var result = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
+        result.Entries.Should().BeEmpty();
+    }
+
+    /// <summary>Plugin-Exceptions werden als Fehlerstatus gemeldet und nicht als leerer Erfolg.</summary>
+    [Fact]
+    public async Task GetDirectoryLoadResultAsync_ShouldReturnFailed_WhenPluginThrows()
+    {
+        var pluginMock = new Mock<IGitPlugin>();
+        pluginMock.Setup(p => p.PluginPrefix).Returns("Test");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
+        var sut = CreateSut();
+
+        var result = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
+    }
+
+    /// <summary>Cache-Keys berücksichtigen Plugin-Prefix und MaxDepth.</summary>
+    [Fact]
+    public async Task GetDirectoryLoadResultAsync_ShouldUsePluginPrefixAndMaxDepthInCacheKey()
+    {
+        var pluginA = CreatePluginMock([new RepositoryDirectoryEntry("a", IsDirectory: true)]);
+        pluginA.Setup(p => p.PluginPrefix).Returns("A");
+        var pluginB = CreatePluginMock([new RepositoryDirectoryEntry("b", IsDirectory: true)]);
+        pluginB.Setup(p => p.PluginPrefix).Returns("B");
+        var sut = CreateSut(new DirectoryStructureOptions { MaxDepth = 3 });
+
+        var first = await sut.GetDirectoriesAsync(pluginA.Object, "https://example.com/repo.git");
+        var second = await sut.GetDirectoriesAsync(pluginB.Object, "https://example.com/repo.git");
+
+        first.Should().Equal("a");
+        second.Should().Equal("b");
     }
 }

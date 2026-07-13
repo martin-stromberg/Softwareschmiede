@@ -114,6 +114,31 @@ public interface IGitPlugin : IPlugin
     Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
         => throw new NotSupportedException($"'{nameof(GetRepositoryStructureAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 
+    /// <summary>Ruft die Verzeichnisstruktur eines externen Repositories mit expliziter Erfolg-/Fehlersemantik ab.</summary>
+    /// <param name="repositoryUrl">URL des Repositories.</param>
+    /// <param name="maxDepth">Maximale Tiefe der abgerufenen Verzeichnisstruktur.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+    {
+        try
+        {
+            var entries = await GetRepositoryStructureAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+            return RepositoryStructureLoadResult.Success(entries);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (NotSupportedException ex)
+        {
+            return RepositoryStructureLoadResult.NotSupported(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return RepositoryStructureLoadResult.Failed(ex.Message);
+        }
+    }
+
     /// <summary>
     /// Löst den tatsächlichen Repository-Pfad für einen lokalen Pfad auf (z. B. Klon- oder Arbeitsverzeichnis-Pfad).
     /// Für die meisten Plugins (GitHub, BitBucket, <c>LocalDirectoryPlugin</c> im <c>SeparateWorkingDirectory</c>-Modus)
