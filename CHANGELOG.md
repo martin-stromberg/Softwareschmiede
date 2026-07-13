@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.9.0...v1.10.0) (2026-07-13)
+
+
+### Features
+
+* arbeitsverzeichnis fuer bitbucket ([e2dc671](https://github.com/martin-stromberg/Softwareschmiede/commit/e2dc67142adaa130019fe3701350194179c98637))
+
 # [1.9.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.8.1...v1.9.0) (2026-07-12)
 
 
