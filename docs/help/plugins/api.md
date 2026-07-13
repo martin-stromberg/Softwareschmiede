@@ -29,7 +29,8 @@ SCM-Operationen auf einem lokalen Repository-Klon.
 | `PullAsync` | `localPath`, `ct` | `Task` | Änderungen vom Remote holen |
 | `CreatePullRequestAsync` | `repositoryId`, `branchName`, `title`, `body`, `ct` | `Task<PullRequest>` | Pull Request erstellen |
 | `ResetAsync` | `localPath`, `resetType`, `targetRef?`, `ct` | `Task` | Git-Reset ausführen |
-| `GetRepositoryStructureAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<IEnumerable<RepositoryDirectoryEntry>>` | Verzeichnisstruktur des Repositories abrufen (für die Arbeitsverzeichnis-Auswahl im UI). Default-Implementierung wirft `NotSupportedException`; aktuell nur von `LocalDirectoryPlugin` implementiert (rekursiv bis `maxDepth`, `.git`-Verzeichnis wird ausgeschlossen). Remote-Provider-Plugins (`GitHubPlugin`, `BitBucketPlugin`) nutzen bewusst die Default-Implementierung, siehe [Repository-Auswahl-Dialog](../projekte/dialog-repository-auswahl.md#technische-details-zur-verzeichnisstruktur-ladung). |
+| `GetRepositoryStructureAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<IEnumerable<RepositoryDirectoryEntry>>` | Kompatibilitätsmethode für direkte Aufrufer: liefert Verzeichniseinträge oder wirft `NotSupportedException`, wenn das Plugin keinen Strukturabruf unterstützt. |
+| `GetRepositoryStructureLoadResultAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<RepositoryStructureLoadResult>` | Bevorzugte Methode für UI und Services: liefert Verzeichnisstruktur mit expliziter Erfolg-/Fehlersemantik für die Arbeitsverzeichnis-Auswahl. Die Default-Implementierung ruft `GetRepositoryStructureAsync` auf und wandelt Erfolg, `NotSupportedException` und sonstige Fehler in ein Result um. |
 
 ---
 
@@ -97,3 +98,24 @@ CLI-basierte Plugins können zusätzliche Startargumente über das Feld `Command
 |-------------|-----|--------------|
 | `Path` | `string` | Relativer Pfad des Verzeichnisses innerhalb des Repositories, `/`-getrennt |
 | `IsDirectory` | `bool` | Aktuell immer `true` — Datei-Einträge sind für die Arbeitsverzeichnis-Auswahl nicht relevant |
+
+### `RepositoryStructureLoadResult`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Status` | `RepositoryStructureLoadStatus` | Ergebnisstatus des Strukturabrufs |
+| `Entries` | `IReadOnlyList<RepositoryDirectoryEntry>` | Geladene Verzeichniseinträge; bei Fehlern leer |
+| `Message` | `string?` | Optionale Fehler- oder Hinweismeldung |
+
+Factory-Methoden:
+- `Success(entries)` — Abruf war erfolgreich, auch wenn `entries` leer ist.
+- `Failed(message)` — technischer Fehler beim Abruf.
+- `NotSupported(message)` — Plugin oder Funktion unterstützt den Strukturabruf nicht.
+
+### `RepositoryStructureLoadStatus`
+
+| Wert | Bedeutung |
+|------|-----------|
+| `Success` | Verzeichnisstruktur wurde erfolgreich geladen. Eine leere Liste bedeutet ein gültiges leeres Repository oder keine Unterverzeichnisse. |
+| `Failed` | Abruf ist technisch fehlgeschlagen, z. B. wegen Berechtigungen, Netzwerk oder API-Fehlern. |
+| `NotSupported` | Das Plugin oder die aktuelle Konfiguration unterstützt den Abruf nicht. |

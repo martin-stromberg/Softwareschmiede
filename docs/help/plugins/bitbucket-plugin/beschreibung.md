@@ -10,6 +10,7 @@ Das BitBucket-Plugin verbindet die Softwareschmiede mit Git-Repositories in **Bi
 - Repository-Klone mit HTTP-Authentifizierung (App Password)
 - Branch-Management (Pull, Push, Erstellung)
 - Pull-Request-Erstellung
+- Remote-Abruf der Repository-Verzeichnisstruktur für die Arbeitsverzeichnis-Auswahl
 - Git-basierte Repository-Operationen (Clone, Pull, Push)
 - Integration mit Jira für Issue-Tracking
 
@@ -56,6 +57,22 @@ Das Plugin kann optional mit **Jira Cloud** integriert werden, um Issues zu lade
 - **Jira API Token**: Persönlicher Jira API Token
 
 Die Jira-Integration ist unabhängig vom BitBucket-Hosting-Modus; dieselbe Jira-Cloud wird für beide BitBucket-Instanzen genutzt.
+
+### Arbeitsverzeichnis-Auswahl
+
+Bei der Repository-Zuweisung und beim Bearbeiten des Arbeitsverzeichnisses lädt das BitBucket-Plugin die
+Verzeichnisstruktur des ausgewählten Remote-Repositories. Dadurch können Benutzer ein Unterverzeichnis
+analog zum GitHub-Plugin direkt aus einer Auswahlbox wählen.
+
+Im Cloud-Modus nutzt das Plugin die Bitbucket-Source-API und folgt paginierten Antworten über den
+`next`-Link. Im Self-Hosted-Modus nutzt es die `browse`-API von Bitbucket Server/Data Center und baut die
+Struktur wegen fehlender rekursiver Tiefenabfrage levelweise bis zur konfigurierten Maximal-Tiefe auf.
+
+Ein erfolgreicher Abruf ohne Unterverzeichnisse ist ein gültiger Zustand: Die Auswahl enthält dann nur
+`"."` für das Repository-Root. Technische Fehler, fehlende Berechtigungen, nicht erreichbare APIs oder
+unparsebare Repository-URLs werden als Fehlerstatus gemeldet. Die Projektanlage oder -bearbeitung wird
+dann nicht blockiert; der Dialog zeigt stattdessen ein Textfeld für die manuelle Eingabe eines relativen
+Arbeitsverzeichnisses.
 
 ## Beispiele
 
@@ -113,5 +130,6 @@ Ports werden in der BitBucket-URL unterstützt.
 | **Authentifizierung** | App Password | App Password | Token (GitHub CLI) |
 | **API-Version** | 2.0 | 1.0 | v3 / GraphQL |
 | **Repository-Namespace** | Workspace | Project Key | User/Org |
+| **Arbeitsverzeichnis-Auswahl** | Remote-Struktur über Source-API | Remote-Struktur über Browse-API | Remote-Struktur über Git-Trees-API |
 
 Das GitHub-Plugin verwendet die GitHub CLI (`gh`), während das BitBucket-Plugin `curl` für API-Aufrufe und `git` für Repository-Operationen nutzt.

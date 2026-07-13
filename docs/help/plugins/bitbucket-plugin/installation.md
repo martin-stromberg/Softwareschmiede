@@ -175,11 +175,13 @@ Die Plugin-APIs sind intern und nicht öffentlich exponiert. Jedoch nutzt das Pl
 
 **Cloud:**
 - `GET /2.0/repositories/{workspace}` — Repositories auflisten
+- `GET /2.0/repositories/{workspace}/{repo_slug}/src/{branch}/` — Verzeichnisstruktur für die Arbeitsverzeichnis-Auswahl laden
 - `GET /2.0/user` — Authentifizierung prüfen (Health-Check)
 - `POST /2.0/repositories/{workspace}/{repo}/pullrequests` — PR erstellen
 
 **Self-Hosted:**
 - `GET /rest/api/1.0/projects/{projectKey}/repos` — Repositories auflisten
+- `GET /rest/api/1.0/projects/{projectKey}/repos/{repoSlug}/browse/{path}` — Verzeichnisstruktur für die Arbeitsverzeichnis-Auswahl laden
 - `GET /rest/api/1.0/user` — Authentifizierung prüfen (Health-Check)
 - `POST /rest/api/1.0/projects/{projectKey}/repos/{repoSlug}/pull-requests` — PR erstellen
 

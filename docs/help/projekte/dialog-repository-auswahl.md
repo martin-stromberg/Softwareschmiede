@@ -18,7 +18,8 @@ Das Dialog-Fenster ist ein modales WPF-Window mit der Größe 500×400 Pixel, ze
 - **Repository-ListBox:** Zeigt gefilterte Repositories mit Name und URL
 - **Arbeitsverzeichnis-Sektion** (nach Repository-Auswahl):
   - **Label:** „Arbeitsverzeichnis im Repository"
-  - **ComboBox für Arbeitsverzeichnis:** Zeigt verfügbare Verzeichnisse des ausgewählten Repositories; deaktiviert während Lade-Vorgang
+  - **ComboBox für Arbeitsverzeichnis:** Zeigt verfügbare Verzeichnisse des ausgewählten Repositories; sichtbar bei erfolgreichem Strukturabruf und deaktiviert während des Lade-Vorgangs
+  - **TextBox für manuelle Eingabe:** Sichtbar, wenn der Strukturabruf technisch fehlschlägt oder vom Plugin nicht unterstützt wird
   - **Lade-Indikator:** Text „Wird geladen…" (sichtbar während `IsLoadingDirectoryStructure == true`)
   - **Hinweis-Text:** „Hinweis: '.' bedeutet Wurzelverzeichnis des Repositories"
 - **Hilfe-Panel:** Zeigt Instruktionen bei fehlenden Plugins
@@ -44,10 +45,15 @@ Das ViewModel verwaltet die Dialog-Logik und wird mit folgenden Dependencies inj
 | `AvailableWorkingDirectories` | `ObservableCollection<string>` | Liste verfügbarer Arbeitsverzeichnisse des ausgewählten Repositories; enthält mindestens `"."` (Repository-Root) |
 | `SelectedWorkingDirectory` | `string?` | Vom Benutzer ausgewähltes Arbeitsverzeichnis (relativer Pfad, `"."` = Repository-Root); Default ist `"."` |
 | `IsLoadingDirectoryStructure` | `bool` | Flag, das während des Abrufens der Verzeichnisstruktur gesetzt ist |
+| `IsWorkingDirectoryManualInput` | `bool` | Steuert, ob statt der ComboBox eine TextBox für das Arbeitsverzeichnis angezeigt wird |
+| `WorkingDirectoryInputText` | `string?` | Manuell eingegebener relativer Pfad im Fallback-Modus |
+| `WorkingDirectoryInputError` | `string?` | Validierungsfehler für die manuelle Eingabe |
 
 ## Arbeitsverzeichnis-Auswahl
 
 Nach Auswahl eines Repositories lädt die Anwendung automatisch die Verzeichnisstruktur des externen Repositories und zeigt verfügbare Unterverzeichnisse zur Auswahl an. Das gewählte Arbeitsverzeichnis wird später beim Starten der KI-CLI als Working Directory verwendet — der Prozess führt dann in diesem Unterverzeichnis statt im Repository-Root aus.
+
+Wenn der Remote-Abruf technisch nicht möglich ist, blockiert der Dialog die Zuweisung nicht. Statt der Auswahlbox wird dann eine TextBox angezeigt, in der der Benutzer einen relativen Pfad manuell erfassen kann.
 
 ### Technische Details zur Verzeichnisstruktur-Ladung
 
@@ -58,15 +64,16 @@ Beim Ändern des `SelectedRepository` wird die folgende Sequenz ausgelöst:
 3. Neue `CancellationTokenSource` wird erzeugt
 4. `LoadDirectoryStructureAsync()` wird asynchron gestartet
 5. `IsLoadingDirectoryStructure` wird auf `true` gesetzt
-6. `DirectoryStructureBrowserService.GetDirectoriesAsync()` wird aufgerufen:
-   - Falls Feature deaktiviert (`DirectoryStructure.Enabled == false`): leere Liste zurückgeben
-   - Falls Cache-Hit: gecachte Liste zurückgeben (5-Minuten-TTL)
-   - Sonst: `IGitPlugin.GetRepositoryStructureAsync()` aufrufen, Ergebnisse filtern (nur Verzeichnisse), sortieren und cachen
-7. Ergebnisse werden in `AvailableWorkingDirectories` eingefüllt, mit `"."` (Repository-Root) als erste Option
-8. `SelectedWorkingDirectory` wird auf `"."` (Default) gesetzt
-9. `IsLoadingDirectoryStructure` wird auf `false` gesetzt
+6. `DirectoryStructureBrowserService.GetDirectoryLoadResultAsync()` wird aufgerufen:
+   - Falls Feature deaktiviert (`DirectoryStructure.Enabled == false`): `NotSupported` zurückgeben
+   - Falls Cache-Hit für einen erfolgreichen Abruf: gecachtes Ergebnis zurückgeben (5-Minuten-TTL)
+   - Sonst: `IGitPlugin.GetRepositoryStructureLoadResultAsync()` aufrufen, Ergebnisse filtern (nur Verzeichnisse), sortieren und erfolgreiche Ergebnisse cachen
+7. Bei `RepositoryStructureLoadStatus.Success` werden Ergebnisse in `AvailableWorkingDirectories` eingefüllt, mit `"."` (Repository-Root) als erste Option
+8. Bei `Failed` oder `NotSupported` wird `IsWorkingDirectoryManualInput = true` gesetzt und `WorkingDirectoryInputText` mit `"."` initialisiert
+9. `SelectedWorkingDirectory` wird auf `"."` (Default) gesetzt oder beim Bestätigen aus der normalisierten manuellen Eingabe übernommen
+10. `IsLoadingDirectoryStructure` wird auf `false` gesetzt
 
-**Fehlerbehandlung:** Falls Abruf fehlschlägt (z. B. Private Repository ohne Auth), wird ein Fehler geloggt; die Collection wird geleert, aber `"."` wird dennoch angezeigt, sodass der Benutzer mindestens den Root wählen kann.
+**Fehlerbehandlung:** Falls der Abruf fehlschlägt (z. B. Private Repository ohne Auth), wird eine Warnung geloggt und die UI wechselt in den manuellen Eingabemodus. Ein erfolgreich abgerufenes, aber leeres Repository gilt dagegen als Erfolg und zeigt weiterhin die Auswahlbox mit `"."`.
 
 **Unterstützte Repository-Quellen:** Die Unterverzeichnis-Auswahl funktioniert für alle drei mitgelieferten SCM-Plugins, jeweils rein remote (ohne dass vorher geklont werden muss):
 
@@ -74,7 +81,7 @@ Beim Ändern des `SelectedRepository` wird die folgende Sequenz ausgelöst:
 - **`GitHubPlugin`:** Ruft die Struktur des Standard-Branches über die GitHub Git-Trees-API ab (`gh api repos/{owner}/{repo}/git/trees/{branch}?recursive=1`). Bei sehr großen Repositories (API-Limit ca. 100.000 Einträge/7 MB) kann die Antwort als `truncated` markiert sein; die Anwendung protokolliert dies als Warnung, zeigt aber weiterhin die ermittelten Verzeichnisse an.
 - **`BitbucketPlugin`:** Ruft die Struktur über die Bitbucket-REST-API ab. Im Cloud-Modus über die Source-API (`GET /2.0/repositories/{workspace}/{repo_slug}/src/{branch}/`, paginiert über den `next`-Link, mit rekursivem `max_depth`-Parameter). Im Self-Hosted-Modus (Bitbucket Server/Data Center) über die `browse`-API, die anders als die Cloud-API keine rekursive Tiefenabfrage kennt — die Anwendung baut die Struktur daher levelweise über mehrere API-Aufrufe auf (begrenzt auf `MaxDepth` Ebenen und max. 500 Verzeichnisse pro Ebene als Guardrail).
 
-Kann die Repository-ID nicht aus der URL ermittelt werden oder schlägt der API-Aufruf fehl (z. B. fehlende Berechtigung, nicht erreichbare Instanz), wird ein Fehler protokolliert und `DirectoryStructureBrowserService` liefert eine leere Liste — der Benutzer kann in diesem Fall nur `"."` (Root) wählen, der Dialog bleibt aber vollständig funktionsfähig.
+Kann die Repository-ID nicht aus der URL ermittelt werden oder schlägt der API-Aufruf fehl (z. B. fehlende Berechtigung, nicht erreichbare Instanz), liefert `DirectoryStructureBrowserService` ein Fehlerergebnis. Der Dialog bleibt funktionsfähig und zeigt eine TextBox, in der der Benutzer das Arbeitsverzeichnis manuell angeben kann.
 
 ### Verwendung des Arbeitsverzeichnisses
 
@@ -159,21 +166,26 @@ Das einmal zugewiesene Arbeitsverzeichnis kann jederzeit nachträglich geändert
    - `LoadDirectoryStructureAsync()` wird asynchron gestartet
 3. Während des Ladens:
    - `IsLoadingDirectoryStructure` wird auf `true` gesetzt
-   - ComboBox für Arbeitsverzeichnis ist deaktiviert
+   - ComboBox oder TextBox für Arbeitsverzeichnis ist deaktiviert
    - Text „Wird geladen…" wird angezeigt
 4. Nach erfolgreichem Abruf:
    - `AvailableWorkingDirectories` wird befüllt (mindestens `"."`, ggf. weitere Verzeichnisse)
+   - `IsWorkingDirectoryManualInput` ist `false`
    - `SelectedWorkingDirectory` wird auf `"."` gesetzt (Default Root)
    - `IsLoadingDirectoryStructure` wird auf `false` gesetzt
    - ComboBox wird aktiviert
 5. Benutzer kann nun ein Arbeitsverzeichnis aus ComboBox wählen oder Default (`"."`) akzeptieren
 
 **Fehlerfall — Verzeichnisstruktur nicht verfügbar:**
-- Falls Plugin keine Struktur abrufen kann oder Feature deaktiviert ist:
-  - `AvailableWorkingDirectories` enthält nur `"."`
+- Falls Plugin keine Struktur abrufen kann, der Abruf fehlschlägt oder Feature deaktiviert ist:
+  - `IsWorkingDirectoryManualInput` wird `true`
+  - `WorkingDirectoryInputText` wird auf `"."` gesetzt
   - Fehler wird geloggt (LogWarning)
-  - `SelectedWorkingDirectory` wird auf `"."` gesetzt
-  - Dialog bleibt funktional; Benutzer kann nur Root wählen
+  - Dialog bleibt funktional; Benutzer kann einen relativen Pfad manuell eingeben und speichern
+
+**Leeres Repository:**
+- Ein erfolgreicher Abruf ohne Unterverzeichnisse ist kein Fehler.
+- Die ComboBox bleibt sichtbar und enthält nur `"."`.
 
 **Fehlerfall — Abruf abgebrochen:**
 - Falls Benutzer schnell Plugin oder Repository wechselt, wird alte `CancellationTokenSource` abgebrochen
@@ -198,13 +210,16 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 | Plugin nicht gewählt | `SelectedScmPlugin == null` | Repository-Liste bleibt leer; „Zuweisen"-Button deaktiviert |
 | Repository nicht gewählt | `SelectedRepository == null` | „Zuweisen"-Button deaktiviert |
 | Plugin-Typ-Vergleich | `GitRepository.PluginTyp` muss mit `IGitPlugin.PluginType.ToString()` exakt übereinstimmen (case-sensitive) | Repositories mit nicht übereinstimmendem PluginTyp werden gefiltert |
+| Manuelles Arbeitsverzeichnis leer | `WorkingDirectoryInputText` ist leer oder Whitespace | Wird als `"."` normalisiert |
+| Manuelles Arbeitsverzeichnis absolut | `Path.IsPathRooted(...) == true` | „Zuweisen"-Button bleibt deaktiviert und `WorkingDirectoryInputError` wird gesetzt |
+| Manuelles Arbeitsverzeichnis verlässt Repository | Pfad enthält ein Segment `..` | „Zuweisen"-Button bleibt deaktiviert und `WorkingDirectoryInputError` wird gesetzt |
 
 ## Konverter und Ressourcen
 
 ### Verwendete Konverter
 
 - **`BoolToVisibilityConverter`:** Steuert Visibility der ListBox (visible wenn `HasScmPlugins == true`)
-- **`InverseBoolToVisibilityConverter`:** Steuert Visibility des Hilfe-Panels (visible wenn `HasScmPlugins == false`)
+- **`InverseBoolToVisibilityConverter`:** Steuert Visibility des Hilfe-Panels (visible wenn `HasScmPlugins == false`) und blendet die Arbeitsverzeichnis-ComboBox aus, wenn der manuelle Modus aktiv ist
 
 ### Verwendete Theme-Ressourcen
 
@@ -237,7 +252,9 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 | `LoadDirectoryStructureAsync_ShouldPopulateDirectories_WithDotRoot` | Überprüft, dass `AvailableWorkingDirectories` mit `"."` (Root) + abgerufene Verzeichnisse befüllt wird |
 | `LoadDirectoryStructureAsync_ShouldSetDefaultSelectedDirectory` | Überprüft, dass `SelectedWorkingDirectory` auf `"."` (Default) gesetzt wird |
 | `LoadDirectoryStructureAsync_ShouldHandleNullRepository` | Überprüft, dass Collection geleert wird bei `SelectedRepository = null` |
-| `LoadDirectoryStructureAsync_ShouldHandleErrors_WithLogging` | Überprüft, dass bei Service-Fehler Collection mit nur `"."` befüllt und Fehler geloggt wird |
+| `LoadDirectoryStructureAsync_ShouldEnableManualInput_WhenDirectoryLoadFails` | Überprüft, dass bei Service-Fehler der manuelle Eingabemodus mit `"."` aktiviert und Fehler geloggt wird |
+| `LoadDirectoryStructureAsync_ShouldKeepSelectionMode_WhenRepositoryIsEmpty` | Überprüft, dass ein erfolgreicher leerer Abruf die ComboBox mit `"."` zeigt |
+| `BestaetigenCommand_ShouldUseManualWorkingDirectoryInput` | Überprüft, dass die manuelle Eingabe normalisiert nach `SelectedWorkingDirectory` übernommen wird |
 
 ### Unit-Tests in `DirectoryStructureBrowserServiceTests`
 
@@ -246,8 +263,10 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 | `GetDirectoriesAsync_ShouldReturnDirectories` | Überprüft, dass Service Liste von Verzeichnis-Pfaden zurückgibt |
 | `GetDirectoriesAsync_ShouldCache_WithTTL` | Überprüft, dass zweiter Abruf aus Cache kommt und TTL respektiert wird |
 | `GetDirectoriesAsync_ShouldHandleErrors_Gracefully` | Überprüft, dass bei Fehler leere Liste zurückgegeben wird, kein Exception |
-| `GetDirectoriesAsync_ShouldCallPluginMethod` | Überprüft, dass `IGitPlugin.GetRepositoryStructureAsync()` aufgerufen wird |
+| `GetDirectoriesAsync_ShouldCallPluginMethod` | Überprüft die Kompatibilitätsmethode für direkte Verzeichnislisten-Aufrufe |
 | `GetDirectoriesAsync_ShouldReturnEmpty_WhenFeatureDisabled` | Überprüft, dass leere Liste zurückgegeben wird wenn Feature deaktiviert ist |
+| `GetDirectoryLoadResultAsync_ShouldReturnSuccess_ForEmptyRepository` | Überprüft, dass ein erfolgreicher leerer Plugin-Result kein Fehlerfallback ist |
+| `GetDirectoryLoadResultAsync_ShouldReturnFailed_WhenPluginThrows` | Überprüft, dass technische Fehler als Fehlerstatus zurückgegeben und nicht gecacht werden |
 
 ## Implementierungsnotizen
 
@@ -276,9 +295,9 @@ Die Task wird ignoriert (Discard `_`) und Fehler werden lokal abgefangen und gel
 Das Laden der Verzeichnisstruktur erfolgt asynchron über `LoadDirectoryStructureAsync()`:
 
 1. Wird aufgerufen, wenn `SelectedRepository` sich ändert (Property-Setter mit Callback)
-2. Ruft `DirectoryStructureBrowserService.GetDirectoriesAsync()` auf
+2. Ruft `DirectoryStructureBrowserService.GetDirectoryLoadResultAsync()` auf
 3. Nutzt `CancellationTokenSource` zur Abbrechung bei Plugin-/Repository-Wechsel
-4. Fehler werden abgefangen und geloggt; Dialog bleibt responsiv
+4. Fehlerstatus wird geloggt und als manueller Eingabemodus an das ViewModel weitergegeben; Dialog bleibt responsiv
 
 **Cancellation-Handling:**
 - Wenn Benutzer schnell ein anderes Repository wählt, wird alte CancellationTokenSource abgebrochen
@@ -302,10 +321,10 @@ Diese Logik verhindert Pfad-Traversal-Angriffe (z. B. `"../../../etc"`) und ist 
 
 `DirectoryStructureBrowserService` cacht abgerufene Verzeichnisstrukturen:
 
-- **Cache-Key:** `"dirs:{repositoryUrl}"` (pro Repository eindeutig)
+- **Cache-Key:** Plugin-Präfix, Repository-URL und `MaxDepth`, damit verschiedene Plugins oder Tiefen nicht kollidieren
 - **TTL:** 5 Minuten (konfigurierbar via `DirectoryStructureOptions.CacheDurationSeconds`)
 - **Größenlimit:** Keine explizite Obergrenze, aber typischerweise klein (< 1 MB pro Repository)
-- **Invalidierung:** Automatisch nach TTL; kein manuelles Refresh im MVP
+- **Invalidierung:** Automatisch nach TTL; fehlgeschlagene Abrufe werden nicht gecacht
 
 ### Backward Compatibility
 

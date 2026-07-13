@@ -698,13 +698,23 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         int maxDepth = 2,
         CancellationToken ct = default)
     {
+        var result = await GetRepositoryStructureLoadResultAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+        return result.Status == RepositoryStructureLoadStatus.Success ? result.Entries : [];
+    }
+
+    /// <inheritdoc/>
+    public override async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(
+        string repositoryUrl,
+        int maxDepth = 2,
+        CancellationToken ct = default)
+    {
         var repositoryId = TryExtractRepositoryId(repositoryUrl);
         if (repositoryId is null)
         {
             _logger.LogWarning(
                 "Verzeichnisstruktur konnte nicht ermittelt werden: Repository-ID konnte nicht aus '{RepositoryUrl}' extrahiert werden.",
                 repositoryUrl);
-            return [];
+            return RepositoryStructureLoadResult.Failed("Repository-ID konnte nicht aus der URL ermittelt werden.");
         }
 
         var branch = await GetDefaultBranchAsync(repositoryUrl, ct);
@@ -715,8 +725,8 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         // eigener "browse"-Aufruf mit verschachtelten "children.values" und "isLastPage"/"nextPageStart" statt
         // eines Link-Headers) — daher zwei getrennte Implementierungen statt eines gemeinsamen Parsers.
         return hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase)
-            ? await GetSelfHostedRepositoryStructureAsync(repositoryId, branch, maxDepth, ct)
-            : await GetCloudRepositoryStructureAsync(repositoryId, branch, maxDepth, ct);
+            ? await GetSelfHostedRepositoryStructureLoadResultAsync(repositoryId, branch, maxDepth, ct)
+            : await GetCloudRepositoryStructureLoadResultAsync(repositoryId, branch, maxDepth, ct);
     }
 
     /// <summary>Ruft die Verzeichnisstruktur über die Bitbucket-Cloud-Source-API ab (paginiert über den <c>next</c>-Link).</summary>
@@ -725,7 +735,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <param name="maxDepth">Maximale Verzeichnistiefe, bis zu der Einträge berücksichtigt werden.</param>
     /// <param name="ct">Cancellation Token.</param>
     /// <returns>Die gefundenen Verzeichniseinträge.</returns>
-    private async Task<IEnumerable<RepositoryDirectoryEntry>> GetCloudRepositoryStructureAsync(
+    private async Task<RepositoryStructureLoadResult> GetCloudRepositoryStructureLoadResultAsync(
         string repositoryId, string branch, int maxDepth, CancellationToken ct)
     {
         var entries = new List<RepositoryDirectoryEntry>();
@@ -752,10 +762,16 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                     repositoryId,
                     branch,
                     result.StdErr);
-                break;
+                return RepositoryStructureLoadResult.Failed(result.StdErr);
             }
 
-            nextUrl = ParseCloudSourcePage(result.StdOut, maxDepth, repositoryId, entries);
+            var parseResult = ParseCloudSourcePage(result.StdOut, maxDepth, repositoryId, entries);
+            if (parseResult.IsFailure)
+            {
+                return RepositoryStructureLoadResult.Failed(parseResult.ErrorMessage);
+            }
+
+            nextUrl = parseResult.NextUrl;
         }
 
         if (pageCount >= maxPages && !string.IsNullOrEmpty(nextUrl))
@@ -766,7 +782,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 maxPages);
         }
 
-        return entries;
+        return RepositoryStructureLoadResult.Success(entries);
     }
 
     /// <summary>
@@ -779,7 +795,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <param name="repositoryId">Repository-ID (für Log-Meldungen).</param>
     /// <param name="entries">Liste, der die gefundenen Verzeichniseinträge hinzugefügt werden.</param>
     /// <returns>Die URL der nächsten Seite, oder <c>null</c> wenn keine weitere Seite existiert.</returns>
-    private string? ParseCloudSourcePage(string json, int maxDepth, string repositoryId, List<RepositoryDirectoryEntry> entries)
+    private CloudSourcePageParseResult ParseCloudSourcePage(string json, int maxDepth, string repositoryId, List<RepositoryDirectoryEntry> entries)
     {
         try
         {
@@ -788,7 +804,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             if (HasBitbucketErrors(doc.RootElement, out var errorMsg))
             {
                 _logger.LogWarning("Bitbucket API-Fehler beim Laden der Verzeichnisstruktur für {RepositoryId}: {Error}", repositoryId, errorMsg);
-                return null;
+                return CloudSourcePageParseResult.Failed(errorMsg);
             }
 
             if (doc.RootElement.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Array)
@@ -814,14 +830,16 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 }
             }
 
-            return doc.RootElement.TryGetProperty("next", out var nextEl) && nextEl.ValueKind == JsonValueKind.String
+            var nextUrl = doc.RootElement.TryGetProperty("next", out var nextEl) && nextEl.ValueKind == JsonValueKind.String
                 ? nextEl.GetString()
                 : null;
+
+            return CloudSourcePageParseResult.Success(nextUrl);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Parsen der Bitbucket-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
-            return null;
+            return CloudSourcePageParseResult.Failed(ex.Message);
         }
     }
 
@@ -836,7 +854,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <param name="maxDepth">Maximale Verzeichnistiefe, bis zu der Einträge berücksichtigt werden.</param>
     /// <param name="ct">Cancellation Token.</param>
     /// <returns>Die gefundenen Verzeichniseinträge.</returns>
-    private async Task<IEnumerable<RepositoryDirectoryEntry>> GetSelfHostedRepositoryStructureAsync(
+    private async Task<RepositoryStructureLoadResult> GetSelfHostedRepositoryStructureLoadResultAsync(
         string repositoryId, string branch, int maxDepth, CancellationToken ct)
     {
         const int maxDirectoriesPerLevel = 500;
@@ -852,8 +870,13 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             {
                 ct.ThrowIfCancellationRequested();
 
-                var childDirectoryNames = await FetchSelfHostedDirectoryChildrenAsync(repositoryId, branch, parentPath, ct);
-                foreach (var name in childDirectoryNames)
+                var childDirectories = await FetchSelfHostedDirectoryChildrenAsync(repositoryId, branch, parentPath, ct);
+                if (childDirectories.IsFailure)
+                {
+                    return RepositoryStructureLoadResult.Failed(childDirectories.ErrorMessage);
+                }
+
+                foreach (var name in childDirectories.Names)
                 {
                     var childPath = string.IsNullOrEmpty(parentPath) ? name : $"{parentPath}/{name}";
                     entries.Add(new RepositoryDirectoryEntry(childPath, true));
@@ -873,7 +896,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             currentLevelPaths = nextLevelPaths;
         }
 
-        return entries;
+        return RepositoryStructureLoadResult.Success(entries);
     }
 
     /// <summary>
@@ -885,7 +908,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <param name="relativePath">Relativer Pfad des zu durchsuchenden Verzeichnisses (leer für das Repository-Root).</param>
     /// <param name="ct">Cancellation Token.</param>
     /// <returns>Die Namen der direkten Unterverzeichnisse.</returns>
-    private async Task<List<string>> FetchSelfHostedDirectoryChildrenAsync(
+    private async Task<SelfHostedDirectoryChildrenResult> FetchSelfHostedDirectoryChildrenAsync(
         string repositoryId, string branch, string relativePath, CancellationToken ct)
     {
         var names = new List<string>();
@@ -906,15 +929,20 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                     repositoryId,
                     relativePath,
                     result.StdErr);
-                return names;
+                return SelfHostedDirectoryChildrenResult.Failed(result.StdErr);
             }
 
             var (pageIsLast, nextStart) = ParseSelfHostedBrowsePage(result.StdOut, repositoryId, names);
+            if (pageIsLast && nextStart == -1)
+            {
+                return SelfHostedDirectoryChildrenResult.Failed("Bitbucket Self-Hosted Browse-Antwort konnte nicht verarbeitet werden.");
+            }
+
             isLastPage = pageIsLast || nextStart is null || nextStart <= start;
             start = nextStart ?? start;
         }
 
-        return names;
+        return SelfHostedDirectoryChildrenResult.Success(names);
     }
 
     /// <summary>
@@ -934,7 +962,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             if (HasBitbucketErrors(doc.RootElement, out var errorMsg))
             {
                 _logger.LogWarning("Bitbucket API-Fehler beim Laden der Verzeichnisstruktur für {RepositoryId}: {Error}", repositoryId, errorMsg);
-                return (true, null);
+                return (true, -1);
             }
 
             if (!doc.RootElement.TryGetProperty("children", out var children) || children.ValueKind != JsonValueKind.Object)
@@ -973,8 +1001,20 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Parsen der Bitbucket-Self-Hosted-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
-            return (true, null);
+            return (true, -1);
         }
+    }
+
+    private sealed record CloudSourcePageParseResult(string? NextUrl, bool IsFailure, string? ErrorMessage)
+    {
+        public static CloudSourcePageParseResult Success(string? nextUrl) => new(nextUrl, IsFailure: false, ErrorMessage: null);
+        public static CloudSourcePageParseResult Failed(string? errorMessage) => new(null, IsFailure: true, errorMessage);
+    }
+
+    private sealed record SelfHostedDirectoryChildrenResult(IReadOnlyList<string> Names, bool IsFailure, string? ErrorMessage)
+    {
+        public static SelfHostedDirectoryChildrenResult Success(IReadOnlyList<string> names) => new(names, IsFailure: false, ErrorMessage: null);
+        public static SelfHostedDirectoryChildrenResult Failed(string? errorMessage) => new([], IsFailure: true, errorMessage);
     }
 
     /// <summary>Baut die Browse-API-URL für Bitbucket Server/Data Center (Self-Hosted) für ein Verzeichnis auf einem Branch.</summary>

@@ -1,40 +1,40 @@
+using System.IO;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>Gemeinsame Lade-Logik für die Arbeitsverzeichnis-Auswahl, genutzt von <see cref="RepositoryAssignViewModel"/> und <see cref="ArbeitsverzeichnisBearbeitenViewModel"/>.</summary>
 internal static class DirectoryStructureLoadHelper
 {
-    /// <summary>Ruft die Verzeichnisstruktur eines Repositories ab und liefert sie inklusive vorangestelltem Root-Eintrag <c>"."</c>. Fehler werden geloggt und führen zu einer Liste, die nur den Root-Eintrag enthält; eine Cancellation wird nicht abgefangen, sondern an den Aufrufer weitergereicht.</summary>
+    /// <summary>Ruft die Verzeichnisstruktur eines Repositories ab und liefert das Ergebnis für Auswahl- oder manuellen Eingabemodus.</summary>
     /// <param name="directoryStructureService">Der Service zum Abruf der Verzeichnisstruktur.</param>
     /// <param name="gitPlugin">Das Git-Plugin des Repositories.</param>
     /// <param name="repositoryUrl">URL bzw. Pfad des Repositories.</param>
     /// <param name="logger">Logger für Fehlermeldungen.</param>
     /// <param name="ct">Cancellation Token.</param>
-    /// <returns>Liste der Arbeitsverzeichnisse, beginnend mit <c>"."</c> (Repository-Root).</returns>
-    public static async Task<List<string>> LoadWorkingDirectoriesAsync(
+    /// <returns>Lade-Ergebnis für die Arbeitsverzeichnis-UI.</returns>
+    public static async Task<WorkingDirectoryLoadResult> LoadWorkingDirectoriesAsync(
         DirectoryStructureBrowserService directoryStructureService,
         IGitPlugin gitPlugin,
         string repositoryUrl,
         ILogger logger,
         CancellationToken ct)
     {
-        var result = new List<string> { "." };
-
-        try
+        var result = await directoryStructureService.GetDirectoryLoadResultAsync(gitPlugin, repositoryUrl, ct);
+        ct.ThrowIfCancellationRequested();
+        if (result.Status != RepositoryStructureLoadStatus.Success)
         {
-            var directories = await directoryStructureService.GetDirectoriesAsync(gitPlugin, repositoryUrl, ct);
-            ct.ThrowIfCancellationRequested();
-            result.AddRange(directories);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogWarning(ex, "Fehler beim Laden der Verzeichnisstruktur.");
+            logger.LogWarning(
+                "Verzeichnisstruktur konnte nicht geladen werden ({Status}): {Message}",
+                result.Status,
+                result.Message);
+            return WorkingDirectoryLoadResult.ManualInput(result.Message);
         }
 
-        return result;
+        return WorkingDirectoryLoadResult.Selection([".", ..result.Entries.Select(entry => entry.Path)]);
     }
 
     /// <summary>
@@ -55,7 +55,7 @@ internal static class DirectoryStructureLoadHelper
     /// erwartungsgemäß abgebrochen wurde (der Aufrufer entscheidet dann selbst, wie mit diesem Fall
     /// umzugehen ist).
     /// </returns>
-    public static async Task<List<string>?> LoadWithLoadingStateAsync(
+    public static async Task<WorkingDirectoryLoadResult?> LoadWithLoadingStateAsync(
         DirectoryStructureBrowserService directoryStructureService,
         IGitPlugin gitPlugin,
         string repositoryUrl,
@@ -77,5 +77,60 @@ internal static class DirectoryStructureLoadHelper
             if (!ct.IsCancellationRequested)
                 setIsLoading(false);
         }
+    }
+}
+
+/// <summary>App-nahes Lade-Ergebnis für die Arbeitsverzeichnis-Auswahl.</summary>
+/// <param name="WorkingDirectories">Arbeitsverzeichnis-Kandidaten für den Auswahlmodus.</param>
+/// <param name="RequiresManualInput">Gibt an, ob statt Auswahl eine manuelle Eingabe benötigt wird.</param>
+/// <param name="Message">Optionale Fehlermeldung.</param>
+internal sealed record WorkingDirectoryLoadResult(
+    IReadOnlyList<string> WorkingDirectories,
+    bool RequiresManualInput,
+    string? Message = null)
+{
+    /// <summary>Erzeugt ein Auswahl-Ergebnis.</summary>
+    public static WorkingDirectoryLoadResult Selection(IEnumerable<string> workingDirectories)
+        => new(workingDirectories.ToList(), RequiresManualInput: false);
+
+    /// <summary>Erzeugt ein Ergebnis für manuelle Eingabe.</summary>
+    public static WorkingDirectoryLoadResult ManualInput(string? message = null)
+        => new([], RequiresManualInput: true, message);
+}
+
+/// <summary>Validiert und normalisiert manuell eingegebene Arbeitsverzeichnis-Pfade.</summary>
+internal static class WorkingDirectoryInputValidator
+{
+    /// <summary>Validiert den Eingabetext und liefert den normalisierten relativen Pfad.</summary>
+    public static bool TryNormalize(string? input, out string normalized, out string? error)
+    {
+        normalized = string.IsNullOrWhiteSpace(input) ? "." : input.Trim().Replace('\\', '/');
+        error = null;
+
+        if (normalized == ".")
+        {
+            return true;
+        }
+
+        if (Path.IsPathRooted(normalized))
+        {
+            error = "Das Arbeitsverzeichnis muss ein relativer Pfad sein.";
+            return false;
+        }
+
+        var parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Any(part => part == ".."))
+        {
+            error = "Das Arbeitsverzeichnis darf keine '..'-Segmente enthalten.";
+            return false;
+        }
+
+        if (normalized.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+        {
+            error = "Das Arbeitsverzeichnis enthält ungültige Zeichen.";
+            return false;
+        }
+
+        return true;
     }
 }

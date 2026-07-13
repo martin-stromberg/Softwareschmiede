@@ -55,6 +55,8 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var pluginMock = CreatePluginMock("GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new RepositoryDirectoryEntry("backend", IsDirectory: true)]);
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([new RepositoryDirectoryEntry("backend", IsDirectory: true)]));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 
@@ -72,6 +74,8 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var pluginMock = CreatePluginMock("GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns(firstLoadTcs.Task);
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await firstLoadTcs.Task));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
         sut.SelectedRepository = new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://example.com/repo1.git");
@@ -82,6 +86,8 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var secondLoadTcs = new TaskCompletionSource<IEnumerable<RepositoryDirectoryEntry>>();
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns(secondLoadTcs.Task);
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await secondLoadTcs.Task));
 
         sut.SelectedRepository = new AvailableRepository("repo2", DateTime.UtcNow, "owner/repo2", "https://example.com/repo2.git");
 
@@ -107,6 +113,16 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
 
                 return [];
             });
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns<string, int, CancellationToken>(async (_, _, ct) =>
+            {
+                if (Interlocked.Increment(ref callCount) == 1)
+                {
+                    await Task.Delay(Timeout.Infinite, ct);
+                }
+
+                return RepositoryStructureLoadResult.Success([]);
+            });
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 
@@ -129,6 +145,8 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var pluginMock = CreatePluginMock("GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await tcs.Task));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 
@@ -158,6 +176,11 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
                 new RepositoryDirectoryEntry("backend", IsDirectory: true),
                 new RepositoryDirectoryEntry("frontend", IsDirectory: true),
             ]);
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([
+                new RepositoryDirectoryEntry("backend", IsDirectory: true),
+                new RepositoryDirectoryEntry("frontend", IsDirectory: true),
+            ]));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 
@@ -174,6 +197,8 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var pluginMock = CreatePluginMock("GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([]));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 
@@ -190,6 +215,8 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var pluginMock = CreatePluginMock("GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new RepositoryDirectoryEntry("backend", IsDirectory: true)]);
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([new RepositoryDirectoryEntry("backend", IsDirectory: true)]));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
         sut.SelectedRepository = new AvailableRepository("repo", DateTime.UtcNow, "owner/repo", "https://example.com/repo.git");
@@ -202,20 +229,58 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         sut.AvailableWorkingDirectories.Should().BeEmpty();
     }
 
-    /// <summary>Schlägt der Abruf der Verzeichnisstruktur fehl, wird auf die Root-Option zurückgefallen, ohne dass eine Exception propagiert wird.</summary>
+    /// <summary>Schlägt der Abruf der Verzeichnisstruktur fehl, wird auf manuelle Eingabe gewechselt.</summary>
     [Fact]
-    public async Task LoadDirectoryStructureAsync_ShouldHandleErrors_WithLogging()
+    public async Task LoadDirectoryStructureAsync_ShouldEnableManualInput_WhenDirectoryLoadFails()
     {
         var pluginMock = CreatePluginMock("GitHub");
-        pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Fehler beim Abruf der Verzeichnisstruktur"));
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Failed("Fehler beim Abruf der Verzeichnisstruktur"));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 
         sut.SelectedRepository = new AvailableRepository("repo", DateTime.UtcNow, "owner/repo", "https://example.com/repo.git");
         await sut.CurrentLoadDirectoryStructureTask!;
 
-        sut.AvailableWorkingDirectories.Should().ContainSingle().Which.Should().Be(".");
+        sut.IsWorkingDirectoryManualInput.Should().BeTrue();
+        sut.WorkingDirectoryInputText.Should().Be(".");
+        sut.AvailableWorkingDirectories.Should().BeEmpty();
         sut.SelectedWorkingDirectory.Should().Be(".");
+    }
+
+    /// <summary>Ein erfolgreich leeres Repository bleibt im Auswahlmodus mit Root-Eintrag.</summary>
+    [Fact]
+    public async Task LoadDirectoryStructureAsync_ShouldKeepSelectionMode_WhenRepositoryIsEmpty()
+    {
+        var pluginMock = CreatePluginMock("GitHub");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([]));
+        var sut = CreateSut();
+        await SelectPluginAndWaitAsync(sut, pluginMock.Object);
+
+        sut.SelectedRepository = new AvailableRepository("repo", DateTime.UtcNow, "owner/repo", "https://example.com/repo.git");
+        await sut.CurrentLoadDirectoryStructureTask!;
+
+        sut.IsWorkingDirectoryManualInput.Should().BeFalse();
+        sut.AvailableWorkingDirectories.Should().Equal(".");
+        sut.SelectedWorkingDirectory.Should().Be(".");
+    }
+
+    /// <summary>Manuelle Eingabe wird beim Bestätigen normalisiert und nach SelectedWorkingDirectory synchronisiert.</summary>
+    [Fact]
+    public async Task BestaetigenCommand_ShouldUseManualWorkingDirectoryInput()
+    {
+        var pluginMock = CreatePluginMock("GitHub");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Failed("offline"));
+        var sut = CreateSut();
+        await SelectPluginAndWaitAsync(sut, pluginMock.Object);
+        sut.SelectedRepository = new AvailableRepository("repo", DateTime.UtcNow, "owner/repo", "https://example.com/repo.git");
+        await sut.CurrentLoadDirectoryStructureTask!;
+        sut.WorkingDirectoryInputText = "backend\\api";
+
+        sut.BestaetigenCommand.Execute(null);
+
+        sut.SelectedWorkingDirectory.Should().Be("backend/api");
     }
 }

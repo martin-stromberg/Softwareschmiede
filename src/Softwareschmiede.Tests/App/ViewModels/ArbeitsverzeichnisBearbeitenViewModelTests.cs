@@ -32,8 +32,11 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
     {
         var mock = new Mock<IGitPlugin>();
         mock.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        mock.SetupGet(p => p.PluginPrefix).Returns("Test");
         mock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(entries);
+        mock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success(entries));
         return mock;
     }
 
@@ -94,31 +97,36 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         sut.SelectedWorkingDirectory.Should().Be(".");
     }
 
-    /// <summary>LadenAsync fällt auf die Root-Option zurück, wenn kein Git-Plugin übergeben wurde (z. B. Plugin nicht mehr installiert).</summary>
+    /// <summary>LadenAsync wechselt auf manuelle Eingabe, wenn kein Git-Plugin übergeben wurde (z. B. Plugin nicht mehr installiert).</summary>
     [Fact]
-    public async Task LadenAsync_ShouldFallbackToRootOnly_WhenGitPluginIsNull()
+    public async Task LadenAsync_ShouldEnableManualInput_WhenGitPluginIsNull()
     {
         var sut = CreateSut(CreateDirectoryStructureService());
 
         await sut.LadenAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null);
 
-        sut.AvailableWorkingDirectories.Should().Equal(".");
+        sut.IsWorkingDirectoryManualInput.Should().BeTrue();
+        sut.WorkingDirectoryInputText.Should().Be(".");
+        sut.AvailableWorkingDirectories.Should().BeEmpty();
         sut.SelectedWorkingDirectory.Should().Be(".");
     }
 
-    /// <summary>Schlägt der Abruf der Verzeichnisstruktur fehl, bleibt der Dialog trotzdem benutzbar (Root-Option, keine Exception).</summary>
+    /// <summary>Schlägt der Abruf der Verzeichnisstruktur fehl, bleibt der Dialog über manuelle Eingabe benutzbar.</summary>
     [Fact]
-    public async Task LadenAsync_ShouldHandleErrors_Gracefully()
+    public async Task LadenAsync_ShouldShowCurrentWorkingDirectoryInManualInput_WhenLoadFails()
     {
         var pluginMock = new Mock<IGitPlugin>();
-        pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
+        pluginMock.SetupGet(p => p.PluginPrefix).Returns("Test");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Failed("Verbindungsfehler"));
         var sut = CreateSut(CreateDirectoryStructureService());
 
         var act = () => sut.LadenAsync(pluginMock.Object, "https://example.com/repo.git", currentWorkingDirectory: "backend");
 
         await act.Should().NotThrowAsync();
-        sut.AvailableWorkingDirectories.Should().Contain(".");
+        sut.IsWorkingDirectoryManualInput.Should().BeTrue();
+        sut.WorkingDirectoryInputText.Should().Be("backend");
+        sut.AvailableWorkingDirectories.Should().BeEmpty();
         sut.SelectedWorkingDirectory.Should().Be("backend");
     }
 
@@ -128,8 +136,9 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
     {
         var tcs = new TaskCompletionSource<IEnumerable<RepositoryDirectoryEntry>>();
         var pluginMock = new Mock<IGitPlugin>();
-        pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(tcs.Task);
+        pluginMock.SetupGet(p => p.PluginPrefix).Returns("Test");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await tcs.Task));
         var sut = CreateSut(CreateDirectoryStructureService());
 
         var loadingWasTrue = false;
@@ -157,11 +166,12 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
     public async Task LadenAsync_ShouldResetLoadingState_WithoutOverwritingSelection_WhenCancelled()
     {
         var pluginMock = new Mock<IGitPlugin>();
-        pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        pluginMock.SetupGet(p => p.PluginPrefix).Returns("Test");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns<string, int, CancellationToken>(async (_, _, ct) =>
             {
                 await Task.Delay(Timeout.Infinite, ct);
-                return [];
+                return RepositoryStructureLoadResult.Success([]);
             });
         var sut = CreateSut(CreateDirectoryStructureService());
         using var cts = new CancellationTokenSource();
@@ -187,6 +197,40 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         sut.BestaetigenCommand.Execute(null);
 
         result.Should().BeTrue();
+    }
+
+    /// <summary>Absolute manuelle Pfade werden abgelehnt.</summary>
+    [Fact]
+    public async Task BestaetigenCommand_ShouldRejectAbsoluteManualWorkingDirectory()
+    {
+        var sut = CreateSut(CreateDirectoryStructureService());
+        await sut.LadenAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null);
+        sut.WorkingDirectoryInputText = "C:\\temp";
+        bool? result = null;
+        sut.CloseRequested += (_, confirmed) => result = confirmed;
+
+        sut.BestaetigenCommand.CanExecute(null).Should().BeFalse();
+        sut.BestaetigenCommand.Execute(null);
+
+        result.Should().BeNull();
+        sut.WorkingDirectoryInputError.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>Traversal-Segmente werden in manuellen Pfaden abgelehnt.</summary>
+    [Fact]
+    public async Task BestaetigenCommand_ShouldRejectTraversalManualWorkingDirectory()
+    {
+        var sut = CreateSut(CreateDirectoryStructureService());
+        await sut.LadenAsync(gitPlugin: null, repositoryUrl: "https://example.com/repo.git", currentWorkingDirectory: null);
+        sut.WorkingDirectoryInputText = "../backend";
+        bool? result = null;
+        sut.CloseRequested += (_, confirmed) => result = confirmed;
+
+        sut.BestaetigenCommand.CanExecute(null).Should().BeFalse();
+        sut.BestaetigenCommand.Execute(null);
+
+        result.Should().BeNull();
+        sut.WorkingDirectoryInputError.Should().Contain("..");
     }
 
     /// <summary>AbbrechenCommand löst CloseRequested mit false aus.</summary>

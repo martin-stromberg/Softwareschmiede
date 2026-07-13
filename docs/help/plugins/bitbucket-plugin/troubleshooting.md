@@ -92,6 +92,35 @@
    - Öffne die Aufgabe und schaue in den **Aufgabenprotokoll**-Bereich
    - Kopiere die Fehlermeldung und prüfe, ob sie spezifische Hinweise gibt
 
+## Arbeitsverzeichnis-Auswahl zeigt nur manuelle Eingabe
+
+**Symptom:** Nach Auswahl eines BitBucket-Repositories erscheint statt der Arbeitsverzeichnis-ComboBox ein
+Textfeld, oder Unterverzeichnisse werden nicht zur Auswahl angeboten.
+
+**Ursachen:**
+- App Password hat keine ausreichende `repository:read`-Berechtigung
+- Repository-URL kann nicht eindeutig als Bitbucket Cloud- oder Self-Hosted-Repository erkannt werden
+- Bitbucket-API ist nicht erreichbar oder liefert einen Fehler
+- Der konfigurierte Branch/Default-Branch ist nicht erreichbar
+- Self-Hosted-Instanz blockiert die `browse`-API oder nutzt ein inkompatibles URL-/Projektformat
+
+**Lösung:**
+1. Prüfe, ob das Repository in BitBucket im Browser geöffnet werden kann.
+2. Prüfe das App Password auf `repository:read`.
+3. Falls Cloud:
+   - Prüfe Workspace und Repository-Slug in der URL `https://bitbucket.org/{workspace}/{repo}`.
+   - Prüfe, ob der Default-Branch existiert und lesbar ist.
+4. Falls Self-Hosted:
+   - Prüfe Project Key und Repository Slug gegen die Web-URL
+     `https://bitbucket.company.com/projects/{PROJECT}/repos/{REPO}`.
+   - Prüfe, ob die Browse-API erreichbar ist, z. B. über
+     `https://bitbucket.company.com/rest/api/1.0/projects/{PROJECT}/repos/{REPO}/browse`.
+5. Gib das Arbeitsverzeichnis bei Bedarf manuell als relativen Pfad ein, z. B. `src` oder `backend/api`.
+
+> **Hinweis:** Das manuelle Textfeld ist ein gewollter Fallback. Die Projektanlage und -bearbeitung bleiben
+> damit möglich, auch wenn die Remote-Verzeichnisstruktur gerade nicht geladen werden kann. Ein leeres
+> Repository mit erfolgreich geladenem Root zeigt dagegen weiterhin die Auswahlbox mit nur `"."`.
+
 ## Repository Clone fehlgeschlagen
 
 **Symptom:** Git-Befehle wie Clone, Pull oder Push schlagen fehl mit Authentifizierungs- oder Netzwerk-Fehlern.
