@@ -10,6 +10,8 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
 {
     private const long MaxInlineBytes = 1_048_576;
     private const int BinaryProbeBytes = 8_192;
+    private const int MaxWorkingTreeNodeCount = 5_000;
+    private const string GitDirectoryName = ".git";
     private static readonly HashSet<string> CodeExtensions =
     [
         ".cs", ".cshtml", ".razor",
@@ -172,6 +174,21 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
             return new FilePreview(relativePath, sourceRelativePath, node.IsDeleted, true, false, null, null, "Binärdatei – Vorschau nicht verfügbar.");
         }
 
+        var currentByteCount = currentContent is null ? 0L : Encoding.UTF8.GetByteCount(currentContent);
+        var originalByteCount = originalContent is null ? 0L : Encoding.UTF8.GetByteCount(originalContent);
+        if (currentByteCount > MaxInlineBytes || originalByteCount > MaxInlineBytes)
+        {
+            return new FilePreview(
+                relativePath,
+                sourceRelativePath,
+                node.IsDeleted,
+                false,
+                true,
+                null,
+                null,
+                $"Commit-Datei ist für die Inline-Vorschau zu groß ({FormatBytes(Math.Max(currentByteCount, originalByteCount))}).");
+        }
+
         if (!currentResult.IsSuccess && !originalResult.IsSuccess)
         {
             return new FilePreview(
@@ -194,6 +211,100 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
             currentContent,
             originalContent,
             null);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<WorkspaceFileNode>> LoadWorkingTreeAsync(string repositoryPath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+
+        return Task.Run(() =>
+        {
+            if (!Directory.Exists(repositoryPath))
+            {
+                _logger.LogWarning("Arbeitsbaum für {RepositoryPath} kann nicht geladen werden: Pfad existiert nicht.", repositoryPath);
+                return (IReadOnlyList<WorkspaceFileNode>)new List<WorkspaceFileNode>();
+            }
+
+            var rootNodes = new List<WorkspaceFileNode>();
+            var nodeCount = 0;
+            WalkWorkingTreeDirectory(repositoryPath, repositoryPath, rootNodes, ref nodeCount, ct);
+
+            if (nodeCount >= MaxWorkingTreeNodeCount)
+            {
+                _logger.LogWarning(
+                    "Arbeitsbaum für {RepositoryPath} überschreitet die Knoten-Obergrenze ({MaxNodeCount}); Baum wird gekürzt angezeigt.",
+                    repositoryPath,
+                    MaxWorkingTreeNodeCount);
+            }
+
+            SortNodes(rootNodes);
+            return (IReadOnlyList<WorkspaceFileNode>)rootNodes;
+        }, ct);
+    }
+
+    private void WalkWorkingTreeDirectory(string rootPath, string currentPath, List<WorkspaceFileNode> parentNodes, ref int nodeCount, CancellationToken ct)
+    {
+        if (nodeCount >= MaxWorkingTreeNodeCount)
+        {
+            return;
+        }
+
+        IEnumerable<string> directories;
+        IEnumerable<string> files;
+        try
+        {
+            directories = Directory.EnumerateDirectories(currentPath).OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+            files = Directory.EnumerateFiles(currentPath).OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            _logger.LogDebug(ex, "Verzeichnis {DirectoryPath} konnte nicht aufgezählt werden und wird übersprungen.", currentPath);
+            return;
+        }
+
+        foreach (var directoryPath in directories)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (nodeCount >= MaxWorkingTreeNodeCount)
+            {
+                return;
+            }
+
+            var name = Path.GetFileName(directoryPath);
+            if (string.Equals(name, GitDirectoryName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var directoryNode = new WorkspaceFileNode
+            {
+                Name = name,
+                RelativePath = Path.GetRelativePath(rootPath, directoryPath),
+                IsDirectory = true,
+                ChildrenLoaded = true,
+            };
+            nodeCount++;
+            parentNodes.Add(directoryNode);
+            WalkWorkingTreeDirectory(rootPath, directoryPath, directoryNode.Children, ref nodeCount, ct);
+        }
+
+        foreach (var filePath in files)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (nodeCount >= MaxWorkingTreeNodeCount)
+            {
+                return;
+            }
+
+            parentNodes.Add(new WorkspaceFileNode
+            {
+                Name = Path.GetFileName(filePath),
+                RelativePath = Path.GetRelativePath(rootPath, filePath),
+                IsDirectory = false,
+            });
+            nodeCount++;
+        }
     }
 
     private async Task<int> ReadCommitCountAsync(string repositoryPath, string? baseReference, CancellationToken ct)

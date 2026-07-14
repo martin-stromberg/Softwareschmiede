@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,7 +24,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         Info,
         Cli,
-        Diff
+        Diff,
+        Dateibrowser
     }
 
     private readonly AufgabeService _aufgabeService;
@@ -37,6 +39,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly IDialogService _dialogService;
     private readonly IPluginManager _pluginManager;
     private readonly IServiceProvider _serviceProvider;
+    private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -102,6 +105,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowEditPanel));
             OnPropertyChanged(nameof(ShowCliPanel));
             OnPropertyChanged(nameof(ShowDiffPanel));
+            OnPropertyChanged(nameof(ShowFileExplorerPanel));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(CanAssignIssue));
@@ -109,6 +113,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowInfoPanel));
             WaehleStandardAnsicht();
             DetailTitelAenderungAction?.Invoke(value?.Titel);
+
+            _fileExplorerViewModel.InitialisierenAsync(value?.LokalerKlonPfad, CancellationToken.None)
+                .SafeFireAndForget(_logger, "TaskDetailViewModel.FileExplorer.InitialisierenAsync");
         }
     }
 
@@ -291,6 +298,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die Diff-Ansicht ausgewählt ist.</summary>
     public bool IsDiffViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Diff;
 
+    /// <summary>Gibt an, ob die Dateiexplorer-Ansicht ausgewählt ist.</summary>
+    public bool IsFileExplorerViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Dateibrowser;
+
     /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
     public string? EditTitel
     {
@@ -319,8 +329,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
     public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
 
+    /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert.</summary>
+    public bool ShowFileExplorerPanel => !string.IsNullOrEmpty(_aufgabe?.LokalerKlonPfad) && Directory.Exists(_aufgabe.LokalerKlonPfad);
+
     /// <summary>True wenn die Info-Ansicht angezeigt werden soll.</summary>
     public bool ShowInfoPanel => IsInfoViewSelected;
+
+    /// <summary>Komponiertes Presentation Model des Dateiexplorers.</summary>
+    public FileExplorerViewModel FileExplorer => _fileExplorerViewModel;
 
     /// <summary>CanExecute für SpeichernCommand: Status ∈ {Neu, Gestartet} &amp;&amp; !IsCliRunning &amp;&amp; Titel.Length > 0.</summary>
     public bool KannSpeichern => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Neu or Domain.Enums.AufgabeStatus.Gestartet
@@ -377,6 +393,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wechselt zur Diff-Ansicht.</summary>
     public ICommand DiffViewCommand { get; }
 
+    /// <summary>Wechselt zur Dateiexplorer-Ansicht.</summary>
+    public ICommand DateiViewCommand { get; }
+
     /// <summary>Navigiert zurück zur vorherigen Ansicht.</summary>
     public ICommand ZurueckCommand { get; }
 
@@ -425,6 +444,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IServiceProvider serviceProvider,
         ILogger<TaskDetailViewModel> logger,
         TimeProvider timeProvider,
+        FileExplorerViewModel fileExplorerViewModel,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -439,6 +459,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _pluginManager = pluginManager;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _fileExplorerViewModel = fileExplorerViewModel;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -457,6 +478,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         InfoViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Info));
         CliViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Cli), () => ShowCliPanel);
         DiffViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Diff), () => ShowDiffPanel);
+        DateiViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Dateibrowser), () => ShowFileExplorerPanel);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
         IssueBrowserOeffnenCommand = new RelayCommand(
@@ -817,6 +839,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ansicht = DetailAnsicht.Info;
         if (ansicht == DetailAnsicht.Diff && !ShowDiffPanel)
             ansicht = DetailAnsicht.Info;
+        if (ansicht == DetailAnsicht.Dateibrowser && !ShowFileExplorerPanel)
+            ansicht = DetailAnsicht.Info;
 
         if (_ausgewaehlteAnsicht == ansicht)
             return;
@@ -826,6 +850,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsInfoViewSelected));
         OnPropertyChanged(nameof(IsCliViewSelected));
         OnPropertyChanged(nameof(IsDiffViewSelected));
+        OnPropertyChanged(nameof(IsFileExplorerViewSelected));
         OnPropertyChanged(nameof(ShowInfoPanel));
     }
 

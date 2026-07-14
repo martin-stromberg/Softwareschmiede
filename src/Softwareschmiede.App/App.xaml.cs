@@ -187,6 +187,8 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<AufgabeRecoveryService>();
         services.AddScoped<PromptVorlagenService>();
         services.AddSingleton<PromptVorlagenPlatzhalterService>();
+        services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();
+        services.AddSingleton<ITextDiffService, TextDiffService>();
 
         // Infrastructure Services
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH")))
@@ -233,6 +235,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<IssueSelectionDialogViewModel>();
+        services.AddTransient<FileExplorerViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

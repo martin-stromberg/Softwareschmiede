@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace Softwareschmiede.Domain.ValueObjects;
 
 /// <summary>Repräsentiert einen Branch-Commit im Repository-Explorer.</summary>
@@ -25,5 +27,5 @@ public sealed class BranchCommit
     public string? ErrorMessage { get; set; }
 
     /// <summary>Liste der im Commit geänderten Dateien.</summary>
-    public List<WorkspaceFileNode> Files { get; set; } = [];
+    public ObservableCollection<WorkspaceFileNode> Files { get; set; } = [];
 }

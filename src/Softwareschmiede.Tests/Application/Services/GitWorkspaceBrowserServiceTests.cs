@@ -416,6 +416,35 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         preview.OriginalContent.Should().BeNull();
     }
 
+    /// <summary>Prüft die Größen-Schutzschranke für Commit-Vorschauen, damit kein übergroßer Inhalt an den Zeilendiff übergeben wird.</summary>
+    [Fact]
+    public async Task LoadCommitPreviewAsync_ShouldReturnTooBigHint_WhenContentExceedsInlineLimit()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var commitSha = "ffffffffffffffffffffffffffffffffffffffff";
+        var largeContent = new string('a', 1_048_577);
+        var service = CreateService(
+            repositoryPath,
+            string.Empty,
+            commitShowBySpec: new Dictionary<string, CliResult>
+            {
+                [$"{commitSha}:src/feature.cs"] = new(0, largeContent, string.Empty),
+                [$"{commitSha}^:src/feature.cs"] = new(0, "old-content", string.Empty),
+            });
+
+        var preview = await service.LoadCommitPreviewAsync(repositoryPath, new WorkspaceFileNode
+        {
+            Name = "feature.cs",
+            RelativePath = Path.Combine("src", "feature.cs"),
+            CommitSha = commitSha,
+        });
+
+        preview.IsTooBig.Should().BeTrue();
+        preview.CurrentContent.Should().BeNull();
+        preview.OriginalContent.Should().BeNull();
+        preview.Hint.Should().Contain("zu groß");
+    }
+
     /// <summary><summary>LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded.</summary>.</summary>
     [Fact]
     /// <summary>LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded.</summary>

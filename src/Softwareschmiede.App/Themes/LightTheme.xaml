@@ -30,6 +30,12 @@
     <Color x:Key="StatusBeendetColor">#6B6B6B</Color>
     <Color x:Key="StatusArchiviertColor">#AAAAAA</Color>
 
+    <!-- Diff-Farben -->
+    <Color x:Key="DiffAddedColor">#E8F5E9</Color>
+    <Color x:Key="DiffRemovedColor">#FFEBEE</Color>
+    <Color x:Key="DiffModifiedColor">#FFF3E0</Color>
+    <Color x:Key="DiffInlineChangedColor">#FFCC80</Color>
+
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
@@ -46,6 +52,10 @@
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
     <SolidColorBrush x:Key="SelectedTabBackgroundBrush" Color="{StaticResource SurfaceColor}" />
     <SolidColorBrush x:Key="UnselectedTabBackgroundBrush" Color="{StaticResource SidebarBackgroundColor}" />
+    <SolidColorBrush x:Key="DiffAddedBrush" Color="{StaticResource DiffAddedColor}" />
+    <SolidColorBrush x:Key="DiffRemovedBrush" Color="{StaticResource DiffRemovedColor}" />
+    <SolidColorBrush x:Key="DiffModifiedBrush" Color="{StaticResource DiffModifiedColor}" />
+    <SolidColorBrush x:Key="DiffInlineChangedBrush" Color="{StaticResource DiffInlineChangedColor}" />
 
     <!-- Buttons: Light Mode -->
     <Style TargetType="Button">

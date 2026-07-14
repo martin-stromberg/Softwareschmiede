@@ -43,6 +43,11 @@ public static class TaskDetailViewModelTestFactory
 
         var serviceProviderMock = new Mock<IServiceProvider>();
 
+        var fileExplorerViewModel = new FileExplorerViewModel(
+            new Mock<IGitWorkspaceBrowserService>().Object,
+            new Mock<ITextDiffService>().Object,
+            NullLogger<FileExplorerViewModel>.Instance);
+
         return new TaskDetailViewModel(
             aufgabeService,
             protokollService,
@@ -56,6 +61,7 @@ public static class TaskDetailViewModelTestFactory
             pluginManagerMock.Object,
             serviceProviderMock.Object,
             NullLogger<TaskDetailViewModel>.Instance,
-            TimeProvider.System);
+            TimeProvider.System,
+            fileExplorerViewModel);
     }
 }

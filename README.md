@@ -60,7 +60,7 @@ Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WP
 
 ## 📌 Implementierungsstatus
 
-Stand: **2026-07-11**
+Stand: **2026-07-14**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
@@ -84,6 +84,7 @@ Stand: **2026-07-11**
 | **Issue 86: Parallele CLI-Ausführungen ohne Blockade bei verborgener Aufgabenseite** | ✅ Implementiert | Entkopplung der ReadLoop vom `TerminalControl`-Lebenszyklus: `PseudoConsoleSession` verwaltet die Leseschleife unabhängig und feuert `BufferChanged`-Events. `TerminalControl` wird zu reinem Renderer, der Events abonniert statt ReadLoop zu steuern. CLI-Prozesse laufen parallel weiter, auch wenn ihre Aufgabenseite nicht angezeigt wird. Betroffene Komponenten: `TerminalControl` (Unloaded-Handler entfernt, Event-Binding hinzugefügt), `PseudoConsoleSession` (ReadLoop ab Konstruktion aktiv), `KiAusfuehrungsService` (Cleanup-Logik angepasst). Unit-Tests für parallele Sessions, View-Wechsel und Session-Cleanup vorhanden; Details siehe [docs/help/terminal](docs/help/terminal/index.md) |
 | **Issue 85: CLI-Konsole optimieren — Buffer-Stabilitäts-Fix und Clipboard-Paste** | ✅ Implementiert | Neue Methode `TerminalBuffer.GetSnapshot()` für konsistentes Rendering unter Lock zur Vermeidung von Race Conditions bei paralleler CLI-Ausgabe. Clipboard-Paste-Unterstützung (Ctrl+V) mit neuer `KeyToVt100Encoder.EncodeClipboardText()`-Methode und Tastaturhandling in `TerminalControl`. Betroffene Komponenten: `TerminalBuffer`, `TerminalControl`, `KeyToVt100Encoder`. Unit-Tests für Thread-Sicherheit, Clipboard-Encoding und Keyboard-Input vorhanden; Details siehe [docs/help/terminal/beschreibung.md](docs/help/terminal/beschreibung.md) |
 | **Issue 122: Zeitgesteuerter Prompt-Versand** | ✅ Implementiert | Neue Funktion in der Aufgabendetailansicht: Benutzer können einen Prompt zeitverzögert versenden. Zwei `TextBox`-Eingabefelder für Stunde (0–23) und Minute (0–59) in der CLI-Ribbon-Gruppe; ist keine Zielzeit angegeben, wird der Prompt sofort versendet (bestehendes Verhalten), ansonsten zeitgesteuert nach `PromptZeitVersandService.SchedulePromptAsync`. Neuer Singleton-Service mit `Dictionary<Guid, ScheduledPromptInfo>` und ereignisgesteuerten pro-Eintrag-Timern (`ITimer` via `TimeProvider.CreateTimer`); Timer-basierte Versendung bei Zielzeit-Erreichen oder sofortiger Versand bei vergangener Zielzeit. Neue ViewModel-Properties: `ScheduledPromptTargetHours`, `ScheduledPromptTargetMinutes`, `ScheduledPromptStatus`, `ScheduledPromptTimeDisplay`, `CanSchedulePrompt`, `SchedulePromptCommand`. Neue `PseudoConsoleSession.WritePromptAsync()` für DRY-Prompt-Logik. Unit-Tests mit `FakeTimeProvider` für deterministische Timer-Tests, E2E-Tests für Happy-Path. Betroffene Komponenten: `PromptZeitVersandService` (neu, Service Layer, Singleton), `ScheduledPromptInfo` (neu, Value Object), `TaskDetailViewModel` (erweitert), `TaskDetailView.xaml` (erweitert), `PseudoConsoleSession` (erweitert), `App.xaml.cs` (DI-Registrierung), Test-NuGet `Microsoft.Extensions.TimeProvider.Testing` hinzugefügt. |
+| **Dateiexplorer für Aufgabendetailansicht** | ✅ Implementiert | Split-View-Dateibrowser in `TaskDetailView` mit zwei Modi: **Standard** (Arbeitsbaum des geklonten Repositories mit `.git`-Ausschluss) und **Vergleich** (Commit-gerichtete Ansicht mit nur geänderten Dateien). Neue Komponenten: `FileExplorerViewModel` (Presentation Model), `FileExplorerView` (UserControl mit Mode-Toggle, TreeView, GridSplitter), `DiffViewer` (ItemsControl-basierter Diff-Renderer), `DiffLineStatusToBrushConverter` (Statusfarben grün/rot/orange, theme-fähig). Neue Services: `ITextDiffService`/`TextDiffService` (präsentations-neutrale Zeilendiff-Engine mit Modified-Paarung und Inline-Segmenten für Wortabschnitts-Granularität), Erweiterung `IGitWorkspaceBrowserService.LoadWorkingTreeAsync()` (Directory-Walk mit Obergrenze und `.git`-Ausschluss). Neue Value Objects: `TextDiffLine`, `InlineDiffSegment`, `FileTextDiff` in Domain Layer. Betroffene Dateien: `TaskDetailViewModel`, `TaskDetailView.xaml`, `IGitWorkspaceBrowserService`, `GitWorkspaceBrowserService`, `App.xaml.cs` (DI-Setup). Unit-Tests für `TextDiffService`, `LoadWorkingTreeAsync`, `FileExplorerViewModel`; E2E-Tests für UI-Interaktion. Details siehe [docs/help/dateiexplorer](docs/help/dateiexplorer/index.md). Bekannte offene Punkte (siehe Doku): fehlende Obergrenze für die Zeilendiff-Berechnung bei sehr großen Commit-Vorschauen, Race-Condition-Härtung bei schnellem Aufgabenwechsel. |
 | Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
 | CI/CD-Pipeline für Release | ✅ Implementiert | Automatisierter Release-Workflow (`.github/workflows/release.yml`): Semantic Release (Conventional Commits) bestimmt die Version, `dotnet publish` erstellt den .NET-10-Build, das Ergebnis wird als `release.zip` verpackt und als GitHub-Release veröffentlicht; manueller Tag-Override (`vX.Y.Z`) möglich; Details in [CONTRIBUTING.md](CONTRIBUTING.md) und [docs/CI_CD.md](docs/CI_CD.md) |
 
@@ -497,6 +498,28 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 - **Bekannte Grenzen:** Wenn keine Basisreferenz (`origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`) auflösbar ist, werden keine Branch-Commits angezeigt; Verzeichnisse und Binärdateien haben keine Inline-Commit-Vorschau (Hint statt Diff-Inhalt).
 - **Testabdeckung (Codebestand):** `GitWorkspaceBrowserServiceTests` (Basisreferenz-Fallback, Branch-Commit-Parsing, Commit-Dateibaum, Commit-Preview), `CommitTreePresenterTests` (Expand/Retry/Flatten), `AufgabeDetailWorkspacePreviewBunitTests` (Lazy-Load-Fehler + Retry, Commit-Preview-Auswahl).
 - **Doku-Links:** [Dokumentationsplan (2026-05-27)](docs/documentation-plan.md), [API Live Project Browser](docs/api/live-project-browser-git-status.md), [Flow Live Project Browser](docs/flows/live-project-browser-git-status-flow.md), [Business F021](docs/business/features/F021-live-project-browser-git-status.md), [Business F022](docs/business/features/F022-diff-vergleichskomponente.md).
+
+#### Dateiexplorer für Aufgabendetailansicht
+
+**Split-View-Dateibrowser mit Standard- und Vergleichmodus in der WPF-Aufgabendetailansicht:**
+
+- **Split-View-Architektur:** Linke Seite zeigt Verzeichnis-/Dateibaum, rechte Seite zeigt Dateiinhalt oder Diff-Vergleich
+- **Zwei Betriebsmodi:**
+  - **Standard:** Zeigt den kompletten Arbeitsbaum des geklonten Repositories mit `.git`-Ausschluss und Knoten-Obergrenze zur Performanzabsicherung
+  - **Vergleich:** Zeigt nur im Branch geänderte Dateien, gruppiert nach Commits; lazy-geladen mit Commit-Datei-Strukturen
+- **Diff-Ansicht für geänderte Dateien:** Neue `DiffViewer`-UserControl rendert zeilenweise Diffs mit farblicher Kennzeichnung (grün für hinzugefügte, rot für gelöschte, orange für geänderte Zeilen mit Inline-Highlighting geänderter Wortteile); Farben sind über `DynamicResource`-Brushes in `DarkTheme.xaml`/`LightTheme.xaml` theme-fähig
+- **Zeilendiff-Engine:** Präsentations-neutrale `ITextDiffService` mit `TextDiffService`-Implementierung; parst Alt-/Neu-Inhalt mit Modified-Paarung und Inline-Segmenten basierend auf gemeinsamen Präfix/Suffix-Wortabschnitten
+- **Repository-Integration:** Wiederverwendung bestehender `IGitWorkspaceBrowserService` mit neuer Methode `LoadWorkingTreeAsync()` für Standard-Baum-Aufzählung; Erweiterung der Diff-APIs für Vergleichsmodus
+- **UI-Komponenten:**
+  - `FileExplorerView` – MainUserControl mit Ribbon-Buttons (Standard/Vergleich/Aktualisieren), TreeView und Inhaltsbereich
+  - `DiffViewer` – ItemsControl-basierter Renderer mit Zeilennummerspalte und Inline-Highlighting
+  - `FileExplorerViewModel` – Presentation Model für Zustand, Auswahl, Modus, Laden und Refresh
+  - `DiffLineStatusToBrushConverter` – Value Converter für Status→Farbe-Mapping
+- **Navigation:** Neuer „Dateien"-Button in der Ansicht-Umschaltgruppe der `TaskDetailView`; nur sichtbar wenn `Aufgabe.LokalerKlonPfad` gesetzt und Verzeichnis existiert
+- **Bekannte Nicht-Umfangsmerkmale:** Feineres Inline-Highlighting (Token-/LCS-basiert), Syntax-Highlighting für Code, Lazy-Nachladen bei sehr großen Repositories
+- **Bekannte offene Punkte:** Fehlende Obergrenze für die Zeilendiff-Berechnung bei sehr großen Commit-Vorschauen (Speicherrisiko), Race-Condition-Härtung bei schnellem Aufgabenwechsel bzw. Refresh während eines laufenden Ladevorgangs, fehlende Fehleranzeige beim Laden von Commit-Dateien in der WPF-Ansicht
+- **Testabdeckung:** Unit-Tests für `TextDiffService` (Context/Added/Removed/Modified/Inline-Segmente), `LoadWorkingTreeAsync` (Baum-Struktur, `.git`-Ausschluss, ungültige Pfade), `FileExplorerViewModel` (Initialisierung, Dateiauswahl, Modus-Wechsel, Aktualisierung); E2E-Tests für UI-Navigation und Renderer
+- **Details:** [docs/help/dateiexplorer](docs/help/dateiexplorer/index.md)
 
 ### 🔍 Diff-Vergleichskomponente
 - Öffentliche REST-Endpunkte unter `/api/diff` für Erzeugung, Abruf, Auflistung, Statistik, Löschung und Cache-Invalidierung von Diffs

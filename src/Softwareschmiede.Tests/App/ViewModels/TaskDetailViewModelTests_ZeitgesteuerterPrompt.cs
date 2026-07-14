@@ -84,6 +84,11 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
 
+        var fileExplorerViewModel = new FileExplorerViewModel(
+            new Mock<IGitWorkspaceBrowserService>().Object,
+            new Mock<ITextDiffService>().Object,
+            NullLogger<FileExplorerViewModel>.Instance);
+
         return new TaskDetailViewModel(
             _aufgabeService,
             _protokollService,
@@ -97,7 +102,8 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             pluginManagerMock.Object,
             new Mock<IServiceProvider>().Object,
             NullLogger<TaskDetailViewModel>.Instance,
-            _timeProvider);
+            _timeProvider,
+            fileExplorerViewModel);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe(AufgabeStatus status = AufgabeStatus.Neu)

@@ -1,0 +1,66 @@
+<UserControl x:Class="Softwareschmiede.App.Controls.DiffViewer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto">
+        <ItemsControl AutomationProperties.Name="DiffViewerZeilen"
+                      ItemsSource="{Binding Lines, ElementName=Root}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{Binding Status, Converter={StaticResource DiffLineStatusToBrushConverter}}"
+                            Padding="4,1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="36" />
+                                <ColumnDefinition Width="36" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding OldLineNumber}"
+                                       FontFamily="Consolas"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       HorizontalAlignment="Right"
+                                       Margin="0,0,6,0" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding NewLineNumber}"
+                                       FontFamily="Consolas"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       HorizontalAlignment="Right"
+                                       Margin="0,0,6,0" />
+                            <ItemsControl Grid.Column="2"
+                                          ItemsSource="{Binding InlineSegments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Text}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsChanged}" Value="True">
+                                                            <Setter Property="FontWeight" Value="Bold" />
+                                                            <Setter Property="Background" Value="{DynamicResource DiffInlineChangedBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
+</UserControl>

@@ -27,4 +27,10 @@ public interface IGitWorkspaceBrowserService
     /// <param name="node">Ausgewählter Commit-Dateiknoten.</param>
     /// <param name="ct">Cancellation Token.</param>
     Task<FilePreview> LoadCommitPreviewAsync(string repositoryPath, WorkspaceFileNode node, CancellationToken ct = default);
+
+    /// <summary>Lädt den vollständigen Arbeitsbaum eines geklonten Repositories (Verzeichnisse und Dateien, <c>.git</c> ausgeschlossen).</summary>
+    /// <param name="repositoryPath">Pfad des lokalen Repositories.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Die Wurzelknoten des Arbeitsbaums, oder eine leere Liste, wenn der Pfad nicht existiert.</returns>
+    Task<IReadOnlyList<WorkspaceFileNode>> LoadWorkingTreeAsync(string repositoryPath, CancellationToken ct = default);
 }
