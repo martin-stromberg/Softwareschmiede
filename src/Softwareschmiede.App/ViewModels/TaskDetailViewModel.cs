@@ -64,6 +64,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private int? _scheduledPromptTargetMinutes;
     private string? _scheduledPromptStatus;
     private string? _scheduledPromptTimeDisplay;
+    private bool _showFileExplorerPanel;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -97,6 +98,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         private set
         {
             SetProperty(ref _aufgabe, value);
+            _showFileExplorerPanel = !string.IsNullOrEmpty(value?.LokalerKlonPfad) && Directory.Exists(value.LokalerKlonPfad);
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
             OnPropertyChanged(nameof(AufgabeBranchName));
@@ -329,8 +331,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
     public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
 
-    /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert.</summary>
-    public bool ShowFileExplorerPanel => !string.IsNullOrEmpty(_aufgabe?.LokalerKlonPfad) && Directory.Exists(_aufgabe.LokalerKlonPfad);
+    /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="Aufgabe"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
+    public bool ShowFileExplorerPanel => _showFileExplorerPanel;
 
     /// <summary>True wenn die Info-Ansicht angezeigt werden soll.</summary>
     public bool ShowInfoPanel => IsInfoViewSelected;

@@ -310,6 +310,24 @@ public sealed class TaskDetailViewModelTests : IDisposable
         }
     }
 
+    /// <summary>ShowFileExplorerPanel wird beim Laden der Aufgabe einmalig ermittelt und gecacht, statt bei jedem Property-Zugriff erneut synchron das Dateisystem zu prüfen; ein nachträgliches Löschen des Verzeichnisses ändert den bereits gecachten Wert daher nicht.</summary>
+    [Fact]
+    public async Task ShowFileExplorerPanel_WertBleibtGecachtNachdemVerzeichnisNachtraeglichGeloeschtWurde()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "MitPfad", "Beschreibung");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/cache", tempDir);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ShowFileExplorerPanel.Should().BeTrue();
+
+        Directory.Delete(tempDir, true);
+
+        sut.ShowFileExplorerPanel.Should().BeTrue();
+    }
+
     // --- KannSpeichern ---
 
     /// <summary>KannSpeichern ist true wenn Status=Neu, Titel gesetzt, kein CLI läuft.</summary>

@@ -12,14 +12,6 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
     private const int BinaryProbeBytes = 8_192;
     private const int MaxWorkingTreeNodeCount = 5_000;
     private const string GitDirectoryName = ".git";
-    private static readonly HashSet<string> CodeExtensions =
-    [
-        ".cs", ".cshtml", ".razor",
-        ".ts", ".tsx", ".js", ".jsx",
-        ".json", ".yml", ".yaml",
-        ".sql", ".ps1", ".sh",
-        ".xml", ".xaml", ".css", ".scss", ".html"
-    ];
 
     private readonly ICliRunner _cliRunner;
     private readonly ILogger<GitWorkspaceBrowserService> _logger;
@@ -52,15 +44,18 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         var baseReference = await ResolveBaseReferenceAsync(repositoryPath, ct);
         var commitCount = await ReadCommitCountAsync(repositoryPath, baseReference, ct);
         var branchCommits = await ReadBranchCommitsAsync(repositoryPath, baseReference, ct);
-        var entries = await ReadStatusEntriesAsync(repositoryPath, ct);
 
-        var snapshot = BuildSnapshot(repositoryPath, commitCount, branchCommits, entries);
+        var snapshot = new WorkspaceSnapshot
+        {
+            RepositoryPath = repositoryPath,
+            CommitCount = commitCount,
+            BranchCommits = branchCommits,
+        };
         _logger.LogInformation(
-            "Workspace-Snapshot geladen für {RepositoryPath}: {CommitCount} Branch-Commits, {BranchCommitNodes} Commit-Knoten, {ChangedCount} geänderte Dateien.",
+            "Workspace-Snapshot geladen für {RepositoryPath}: {CommitCount} Branch-Commits, {BranchCommitNodes} Commit-Knoten.",
             repositoryPath,
             snapshot.CommitCount,
-            snapshot.BranchCommits.Count,
-            snapshot.ChangedFileCount);
+            snapshot.BranchCommits.Count);
 
         return snapshot;
     }
@@ -510,122 +505,6 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return rootNodes;
     }
 
-    private async Task<IReadOnlyList<WorkspaceStatusEntry>> ReadStatusEntriesAsync(string repositoryPath, CancellationToken ct)
-    {
-        var result = await _cliRunner.RunAsync(
-            "git",
-            ["status", "--porcelain=v1", "--untracked-files=all"],
-            repositoryPath,
-            null,
-            ct);
-
-        if (!result.IsSuccess)
-        {
-            throw new InvalidOperationException($"git status fehlgeschlagen: {result.StdErr}");
-        }
-
-        var entries = new List<WorkspaceStatusEntry>();
-        var lines = result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-
-        foreach (var rawLine in lines)
-        {
-            var line = rawLine.TrimEnd('\r');
-            if (line.Length < 3)
-            {
-                continue;
-            }
-
-            if (line.StartsWith("!!", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (line.StartsWith("??", StringComparison.Ordinal))
-            {
-                var path = NormalizeRelativePath(line[3..]);
-                entries.Add(new WorkspaceStatusEntry(path, null, new WorkspaceFileStatus('?', '?')));
-                continue;
-            }
-
-            var status = WorkspaceFileStatus.Parse(line[..2]);
-            var payload = line[3..];
-            string relativePath;
-            string? sourcePath = null;
-
-            if (status.IsRenameOrCopy && payload.Contains(" -> ", StringComparison.Ordinal))
-            {
-                var split = payload.Split(" -> ", 2, StringSplitOptions.None);
-                sourcePath = NormalizeRelativePath(split[0]);
-                relativePath = NormalizeRelativePath(split[1]);
-            }
-            else
-            {
-                relativePath = NormalizeRelativePath(payload);
-            }
-
-            entries.Add(new WorkspaceStatusEntry(relativePath, sourcePath, status));
-        }
-
-        return entries;
-    }
-
-    private WorkspaceSnapshot BuildSnapshot(string repositoryPath, int commitCount, IReadOnlyList<BranchCommit> branchCommits, IReadOnlyList<WorkspaceStatusEntry> entries)
-    {
-        var fileNodes = new List<WorkspaceFileNode>();
-        var rootNodes = new List<WorkspaceFileNode>();
-        var pathMap = new Dictionary<string, WorkspaceFileNode>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var entry in entries.OrderBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase))
-        {
-            var node = CreateFileNode(entry);
-            fileNodes.Add(node);
-            InsertNode(rootNodes, pathMap, node);
-            IncrementAncestorCounts(pathMap, node.RelativePath);
-        }
-
-        SortNodes(rootNodes);
-
-        var orderedFlatFiles = fileNodes.OrderBy(node => node.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
-        var planningDocuments = orderedFlatFiles
-            .Where(IsPlanningDocumentNode)
-            .ToList();
-        if (planningDocuments.Count == 0)
-        {
-            planningDocuments = orderedFlatFiles
-                .Where(node => IsPlanningDocumentPathFallback(node.RelativePath) || IsPlanningDocumentPathFallback(node.SourceRelativePath))
-                .ToList();
-        }
-        var codeFiles = orderedFlatFiles
-            .Where(node => !IsPlanningDocumentNode(node) && IsCodeFileNode(node))
-            .ToList();
-
-        return new WorkspaceSnapshot
-        {
-            RepositoryPath = repositoryPath,
-            CommitCount = commitCount,
-            BranchCommits = branchCommits,
-            ChangedFileCount = fileNodes.Count,
-            RootNodes = rootNodes,
-            FlatFiles = orderedFlatFiles,
-            CodeFiles = codeFiles,
-            PlanningDocuments = planningDocuments,
-        };
-    }
-
-    private static WorkspaceFileNode CreateFileNode(WorkspaceStatusEntry entry)
-    {
-        var name = Path.GetFileName(entry.RelativePath);
-        return new WorkspaceFileNode
-        {
-            Name = string.IsNullOrEmpty(name) ? entry.RelativePath : name,
-            RelativePath = entry.RelativePath,
-            IsDirectory = false,
-            IsDeleted = entry.Status.IsDeleted,
-            SourceRelativePath = entry.SourceRelativePath,
-            Status = entry.Status,
-        };
-    }
-
     private static void InsertNode(List<WorkspaceFileNode> rootNodes, IDictionary<string, WorkspaceFileNode> pathMap, WorkspaceFileNode fileNode)
     {
         var segments = fileNode.RelativePath.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
@@ -739,63 +618,6 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return relativePath.Trim().Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
     }
 
-    private static bool IsCodeFilePath(string relativePath)
-    {
-        var extension = Path.GetExtension(relativePath);
-        return !string.IsNullOrWhiteSpace(extension) && CodeExtensions.Contains(extension);
-    }
-
-    private static bool IsCodeFileNode(WorkspaceFileNode node)
-    {
-        return IsCodeFilePath(node.RelativePath) || (!string.IsNullOrWhiteSpace(node.SourceRelativePath) && IsCodeFilePath(node.SourceRelativePath));
-    }
-
-    private static bool IsPlanningDocumentNode(WorkspaceFileNode node)
-    {
-        return IsPlanningDocumentPath(node.RelativePath) || IsPlanningDocumentPath(node.SourceRelativePath);
-    }
-
-    private static bool IsPlanningDocumentPath(string? relativePath)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath))
-        {
-            return false;
-        }
-
-        var normalizedPath = NormalizeRelativePath(relativePath);
-        if (normalizedPath.StartsWith($".{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-        {
-            normalizedPath = normalizedPath[2..];
-        }
-
-        if (!normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return normalizedPath.StartsWith(Path.Combine("docs", "requirements"), StringComparison.OrdinalIgnoreCase)
-               || normalizedPath.StartsWith(Path.Combine("docs", "architecture"), StringComparison.OrdinalIgnoreCase)
-               || normalizedPath.StartsWith(Path.Combine("docs", "improvements"), StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsPlanningDocumentPathFallback(string? relativePath)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath))
-        {
-            return false;
-        }
-
-        var normalizedPath = relativePath.Trim().Replace('\\', '/').TrimStart('.', '/');
-        if (!normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return normalizedPath.StartsWith("docs/requirements/", StringComparison.OrdinalIgnoreCase)
-               || normalizedPath.StartsWith("docs/architecture/", StringComparison.OrdinalIgnoreCase)
-               || normalizedPath.StartsWith("docs/improvements/", StringComparison.OrdinalIgnoreCase);
-    }
-
     private static string CombinePath(string rootPath, string relativePath)
     {
         var candidate = Path.GetFullPath(Path.Combine(rootPath, relativePath));
@@ -820,6 +642,4 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         var size = byteCount / 1024d / 1024d;
         return $"{size:0.##} MB";
     }
-
-    private sealed record WorkspaceStatusEntry(string RelativePath, string? SourceRelativePath, WorkspaceFileStatus Status);
 }

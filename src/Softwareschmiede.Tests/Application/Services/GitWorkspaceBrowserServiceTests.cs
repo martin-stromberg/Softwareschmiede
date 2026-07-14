@@ -24,53 +24,6 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         }
     }
 
-    /// <summary>Ermittelt einen rekursiven Baum und behält Git-Sonderstatus korrekt bei.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldBuildRecursiveTree_AndPreserveSpecialStatuses()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-             M src/Changed.cs
-            A  src/NewFile.cs
-            D  src/Deleted.cs
-            R  src/OldName.cs -> src/NewName.cs
-            C  src/Source.cs -> src/Copy.cs
-            T  src/TypeChange.cs
-            UU src/Conflict.cs
-            ?? docs/requirements/new-feature.md
-            ?? docs/architecture/target-state.md
-            R  docs/improvements/legacy-plan.md -> archive/legacy-plan.md
-            ?? ./docs/improvements/edge-case.md
-            ?? docs/Untracked.md
-            !! obj/Ignored.dll
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-
-        snapshot.HasError.Should().BeFalse();
-        snapshot.CommitCount.Should().Be(42);
-        snapshot.BranchCommits.Should().ContainSingle();
-        snapshot.BranchCommits[0].Sha.Should().Be("1111111111111111111111111111111111111111");
-        snapshot.ChangedFileCount.Should().Be(12);
-        snapshot.CodeFiles.Should().HaveCount(7);
-        snapshot.PlanningDocuments.Should().HaveCount(4);
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine("docs", "requirements", "new-feature.md"));
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine("docs", "architecture", "target-state.md"));
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine("archive", "legacy-plan.md"));
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine(".", "docs", "improvements", "edge-case.md"));
-
-        FindNode(snapshot.RootNodes, "src").Should().NotBeNull();
-        FindNode(snapshot.RootNodes, Path.Combine("src", "NewName.cs"))!.Status!.BadgeText.Should().Be("R");
-        FindNode(snapshot.RootNodes, Path.Combine("src", "TypeChange.cs"))!.Status!.BadgeText.Should().Be("T");
-        FindNode(snapshot.RootNodes, Path.Combine("src", "Conflict.cs"))!.Status!.IsConflict.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine("docs", "Untracked.md"))!.Status!.IsUntracked.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine("docs", "requirements", "new-feature.md"))!.Status!.IsUntracked.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine(".", "docs", "improvements", "edge-case.md"))!.Status!.IsUntracked.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine("src", "Deleted.cs"))!.IsDeleted.Should().BeTrue();
-    }
-
     /// <summary>Prüft, dass ein fehlender Repository-Pfad als Fehler-Snapshot zurückkommt.</summary>
     [Fact]
     public async Task LoadSnapshotAsync_ShouldReturnError_WhenRepositoryPathDoesNotExist()
@@ -95,97 +48,6 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
         snapshot.HasError.Should().BeTrue();
         snapshot.ErrorMessage.Should().Contain("kein Git-Repository");
-    }
-
-    /// <summary>Prüft, dass ein leerer Status-Output zu einem leeren Snapshot führt.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldReturnEmptySnapshot_WhenNoChangesExist()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(repositoryPath, string.Empty);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-
-        snapshot.HasError.Should().BeFalse();
-        snapshot.ChangedFileCount.Should().Be(0);
-        snapshot.RootNodes.Should().BeEmpty();
-        snapshot.FlatFiles.Should().BeEmpty();
-        snapshot.CodeFiles.Should().BeEmpty();
-        snapshot.PlanningDocuments.Should().BeEmpty();
-    }
-
-    /// <summary>Erkennt Planungsdokumente über Fallback für Slash- und Dot-Varianten.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldDetectPlanningDocumentsViaFallback_WhenOnlySlashAndDotVariantsExist()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-            ?? /docs/architecture/target-state.md
-            ?? ././docs/requirements/new-feature.md
-            ?? /docs/notes/outside.md
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-        var expectedArchitecturePath = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}architecture{Path.DirectorySeparatorChar}target-state.md";
-        var expectedRequirementsPath = $".{Path.DirectorySeparatorChar}.{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}requirements{Path.DirectorySeparatorChar}new-feature.md";
-        var excludedNotesSuffix = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}notes{Path.DirectorySeparatorChar}outside.md";
-
-        snapshot.PlanningDocuments.Should().HaveCount(2);
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == expectedArchitecturePath);
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == expectedRequirementsPath);
-        snapshot.PlanningDocuments.Should().NotContain(node => node.RelativePath.EndsWith(excludedNotesSuffix, StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>Erkennt Planungsdokumente im Fallback über SourceRelativePath bei Rename/Copies.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldUseSourceRelativePath_ForPlanningDocumentFallbackDetection()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            "R  /docs/improvements/legacy-plan.md -> src/legacy-plan.txt");
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-        var expectedSourcePath = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}improvements{Path.DirectorySeparatorChar}legacy-plan.md";
-
-        snapshot.PlanningDocuments.Should().ContainSingle();
-        snapshot.PlanningDocuments[0].RelativePath.Should().Be(Path.Combine("src", "legacy-plan.txt"));
-        snapshot.PlanningDocuments[0].SourceRelativePath.Should().Be(expectedSourcePath);
-    }
-
-    /// <summary>Klassifiziert Markdown außerhalb erlaubter docs-Bereiche auch im Fallback nicht als Planung.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldNotClassifyMarkdownOutsideAllowedDocsFolders_AsPlanningDocumentInFallback()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-            ?? /docs/notes/planning.md
-            ?? /docs/requirements/accepted.md
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-        var expectedAcceptedSuffix = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}requirements{Path.DirectorySeparatorChar}accepted.md";
-        var excludedNotesSuffix = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}notes{Path.DirectorySeparatorChar}planning.md";
-
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath.EndsWith(expectedAcceptedSuffix, StringComparison.OrdinalIgnoreCase));
-        snapshot.PlanningDocuments.Should().NotContain(node => node.RelativePath.EndsWith(excludedNotesSuffix, StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>Prüft, dass ein fehlschlagendes git status als Ausnahme durchgereicht wird.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldThrow_WhenGitStatusFails()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(repositoryPath, string.Empty, statusSuccess: false, statusStdErr: "kaputt");
-
-        var act = () => service.LoadSnapshotAsync(repositoryPath);
-
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*git status fehlgeschlagen*");
     }
 
     /// <summary>Setzt CommitCount auf 0 wenn der rev-list-Aufruf fehlschlägt.</summary>
@@ -658,27 +520,6 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*außerhalb des Repository-Roots*");
-    }
-
-    /// <summary>Ignoriert zu kurze oder inkonsistente Statuszeilen ohne Ausnahme.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldIgnoreTooShortStatusLines_WithoutThrowing()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-            ?
-            A
-             
-
-            ?? src/valid.cs
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-
-        snapshot.ChangedFileCount.Should().Be(1);
-        snapshot.FlatFiles.Should().ContainSingle(node => node.RelativePath == Path.Combine("src", "valid.cs"));
     }
 
     private GitWorkspaceBrowserService CreateService(

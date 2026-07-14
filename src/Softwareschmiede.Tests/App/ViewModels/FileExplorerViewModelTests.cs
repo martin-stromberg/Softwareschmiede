@@ -78,6 +78,85 @@ public sealed class FileExplorerViewModelTests
         capturedTokenForA!.Value.IsCancellationRequested.Should().BeTrue();
     }
 
+    /// <summary>InitialisierenAsync bricht einen noch laufenden DateiLadenAsync-Vorgang ab, statt ihn den gerade geleerten Zustand mit veraltetem Inhalt überschreiben zu lassen.</summary>
+    [Fact]
+    public async Task InitialisierenAsync_BrichtLaufendenDateiLadevorgangAb()
+    {
+        var (sut, gitMock, _) = CreateSut();
+        gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        await sut.InitialisierenAsync(RepositoryPath);
+
+        var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
+        CancellationToken? capturedToken = null;
+        var previewCompletionSource = new TaskCompletionSource<FilePreview>();
+        gitMock.Setup(g => g.LoadPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>()))
+            .Returns((string _, WorkspaceFileNode _, CancellationToken ct) =>
+            {
+                capturedToken = ct;
+                return previewCompletionSource.Task;
+            });
+
+        sut.AusgewaehlterKnoten = node;
+        await WaitForAsync(() => capturedToken is not null);
+
+        await sut.InitialisierenAsync(RepositoryPath);
+
+        capturedToken!.Value.IsCancellationRequested.Should().BeTrue();
+    }
+
+    /// <summary>AktualisierenAsync bricht einen noch laufenden DateiLadenAsync-Vorgang ab, statt ihn den gerade geleerten Zustand mit veraltetem Inhalt überschreiben zu lassen.</summary>
+    [Fact]
+    public async Task AktualisierenCommand_BrichtLaufendenDateiLadevorgangAb()
+    {
+        var (sut, gitMock, _) = CreateSut();
+        gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        await sut.InitialisierenAsync(RepositoryPath);
+
+        var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
+        CancellationToken? capturedToken = null;
+        var previewCompletionSource = new TaskCompletionSource<FilePreview>();
+        gitMock.Setup(g => g.LoadPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>()))
+            .Returns((string _, WorkspaceFileNode _, CancellationToken ct) =>
+            {
+                capturedToken = ct;
+                return previewCompletionSource.Task;
+            });
+
+        sut.AusgewaehlterKnoten = node;
+        await WaitForAsync(() => capturedToken is not null);
+
+        await ((AsyncRelayCommand)sut.AktualisierenCommand).ExecuteAsync();
+
+        capturedToken!.Value.IsCancellationRequested.Should().BeTrue();
+    }
+
+    /// <summary>Schlägt das Laden der Dateivorschau fehl, zeigt DateiInhalt einen Hinweistext statt des veralteten Inhalts der vorherigen Datei, und DiffZeilen wird geleert.</summary>
+    [Fact]
+    public async Task DateiLadenAsync_FehlerBeimLaden_ZeigtHinweisUndLeertDiffZeilen()
+    {
+        var (sut, gitMock, diffMock) = CreateSut();
+        gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        await sut.InitialisierenAsync(RepositoryPath);
+
+        var diffNode = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };
+        var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
+        gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, diffNode, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
+        var diffLines = new List<TextDiffLine> { new("neu", DiffLineStatus.Modified, 1, 1, []) };
+        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines, 0, 0, 1));
+        sut.AusgewaehlterKnoten = diffNode;
+        await WaitForAsync(() => sut.DiffZeilen.Count > 0);
+
+        var failingNode = new WorkspaceFileNode { Name = "b.txt", RelativePath = "b.txt" };
+        gitMock.Setup(g => g.LoadPreviewAsync(RepositoryPath, failingNode, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+
+        sut.AusgewaehlterKnoten = failingNode;
+        await WaitForAsync(() => sut.DateiInhalt == "Datei konnte nicht geladen werden.");
+
+        sut.DateiInhalt.Should().Be("Datei konnte nicht geladen werden.");
+        sut.DiffZeilen.Should().BeEmpty();
+    }
+
     /// <summary>Die Auswahl eines Verzeichnis-Knotens leert den zuvor angezeigten Dateiinhalt und die Diff-Zeilen, statt die veraltete Anzeige stehen zu lassen.</summary>
     [Fact]
     public async Task DateiAuswahl_Verzeichnis_LeertVorherigenDateiInhaltUndDiffZeilen()

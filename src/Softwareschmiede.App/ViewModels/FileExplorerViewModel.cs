@@ -99,6 +99,9 @@ public sealed class FileExplorerViewModel : ViewModelBase
     {
         _repositoryPath = repositoryPath;
         AktuellerModus = DateibrowserAnsichtsmodus.Standard;
+        _dateiLadenCts?.Cancel();
+        _dateiLadenCts?.Dispose();
+        _dateiLadenCts = null;
         _ausgewaehlterKnoten = null;
         OnPropertyChanged(nameof(AusgewaehlterKnoten));
         DateiInhalt = null;
@@ -196,6 +199,11 @@ public sealed class FileExplorerViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Dateivorschau für {RelativePath} konnte nicht geladen werden.", knoten.RelativePath);
+            _dispatcherInvoke(() =>
+            {
+                DateiInhalt = "Datei konnte nicht geladen werden.";
+                ClearDiffZeilen();
+            });
         }
     }
 
@@ -217,6 +225,9 @@ public sealed class FileExplorerViewModel : ViewModelBase
         CommitGruppen.Clear();
         DateiInhalt = null;
         ClearDiffZeilen();
+        _dateiLadenCts?.Cancel();
+        _dateiLadenCts?.Dispose();
+        _dateiLadenCts = null;
         _ausgewaehlterKnoten = null;
         OnPropertyChanged(nameof(AusgewaehlterKnoten));
 

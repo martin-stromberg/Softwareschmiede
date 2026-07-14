@@ -97,4 +97,20 @@ public sealed class TextDiffServiceTests
         nurAlt.Lines.Should().ContainSingle();
         nurAlt.Lines[0].Status.Should().Be(DiffLineStatus.Removed);
     }
+
+    /// <summary>Überschreitet die Zeilenanzahl die LCS-Obergrenze, weicht der Diff auf einen einfachen Blockdiff aus, statt die volle O(n·m)-Matrix zu allokieren.</summary>
+    [Fact]
+    public void BuildDiff_ZeilenanzahlUeberSchwelle_LiefertBlockdiffOhneVolleLcsMatrix()
+    {
+        const int lineCount = 5_001;
+        var original = string.Join('\n', Enumerable.Range(0, lineCount).Select(i => $"alt-{i}"));
+        var current = string.Join('\n', Enumerable.Range(0, lineCount).Select(i => $"neu-{i}"));
+
+        var build = () => _sut.BuildDiff(original, current);
+
+        build.Should().NotThrow();
+        var diff = build();
+        diff.Lines.Should().HaveCount(lineCount);
+        diff.ModifiedCount.Should().Be(lineCount);
+    }
 }

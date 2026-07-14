@@ -18,8 +18,8 @@ Branch: `task/6770ad62e0d6455c919d5ecc54be1f1a-dateiexplorer`
 | [x] | 8b | Tests ausführen (Unteragent) | `test-results.md` |
 | [x] | – | Iteration oder Abschluss entscheiden | – |
 | [x] | 8a | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
-| [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
+| [x] | 9 | Dokumentation erstellen (Unteragent) — übersprungen: Fortsetzung einer `continue.md`, keine grundlegende Programmlogik geändert | `docs/help/` |
+| [x] | 9b | README aktualisieren (Unteragent) — übersprungen, da Schritt 9 übersprungen | `README.md` |
 | [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
 | [ ] | – | Feature-Verzeichnis löschen | – |
 | [ ] | – | Commit durchführen | – |

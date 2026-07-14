@@ -4,69 +4,99 @@
 
 **Status:** Befunde vorhanden
 
+## Zusammenfassung der Nacharbeitsprüfung
+
+Die in dieser Runde durchgeführte Löschung der ungenutzten Kategorisierungslogik aus
+`WorkspaceSnapshot` (`RootNodes`, `FlatFiles`, `CodeFiles`, `PlanningDocuments`, `ChangedFileCount`)
+sowie der zugehörigen Duplikation (`IsPlanningDocumentPath`/`IsPlanningDocumentPathFallback`,
+`IsCodeFilePath`, `ReadStatusEntriesAsync`) ist für den **kompilierten und ausgeführten Code
+vollständig und sauber**:
+
+- Kein produktiver Code (WPF-Views/XAML, ViewModels, Services) referenziert die entfernten
+  Member mehr (global geprüft, keine Treffer).
+- Kein kompilierter Test referenziert entfernte Member (App-/Application-Testordner sauber).
+- Keine ungenutzten `using`-Direktiven in den geprüften neuen Dateien.
+- Es wurde **keine vom WPF-UI benötigte Funktionalität** entfernt: Die WPF-Oberfläche
+  (`FileExplorerView.xaml`) bindet ausschließlich `Name`/`Children` (WorkspaceFileNode) bzw.
+  `Subject`/`ShortSha`/`IsLoadingFiles`/`ErrorMessage`/`Files` (BranchCommit) und hat die
+  gelöschte Kategorisierung nie konsumiert.
+
+Es verbleiben jedoch zwei Rest-Befunde derselben „berechnet-aber-nie-gelesen"-Familie, die im
+Zuge dieser Aufräumrunde konsequenterweise ebenfalls hätten entfernt werden sollen, sowie eine
+Beobachtung zu verwaisten (nicht kompilierten) Blazor-Testdateien.
+
 ## Befunde
 
-### TextDiffService.cs (TextDiffService)
+### GitWorkspaceBrowserService.cs (GitWorkspaceBrowserService)
 
-- **Efficiency / Speculative Generality** — `ComputeLineOperations` (Zeilen 77-129) allokiert die vollständige LCS-DP-Matrix `int[n + 1, m + 1]`. `BuildDiff` wird aus `FileExplorerViewModel.DateiLadenAsync` mit dem Commit-Vorschauinhalt aufgerufen, der in `GitWorkspaceBrowserService.LoadCommitPreviewAsync` erst bei `MaxInlineBytes = 1_048_576` (1 MB) abgeschnitten wird. Eine 1-MB-Quelldatei mit z. B. 30.000 Zeilen führt zu einer Matrix von 30.000 × 30.000 `int` ≈ 3,6 GB und damit zu `OutOfMemoryException`/LOH-Thrashing. Es existiert keine Zeilen-Obergrenze.
+- **Toter Code** — `IncrementAncestorCounts` (Zeilen 544–556), aufgerufen aus
+  `BuildCommitFileTree` (Zeile 501), pflegt pro Verzeichnisknoten die Aggregation
+  `WorkspaceFileNode.ChangedFileCount`. Dieser Wert wird von **keinem kompilierten Konsumenten**
+  gelesen: Die WPF-`TreeView`-Templates in `FileExplorerView.xaml` zeigen keinen Änderungszähler
+  an, und die einzigen Lesezugriffe auf `ChangedFileCount` liegen in den **nicht kompilierten**
+  Blazor-Tests unter `src/Softwareschmiede.Tests/Components/**` (per `<Compile Remove>` aus dem
+  Build ausgeschlossen). Es handelt sich damit um genau dieselbe Kategorisierungs-/
+  Aggregationslogik, die diese Runde aus `WorkspaceSnapshot` entfernt hat — nur auf Knotenebene
+  übrig geblieben.
 
-  Empfehlung: Vor der O(n·m)-LCS-Berechnung eine Zeilenanzahl-Obergrenze prüfen (analog zu `MaxWorkingTreeNodeCount`) und bei Überschreitung auf einen einfachen, speicherschonenden Fallback (z. B. reiner Added/Removed-Blockdiff oder Hinweistext „Diff zu groß") ausweichen, oder einen speicher-effizienten Diff-Algorithmus (Myers mit linearem Speicher) verwenden.
+  Empfehlung: `IncrementAncestorCounts` und den Aufruf in `BuildCommitFileTree` (Zeile 501)
+  entfernen. Die dann vollständig schreib-nur-genutzte Eigenschaft
+  `WorkspaceFileNode.ChangedFileCount` (`src/Softwareschmiede/Domain/ValueObjects/WorkspaceFileNode.cs`,
+  Zeile 37) ebenfalls entfernen (wird nur noch von den nicht kompilierten Blazor-Tests referenziert,
+  daher build-neutral).
 
-### FileExplorerViewModel.cs (FileExplorerViewModel)
+### TextDiffService.cs / FileTextDiff.cs (TextDiffService, FileTextDiff)
 
-- **Fehlerbehandlung** — `InitialisierenAsync` (Zeilen 98-115) und `AktualisierenAsync` (Zeilen 214-227) setzen `_ausgewaehlterKnoten = null` direkt über das Backing-Field (unter Umgehung des Setters, der `_dateiLadenCts` abbricht). Ein zum Zeitpunkt des Aufrufs noch laufender `DateiLadenAsync`-Vorgang wird dadurch **nicht** abgebrochen. Kehrt dessen Git-Aufruf danach zurück, überschreibt der Dispatcher-Callback `DateiInhalt`/`DiffZeilen` mit dem veralteten Inhalt der vorherigen Auswahl – obwohl `InitialisierenAsync`/`AktualisierenAsync` diese gerade geleert hat (z. B. beim Wechsel der Aufgabe).
+- **Toter Code / Speculative Generality** — `FileTextDiff.AddedCount`, `RemovedCount` und
+  `ModifiedCount` sowie die zugehörige Zählerlogik in `TextDiffService.BuildDiff`
+  (`addedCount`/`removedCount`/`modifiedCount`, Zeilen 19–21, 54, 61, 68 und Rückgabe Zeile 73)
+  werden von der Anwendung nicht konsumiert: `FileExplorerViewModel.DateiLadenAsync` nutzt nur
+  `diff.Lines` (Zeile 185–186). Die drei Zähler werden ausschließlich von `TextDiffServiceTests`
+  ausgewertet.
 
-  Empfehlung: In `InitialisierenAsync` und `AktualisierenAsync` den laufenden Ladevorgang wie im `AusgewaehlterKnoten`-Setter über `_dateiLadenCts?.Cancel()`/`Dispose()` abbrechen, bevor der Zustand zurückgesetzt wird.
+  Empfehlung: Niedrige Priorität. Entweder als bewusst getesteten Bestandteil des Value-Objects
+  belassen (dann so dokumentieren) oder — konsistent zur Aufräumzielsetzung dieser Runde — die
+  drei Zähler aus `FileTextDiff`, der Zählerlogik in `BuildDiff` und den entsprechenden
+  Test-Assertions entfernen.
 
-- **Fehlerbehandlung** — `DateiLadenAsync` (Zeilen 196-199): Der allgemeine `catch (Exception)`-Block protokolliert den Fehler nur, lässt aber `DateiInhalt` und `DiffZeilen` unverändert. Schlägt das Laden der Vorschau fehl, bleibt der Inhalt der zuvor gewählten Datei sichtbar, ohne dass der Nutzer den Fehler erkennt (irreführende, veraltete Anzeige).
+### src/Softwareschmiede.Tests/Components/Pages/Aufgaben/* (verwaiste Blazor-bUnit-Tests)
 
-  Empfehlung: Im `catch` (über den Dispatcher) `DateiInhalt` auf einen aussagekräftigen Hinweistext setzen und `ClearDiffZeilen()` aufrufen.
+- **Toter Code (Beobachtung, kein Build-/Testfehler)** — Die Dateien
+  `AufgabeDetailWorkspacePreviewBunitTests.cs`, `AufgabeDetailFolgePromptTests.cs` und
+  `AufgabeDetailGitActionsBunitTests.cs` initialisieren `WorkspaceSnapshot` weiterhin mit den in
+  dieser Runde entfernten Membern (`RootNodes`, `FlatFiles`, `CodeFiles`, `PlanningDocuments`,
+  `ChangedFileCount`) und rendern eine nicht mehr existierende Blazor-Komponente `AufgabeDetail`
+  (kein `.razor` im Repo). **Wichtig:** Diese Dateien werden über
+  `<Compile Remove="Components\**\*.cs" />` in `Softwareschmiede.Tests.csproj` (Zeile 41) vom
+  Build ausgeschlossen — es entsteht daher **kein Kompilierfehler und kein fehlschlagender Test**.
+  Es handelt sich um vorbestehende, aus der entfernten Blazor-UI verwaiste Testdateien
+  (außerhalb des engeren Branch-Diffs), deren Referenzen durch das Trimmen von `WorkspaceSnapshot`
+  nun endgültig ins Leere zeigen.
 
-- **Fehlerbehandlung** — `CommitAufklappenAsync` (Zeilen 144-149): Schlägt das Laden der Commit-Dateien fehl, wird `commit.ErrorMessage` gesetzt, aber die WPF-Ansicht (`FileExplorerView.xaml`) bindet weder `ErrorMessage` noch `IsLoadingFiles`, und `BranchCommit` implementiert kein `INotifyPropertyChanged`. Der Fehler wird dadurch in der WPF-Oberfläche nie sichtbar – der Commit erscheint dem Nutzer einfach als leer. (In der bestehenden Blazor-`CommitTreePresenter`-Ansicht werden diese Felder genutzt; im neuen WPF-Kontext sind sie wirkungslos.)
-
-  Empfehlung: Ladefehler und Lade-/Leerzustand eines Commits in der WPF-Ansicht sichtbar machen (z. B. Fehler-/Ladehinweis im `HierarchicalDataTemplate` des `BranchCommit`), oder bewusst dokumentieren, dass diese Zustände im WPF-Explorer nicht dargestellt werden.
-
-### BranchCommit.cs (BranchCommit)
-
-- **Feature Envy / Temporäres Feld (WPF-Kontext)** — Die View-State-Felder `IsExpanded`, `IsLoadingFiles`, `ErrorMessage` (Zeilen 18-27) werden von `FileExplorerViewModel.CommitAufklappenAsync` geschrieben, aber ohne `INotifyPropertyChanged` und ohne Bindung in `FileExplorerView.xaml` im WPF-Explorer nie beobachtet. Sie stammen aus der bestehenden Blazor-Nutzung; im neu hinzugefügten WPF-Pfad sind die Zuweisungen wirkungslos.
-
-  Empfehlung: Entweder die Felder in der WPF-Ansicht tatsächlich binden/darstellen (siehe Befund zu `CommitAufklappenAsync`) oder das absichtliche Nichtdarstellen dokumentieren; keine wirkungslosen Zustandszuweisungen im WPF-ViewModel belassen.
-
-### TaskDetailViewModel.cs (TaskDetailViewModel)
-
-- **Efficiency** — `ShowFileExplorerPanel` (Zeile 333) ruft bei jedem Property-Zugriff synchron `Directory.Exists(_aufgabe.LokalerKlonPfad)` auf. Da die Property im `Aufgabe`-Setter und über Binding-Refreshs mehrfach ausgewertet wird, entstehen wiederholte Dateisystem-Zugriffe auf dem UI-Thread.
-
-  Empfehlung: Das Ergebnis der `Directory.Exists`-Prüfung einmalig beim Setzen von `Aufgabe`/`LokalerKlonPfad` in ein Feld cachen und dieses in der Property zurückgeben.
+  Empfehlung: Optionaler, separater Aufräumschritt — das gesamte Verzeichnis
+  `src/Softwareschmiede.Tests/Components/` löschen, da es toten Testcode einer nicht mehr
+  vorhandenen Blazor-Oberfläche enthält. Für die aktuelle Nacharbeit nicht blockierend.
 
 ## Geprüfte Dateien
 
-- `src/Softwareschmiede/Application/Services/GitWorkspaceBrowserService.cs` (neu: `LoadWorkingTreeAsync`, `WalkWorkingTreeDirectory`)
+- `src/Softwareschmiede/Application/Services/GitWorkspaceBrowserService.cs`
 - `src/Softwareschmiede/Application/Services/IGitWorkspaceBrowserService.cs`
 - `src/Softwareschmiede/Application/Services/ITextDiffService.cs`
 - `src/Softwareschmiede/Application/Services/TextDiffService.cs`
+- `src/Softwareschmiede/Domain/ValueObjects/WorkspaceSnapshot.cs`
 - `src/Softwareschmiede/Domain/ValueObjects/BranchCommit.cs`
 - `src/Softwareschmiede/Domain/ValueObjects/FileTextDiff.cs`
 - `src/Softwareschmiede/Domain/ValueObjects/InlineDiffSegment.cs`
 - `src/Softwareschmiede/Domain/ValueObjects/TextDiffLine.cs`
-- `src/Softwareschmiede.App/App.xaml`
-- `src/Softwareschmiede.App/App.xaml.cs`
-- `src/Softwareschmiede.App/Themes/DarkTheme.xaml`
-- `src/Softwareschmiede.App/Themes/LightTheme.xaml`
-- `src/Softwareschmiede.App/Controls/DiffViewer.xaml`
-- `src/Softwareschmiede.App/Controls/DiffViewer.xaml.cs`
-- `src/Softwareschmiede.App/Converters/DiffLineStatusToBrushConverter.cs`
-- `src/Softwareschmiede.App/ViewModels/DateibrowserAnsichtsmodus.cs`
+- `src/Softwareschmiede/Domain/ValueObjects/WorkspaceFileNode.cs` (Kontext; nicht im Branch-Diff)
 - `src/Softwareschmiede.App/ViewModels/FileExplorerViewModel.cs`
-- `src/Softwareschmiede.App/ViewModels/TaskDetailViewModel.cs`
+- `src/Softwareschmiede.App/ViewModels/DateibrowserAnsichtsmodus.cs`
+- `src/Softwareschmiede.App/ViewModels/TaskDetailViewModel.cs` (Integrationsdiff)
 - `src/Softwareschmiede.App/Views/FileExplorerView.xaml`
 - `src/Softwareschmiede.App/Views/FileExplorerView.xaml.cs`
-- `src/Softwareschmiede.App/Views/TaskDetailView.xaml`
-- `src/Softwareschmiede.Tests/App/Converters/DiffLineStatusToBrushConverterTests.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/FileExplorerViewModelTests.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/TaskDetailViewModelTests.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/TaskDetailViewModelTests_ZeitgesteuerterPrompt.cs`
-- `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
+- `src/Softwareschmiede.App/Controls/DiffViewer.xaml.cs`
+- `src/Softwareschmiede.App/Converters/DiffLineStatusToBrushConverter.cs`
+- `src/Softwareschmiede.App/App.xaml.cs` (DI-Registrierungen)
 - `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceWorkingTreeTests.cs`
-- `src/Softwareschmiede.Tests/Application/Services/TextDiffServiceTests.cs`
-- `src/Softwareschmiede.Tests/E2E/E2E_FileExplorer.cs`
-- `src/Softwareschmiede.Tests/Helpers/TaskDetailViewModelTestFactory.cs`
+- `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` (Compile-Ausschluss verifiziert)
+- Querprüfung: `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/*` (nicht kompiliert)

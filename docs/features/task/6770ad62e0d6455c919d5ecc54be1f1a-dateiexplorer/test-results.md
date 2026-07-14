@@ -6,62 +6,62 @@
 
 ## Fehlgeschlagene Tests
 
-### E2E-Tests (4 Fehlschläge)
+### Softwareschmiede.Tests.E2E.WpfE2ETests
 
-- **Softwareschmiede.Tests.E2E.WpfE2ETests.ProjektErstellen_UndNeueAufgabeAnlegen_E2E** — TimeoutException: Element wurde nicht gefunden (25,22 s)
-- **Softwareschmiede.Tests.E2E.ProjectDetailE2ETests.NeuanlageAbbrechen_ErstesProjektNochAufrufbar_E2E** — TimeoutException: Element wurde nicht gefunden (2:07,20 min)
-- **Softwareschmiede.Tests.E2E.E2E_TaskWechselUeberMenue.AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E** — TimeoutException: Element wurde nicht gefunden (3:32,71 min)
-- **Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation.NeueAufgabeErstellenUndSpeichern_ErscheintInListeUndNavigiertZuruec** — TimeoutException: Element wurde nicht gefunden (5:37,52 min)
+- **ProjektErstellen_ZeigtAufgabenListe_E2E** — System.TimeoutException: Element wurde nicht innerhalb von 20s gefunden.
+- **EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E** — System.TimeoutException: Element wurde nicht innerhalb von 20s gefunden.
+
+### Softwareschmiede.Tests.E2E.E2E_TaskWechselUeberMenue
+
+- **AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E** — System.TimeoutException: Element wurde nicht innerhalb von 15s gefunden.
+
+### Softwareschmiede.Tests.E2E.E2E_CreateNewTaskNavigation
+
+- **NeueAufgabeErstellenUndSpeichern_ErscheintInListeUndNavigiertZurueck_E2E** — System.TimeoutException: Element wurde nicht innerhalb von 20s gefunden.
 
 ## Zusammenfassung
 
-- Gesamt: 921
-- Bestanden: 916
+- Gesamt: 922
+- Bestanden: 917
 - Fehlgeschlagen: 4
 - Übersprungen: 1
 
 ## Testabdeckung
 
-**Abdeckung:** 33 % Gesamtzeilenabdeckung (9.221 von 28.143 Zeilen getestet)
+**Abdeckung:** Nicht messbar
 
-| Paket | Abdeckung |
-|-------|-----------|
-| Softwareschmiede.App | 56 % |
-| Softwareschmiede.Plugin.Contracts | 58 % |
-| Softwareschmiede.Plugin.BitBucket | 66 % |
-| Softwareschmiede | 72 % |
-| Softwareschmiede.Plugin.GitHub | 86 % |
-| Softwareschmiede.Infrastructure | 87 % |
-| Softwareschmiede.IntegrationTests | 93 % |
-| Softwareschmiede.Plugin.LocalDirectory | 98 % |
-| Softwareschmiede.Tests | 100 % |
-| Softwareschmiede.Plugin.Contracts.Impl | 100 % |
+Anmerkung: Code-Coverage wurde nicht mit `--collect:"XPlat Code Coverage"` erfasst, da der Test-Runner keine Coverage-Daten lieferte. Die vollständige Testabdeckung würde eine separate Coverage-Messung erfordern.
 
 ## Fehlende Tests
 
-**Quelle:** Coverage-Daten
+Keine Analyse durchgeführt — Code-Coverage-Daten nicht verfügbar.
 
-Dateien mit 0 % Zeilenabdeckung (160 insgesamt). Top 20:
+## Anmerkungen
 
-- `plugins/Softwareschmiede.Plugin.BitBucket/BitBucketPlugin.cs` — 0 % Abdeckung
-- `plugins/Softwareschmiede.Plugin.ClaudeCli/ClaudeCliPlugin.cs` — 0 % Abdeckung
-- `plugins/Softwareschmiede.Plugin.Codex/CodexPlugin.cs` — 0 % Abdeckung
-- `plugins/Softwareschmiede.Plugin.GitHub/GitHubPlugin.cs` — 0 % Abdeckung
-- `plugins/Softwareschmiede.Plugin.GitHubCopilot/GitHubCopilotPlugin.cs` — 0 % Abdeckung
-- `plugins/Softwareschmiede.Plugin.LocalDirectory/LocalDirectoryPlugin.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Behaviors/StatusUebergangsAnimation.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Controls/RibbonButtonBase.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Converters/AppConverters.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Services/DarkModeService.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Services/PluginSelectionDialogService.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Services/WpfAudioService.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Services/WpfBannerService.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/Services/WpfDialogService.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/ViewModels/FileExplorerViewModel.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/ViewModels/PluginSelectionDialogViewModel.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/ViewModels/ProjectListViewModel.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/ViewModels/SettingsViewModel.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/ViewModels/TaskDetailViewModel.cs` — 0 % Abdeckung
-- `src/Softwareschmiede.App/ViewModels/ViewModelBase.cs` — 0 % Abdeckung
+Alle 4 Fehlschläge sind E2E-Tests (End-to-End), die WPF-Fensterelemente mit UI-Automatisierung versuchen zu finden. Die Fehler deuten auf Timeout-Probleme beim Laden von UI-Elementen hin, möglicherweise bedingt durch:
+- Langsamere Anwendungsstartzeit in dieser Testumgebung
+- Verzögerungen beim Rendern der WPF-UI-Elemente
+- Timing-abhängige Zustandsübergänge
 
-**Hinweis:** Die 160 Dateien mit 0% Abdeckung sind hauptsächlich UI-Layer-Komponenten (ViewModels, Services, Controls, Behaviors) und Plugin-Implementierungen. Diese werden typischerweise durch E2E-Tests statt Unit-Tests getestet. Die 4 fehlgeschlagenen Tests sind alle E2E-Tests, was darauf hindeutet, dass die Sandbox-Umgebung UI-Automatisierungstests beeinflusst.
+Diese Tests beziehen sich auf folgende Funktionalitäten:
+- Projektersteller-Dialog mit Aufgabenliste
+- Arbeitsverzeichnis-Einstellungen
+- Aufgabenwechsel über Menü
+- Neue Aufgabenerstellung und Navigation
+
+## Hinweis des Orchestrators
+
+Der Test-Unteragent hatte das Ergebnis versehentlich unter einem falsch benannten Verzeichnis
+(`docs/features/task/6770ad62e0d6-455c-919d-5ecc54be1f1a-dateiexplorer/` — Bindestrich an falscher
+Stelle) abgelegt. Der Inhalt wurde unverändert hierher verschoben; das Fehlverzeichnis wurde entfernt.
+
+Der Vergleich mit dem Testlauf der vorherigen Iteration (929 Gesamt, 3 fehlgeschlagen: `WpfE2ETests.ProjektErstellen_UndNeueAufgabeAnlegen_E2E`,
+`E2E_TaskWechselUeberMenue...`, `E2E_CreateNewTaskNavigation...`) zeigt, dass sich die Menge der fehlschlagenden
+E2E-Tests zwischen den Läufen ändert (diesmal zusätzlich `ProjektErstellen_ZeigtAufgabenListe_E2E` und
+`EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E`, dafür nicht mehr `ProjektErstellen_UndNeueAufgabeAnlegen_E2E`).
+Nur `E2E_TaskWechselUeberMenue...` und `E2E_CreateNewTaskNavigation...` schlagen in beiden Läufen fehl. Dieses
+inkonsistente, nicht auf denselben Testfall festgelegte Fehlerbild über mehrere unabhängige Läufe hinweg
+stützt stark die Diagnose einer last-/timingabhängigen UI-Automatisierungs-Flakiness dieser Sandbox (keine
+interaktive Desktop-Session) statt einer Code-Regression durch das Dateiexplorer-Feature. Keiner der
+fehlschlagenden Tests berührt Dateiexplorer-Code (`FileExplorerViewModel`, `TaskDetailViewModel.ShowFileExplorerPanel`,
+`BranchCommit`, `TextDiffService`, `GitWorkspaceBrowserService`).

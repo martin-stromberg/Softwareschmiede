@@ -6,6 +6,8 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Baut aus altem und neuem Dateiinhalt einen zeilenweisen Präsentations-Diff.</summary>
 public sealed class TextDiffService : ITextDiffService
 {
+    private const int MaxLcsDiffLineCount = 5_000;
+
     /// <inheritdoc/>
     public FileTextDiff BuildDiff(string? originalContent, string? currentContent)
     {
@@ -76,6 +78,9 @@ public sealed class TextDiffService : ITextDiffService
 
     private static List<LineOperation> ComputeLineOperations(string[] oldLines, string[] newLines)
     {
+        if (oldLines.Length > MaxLcsDiffLineCount || newLines.Length > MaxLcsDiffLineCount)
+            return ComputeBlockOperations(oldLines, newLines);
+
         var n = oldLines.Length;
         var m = newLines.Length;
         var lcsLengths = new int[n + 1, m + 1];
@@ -124,6 +129,26 @@ public sealed class TextDiffService : ITextDiffService
             operations.Add(new LineOperation(LineOperationKind.Insert, null, newLines[y]));
             y++;
         }
+
+        return operations;
+    }
+
+    /// <summary>
+    /// Speichereffizienter Ersatz für die LCS-Berechnung bei sehr großen Dateien: verzichtet auf die O(n·m)-Matrix
+    /// und liefert stattdessen einen einfachen, positionsbasierten Blockdiff (kein Gleichheitsabgleich zwischen Zeilen).
+    /// </summary>
+    /// <param name="oldLines">Zeilen des ursprünglichen Inhalts.</param>
+    /// <param name="newLines">Zeilen des aktuellen Inhalts.</param>
+    /// <returns>Liste von Lösch- gefolgt von Einfüge-Operationen ohne LCS-Abgleich.</returns>
+    private static List<LineOperation> ComputeBlockOperations(string[] oldLines, string[] newLines)
+    {
+        var operations = new List<LineOperation>(oldLines.Length + newLines.Length);
+
+        foreach (var line in oldLines)
+            operations.Add(new LineOperation(LineOperationKind.Delete, line, null));
+
+        foreach (var line in newLines)
+            operations.Add(new LineOperation(LineOperationKind.Insert, null, line));
 
         return operations;
     }
