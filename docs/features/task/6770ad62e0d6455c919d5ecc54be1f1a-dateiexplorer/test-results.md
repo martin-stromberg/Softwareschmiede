@@ -2,21 +2,25 @@
 
 ## Ergebnis
 
-**Status:** Fehler vorhanden (nachweislich nicht Dateiexplorer-bezogen)
+**Status:** Fehler vorhanden (nachweislich nicht Dateiexplorer-bezogen, Umgebungsproblem)
 
-## Zusammenfassung
+## Zusammenfassung (nach Merge von `main`)
 
-- Gesamt: 944
-- Bestanden: 941
-- Fehlgeschlagen: 2
+- Gesamt: 996
+- Bestanden: 994
+- Fehlgeschlagen: 1
 - Übersprungen: 1
 
 ## Fehlgeschlagene Tests
 
-- `TerminalControlTests.ReadClipboardAndInsertAsync_ClipboardAccessThrows_LogsWarningAndContinues` — hängt von echtem Zwischenablage-Zugriff ab; bereits mehrfach als Sandbox-Einschränkung dokumentiert (keine interaktive Desktop-Session), nicht Dateiexplorer-bezogen.
-- `WpfE2ETests.ProjektErstellen_UndNeueAufgabeAnlegen_E2E` — bereits mehrfach als last-/timingabhängige E2E-Flakiness dokumentiert, nicht Dateiexplorer-bezogen.
+- `E2E_WorkingDirectory.RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E`
+  — `System.UnauthorizedAccessException` beim `Directory.Delete(repositoryPath, recursive: true)` in Zeile 76 des
+  Tests (Betriebssystem-Dateisperre, z. B. durch Virenscanner oder einen noch laufenden Git-Prozess auf ein Objekt
+  im `.git`-Verzeichnis des geklonten Test-Repositories). Reproduziert konsistent über mehrere isolierte Läufe.
+  `E2E_WorkingDirectory.cs` ist von diesem Branch nicht verändert (`git diff main...HEAD` zeigt keine Änderungen
+  an dieser Datei oder an verwandten Infrastruktur-/Service-Dateien für den Repository-Klon-Vorgang). Ein reines
+  Betriebssystem-/Sandbox-Dateisperrenproblem, keine Dateiexplorer-Regression.
 
-`E2E_FileExplorer` (beide Tests, inkl. der neuen Sichtbarkeitsprüfung des „Datei öffnen"-Buttons) wurde isoliert
-erneut ausgeführt und bestand vollständig (2/2). Über mehrere volle Testläufe hinweg dieses Nacharbeitszyklus
-schwankte die Gesamtfehleranzahl zwischen 0 und 2, stets mit wechselnden, unabhängigen E2E-/Clipboard-Tests —
-kein einziger Fehlschlag betraf je Dateiexplorer-Code.
+`E2E_FileExplorer` (inkl. Regressionstest und neuem „Datei öffnen"-Button) wurde mehrfach isoliert ausgeführt und
+bestand jedes Mal vollständig. Der volle Testlauf nach dem Merge von `main` zeigt insgesamt nur diesen einen,
+umgebungsbedingten Fehlschlag.
