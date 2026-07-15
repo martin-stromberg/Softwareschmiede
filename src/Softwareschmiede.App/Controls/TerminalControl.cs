@@ -184,7 +184,7 @@ public sealed class TerminalControl : FrameworkElement
     /// <inheritdoc/>
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
-        if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        if (e.Key == Key.V && (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0)
         {
             if (Session?.InputStream != null)
             {

@@ -45,6 +45,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0">
@@ -121,6 +122,48 @@
                     <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
                                                       NavigateCommand="{Binding NavigateZuAufgabeCommand}" />
                 </ScrollViewer>
+
+                <StackPanel Grid.Row="2"
+                            Margin="4,8,4,8">
+                    <Border Height="1"
+                            Background="{DynamicResource BorderBrush}"
+                            Margin="4,0,4,8" />
+
+                    <Button Command="{Binding UpdateStartenCommand}"
+                            Visibility="{Binding UpdateVerfuegbar, Converter={StaticResource BoolToVisibilityConverter}}"
+                            AutomationProperties.Name="Programmupdate starten"
+                            ToolTip="{Binding VerfuegbaresUpdate.Version, StringFormat=Update auf Version {0} vorbereiten}"
+                            Margin="0,2"
+                            Padding="8,8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⇧" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text=" Update"
+                                       Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding UpdatePruefenCommand}"
+                            AutomationProperties.Name="Programmupdate prüfen"
+                            ToolTip="Auf Programmupdate prüfen"
+                            Margin="0,2"
+                            Padding="8,8"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⟳" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text=" Prüfen"
+                                       Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 
