@@ -125,6 +125,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
 
+        var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
+
         var vm = new TaskDetailViewModel(
             _aufgabeService,
             _protokollService,
@@ -138,7 +140,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
             pluginManager,
             serviceProviderObj,
             NullLogger<TaskDetailViewModel>.Instance,
-            TimeProvider.System);
+            TimeProvider.System,
+            fileExplorerViewModel);
         vm.ZurueckAction = zurueckAction;
         return vm;
     }
@@ -249,6 +252,77 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ShowDiffPanel.Should().BeTrue();
         sut.ShowEditPanel.Should().BeFalse();
         sut.ShowCliPanel.Should().BeFalse();
+    }
+
+    // --- ShowFileExplorerPanel, DateiViewCommand ---
+
+    /// <summary>DateiViewCommand wechselt zur Dateiexplorer-Ansicht.</summary>
+    [Fact]
+    public async Task DateiViewCommand_SetztFileExplorerAnsicht()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
+            await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dateien", tempDir);
+            var sut = CreateSut();
+            sut.AufgabeId = aufgabe.Id;
+            await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+            ((RelayCommand)sut.DateiViewCommand).Execute(null);
+
+            sut.IsFileExplorerViewSelected.Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    /// <summary>ShowFileExplorerPanel ist nur true, wenn LokalerKlonPfad gesetzt ist und das Verzeichnis existiert.</summary>
+    [Fact]
+    public async Task ShowFileExplorerPanel_NurBeiVorhandenemKlonPfad()
+    {
+        var aufgabeOhnePfad = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sutOhnePfad = CreateSut();
+        sutOhnePfad.AufgabeId = aufgabeOhnePfad.Id;
+        await ((AsyncRelayCommand)sutOhnePfad.LadenCommand).ExecuteAsync();
+
+        sutOhnePfad.ShowFileExplorerPanel.Should().BeFalse();
+
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var aufgabeMitPfad = await _aufgabeService.CreateAsync(_projektId, "MitPfad", "Beschreibung");
+            await _aufgabeService.StartenAsync(aufgabeMitPfad.Id, "feature/mit-pfad", tempDir);
+            var sutMitPfad = CreateSut();
+            sutMitPfad.AufgabeId = aufgabeMitPfad.Id;
+            await ((AsyncRelayCommand)sutMitPfad.LadenCommand).ExecuteAsync();
+
+            sutMitPfad.ShowFileExplorerPanel.Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    /// <summary>ShowFileExplorerPanel wird beim Laden der Aufgabe einmalig ermittelt und gecacht, statt bei jedem Property-Zugriff erneut synchron das Dateisystem zu prüfen; ein nachträgliches Löschen des Verzeichnisses ändert den bereits gecachten Wert daher nicht.</summary>
+    [Fact]
+    public async Task ShowFileExplorerPanel_WertBleibtGecachtNachdemVerzeichnisNachtraeglichGeloeschtWurde()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "MitPfad", "Beschreibung");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/cache", tempDir);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ShowFileExplorerPanel.Should().BeTrue();
+
+        Directory.Delete(tempDir, true);
+
+        sut.ShowFileExplorerPanel.Should().BeTrue();
     }
 
     // --- KannSpeichern ---

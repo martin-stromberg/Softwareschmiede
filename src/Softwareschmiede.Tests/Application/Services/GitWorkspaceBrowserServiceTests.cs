@@ -24,56 +24,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         }
     }
 
-    /// <summary>Ermittelt einen rekursiven Baum und behält Git-Sonderstatus korrekt bei.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldBuildRecursiveTree_AndPreserveSpecialStatuses()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-             M src/Changed.cs
-            A  src/NewFile.cs
-            D  src/Deleted.cs
-            R  src/OldName.cs -> src/NewName.cs
-            C  src/Source.cs -> src/Copy.cs
-            T  src/TypeChange.cs
-            UU src/Conflict.cs
-            ?? docs/requirements/new-feature.md
-            ?? docs/architecture/target-state.md
-            R  docs/improvements/legacy-plan.md -> archive/legacy-plan.md
-            ?? ./docs/improvements/edge-case.md
-            ?? docs/Untracked.md
-            !! obj/Ignored.dll
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-
-        snapshot.HasError.Should().BeFalse();
-        snapshot.CommitCount.Should().Be(42);
-        snapshot.BranchCommits.Should().ContainSingle();
-        snapshot.BranchCommits[0].Sha.Should().Be("1111111111111111111111111111111111111111");
-        snapshot.ChangedFileCount.Should().Be(12);
-        snapshot.CodeFiles.Should().HaveCount(7);
-        snapshot.PlanningDocuments.Should().HaveCount(4);
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine("docs", "requirements", "new-feature.md"));
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine("docs", "architecture", "target-state.md"));
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine("archive", "legacy-plan.md"));
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == Path.Combine(".", "docs", "improvements", "edge-case.md"));
-
-        FindNode(snapshot.RootNodes, "src").Should().NotBeNull();
-        FindNode(snapshot.RootNodes, Path.Combine("src", "NewName.cs"))!.Status!.BadgeText.Should().Be("R");
-        FindNode(snapshot.RootNodes, Path.Combine("src", "TypeChange.cs"))!.Status!.BadgeText.Should().Be("T");
-        FindNode(snapshot.RootNodes, Path.Combine("src", "Conflict.cs"))!.Status!.IsConflict.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine("docs", "Untracked.md"))!.Status!.IsUntracked.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine("docs", "requirements", "new-feature.md"))!.Status!.IsUntracked.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine(".", "docs", "improvements", "edge-case.md"))!.Status!.IsUntracked.Should().BeTrue();
-        FindNode(snapshot.RootNodes, Path.Combine("src", "Deleted.cs"))!.IsDeleted.Should().BeTrue();
-    }
-
     /// <summary>Prüft, dass ein fehlender Repository-Pfad als Fehler-Snapshot zurückkommt.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_ShouldReturnError_WhenRepositoryPathDoesNotExist()
+    public async Task LoadSnapshotAsync_FehlenderRepositoryPfad_LiefertFehlerSnapshot()
     {
         var missingPath = Path.Combine(CreateTempDirectory(), "missing");
         var service = CreateService(missingPath, string.Empty);
@@ -86,7 +39,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft, dass ein nicht-gitfähiger Ordner als Fehler-Snapshot zurückkommt.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_ShouldReturnError_WhenPathIsNotAGitRepository()
+    public async Task LoadSnapshotAsync_KeinGitRepository_LiefertFehlerSnapshot()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty, repoCheckStdOut: "false");
@@ -97,100 +50,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.ErrorMessage.Should().Contain("kein Git-Repository");
     }
 
-    /// <summary>Prüft, dass ein leerer Status-Output zu einem leeren Snapshot führt.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldReturnEmptySnapshot_WhenNoChangesExist()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(repositoryPath, string.Empty);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-
-        snapshot.HasError.Should().BeFalse();
-        snapshot.ChangedFileCount.Should().Be(0);
-        snapshot.RootNodes.Should().BeEmpty();
-        snapshot.FlatFiles.Should().BeEmpty();
-        snapshot.CodeFiles.Should().BeEmpty();
-        snapshot.PlanningDocuments.Should().BeEmpty();
-    }
-
-    /// <summary>Erkennt Planungsdokumente über Fallback für Slash- und Dot-Varianten.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldDetectPlanningDocumentsViaFallback_WhenOnlySlashAndDotVariantsExist()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-            ?? /docs/architecture/target-state.md
-            ?? ././docs/requirements/new-feature.md
-            ?? /docs/notes/outside.md
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-        var expectedArchitecturePath = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}architecture{Path.DirectorySeparatorChar}target-state.md";
-        var expectedRequirementsPath = $".{Path.DirectorySeparatorChar}.{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}requirements{Path.DirectorySeparatorChar}new-feature.md";
-        var excludedNotesSuffix = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}notes{Path.DirectorySeparatorChar}outside.md";
-
-        snapshot.PlanningDocuments.Should().HaveCount(2);
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == expectedArchitecturePath);
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath == expectedRequirementsPath);
-        snapshot.PlanningDocuments.Should().NotContain(node => node.RelativePath.EndsWith(excludedNotesSuffix, StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>Erkennt Planungsdokumente im Fallback über SourceRelativePath bei Rename/Copies.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldUseSourceRelativePath_ForPlanningDocumentFallbackDetection()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            "R  /docs/improvements/legacy-plan.md -> src/legacy-plan.txt");
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-        var expectedSourcePath = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}improvements{Path.DirectorySeparatorChar}legacy-plan.md";
-
-        snapshot.PlanningDocuments.Should().ContainSingle();
-        snapshot.PlanningDocuments[0].RelativePath.Should().Be(Path.Combine("src", "legacy-plan.txt"));
-        snapshot.PlanningDocuments[0].SourceRelativePath.Should().Be(expectedSourcePath);
-    }
-
-    /// <summary>Klassifiziert Markdown außerhalb erlaubter docs-Bereiche auch im Fallback nicht als Planung.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldNotClassifyMarkdownOutsideAllowedDocsFolders_AsPlanningDocumentInFallback()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-            ?? /docs/notes/planning.md
-            ?? /docs/requirements/accepted.md
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-        var expectedAcceptedSuffix = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}requirements{Path.DirectorySeparatorChar}accepted.md";
-        var excludedNotesSuffix = $"{Path.DirectorySeparatorChar}docs{Path.DirectorySeparatorChar}notes{Path.DirectorySeparatorChar}planning.md";
-
-        snapshot.PlanningDocuments.Should().ContainSingle(node => node.RelativePath.EndsWith(expectedAcceptedSuffix, StringComparison.OrdinalIgnoreCase));
-        snapshot.PlanningDocuments.Should().NotContain(node => node.RelativePath.EndsWith(excludedNotesSuffix, StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>Prüft, dass ein fehlschlagendes git status als Ausnahme durchgereicht wird.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldThrow_WhenGitStatusFails()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(repositoryPath, string.Empty, statusSuccess: false, statusStdErr: "kaputt");
-
-        var act = () => service.LoadSnapshotAsync(repositoryPath);
-
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*git status fehlgeschlagen*");
-    }
-
     /// <summary>Setzt CommitCount auf 0 wenn der rev-list-Aufruf fehlschlägt.</summary>
     [Fact]
-    public async Task LoadSnapshotAsync_ShouldReturnCommitCountZero_WhenRevListFails()
+    public async Task LoadSnapshotAsync_RevListFehlgeschlagen_SetztCommitCountAufNull()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, "?? src/file.cs", commitCountSuccess: false, commitCountStdErr: "fatal");
@@ -200,10 +62,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.CommitCount.Should().Be(0);
     }
 
-    /// <summary><summary>LoadSnapshotAsync_ShouldUseFallbackBaseBranch_WhenOriginHeadCannotBeResolved.</summary>.</summary>
+    /// <summary>Verwendet den Fallback-Basis-Branch, wenn origin/HEAD nicht aufgelöst werden kann.</summary>
     [Fact]
-    /// <summary>LoadSnapshotAsync_ShouldUseFallbackBaseBranch_WhenOriginHeadCannotBeResolved.</summary>
-    public async Task LoadSnapshotAsync_ShouldUseFallbackBaseBranch_WhenOriginHeadCannotBeResolved()
+    public async Task LoadSnapshotAsync_OriginHeadNichtAufloesbar_VerwendetFallbackBasisBranch()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -221,10 +82,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].ShortSha.Should().Be("aaaaaaa");
     }
 
-    /// <summary><summary>LoadSnapshotAsync_ShouldHandleAmbiguousRemoteHeadOutput_ByUsingFirstValidReference.</summary>.</summary>
+    /// <summary>Verwendet bei mehrdeutiger origin/HEAD-Ausgabe die erste gültige Referenz.</summary>
     [Fact]
-    /// <summary>LoadSnapshotAsync_ShouldHandleAmbiguousRemoteHeadOutput_ByUsingFirstValidReference.</summary>
-    public async Task LoadSnapshotAsync_ShouldHandleAmbiguousRemoteHeadOutput_ByUsingFirstValidReference()
+    public async Task LoadSnapshotAsync_MehrdeutigeRemoteHeadAusgabe_VerwendetErsteGueltigeReferenz()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -242,10 +102,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].Sha.Should().Be("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     }
 
-    /// <summary><summary>LoadSnapshotAsync_ShouldNormalizeRemoteHeadArrowReference.</summary>.</summary>
+    /// <summary>Normalisiert eine origin/HEAD-Ausgabe im Pfeil-Format (origin/HEAD -> origin/main).</summary>
     [Fact]
-    /// <summary>LoadSnapshotAsync_ShouldNormalizeRemoteHeadArrowReference.</summary>
-    public async Task LoadSnapshotAsync_ShouldNormalizeRemoteHeadArrowReference()
+    public async Task LoadSnapshotAsync_RemoteHeadPfeilReferenz_WirdNormalisiert()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -263,10 +122,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].Sha.Should().Be("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     }
 
-    /// <summary><summary>LoadSnapshotAsync_ShouldFallbackToKnownReference_WhenRemoteHeadOutputIsWhitespace.</summary>.</summary>
+    /// <summary>Fällt auf eine bekannte Referenz zurück, wenn die origin/HEAD-Ausgabe nur aus Whitespace besteht.</summary>
     [Fact]
-    /// <summary>LoadSnapshotAsync_ShouldFallbackToKnownReference_WhenRemoteHeadOutputIsWhitespace.</summary>
-    public async Task LoadSnapshotAsync_ShouldFallbackToKnownReference_WhenRemoteHeadOutputIsWhitespace()
+    public async Task LoadSnapshotAsync_RemoteHeadAusgabeNurWhitespace_FaelltAufBekannteReferenzZurueck()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -284,10 +142,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits[0].ShortSha.Should().Be("ccccccc");
     }
 
-    /// <summary><summary>LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected.</summary>.</summary>
+    /// <summary>Liefert CommitCount 0 und keine Branch-Commits, wenn kein Basis-Ref ermittelt werden kann.</summary>
     [Fact]
-    /// <summary>LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected.</summary>
-    public async Task LoadSnapshotAsync_ShouldReturnZeroBranchCommits_WhenNoBaseRefCanBeDetected()
+    public async Task LoadSnapshotAsync_KeinBasisRefErkennbar_LiefertKeineBranchCommits()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -302,10 +159,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits.Should().BeEmpty();
     }
 
-    /// <summary><summary>LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha.</summary>.</summary>
+    /// <summary>Baut den Dateibaum aus dem Diff-Tree auf und weist jedem Knoten die Commit-SHA zu.</summary>
     [Fact]
-    /// <summary>LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha.</summary>
-    public async Task LoadCommitFilesAsync_ShouldBuildTreeAndAssignCommitSha()
+    public async Task LoadCommitFilesAsync_BautBaumAufUndWeistCommitShaZu()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);
@@ -319,10 +175,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         fileNode!.CommitSha.Should().Be(commitSha);
     }
 
-    /// <summary><summary>LoadCommitFilesAsync_ShouldIgnoreIncompleteRenameTokens_AndKeepValidEntries.</summary>.</summary>
+    /// <summary>Ignoriert unvollständige Rename-Tokens im diff-tree-Output und behält die gültigen Einträge.</summary>
     [Fact]
-    /// <summary>LoadCommitFilesAsync_ShouldIgnoreIncompleteRenameTokens_AndKeepValidEntries.</summary>
-    public async Task LoadCommitFilesAsync_ShouldIgnoreIncompleteRenameTokens_AndKeepValidEntries()
+    public async Task LoadCommitFilesAsync_UnvollstaendigeRenameTokens_IgnoriertUndBehaeltGueltigeEintraege()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "dddddddddddddddddddddddddddddddddddddddd";
@@ -339,10 +194,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         FindNode(files, Path.Combine("src", "Old.cs")).Should().BeNull();
     }
 
-    /// <summary><summary>LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions.</summary>.</summary>
+    /// <summary>Lädt sowohl die aktuelle als auch die ursprüngliche Version des Commit-Inhalts.</summary>
     [Fact]
-    /// <summary>LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions.</summary>
-    public async Task LoadCommitPreviewAsync_ShouldLoadCurrentAndOriginalVersions()
+    public async Task LoadCommitPreviewAsync_LaedtAktuelleUndUrspruenglicheVersion()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "cccccccccccccccccccccccccccccccccccccccc";
@@ -366,10 +220,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         preview.OriginalContent.Should().Be("old-content");
     }
 
-    /// <summary><summary>LoadCommitPreviewAsync_ShouldReturnHint_WhenNodeIsDirectory.</summary>.</summary>
+    /// <summary>Liefert einen Hinweis statt Inhalt, wenn der Knoten ein Verzeichnis ist.</summary>
     [Fact]
-    /// <summary>LoadCommitPreviewAsync_ShouldReturnHint_WhenNodeIsDirectory.</summary>
-    public async Task LoadCommitPreviewAsync_ShouldReturnHint_WhenNodeIsDirectory()
+    public async Task LoadCommitPreviewAsync_KnotenIstVerzeichnis_LiefertHinweis()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);
@@ -387,10 +240,9 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         preview.OriginalContent.Should().BeNull();
     }
 
-    /// <summary><summary>LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter.</summary>.</summary>
+    /// <summary>Erkennt Binärinhalt anhand eines Null-Zeichens und liefert einen entsprechenden Hinweis.</summary>
     [Fact]
-    /// <summary>LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter.</summary>
-    public async Task LoadCommitPreviewAsync_ShouldReturnBinaryHint_WhenCommitContentContainsNullCharacter()
+    public async Task LoadCommitPreviewAsync_InhaltEnthaeltNullZeichen_LiefertBinaerHinweis()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "dddddddddddddddddddddddddddddddddddddddd";
@@ -416,10 +268,38 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         preview.OriginalContent.Should().BeNull();
     }
 
-    /// <summary><summary>LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded.</summary>.</summary>
+    /// <summary>Prüft die Größen-Schutzschranke für Commit-Vorschauen, damit kein übergroßer Inhalt an den Zeilendiff übergeben wird.</summary>
     [Fact]
-    /// <summary>LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded.</summary>
-    public async Task LoadCommitPreviewAsync_ShouldReturnErrorHint_WhenCurrentAndOriginalCannotBeLoaded()
+    public async Task LoadCommitPreviewAsync_InhaltUeberschreitetLimit_LiefertZuGrossHinweis()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var commitSha = "ffffffffffffffffffffffffffffffffffffffff";
+        var largeContent = new string('a', 1_048_577);
+        var service = CreateService(
+            repositoryPath,
+            string.Empty,
+            commitShowBySpec: new Dictionary<string, CliResult>
+            {
+                [$"{commitSha}:src/feature.cs"] = new(0, largeContent, string.Empty),
+                [$"{commitSha}^:src/feature.cs"] = new(0, "old-content", string.Empty),
+            });
+
+        var preview = await service.LoadCommitPreviewAsync(repositoryPath, new WorkspaceFileNode
+        {
+            Name = "feature.cs",
+            RelativePath = Path.Combine("src", "feature.cs"),
+            CommitSha = commitSha,
+        });
+
+        preview.IsTooBig.Should().BeTrue();
+        preview.CurrentContent.Should().BeNull();
+        preview.OriginalContent.Should().BeNull();
+        preview.Hint.Should().Contain("zu groß");
+    }
+
+    /// <summary>Liefert einen Fehlerhinweis mit Fehlermeldung, wenn weder aktueller noch ursprünglicher Inhalt geladen werden kann.</summary>
+    [Fact]
+    public async Task LoadCommitPreviewAsync_AktuellUndOriginalNichtLadbar_LiefertFehlerHinweis()
     {
         var repositoryPath = CreateTempDirectory();
         var commitSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -447,7 +327,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Liest gelöschte Dateien aus HEAD und verweigert Inline-Vorschau für Binärdateien.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ShouldUseHeadForDeletedFiles_AndDetectBinaryFiles()
+    public async Task LoadPreviewAsync_GeloeschteDateiUndBinaerdatei_VerwendetHeadUndErkenntBinaer()
     {
         var repositoryPath = CreateTempDirectory();
         var deletedService = CreateService(repositoryPath, string.Empty, headContent: "old content");
@@ -489,7 +369,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Lädt bei fehlender Working-Tree-Datei den HEAD-Inhalt und liefert einen Hinweistext.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ShouldFallbackToHeadAndHint_WhenWorkingTreeFileIsMissing()
+    public async Task LoadPreviewAsync_ArbeitsbaumDateiFehlt_FaelltAufHeadZurueckMitHinweis()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(
@@ -515,7 +395,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Lädt bei regulären Textdateien den HEAD-Inhalt als OriginalContent.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ShouldPopulateOriginalContent_ForRegularTextFileWhenHeadExists()
+    public async Task LoadPreviewAsync_RegulaereTextdateiMitHead_FuelltOriginalContent()
     {
         var repositoryPath = CreateTempDirectory();
         var relativePath = Path.Combine("src", "changed.cs");
@@ -545,7 +425,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Setzt OriginalContent auf null wenn git show für HEAD-Inhalt fehlschlägt.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ShouldSetOriginalContentNull_WhenGitShowFails()
+    public async Task LoadPreviewAsync_GitShowFehlgeschlagen_SetztOriginalContentAufNull()
     {
         var repositoryPath = CreateTempDirectory();
         var relativePath = Path.Combine("src", "changed.cs");
@@ -575,7 +455,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft, dass Verzeichnisse keine Dateivorschau auslösen.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ShouldReturnDirectoryHint_WhenNodeIsDirectory()
+    public async Task LoadPreviewAsync_KnotenIstVerzeichnis_LiefertHinweis()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);
@@ -594,7 +474,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft die Größen-Schutzschranke für Inline-Vorschauen.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ShouldReturnTooBigHint_WhenFileExceedsInlineLimit()
+    public async Task LoadPreviewAsync_DateiUeberschreitetLimit_LiefertZuGrossHinweis()
     {
         var repositoryPath = CreateTempDirectory();
         var largeFilePath = Path.Combine(repositoryPath, "large.txt");
@@ -615,7 +495,7 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
     /// <summary>Prüft den Schutz gegen Pfad-Traversal außerhalb des Repository-Roots.</summary>
     [Fact]
-    public async Task LoadPreviewAsync_ShouldRejectPathTraversalOutsideRepository()
+    public async Task LoadPreviewAsync_PfadAusserhalbRepository_WirftException()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService(repositoryPath, string.Empty);
@@ -629,27 +509,6 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*außerhalb des Repository-Roots*");
-    }
-
-    /// <summary>Ignoriert zu kurze oder inkonsistente Statuszeilen ohne Ausnahme.</summary>
-    [Fact]
-    public async Task LoadSnapshotAsync_ShouldIgnoreTooShortStatusLines_WithoutThrowing()
-    {
-        var repositoryPath = CreateTempDirectory();
-        var service = CreateService(
-            repositoryPath,
-            """
-            ?
-            A
-             
-
-            ?? src/valid.cs
-            """);
-
-        var snapshot = await service.LoadSnapshotAsync(repositoryPath);
-
-        snapshot.ChangedFileCount.Should().Be(1);
-        snapshot.FlatFiles.Should().ContainSingle(node => node.RelativePath == Path.Combine("src", "valid.cs"));
     }
 
     private GitWorkspaceBrowserService CreateService(

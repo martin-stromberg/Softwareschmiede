@@ -32,7 +32,4 @@ public sealed class WorkspaceFileNode
 
     /// <summary>Unterknoten.</summary>
     public List<WorkspaceFileNode> Children { get; init; } = [];
-
-    /// <summary>Anzahl geänderter Dateien unterhalb dieses Knotens.</summary>
-    public int ChangedFileCount { get; set; }
 }

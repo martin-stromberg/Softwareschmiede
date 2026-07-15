@@ -18,6 +18,9 @@
             <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
             <converters:UnassignedRepositoriesConverter x:Key="UnassignedRepositoriesConverter" />
             <converters:KiAusfuehrungsStatusConverter x:Key="KiAusfuehrungsStatusConverter" />
+            <converters:DiffLineStatusToBrushConverter x:Key="DiffLineStatusToBrushConverter" />
+            <converters:WorkspaceFileNodeIconConverter x:Key="WorkspaceFileNodeIconConverter" />
+            <converters:WorkspaceFileNodeStatusIconConverter x:Key="WorkspaceFileNodeStatusIconConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

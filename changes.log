@@ -1,3 +1,13 @@
+## 2026-07-14 — Dateiexplorer für Aufgabendetailansicht
+
+- Neues Register „Dateien" in der Aufgabendetailansicht mit Split-View-Architektur: links ein Verzeichnis-/Dateibaum, rechts der Dateiinhalt oder ein Diff.
+- Zwei Ansichtsmodi: **Standard** zeigt den vollständigen Arbeitsbaum des geklonten Repositories, **Vergleich** listet nur im Branch geänderte Dateien (gruppiert nach Commits).
+- Neue Komponenten: `FileExplorerViewModel` als Presentation Model, `FileExplorerView` und `DiffViewer` als UserControls für die Benutzeroberfläche.
+- Neue Value Objects (`TextDiffLine`, `InlineDiffSegment`, `FileTextDiff`) und `ITextDiffService` / `TextDiffService` für zeilenweise Diff-Erzeugung mit Inline-Highlighting geänderter Wortteile.
+- Erweiterung von `IGitWorkspaceBrowserService` um `LoadWorkingTreeAsync()` für vollständige Arbeitsbaum-Aufzählung.
+- Diff-Anzeige mit farblicher Zeilenkennzeichnung: grün (neu), rot (gelöscht), orange (geändert mit Inline-Highlighting).
+- Unit-Tests für Diff-Service, Arbeitsbaum-Laden und ViewModel-Logik; E2E-Test für UI-Navigation und Baum-Anzeige.
+
 ## 2026-07-12 — Zeitgesteuerter Prompt-Versand
 
 - Neue UI-Felder (Stunde/Minute) im Ribbon der Aufgabendetailansicht zur zeitgesteuerten Planung von Prompts. Ein neuer Button „Zeitgesteuert senden" ermöglicht die Planung des Prompts zur angegebenen Uhrzeit.

@@ -14,6 +14,7 @@
 
 ## Benutzeroberfläche
 
+- [Dateiexplorer](dateiexplorer/index.md) — Durchsucht und inspiziert die lokale Dateistruktur des geklonten Repositories in zwei Modi: Standard (vollständiger Arbeitsbaum) und Vergleich (nur geänderte Dateien mit farblich hervorgehobenem Diff). Integriert in die Aufgabendetailansicht.
 - [Terminal-Integration](terminal/index.md) — KI-CLI-Tools (Claude, Codex, GitHub Copilot) werden über Windows Pseudo Console (ConPTY) gestartet und direkt in der WPF-Aufgabendetailansicht gerendert. Der VT100/ANSI-Output wird mit voller Farbunterstützung in einem benutzerdefinierten Control angezeigt; Tastatureingaben werden nativ an den Prozess weitergeleitet.
 - [Diff-Anzeige](diff/index.md) — Zeigt die Unterschiede zwischen zwei Versionen einer Datei, integriert in die Aufgabendetailansicht.
 

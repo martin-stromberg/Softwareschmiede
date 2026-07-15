@@ -192,6 +192,8 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<AufgabeRecoveryService>();
         services.AddScoped<PromptVorlagenService>();
         services.AddSingleton<PromptVorlagenPlatzhalterService>();
+        services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();
+        services.AddSingleton<ITextDiffService, TextDiffService>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();
@@ -249,6 +251,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<IssueSelectionDialogViewModel>();
+        services.AddTransient<FileExplorerViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();
