@@ -1,18 +1,22 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Plugins;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Infrastructure.Services.Updates;
 using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App;
@@ -157,6 +161,7 @@ public sealed partial class App : System.Windows.Application
 
         services.AddMemoryCache();
         services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
+        services.AddSingleton<IOptions<UpdateOptions>>(Options.Create(new UpdateOptions()));
         services.AddSingleton<DirectoryStructureBrowserService>();
 
         // Domain Services
@@ -189,6 +194,9 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<PromptVorlagenPlatzhalterService>();
         services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();
         services.AddSingleton<ITextDiffService, TextDiffService>();
+        services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
+        services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         // Infrastructure Services
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH")))
@@ -209,7 +217,15 @@ public sealed partial class App : System.Windows.Application
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
+        services.AddSingleton<IUpdateProgressDialogService, WpfUpdateProgressDialogService>();
+        services.AddSingleton<IApplicationShutdownService, WpfApplicationShutdownService>();
         services.AddSingleton<PluginSelectionDialogService>();
+        services.AddSingleton(sp =>
+            new HttpClient());
+        services.AddSingleton<IUpdateReleaseClient, GitHubReleaseClient>();
+        services.AddSingleton<IUpdatePackageService, UpdatePackageService>();
+        services.AddSingleton<IUpdateScriptService, UpdateScriptService>();
+        services.AddSingleton<IUpdateProcessLauncher, UpdateProcessLauncher>();
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();

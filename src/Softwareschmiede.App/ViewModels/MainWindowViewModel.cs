@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Extensions;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -24,6 +25,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly PromptZeitVersandService _promptZeitVersandService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
+    private readonly IUpdateService? _updateService;
+    private readonly ICliUpdateSafetyService? _cliUpdateSafetyService;
+    private readonly IUpdateProgressDialogService? _updateProgressDialogService;
+    private readonly IDialogService? _dialogService;
     private readonly IPluginManager? _pluginManager;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
@@ -32,6 +37,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private ViewModelBase? _currentView;
     private bool _isNavigationExpanded = true;
     private string _title = "Softwareschmiede";
+    private bool _updateVerfuegbar;
+    private UpdateInfo? _verfuegbaresUpdate;
+    private bool _updateCheckLaeuft;
+    private bool _updateWirdVorbereitet;
+    private string? _updateHinweis;
     private bool _disposed;
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
@@ -59,6 +69,41 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _isNavigationExpanded, value);
     }
 
+    /// <summary>Gibt an, ob ein neueres Programmupdate verfügbar ist.</summary>
+    public bool UpdateVerfuegbar
+    {
+        get => _updateVerfuegbar;
+        private set => SetProperty(ref _updateVerfuegbar, value, RelayCommand.Refresh);
+    }
+
+    /// <summary>Informationen zum aktuell verfügbaren Update.</summary>
+    public UpdateInfo? VerfuegbaresUpdate
+    {
+        get => _verfuegbaresUpdate;
+        private set => SetProperty(ref _verfuegbaresUpdate, value);
+    }
+
+    /// <summary>Gibt an, ob gerade eine Update-Prüfung läuft.</summary>
+    public bool UpdateCheckLaeuft
+    {
+        get => _updateCheckLaeuft;
+        private set => SetProperty(ref _updateCheckLaeuft, value, RelayCommand.Refresh);
+    }
+
+    /// <summary>Gibt an, ob gerade ein Update heruntergeladen oder vorbereitet wird.</summary>
+    public bool UpdateWirdVorbereitet
+    {
+        get => _updateWirdVorbereitet;
+        private set => SetProperty(ref _updateWirdVorbereitet, value, RelayCommand.Refresh);
+    }
+
+    /// <summary>Optionaler Hinweis zur letzten Update-Prüfung.</summary>
+    public string? UpdateHinweis
+    {
+        get => _updateHinweis;
+        private set => SetProperty(ref _updateHinweis, value);
+    }
+
     /// <summary>Aktuell aktive Aufgaben (Status Gestartet oder Wartend) für die Seitenleisten-Anzeige.</summary>
     public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe { get; } = new();
 
@@ -83,6 +128,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Navigiert zur Aufgabendetailansicht einer aktiven Aufgabe.</summary>
     public ICommand NavigateZuAufgabeCommand { get; }
 
+    /// <summary>Startet den geführten Update-Ablauf.</summary>
+    public ICommand UpdateStartenCommand { get; }
+
+    /// <summary>Prüft manuell erneut auf Programmupdates.</summary>
+    public ICommand UpdatePruefenCommand { get; }
+
     /// <inheritdoc cref="MainWindowViewModel"/>
     public MainWindowViewModel(
         DarkModeService darkModeService,
@@ -91,7 +142,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         PromptZeitVersandService promptZeitVersandService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
-        Action<Action>? dispatcherInvoke = null)
+        Action<Action>? dispatcherInvoke = null,
+        IUpdateService? updateService = null,
+        ICliUpdateSafetyService? cliUpdateSafetyService = null,
+        IUpdateProgressDialogService? updateProgressDialogService = null,
+        IDialogService? dialogService = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
@@ -99,14 +154,22 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _promptZeitVersandService = promptZeitVersandService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
+        _updateService = updateService;
+        _cliUpdateSafetyService = cliUpdateSafetyService;
+        _updateProgressDialogService = updateProgressDialogService;
+        _dialogService = dialogService;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
         NavigateToProjectListCommand = new RelayCommand(NavigateToProjectList);
         NavigateToSettingsCommand = new RelayCommand(NavigateToSettings);
+        ToggleDarkModeCommand = new AsyncRelayCommand(async ct =>
+            await _darkModeService.SetModeAsync(_darkModeService.Current == "Dark" ? "Light" : "Dark", ct));
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
         NavigateZuAufgabeCommand = new RelayCommand<Guid>(NavigateZuAufgabe);
+        UpdatePruefenCommand = new AsyncRelayCommand(UpdatePruefenAsync, () => _updateService is not null && !UpdateCheckLaeuft && !UpdateWirdVorbereitet);
+        UpdateStartenCommand = new AsyncRelayCommand(UpdateStartenAsync, () => _updateService is not null && UpdateVerfuegbar && !UpdateCheckLaeuft && !UpdateWirdVorbereitet);
 
         _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
 
@@ -118,6 +181,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _aktualisierungsTimer.Start();
 
         NavigateToDashboard();
+        UpdatePruefenImHintergrund();
     }
 
     private DashboardViewModel? _dashboardViewModel;
@@ -261,6 +325,101 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private void AktiveAufgabenImHintergrundAktualisieren()
     {
         AktiveAufgabenAktualisierenAsync().SafeFireAndForget(_logger, AktiveAufgabenAktualisierenKontext);
+    }
+
+    private void UpdatePruefenImHintergrund()
+    {
+        if (_updateService is null)
+            return;
+
+        UpdatePruefenCoreAsync(CancellationToken.None, isManualRefresh: false).SafeFireAndForget(_logger, "MainWindowViewModel.UpdatePruefenAsync");
+    }
+
+    private async Task UpdatePruefenAsync(CancellationToken ct)
+        => await UpdatePruefenCoreAsync(ct, isManualRefresh: true);
+
+    private async Task UpdatePruefenCoreAsync(CancellationToken ct, bool isManualRefresh)
+    {
+        if (_updateService is null)
+            return;
+
+        UpdateCheckLaeuft = true;
+        UpdateHinweis = null;
+        try
+        {
+            var result = await _updateService.CheckForUpdateAsync(ct);
+            ApplyUpdateCheckResult(result, isManualRefresh);
+        }
+        finally
+        {
+            UpdateCheckLaeuft = false;
+        }
+    }
+
+    private async Task UpdateStartenAsync(CancellationToken ct)
+    {
+        if (_updateService is null || _cliUpdateSafetyService is null || _updateProgressDialogService is null || _dialogService is null)
+            return;
+
+        UpdateWirdVorbereitet = true;
+        UpdateHinweis = null;
+        using var updateCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var progressViewModel = new UpdateProgressViewModel(updateCts.Cancel);
+        try
+        {
+            var checkResult = await _updateService.CheckForUpdateAsync(updateCts.Token);
+            ApplyUpdateCheckResult(checkResult, isManualRefresh: false);
+            if (checkResult.Status != UpdateCheckStatus.UpdateVerfuegbar || checkResult.Update is null)
+                return;
+
+            var safety = await _cliUpdateSafetyService.CheckAsync(updateCts.Token);
+            if (safety.RequiresConfirmation && !_dialogService.BestaetigenDialog(BuildSafetyMessage(safety), "Update starten?"))
+                return;
+
+            var progress = new Progress<UpdatePreparationProgress>(progressViewModel.Apply);
+            _updateProgressDialogService.Show(progressViewModel);
+            var preparation = await _updateService.PrepareUpdateAsync(checkResult.Update, progress, updateCts.Token);
+            progressViewModel.MarkUpdaterStarting();
+            await _updateService.StartPreparedUpdateAsync(preparation, updateCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            progressViewModel.SetError("Update-Vorbereitung wurde abgebrochen.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Update konnte nicht vorbereitet oder gestartet werden.");
+            progressViewModel.SetError($"Update konnte nicht vorbereitet werden: {ex.Message}");
+            UpdateHinweis = "Update konnte nicht vorbereitet werden.";
+        }
+        finally
+        {
+            UpdateWirdVorbereitet = false;
+        }
+    }
+
+    private void ApplyUpdateCheckResult(UpdateCheckResult result, bool isManualRefresh)
+    {
+        if (result.Status == UpdateCheckStatus.UpdateVerfuegbar && result.Update is not null)
+        {
+            VerfuegbaresUpdate = result.Update;
+            UpdateVerfuegbar = true;
+            UpdateHinweis = null;
+            return;
+        }
+
+        VerfuegbaresUpdate = null;
+        UpdateVerfuegbar = false;
+        UpdateHinweis = isManualRefresh ? result.Message : null;
+    }
+
+    private static string BuildSafetyMessage(CliUpdateSafetyResult safety)
+    {
+        var tasks = string.Join(Environment.NewLine, safety.RiskyTasks.Take(5).Select(t => $"- {t}"));
+        var suffix = safety.RiskyTaskCount > 5
+            ? $"{Environment.NewLine}- weitere {safety.RiskyTaskCount - 5} Aufgabe(n)"
+            : string.Empty;
+        return $"Es laufen {safety.RiskyTaskCount} CLI-Aufgabe(n), die nicht auf Eingabe warten.{Environment.NewLine}{Environment.NewLine}{tasks}{suffix}{Environment.NewLine}{Environment.NewLine}Soll das Update trotzdem vorbereitet und die Anwendung beendet werden?";
     }
 
     /// <inheritdoc/>

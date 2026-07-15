@@ -28,7 +28,10 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
     [SkippableFact]
     public void AufgabeStarten_KlontRepositoryUndStartetCli_E2E()
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("AufgabeStarten-Repo", "AufgabeStarten-Projekt");
+        var mainWindow = SetupProjectMitNeuerAufgabe(
+            "AufgabeStarten-Repo",
+            "AufgabeStarten-Projekt",
+            initializeSourceGitRepository: false);
 
         // Erster Versuch: ConfirmGitInitInSourceDirectory ist nicht gesetzt → Fehlermeldung erwartet
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");

@@ -203,7 +203,10 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             },
-            TimeSpan.FromSeconds(15));
+            TimeSpan.FromSeconds(15),
+            new SimulatedPseudoConsoleProcessLauncher(
+                NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance,
+                NullLoggerFactory.Instance));
     }
 
     /// <summary>
@@ -216,14 +219,17 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// <param name="pluginProcessStartInfo">Der vom gemockten Plugin gelieferte Befehl, der den überwachten Prozess
     /// (klassisch) bzw. die getippte Konsoleneingabe (ConPTY) tatsächlich beendet.</param>
     /// <param name="timeout">Maximale Wartezeit auf das Logging der Exception.</param>
+    /// <param name="pseudoConsoleProcessLauncher">Optionaler Launcher für den PseudoConsole-Pfad, damit Tests keinen
+    /// echten Win32-ConPTY-Launcher verwenden müssen.</param>
     private static async Task AssertSubscriberExceptionIsLoggedAsync(
         Func<KiAusfuehrungsService, Guid, IKiPlugin, Task> startAsync,
         System.Diagnostics.ProcessStartInfo pluginProcessStartInfo,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        IPseudoConsoleProcessLauncher? pseudoConsoleProcessLauncher = null)
     {
         var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        using var sut = new KiAusfuehrungsService(loggerMock.Object, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        using var sut = new KiAusfuehrungsService(loggerMock.Object, NullLoggerFactory.Instance, scopeFactoryMock.Object, pseudoConsoleProcessLauncher);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();

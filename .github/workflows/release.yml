@@ -18,7 +18,7 @@ permissions:
 # Tag und pusht Commit+Tag zurueck nach main - ohne Serialisierung droht ein Wettlauf mit
 # doppelt vergebenen Versionen oder fehlschlagenden Git-Pushes.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
@@ -44,8 +44,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Determine next release version
+        id: release_version
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $output = npx semantic-release --dry-run --no-ci 2>&1 | Out-String
+          $version = $null
+          if ($output -match 'The next release version is ([0-9]+\.[0-9]+\.[0-9]+(?:[-+][^\s]+)?)') {
+            $version = $Matches[1]
+          }
+          if (-not $version) {
+            $package = Get-Content package.json -Raw | ConvertFrom-Json
+            $version = $package.version
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
       - name: Build and package
         uses: ./.github/actions/build-and-package
+        with:
+          release-version: ${{ steps.release_version.outputs.version }}
+          release-tag: ${{ steps.release_version.outputs.tag }}
 
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@16ca923e6ccbb50770c415a0ccd43709a8c5f7a4 # v4.2.2
@@ -70,6 +91,9 @@ jobs:
 
       - name: Build and package
         uses: ./.github/actions/build-and-package
+        with:
+          release-version: ${{ github.ref_name }}
+          release-tag: ${{ github.ref_name }}
 
       - name: Create GitHub Release for manual tag
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
