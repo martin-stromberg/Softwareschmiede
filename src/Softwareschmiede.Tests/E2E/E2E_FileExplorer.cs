@@ -49,5 +49,45 @@ public sealed class E2E_FileExplorer : WpfTestBase
 
         var aktualisierenButton = WaitForElement(mainWindow, cf => cf.ByName("FileExplorerAktualisierenButton"), Short);
         Assert.NotNull(aktualisierenButton);
+
+        var dateiOeffnenButton = WaitForElement(mainWindow, cf => cf.ByName("FileExplorerDateiOeffnenButton"), Short);
+        Assert.NotNull(dateiOeffnenButton);
+    }
+
+    /// <summary>
+    /// Regressionstest: Nachdem das Dateiexplorer-Register einmal angezeigt wurde, muss weiterhin zum
+    /// Info- und CLI-Register gewechselt werden können. Vorher blockierte ein defektes Visibility-Binding
+    /// (RelativeSource AncestorType=UserControl auf eine Eigenschaft, die nur im DataContext existiert)
+    /// das FileExplorerView dauerhaft sichtbar, sodass es die anderen Register überdeckte.
+    /// </summary>
+    [SkippableFact]
+    public void DateiViewButton_DannInfoRegister_BlendetDateiexplorerAusUndZeigtInfoWiederAn_E2E()
+    {
+        var mainWindow = SetupProjectMitNeuerAufgabe("FileExplorer-Regression-Repo", "FileExplorer-Regression-Projekt");
+
+        ConfirmLocalDirectoryGitInitInSourceDirectory();
+        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+
+        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        Assert.NotNull(stoppenButton);
+
+        var dateiViewButton = WaitForElement(mainWindow, cf => cf.ByName("DateiViewButton"), Short);
+        dateiViewButton.AsButton().Click();
+
+        var baum = WaitForElement(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
+        Assert.NotNull(baum);
+
+        var infoButton = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Short);
+        infoButton.AsButton().Click();
+
+        // Dateiexplorer-Baum muss verschwinden - vorher blieb er wegen des defekten Bindings dauerhaft
+        // sichtbar und überdeckte das Info-Register.
+        WaitUntilGone(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
+
+        var cliViewButton = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
+        cliViewButton.AsButton().Click();
+
+        var terminal = WaitForElement(mainWindow, cf => cf.ByName("TerminalConsole"), Short);
+        Assert.NotNull(terminal);
     }
 }

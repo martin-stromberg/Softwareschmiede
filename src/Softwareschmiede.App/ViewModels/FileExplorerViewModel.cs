@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Extensions;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.ViewModels;
@@ -23,6 +26,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
     private string? _dateiInhalt;
     private DateibrowserAnsichtsmodus _aktuellerModus = DateibrowserAnsichtsmodus.Standard;
     private CancellationTokenSource? _dateiLadenCts;
+    private int _aktuellerAenderungsIndex = -1;
 
     /// <summary>Wurzelknoten des Arbeitsbaums im Standardmodus.</summary>
     public ObservableCollection<WorkspaceFileNode> Wurzelknoten { get; } = new();
@@ -75,6 +79,23 @@ public sealed class FileExplorerViewModel : ViewModelBase
     /// <summary>Lädt den aktuellen Modus (Baum bzw. Commits) neu.</summary>
     public ICommand AktualisierenCommand { get; }
 
+    /// <summary>Springt im Diff zur nächsten Änderung (Added/Removed/Modified-Block).</summary>
+    public ICommand NaechsteAenderungCommand { get; }
+
+    /// <summary>Springt im Diff zur vorherigen Änderung (Added/Removed/Modified-Block).</summary>
+    public ICommand VorherigeAenderungCommand { get; }
+
+    /// <summary>Öffnet die aktuell angezeigte Datei mit der Standardanwendung des Betriebssystems.</summary>
+    public ICommand DateiMitStandardanwendungOeffnenCommand { get; }
+
+    /// <summary>Wird ausgelöst, wenn per Navigation zu einer Änderung gesprungen wurde, mit dem Index der Zielzeile in <see cref="DiffZeilen"/>.</summary>
+    public event Action<int>? DiffZeileFokussiert;
+
+    /// <summary>Gibt an, ob die aktuell im Baum ausgewählte Datei mit der Standardanwendung geöffnet werden kann (kein
+    /// Verzeichnis, nicht gelöscht, kein Commit-Knoten aus dem Vergleichsmodus – nur dann stimmt die angezeigte
+    /// Vorschau mit der Datei auf der Festplatte überein).</summary>
+    private bool KannAktuelleDateiOeffnen => _ausgewaehlterKnoten is { IsDirectory: false, IsDeleted: false, CommitSha: null };
+
     /// <inheritdoc cref="FileExplorerViewModel"/>
     public FileExplorerViewModel(
         IGitWorkspaceBrowserService gitWorkspaceBrowserService,
@@ -90,6 +111,9 @@ public sealed class FileExplorerViewModel : ViewModelBase
         StandardAnsichtCommand = new AsyncRelayCommand(StandardAnsichtAsync);
         VergleichCommand = new AsyncRelayCommand(VergleichAsync);
         AktualisierenCommand = new AsyncRelayCommand(AktualisierenAsync);
+        NaechsteAenderungCommand = new RelayCommand(() => AenderungNavigieren(vorwaerts: true), () => ZeigtDiffAnsicht);
+        VorherigeAenderungCommand = new RelayCommand(() => AenderungNavigieren(vorwaerts: false), () => ZeigtDiffAnsicht);
+        DateiMitStandardanwendungOeffnenCommand = new RelayCommand(DateiMitStandardanwendungOeffnen, () => KannAktuelleDateiOeffnen);
     }
 
     /// <summary>Setzt das Repository-Verzeichnis, wechselt in den Standardmodus und lädt den Arbeitsbaum.</summary>
@@ -292,15 +316,84 @@ public sealed class FileExplorerViewModel : ViewModelBase
         DiffZeilen.Clear();
         foreach (var zeile in zeilen)
             DiffZeilen.Add(zeile);
+        _aktuellerAenderungsIndex = -1;
         OnPropertyChanged(nameof(ZeigtDiffAnsicht));
     }
 
     private void ClearDiffZeilen()
     {
+        _aktuellerAenderungsIndex = -1;
+
         if (DiffZeilen.Count == 0)
             return;
 
         DiffZeilen.Clear();
         OnPropertyChanged(nameof(ZeigtDiffAnsicht));
+    }
+
+    private void AenderungNavigieren(bool vorwaerts)
+    {
+        var blockStartIndizes = ErmittleAenderungsBlockStartIndizes();
+        if (blockStartIndizes.Count == 0)
+            return;
+
+        var aktuellePosition = blockStartIndizes.IndexOf(_aktuellerAenderungsIndex);
+        int neuePosition;
+        if (aktuellePosition < 0)
+        {
+            neuePosition = vorwaerts ? 0 : blockStartIndizes.Count - 1;
+        }
+        else
+        {
+            neuePosition = vorwaerts
+                ? (aktuellePosition + 1) % blockStartIndizes.Count
+                : (aktuellePosition - 1 + blockStartIndizes.Count) % blockStartIndizes.Count;
+        }
+
+        _aktuellerAenderungsIndex = blockStartIndizes[neuePosition];
+        DiffZeileFokussiert?.Invoke(_aktuellerAenderungsIndex);
+    }
+
+    private void DateiMitStandardanwendungOeffnen()
+    {
+        if (string.IsNullOrWhiteSpace(_repositoryPath) || !KannAktuelleDateiOeffnen)
+            return;
+
+        var knoten = _ausgewaehlterKnoten!;
+
+        try
+        {
+            var vollstaendigerPfad = Path.GetFullPath(Path.Combine(_repositoryPath, knoten.RelativePath));
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = vollstaendigerPfad,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Datei {RelativePath} konnte nicht mit der Standardanwendung geöffnet werden.", knoten.RelativePath);
+        }
+    }
+
+    private List<int> ErmittleAenderungsBlockStartIndizes()
+    {
+        var indizes = new List<int>();
+        var inBlock = false;
+        for (var i = 0; i < DiffZeilen.Count; i++)
+        {
+            var istAenderung = DiffZeilen[i].Status != DiffLineStatus.Context;
+            if (istAenderung && !inBlock)
+            {
+                indizes.Add(i);
+                inBlock = true;
+            }
+            else if (!istAenderung)
+            {
+                inBlock = false;
+            }
+        }
+
+        return indizes;
     }
 }

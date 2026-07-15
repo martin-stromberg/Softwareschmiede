@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Controls;
@@ -25,5 +26,16 @@ public sealed partial class DiffViewer : UserControl
     public DiffViewer()
     {
         InitializeComponent();
+    }
+
+    /// <summary>Scrollt die Zeile am angegebenen Index der aktuell gebundenen <see cref="Lines"/> in den sichtbaren Bereich.</summary>
+    /// <param name="index">Der Index der Zeile innerhalb von <see cref="Lines"/>.</param>
+    public void ScrollToIndex(int index)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (LinesItemsControl.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement container)
+                container.BringIntoView();
+        }, DispatcherPriority.Loaded);
     }
 }

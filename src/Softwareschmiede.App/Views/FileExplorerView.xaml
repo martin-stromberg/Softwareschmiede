@@ -4,6 +4,37 @@
              xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
              xmlns:vo="clr-namespace:Softwareschmiede.Domain.ValueObjects;assembly=Softwareschmiede"
              Background="{DynamicResource BackgroundBrush}">
+    <UserControl.Resources>
+        <HierarchicalDataTemplate DataType="{x:Type vo:WorkspaceFileNode}"
+                                   ItemsSource="{Binding Children}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Converter={StaticResource WorkspaceFileNodeIconConverter}}"
+                           FontSize="12"
+                           Margin="0,0,4,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding Name}"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2"
+                           Text="{Binding Converter={StaticResource WorkspaceFileNodeStatusIconConverter}}"
+                           FontSize="12"
+                           Margin="8,0,0,0"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </HierarchicalDataTemplate>
+        <Style x:Key="FileExplorerBaumItemContainerStyle" TargetType="TreeViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+    </UserControl.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -14,23 +45,29 @@
         <StackPanel Grid.Row="0"
                     Orientation="Horizontal"
                     Margin="0,0,0,8">
-            <Button Content="Standard"
+            <Button Content="📁"
+                    ToolTip="Standard"
                     AutomationProperties.Name="FileExplorerStandardButton"
+                    AutomationProperties.HelpText="Standard"
                     Command="{Binding StandardAnsichtCommand}"
-                    Padding="12,4"
+                    Padding="10,4"
                     Margin="0,0,6,0"
-                    FontSize="12" />
-            <Button Content="Vergleich"
+                    FontSize="14" />
+            <Button Content="🔀"
+                    ToolTip="Vergleich"
                     AutomationProperties.Name="FileExplorerVergleichButton"
+                    AutomationProperties.HelpText="Vergleich"
                     Command="{Binding VergleichCommand}"
-                    Padding="12,4"
+                    Padding="10,4"
                     Margin="0,0,6,0"
-                    FontSize="12" />
-            <Button Content="Aktualisieren"
+                    FontSize="14" />
+            <Button Content="🔄"
+                    ToolTip="Aktualisieren"
                     AutomationProperties.Name="FileExplorerAktualisierenButton"
+                    AutomationProperties.HelpText="Aktualisieren"
                     Command="{Binding AktualisierenCommand}"
-                    Padding="12,4"
-                    FontSize="12" />
+                    Padding="10,4"
+                    FontSize="14" />
         </StackPanel>
 
         <!-- Split-View: Baum + Inhalt -->
@@ -49,14 +86,8 @@
                       BorderBrush="{DynamicResource BorderBrush}"
                       BorderThickness="1"
                       ItemsSource="{Binding Wurzelknoten}"
-                      SelectedItemChanged="OnBaumSelectedItemChanged">
-                <TreeView.ItemTemplate>
-                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                        <TextBlock Text="{Binding Name}"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   FontSize="12" />
-                    </HierarchicalDataTemplate>
-                </TreeView.ItemTemplate>
+                      SelectedItemChanged="OnBaumSelectedItemChanged"
+                      ItemContainerStyle="{StaticResource FileExplorerBaumItemContainerStyle}">
                 <TreeView.Style>
                     <Style TargetType="TreeView">
                         <Style.Triggers>
@@ -77,7 +108,8 @@
                       BorderThickness="1"
                       ItemsSource="{Binding CommitGruppen}"
                       SelectedItemChanged="OnBaumSelectedItemChanged"
-                      TreeViewItem.Expanded="OnCommitKnotenExpanded">
+                      TreeViewItem.Expanded="OnCommitKnotenExpanded"
+                      ItemContainerStyle="{StaticResource FileExplorerBaumItemContainerStyle}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type vo:BranchCommit}"
                                                ItemsSource="{Binding Files}">
@@ -105,12 +137,6 @@
                                        Visibility="{Binding ErrorMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                         </StackPanel>
                     </HierarchicalDataTemplate>
-                    <HierarchicalDataTemplate DataType="{x:Type vo:WorkspaceFileNode}"
-                                               ItemsSource="{Binding Children}">
-                        <TextBlock Text="{Binding Name}"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   FontSize="12" />
-                    </HierarchicalDataTemplate>
                 </TreeView.Resources>
                 <TreeView.Style>
                     <Style TargetType="TreeView">
@@ -132,19 +158,58 @@
             <!-- Rechts: Dateiinhalt (Standard) bzw. DiffViewer (Vergleich) -->
             <Grid Grid.Column="2"
                   Margin="8,0,0,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Auto"
-                              Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                    <TextBlock AutomationProperties.Name="FileExplorerDateiInhalt"
-                               Text="{Binding DateiInhalt}"
-                               FontFamily="Consolas"
-                               FontSize="12"
-                               TextWrapping="NoWrap"
-                               Foreground="{DynamicResource PrimaryTextBrush}" />
-                </ScrollViewer>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <controls:DiffViewer Lines="{Binding DiffZeilen}"
-                                     Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <StackPanel Grid.Row="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button Content="◀"
+                                ToolTip="Vorherige Änderung"
+                                AutomationProperties.Name="FileExplorerVorherigeAenderungButton"
+                                AutomationProperties.HelpText="Vorherige Änderung"
+                                Command="{Binding VorherigeAenderungCommand}"
+                                Padding="10,4"
+                                Margin="0,0,6,0"
+                                FontSize="12" />
+                        <Button Content="▶"
+                                ToolTip="Nächste Änderung"
+                                AutomationProperties.Name="FileExplorerNaechsteAenderungButton"
+                                AutomationProperties.HelpText="Nächste Änderung"
+                                Command="{Binding NaechsteAenderungCommand}"
+                                Padding="10,4"
+                                Margin="0,0,6,0"
+                                FontSize="12" />
+                    </StackPanel>
+                    <Button Content="📂"
+                            ToolTip="Mit Standardanwendung öffnen"
+                            AutomationProperties.Name="FileExplorerDateiOeffnenButton"
+                            AutomationProperties.HelpText="Mit Standardanwendung öffnen"
+                            Command="{Binding DateiMitStandardanwendungOeffnenCommand}"
+                            Padding="10,4"
+                            FontSize="14" />
+                </StackPanel>
+
+                <Grid Grid.Row="1">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                        <TextBlock AutomationProperties.Name="FileExplorerDateiInhalt"
+                                   Text="{Binding DateiInhalt}"
+                                   FontFamily="Consolas"
+                                   FontSize="12"
+                                   TextWrapping="NoWrap"
+                                   Foreground="{DynamicResource PrimaryTextBrush}" />
+                    </ScrollViewer>
+
+                    <controls:DiffViewer x:Name="DiffViewerControl"
+                                         Lines="{Binding DiffZeilen}"
+                                         Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource BoolToVisibilityConverter}}" />
+                </Grid>
             </Grid>
         </Grid>
     </Grid>

@@ -13,11 +13,38 @@ namespace Softwareschmiede.App.Views;
 public sealed partial class FileExplorerView : UserControl
 {
     private readonly ILogger _logger = (ILogger?)App.Services?.GetService<ILogger<FileExplorerView>>() ?? NullLogger.Instance;
+    private FileExplorerViewModel? _subscribedViewModel;
 
     /// <inheritdoc cref="FileExplorerView"/>
     public FileExplorerView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+        Unloaded += OnUnloaded;
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (_subscribedViewModel is not null)
+            _subscribedViewModel.DiffZeileFokussiert -= OnDiffZeileFokussiert;
+
+        _subscribedViewModel = e.NewValue as FileExplorerViewModel;
+
+        if (_subscribedViewModel is not null)
+            _subscribedViewModel.DiffZeileFokussiert += OnDiffZeileFokussiert;
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (_subscribedViewModel is not null)
+            _subscribedViewModel.DiffZeileFokussiert -= OnDiffZeileFokussiert;
+
+        _subscribedViewModel = null;
+    }
+
+    private void OnDiffZeileFokussiert(int index)
+    {
+        DiffViewerControl.ScrollToIndex(index);
     }
 
     private void OnBaumSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

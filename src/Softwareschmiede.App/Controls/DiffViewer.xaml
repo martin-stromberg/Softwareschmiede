@@ -4,7 +4,8 @@
              x:Name="Root">
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Auto">
-        <ItemsControl AutomationProperties.Name="DiffViewerZeilen"
+        <ItemsControl x:Name="LinesItemsControl"
+                      AutomationProperties.Name="DiffViewerZeilen"
                       ItemsSource="{Binding Lines, ElementName=Root}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>

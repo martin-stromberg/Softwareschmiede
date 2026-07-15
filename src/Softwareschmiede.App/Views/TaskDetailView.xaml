@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
              xmlns:views="clr-namespace:Softwareschmiede.App.Views"
+             x:Name="Root"
              Background="{DynamicResource BackgroundBrush}">
     <Grid>
         <Grid.RowDefinitions>
@@ -351,7 +352,7 @@
                 </ScrollViewer>
 
                 <views:FileExplorerView DataContext="{Binding FileExplorer}"
-                                        Visibility="{Binding IsFileExplorerViewSelected, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                        Visibility="{Binding DataContext.IsFileExplorerViewSelected, ElementName=Root, Converter={StaticResource BoolToVisibilityConverter}}" />
             </Grid>
         </Grid>
 
