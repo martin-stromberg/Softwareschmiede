@@ -1,3 +1,15 @@
+# [1.11.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.10.0...v1.11.0) (2026-07-15)
+
+
+### Bug Fixes
+
+* handle disposed cli process scopes ([e9cae39](https://github.com/martin-stromberg/Softwareschmiede/commit/e9cae39fe247d4130d1a8c50ae98ef5a33e88fd7))
+
+
+### Features
+
+* programmupdate ([ea0a881](https://github.com/martin-stromberg/Softwareschmiede/commit/ea0a881273fb2bba56497e8806012971cd93687c))
+
 # [1.10.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.9.0...v1.10.0) (2026-07-13)
 
 
