@@ -372,7 +372,7 @@ public abstract class WpfTestBase : IDisposable
     /// Erstellt ein temporäres lokales Quellverzeichnis mit einem Unterordner (simuliertes Repository)
     /// für Tests des LocalDirectoryPlugin. Gibt den Pfad des Quellverzeichnisses zurück.
     /// </summary>
-    protected string CreateLocalSourceDirectory(string repositoryFolderName)
+    protected string CreateLocalSourceDirectory(string repositoryFolderName, bool initializeGitRepository = true)
     {
         var sourceDirectory = Path.Combine(
             Path.GetTempPath(),
@@ -380,7 +380,52 @@ public abstract class WpfTestBase : IDisposable
         var repositoryPath = Path.Combine(sourceDirectory, repositoryFolderName);
         Directory.CreateDirectory(repositoryPath);
         File.WriteAllText(Path.Combine(repositoryPath, "readme.txt"), "E2E-Testdatei");
+
+        if (initializeGitRepository)
+        {
+            InitializeGitRepository(repositoryPath);
+        }
+
         return sourceDirectory;
+    }
+
+    private static void InitializeGitRepository(string repositoryPath)
+    {
+        RunGitCommand(repositoryPath, "init");
+        RunGitCommand(repositoryPath, "config", "user.name", "Softwareschmiede E2E");
+        RunGitCommand(repositoryPath, "config", "user.email", "e2e@softwareschmiede.local");
+        RunGitCommand(repositoryPath, "add", ".");
+        RunGitCommand(repositoryPath, "commit", "-m", "Initial E2E repository snapshot");
+    }
+
+    private static void RunGitCommand(string workingDirectory, params string[] arguments)
+    {
+        using var process = new Process();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        foreach (var argument in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+
+        process.Start();
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Git-Testrepository konnte nicht vorbereitet werden: git {string.Join(' ', arguments)} in '{workingDirectory}' " +
+                $"endete mit Exit-Code {process.ExitCode}.{Environment.NewLine}{stdout}{stderr}");
+        }
     }
 
     /// <summary>
@@ -459,9 +504,10 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement SetupProjectMitNeuerAufgabe(
         string repositoryFolderName,
         string projektName,
-        bool useInSourceDirectoryMode = true)
+        bool useInSourceDirectoryMode = true,
+        bool initializeSourceGitRepository = true)
     {
-        var sourceDirectory = CreateLocalSourceDirectory(repositoryFolderName);
+        var sourceDirectory = CreateLocalSourceDirectory(repositoryFolderName, initializeSourceGitRepository);
 
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, Long)!;
