@@ -5,6 +5,16 @@ description: >
   und `release-manual-tag` in release.yml gemeinsam genutzt, um Divergenz zwischen
   den identischen Build-Schritten zu vermeiden.
 
+inputs:
+  release-version:
+    description: Version ohne fuehrendes v, die in version.json geschrieben wird.
+    required: false
+    default: ''
+  release-tag:
+    description: Release-Tag, der in version.json geschrieben wird.
+    required: false
+    default: ''
+
 runs:
   using: composite
   steps:
@@ -33,10 +43,36 @@ runs:
       run: Rename-Item -Path 'publish/Softwareschmiede.App.exe' -NewName 'Softwareschmiede.exe'
       shell: pwsh
 
+    - name: Write version manifest
+      env:
+        RELEASE_VERSION: ${{ inputs.release-version }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        $version = $env:RELEASE_VERSION
+        $tagName = $env:RELEASE_TAG
+        if (-not $tagName) {
+          $tagName = "v0.0.0"
+        }
+        if (-not $version) {
+          $version = $tagName -replace '^v', ''
+        }
+        $version = $version -replace '^v', ''
+        $manifest = [ordered]@{
+          version = $version
+          tagName = $tagName
+          commit = $env:GITHUB_SHA
+          createdAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+        }
+        $manifest | ConvertTo-Json -Depth 3 | Set-Content -Path 'publish/version.json' -Encoding UTF8
+      shell: pwsh
+
     - name: Verify publish output
       run: |
         if (-not (Test-Path 'publish/Softwareschmiede.exe')) {
           throw "publish/ ist unvollstaendig: Softwareschmiede.exe fehlt."
+        }
+        if (-not (Test-Path 'publish/version.json')) {
+          throw "publish/ ist unvollstaendig: version.json fehlt."
         }
         $pluginDlls = Get-ChildItem -Path 'publish/plugins' -Filter '*.dll' -Recurse -ErrorAction SilentlyContinue
         if (-not $pluginDlls -or $pluginDlls.Count -eq 0) {

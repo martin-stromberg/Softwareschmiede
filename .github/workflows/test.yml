@@ -18,8 +18,8 @@ concurrency:
 
 jobs:
   test:
-    # Softwareschmiede.Tests referenziert Softwareschmiede.App (WPF, net10.0-windows) und faehrt
-    # FlaUI-basierte E2E-UI-Automatisierung - beides erfordert einen Windows-Runner.
+    # Softwareschmiede.Tests referenziert Softwareschmiede.App (WPF, net10.0-windows),
+    # deshalb bleibt der stabile CI-Testlauf trotz E2E-Ausschluss auf Windows.
     runs-on: windows-latest
     timeout-minutes: 20
 
@@ -41,17 +41,11 @@ jobs:
         shell: pwsh
 
       - name: Test
-        # SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS: Der auf windows-latest per ConPTY gestartete
-        # CLI-Kindprozess wird empirisch bestaetigt (Testlauf vom 2026-07-11, PR #120) nicht an die
-        # Pseudo-Konsole isoliert, sondern beendet sich fast sofort (ExitCode 0) - derselbe
-        # nicht-interaktive-Session-Effekt wie in der Claude-Code-Sandbox, siehe CLAUDE.md und
-        # ConPtyEnvironmentProbe. Die 14 betroffenen Tests ueberspringen sich damit hier kontrolliert
-        # statt mit TimeoutException zu scheitern. Faellt in Zukunft ein self-hosted Runner mit
-        # echter interaktiver Session an, sollte diese Variable dort entfernt werden.
-        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
+        # PR-Gate: nur stabile Unit-/Integrations-/BUnit-nahe Tests. WPF/FlaUI-E2E und echte
+        # ConPTY-Umgebungstests laufen lokal waehrend der Entwicklung, weil GitHub-hosted Runner
+        # keine verlaessliche interaktive Desktop-/Konsolen-Session bereitstellen.
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category!=E2E&Category!=ConPTY" --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
         shell: pwsh
-        env:
-          SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS: '1'
 
       - name: Upload test results
         if: always()
