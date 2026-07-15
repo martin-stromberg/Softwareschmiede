@@ -125,10 +125,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
 
-        var fileExplorerViewModel = new FileExplorerViewModel(
-            new Mock<IGitWorkspaceBrowserService>().Object,
-            new Mock<ITextDiffService>().Object,
-            NullLogger<FileExplorerViewModel>.Instance);
+        var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
         var vm = new TaskDetailViewModel(
             _aufgabeService,

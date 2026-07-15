@@ -84,10 +84,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
 
-        var fileExplorerViewModel = new FileExplorerViewModel(
-            new Mock<IGitWorkspaceBrowserService>().Object,
-            new Mock<ITextDiffService>().Object,
-            NullLogger<FileExplorerViewModel>.Instance);
+        var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
         return new TaskDetailViewModel(
             _aufgabeService,

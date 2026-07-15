@@ -43,10 +43,7 @@ public static class TaskDetailViewModelTestFactory
 
         var serviceProviderMock = new Mock<IServiceProvider>();
 
-        var fileExplorerViewModel = new FileExplorerViewModel(
-            new Mock<IGitWorkspaceBrowserService>().Object,
-            new Mock<ITextDiffService>().Object,
-            NullLogger<FileExplorerViewModel>.Instance);
+        var fileExplorerViewModel = CreateStub();
 
         return new TaskDetailViewModel(
             aufgabeService,
@@ -64,4 +61,12 @@ public static class TaskDetailViewModelTestFactory
             TimeProvider.System,
             fileExplorerViewModel);
     }
+
+    /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
+    /// <returns>Ein einsatzbereites FileExplorerViewModel mit Mock-Services.</returns>
+    public static FileExplorerViewModel CreateStub()
+        => new(
+            new Mock<IGitWorkspaceBrowserService>().Object,
+            new Mock<ITextDiffService>().Object,
+            NullLogger<FileExplorerViewModel>.Instance);
 }

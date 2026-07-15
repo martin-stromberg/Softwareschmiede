@@ -36,12 +36,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- Blazor-Komponenten-Tests werden in der WPF-Version nicht kompiliert -->
-  <ItemGroup>
-    <Compile Remove="Components\**\*.cs" />
-    <None Include="Components\**\*.cs" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.BitBucket\Softwareschmiede.Plugin.BitBucket.csproj" />
     <ProjectReference Include="..\..\plugins\Softwareschmiede.Plugin.GitHub\Softwareschmiede.Plugin.GitHub.csproj" />

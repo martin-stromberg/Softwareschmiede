@@ -19,9 +19,6 @@ public sealed class TextDiffServiceTests
 
         diff.Lines.Should().HaveCount(3);
         diff.Lines.Should().OnlyContain(line => line.Status == DiffLineStatus.Context);
-        diff.AddedCount.Should().Be(0);
-        diff.RemovedCount.Should().Be(0);
-        diff.ModifiedCount.Should().Be(0);
     }
 
     /// <summary>Eine im Zielinhalt neu hinzugefügte Zeile liefert Added-Status mit NewLineNumber.</summary>
@@ -33,7 +30,6 @@ public sealed class TextDiffServiceTests
 
         var diff = _sut.BuildDiff(original, current);
 
-        diff.AddedCount.Should().Be(1);
         var addedLine = diff.Lines.Should().ContainSingle(line => line.Status == DiffLineStatus.Added).Subject;
         addedLine.Content.Should().Be("zeile3");
         addedLine.NewLineNumber.Should().Be(3);
@@ -49,7 +45,6 @@ public sealed class TextDiffServiceTests
 
         var diff = _sut.BuildDiff(original, current);
 
-        diff.RemovedCount.Should().Be(1);
         var removedLine = diff.Lines.Should().ContainSingle(line => line.Status == DiffLineStatus.Removed).Subject;
         removedLine.Content.Should().Be("zeile2");
         removedLine.OldLineNumber.Should().Be(2);
@@ -65,7 +60,6 @@ public sealed class TextDiffServiceTests
 
         var diff = _sut.BuildDiff(original, current);
 
-        diff.ModifiedCount.Should().Be(1);
         var modifiedLine = diff.Lines.Should().ContainSingle(line => line.Status == DiffLineStatus.Modified).Subject;
         modifiedLine.Content.Should().Be("hallo erde");
         modifiedLine.OldLineNumber.Should().Be(1);
@@ -111,6 +105,5 @@ public sealed class TextDiffServiceTests
         build.Should().NotThrow();
         var diff = build();
         diff.Lines.Should().HaveCount(lineCount);
-        diff.ModifiedCount.Should().Be(lineCount);
     }
 }

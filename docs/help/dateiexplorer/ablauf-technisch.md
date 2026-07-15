@@ -202,7 +202,7 @@ DateiLadenAsync(knoten, CancellationToken)
       Berechne Zeilendiff (Added/Removed/Modified/Context)
       Pro Modified-Zeile: berechne Inline-Segmente (gemeinsames Präfix/Suffix)
       ↓
-      → FileTextDiff { Lines, AddedCount, RemovedCount, ModifiedCount }
+      → FileTextDiff { Lines }
     ↓
     DiffZeilen ← diff.Lines
     DateiInhalt ← leer (wird vom DiffViewer überschrieben)
@@ -253,7 +253,7 @@ graph TD
     H --> L
     I --> L
     K --> L
-    L --> M["FileTextDiff<br/>Lines, AddedCount, RemovedCount"]
+    L --> M["FileTextDiff<br/>Lines"]
 ```
 
 ## Fehlerbehandlung

@@ -16,9 +16,6 @@ public sealed class TextDiffService : ITextDiffService
         var operations = ComputeLineOperations(oldLines, newLines);
 
         var lines = new List<TextDiffLine>();
-        var addedCount = 0;
-        var removedCount = 0;
-        var modifiedCount = 0;
         var oldLineNumber = 0;
         var newLineNumber = 0;
 
@@ -51,26 +48,23 @@ public sealed class TextDiffService : ITextDiffService
             {
                 oldLineNumber++;
                 newLineNumber++;
-                modifiedCount++;
                 lines.Add(BuildModifiedLine(deletes[i], inserts[i], oldLineNumber, newLineNumber));
             }
 
             for (var i = pairCount; i < deletes.Count; i++)
             {
                 oldLineNumber++;
-                removedCount++;
                 lines.Add(new TextDiffLine(deletes[i], DiffLineStatus.Removed, oldLineNumber, null, SingleSegment(deletes[i])));
             }
 
             for (var i = pairCount; i < inserts.Count; i++)
             {
                 newLineNumber++;
-                addedCount++;
                 lines.Add(new TextDiffLine(inserts[i], DiffLineStatus.Added, null, newLineNumber, SingleSegment(inserts[i])));
             }
         }
 
-        return new FileTextDiff(lines, addedCount, removedCount, modifiedCount);
+        return new FileTextDiff(lines);
     }
 
     private static string[] SplitLines(string? content)

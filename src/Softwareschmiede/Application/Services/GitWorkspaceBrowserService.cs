@@ -498,7 +498,6 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
 
             files.Add(node);
             InsertNode(rootNodes, pathMap, node);
-            IncrementAncestorCounts(pathMap, node.RelativePath);
         }
 
         SortNodes(rootNodes);
@@ -539,20 +538,6 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         }
 
         parentNodes.Add(fileNode);
-    }
-
-    private static void IncrementAncestorCounts(IReadOnlyDictionary<string, WorkspaceFileNode> pathMap, string relativePath)
-    {
-        var parent = Path.GetDirectoryName(relativePath);
-        while (!string.IsNullOrWhiteSpace(parent))
-        {
-            if (pathMap.TryGetValue(parent, out var node))
-            {
-                node.ChangedFileCount++;
-            }
-
-            parent = Path.GetDirectoryName(parent);
-        }
     }
 
     private static void SortNodes(List<WorkspaceFileNode> nodes)

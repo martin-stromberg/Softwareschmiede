@@ -142,7 +142,7 @@ public sealed class FileExplorerViewModelTests
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
         gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, diffNode, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
         var diffLines = new List<TextDiffLine> { new("neu", DiffLineStatus.Modified, 1, 1, []) };
-        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines, 0, 0, 1));
+        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines));
         sut.AusgewaehlterKnoten = diffNode;
         await WaitForAsync(() => sut.DiffZeilen.Count > 0);
 
@@ -169,7 +169,7 @@ public sealed class FileExplorerViewModelTests
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
         gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, fileNode, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
         var diffLines = new List<TextDiffLine> { new("neu", DiffLineStatus.Modified, 1, 1, []) };
-        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines, 0, 0, 1));
+        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines));
 
         sut.AusgewaehlterKnoten = fileNode;
         await WaitForAsync(() => sut.DiffZeilen.Count > 0);
@@ -277,7 +277,7 @@ public sealed class FileExplorerViewModelTests
         gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
 
         var diffLines = new List<TextDiffLine> { new("neu", DiffLineStatus.Modified, 1, 1, []) };
-        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines, 0, 0, 1));
+        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(diffLines));
 
         sut.AusgewaehlterKnoten = node;
         await WaitForAsync(() => sut.DiffZeilen.Count > 0);
