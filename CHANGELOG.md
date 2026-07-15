@@ -1,3 +1,17 @@
+# [1.12.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.11.0...v1.12.0) (2026-07-15)
+
+
+### Bug Fixes
+
+* Dateiexplorer-Nacharbeiten (OOM-Schutz, Ladezustand, Cache, toter Code) ([1cf68f6](https://github.com/martin-stromberg/Softwareschmiede/commit/1cf68f69d1c35865ac15c3a89253f9c16681fbe2))
+
+
+### Features
+
+* Dateiexplorer-Nacharbeiten abschliessen ([b0a35bf](https://github.com/martin-stromberg/Softwareschmiede/commit/b0a35bfedf98540111e9910fe7601a5d5c20e75e))
+* Dateiexplorer-Register mit Standard- und Vergleichsmodus ([3f578e6](https://github.com/martin-stromberg/Softwareschmiede/commit/3f578e6bb9f6b8548cf3915c7fe7b00ff07fa27a))
+* Dateiexplorer-Register-Regression beheben und Bedienung erweitern ([3f56ca4](https://github.com/martin-stromberg/Softwareschmiede/commit/3f56ca4faf9779d224b0891b75a0260219ecee56))
+
 # [1.11.0](https://github.com/martin-stromberg/Softwareschmiede/compare/v1.10.0...v1.11.0) (2026-07-15)
 
 
