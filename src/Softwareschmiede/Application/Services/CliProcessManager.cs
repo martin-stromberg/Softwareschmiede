@@ -157,9 +157,10 @@ public sealed class CliProcessManager : IDisposable
     /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess gestartet wurde.</param>
     private async Task AktivenLaufSetzenAsync(Guid aufgabeId)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-        await aufgabeService.AktivenLaufSetzenAsync(aufgabeId, Guid.NewGuid().ToString("N")).ConfigureAwait(false);
+        await ExecuteWithAufgabeServiceAsync(
+            aufgabeId,
+            "Setzen des aktiven Laufs",
+            aufgabeService => aufgabeService.AktivenLaufSetzenAsync(aufgabeId, Guid.NewGuid().ToString("N"))).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -169,9 +170,10 @@ public sealed class CliProcessManager : IDisposable
     /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
     private async Task AktivenLaufBeendenAsync(Guid aufgabeId)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-        await aufgabeService.AktivenLaufBeendenAsync(aufgabeId).ConfigureAwait(false);
+        await ExecuteWithAufgabeServiceAsync(
+            aufgabeId,
+            "Beenden des aktiven Laufs",
+            aufgabeService => aufgabeService.AktivenLaufBeendenAsync(aufgabeId)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -242,9 +244,39 @@ public sealed class CliProcessManager : IDisposable
     /// <param name="laufStatus">Neuer Laufzeit-Substatus.</param>
     private async Task AktualisiereLaufStatusAsync(Guid aufgabeId, AufgabeLaufStatus laufStatus)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-        await aufgabeService.AktualisiereLaufStatusAsync(aufgabeId, laufStatus).ConfigureAwait(false);
+        await ExecuteWithAufgabeServiceAsync(
+            aufgabeId,
+            "Aktualisieren des Laufstatus",
+            aufgabeService => aufgabeService.AktualisiereLaufStatusAsync(aufgabeId, laufStatus)).ConfigureAwait(false);
+    }
+
+    private async Task ExecuteWithAufgabeServiceAsync(
+        Guid aufgabeId,
+        string operation,
+        Func<AufgabeService, Task> action)
+    {
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+            await action(aufgabeService).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "ServiceScopeFactory ist bereits disposed; {Operation} wird fuer Aufgabe {AufgabeId} uebersprungen.",
+                operation,
+                aufgabeId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Fehler bei {Operation} fuer Aufgabe {AufgabeId}.",
+                operation,
+                aufgabeId);
+        }
     }
 
     /// <inheritdoc/>

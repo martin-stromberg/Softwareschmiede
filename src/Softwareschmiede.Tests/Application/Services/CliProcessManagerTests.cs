@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -81,5 +82,50 @@ public sealed class CliProcessManagerTests : IDisposable
         taskB.IsCompletedSuccessfully.Should().BeTrue();
 
         semaphoreA.Release();
+    }
+
+    /// <summary>Shutdown-Race: AktivenLaufSetzenAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
+    [Fact]
+    public async Task AktivenLaufSetzenAsync_WithDisposedScopeFactory_Completes()
+    {
+        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("AktivenLaufSetzenAsync", Guid.NewGuid());
+    }
+
+    /// <summary>Shutdown-Race: AktivenLaufBeendenAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
+    [Fact]
+    public async Task AktivenLaufBeendenAsync_WithDisposedScopeFactory_Completes()
+    {
+        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("AktivenLaufBeendenAsync", Guid.NewGuid());
+    }
+
+    /// <summary>Shutdown-Race: AktualisiereLaufStatusAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
+    [Fact]
+    public async Task AktualisiereLaufStatusAsync_WithDisposedScopeFactory_Completes()
+    {
+        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync(
+            "AktualisiereLaufStatusAsync",
+            Guid.NewGuid(),
+            AufgabeLaufStatus.WartetAufEingabe);
+    }
+
+    private async Task InvokePersistierungsMethodeMitDisposedScopeFactoryAsync(string methodName, params object[] arguments)
+    {
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        scopeFactoryMock
+            .Setup(f => f.CreateScope())
+            .Throws(new ObjectDisposedException("ServiceProvider"));
+
+        using var kiService = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            scopeFactoryMock.Object);
+        using var manager = new CliProcessManager(
+            kiService,
+            scopeFactoryMock.Object,
+            NullLogger<CliProcessManager>.Instance);
+
+        var method = typeof(CliProcessManager).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var task = (Task)method.Invoke(manager, arguments)!;
+        await task;
     }
 }
