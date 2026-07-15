@@ -262,6 +262,28 @@ public abstract class WpfTestBase : IDisposable
         button.AsButton().Click();
     }
 
+    /// <summary>Navigiert zur Einstellungsseite und wartet, bis die Settings-Tabs geladen sind.</summary>
+    protected void NavigateToSettings(AutomationElement mainWindow)
+    {
+        var deadline = DateTime.UtcNow + Long;
+        while (DateTime.UtcNow < deadline)
+        {
+            mainWindow.Focus();
+
+            var button = mainWindow.FindFirstDescendant(cf => cf.ByName(" Einstellungen"));
+            if (button is not null)
+                button.AsButton().Click();
+
+            var settingsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Quellcodeverwaltung"));
+            if (settingsTab is not null)
+                return;
+
+            Thread.Sleep(300);
+        }
+
+        WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), Short);
+    }
+
     /// <summary>
     /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> verschwunden ist.
     /// Assertiert anschließend, dass das Element nicht mehr vorhanden ist.
@@ -437,10 +459,7 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     protected void ConfigureLocalDirectoryPlugin(AutomationElement mainWindow, string sourceDirectory, bool useInSourceDirectoryMode = true)
     {
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), Short);
-        einstellungenButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        NavigateToSettings(mainWindow);
 
         var quellcodeTab = WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), Short);
         quellcodeTab.Click();
