@@ -380,3 +380,4 @@ FodyWeavers.xsd
 /.softwareschmiede/copilot-runtime
 issue.md
 /test-results/
+docs/token-usage-log.csv

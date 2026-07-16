@@ -1,0 +1,56 @@
+name: Security Scan
+
+# Dauerhafter Vulnerability-Scan aller NuGet-Abhaengigkeiten (direkt + transitiv). Getrennt von
+# test.yml, damit der woechentliche "schedule"-Trigger nicht den PR-Test-Gate-Lauf beeinflusst.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Woechentlich montags 04:00 UTC, damit auch auf unveraenderten Abhaengigkeiten neu gemeldete
+    # Advisories erkannt werden.
+    - cron: '0 4 * * 1'
+
+concurrency:
+  group: security-scan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-scan:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+        shell: pwsh
+
+      - name: Scan for vulnerable packages
+        shell: pwsh
+        run: |
+          $output = dotnet list Softwareschmiede.slnx package --vulnerable --include-transitive 2>&1 | Tee-Object -Variable scanOutput
+          $scanOutput | Out-File -FilePath vulnerable-packages-scan.log -Encoding utf8
+
+          if ($scanOutput -match "has the following vulnerable packages" -or $scanOutput -match "Severity") {
+            Write-Host "::error::Es wurden verwundbare NuGet-Pakete gefunden. Siehe Scan-Ausgabe oben bzw. Artefakt 'vulnerable-packages-scan'."
+            exit 1
+          }
+
+          Write-Host "Keine verwundbaren Pakete gefunden."
+
+      - name: Upload scan log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerable-packages-scan
+          path: vulnerable-packages-scan.log
+          retention-days: 14
