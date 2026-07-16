@@ -34,6 +34,12 @@ Dieser Kanal ist privat zwischen Ihnen und dem Maintainer, sodass die Schwachste
   veröffentlicht; die Reaktionszeit hängt vom Schweregrad ab.
 - Nach Veröffentlichung eines Fixes wird die Schwachstelle im GitHub Security Advisory
   dokumentiert und, sofern zutreffend, im `CHANGELOG.md` als Fix vermerkt.
+- Softwareschmiede führt CLI-Tools anderer Anbieter (z. B. KI-Agenten-CLIs wie GitHub Copilot CLI,
+  Claude CLI oder Codex CLI) eingebettet aus. Stellt sich bei der Prüfung einer gemeldeten
+  Schwachstelle heraus, dass die Ursache nicht in Softwareschmiede selbst liegt, sondern im
+  Verhalten einer eingebetteten Dritt-CLI, kann die Rückmeldung entsprechend darauf hinweisen und
+  auf den jeweiligen Anbieter dieser CLI verweisen. Der Meldeweg selbst (GitHub Private Security
+  Advisories, siehe oben) bleibt davon unberührt.
 
 ## Umfang
 
