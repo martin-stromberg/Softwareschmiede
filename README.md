@@ -387,7 +387,6 @@ flowchart TB
         APL3["ProtokollService"]
         APL4["KiAusfuehrungsService"]
         APL5["GitOrchestrationService"]
-        APL6["AgentPackageReader / IAgentPackageService"]
     end
 
     subgraph Domain["Domain Layer (Kern - keine aeußeren Abhaengigkeiten)"]
@@ -403,7 +402,6 @@ flowchart TB
         INL3["GitHubPlugin / BitBucketPlugin / LocalDirectoryPlugin / GitHubCopilotPlugin / ClaudeCliPlugin"]
         INL4["CLI-Runner fuer gh, copilot und claude"]
         INL5["Windows Credential Store"]
-        INL6["AgentPackageReader"]
     end
 
     Presentation -->|ruft auf| Application
@@ -499,7 +497,6 @@ Feature-spezifische Testartefakte:
 - Compliance-Tests Agentendefinitionen:
   - Copilot-Plugin Health/CLI/Package-Kompatibilität: `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubCopilotPluginTests.cs`
   - Claude-Plugin Package-/Description-Robustheit: `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
-  - AgentPackageReader I/O-Fallback: `src/Softwareschmiede.Tests/Infrastructure/Services/AgentPackageReaderTests.cs`
 - Benachrichtigungssystem für abgeschlossene KI-Aufgaben:
   - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
   - Einstellungs- und Audio-Validierung/Persistenz: `src/Softwareschmiede.Tests/Application/Services/BenachrichtigungsEinstellungenServiceTests.cs`
