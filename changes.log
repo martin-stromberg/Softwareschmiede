@@ -1,3 +1,9 @@
+## 2026-07-16 — Toten Code zum Agentenpaket-Feature entfernen
+
+- Entfernung aller ungenutzten Typen und Implementierungen des Agentenpaket-Features: Interfaces `IAgentPackageService` und `IAgentPackageFileService`, ValueObjects `AgentPackageInfo` und `FileTreeNode`, Services `AgentPackageReader` und `AgentPackageFileService` sowie zugehörige Unit- und Integrationstests (`AgentPackageReaderTests`, `AgentPackageFileServiceTests`) aus `src/Softwareschmiede/` und `src/Softwareschmiede.Tests/`.
+- Das Feature war bereits aus der Produktdokumentation (README.md, Architektur-Diagramm) entfernt und hatte keine Registrierung in `Program.cs` oder externe Referenzen — es handelt sich um reine Codebereinigung ohne Verhaltensänderungen für Anwender.
+- Aktualisierung von `README.md`: Entfernung der Knoten `APL6` und `INL6` aus dem Architektur-Diagramm sowie der Testdatei-Referenz für AgentPackageReader.
+
 ## 2026-07-16 — Veröffentlichung des Repositorys
 
 - Neue `LICENSE` (MIT) sowie `THIRD_PARTY_LICENSES.md` mit Übersicht aller ausgelieferten Abhängigkeiten und deren Lizenzen; die GPL-3.0-Testabhängigkeit FlaUI ist als Test-only gekennzeichnet und propagiert dank `PrivateAssets`/`IncludeAssets` in `Softwareschmiede.Tests.csproj` nicht mehr transitiv.
