@@ -1,3 +1,11 @@
+## 2026-07-16 — Veröffentlichung des Repositorys
+
+- Neue `LICENSE` (MIT) sowie `THIRD_PARTY_LICENSES.md` mit Übersicht aller ausgelieferten Abhängigkeiten und deren Lizenzen; die GPL-3.0-Testabhängigkeit FlaUI ist als Test-only gekennzeichnet und propagiert dank `PrivateAssets`/`IncludeAssets` in `Softwareschmiede.Tests.csproj` nicht mehr transitiv.
+- Neue `SECURITY.md` mit Meldeweg über GitHub Private Security Advisories.
+- `README.md` und `CONTRIBUTING.md` für externe Nutzer und Beitragende überarbeitet (Lizenzverweis, Setup, Coding-Standards, PR-Prozess, Kontakt).
+- Dauerhafter CI-Workflow `.github/workflows/security-scan.yml` prüft bei jedem Pull Request, Push auf `main` sowie wöchentlich per Zeitplan auf verwundbare NuGet-Pakete.
+- Das interne Token-Verbrauchsprotokoll (`.claude/hooks/log_token_usage.py`) schreibt künftig an einen repo-externen Pfad statt nach `docs/token-usage-log.csv`, damit reine Prozessmetriken nicht Teil des öffentlichen Repositorys werden; bestehende Daten wurden migriert.
+
 ## 2026-07-14 — Dateiexplorer für Aufgabendetailansicht
 
 - Neues Register „Dateien" in der Aufgabendetailansicht mit Split-View-Architektur: links ein Verzeichnis-/Dateibaum, rechts der Dateiinhalt oder ein Diff.

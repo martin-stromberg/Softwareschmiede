@@ -8,7 +8,7 @@
 [![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
 [![Release](https://img.shields.io/github/actions/workflow/status/martin-stromberg/Softwareschmiede/release.yml?label=Release)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml)
-[![License](https://img.shields.io/badge/License-zu%20definieren-lightgrey)](#-lizenz)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](#-lizenz)
 
 ---
 
@@ -1720,15 +1720,19 @@ refactor: KiAusfuehrungsService in kleinere Methoden aufgeteilt
 
 ## 📄 Lizenz
 
-Die Lizenz ist noch nicht final festgelegt.  
-Vor einem öffentlichen Release wird eine `LICENSE`-Datei ergänzt und diese Sektion aktualisiert.
+Softwareschmiede steht unter der **MIT-Lizenz** — siehe [`LICENSE`](LICENSE).
+
+Eine Übersicht aller Drittanbieter-Abhängigkeiten und deren Lizenzen findet sich in
+[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). Sicherheitsrelevante Meldungen bitte gemäß
+[`SECURITY.md`](SECURITY.md) über GitHub Private Security Advisories einreichen.
 
 ---
 
 ## 📬 Kontakt
 
-- Aktuell kein öffentlicher Maintainer-Kontakt hinterlegt.
+- **Maintainer:** [martin-stromberg](https://github.com/martin-stromberg) (alleiniger Maintainer).
 - Für Rückfragen/Feedback bitte Issues im Repository verwenden.
+- Sicherheitslücken bitte **nicht** öffentlich melden, sondern gemäß [`SECURITY.md`](SECURITY.md).
 
 ---
 
