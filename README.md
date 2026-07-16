@@ -3,7 +3,6 @@
 > **KI-gestützter Softwareentwicklungs-Workflow — lokal, strukturiert und erweiterbar**
 
 [![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4?logo=blazor)](https://blazor.net/)
 [![WPF](https://img.shields.io/badge/WPF-Desktop-512BD4?logo=dotnet)](https://learn.microsoft.com/dotnet/desktop/wpf/)
 [![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57?logo=sqlite)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
@@ -34,8 +33,6 @@
 18. [Lizenz](#-lizenz)
 19. [Kontakt](#-kontakt)
 
-> **Hinweis:** Das Projekt befindet sich in der Migration von Blazor Server zu einer nativen **WPF-Desktopanwendung**. Beide Frontends nutzen dieselben Domain- und Service-Schichten. Details unter [WPF-Desktopanwendung (in Entwicklung)](#️-wpf-desktopanwendung-in-entwicklung).
-
 ---
 
 ## 📖 Projektbeschreibung
@@ -44,7 +41,7 @@
 
 Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Login** und verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung und KI-Steuerung an einem zentralen Ort.
 
-Aktuell wird die Anwendung von **Blazor Server (.NET 10+)** auf eine native **WPF-Desktopanwendung** migriert. Das neue WPF-Projekt (`src/Softwareschmiede.App`) ist bereits in der Solution enthalten; die bisherige Blazor-Oberfläche ist weiterhin aktiv bis zur vollständigen Ablösung.
+Die Oberfläche ist eine native **WPF-Desktopanwendung** (`src/Softwareschmiede.App`, .NET 10+). Eine frühere Blazor-Server-Oberfläche wurde vollständig durch die WPF-Anwendung abgelöst und ist nicht mehr Teil des Projekts.
 
 ### Geschäftsziele
 
@@ -64,7 +61,7 @@ Stand: **2026-07-14**
 
 | Bereich | Status | Hinweise |
 |---|---|---|
-| Projekt-, Aufgaben- und Protokollverwaltung | ✅ Implementiert | Blazor-UI inkl. Dashboard, Detailseiten und Verlauf |
+| Projekt-, Aufgaben- und Protokollverwaltung | ✅ Implementiert | WPF-UI inkl. Dashboard, Detailseiten und Verlauf |
 | SCM-Plugins | ✅ Implementiert | `GitHub`, `BitBucket` und `LocalDirectoryPlugin` produktiv verfügbar |
 | Separates Arbeitsverzeichnis mit Git-Workflow-Fallback | ✅ Implementiert | `git init`-Fallback, Pull ohne Merge (inkl. Nutzerhinweis), Push als Datei-Sync inkl. Delete-Sync über `git status` |
 | KI-Plugins | ✅ Implementiert | `GitHub Copilot`, `Claude CLI` und `Codex CLI` produktiv verfügbar |
@@ -78,7 +75,7 @@ Stand: **2026-07-14**
 | **Arbeitsverzeichnis für KI-Ausführung (Issue #98)** | ✅ Implementiert | Repository-Startskript kann in konfigurierbarem Unterverzeichnis ausgeführt werden; UI-Dialog mit Verzeichnisstruktur-Vorschau oder manueller Eingabe bei Abruffehlern; `WorkingDirectoryRelativePath` in `RepositoryStartKonfiguration`; `DirectoryStructureBrowserService` mit Caching; Path-Traversal-Sicherheit; E2E-Tests implementiert |
 | **ConPTY-Terminal-Integration** | ✅ Implementiert | Windows Pseudo Console API für interaktive KI-CLI-Prozesse; `TerminalControl` mit VT100-Parsing, `AnsiSequenceParser`, `TerminalBuffer`, `KeyToVt100Encoder`; Farbunterstützung (3-bit/8-bit/24-bit), Tastatureingabe-Handling, automatische Größenanpassung, CLI-Laufzeitstatus in der Fußzeile (`Ausführung läuft`/`Wartet auf Eingabe`); Voraussetzung: Windows 10 Build 17763+ |
 | **Promptvorlagen für CLI-Eingaben** | ✅ Implementiert | In den Einstellungen verwaltbare Promptvorlagen mit Name und Prompttext; Sofortversand aus der Aufgabendetailansicht an die laufende CLI; Platzhalter `%ProjectName%`, `%TaskName%` und `%RepositoryUrl%` werden vor dem Senden aufgelöst |
-| **WPF-Desktopanwendung (Migration)** | 🔄 In Entwicklung | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und expliziten Info-/CLI-/Diff-Ansichten vollständig implementiert; Fenstertitel zeigt die geöffnete Aufgabe, die Fußzeile den tatsächlich aktiven CLI-Namen, Info bleibt auch bei gestarteten und beendeten Aufgaben erreichbar**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden; Git-Plugin-Aufgaben ohne Issue-Bezug können gestartet werden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`**; **Issue 107: Programmsymbol für Softwareschmiede.App (✅): Hammer-Icon (🔨) über `<ApplicationIcon>`-Property in `Softwareschmiede.App.csproj` eingebettet und als WPF-Pack-Resource verfügbar; `Window.Icon="/images/Softwareschmiede.ico"` in `MainWindow.xaml` gesetzt für konsistente Darstellung in Windows-Explorer, Taskleiste und Fenster-Titelleiste** |
+| **WPF-Desktopanwendung** | ✅ Implementiert | `src/Softwareschmiede.App` — WPF-UI-Gerüst, ViewModels, Dark Mode, ConPTY-Terminal-Integration, Recovery-Banner, Audio-Benachrichtigungen; Projektdetailansicht vollständig implementiert mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (bearbeitbar), Aufgaben-Kachel (filterbar), Repository-Zuweisungs-Dialog und E2E-Tests; Einstellungsansicht mit Plugin-Registerkarten (SCM/KI) mit dynamischen Plugin-Einstellungspanels und globalen Dark-Mode-Styles; **Aufgabendetailansicht mit Ribbon-Menü und expliziten Info-/CLI-/Diff-Ansichten vollständig implementiert; Fenstertitel zeigt die geöffnete Aufgabe, die Fußzeile den tatsächlich aktiven CLI-Namen, Info bleibt auch bei gestarteten und beendeten Aufgaben erreichbar**; **Separate Aufgabendetailansicht implementiert (✅): Auslagerung aus Inline-Position in fensterumfassende View mit Callback-basierter Navigation zwischen ProjectDetailView und TaskDetailView**; **Aufgabenworkflow-Optimierung (Feature #72) in Arbeit: Vereinfachtes Statusmodell (ArbeitsverzeichnisEingerichtet/InArbeit entfernt), neuer `StartenCommand` mit kombiniertem Klone+CLI-Start, Plugin-Dialog mit Projekt-Level-Speicherung, `PluginAendernCommand` für Plugin-Wechsel, automatischer CLI-Neustart bei Aufgabe-Laden; Git-Plugin-Aufgaben ohne Issue-Bezug können gestartet werden**; **Repository-Suggestion-Panel in Arbeit: Neue Service-Methode `GetUnassignedRepositoriesAsync()`, ViewModel-Integration mit `UnassignedRepositories`-Property und `RepositoryDoubleclickCommand`, XAML-Panel mit ItemsControl und Value Converter für relative Datumsformatierung, E2E-Tests**; **Issue 81: Aktive Aufgaben im Menü (in Arbeit): Anzeige von Aufgaben mit Status `Gestartet` oder `Wartend` in der Navigations-Seitenleiste als gerahmte Kacheln mit Titel und KI-Ausführungsstatus; Sektion automatisch verborgen wenn Dashboard aktiv ist; neue `KiAusfuehrungsStatusConverter` für Status-Ermittlung basierend auf `AktiveRunId` und `LastHeartbeatUtc`; erweiterte ViewModels (`MainWindowViewModel`, `DashboardViewModel`) und neue Service-Methode `GetAktiveAufgabenAsync()` in `AufgabeService`**; **Issue 107: Programmsymbol für Softwareschmiede.App (✅): Hammer-Icon (🔨) über `<ApplicationIcon>`-Property in `Softwareschmiede.App.csproj` eingebettet und als WPF-Pack-Resource verfügbar; `Window.Icon="/images/Softwareschmiede.ico"` in `MainWindow.xaml` gesetzt für konsistente Darstellung in Windows-Explorer, Taskleiste und Fenster-Titelleiste** |
 | **Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget)** | ✅ Implementiert | Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs`; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` für alle Fire-and-Forget-Aufrufe; konsolidierter, try-catch-geschützter `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start); Heartbeat-Aktualisierung pro Aufgabe über eigenes `SemaphoreSlim` in `CliProcessManager` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` mit vollständigem Exception-Handling und überwachtem Hintergrund-Task; Startfehler von `CliProcessManager`-Initialisierung und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts |
 | **Issue 108: Automatische Statusaktualisierung aktiver Aufgaben** | ✅ Implementiert | Seitenleisten- und Dashboard-Aufgabenlisten zeigen KI-Ausführungsstatus (▶ Läuft, ⏸ Wartet, ✓ Bereit) in Echtzeit an. Hybrid-Mechanismus: `IRunningAutomationStatusSource.RunningCountChanged`-Event für Sofortaktualisierung bei Prozess-Start/-Stopp, `DispatcherTimer` (5 s Intervall) als Fallback für Heartbeat-Ablauf und Rate-Limit-Übergänge. `SemaphoreSlim`-Re-Entrancy-Schutz verhindert DbContext-Konflikte. `StatusAenderungsErkennung` nutzt `Aufgabe.Id`-Keying, um Übergangsanimation nur bei echtem Statuswechsel auszulösen (dezente Opacity-Fade). `StatusUebergangsAnimation` als Attached Behavior mit in Code konstruiertem DoubleAnimation (250 ms EaseOut). E2E-Tests mit FlaUI über `AutomationProperties.HelpText`. |
 | **Issue 86: Parallele CLI-Ausführungen ohne Blockade bei verborgener Aufgabenseite** | ✅ Implementiert | Entkopplung der ReadLoop vom `TerminalControl`-Lebenszyklus: `PseudoConsoleSession` verwaltet die Leseschleife unabhängig und feuert `BufferChanged`-Events. `TerminalControl` wird zu reinem Renderer, der Events abonniert statt ReadLoop zu steuern. CLI-Prozesse laufen parallel weiter, auch wenn ihre Aufgabenseite nicht angezeigt wird. Betroffene Komponenten: `TerminalControl` (Unloaded-Handler entfernt, Event-Binding hinzugefügt), `PseudoConsoleSession` (ReadLoop ab Konstruktion aktiv), `KiAusfuehrungsService` (Cleanup-Logik angepasst). Unit-Tests für parallele Sessions, View-Wechsel und Session-Cleanup vorhanden; Details siehe [docs/help/terminal](docs/help/terminal/index.md) |
@@ -86,7 +83,7 @@ Stand: **2026-07-14**
 | **Issue 122: Zeitgesteuerter Prompt-Versand** | ✅ Implementiert | Neue Funktion in der Aufgabendetailansicht: Benutzer können einen Prompt zeitverzögert versenden. Zwei `TextBox`-Eingabefelder für Stunde (0–23) und Minute (0–59) in der CLI-Ribbon-Gruppe; ist keine Zielzeit angegeben, wird der Prompt sofort versendet (bestehendes Verhalten), ansonsten zeitgesteuert nach `PromptZeitVersandService.SchedulePromptAsync`. Neuer Singleton-Service mit `Dictionary<Guid, ScheduledPromptInfo>` und ereignisgesteuerten pro-Eintrag-Timern (`ITimer` via `TimeProvider.CreateTimer`); Timer-basierte Versendung bei Zielzeit-Erreichen oder sofortiger Versand bei vergangener Zielzeit. Neue ViewModel-Properties: `ScheduledPromptTargetHours`, `ScheduledPromptTargetMinutes`, `ScheduledPromptStatus`, `ScheduledPromptTimeDisplay`, `CanSchedulePrompt`, `SchedulePromptCommand`. Neue `PseudoConsoleSession.WritePromptAsync()` für DRY-Prompt-Logik. Unit-Tests mit `FakeTimeProvider` für deterministische Timer-Tests, E2E-Tests für Happy-Path. Betroffene Komponenten: `PromptZeitVersandService` (neu, Service Layer, Singleton), `ScheduledPromptInfo` (neu, Value Object), `TaskDetailViewModel` (erweitert), `TaskDetailView.xaml` (erweitert), `PseudoConsoleSession` (erweitert), `App.xaml.cs` (DI-Registrierung), Test-NuGet `Microsoft.Extensions.TimeProvider.Testing` hinzugefügt. |
 | **Dateiexplorer für Aufgabendetailansicht** | ✅ Implementiert | Split-View-Dateibrowser in `TaskDetailView` mit zwei Modi: **Standard** (Arbeitsbaum des geklonten Repositories mit `.git`-Ausschluss) und **Vergleich** (Commit-gerichtete Ansicht mit nur geänderten Dateien). Neue Komponenten: `FileExplorerViewModel` (Presentation Model), `FileExplorerView` (UserControl mit Mode-Toggle, TreeView, GridSplitter, Datei-/Verzeichnis- und Änderungsstatus-Symbolen, Navigation zur nächsten/vorherigen Änderung im Vergleichsmodus, Button zum Öffnen der Datei mit der Standardanwendung), `DiffViewer` (ItemsControl-basierter Diff-Renderer), `DiffLineStatusToBrushConverter` (Statusfarben grün/rot/orange, theme-fähig), `WorkspaceFileNodeIconConverter`/`WorkspaceFileNodeStatusIconConverter`. Neue Services: `ITextDiffService`/`TextDiffService` (präsentations-neutrale Zeilendiff-Engine mit Modified-Paarung und Inline-Segmenten für Wortabschnitts-Granularität), Erweiterung `IGitWorkspaceBrowserService.LoadWorkingTreeAsync()` (Directory-Walk mit Obergrenze und `.git`-Ausschluss). Neue Value Objects: `TextDiffLine`, `InlineDiffSegment`, `FileTextDiff` in Domain Layer. Betroffene Dateien: `TaskDetailViewModel`, `TaskDetailView.xaml`, `IGitWorkspaceBrowserService`, `GitWorkspaceBrowserService`, `App.xaml.cs` (DI-Setup). Unit-Tests für `TextDiffService`, `LoadWorkingTreeAsync`, `FileExplorerViewModel`; E2E-Tests für UI-Interaktion. Details siehe [docs/help/dateiexplorer](docs/help/dateiexplorer/index.md). Bekannte offene Punkte (siehe Doku): fehlende Obergrenze für die Zeilendiff-Berechnung bei sehr großen Commit-Vorschauen, Race-Condition-Härtung bei schnellem Aufgabenwechsel. |
 | **Programmupdate** | ✅ Implementiert | Die WPF-App prüft beim Start stabile GitHub-Releases, vergleicht gegen `version.json`, bietet Update- und Refresh-Aktionen im Sidebar-Footer an, schützt aktive nicht-wartende CLI-Läufe per Sicherheitsabfrage, bereitet `release.zip` mit Fortschrittsdialog vor und startet ein externes PowerShell-Update-Skript mit optionaler UAC/Elevation. Es gibt kein automatisches Rollback; Details siehe [docs/help/programmupdate](docs/help/programmupdate/index.md). |
-| Öffentliche HTTP-API | ⚠️ Teilweise | Aktuell fokussiert auf Diff-Endpunkte; weitere API-Bereiche weiterhin plugin-/servicebasiert |
+| Diff-Funktionalität | ✅ Implementiert | `DiffService` wird von der WPF-Anwendung direkt über Dependency Injection genutzt (kein separat gehosteter HTTP-Server); `DiffController` existiert als ASP.NET-Core-Controller im Projekt `Softwareschmiede`, ist aber ohne eigenen Web-Host aktuell nicht erreichbar |
 | CI/CD-Pipeline für Release | ✅ Implementiert | Automatisierter Release-Workflow (`.github/workflows/release.yml`): Semantic Release (Conventional Commits) bestimmt die Version, `dotnet publish` erstellt den .NET-10-Build, das Ergebnis wird als `release.zip` verpackt und als GitHub-Release veröffentlicht; manueller Tag-Override (`vX.Y.Z`) möglich; Details in [CONTRIBUTING.md](CONTRIBUTING.md) und [docs/CI_CD.md](docs/CI_CD.md) |
 
 ---
@@ -486,18 +483,18 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 #### Feature-Fokus: Changed Artifact Detection & Agentendefinitions-Compliance
 - **Ziel:** Geänderte Planungsdokumente im Workspace-Browser zusätzlich zu Codedateien sichtbar machen und Agentenpakete robust auf Struktur-/Lesekompatibilität prüfen.
 - **Verhalten:** `WorkspaceSnapshot` trennt Änderungen in `CodeFiles` und `PlanningDocuments`; die Erkennung umfasst `docs/requirements`, `docs/architecture`, `docs/improvements` inkl. Fallback für Slash-/Dot-Pfadvarianten.
-- **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `WorkspaceSnapshot`, `AufgabeDetail`, `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`.
+- **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `WorkspaceSnapshot`, `FileExplorerViewModel`/`FileExplorerView` (WPF-Dateiexplorer), `GitHubCopilotPlugin`, `ClaudeCliPlugin`, `AgentPackageReader`.
 - **Compliance:** Agentenpakete werden auf kompatible Struktur (u. a. `.github`) sowie robuste Fehlerpfade bei fehlenden Pfaden/Beschreibungen geprüft.
-- **Testabdeckung:** `GitWorkspaceBrowserServiceTests`, `AufgabeDetailWorkspacePreviewBunitTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`; ergänzend [Testplan](docs/tests/testplan-changed-artifact-detection-agent-compliance.md) und [Testlückenanalyse](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md).
+- **Testabdeckung:** `GitWorkspaceBrowserServiceTests`, `GitHubCopilotPluginTests`, `ClaudeCliPluginTests`, `AgentPackageReaderTests`; ergänzend [Testplan](docs/tests/testplan-changed-artifact-detection-agent-compliance.md) und [Testlückenanalyse](docs/tests/testluecken-changed-artifact-detection-agent-compliance.md).
 - **Workflow-Auswirkung:** In der Aufgabenseite werden geänderte Planungsartefakte getrennt von Codedateien verarbeitet; Agentenpaket-Auswahl und KI-Lauf bleiben bei unvollständigen Paketinhalten fehlertolerant nutzbar.
 - **Doku-Links:** [API Live Project Browser](docs/api/live-project-browser-git-status.md), [API Plugin-Interfaces](docs/api/plugin-interfaces.md), [Flow](docs/flows/live-project-browser-git-status-flow.md), [Business F021](docs/business/features/F021-live-project-browser-git-status.md), [Business F004](docs/business/features/F004-agentenpakete.md), [Planungsübersicht](docs/planning-overview-changed-artifact-detection.md).
 
 #### Feature-Fokus: Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview
 - **Ziel:** Commit-Kontext direkt in der Aufgabenansicht sichtbar machen und für Commit-Dateien eine gezielte Vorschau ohne Wechsel in externe Tools bereitstellen.
 - **Verhalten:** `WorkspaceSnapshot` liefert `BranchCommits`; pro Commit werden Dateiknoten lazy über `LoadCommitFilesAsync` geladen und bei Dateiauswahl mit `LoadCommitPreviewAsync` angezeigt.
-- **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `IGitWorkspaceBrowserService`, `WorkspaceSnapshot`, `WorkspaceFileNode`, `BranchCommit`, `CommitTreePresenter`, `AufgabeDetail.razor` / `AufgabeDetail.razor.cs`.
+- **Betroffene Komponenten:** `GitWorkspaceBrowserService`, `IGitWorkspaceBrowserService`, `WorkspaceSnapshot`, `WorkspaceFileNode`, `BranchCommit`, `CommitTreePresenter`, `FileExplorerViewModel`/`FileExplorerView` (WPF-Dateiexplorer).
 - **Bekannte Grenzen:** Wenn keine Basisreferenz (`origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`) auflösbar ist, werden keine Branch-Commits angezeigt; Verzeichnisse und Binärdateien haben keine Inline-Commit-Vorschau (Hint statt Diff-Inhalt).
-- **Testabdeckung (Codebestand):** `GitWorkspaceBrowserServiceTests` (Basisreferenz-Fallback, Branch-Commit-Parsing, Commit-Dateibaum, Commit-Preview), `CommitTreePresenterTests` (Expand/Retry/Flatten), `AufgabeDetailWorkspacePreviewBunitTests` (Lazy-Load-Fehler + Retry, Commit-Preview-Auswahl).
+- **Testabdeckung (Codebestand):** `GitWorkspaceBrowserServiceTests` (Basisreferenz-Fallback, Branch-Commit-Parsing, Commit-Dateibaum, Commit-Preview), `CommitTreePresenterTests` (Expand/Retry/Flatten).
 - **Doku-Links:** [Dokumentationsplan (2026-05-27)](docs/documentation-plan.md), [API Live Project Browser](docs/api/live-project-browser-git-status.md), [Flow Live Project Browser](docs/flows/live-project-browser-git-status-flow.md), [Business F021](docs/business/features/F021-live-project-browser-git-status.md), [Business F022](docs/business/features/F022-diff-vergleichskomponente.md).
 
 #### Dateiexplorer für Aufgabendetailansicht
@@ -582,9 +579,9 @@ Der Repository-Zuweisungs-Dialog (`RepositoryAssignDialog`) wird um die Auswahl 
 - Farbkodierte Statusanzeige (KI aktiv = blau, Fehlgeschlagen = rot, Abgeschlossen = grün)
 - Direktnavigation zum Aufgabenprotokoll per Klick
 
-### 🖥️ WPF-Desktopanwendung (in Entwicklung)
+### 🖥️ WPF-Desktopanwendung
 
-Das Projekt `src/Softwareschmiede.App` enthält die neue native WPF-Oberfläche als Ablösung der Blazor-Anwendung:
+Das Projekt `src/Softwareschmiede.App` enthält die native WPF-Oberfläche der Anwendung:
 
 #### Kernfeatures
 
@@ -753,9 +750,9 @@ Die Terminal-Integration wurde mit zwei kritischen Verbesserungen erweitert:
 **Dokumentation:** siehe [docs/help/terminal/beschreibung.md](docs/help/terminal/beschreibung.md)
 
 ### 🎨 Branding & UI-Assets
-- Anwendung nutzt ein dediziertes SVG-Favicon `favicon-hammer-pick.svg` (gekreuzter Hammer/Pickel) aus `src/Softwareschmiede/wwwroot/`
-- Browser-Head enthält konsistente SVG-Referenzen (`icon`, `shortcut icon`, `mask-icon`) für moderne Browserdarstellung
-- Legacy-Favicon-Verweise (`favicon.ico`, `favicon.png`) wurden aus `App.razor` entfernt
+- Anwendung nutzt ein dediziertes Hammer-Icon (`src/Softwareschmiede.App/images/Softwareschmiede.ico`) als Programmsymbol
+- Icon ist über `<ApplicationIcon>` in die `.exe` eingebettet und über `Window.Icon` zusätzlich in der Fenster-Titelleiste gesetzt
+- Konsistente Darstellung in Windows-Explorer, Taskleiste und Fenster-Titelleiste (siehe Feature „Programmsymbol für Softwareschmiede.App" oben)
 
 ---
 
@@ -812,15 +809,6 @@ cd Softwareschmiede
 
 ### 2. Abhängigkeiten wiederherstellen & bauen
 
-**Blazor Server (aktuell produktiv):**
-
-```powershell
-dotnet restore
-dotnet build src/Softwareschmiede/Softwareschmiede.csproj
-```
-
-**WPF-Desktopanwendung (in Entwicklung):**
-
 ```powershell
 dotnet restore
 dotnet build src/Softwareschmiede.App/Softwareschmiede.App.csproj
@@ -829,16 +817,6 @@ dotnet build src/Softwareschmiede.App/Softwareschmiede.App.csproj
 Beim Build werden die Plugin-DLLs automatisch nach `bin/<Config>/plugins/` kopiert (MSBuild-Target `CopyPluginsToOutput`).
 
 ### 3. Anwendung starten
-
-**Blazor Server:**
-
-```powershell
-dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj
-```
-
-Die Blazor-Anwendung ist danach unter **`https://localhost:5001`** (oder dem konfigurierten Port) erreichbar.
-
-**WPF-Desktop:**
 
 ```powershell
 dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj
@@ -922,14 +900,9 @@ zugewiesenen Repositories jederzeit angepasst werden, ohne die Zuweisung selbst 
 - In der Aufgaben-Aktionsleiste gilt bei `LocalDirectory + Arbeitskopie`: **Push/Pull/Pull Request ausblenden, Merge einblenden** (gesteuert über `GitActionCapabilities`).
 - Nicht unterstützte Remote-Provider-Operationen (z. B. Pull Request/Issues/Remote-Branch-Abfragen) werden im LocalDirectoryPlugin mit `NotSupportedException` abgelehnt.
 
-### Diff-Funktionalität über REST nutzen
+### Diff-Funktionalität
 
-- `POST /api/diff/generate` erzeugt ein Diff aus Source-/Target-Inhalt.
-- `GET /api/diff/{id}` lädt ein bestehendes Diff mit Blöcken und Zeilen.
-- `GET /api/diff?aufgabeId=...` listet Diffs einer Aufgabe paginiert.
-- `GET /api/diff/statistics?aufgabeId=...` liefert aggregierte Kennzahlen.
-- `DELETE /api/diff/{id}` entfernt ein Diff; `POST /api/diff/{id}/invalidate-cache` invalidiert nur den Cache.
-- Referenzdokumentation: [HTTP-Endpunkte](docs/api/http-endpoints.md), [API-Index](docs/api/README.md)
+Der Dateiexplorer der Aufgabendetailansicht (`FileExplorerViewModel`) nutzt `DiffService` direkt über Dependency Injection innerhalb der WPF-Anwendung — es gibt keinen separat laufenden HTTP-Server, gegen den REST-Aufrufe nötig wären.
 
 ### KI-Plugin-Auswahl (Copilot, Claude CLI oder Codex CLI)
 
@@ -985,12 +958,6 @@ Details zu den einzelnen Schritten:
 - [Feature-Dokumentation](docs/business/features.md)
 - [Requirements: Kontextsteuerung bei Folgeanweisungen](docs/requirements/kontextsteuerung-folgeanweisungen-requirements-analysis.md)
 - [Architektur: Kontextsteuerung bei Folgeanweisungen](docs/architecture/kontextsteuerung-folgeanweisungen-architecture-blueprint.md)
-
-### SVG-Favicon im Browser verifizieren
-
-1. Anwendung lokal starten (`dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj`).
-2. Browser-Tab der App öffnen und Favicon prüfen (Hammer/Pickel-Symbol).
-3. Optional DevTools öffnen und im `<head>` prüfen, dass `favicon-hammer-pick.svg` in `icon`, `shortcut icon` und `mask-icon` referenziert wird.
 
 ---
 
@@ -1183,7 +1150,7 @@ Für **Claude CLI** gilt zusätzlich: Der Paketinhalt muss einen `.github`-Ordne
 ```
 Softwareschmiede/                            # Solution Root
 ├── src/
-│   ├── Softwareschmiede/                    # Blazor Server Hauptprojekt (Host)
+│   ├── Softwareschmiede/                    # Domain/Application/Infrastructure (Klassenbibliothek)
 │   │   ├── Application/
 │   │   │   └── Services/                    # EntwicklungsprozessService, ProjektService,
 │   │   │                                    # AufgabeService, ProtokollService,
@@ -1197,14 +1164,8 @@ Softwareschmiede/                            # Solution Root
 │   │   │   ├── Data/                        # EF Core DbContext, Migrations
 │   │   │   ├── Plugins/                     # PluginManager (Discovery/Loading)
 │   │   │   └── Services/                    # CliRunner, WindowsCredentialStore, ...
-│   │   ├── Components/
-│   │   │   └── Pages/                       # Blazor Razor Pages
-│   │   │       ├── Home.razor               # Dashboard
-│   │   │       ├── Projekte/
-│   │   │       ├── Aufgaben/
-│   │   │       └── Agentenpakete/
-│   │   └── wwwroot/                         # Statische Assets (CSS, JS, Bilder)
-│   ├── Softwareschmiede.App/                # WPF-Desktopanwendung (net10.0-windows)
+│   │   └── Controllers/                     # DiffController (ohne eigenen Web-Host aktuell nicht erreichbar)
+│   ├── Softwareschmiede.App/                # WPF-Desktopanwendung (net10.0-windows) — die Benutzeroberfläche
 │   │   ├── Views/                           # MainWindow, Dashboard-, Projekt-, Aufgaben-, Einstellungs-Views
 │   │   │   ├── ProjectDetailView.xaml       # Projektdetailansicht mit Ribbon-Menü und Kacheln
 │   │   │   ├── RepositoryAssignDialog.xaml # Dialog zur Repository-Zuweisung
@@ -1221,7 +1182,6 @@ Softwareschmiede/                            # Solution Root
 │   │   ├── Services/                        # DarkModeService, WpfAudioService
 │   │   ├── Themes/                          # DarkTheme.xaml, LightTheme.xaml
 │   │   ├── Converters/                      # AppConverters, KiAusfuehrungsStatusConverter (WPF-Wertkonverter)
-│   ├── Softwareschmiede.Client/             # Blazor WebAssembly Client Assembly
 │   ├── Softwareschmiede.IntegrationTests/   # Integrations-Tests
 │   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, PluginType
 │   └── Softwareschmiede.Tests/              # Unit-Tests (xUnit, FluentAssertions, Moq)
@@ -1233,9 +1193,6 @@ Softwareschmiede/                            # Solution Root
 │   ├── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
 │   └── Softwareschmiede.Plugin.Codex/       # KI-Plugin (Codex CLI)
 ├── docs/                                    # Planungsdokumente und Architektur
-│   ├── features/72-wpf/                     # WPF-Migrationsdokumentation
-│   │   ├── requirement.md                   # Technische Anforderungsspezifikation
-│   │   └── plan.md                          # Umsetzungsplan inkl. Designentscheidungen
 │   ├── requirements/
 │   │   ├── requirements-analysis.md
 │   │   └── plugin-klassenbibliotheken-github-und-copilot.md
@@ -1252,14 +1209,14 @@ Softwareschmiede/                            # Solution Root
 
 ## 🏗️ Architektur
 
-Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten. Die Präsentationsschicht wird derzeit von Blazor Server auf WPF migriert; Domain, Application und Infrastructure bleiben für beide Frontends identisch:
+Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten:
 
 ```mermaid
 flowchart TB
-    subgraph Presentation["Presentation Layer (Blazor Server)"]
-        PRL1["Razor Pages / Components"]
-        PRL2["ViewModels"]
-        PRL3["SignalR - Echtzeit-Streaming"]
+    subgraph Presentation["Presentation Layer (WPF)"]
+        PRL1["Views (XAML)"]
+        PRL2["ViewModels (MVVM)"]
+        PRL3["ConPTY-Terminal-Integration"]
     end
 
     subgraph Application["Application Layer (Services / Use Cases)"]
@@ -1295,8 +1252,7 @@ flowchart TB
 
 | Schicht | Verantwortung |
 |---------|---------------|
-| **Presentation (Blazor)** | UI-Rendering, Benutzerinteraktion, ViewModel-Binding, Echtzeit-Updates via SignalR |
-| **Presentation (WPF, in Entwicklung)** | Native Windows-UI, MVVM (ViewModelBase), Dark Mode, CLI-Fenstereinbettung via Win32 SetParent |
+| **Presentation (WPF)** | Native Windows-UI, MVVM (ViewModelBase), Dark Mode, ConPTY-Terminal-Integration |
 | **Application** | Anwendungsfalllogik, Koordination von Domain und Infrastructure, Plugin-Aufruf |
 | **Domain** | Fachentitäten, Domänenregeln, Plugin-Interfaces – **keine** äußeren Abhängigkeiten |
 | **Infrastructure** | DB-Zugriff, CLI-Prozesse, Credential Store, Dateisystem |
@@ -1370,37 +1326,21 @@ dotnet test --collect:"XPlat Code Coverage"
 
 Feature-spezifische Testartefakte:
 - Service-Tests (Diff-Pipeline/Cache/Algorithmus): `src/Softwareschmiede.Tests/Application/Services/DiffServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffCachingServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffAlgorithmServiceTests.cs`
-- Wiring-Test (DI-Registrierung der Diff-Services): `src/Softwareschmiede.Tests/ProgramDiWiringTests.cs`
-- UI-bUnit-Tests (DiffViewer: Embedded/Standalone + Parameterwechsel): `src/Softwareschmiede.Tests/Components/Diff/DiffViewerBunitTests.cs`
-- UI-bUnit-Tests (DiffPreviewPanel: FR-4-Fallbacks + DiffViewer-Einbettung): `src/Softwareschmiede.Tests/Components/Diff/DiffPreviewPanelBunitTests.cs`
-- UI-bUnit-Tests (Standalone-Route `/diff/{DiffResultId:guid}`): `src/Softwareschmiede.Tests/Components/Pages/Diff/DiffViewerPageBunitTests.cs`
-- UI-bUnit-Tests (AufgabeDetail Workspace-Preview/Stabilität): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailWorkspacePreviewBunitTests.cs`
 - Service-Tests (Changed Artifact Detection: `CodeFiles` + `PlanningDocuments`, Fallback-Pfade): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
 - Service-Tests (Branch-Commit-Baum & Commit-Preview): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
-- UI-bUnit-Tests (Commit-Knoten Lazy Load, Fehler/Retry, Commit-Preview): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailWorkspacePreviewBunitTests.cs`
-- Presenter-Tests (Expand/Retry/Flatten/Commit-Preview-Entscheidung): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/CommitTreePresenterTests.cs`
 - Service-Tests (dateispezifische Diff-Auflösung): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
 - Service-Tests (Issue 58 Pluginauswahl/Persistenz): `src/Softwareschmiede.Tests/Application/Services/PluginSelectionServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
-- UI-bUnit-Tests (Issue 58 Reihenfolge/Weitergabe): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
-- Protokoll-Tests (Markdown-Struktur + Sanitizing/Fallback): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailFolgePromptTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
-- UI-bUnit-Tests (Git-Aktionsleiste/Pluginauswahl): `src/Softwareschmiede.Tests/Components/Pages/Aufgaben/AufgabeDetailGitActionsBunitTests.cs`
-- UI-Tests (Projektdetail Startkonfiguration): `src/Softwareschmiede.Tests/Components/Pages/Projekte/ProjektDetailRepositoryFormTests.cs`
 - Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`
 - Integrationstests: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
-- UI/Settings-Tests: `src/Softwareschmiede.Tests/Components/Pages/EinstellungenBaseArbeitsverzeichnisTests.cs`
 - Compliance-Tests Agentendefinitionen:
   - Copilot-Plugin Health/CLI/Package-Kompatibilität: `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubCopilotPluginTests.cs`
   - Claude-Plugin Package-/Description-Robustheit: `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
   - AgentPackageReader I/O-Fallback: `src/Softwareschmiede.Tests/Infrastructure/Services/AgentPackageReaderTests.cs`
 - Benachrichtigungssystem für abgeschlossene KI-Aufgaben:
   - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
-  - UI-/Dispatch-Logik (Modusmatrix, Dedupe, Audio-/Toast-Verhalten, Audit): `src/Softwareschmiede.Tests/Components/Layout/MainLayoutTests.cs`
   - Einstellungs- und Audio-Validierung/Persistenz: `src/Softwareschmiede.Tests/Application/Services/BenachrichtigungsEinstellungenServiceTests.cs`
-- SVG-Favicon (Hammer/Pickel):
-  - Markup-Referenzen in `App.razor` (SVG-Link-Tags, keine Legacy-Favicon-Dateien): `src/Softwareschmiede.Tests/Components/AppTests.cs`
-  - Statisches Asset (Existenz + SVG-Struktur/Branding-Marker): `src/Softwareschmiede.Tests/Infrastructure/StaticAssets/FaviconHammerPickSvgTests.cs`
 - [Testplan: Arbeitsverzeichnis](docs/tests/testplan-arbeitsverzeichnis.md)
 - [Testlücken: Arbeitsverzeichnis](docs/tests/testluecken-arbeitsverzeichnis.md)
 - [Testplan: Separates Arbeitsverzeichnis mit Git-Workflow-Fallback](docs/tests/testplan-separates-arbeitsverzeichnis-git-workflow-fallback.md)
@@ -1441,16 +1381,9 @@ Feature-spezifische Testartefakte:
 
 Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
 
-**Blazor Server:**
-
-- **Development:** `dotnet run --project src/Softwareschmiede/Softwareschmiede.csproj`
-- **Publish:** `dotnet publish src/Softwareschmiede/Softwareschmiede.csproj -c Release`
-- Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
-
-**WPF-Desktopanwendung (in Entwicklung):**
-
 - **Development:** `dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj`
 - **Publish:** `dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release`
+- Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
 - Log-Dateien werden unter `{Programmverzeichnis}/logs` abgelegt (Serilog File-Sink).
 
 Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügbar sein (`copilot` oder `claude`; für Claude-Läufe zusätzlich `ANTHROPIC_API_KEY` als Credential).
@@ -1515,11 +1448,11 @@ Zuletzt dokumentiert (README-/Doku-Update):
 - [x] GitHub Copilot-Plugin (copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
 - [x] Claude-CLI-Plugin (claude CLI) – KI-Steuerung inkl. Credential-Integration und Agentenpaket-Kompatibilitätsprüfung
 - [x] Codex-CLI-Plugin (codex CLI) – KI-Steuerung mit optional konfigurierbarem Executable-Pfad
-- [x] Blazor UI: Dashboard, Projekte, Aufgaben, Protokoll, Agentenpakete
+- [x] UI: Dashboard, Projekte, Aufgaben, Protokoll, Agentenpakete
 - [x] Folgeanweisungen mit Agent- und Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
 - [x] Windows Credential Store Integration
 
-### v2.0 – WPF-Desktopanwendung (in Entwicklung)
+### v2.0 – WPF-Desktopanwendung (abgeschlossen ✅)
 - [x] WPF-Projekt `src/Softwareschmiede.App` erstellt (net10.0-windows)
 - [x] MVVM-Gerüst: Views, ViewModels, ViewModelBase
 - [x] Dark Mode via `DarkModeService` + ResourceDictionary-Themes
@@ -1552,7 +1485,7 @@ Zuletzt dokumentiert (README-/Doku-Update):
   - [ ] E2E-Tests für Anzeige, Sortierung und Projekt-Schnellerstellung
 - [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
 - [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
-- [ ] Blazor-Code vollständig entfernt
+- [x] Blazor-Code vollständig entfernt
 
 ### v2.x – Erweiterungen
 - [ ] GitLab-Plugin
