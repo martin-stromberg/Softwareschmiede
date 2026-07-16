@@ -25,11 +25,10 @@
 10. [Tests](#-tests)
 11. [Deployment](#-deployment)
 12. [Changelog](#-changelog)
-13. [Roadmap](#-roadmap)
-14. [Dokumentation](#-dokumentation)
-15. [Beitragen](#-beitragen)
-16. [Lizenz](#-lizenz)
-17. [Kontakt](#-kontakt)
+13. [Dokumentation](#-dokumentation)
+14. [Beitragen](#-beitragen)
+15. [Lizenz](#-lizenz)
+16. [Kontakt](#-kontakt)
 
 ---
 
@@ -67,7 +66,7 @@ Die wichtigsten Features:
 - **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
-- **Benachrichtigungssystem** – Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen
+- **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
 - **Programmupdate** – Update-Prüfung gegen GitHub-Releases direkt aus der Anwendung
 
 Details zu den einzelnen Bereichen finden Sie in der [Anwendungsdokumentation](docs/help/index.md).
@@ -541,99 +540,7 @@ Das In-App-Update erwartet im GitHub-Release exakt das Asset `release.zip`. Im R
 
 ## 📝 Changelog
 
-Versionsstände werden automatisiert per Semantic Release aus Conventional Commits erzeugt und in [`CHANGELOG.md`](CHANGELOG.md) festgehalten. Ergänzend wird lokal eine `changes.log` im Projektstamm mit stichwortartigen Änderungsvermerken je Aufgabe geführt (aktuell nicht versioniert, siehe `*.log`-Regel in `.gitignore`).
-
-Zuletzt dokumentiert (README-/Doku-Update):
-- **Programmupdate:** WPF-App prüft beim Start stabile GitHub-Releases, vergleicht gegen `version.json`, zeigt Update- und Refresh-Aktion im Sidebar-Footer, prüft riskante aktive CLI-Läufe vor dem Update, lädt `release.zip`, entpackt und validiert das Paket, erzeugt ein externes PowerShell-Update-Skript und startet es mit optionaler Elevation; Fortschrittsdialog, DI-Registrierung, Release-Workflow-Manifest und fokussierte Tests ergänzt (**2026-07-15**)
-- **Issue 88: Aufgabendetailansicht optimieren:** WPF-Aufgabendetailansicht zeigt den Namen der geöffneten Aufgabe im Fenstertitel, trennt den aktiven CLI-Namen in der Fußzeile vom Laufstatus, bietet explizite `Info`-, `CLI`- und `Diff`-Ansichten mit dauerhaft erreichbarer Info-Ansicht für neue, gestartete, wartende und beendete Aufgaben und erlaubt den Start von Git-Plugin-Aufgaben ohne Issue-Bezug; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-07-11**)
-- **Bereitstellung der fertigen Anwendung (CI/CD-Release-Pipeline, Review-Verbesserungen):** Release-Workflow (`.github/workflows/release.yml`) im Review überarbeitet: gemeinsame Composite Action `.github/actions/build-and-package` löst die zuvor doppelten Build-/Publish-/ZIP-Schritte in beiden Jobs ab; `cycjimmy/semantic-release-action` und `softprops/action-gh-release` auf einen festen Commit-SHA statt auf einen beweglichen Versions-Tag gepinnt (Supply-Chain-Absicherung); neuer Guard-Step prüft das `publish/`-Verzeichnis vor dem Zippen auf Vollständigkeit; `concurrency`-Guard verhindert parallele Release-Läufe für denselben Ref; CI-Status-Badge für den Release-Workflow in der README ergänzt; Details siehe [docs/CI_CD.md](docs/CI_CD.md) (**2026-07-08**)
-- **Bereitstellung der fertigen Anwendung (CI/CD-Release-Pipeline):** Neuer automatisierter GitHub-Actions-Workflow `.github/workflows/release.yml`, der bei jedem Push auf `main` mittels Semantic Release (Conventional Commits) die Version bestimmt, einen .NET-10-Release-Build erstellt, das Ergebnis als `release.zip` verpackt und als GitHub-Release veröffentlicht; manueller Versions-Override per Git-Tag (`vX.Y.Z`) möglich; neue Konfigurationsdateien `package.json` und `.releaserc.json` im Repository-Root; neue Dokumentation `CONTRIBUTING.md` (Commit-Konventionen, Team-Regeln) und `docs/CI_CD.md` (Workflow-Beschreibung, Troubleshooting, Recovery); Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-07-07**)
-- **Beseitigung von Fehlerpotentialen (Absturzstabilisierung):** Drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`) in `App.xaml.cs` registriert und loggen alle unbehandelten Fehler zentral über Serilog; neue Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget` sichert alle Fire-and-Forget-Aufrufe (Heartbeat-Updates, verzögertes Senden von CLI-Befehlen, Laden von Projekten/Aufgaben, Terminal-Lesevorgang) gegen unbeobachtete Exceptions ab; `Process.Exited`-Handler in `KiAusfuehrungsService` (klassischer und ConPTY-Start) konsolidiert und vollständig try-catch-geschützt; `CliProcessManager` serialisiert Heartbeat-Updates nun pro Aufgabe über ein eigenes `SemaphoreSlim` statt einer klassenweiten Sperre; `TerminalControl.ReadLoopAsync` um generisches Exception-Handling und überwachten Hintergrund-Task erweitert; Startfehler von `CliProcessManager` und `MainWindow.Show()` führen nicht mehr zum Abbruch des Anwendungsstarts; neue fachliche Dokumentation unter `docs/help/stabilitaet/`; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-07-04**)
-- **Issue 81: Aktive Aufgaben im Menü (in Arbeit):** Neue Seitenleisten-Sektion in der WPF-Desktopanwendung zeigt aktive Aufgaben (Status `Gestartet` oder `Wartend`) als gerahmte Kacheln mit Titel und dynamischem KI-Ausführungsstatus an; `KiAusfuehrungsStatusConverter` bestimmt Status basierend auf `AktiveRunId` und `LastHeartbeatUtc` (< 5 Min = "Läuft", Wartend = "Wartet"); neue Service-Methode `AufgabeService.GetAktiveAufgabenAsync()` filtert und sortiert Aufgaben nach Aktivität; erweiterte ViewModels mit Properties (`AktiveAufgaben`, `IsDashboardVisible`) und Commands (`NavigateZuAufgabeCommand`); Seitenleisten-Sektion automatisch verborgen wenn Dashboard aktiv; Dashboard zeigt gleiche Liste ohne Höhenlimit; XAML-Erweiterungen in MainWindow und DashboardView; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-07-01**)
-- **Automatische issue.md-Dateierstellung beim Repository-Setup (implementiert ✅):** Beim Repository-Klon wird automatisch eine `issue.md`-Datei mit Aufgabendaten (Titel, ID, Branch, Datum, Anforderungsbeschreibung) im Markdown-Format erstellt; `.gitignore` wird automatisch um den Eintrag `issue.md` erweitert (mit Duplikatsprüfung); Fallback-Text bei leerer Anforderung; Fehlerbehandlung mit Logging (graceful degradation); Neue Methoden `CreateIssueFileAsync` und `UpdateGitignoreAsync` in `EntwicklungsprozessService`, Integration in `ProzessStartenAsync`; Unit-Tests für alle Szenarien (erfolgreiche Erstellung, Fallback-Text, Duplikatsprüfung, Fehlerbehandlung); Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-30**)
-- **Repository-Suggestion-Panel (in Arbeit):** Neues Panel auf der Projektübersichtsseite mit Vorschlägen unzugeordneter Repositories aus allen Git-Plugins, sortiert nach letzter Aktivität mit relativer Datumsformatierung; Doppelklick erstellt neues Projekt mit automatischer Repository-Zuordnung; Echtzeit-Updates beim Laden und nach Rückkehr von Projektdetail; Fehlerrobustheit bei Plugin-Ausfällen; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-26**)
-- **WPF Aufgabenworkflow-Optimierung (Feature #72):** Vereinfachtes Aufgaben-Statusmodell mit direktem Übergang von "Neu" zu "Gestartet"; neuer `StartenCommand` kombiniert Repository-Klone und CLI-Start in einem Schritt; Plugin-Auswahl-Dialog mit optionaler Projekt-Level-Speicherung; `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI mit Prozess-Neustart; automatischer CLI-Neustart beim Aufgabe-Laden; Enum-Vereinfachung (`ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernt); Datenbankmigrationen und Status-Validierung; E2E-Tests für alle Szenarien; Anforderungsanalyse und Umsetzungsplan in requirement.md und plan.md dokumentiert (**2026-06-17**)
-- **WPF separate Aufgabendetailansicht (Feature #72):** Aufgabendetailansicht aus der Inline-Position in `ProjectDetailView` ausgelagert in eine fensterumfassende, separate View; Callback-basierte Navigation (`NavigateToTaskViewCallback`, `NavigateBackToProjectCallback`) zwischen `ProjectDetailView` und `TaskDetailView` implementiert; Neuanlage von Aufgaben öffnet `TaskDetailView` mit leerem Formular und persistiert neue Aufgabe mit Status "Neu"; Fehlerbehandlung mit lokaler Fehlermeldung; Dokumentation in requirement.md und plan.md aktualisiert (**2026-06-16**)
-- **WPF Plugin-Einstellungen & Styling (Feature #72):** Einstellungsansicht um zwei neue Register (Quellcodeverwaltung, KI) mit Plugin-Auswahl und dynamisch geladenen Einstellungspanels erweitert; feldtyp-spezifische Eingabekomponenten (TextBox, PasswordBox, CheckBox, ComboBox, FilePath); globale Dark-Mode-kompatible Styles in Theme-Dictionaries; StandardPlugin-Persistierung in AppEinstellung (**2026-06-15**)
-- **WPF-Projektdetailansicht (Feature #72):** Projektdetailansicht mit Ribbon-Menü (Navigation, Projekt, Aufgaben, Repository), Projekt-Kachel (Symbol, Titel, Beschreibung — bearbeitbar), Aufgaben-Kachel (filterbar nach Status), Repository-Zuweisungs-Dialog und E2E-Tests vollständig implementiert; README und Roadmap aktualisiert (**2026-06-13**)
-- **WPF-Migration (Feature #72):** `src/Softwareschmiede.App` als neues WPF-Projekt ergänzt — MVVM-Gerüst, Views, Dark Mode, CLI-Fenstereinbettung, Recovery-Banner, Audio-Service, neues Aufgaben-Statusmodell (`Neu` → `ArbeitsverzeichnisEingerichtet` → `Gestartet` → `InArbeit` → `Wartend` → `Beendet`) in README dokumentiert (**2026-06-11**)
-- Feature **„Branch-Commit-Anzeige im Dateibaum + Commit-Diff-Preview”** ergänzt (Implementierungsstatus, Features, Architektur- und Testbezug, Grenzen) auf Basis des Dokumentationsplan-Abschnitts vom **2026-05-27**
-- Feature **„KI-Protokoll Auto-Scroll“ (F027)** in README ergänzt (Features/Usage/Changelog) inkl. Verweis auf die neue Fachdokumentation und den Dokumentationsplan-Abschnitt vom 2026-05-25
-- Diff-Funktionalität in README konsolidiert (Implementierungsstatus, Feature- und Usage-Abschnitte) inkl. Verweisen auf `/api/diff`
-- Testsektion um Diff-spezifische Service-/DI-Tests ergänzt (`DiffService`, `DiffCachingService`, `DiffAlgorithmService`, `ProgramDiWiringTests`)
-- LocalDirectoryPlugin als produktiv verfügbares SCM-Plugin ergänzt (inkl. WorkspaceMode und Guardrails)
-- Konfiguration, Usage, Architektur und Testsektion auf LocalDirectoryPlugin-Stand synchronisiert
-- README auf Feature „Separates Arbeitsverzeichnis mit Git-Workflow-Fallback“ aktualisiert (`git init`-Fallback, Pull ohne Merge + Nutzerhinweis, Push-Sync, Delete-Sync über Git-Status)
-- Erweiterte Testabdeckung für den separaten Workspace-Workflow ergänzt (u. a. Guard-/Fehlerpfade für Push/Pull, Delete-Sync und Fallback-Auflösung)
-- Claude-CLI-Integration als produktiv verfügbares KI-Plugin ergänzt
-- Testartefakte für `lokales-verzeichnis-plugin` und `claude-cli-integration` in der Dokumentationsübersicht verlinkt
-- WorkspaceMode-Übersetzungen, dynamische Repository-Felder und Standardplugin-Vorauswahl konsistent dokumentiert
-- Projektspezifische `IGitPlugin`-Auflösung in `GitOrchestrationService`/`AufgabeDetail` präzisiert (inkl. LocalDirectory-/LocalRepository-Szenarien und Fallback-Verhalten)
-- Testabsicherung für diese Auflösung ergänzt (Service: `GitOrchestrationServiceTests`, UI: `AufgabeDetailGitActionsBunitTests`)
-- Repository-Startskript mit freier Portzuweisung dokumentiert (Business/API/Flow) inkl. Persistenzmodell `RepositoryStartKonfiguration`
-- Testsektion und Dokumentationsindex um neue Startskript-/Port-Tests und Planungsartefakte erweitert
-- `start.ps1`-Skriptvertrag für Visual-Studio-Debug ergänzt (Aufruf, Parameter/Env-Priorität, Exit-Codes, F5-Workflow)
-- DiffViewer-Korrektur dokumentiert: dateispezifische Diff-Auflösung für geänderte Dateien in `AufgabeDetail` inkl. Pfadnormalisierung/Fallback und ergänzter Testabdeckung
-- SVG-Favicon `favicon-hammer-pick.svg` dokumentiert (Features/Usage) inkl. ergänzter Testabdeckung für Head-Markup und statische Asset-Validierung
-- Feature-Dokumentation für „Erkennung geänderter Planungsdokumente“ konsolidiert (API/Flow/Business/Tests): getrennte Workspace-Klassifikation (`CodeFiles`/`PlanningDocuments`) und Fallback-Erkennung
-- Feature-Dokumentation für **Issue 58** ergänzt (API/Flow/Business/README): plugin-spezifische Agenten-Discovery/Auswahl, `KiPluginPrefix`-Persistenz und konsistente Auflösung in Start-/Folgeprompt
-- Dokumentation für **KI-Arbeitsprotokoll als Markdown** präzisiert (API-/Flow-/Business-/Guide-/Test-Doku): verbindliche Struktur `# Datum` + `## Schritt n`, Markdown-Rendering in der Webausgabe und Sanitizing-/Fallback-Regeln
-
----
-
-## 🗺️ Roadmap
-
-### v1.0 – MVP (vollständig implementiert ✅)
-- [x] Anforderungsanalyse und Architektur-Blueprint
-- [x] Domänenmodell und EF Core Datenbankschema
-- [x] GitHub-Plugin (gh CLI) – vollständige Git-Integration
-- [x] GitHub Copilot-Plugin (copilot CLI) – KI-Steuerung mit Echtzeit-Streaming
-- [x] Claude-CLI-Plugin (claude CLI) – KI-Steuerung inkl. Credential-Integration
-- [x] Codex-CLI-Plugin (codex CLI) – KI-Steuerung mit optional konfigurierbarem Executable-Pfad
-- [x] UI: Dashboard, Projekte, Aufgaben, Protokoll
-- [x] Folgeanweisungen mit Kontextsteuerung (Kontext mitgeben / ignorieren / neu beginnen)
-- [x] Windows Credential Store Integration
-
-### v2.0 – WPF-Desktopanwendung (abgeschlossen ✅)
-- [x] WPF-Projekt `src/Softwareschmiede.App` erstellt (net10.0-windows)
-- [x] MVVM-Gerüst: Views, ViewModels, ViewModelBase
-- [x] Dark Mode via `DarkModeService` + ResourceDictionary-Themes
-- [x] CLI-Fenstereinbettung via `ProcessWindowHost` (Win32 SetParent)
-- [x] Recovery-Banner (`RecoveryBannerControl`) und Status-Indikator (`StatusIndicatorControl`)
-- [x] Audio-Benachrichtigungen via `WpfAudioService` (WPF MediaPlayer)
-- [x] Plugin-DLL-Kopie via MSBuild-Target
-- [x] Projektdetailansicht mit Ribbon-Menü, Projekt-/Aufgaben-Kacheln und Repository-Verwaltung
-- [x] E2E-Tests für Projektdetailansicht (Bearbeitung, Löschen, Aufgaben, Repository-Verwaltung, Navigation)
-- [x] Einstellungsansicht mit Registerkarten für Plugin-Konfiguration (SCM/KI) mit dynamischen Einstellungspanels
-- [x] Globale Dark-Mode-kompatible Styles für UI-Komponenten (Label, CheckBox, TextBox, etc.)
-- [x] Aufgabendetailansicht mit Ribbon-Menü und Status-abhängigem Content-Switching (Edit/CLI/Diff)
-- [x] Separate Aufgabendetailansicht (fensterumfassende View statt inline) – Feature 72
-- [x] Aufgabendetailansicht optimiert: Fenstertitel mit Aufgabenname, Fußzeile mit aktivem CLI-Namen, explizite Info-/CLI-/Diff-Ansichten und Startbarkeit von Git-Plugin-Aufgaben ohne Issue-Bezug
-- [x] Automatische issue.md-Dateierstellung beim Repository-Setup
-- [ ] Aufgabenworkflow-Optimierung – Feature 72 (in Entwicklung)
-  - [ ] Enum-Vereinfachung: `ArbeitsverzeichnisEingerichtet` und `InArbeit` entfernen
-  - [ ] `StartenCommand` mit kombiniertem Repository-Klone + CLI-Start
-  - [ ] Plugin-Auswahl-Dialog mit optionalem Projekt-Level-Standard
-  - [ ] `PluginAendernCommand` für Plugin-Wechsel bei laufender CLI
-  - [ ] Automatischer CLI-Neustart bei Aufgabe-Laden
-  - [ ] E2E-Tests für alle Szenarien
-  - [ ] Datenbankmigrationen und Status-Validierung
-- [ ] Repository-Suggestion-Panel (in Entwicklung)
-  - [ ] Service-Methode `GetUnassignedRepositoriesAsync()` implementieren
-  - [ ] Value Converter für relative Datumsformatierung (`UnassignedRepositoriesConverter`)
-  - [ ] ProjectListViewModel erweitern um `UnassignedRepositories` und `RepositoryDoubleclickCommand`
-  - [ ] ProjectListView XAML mit neuem Suggestions-Panel
-  - [ ] Unit-Tests für Service und ViewModel
-  - [ ] E2E-Tests für Anzeige, Sortierung und Projekt-Schnellerstellung
-- [ ] Neues Aufgaben-Statusmodell vollständig aktiviert (DB-Migration)
-- [ ] `IKiPlugin`-Interface-Anpassung (neue CLI-Start-Methoden)
-- [x] Blazor-Code vollständig entfernt
-
-### v2.x – Erweiterungen
-- [ ] GitLab-Plugin
-- [ ] Azure DevOps-Plugin
-- [ ] Weitere KI-Plugins (z. B. OpenAI, Gemini als dedizierte Provider)
-- [ ] Export des Aufgabenprotokolls (PDF / Markdown)
+Versionsstände werden automatisiert per Semantic Release aus Conventional Commits erzeugt und in [`CHANGELOG.md`](CHANGELOG.md) festgehalten.
 
 ---
 
