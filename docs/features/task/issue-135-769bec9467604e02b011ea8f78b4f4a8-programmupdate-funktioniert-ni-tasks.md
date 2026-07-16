@@ -1,14 +1,9 @@
-# Tasks: Programmupdate-Fehler beheben
+# Aufgaben: Programmupdate-Fehler beheben (Issue 135)
 
-| # | Bereich | Aufgabe | Status | Testnachweis |
-|---|---------|---------|--------|--------------|
-| 1 | ViewModel | `UpdateProgressViewModel.Percent` Setter von `private set` auf öffentliches `set` umstellen | Offen | — |
-| 2 | ViewModel | `UpdateProgressViewModel.PhaseText` Setter öffentlich machen | Offen | — |
-| 3 | ViewModel | `UpdateProgressViewModel.Message` Setter öffentlich machen | Offen | — |
-| 4 | ViewModel | `UpdateProgressViewModel.IsIndeterminate` Setter öffentlich machen | Offen | — |
-| 5 | ViewModel | `UpdateProgressViewModel.HasError` Setter öffentlich machen | Offen | — |
-| 6 | ViewModel | `UpdateProgressViewModel.CanClose` Setter öffentlich machen | Offen | — |
-| 7 | ViewModel | `UpdateProgressViewModel.CanCancel` Setter öffentlich machen (`RelayCommand.Refresh`-Callback beibehalten) | Offen | — |
-| 8 | Tests | Testklasse `UpdateProgressDialogTests` anlegen | Offen | — |
-| 9 | E2E-Tests | STA-Regressionstest `Show_ShouldNotThrowBindingException`: Dialog mit gebundenem ViewModel instanziieren/anzeigen, keine `InvalidOperationException` | Offen | — |
-| 10 | Tests | Bestehende `UpdateProgressViewModelTests` gegenprüfen (weiterhin grün) | Offen | — |
+| # | Aufgabe | Status | Testnachweis |
+|---|---------|--------|--------------|
+| 1 | Setter der 7 Properties (`PhaseText`, `Message`, `Percent`, `IsIndeterminate`, `HasError`, `CanClose`, `CanCancel`) in `UpdateProgressViewModel` von `private set` auf öffentliches `set` umstellen | Erledigt | `UpdateProgressDialogTests.Show_ShouldNotThrowBindingException` (deckt den Binding-Pfad direkt ab); `UpdateProgressViewModelTests` (belegt unveränderte interne Zustandsführung) |
+| 2 | `CanCancel`-Setter behält `RelayCommand.Refresh`-Callback im `SetProperty`-Aufruf | Erledigt | `UpdateProgressViewModelTests.CancelCommand_ShouldInvokeCancellationAndDisableCancel` |
+| 3 | Konstruktor, `CancelCommand`, `Apply`, `SetError`, `MarkUpdaterStarting`, `RequestCancel` und Felder unverändert lassen | Erledigt | `UpdateProgressViewModelTests` (alle 4 bestehenden Tests) |
+| 4 | Neue Testklasse `UpdateProgressDialogTests` mit STA-Regressionstest `Show_ShouldNotThrowBindingException` anlegen | Erledigt | `UpdateProgressDialogTests.Show_ShouldNotThrowBindingException` |
+| 5 | Bestehende `UpdateProgressViewModelTests` bleiben grün (keine Anpassung nötig) | Erledigt | `UpdateProgressViewModelTests` (4 Tests, unverändert) |

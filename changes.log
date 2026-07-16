@@ -1,3 +1,9 @@
+## 2026-07-16 — Update-Dialog-Anzeige reparieren
+
+- Behebung eines WPF-Databinding-Fehlers beim Fortschrittsdialog des Programmupdate-Features: `UpdateProgressViewModel` hatte sieben Properties mit `private set`, was verhinderte, dass die WPF-Databinding-Engine auf die Setter zugriff und Bindings aufbaute. Die Setter aller sieben Properties (`PhaseText`, `Message`, `Percent`, `IsIndeterminate`, `HasError`, `CanClose`, `CanCancel`) wurden auf öffentlich umgestellt, während die interne Steuerung über `SetProperty()` und spezialisierte Methoden (`Apply()`, `SetError()`, `MarkUpdaterStarting()`) erhalten bleibt.
+- Ein neuer Regressionstest verifiziert empirisch, dass der Dialog auf einem STA-Thread instanziiert und ohne `InvalidOperationException` angezeigt werden kann.
+- Änderungen beschränkt auf `src/Softwareschmiede.App/ViewModels/UpdateProgressViewModel.cs` und neue Test-Klasse — keine Datenbankmigrationen oder Konfigurationsänderungen erforderlich.
+
 ## 2026-07-16 — Toten Code zum Agentenpaket-Feature entfernen
 
 - Entfernung aller ungenutzten Typen und Implementierungen des Agentenpaket-Features: Interfaces `IAgentPackageService` und `IAgentPackageFileService`, ValueObjects `AgentPackageInfo` und `FileTreeNode`, Services `AgentPackageReader` und `AgentPackageFileService` sowie zugehörige Unit- und Integrationstests (`AgentPackageReaderTests`, `AgentPackageFileServiceTests`) aus `src/Softwareschmiede/` und `src/Softwareschmiede.Tests/`.
