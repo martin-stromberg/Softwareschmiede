@@ -26,49 +26,49 @@ public sealed class UpdateProgressViewModel : ViewModelBase
     public string PhaseText
     {
         get => _phaseText;
-        private set => SetProperty(ref _phaseText, value);
+        set => SetProperty(ref _phaseText, value);
     }
 
     /// <summary>Aktuelle Fortschrittsmeldung.</summary>
     public string Message
     {
         get => _message;
-        private set => SetProperty(ref _message, value);
+        set => SetProperty(ref _message, value);
     }
 
     /// <summary>Fortschritt in Prozent.</summary>
     public double Percent
     {
         get => _percent;
-        private set => SetProperty(ref _percent, value);
+        set => SetProperty(ref _percent, value);
     }
 
     /// <summary>Gibt an, ob der Fortschritt ohne konkreten Prozentwert angezeigt wird.</summary>
     public bool IsIndeterminate
     {
         get => _isIndeterminate;
-        private set => SetProperty(ref _isIndeterminate, value);
+        set => SetProperty(ref _isIndeterminate, value);
     }
 
     /// <summary>Gibt an, ob ein Fehler angezeigt wird.</summary>
     public bool HasError
     {
         get => _hasError;
-        private set => SetProperty(ref _hasError, value);
+        set => SetProperty(ref _hasError, value);
     }
 
     /// <summary>Gibt an, ob der Dialog geschlossen werden darf.</summary>
     public bool CanClose
     {
         get => _canClose;
-        private set => SetProperty(ref _canClose, value);
+        set => SetProperty(ref _canClose, value);
     }
 
     /// <summary>Gibt an, ob die Vorbereitung noch abgebrochen werden kann.</summary>
     public bool CanCancel
     {
         get => _canCancel;
-        private set => SetProperty(ref _canCancel, value, RelayCommand.Refresh);
+        set => SetProperty(ref _canCancel, value, RelayCommand.Refresh);
     }
 
     /// <summary>Bricht die laufende Vorbereitung ab.</summary>
