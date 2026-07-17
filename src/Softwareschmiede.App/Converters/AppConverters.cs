@@ -123,9 +123,7 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
             return "⏳ Prompt in Wartestellung";
         }
 
-        if (status.AktiveRunId != null
-            && status.LastHeartbeatUtc != null
-            && DateTimeOffset.UtcNow - status.LastHeartbeatUtc.Value < TimeSpan.FromMinutes(AufgabeRecoveryService.HeartbeatTimeoutMinutes))
+        if (AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, DateTimeOffset.UtcNow))
         {
             // LaufStatus bildet den Laufzeit-Substatus der CLI ab (siehe PseudoConsoleSession.RuntimeStatus,
             // persistiert über CliProcessManager/AufgabeService.AktualisiereLaufStatusAsync). Ohne diesen

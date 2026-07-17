@@ -20,6 +20,6 @@ Branch: `task/issue-135-769bec9467604e02b011ea8f78b4f4a8-programmupdate-funktion
 | [x] | 8a | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
 | [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
-| [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
-| [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | – | Commit durchführen | – |
+| [x] | 10 | Nacharbeiten abschließen (fachlicher Fix aus `continue.md`, korrigierte Root-Cause) | `continue.md` (aktualisiert, Planelement erledigt) |
+| [ ] | – | Feature-Verzeichnis löschen (zurückgestellt bis Anwender-Bestätigung) | – |
+| [x] | – | Commit durchführen | – |
