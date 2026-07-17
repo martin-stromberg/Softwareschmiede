@@ -1,6 +1,5 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -54,8 +53,6 @@ public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
 
         var reloadedBox = WaitForElement(mainWindow, cf => cf.ByName("CommandLineParameters"), Short);
         Assert.Equal(expectedValue, reloadedBox.AsTextBox().Text);
-
-        new WindowsCredentialStore().DeleteCredential("Softwareschmiede.Codex.CommandLineParameters");
     }
 
     /// <summary>

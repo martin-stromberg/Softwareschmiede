@@ -1,3 +1,13 @@
+## 2026-07-17 — E2E-Test-Isolation: Credential-Store-Cleanup zentralisieren
+
+- Problem: E2E-Tests schreiben produktive Parameter (z. B. `Softwareschmiede.Codex.CommandLineParameters`) in den OS-weiten Windows Credential Store, ohne diese vorher zu sichern. Wenn ein Test abbricht, bevor der manuelle `DeleteCredential()`-Aufruf erfolgt, bleiben Test-Parameter dauerhaft gespeichert und überschreiben produktive Konfiguration.
+- Lösung: Zentrale Backup/Restore-Mechanik (Memento-Pattern) in der E2E-Testbasis `WpfTestBase`. Neue Klasse `CredentialStoreSnapshot` speichert die Werte aller verwalteten Credential-Schlüssel im Konstruktor und stellt sie im `Dispose()`-Aufruf (auch bei Test-Fehler) wiederher — exakt im ursprünglichen Zustand (Wert setzen, falls vorhanden, oder löschen, falls ursprünglich nicht vorhanden).
+- Verwaltete Schlüssel (konstante Liste in `WpfTestBase.ManagedCredentialKeys`): `Softwareschmiede.Codex.CommandLineParameters`, `Softwareschmiede.Codex.ExecutablePath`, `LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory`, `LocalDirectoryPlugin.WorkspaceMode`, `LocalDirectoryPlugin.SourceDirectory`.
+- Redundante manuelle `DeleteCredential()`-Aufrufe in E2E-Tests entfernt (z. B. in `E2E_TaskExecutionCommandLineParameters`, `E2E_SettingsCommandLineParameters`); Cleanup erfolgt nun zentral und automatisch.
+- Unit-Tests `CredentialStoreSnapshotTests` mit In-Memory-`ICredentialStore`-Fake prüfen Szenarios: (1) Wiederherstellung eines vorhandenen Werts nach Überschreiben, (2) Löschung eines ursprünglich fehlenden Werts nach Test-Änderung.
+- Nebeneffekt: Bisheriges pauschales Löschen aller `LocalDirectoryPlugin.*`-Werte entfällt; produktive Werte werden nun korrekt wiederhergestellt statt gelöscht.
+- Alle E2E-Tests profitieren automatisch von der Isolation (erben von `WpfTestBase`); kein Produktivcode betroffen.
+
 ## 2026-07-17 — Sicherheitsprüfung beim Programmupdate korrigieren
 
 - Behebung eines Filterprädikat-Fehlers in `CliUpdateSafetyService.CheckAsync()`: Das Filterprädikat `a.LaufStatus != AufgabeLaufStatus.WartetAufEingabe` stufte Aufgaben mit `LaufStatus == null` (noch nicht initialisiert / "Bereit") fälschlicherweise als blockierend für das Programmupdate ein. Da `null != WartetAufEingabe` zu `true` auswertet, wurden diese Aufgaben einbezogen. Das Filterprädikat wurde auf den positiven Vergleich `a.LaufStatus == AufgabeLaufStatus.Laeuft` geändert — nur Aufgaben mit tatsächlich aktiv laufendem CLI-Prozess blockieren das Update; `LaufStatus == null` und `LaufStatus == AufgabeLaufStatus.WartetAufEingabe` sind nicht blockierend.

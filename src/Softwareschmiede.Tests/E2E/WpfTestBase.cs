@@ -7,6 +7,7 @@ using FlaUI.UIA3;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Tests.Infrastructure.Services;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -37,9 +38,24 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Langes Timeout (30s), z. B. für das initiale Erscheinen des Hauptfensters.</summary>
     protected static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// Credential-Schlüssel, die von E2E-Tests direkt oder indirekt (über die UI) im OS-weiten
+    /// Windows Credential Store gesetzt werden. Wird ein neuer Schlüssel von einem E2E-Test
+    /// verwendet, muss er hier ergänzt werden, damit er vom Backup/Restore erfasst wird.
+    /// </summary>
+    private static readonly string[] ManagedCredentialKeys =
+    [
+        "Softwareschmiede.Codex.CommandLineParameters",
+        "LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory",
+        "LocalDirectoryPlugin.WorkspaceMode",
+        "LocalDirectoryPlugin.SourceDirectory",
+        "Softwareschmiede.Codex.ExecutablePath",
+    ];
+
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
     private readonly string _testDbPath;
+    private readonly CredentialStoreSnapshot _credentialSnapshot;
     private string? _appLogDirectory;
     private LogSnapshot _appLogSnapshot;
 
@@ -65,6 +81,7 @@ public abstract class WpfTestBase : IDisposable
         _testDbPath = Path.Combine(
             Path.GetTempPath(),
             $"softwareschmiede_e2e_{Guid.NewGuid():N}.db");
+        _credentialSnapshot = new CredentialStoreSnapshot(new WindowsCredentialStore(), ManagedCredentialKeys);
     }
 
     /// <summary>
@@ -156,19 +173,10 @@ public abstract class WpfTestBase : IDisposable
         // hineinleckt (z. B. PluginManagerTests, die ohne Test-Modus-Einschränkung laufen sollen).
         Environment.SetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH", null);
 
-        // LocalDirectoryPlugin-Credentials aus dem OS-weiten Windows-Credential-Store löschen,
-        // damit der WorkspaceMode nicht zwischen E2E-Tests leakt.
-        try { DeleteLocalDirectoryPluginCredentials(); }
-        catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Plugin-Credentials: {ex}"); }
-    }
-
-    private static void DeleteLocalDirectoryPluginCredentials()
-    {
-        var store = new WindowsCredentialStore();
-        store.DeleteCredential("LocalDirectoryPlugin.WorkspaceMode");
-        store.DeleteCredential("LocalDirectoryPlugin.SourceDirectory");
-        store.DeleteCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory");
-        store.DeleteCredential("Softwareschmiede.Codex.ExecutablePath");
+        // Credential-Store-Zustand aus dem OS-weiten Windows-Credential-Store wiederherstellen,
+        // damit produktive Werte durch den Testlauf nicht verloren gehen oder zwischen E2E-Tests leaken.
+        try { _credentialSnapshot.Restore(); }
+        catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Wiederherstellen des Credential-Store-Zustands: {ex}"); }
     }
 
     /// <summary>
