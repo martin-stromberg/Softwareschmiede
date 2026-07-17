@@ -7,23 +7,19 @@ on:
 
 permissions:
   contents: write
-  # Der "success"-Schritt von @semantic-release/github listet die Commits verknuepfter PRs auf
-  # (GET /pulls/{number}/commits), um sie zu kommentieren. Ohne pull-requests: read schlaegt
-  # dieser Schritt mit 403 "Resource not accessible by integration" fehl (Release selbst war
-  # davon nicht betroffen, nur die abschliessende PR-Benachrichtigung).
-  pull-requests: read
 
 # Verhindert parallele Release-Laeufe (z. B. schneller Merge nach main + manueller Tag-Push
-# kurz danach): Semantic Release berechnet die naechste Version aus dem zuletzt existierenden
-# Tag und pusht Commit+Tag zurueck nach main - ohne Serialisierung droht ein Wettlauf mit
-# doppelt vergebenen Versionen oder fehlschlagenden Git-Pushes.
+# kurz danach): Der Release-Job berechnet die naechste Version aus dem zuletzt existierenden
+# Tag und erstellt danach Tag/Release ueber die GitHub-API - ohne Serialisierung droht ein
+# Wettlauf mit doppelt vergebenen Versionen oder fehlschlagenden Release-Erstellungen.
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
   # Normalfall: Push/Merge auf main. Semantic Release wertet die Commits seit dem letzten
-  # Tag aus, bestimmt die naechste Version, erstellt Tag/Release/Notes und laedt release.zip hoch.
+  # Tag per Dry-Run aus und bestimmt die naechste Version. Tag/Release werden anschliessend
+  # per GitHub-API erstellt, damit der geschuetzte main-Branch nicht direkt beschrieben wird.
   release:
     if: startsWith(github.ref, 'refs/heads/')
     # Softwareschmiede.App ist eine WPF-Anwendung (net10.0-windows, UseWPF=true) und kann
@@ -58,8 +54,10 @@ jobs:
           Write-Host $output
 
           $version = $null
+          $shouldRelease = $false
           if ($output -match 'The next release version is ([0-9]+\.[0-9]+\.[0-9]+(?:[-+][^\s]+)?)') {
             $version = $Matches[1]
+            $shouldRelease = $true
           }
           if (-not $version) {
             try {
@@ -74,20 +72,27 @@ jobs:
           Write-Host "Determined version: $version"
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version" >> $env:GITHUB_OUTPUT
+          "should_release=$($shouldRelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           exit 0
 
       - name: Build and package
+        if: steps.release_version.outputs.should_release == 'true'
         uses: ./.github/actions/build-and-package
         with:
           release-version: ${{ steps.release_version.outputs.version }}
           release-tag: ${{ steps.release_version.outputs.tag }}
 
-      - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@16ca923e6ccbb50770c415a0ccd43709a8c5f7a4 # v4.2.2
-        with:
-          semantic_version: 21.x
+      - name: Create GitHub Release
+        if: steps.release_version.outputs.should_release == 'true'
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.release_version.outputs.tag }}"
+          gh release create $tag release.zip `
+            --target $env:GITHUB_SHA `
+            --title $tag `
+            --generate-notes
 
   # Manueller Override: Ein Tag im Format vX.Y.Z wurde bewusst gepusht (git tag vX.Y.Z && git push origin vX.Y.Z).
   # Ein Tag-Push loest keinen "push: branches: [main]"-Trigger aus, daher baut dieser eigene Job
