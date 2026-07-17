@@ -31,21 +31,22 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary>Laufende und unbekannte aktive CLI-Status werden als riskant gezählt.</summary>
+    /// <summary>Nur tatsächlich laufende CLI-Aufgaben werden als riskant gezählt; "Bereit" (null) und "Wartet auf Eingabe" blockieren nicht.</summary>
     [Fact]
-    public async Task CheckAsync_ShouldTreatRunningAndNullStatusAsRisky()
+    public async Task CheckAsync_ShouldTreatOnlyRunningStatusAsRisky()
     {
         var running = await CreateActiveTaskAsync("Laeuft", AufgabeLaufStatus.Laeuft);
         var nullStatus = await CreateActiveTaskAsync("Null", null);
-        await CreateActiveTaskAsync("Wartet", AufgabeLaufStatus.WartetAufEingabe);
+        var waiting = await CreateActiveTaskAsync("Wartet", AufgabeLaufStatus.WartetAufEingabe);
         var sut = new CliUpdateSafetyService(_aufgabeService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync();
 
         result.RequiresConfirmation.Should().BeTrue();
-        result.RiskyTaskCount.Should().Be(2);
+        result.RiskyTaskCount.Should().Be(1);
         result.RiskyTasks.Should().Contain(t => t.Contains(running.Titel, StringComparison.Ordinal));
-        result.RiskyTasks.Should().Contain(t => t.Contains(nullStatus.Titel, StringComparison.Ordinal));
+        result.RiskyTasks.Should().NotContain(t => t.Contains(nullStatus.Titel, StringComparison.Ordinal));
+        result.RiskyTasks.Should().NotContain(t => t.Contains(waiting.Titel, StringComparison.Ordinal));
     }
 
     private async Task<Softwareschmiede.Domain.Entities.Aufgabe> CreateActiveTaskAsync(string title, AufgabeLaufStatus? laufStatus)
