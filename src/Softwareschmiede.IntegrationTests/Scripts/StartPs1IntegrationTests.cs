@@ -7,6 +7,7 @@ namespace Softwareschmiede.IntegrationTests.Scripts;
 /// <summary>
 /// Integration tests for the repository root start.ps1 behavior.
 /// </summary>
+[Trait("Category", "OsInterface")]
 public sealed class StartPs1IntegrationTests : IDisposable
 {
     private readonly List<string> _temporaryDirectories = [];

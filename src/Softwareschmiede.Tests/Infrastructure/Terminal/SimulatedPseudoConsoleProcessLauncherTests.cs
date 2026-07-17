@@ -14,7 +14,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
 
     /// <summary>Nach dem Start muss der Kindprozess laufen und eine funktionsfähige Sitzung mit
     /// <see cref="IntPtr.Zero"/> als natives Prozess-Handle geliefert werden.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void Start_LiefertLaufendenProzessUndSession()
     {
         var (process, session, nativeProcessHandle) = _sut.Start(Guid.NewGuid(), Path.GetTempPath(), "echo simuliert");
@@ -35,7 +35,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// gesendetes Kommando muss vom laufenden, interaktiven <c>cmd.exe</c> ausgeführt werden und im
     /// <see cref="Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession.Buffer"/> erscheinen — genau die
     /// Choreografie, die <c>KiAusfuehrungsService.SendCommandDelayedAsync</c> im Produktivpfad verwendet.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task Start_GesendetesKommandoWirdAusgefuehrt()
     {
         var (process, session, _) = _sut.Start(Guid.NewGuid(), Path.GetTempPath(), "echo simuliert");
@@ -69,7 +69,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// <summary>Nach <see cref="System.Diagnostics.Process.Kill(bool)"/> mit <c>entireProcessTree: true</c> muss
     /// der Prozess innerhalb kurzer Zeit als beendet erkennbar sein — bestätigt Kompatibilität mit
     /// <c>KiAusfuehrungsService.StopCliAsync</c>, das denselben Aufruf für den Stop-Fallback nutzt.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task Start_ProzessBeendetSichAufKillEntireProcessTree()
     {
         var (process, session, _) = _sut.Start(Guid.NewGuid(), Path.GetTempPath(), "echo simuliert");

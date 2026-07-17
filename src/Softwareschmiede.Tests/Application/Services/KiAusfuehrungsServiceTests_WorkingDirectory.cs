@@ -110,7 +110,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory : IDisposable
     }
 
     /// <summary>StartCliAsync übergibt dem Plugin das konfigurierte (effektive) Arbeitsverzeichnis, wenn startConfig gesetzt ist.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task StartCliAsync_ShouldUseEffectiveWorkingDirectory()
     {
         var subDirectory = Path.Combine(_tempRoot, "backend");
@@ -135,7 +135,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory : IDisposable
     }
 
     /// <summary>StartCliAsync übergibt dem Plugin das Repository-Root, wenn kein startConfig angegeben ist.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task StartCliAsync_ShouldUseRepoRootWhenConfigNull()
     {
         string? usedPath = null;

@@ -62,7 +62,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     }
 
     /// <summary>TestCliStartAsync: CLI wird gestartet, ProcessHandle wird zurückgegeben.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task TestCliStartAsync()
     {
         // Arrange
@@ -88,7 +88,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     }
 
     /// <summary>StartCliAsync returns handle when plugin provides valid ProcessStartInfo.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task StartCliAsync_ShouldReturnHandle_WhenPluginProvidesValidProcessStartInfo()
     {
         var aufgabeId = Guid.NewGuid();
@@ -122,7 +122,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// ObjectDisposedException wirft, darf PersistFehlgeschlagenAsync diese nicht unbehandelt
     /// weiterwerfen (führte zuvor zu einer TaskScheduler.UnobservedTaskException).
     /// </summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task ProcessExited_ScopeFactoryDisposed_PersistiertNichtUndWirftNicht()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -166,7 +166,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// Wenn ein Abonnent von CliProcessStatusChanged im Exited-Handler von StartCliAsync eine Exception
     /// wirft, muss diese geloggt werden, ohne die Multicast-Kette oder die Anwendung zum Absturz zu bringen.
     /// </summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task ProcessExited_SubscriberThrows_LogsAndDoesNotCrash()
     {
         // Klassischer Pfad: der Plugin-ProcessStartInfo wird direkt als der überwachte Prozess gestartet
@@ -187,7 +187,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// Wenn ein Abonnent von CliProcessStatusChanged im ConPTY-Exited-Handler von StartWithPseudoConsoleAsync
     /// eine Exception wirft, muss diese geloggt werden, ohne die Anwendung zum Absturz zu bringen.
     /// </summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash()
     {
         // ConPTY-Pfad: der überwachte Prozess ist die dauerhafte, interaktive äußere cmd.exe-Shell; der
@@ -263,7 +263,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// muss <see cref="KiAusfuehrungsService.HandleProcessExited"/> die zugehörige <see cref="PseudoConsoleSession"/>
     /// disposen (Leseschleife wird abgebrochen, Streams werden geschlossen), bevor das Handle aus <c>_handles</c>
     /// entfernt wird.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task KiAusfuehrungsService_HandleProcessExited_DisposesSession()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -302,7 +302,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// <summary>Ruft man <see cref="KiAusfuehrungsService.Dispose"/> auf, während noch eine ConPTY-Sitzung läuft,
     /// müssen deren Prozess beendet und die zugehörige <see cref="PseudoConsoleSession"/> disposed werden (Leseschleife
     /// abgebrochen, Streams geschlossen) — keine verwaisten Leseschleifen nach dem Beenden des Service.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task KiAusfuehrungsService_Dispose_CancelsAllSessions()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
@@ -349,7 +349,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// storniert werden — es darf gar keine <see cref="ObjectDisposedException"/> auftreten (unabhängig vom
     /// Log-Level, mit dem eine trotzdem auftretende ObjectDisposedException protokolliert würde).
     /// </summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task StartWithPseudoConsoleAsync_ProzessEndetVorVerzoegertemSenden_KeineWarnungWegenGeschlossenemStream()
     {
         var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
@@ -417,7 +417,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// <summary>Wird ein <see cref="SimulatedPseudoConsoleProcessLauncher"/> injiziert, muss
     /// <see cref="KiAusfuehrungsService.StartWithPseudoConsoleAsync"/> ohne echtes ConPTY bis zum Status
     /// <see cref="CliProcessStatus.Gestartet"/> gelangen (siehe docs/features/e2e-korrektur/requirement.md).</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task StartWithPseudoConsoleAsync_MitInjiziertemFakeLauncher_ErreichtGestartet()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();

@@ -10,8 +10,10 @@
          einziger Test ausgeführt, wenn der Build nicht sauber durchläuft).
       2. Alle Testprojekte werden ermittelt (jedes .csproj mit Referenz auf Microsoft.NET.Test.Sdk).
       3. Pro Projekt werden alle Tests via "dotnet test --list-tests" ermittelt.
-      4. Jeder Test wird einzeln über "dotnet test --filter FullyQualifiedName=..." ausgeführt
-         (mit --no-build, damit zwischen den einzelnen Tests kein Rebuild passiert).
+      4. Jeder stabile Test-Filter wird einzeln über "dotnet test --filter FullyQualifiedName=..."
+         ausgeführt (mit --no-build, damit zwischen den einzelnen Tests kein Rebuild passiert).
+         xUnit-Theory-Datenzeilen aus "--list-tests" sind Displaynamen und werden methodenbasiert
+         gruppiert, weil einzelne Datenzeilen nicht stabil per FullyQualifiedName adressierbar sind.
       5. Für jeden Test wird das Ergebnis (TRX-Logger) ausgewertet: Bestanden / Fehlgeschlagen /
          Ausführungsfehler (Testhost-Absturz, fehlende Build-Artefakte o.ä. statt einer echten
          Assertion). Bei einem Ausführungsfehler wird die Solution neu gebaut und der betroffene
@@ -31,6 +33,10 @@
     Optionaler Teilstring-Filter (Groß-/Kleinschreibung wird ignoriert) auf den vollqualifizierten
     Testnamen. Nur passende Tests werden ausgeführt. Leer = alle Tests.
 
+.PARAMETER TestSet
+    Testgruppe, die ausgeführt wird: Regular (Category!=OsInterface), OsInterface (Category=OsInterface)
+    oder All (kein Kategorie-Filter). Standard: Regular.
+
 .PARAMETER ResultsDirectory
     Zielverzeichnis für die Ergebnisdateien. Standard: test-results/<Zeitstempel> im Repo-Root.
 
@@ -38,12 +44,14 @@
     ./scripts/Run-AllTestsIndividually.ps1
 
 .EXAMPLE
-    ./scripts/Run-AllTestsIndividually.ps1 -Filter "PseudoConsole"
+    ./scripts/Run-AllTestsIndividually.ps1 -TestSet OsInterface -Filter "PseudoConsole"
 #>
 [CmdletBinding()]
 param(
     [string]$Configuration = "Debug",
     [string]$Filter = "",
+    [ValidateSet("Regular", "OsInterface", "All")]
+    [string]$TestSet = "Regular",
     [string]$ResultsDirectory = ""
 )
 
@@ -102,17 +110,72 @@ try {
         throw "Initialer Build fehlgeschlagen. Siehe $buildLogPath. Breche ab, ohne Tests auszufuehren."
     }
 
-    function Get-TestNames {
+    function Get-CategoryFilterExpression {
+        switch ($TestSet) {
+            "Regular" { return "Category!=OsInterface" }
+            "OsInterface" { return "Category=OsInterface" }
+            default { return "" }
+        }
+    }
+
+    function Join-TestFilter {
+        param([string]$NameFilter, [string]$CategoryFilter)
+        if ([string]::IsNullOrWhiteSpace($CategoryFilter)) {
+            return $NameFilter
+        }
+        return "($NameFilter)&($CategoryFilter)"
+    }
+
+    $categoryFilterExpression = Get-CategoryFilterExpression
+
+    function New-TestTarget {
+        param(
+            [string]$FilterName,
+            [string]$DisplayName,
+            [string]$ExecutionMode,
+            [int]$DiscoveryCount
+        )
+        return [PSCustomObject]@{
+            FilterName     = $FilterName
+            DisplayName    = $DisplayName
+            ExecutionMode  = $ExecutionMode
+            DiscoveryCount = $DiscoveryCount
+        }
+    }
+
+    function Get-TestTargets {
         param([string]$ProjectPath)
-        $listOutput = & dotnet test $ProjectPath -c $Configuration --no-build --list-tests 2>&1
-        $names = [System.Collections.Generic.List[string]]::new()
+        if ([string]::IsNullOrWhiteSpace($categoryFilterExpression)) {
+            $listOutput = & dotnet test $ProjectPath -c $Configuration --no-build --list-tests 2>&1
+        }
+        else {
+            $listOutput = & dotnet test $ProjectPath -c $Configuration --no-build --list-tests --filter $categoryFilterExpression 2>&1
+        }
+        $targetsByFilterName = [ordered]@{}
         foreach ($line in $listOutput) {
             $trimmed = "$line".Trim()
-            if ($trimmed -match '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$') {
-                $names.Add($trimmed)
+            if ($trimmed -match '^([A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+)\(.+\)$') {
+                $methodName = $matches[1]
+                if (-not $targetsByFilterName.Contains($methodName)) {
+                    $targetsByFilterName[$methodName] = New-TestTarget `
+                        -FilterName $methodName `
+                        -DisplayName "$methodName (alle entdeckten Theory-Datenzeilen)" `
+                        -ExecutionMode "TheoryMethod" `
+                        -DiscoveryCount 0
+                }
+                $targetsByFilterName[$methodName].DiscoveryCount++
+            }
+            elseif ($trimmed -match '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$') {
+                if (-not $targetsByFilterName.Contains($trimmed)) {
+                    $targetsByFilterName[$trimmed] = New-TestTarget `
+                        -FilterName $trimmed `
+                        -DisplayName $trimmed `
+                        -ExecutionMode "Individual" `
+                        -DiscoveryCount 1
+                }
             }
         }
-        return $names
+        return @($targetsByFilterName.Values)
     }
 
     function Get-TrxResult {
@@ -126,19 +189,31 @@ try {
         }
         $ns = [System.Xml.XmlNamespaceManager]::new($trx.NameTable)
         $ns.AddNamespace("t", "http://microsoft.com/schemas/VisualStudio/TeamTest/2010")
-        $result = $trx.SelectSingleNode("//t:UnitTestResult", $ns)
-        if (-not $result) { return $null }
+        $resultNodes = @($trx.SelectNodes("//t:UnitTestResult", $ns))
+        if ($resultNodes.Count -eq 0) { return $null }
+        $result = $resultNodes | Where-Object { $_.outcome -eq "Failed" } | Select-Object -First 1
+        if (-not $result) { $result = $resultNodes[0] }
         $message = $null
         $stack = $null
         $msgNode = $result.SelectSingleNode("t:Output/t:ErrorInfo/t:Message", $ns)
         if ($msgNode) { $message = $msgNode.InnerText }
         $stackNode = $result.SelectSingleNode("t:Output/t:ErrorInfo/t:StackTrace", $ns)
         if ($stackNode) { $stack = $stackNode.InnerText }
+        $outcome = if (($resultNodes | Where-Object { $_.outcome -eq "Failed" }).Count -gt 0) {
+            "Failed"
+        }
+        elseif (($resultNodes | Where-Object { $_.outcome -ne "Passed" }).Count -gt 0) {
+            ($resultNodes | Where-Object { $_.outcome -ne "Passed" } | Select-Object -First 1).outcome
+        }
+        else {
+            "Passed"
+        }
         return [PSCustomObject]@{
-            Outcome    = $result.outcome
-            Duration   = $result.duration
+            Outcome    = $outcome
+            Duration   = if ($resultNodes.Count -eq 1) { $result.duration } else { "$($resultNodes.Count) Ergebnisse" }
             Message    = $message
             StackTrace = $stack
+            ResultCount = $resultNodes.Count
         }
     }
 
@@ -166,15 +241,16 @@ try {
     }
 
     function Invoke-SingleTest {
-        param([string]$ProjectPath, [string]$TestName)
+        param([string]$ProjectPath, [object]$TestTarget)
 
-        $safeName = ($TestName -replace '[^A-Za-z0-9_.]', '_')
+        $safeName = ($TestTarget.FilterName -replace '[^A-Za-z0-9_.]', '_')
         $trxFileName = "$safeName.trx"
         $trxFullPath = Join-Path $trxDirectory $trxFileName
         if (Test-Path $trxFullPath) { Remove-Item $trxFullPath -Force }
 
+        $dotnetFilter = Join-TestFilter -NameFilter "FullyQualifiedName=$($TestTarget.FilterName)" -CategoryFilter $categoryFilterExpression
         $output = & dotnet test $ProjectPath -c $Configuration --no-build `
-            --filter "FullyQualifiedName=$TestName" `
+            --filter $dotnetFilter `
             --logger "trx;LogFileName=$trxFileName" `
             --results-directory $trxDirectory `
             --logger "console;verbosity=quiet" 2>&1
@@ -189,14 +265,16 @@ try {
         }
     }
 
-    # 4. Alle Tests aus allen Projekten einsammeln (optional gefiltert)
+    # 4. Alle Tests aus allen Projekten einsammeln (optional gefiltert). xUnit-Theory-Datenzeilen
+    # werden als entdeckte Tests gezaehlt, aber methodenbasiert ausgefuehrt: Der Displayname einer
+    # einzelnen Datenzeile ist nicht stabil als FullyQualifiedName-Filter adressierbar.
     $allTests = [System.Collections.Generic.List[object]]::new()
     foreach ($project in $testProjects) {
         Write-Host "==> Ermittle Tests: $($project.Name)" -ForegroundColor Cyan
-        $names = Get-TestNames -ProjectPath $project.FullName
-        foreach ($n in $names) {
-            if ([string]::IsNullOrWhiteSpace($Filter) -or ($n -like "*$Filter*")) {
-                $allTests.Add([PSCustomObject]@{ Project = $project; TestName = $n })
+        $targets = Get-TestTargets -ProjectPath $project.FullName
+        foreach ($target in $targets) {
+            if ([string]::IsNullOrWhiteSpace($Filter) -or ($target.DisplayName -like "*$Filter*") -or ($target.FilterName -like "*$Filter*")) {
+                $allTests.Add([PSCustomObject]@{ Project = $project; TestTarget = $target })
             }
         }
     }
@@ -205,16 +283,27 @@ try {
         throw "Keine Tests gefunden (ggf. Filter '$Filter' zu eng)."
     }
 
-    Write-Host "==> $($allTests.Count) Tests werden einzeln ausgefuehrt." -ForegroundColor Cyan
+    $testSetLabel = switch ($TestSet) {
+        "Regular" { "regulaere Tests (Category!=OsInterface)" }
+        "OsInterface" { "OS-Schnittstellen-Tests (Category=OsInterface)" }
+        default { "alle Tests" }
+    }
+    $discoveredTests = ($allTests | ForEach-Object { $_.TestTarget.DiscoveryCount } | Measure-Object -Sum).Sum
+    $theoryTargets = @($allTests | Where-Object { $_.TestTarget.ExecutionMode -eq "TheoryMethod" })
+    $groupedTheoryRows = ($theoryTargets | ForEach-Object { $_.TestTarget.DiscoveryCount } | Measure-Object -Sum).Sum
+    Write-Host "==> $discoveredTests entdeckte Tests werden ueber $($allTests.Count) stabile Filter ausgefuehrt: $testSetLabel." -ForegroundColor Cyan
+    if ($theoryTargets.Count -gt 0) {
+        Write-Host "==> $groupedTheoryRows Theory-Datenzeilen laufen bewusst gruppiert ueber $($theoryTargets.Count) Methodennamen." -ForegroundColor Cyan
+    }
 
     # 5. Jeden Test einzeln ausfuehren, inkl. Retry-nach-Rebuild bei Ausfuehrungsfehlern
     $results = [System.Collections.Generic.List[object]]::new()
     $index = 0
     foreach ($entry in $allTests) {
         $index++
-        Write-Host "[$index/$($allTests.Count)] $($entry.TestName)" -NoNewline
+        Write-Host "[$index/$($allTests.Count)] $($entry.TestTarget.DisplayName)" -NoNewline
 
-        $run = Invoke-SingleTest -ProjectPath $entry.Project.FullName -TestName $entry.TestName
+        $run = Invoke-SingleTest -ProjectPath $entry.Project.FullName -TestTarget $entry.TestTarget
         $retried = $false
 
         if ($run.IsRuntimeError) {
@@ -222,7 +311,7 @@ try {
             $rebuildOk = Invoke-FullBuild -Projects $testProjects
             $retried = $true
             if ($rebuildOk) {
-                $run = Invoke-SingleTest -ProjectPath $entry.Project.FullName -TestName $entry.TestName
+                $run = Invoke-SingleTest -ProjectPath $entry.Project.FullName -TestTarget $entry.TestTarget
             }
         }
 
@@ -250,7 +339,11 @@ try {
 
         $results.Add([PSCustomObject]@{
             Project    = $entry.Project.Name
-            TestName   = $entry.TestName
+            TestSet    = $TestSet
+            TestName   = $entry.TestTarget.DisplayName
+            FilterName = $entry.TestTarget.FilterName
+            ExecutionMode = $entry.TestTarget.ExecutionMode
+            DiscoveryCount = $entry.TestTarget.DiscoveryCount
             Status     = $status
             Duration   = if ($run.Trx) { $run.Trx.Duration } else { $null }
             Message    = if ($run.Trx) { $run.Trx.Message } else { $null }
@@ -269,14 +362,26 @@ try {
     $lines.Add("# Testergebnisse ($timestamp)")
     $lines.Add("")
     $lines.Add("Testprojekte: $(($testProjects.Name) -join ', '), Konfiguration: $Configuration")
+    $lines.Add("Testgruppe: $testSetLabel")
+    if ($categoryFilterExpression) { $lines.Add("Kategorie-Filter: $categoryFilterExpression") }
     if ($Filter) { $lines.Add("Filter: $Filter") }
     $lines.Add("")
     $lines.Add("## Zusammenfassung")
     $lines.Add("")
-    $lines.Add("- Gesamt: $($results.Count)")
+    $lines.Add("- Entdeckte Tests: $discoveredTests")
+    $lines.Add("- Ausgefuehrte Filter: $($results.Count)")
+    if ($theoryTargets.Count -gt 0) {
+        $lines.Add("- Gruppierte Theory-Datenzeilen: $groupedTheoryRows ueber $($theoryTargets.Count) Methodennamen")
+        $lines.Add("- Hinweis: Einzelne xUnit-Theory-Datenzeilen aus ``dotnet test --list-tests`` sind Displaynamen und werden methodenbasiert ausgefuehrt, damit sie nicht stillschweigend ausgelassen werden.")
+    }
     $lines.Add("- Bestanden: $passed")
-    $lines.Add("- Fehlgeschlagen: $failed")
-    $lines.Add("- Ausfuehrungsfehler: $execErrors")
+    if ($TestSet -eq "OsInterface") {
+        $lines.Add("- OS-Schnittstellen-Fehler: $failed")
+    }
+    else {
+        $lines.Add("- Regulaere Fehler: $failed")
+    }
+    $lines.Add("- Infrastruktur-/Ausfuehrungsfehler: $execErrors")
     if ($unknown -gt 0) { $lines.Add("- Unbekannt: $unknown") }
     $lines.Add("")
 
@@ -298,10 +403,11 @@ try {
 
     $lines.Add("## Alle Tests")
     $lines.Add("")
-    $lines.Add("| Projekt | Test | Status | Dauer |")
-    $lines.Add("|---|---|---|---|")
+    $lines.Add("| Projekt | Test | Ausfuehrung | Entdeckte Tests | Status | Dauer |")
+    $lines.Add("|---|---|---|---|---|---|")
     foreach ($r in $results) {
-        $lines.Add("| $($r.Project) | $($r.TestName) | $($r.Status) | $($r.Duration) |")
+        $execution = if ($r.ExecutionMode -eq "TheoryMethod") { "Theory-Methode" } else { "Einzeltest" }
+        $lines.Add("| $($r.Project) | $($r.TestName) | $execution | $($r.DiscoveryCount) | $($r.Status) | $($r.Duration) |")
     }
 
     $lines | Out-File -FilePath $summaryPath -Encoding utf8

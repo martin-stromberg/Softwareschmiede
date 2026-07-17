@@ -41,8 +41,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _arbeitsverzeichnisResolverMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Path.GetTempPath(), false, "configured", null));
 
-        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiAusfuehrungsService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
 
         _sut = new EntwicklungsprozessService(
             _aufgabeService,

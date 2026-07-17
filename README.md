@@ -469,20 +469,29 @@ public interface IKiPlugin : IPlugin { /* AI operations */ }
 
 ## 🧪 Tests
 
-Das Projekt enthält Unit-Tests im Projekt `Softwareschmiede.Tests`:
+Das Projekt enthält Unit-Tests im Projekt `Softwareschmiede.Tests` und Integrationstests im Projekt `Softwareschmiede.IntegrationTests`:
 
 ```powershell
-# Alle Tests ausführen
-dotnet test
+# Regulaere Unit-/Service-/ViewModel-Tests ohne echte OS-Schnittstellen ausführen
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"
+
+# Regulaere Integrationstests ohne echte OS-Schnittstellen ausführen
+dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category!=OsInterface"
+
+# OS-Schnittstellen-Tests separat ausführen
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface"
+dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category=OsInterface"
 
 # Tests mit Coverage-Report
-dotnet test --collect:"XPlat Code Coverage"
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface" --collect:"XPlat Code Coverage"
 ```
 
 **Test-Stack:**
 - [xUnit](https://xunit.net/) – Test-Framework
 - [FluentAssertions](https://fluentassertions.com/) – Lesbare Assertions
 - [Moq](https://github.com/moq/moq4) – Mocking von Plugin-Interfaces und Services
+
+Tests mit echter Desktop-, ConPTY-, Clipboard-, Prozessstart- oder vergleichbarer OS-Berührung tragen `Category=OsInterface` und werden getrennt vom regulären Testlauf bewertet. In CI laufen `Softwareschmiede.Tests` und `Softwareschmiede.IntegrationTests` jeweils blockierend mit `Category!=OsInterface`; die `Category=OsInterface`-Läufe werden separat als best-effort ausgeführt und getrennt als TRX-Artefakte hochgeladen. Details: [OS-Schnittstellen-Tests](docs/help/stabilitaet/os-interface-tests.md).
 
 Feature-spezifische Testartefakte:
 - Service-Tests (Diff-Pipeline/Cache/Algorithmus): `src/Softwareschmiede.Tests/Application/Services/DiffServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffCachingServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffAlgorithmServiceTests.cs`

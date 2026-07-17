@@ -46,7 +46,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     }
 
     /// <summary>StartCliAsync startet einen Prozess und setzt IsRunning auf true.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task StartCliAsync_StartetProzess_UndSetztIsRunningAufTrue()
     {
         var aufgabeId = Guid.NewGuid();
@@ -61,7 +61,7 @@ public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
     }
 
     /// <summary>StartWithPseudoConsoleAsync startet einen Prozess via ConPTY und liefert eine PseudoConsoleSession.</summary>
-    [Fact]
+    [OsInterfaceFact]
     [Trait("Category", "ConPTY")]
     public async Task StartWithPseudoConsoleAsync_StartetProzess_UndSetztPseudoConsoleSession()
     {

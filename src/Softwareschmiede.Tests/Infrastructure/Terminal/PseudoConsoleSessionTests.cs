@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Softwareschmiede.Infrastructure.Terminal;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Terminal;
 
@@ -214,13 +215,7 @@ public sealed class PseudoConsoleSessionTests
 
     private static PseudoConsoleSession CreateSession(Stream outputStream, ILogger? logger = null)
     {
-        var pseudoConsole = PseudoConsole.Create(1, 1);
-        return new PseudoConsoleSession(
-            pseudoConsole,
-            System.Diagnostics.Process.GetCurrentProcess(),
-            new MemoryStream(),
-            outputStream,
-            logger);
+        return TestPseudoConsoleSessionFactory.Create(new MemoryStream(), outputStream, logger);
     }
 
     /// <summary>Stream, der beim Lesevorgang eine Exception wirft (z. B. simulierter Pipe-Fehler).</summary>

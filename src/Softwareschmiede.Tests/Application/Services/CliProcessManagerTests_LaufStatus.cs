@@ -11,6 +11,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Terminal;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -65,8 +66,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
         }
 
         var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
-        var kiScopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, kiScopeFactoryMock.Object);
+        _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _sut = new CliProcessManager(_kiService, scopeFactory, NullLogger<CliProcessManager>.Instance);
     }
 
@@ -102,11 +102,8 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     /// <returns>Die neu angelegte, in <see cref="KiAusfuehrungsService"/> registrierte Sitzung.</returns>
     private PseudoConsoleSession RegisterFakeSessionForAufgabe(Guid aufgabeId)
     {
-        var pseudoConsole = PseudoConsole.Create(1, 1);
         var process = System.Diagnostics.Process.GetCurrentProcess();
-        var session = new PseudoConsoleSession(
-            pseudoConsole,
-            process,
+        var session = TestPseudoConsoleSessionFactory.Create(
             new MemoryStream(),
             new NeverEndingStream(),
             TimeProvider.System,

@@ -6,6 +6,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// E2E-Test fuer das Speichern des Standard-KI-Plugins und der plugin-spezifischen Codex-Einstellungen.
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_SettingsKiPluginPersistence : WpfTestBase
 {

@@ -3,6 +3,7 @@ using FluentAssertions;
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>Tests für <see cref="AppStartupLogInspector"/> gegen synthetische Log-Dateien.</summary>
+[OsInterface]
 public sealed class AppStartupLogInspectorTests : IDisposable
 {
     private readonly string _logDirectory;
