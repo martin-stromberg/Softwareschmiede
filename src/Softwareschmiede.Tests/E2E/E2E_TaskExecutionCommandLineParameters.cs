@@ -32,7 +32,5 @@ public sealed class E2E_TaskExecutionCommandLineParameters : WpfTestBase
 
         var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
         Assert.NotNull(stoppenButton);
-
-        new WindowsCredentialStore().DeleteCredential("Softwareschmiede.Codex.CommandLineParameters");
     }
 }
