@@ -1,3 +1,15 @@
+## 2026-07-17 — Sicherheitsprüfung beim Programmupdate korrigieren
+
+- Behebung eines Filterprädikat-Fehlers in `CliUpdateSafetyService.CheckAsync()`: Das Filterprädikat `a.LaufStatus != AufgabeLaufStatus.WartetAufEingabe` stufte Aufgaben mit `LaufStatus == null` (noch nicht initialisiert / "Bereit") fälschlicherweise als blockierend für das Programmupdate ein. Da `null != WartetAufEingabe` zu `true` auswertet, wurden diese Aufgaben einbezogen. Das Filterprädikat wurde auf den positiven Vergleich `a.LaufStatus == AufgabeLaufStatus.Laeuft` geändert — nur Aufgaben mit tatsächlich aktiv laufendem CLI-Prozess blockieren das Update; `LaufStatus == null` und `LaufStatus == AufgabeLaufStatus.WartetAufEingabe` sind nicht blockierend.
+- Angepasster Unit-Test in `CliUpdateSafetyServiceTests`: Test umbenennt zu `CheckAsync_ShouldTreatOnlyRunningStatusAsRisky` und Assertions angepasst auf die korrigierte Semantik (erwartet `RiskyTaskCount == 1` statt 2, prüft explizit, dass `null`- und `WartetAufEingabe`-Aufgaben nicht als riskant erfasst werden).
+- Dokumentation erweitert: `docs/help/programmupdate/ablauf-technisch.md` dokumentiert nun die Sicherheitsprüfung vor Programmupdate mit Filterlogik und blockierenden Zuständen.
+
+## 2026-07-16 — Update-Dialog-Anzeige reparieren
+
+- Behebung eines WPF-Databinding-Fehlers beim Fortschrittsdialog des Programmupdate-Features: `UpdateProgressViewModel` hatte sieben Properties mit `private set`, was verhinderte, dass die WPF-Databinding-Engine auf die Setter zugriff und Bindings aufbaute. Die Setter aller sieben Properties (`PhaseText`, `Message`, `Percent`, `IsIndeterminate`, `HasError`, `CanClose`, `CanCancel`) wurden auf öffentlich umgestellt, während die interne Steuerung über `SetProperty()` und spezialisierte Methoden (`Apply()`, `SetError()`, `MarkUpdaterStarting()`) erhalten bleibt.
+- Ein neuer Regressionstest verifiziert empirisch, dass der Dialog auf einem STA-Thread instanziiert und ohne `InvalidOperationException` angezeigt werden kann.
+- Änderungen beschränkt auf `src/Softwareschmiede.App/ViewModels/UpdateProgressViewModel.cs` und neue Test-Klasse — keine Datenbankmigrationen oder Konfigurationsänderungen erforderlich.
+
 ## 2026-07-16 — Toten Code zum Agentenpaket-Feature entfernen
 
 - Entfernung aller ungenutzten Typen und Implementierungen des Agentenpaket-Features: Interfaces `IAgentPackageService` und `IAgentPackageFileService`, ValueObjects `AgentPackageInfo` und `FileTreeNode`, Services `AgentPackageReader` und `AgentPackageFileService` sowie zugehörige Unit- und Integrationstests (`AgentPackageReaderTests`, `AgentPackageFileServiceTests`) aus `src/Softwareschmiede/` und `src/Softwareschmiede.Tests/`.

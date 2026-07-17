@@ -10,7 +10,7 @@
 ## Anwendung
 
 - [Programmsymbol](anwendung/index.md) — Visuelles Markenidentitäts-Symbol (Hammer-/Spitzhacken) der Softwareschmiede, angezeigt im Windows-Explorer, in der Taskleiste und im Fenster-Titel.
-- [Programmupdate](programmupdate/index.md) — Prüft GitHub-Releases, zeigt verfügbare Updates in der Seitenleiste an und führt Download, Entpacken, Sicherheitsabfrage, externes Update-Skript und Neustart.
+- [Programmupdate](programmupdate/index.md) — Aktualisiert die Anwendung über das GUI mit Sicherheitsprüfung und Fortschrittsanzeige. Vor dem Update wird überprüft, ob laufende CLI-Aufgaben das Update blockieren würden; der Benutzer wird ggf. gewarnt. Der Fortschrittsdialog zeigt den Status der Update-Vorbereitung (Download, Entpacken, Validierung) an und erlaubt dem Benutzer, den Prozess abzubrechen.
 
 ## Benutzeroberfläche
 
