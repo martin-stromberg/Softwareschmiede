@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
       - name: Install dependencies
         run: npm ci
@@ -50,31 +50,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $semanticReleaseOutput = & npx semantic-release --dry-run --no-ci 2>&1
-          $exitCode = $LASTEXITCODE
-          $output = $semanticReleaseOutput | Out-String
-
-          Write-Host "semantic-release exit code: $exitCode"
-          Write-Host $output
-
+          $output = npx semantic-release --dry-run --no-ci 2>&1 | Out-String
           $version = $null
           if ($output -match 'The next release version is ([0-9]+\.[0-9]+\.[0-9]+(?:[-+][^\s]+)?)') {
             $version = $Matches[1]
           }
           if (-not $version) {
-            try {
-              $package = Get-Content package.json -Raw | ConvertFrom-Json
-              $version = $package.version
-            }
-            catch {
-              Write-Host "Could not read package.json: $($_.Exception.Message)"
-              $version = "0.0.0"
-            }
+            $package = Get-Content package.json -Raw | ConvertFrom-Json
+            $version = $package.version
           }
-          Write-Host "Determined version: $version"
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version" >> $env:GITHUB_OUTPUT
-          exit 0
 
       - name: Build and package
         uses: ./.github/actions/build-and-package
