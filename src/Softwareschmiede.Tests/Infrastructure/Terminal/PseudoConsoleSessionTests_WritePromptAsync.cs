@@ -1,6 +1,7 @@
 using System.Text;
 using FluentAssertions;
 using Softwareschmiede.Infrastructure.Terminal;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Terminal;
 
@@ -47,11 +48,6 @@ public sealed class PseudoConsoleSessionTests_WritePromptAsync
 
     private static PseudoConsoleSession CreateSession(Stream inputStream)
     {
-        var pseudoConsole = PseudoConsole.Create(1, 1);
-        return new PseudoConsoleSession(
-            pseudoConsole,
-            System.Diagnostics.Process.GetCurrentProcess(),
-            inputStream,
-            new MemoryStream());
+        return TestPseudoConsoleSessionFactory.Create(inputStream, new MemoryStream());
     }
 }

@@ -12,9 +12,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Im Test-Modus (SOFTWARESCHMIEDE_TEST_DB_PATH gesetzt) steht ausschließlich das LocalDirectoryPlugin
 ///   als SCM-Plugin zur Verfügung (kein GitHub-Plugin), siehe PluginManager.IsAllowedInTestMode.
 ///
-/// CI-Ausschluss: dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_AufgabeStarten : WpfTestBase
 {

@@ -6,9 +6,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// E2E-Regressionstest: Gespeicherte CommandLineParameters eines Plugins dürfen den Start einer
 /// Aufgabe mit einem anderen Plugin (KI Simulator) nicht beeinträchtigen.
 ///
-/// CI-Ausschluss: dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_TaskExecutionCommandLineParameters : WpfTestBase
 {

@@ -28,8 +28,7 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
-        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();

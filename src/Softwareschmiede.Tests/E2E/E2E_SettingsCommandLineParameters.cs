@@ -7,9 +7,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// <summary>
 /// E2E-Tests für das CommandLineParameters-Einstellungsfeld und den Hilfe-Button in der KI-Plugin-Konfiguration.
 ///
-/// CI-Ausschluss: dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
 {

@@ -19,7 +19,7 @@ concurrency:
 jobs:
   test:
     # Softwareschmiede.Tests referenziert Softwareschmiede.App (WPF, net10.0-windows),
-    # deshalb bleibt der stabile CI-Testlauf trotz E2E-Ausschluss auf Windows.
+    # deshalb bleibt der stabile CI-Testlauf trotz OsInterface-Trennung auf Windows.
     runs-on: windows-latest
     timeout-minutes: 20
 
@@ -37,20 +37,51 @@ jobs:
         shell: pwsh
 
       - name: Build
-        run: dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore -c Debug
+        run: |
+          dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore -c Debug
+          dotnet build src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-restore -c Debug
         shell: pwsh
 
-      - name: Test
-        # PR-Gate: nur stabile Unit-/Integrations-/BUnit-nahe Tests. WPF/FlaUI-E2E und echte
-        # ConPTY-Umgebungstests laufen lokal waehrend der Entwicklung, weil GitHub-hosted Runner
-        # keine verlaessliche interaktive Desktop-/Konsolen-Session bereitstellen.
-        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category!=E2E&Category!=ConPTY" --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=normal"
+      - name: Test regular tests
+        # PR-Gate: stabile Unit-/Integrations-/BUnit-nahe Tests ohne echte OS-Schnittstellen.
+        # E2E-, ConPTY-, Clipboard- und Prozessstart-Tests tragen zusaetzlich Category=OsInterface.
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category!=OsInterface" --logger "trx;LogFileName=test-results-regular-tests.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
-      - name: Upload test results
+      - name: Test regular integration
+        # PR-Gate: regulaere IntegrationTests ohne echte OS-Schnittstellen.
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Test OS interfaces tests
+        # Best-effort: echte Desktop-/ConPTY-/Clipboard-/Prozessumgebung ist auf GitHub-hosted Runnern
+        # nicht immer verlaesslich. Ergebnisse werden separat hochgeladen, blockieren PRs aber nicht.
+        continue-on-error: true
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-tests.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Test OS interfaces integration
+        # Best-effort: start.ps1-Integrationstests laufen getrennt von der blockierenden Regular-Lane.
+        continue-on-error: true
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Upload regular test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: src/Softwareschmiede.Tests/TestResults/*.trx
+          name: test-results-regular
+          path: |
+            src/Softwareschmiede.Tests/TestResults/*regular*.trx
+            src/Softwareschmiede.IntegrationTests/TestResults/*regular*.trx
+          retention-days: 14
+
+      - name: Upload OS interface test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-os-interface
+          path: |
+            src/Softwareschmiede.Tests/TestResults/*os-interface*.trx
+            src/Softwareschmiede.IntegrationTests/TestResults/*os-interface*.trx
           retention-days: 14

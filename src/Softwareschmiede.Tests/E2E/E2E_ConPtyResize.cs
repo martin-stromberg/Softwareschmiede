@@ -7,9 +7,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Windows-Desktop-Session (kein Headless-CI), Windows 10 Build 17763 oder neuer
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein
 ///
-/// CI-Ausschluss: dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_ConPtyResize : WpfTestBase
 {

@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Softwareschmiede.App.Controls;
+using Softwareschmiede.Tests.Helpers;
 using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.Tests.App.Controls;
@@ -232,8 +233,7 @@ public sealed partial class TerminalControlTests
 
     private static PseudoConsoleSession CreateSession(Stream inputStream, Stream outputStream)
     {
-        var pseudoConsole = PseudoConsole.Create(1, 1);
-        return new PseudoConsoleSession(pseudoConsole, System.Diagnostics.Process.GetCurrentProcess(), inputStream, outputStream);
+        return TestPseudoConsoleSessionFactory.Create(inputStream, outputStream);
     }
 
     private static void RunOnSta(Action action)

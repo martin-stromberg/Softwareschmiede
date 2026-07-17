@@ -15,9 +15,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// Arbeitsverzeichnis weiterhin gezielt in der Test-Datenbank, weil dort die spätere CLI-Auswirkung
 /// im Vordergrund steht.
 ///
-/// CI-Ausschluss: dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_WorkingDirectory : WpfTestBase
 {

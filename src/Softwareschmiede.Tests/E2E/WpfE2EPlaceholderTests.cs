@@ -12,9 +12,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein (dotnet build src/Softwareschmiede.App)
 ///
 /// Ausführung (lokal): dotnet test --filter Category=E2E
-/// CI-Ausschluss:      dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf:    dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class WpfE2ETests : WpfTestBase
 {

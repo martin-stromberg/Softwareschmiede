@@ -28,9 +28,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein
 /// - Im Test-Modus steht ausschließlich das LocalDirectoryPlugin als SCM-Plugin zur Verfügung.
 ///
-/// CI-Ausschluss: dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
 {

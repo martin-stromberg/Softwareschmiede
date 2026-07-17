@@ -19,8 +19,7 @@ public static class TaskDetailViewModelTestFactory
     public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService)
     {
         var dialogServiceMock = new Mock<IDialogService>();
-        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        var kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        var kiService = TestKiAusfuehrungsServiceFactory.Create();
         var protokollService = new ProtokollService(db, NullLogger<ProtokollService>.Instance);
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);

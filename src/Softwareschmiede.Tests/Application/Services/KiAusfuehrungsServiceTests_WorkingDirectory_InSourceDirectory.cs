@@ -7,6 +7,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -56,8 +57,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
 
         _gitPlugin = new LocalDirectoryPlugin(cliRunnerMock.Object, credentialStoreMock.Object, NullLogger<LocalDirectoryPlugin>.Instance);
 
-        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiAusfuehrungsService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
     }
 
     /// <summary>Dispose.</summary>
@@ -80,7 +80,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory_InSourceDirector
     /// (nicht relativ zum Pointer-Verzeichnis), wenn das übergebene <see cref="IGitPlugin"/> im
     /// InSourceDirectory-Modus arbeitet.
     /// </summary>
-    [Fact]
+    [OsInterfaceFact]
     public async Task StartCliAsync_ShouldResolveConfiguredWorkingDirectory_ViaSourcePath_WhenPluginIsInSourceDirectoryMode()
     {
         // Arrange

@@ -6,6 +6,7 @@ using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Terminal;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -19,8 +20,7 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
     /// <summary>PromptZeitVersandServiceTests.</summary>
     public PromptZeitVersandServiceTests()
     {
-        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
         _sut = new PromptZeitVersandService(_kiService, _timeProvider, NullLogger<PromptZeitVersandService>.Instance);
     }
@@ -40,25 +40,20 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
     /// angehängt, damit <see cref="KiAusfuehrungsService.GetPseudoConsoleSession"/> sie zurückgibt.
     /// </summary>
     /// <returns>Die ID der Aufgabe, für die eine Session registriert wurde.</returns>
-    private async Task<Guid> StartCliSessionAsync()
+    private Task<Guid> StartCliSessionAsync()
     {
         var aufgabeId = Guid.NewGuid();
-        var pluginMock = new Mock<IKiPlugin>();
-        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = "/c ping 127.0.0.1 -n 30 > nul",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
+        var session = TestPseudoConsoleSessionFactory.Create(new MemoryStream(), new MemoryStream());
+        var handle = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess())
+        {
+            PseudoConsoleSession = session
+        };
 
-        var handle = await _kiService.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        handles[aufgabeId] = handle;
 
-        var pseudoConsole = PseudoConsole.Create(1, 1);
-        handle.PseudoConsoleSession = new PseudoConsoleSession(pseudoConsole, handle.Process, new MemoryStream(), new MemoryStream());
-
-        return aufgabeId;
+        return Task.FromResult(aufgabeId);
     }
 
     /// <summary>Liegt die Zielzeit in der Vergangenheit, wird der Prompt sofort versendet und es bleibt kein Eintrag in der Warteschlange.</summary>

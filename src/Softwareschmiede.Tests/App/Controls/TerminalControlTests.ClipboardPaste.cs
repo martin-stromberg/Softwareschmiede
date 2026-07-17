@@ -64,7 +64,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>Drückt der Anwender <c>Ctrl+V</c>, muss das Tastaturereignis als behandelt markiert werden,
     /// damit es nicht an den bestehenden Tastatur-Encoder weitergereicht wird.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void OnPreviewKeyDown_CtrlV_SetsHandledTrue()
     {
         RunOnSta(() =>
@@ -84,7 +84,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Drückt der Anwender <c>Ctrl+V</c> bei vorhandenem Zwischenablage-Text, muss der Text kodiert
     /// und in den Input-Stream der Session geschrieben werden (Nachweis, dass <c>ReadClipboardAndInsertAsync</c>
     /// angestoßen wurde).</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void OnPreviewKeyDown_CtrlV_CallsReadClipboardAndInsertAsync()
     {
         RunOnSta(() =>
@@ -109,7 +109,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>Ein erfolgreicher Zwischenablage-Read schreibt die newline-normalisierten UTF-8-Bytes des
     /// Textes in den Input-Stream der Session.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void ReadClipboardAndInsertAsync_Success_WritesEncodedBytesToInputStream()
     {
         RunOnSta(() =>
@@ -129,7 +129,7 @@ public sealed partial class TerminalControlTests
     }
 
     /// <summary>Ist die Zwischenablage leer, darf nichts in den Input-Stream geschrieben werden.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void ReadClipboardAndInsertAsync_ClipboardEmpty_DoesNothing()
     {
         RunOnSta(() =>
@@ -149,7 +149,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>Schlägt das Schreiben in den Input-Stream während des Zwischenablage-Einfügens fehl, muss der
     /// Fehler über den Logger protokolliert werden, statt das Control zu beeinträchtigen.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void ReadClipboardAndInsertAsync_ClipboardAccessThrows_LogsWarningAndContinues()
     {
         var loggerMock = new Mock<ILogger<TerminalControl>>();
@@ -181,7 +181,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>Nach erfolgreichem Schreiben in den Input-Stream muss <c>Session.MarkInputActivity()</c>
     /// aufgerufen werden, damit der Laufzeitstatus der CLI korrekt aktualisiert wird.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void ReadClipboardAndInsertAsync_CallsMarkInputActivity()
     {
         RunOnSta(() =>
@@ -202,7 +202,7 @@ public sealed partial class TerminalControlTests
     }
 
     /// <summary>Enthält die Zwischenablage Text, muss <c>GetClipboardText()</c> diesen unverändert zurückgeben.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void GetClipboardText_ClipboardContainsText_ReturnsText()
     {
         RunOnSta(() =>
@@ -219,7 +219,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Schlägt der Zwischenablage-Zugriff fehl (hier simuliert durch Aufruf von einem Nicht-STA-Thread,
     /// was einen echten Zugriffsfehler der WPF-Zwischenablage-API auslöst), muss <c>GetClipboardText()</c> einen
     /// Leerstring zurückgeben statt die Exception zu propagieren.</summary>
-    [Fact]
+    [OsInterfaceFact]
     public void GetClipboardText_ClipboardAccessThrows_ReturnsEmptyString()
     {
         RunOnSta(() =>

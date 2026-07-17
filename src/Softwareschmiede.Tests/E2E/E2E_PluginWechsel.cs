@@ -11,9 +11,10 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Im Test-Modus steht ausschließlich das LocalDirectoryPlugin als SCM-Plugin zur Verfügung;
 ///   als KI-Plugins sind u.a. Softwareschmiede.KiSimulator und Softwareschmiede.ClaudeCli verfügbar.
 ///
-/// CI-Ausschluss: dotnet test --filter "Category!=E2E"
+/// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
+[OsInterface]
 [Collection("E2E")]
 public sealed class E2E_PluginWechsel : WpfTestBase
 {

@@ -13,6 +13,16 @@ Beide Jobs bauen und veröffentlichen dieselbe Anwendung, unterscheiden sich abe
 
 ## Workflow-Schritte
 
+### Test-Workflow
+
+Der separate Workflow `.github/workflows/test.yml` laeuft fuer Pull Requests nach `main` und fuer Pushes auf `main`. Er baut `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` auf `windows-latest` und trennt die Testauswertung:
+
+- `Test regular` ist blockierend und fuehrt `Category!=OsInterface` aus.
+- `Test OS interfaces` fuehrt `Category=OsInterface` best-effort mit `continue-on-error: true` aus.
+- TRX-Dateien werden getrennt als `test-results-regular` und `test-results-os-interface` hochgeladen.
+
+Die Trennung ersetzt den frueheren Ausschluss ueber `Category!=E2E&Category!=ConPTY`. E2E- und ConPTY-Tests behalten diese Kategorien, tragen aber zusaetzlich `OsInterface`.
+
 ### Job `release` (Push auf `main`)
 
 | # | Step | Zweck |
