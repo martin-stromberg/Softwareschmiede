@@ -21,7 +21,7 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
     {
         var activeTasks = await _aufgabeService.GetAktiveAufgabenAsync(ct);
         var riskyTasks = activeTasks
-            .Where(a => a.AktiveRunId is not null && a.LaufStatus != AufgabeLaufStatus.WartetAufEingabe)
+            .Where(a => a.AktiveRunId is not null && a.LaufStatus == AufgabeLaufStatus.Laeuft)
             .Select(a => $"{a.Titel} ({a.Id})")
             .ToList();
 

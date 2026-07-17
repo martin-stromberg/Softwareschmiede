@@ -4,9 +4,28 @@
 
 ## Übersicht
 
-Das Programmupdate wird durch einen Update-Service initiiert, der den Fortschritt über ein `UpdateProgressViewModel` an einen WPF-Dialog meldet. Der Dialog zeigt die Fortschrittsinformationen mit Bindings an und erlaubt dem Benutzer, den Prozess abzubrechen.
+Das Programmupdate wird durch einen Update-Service initiiert, der vorher eine Sicherheitsprüfung durchführt, um zu bestimmen, ob laufende CLI-Aufgaben das Update blockieren würden. Falls keine blockierenden Aufgaben gefunden werden, wird der Fortschritt über ein `UpdateProgressViewModel` an einen WPF-Dialog gemeldet. Der Dialog zeigt die Fortschrittsinformationen mit Bindings an und erlaubt dem Benutzer, den Prozess abzubrechen.
 
 ## Ablauf
+
+### 0. Sicherheitsprüfung (CliUpdateSafetyService)
+
+Vor dem Start des Update-Prozesses wird überprüft, ob aktive CLI-Aufgaben das Update blockieren würden:
+
+Beteiligte Komponenten:
+- `ICliUpdateSafetyService.CheckAsync()` — Ermittelt blockierende Aufgaben
+- `AufgabeService.GetAktiveAufgabenAsync()` — Lädt aktive Aufgaben (Status `Gestartet` oder `Wartend`, max. 20)
+- `Aufgabe.LaufStatus` — Gibt den Laufzeit-Substatus an
+
+**Filterlogik:** Eine Aufgabe blockiert das Update nur dann, wenn beide Bedingungen erfüllt sind:
+1. `AktiveRunId is not null` — Die Aufgabe hat eine aktive CLI-Session
+2. `LaufStatus == AufgabeLaufStatus.Laeuft` — Der CLI-Prozess läuft aktiv (nicht bloß "wartet" oder "bereit")
+
+**Nicht blockierende Zustände:**
+- `LaufStatus == null` — Aufgabe ist bereit oder noch nicht klassifiziert; kein CLI-Prozess läuft
+- `LaufStatus == AufgabeLaufStatus.WartetAufEingabe` — CLI läuft, wartet aber auf Benutzer; ist bereits eingeplant und benötigt nicht zu unterbrechen
+
+**Ergebnis:** `CliUpdateSafetyResult` enthält die Anzahl riskanter Aufgaben und deren Titel/ID. Falls `RiskyTaskCount > 0`, wird `RequiresConfirmation = true` gesetzt, und der Benutzer erhält eine Warnung mit Optionen.
 
 ### 1. Update-Dialog initialisieren
 
@@ -44,24 +63,32 @@ Nach erfolgreicher Vorbereitung wird `UpdateProgressViewModel.MarkUpdaterStartin
 
 ```mermaid
 flowchart TD
-    A["Update-Service ruft Show auf"] --> B["Dialog wird auf UI-Thread initialisiert"]
-    B --> C["XAML-Bindings werden aufgebaut"]
-    C --> D{"Alle Property-Setter öffentlich?"}
-    D -- Nein --> E["InvalidOperationException<br/>Dialog wird nicht angezeigt"]
-    D -- Ja --> F["Dialog wird angezeigt"]
-    F --> G["Update-Service sendet<br/>Fortschrittsmeldungen"]
-    G --> H["ViewModel.Apply aktualisiert Properties"]
-    H --> I["PropertyChanged-Event<br/>auslöst UI-Update"]
-    I --> J{"Fehler?"}
-    J -- Ja --> K["ViewModel.SetError aufrufen"]
-    K --> L["Fehler-UI anzeigen"]
-    J -- Nein --> M{"Abbrechen?"}
-    M -- Ja --> N["ViewModel.RequestCancel aufrufen"]
-    N --> O["CancelAction wird aufgerufen"]
-    M -- Nein --> P["Vorbereitung abgeschlossen"]
-    P --> Q["ViewModel.MarkUpdaterStarting aufrufen"]
-    Q --> R["Externes Updater-Skript startet"]
-    R --> S["Anwendung wird beendet"]
+    A["Update-Benutzer löst aus"] --> B["CliUpdateSafetyService.CheckAsync aufrufen"]
+    B --> C["Aktive Aufgaben laden"]
+    C --> D{"Laufende CLI-Prozesse?<br/>(LaufStatus == Laeuft)"}
+    D -- Ja --> E["Warnung anzeigen<br/>RequiresConfirmation = true"]
+    E --> F{"Benutzer bestätigt?"}
+    F -- Nein --> G["Abbruch"]
+    D -- Nein --> H["Update-Service startet"]
+    F -- Ja --> H
+    H --> I["Update-Dialog auf UI-Thread initialisieren"]
+    I --> J["XAML-Bindings werden aufgebaut"]
+    J --> K{"Alle Property-Setter öffentlich?"}
+    K -- Nein --> L["InvalidOperationException<br/>Dialog wird nicht angezeigt"]
+    K -- Ja --> M["Dialog wird angezeigt"]
+    M --> N["Update-Service sendet<br/>Fortschrittsmeldungen"]
+    N --> O["ViewModel.Apply aktualisiert Properties"]
+    O --> P["PropertyChanged-Event<br/>auslöst UI-Update"]
+    P --> Q{"Fehler?"}
+    Q -- Ja --> R["ViewModel.SetError aufrufen"]
+    R --> S["Fehler-UI anzeigen"]
+    Q -- Nein --> T{"Abbrechen?"}
+    T -- Ja --> U["ViewModel.RequestCancel aufrufen"]
+    U --> V["CancelAction wird aufgerufen"]
+    T -- Nein --> W["Vorbereitung abgeschlossen"]
+    W --> X["ViewModel.MarkUpdaterStarting aufrufen"]
+    X --> Y["Externes Updater-Skript startet"]
+    Y --> Z["Anwendung wird beendet"]
 ```
 
 ## Fehlerbehandlung
