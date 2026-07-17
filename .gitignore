@@ -381,3 +381,4 @@ FodyWeavers.xsd
 issue.md
 /test-results/
 docs/token-usage-log.csv
+/.devin/skills/*
