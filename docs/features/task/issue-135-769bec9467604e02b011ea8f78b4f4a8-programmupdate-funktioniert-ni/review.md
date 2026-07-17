@@ -6,20 +6,28 @@
 
 ## Umgesetzte Planelemente
 
-- [x] `CliUpdateSafetyService.CheckAsync()` (Methode) — Filterprädikat korrigiert: `src/Softwareschmiede/Application/Services/Updates/CliUpdateSafetyService.cs:24` nutzt jetzt `a.AktiveRunId is not null && a.LaufStatus == AufgabeLaufStatus.Laeuft` (positiver Whitelist-Vergleich statt Negativ-Vergleich). Keine Signatur-, Rückgabetyp- oder Abhängigkeitsänderung.
-- [x] Test umbenannt/angepasst — `CheckAsync_ShouldTreatRunningAndNullStatusAsRisky` existiert nicht mehr; ersetzt durch `CheckAsync_ShouldTreatOnlyRunningStatusAsRisky` in `src/Softwareschmiede.Tests/Application/Services/Updates/CliUpdateSafetyServiceTests.cs:36`.
-- [x] `RiskyTaskCount == 1` erwartet (Zeile 46) und ausschließlich die `Laeuft`-Aufgabe als riskant verifiziert (Zeile 47).
-- [x] Explizite Prüfung, dass `null`- und `WartetAufEingabe`-Aufgaben **nicht** in `RiskyTasks` enthalten sind (Zeilen 48–49, `NotContain`).
-- [x] Hilfsmethode `CreateActiveTaskAsync(string, AufgabeLaufStatus?)` — vorhanden (Zeile 52), deckt alle drei Zustände (`Laeuft`, `WartetAufEingabe`, `null`) ab; keine neue Infrastruktur nötig (plankonform).
-- [x] Build + Tests verifiziert — Vollständiger Build erfolgreich, `CliUpdateSafetyServiceTests` grün (1 bestanden, 0 Fehler; `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`, kein Hintergrund-`dotnet test`).
-
-Planpositionen ohne Umsetzungsbedarf (plankonform als „Keine" ausgewiesen): Neue Klassen, Datenbankmigrationen, Validierungsregeln, Konfigurationsänderungen, E2E-Tests.
+- [x] `AufgabeLaufAktivitaet` (statische Hilfsklasse, `Softwareschmiede.Application.Services`) — angelegt unter `src/Softwareschmiede/Application/Services/AufgabeLaufAktivitaet.cs`
+- [x] Methode `IstAktiv(string? aktiveRunId, DateTimeOffset? lastHeartbeatUtc, DateTimeOffset nowUtc)` (public static) — vorhanden; korrekte Bedingung `aktiveRunId != null && lastHeartbeatUtc != null && nowUtc - lastHeartbeatUtc.Value < TimeSpan.FromMinutes(AufgabeRecoveryService.HeartbeatTimeoutMinutes)` (striktes `<`)
+- [x] `KiAusfuehrungsStatusConverter.Convert()` (`AppConverters.cs`) — Inline-Heartbeat-Bedingung durch `AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, DateTimeOffset.UtcNow)` ersetzt; Substatus-Zweig (`WartetAufEingabe` → „⏸ Wartet" / sonst „▶ Läuft") unverändert
+- [x] `CliUpdateSafetyService.CheckAsync()` — Filterprädikat auf `AufgabeLaufAktivitaet.IstAktiv(a.AktiveRunId, a.LastHeartbeatUtc, DateTimeOffset.UtcNow)` umgestellt; `using Softwareschmiede.Domain.Enums;` entfernt; Signatur/Rückgabetyp unverändert
+- [x] Testklasse `AufgabeLaufAktivitaetTests` (neu) — angelegt mit allen fünf geplanten Fällen:
+  - [x] `IstAktiv_ShouldReturnTrue_WhenRunIdSetAndHeartbeatFresh` — vorhanden
+  - [x] `IstAktiv_ShouldReturnFalse_WhenHeartbeatOlderThanTimeout` — vorhanden
+  - [x] `IstAktiv_ShouldReturnFalse_WhenHeartbeatExactlyAtTimeout` (Grenzfall striktes `<`) — vorhanden
+  - [x] `IstAktiv_ShouldReturnFalse_WhenHeartbeatNull` — vorhanden
+  - [x] `IstAktiv_ShouldReturnFalse_WhenRunIdNull` — vorhanden
+- [x] Hilfsmethode `CreateActiveTaskAsync` in `CliUpdateSafetyServiceTests` — um optionalen Parameter `DateTimeOffset? lastHeartbeatUtc = null` erweitert (Default: frischer Heartbeat aus `AktivenLaufSetzenAsync`, Override setzt `tracked.LastHeartbeatUtc`)
+- [x] `CliUpdateSafetyServiceTests.CheckAsync_ShouldTreatTaskWithFreshHeartbeatAsRisky` — vorhanden (frischer Heartbeat → riskant, `RequiresConfirmation == true`)
+- [x] `CliUpdateSafetyServiceTests.CheckAsync_ShouldNotTreatTaskWithStaleHeartbeatAsRisky` — vorhanden (veralteter Heartbeat trotz `LaufStatus == Laeuft` → nicht riskant, `RequiresConfirmation == false`)
+- [x] Bestehender Test `CheckAsync_ShouldTreatOnlyRunningStatusAsRisky` — entfernt (in Fresh-Heartbeat-Test überführt); repo-weit nicht mehr auffindbar
+- [x] Einzige Quelle der Aktiv-Bedingung — repo-weiter Suchlauf bestätigt keine verbleibende Inline-Kopie der Heartbeat-Timeout-Bedingung außerhalb von `AufgabeLaufAktivitaet`
 
 ## Offene Aufgaben
 
-Keine.
+Keine offenen Code-Elemente. (Prozess-Task 13 „Build + Tests grün verifizieren" wurde im Rahmen dieses reinen Plan-Reviews bewusst nicht ausgeführt — kein Code-Artefakt, sondern ein Verifikationsschritt.)
 
 ## Hinweise
 
-- Der optionale Zusatztest `CheckAsync_ShouldNotTreatNullStatusAsRisky` wurde — wie im Plan bevorzugt — nicht separat angelegt, sondern in den umbenannten Haupttest integriert (`NotContain` für `nullStatus`). Das entspricht der Planempfehlung.
-- Die im Plan als unabhängig markierte UI-Stelle (`AppConverters.KiAusfuehrungsStatusConverter`) wurde erwartungsgemäß nicht verändert.
+- Keine Datenbankmigrationen, Validierungs- oder Konfigurationsänderungen im Plan — konsistent mit dem Code (keine solchen Änderungen vorhanden).
+- Der Plan sieht keine E2E-Tests vor; Abdeckung erfolgt vollständig über die genannten Unit-Tests und die bestehenden `KiAusfuehrungsStatusConverterTests` als Regressionsnachweis der verhaltensneutralen Extraktion.
+- Task 13 (voller Build + Testlauf) sollte vor Abschluss noch ausgeführt werden — projektregelkonform: `dotnet test` niemals im Hintergrund, `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` setzen, keine `Softwareschmiede.App.exe` beenden.
