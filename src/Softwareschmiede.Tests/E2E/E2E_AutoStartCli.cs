@@ -43,8 +43,7 @@ public sealed class E2E_AutoStartCli : WpfTestBase
 
         WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
-        var statusGestartetNachStop = WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
-        Assert.NotNull(statusGestartetNachStop);
+        WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
 
         // Zurück navigieren und Aufgabe erneut öffnen (löst TaskDetailViewModel.LadenAsync neu aus)
         AufgabeDetailZurueck(mainWindow);
@@ -54,7 +53,6 @@ public sealed class E2E_AutoStartCli : WpfTestBase
         ErsteOffeneAufgabeOeffnen(items);
 
         // Automatischer CLI-Neustart beim Laden: Stoppen-Button erscheint ohne manuellen Start-Klick
-        var stoppenButtonNachAutoStart = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        Assert.NotNull(stoppenButtonNachAutoStart);
+        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
     }
 }

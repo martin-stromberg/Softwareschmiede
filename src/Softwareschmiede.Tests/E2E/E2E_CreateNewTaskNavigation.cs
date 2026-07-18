@@ -33,12 +33,10 @@ public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
         AufgabeDetailSpeichern(mainWindow);
 
         // Navigation kehrt zur ProjectDetailView zurück (ProjektName-Feld wieder sichtbar)
-        var projektNameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
-        Assert.NotNull(projektNameBox);
+        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
 
         // Neue Aufgabe erscheint mit aktualisiertem Titel in der Aufgabenliste
-        var aufgabenTitel = WaitForElement(mainWindow, cf => cf.ByName("Persistierte Neue Aufgabe"), Short);
-        Assert.NotNull(aufgabenTitel);
+        WaitForElement(mainWindow, cf => cf.ByName("Persistierte Neue Aufgabe"), Short);
 
         // Phase Abbrechen
         NeueAufgabeAnlegen(mainWindow);

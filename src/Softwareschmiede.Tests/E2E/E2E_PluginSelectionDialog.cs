@@ -45,26 +45,16 @@ public sealed class E2E_PluginSelectionDialog : WpfTestBase
         abbrechenButton.AsButton().Click();
 
         // Edit-Panel weiterhin sichtbar (Status nach wie vor "Neu")
-        var editTitel = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-        Assert.NotNull(editTitel);
+        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
 
         var stoppenButtonNachAbbrechen = mainWindow.FindFirstDescendant(cf =>
             cf.ByName("CliStoppen").And(cf.ByControlType(ControlType.Button)));
         Assert.Null(stoppenButtonNachAbbrechen);
 
         // Phase OK
-        var startenButtonErneut = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
-        startenButtonErneut.AsButton().Click();
-
-        var okDialog = WaitForWindow("KI-Plugin auswählen", Medium);
-        var pluginAuswahlBox = WaitForElement(okDialog, cf => cf.ByName("PluginAuswahl"), Short);
-        SelectComboBoxItemByClick(pluginAuswahlBox, "Softwareschmiede.KiSimulator", Short);
-
-        var okButton = WaitForElement(okDialog, cf => cf.ByName("OK"), Short);
-        okButton.AsButton().Click();
+        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
         // Nach Bestätigung: kombinierter Start-Ablauf läuft weiter, CLI startet
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        Assert.NotNull(stoppenButton);
+        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
     }
 }

@@ -44,8 +44,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Erstes Projekt ist noch in der Liste und aufrufbar
         OpenProject(mainWindow, "Bestehendes-Projekt");
-        var speichernInDetail = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        Assert.NotNull(speichernInDetail);
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
         // Zurück zur Übersicht, Projekt erneut öffnen
         ZurueckZurProjektuebersicht(mainWindow);
@@ -56,8 +55,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // Zurück zur Übersicht
         ZurueckZurProjektuebersicht(mainWindow);
 
-        var projektTile = WaitForElement(mainWindow, cf => cf.ByName("Bestehendes-Projekt"), Short);
-        Assert.NotNull(projektTile);
+        WaitForElement(mainWindow, cf => cf.ByName("Bestehendes-Projekt"), Short);
     }
 
     /// <summary>
@@ -80,12 +78,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Projektkachel zeigt jetzt den neuen Namen
         var aktualisierteKachel = WaitForElement(mainWindow, cf => cf.ByName("Umbenennen-Test-Aktualisiert"), Short);
-        Assert.NotNull(aktualisierteKachel);
 
         // Kachel erneut anklicken → Detailansicht öffnet sich
         aktualisierteKachel.Click();
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        Assert.NotNull(nameBox);
+        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
 
         // Erneut bearbeiten und speichern (UpdateAsync-Pfad); Name bleibt aktualisiert
         ProjektNamenAendernUndSpeichern(mainWindow, "Umbenennen-Test-Aktualisiert-Erneut");
@@ -151,21 +147,16 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         NavigateToProjecten(mainWindow);
         OpenProject(mainWindow, projektName);
 
-        var offeneAufgabenListe = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
-        Assert.NotNull(offeneAufgabenListe);
-
-        var offeneItems = offeneAufgabenListe.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+        var offeneItems = OffeneAufgabenItems(mainWindow);
         Assert.Contains(offeneItems, item => item.Name == offeneAufgabeTitel);
         Assert.DoesNotContain(offeneItems, item => item.Name == beendeteAufgabeTitel);
 
         var beendeteAufgabenExpander = WaitForElement(mainWindow, cf => cf.ByName("BeendeteAufgabenExpander"), Short);
-        Assert.NotNull(beendeteAufgabenExpander);
         Assert.Equal(ExpandCollapseState.Collapsed, beendeteAufgabenExpander.Patterns.ExpandCollapse.Pattern.ExpandCollapseState);
 
         beendeteAufgabenExpander.Patterns.ExpandCollapse.Pattern.Expand();
 
         var beendeteAufgabenListe = WaitForElement(beendeteAufgabenExpander, cf => cf.ByName("BeendeteAufgabenListe"), Short);
-        Assert.NotNull(beendeteAufgabenListe);
 
         var beendeteItems = beendeteAufgabenListe.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.Contains(beendeteItems, item => item.Name == beendeteAufgabeTitel);
@@ -185,8 +176,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         CreateAndOpenProject(mainWindow, "Aufgabe-Test");
 
         // Neue Aufgabe erstellen; Navigation zur separaten TaskDetailView (Edit-Panel, da Status == Neu)
-        var editTitelBox = NeueAufgabeAnlegen(mainWindow);
-        Assert.NotNull(editTitelBox);
+        NeueAufgabeAnlegen(mainWindow);
 
         // Zurück zur Projektdetailansicht navigieren
         AufgabeDetailZurueck(mainWindow);
@@ -200,8 +190,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         filterButton.AsButton().Click();
 
         // Überschrift "Aufgaben filtern" erscheint
-        var overlayTitel = WaitForElement(mainWindow, cf => cf.ByName("Aufgaben filtern"), Short);
-        Assert.NotNull(overlayTitel);
+        WaitForElement(mainWindow, cf => cf.ByName("Aufgaben filtern"), Short);
 
         // RadioButton "Aktiv" wählen
         var aktivRadio = WaitForElement(
@@ -231,8 +220,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         var mainWindow = StartAndNavigateToProjects();
         CreateAndOpenProject(mainWindow, "Repository-Dialog-Test");
 
-        var oeffnenButton = WaitForElement(mainWindow, cf => cf.ByName("Öffnen"), Short);
-        Assert.NotNull(oeffnenButton);
+        WaitForElement(mainWindow, cf => cf.ByName("Öffnen"), Short);
 
         // "Zuweisen"-Button im Ribbon klicken
         var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
@@ -240,15 +228,13 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // RepositoryAssignDialog erscheint als separates Fenster
         var dialog = WaitForWindow("Repository zuweisen", Short);
-        Assert.NotNull(dialog);
 
         // ComboBox für SCM-Plugin-Auswahl muss vorhanden sein
         var comboBoxen = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.ComboBox));
         Assert.True(comboBoxen.Length >= 1, "RepositoryAssignDialog muss mindestens eine ComboBox für die Plugin-Auswahl enthalten.");
 
         // Label "Arbeitsverzeichnis im Repository" ist vorhanden
-        var label = WaitForElement(dialog, cf => cf.ByName("Arbeitsverzeichnis im Repository"), Short);
-        Assert.NotNull(label);
+        WaitForElement(dialog, cf => cf.ByName("Arbeitsverzeichnis im Repository"), Short);
 
         // Zweite ComboBox (Arbeitsverzeichnis-Auswahl) ist zusätzlich zur Plugin-Auswahl vorhanden
         Assert.True(comboBoxen.Length >= 2, "RepositoryAssignDialog muss zusätzlich zur Plugin-Auswahl eine ComboBox für die Arbeitsverzeichnis-Auswahl enthalten.");
@@ -258,8 +244,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         abbrechenButton.AsButton().Click();
 
         // Hauptfenster-Overlay noch offen (Speichern-Button sichtbar)
-        var speichernNachAbbrechen = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        Assert.NotNull(speichernNachAbbrechen);
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
     }
 
     /// <summary>
