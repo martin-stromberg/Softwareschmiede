@@ -2,11 +2,11 @@
 
 | # | Bereich | Aufgabe | Status | Testnachweis |
 |---|---------|---------|--------|--------------|
-| 1 | Konfiguration | `Softwareschmiede.Tests.csproj`: `<PackageReference Include="AngleSharp" Version="1.5.0" />` ergänzen | Offen | — |
-| 2 | Konfiguration | `Softwareschmiede.Plugin.LocalDirectory.csproj`: `<InternalsVisibleTo Include="Softwareschmiede.Tests" />` ergänzen | Offen | — |
-| 3 | Logik | `LocalDirectoryPlugin`: Feld `_enumerateDirectories` (`Func<string, IEnumerable<string>>`) anlegen | Offen | — |
-| 4 | Logik | `LocalDirectoryPlugin`: `internal`-Konstruktor-Overload mit Parameter `enumerateDirectories` anlegen; öffentlicher Konstruktor setzt Default `Directory.EnumerateDirectories` | Offen | — |
-| 5 | Logik | `LocalDirectoryPlugin.CollectDirectoryEntries`: Enumeration auf `_enumerateDirectories(currentPath)` umstellen | Offen | — |
-| 6 | Tests | `LocalDirectoryPluginTests_GetRepositoryStructureAsync`: Seam-basierte SUT-Hilfe (nutzt `internal`-Konstruktor mit injiziertem Enumerator) bereitstellen | Offen | — |
-| 7 | Tests | `GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal` deterministisch umschreiben (kleiner Baum, Enumerator löst `cts.Cancel()` aus; 3000er-Schleife und `CancelAfter(5ms)` entfernen) | Offen | — |
-| 8 | Verifikation | Vollständiger Build + `dotnet test --filter "Category!=OsInterface"` mehrfach ausführen; AngleSharp-Warnung verschwunden bestätigen | Offen | — |
+| 1 | Konfiguration | `Softwareschmiede.Tests.csproj`: `<PackageReference Include="AngleSharp" Version="1.5.0" />` ergänzen | Erledigt | Kein direkter Test (Build-Warnung NU1903/NU1904 würde ohne den Eintrag wieder auftreten) |
+| 2 | Konfiguration | `Softwareschmiede.Plugin.LocalDirectory.csproj`: `<InternalsVisibleTo Include="Softwareschmiede.Tests" />` ergänzen | Erledigt | `LocalDirectoryPluginTests_GetRepositoryStructureAsync.GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal` (Testprojekt würde ohne InternalsVisibleTo nicht kompilieren) |
+| 3 | Logik | `LocalDirectoryPlugin`: Feld `_enumerateDirectories` (`Func<string, IEnumerable<string>>`) anlegen | Erledigt | `LocalDirectoryPluginTests_GetRepositoryStructureAsync.GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal` |
+| 4 | Logik | `LocalDirectoryPlugin`: `internal`-Konstruktor-Overload mit Parameter `enumerateDirectories` anlegen; öffentlicher Konstruktor setzt Default `Directory.EnumerateDirectories` | Erledigt | `LocalDirectoryPluginTests_GetRepositoryStructureAsync.GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal` |
+| 5 | Logik | `LocalDirectoryPlugin.CollectDirectoryEntries`: Enumeration auf `_enumerateDirectories(currentPath)` umstellen | Erledigt | `LocalDirectoryPluginTests_GetRepositoryStructureAsync.GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal` |
+| 6 | Tests | `LocalDirectoryPluginTests_GetRepositoryStructureAsync`: Seam-basierte SUT-Hilfe (nutzt `internal`-Konstruktor mit injiziertem Enumerator) bereitstellen | Erledigt | `CreateSutWithCancellingEnumerator` (verwendet in `GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal`) |
+| 7 | Tests | `GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal` deterministisch umschreiben (kleiner Baum, Enumerator löst `cts.Cancel()` aus; 3000er-Schleife und `CancelAfter(5ms)` entfernen) | Erledigt | `LocalDirectoryPluginTests_GetRepositoryStructureAsync.GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal` |
+| 8 | Verifikation | Vollständiger Build + `dotnet test --filter "Category!=OsInterface"` mehrfach ausführen; AngleSharp-Warnung verschwunden bestätigen | Offen | Kein direkter Test (manueller Verifikationsschritt, im Review nicht ausgeführt) |

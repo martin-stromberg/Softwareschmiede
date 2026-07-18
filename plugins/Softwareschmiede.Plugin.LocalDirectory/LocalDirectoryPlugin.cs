@@ -30,6 +30,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     private readonly ILogger<LocalDirectoryPlugin> _logger;
     private readonly ConcurrentDictionary<string, string> _workspaceMappings = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _workspaceSourceMappings = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<string, IEnumerable<string>> _enumerateDirectories;
 
     /// <inheritdoc/>
     public override string PluginName => "Local Directory";
@@ -113,10 +114,21 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         ICliRunner cliRunner,
         ICredentialStore credentialStore,
         ILogger<LocalDirectoryPlugin> logger)
+        : this(cliRunner, credentialStore, logger, Directory.EnumerateDirectories)
+    {
+    }
+
+    /// <summary>Erstellt eine neue Instanz von <see cref="LocalDirectoryPlugin"/> mit injizierbarem Verzeichnis-Enumerator (nur für Tests).</summary>
+    internal LocalDirectoryPlugin(
+        ICliRunner cliRunner,
+        ICredentialStore credentialStore,
+        ILogger<LocalDirectoryPlugin> logger,
+        Func<string, IEnumerable<string>> enumerateDirectories)
         : base(cliRunner)
     {
         _credentialStore = credentialStore;
         _logger = logger;
+        _enumerateDirectories = enumerateDirectories;
     }
 
     /// <inheritdoc/>
@@ -332,7 +344,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         List<string> directories;
         try
         {
-            directories = Directory.EnumerateDirectories(currentPath).ToList();
+            directories = _enumerateDirectories(currentPath).ToList();
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {

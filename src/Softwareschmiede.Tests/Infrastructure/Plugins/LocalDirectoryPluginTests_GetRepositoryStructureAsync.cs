@@ -16,6 +16,17 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
             new Mock<ICredentialStore>().Object,
             NullLogger<LocalDirectoryPlugin>.Instance);
 
+    private static LocalDirectoryPlugin CreateSutWithCancellingEnumerator(CancellationTokenSource cts) =>
+        new(
+            new Mock<ICliRunner>(MockBehavior.Strict).Object,
+            new Mock<ICredentialStore>().Object,
+            NullLogger<LocalDirectoryPlugin>.Instance,
+            path =>
+            {
+                cts.Cancel();
+                return Directory.EnumerateDirectories(path);
+            });
+
     /// <summary>Liefert die Unterverzeichnisse bis zur konfigurierten Tiefe als relative Pfade mit '/' als Trenner.</summary>
     [Fact]
     public async Task GetRepositoryStructureAsync_ShouldReturnDirectories_UpToMaxDepth()
@@ -111,7 +122,8 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
     /// Ein CancellationToken, das erst während der laufenden Traversierung abgebrochen wird (nicht bereits
     /// vor dem Start), muss ebenfalls zu einer OperationCanceledException führen. Deckt die
     /// <c>ct.ThrowIfCancellationRequested()</c>-Prüfung innerhalb der Verzeichnis-Schleife ab
-    /// (Code-Review-Befund: bislang war nur der Vorab-Abbruch getestet).
+    /// (Code-Review-Befund: bislang war nur der Vorab-Abbruch getestet). Der Abbruch wird deterministisch
+    /// über einen injizierten Verzeichnis-Enumerator ausgelöst statt über ein Wall-Clock-Zeitfenster.
     /// </summary>
     [Fact]
     public async Task GetRepositoryStructureAsync_ShouldThrow_WhenCancelledDuringTraversal()
@@ -119,16 +131,11 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
         var root = Directory.CreateTempSubdirectory().FullName;
         try
         {
-            // Großer, flacher Verzeichnisbaum, damit die Traversierung lange genug dauert, um den
-            // Abbruch zuverlässig mitten in der Verarbeitung (statt vor dem Start) auszulösen.
-            for (var i = 0; i < 3000; i++)
-            {
-                Directory.CreateDirectory(Path.Combine(root, $"dir-{i:D5}"));
-            }
+            Directory.CreateDirectory(Path.Combine(root, "dir-0"));
+            Directory.CreateDirectory(Path.Combine(root, "dir-1"));
 
-            var sut = CreateSut();
             using var cts = new CancellationTokenSource();
-            cts.CancelAfter(TimeSpan.FromMilliseconds(5));
+            var sut = CreateSutWithCancellingEnumerator(cts);
 
             var act = () => sut.GetRepositoryStructureAsync(root, maxDepth: 2, cts.Token);
 
