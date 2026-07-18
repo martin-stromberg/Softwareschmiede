@@ -1,6 +1,5 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using FlaUI.Core.Input;
 using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
@@ -22,123 +21,76 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class ProjectDetailE2ETests : WpfTestBase
 {
     /// <summary>
-    /// Szenario: Projekt anlegen, Neuanlage starten und mit Zurück abbrechen, erstes Projekt öffnen.
-    /// Prüft: Nach Abbrechen der Neuanlage ist das erste Projekt noch in der Liste aufrufbar.
+    /// Szenario: Projekt anlegen; Neuanlage starten und über "Zurück" abbrechen; erstes Projekt
+    /// öffnen und wieder verlassen; erneut öffnen; zuletzt zur Übersicht zurücknavigieren.
+    /// Prüft: Nach Abbrechen der Neuanlage ist das erste Projekt noch in der Liste aufrufbar; das
+    /// wiederholte Öffnen/Verlassen der Detailansicht funktioniert; die Übersicht zeigt die
+    /// Projektkachel nach dem finalen "Zurück".
     /// </summary>
     [Fact]
-    public void NeuanlageAbbrechen_ErstesProjektNochAufrufbar_E2E()
+    public void ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E()
     {
         var mainWindow = StartAndNavigateToProjects();
 
         // Erstes Projekt anlegen
         CreateProject(mainWindow, "Bestehendes-Projekt");
 
-        // Neuanlage starten
+        // Neuanlage starten und über Zurück abbrechen
         var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
         neuButton.AsButton().Click();
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
-        // Neuanlage über Zurück abbrechen
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
-
-        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
+        ZurueckZurProjektuebersicht(mainWindow);
 
         // Erstes Projekt ist noch in der Liste und aufrufbar
         OpenProject(mainWindow, "Bestehendes-Projekt");
-
         var speichernInDetail = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         Assert.NotNull(speichernInDetail);
-    }
 
+        // Zurück zur Übersicht, Projekt erneut öffnen
+        ZurueckZurProjektuebersicht(mainWindow);
 
-    /// <summary>
-    /// Szenario: Projekt anlegen, Projekt öffnen und zurück, Projekt erneut öffnen.
-    /// Prüft: Das hin und her zwischen Detailansicht und Übersicht funktioniert.
-    /// </summary>
-    [Fact]
-    public void ProjektOeffnenUndZurueck_ErneutOeffnen_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects();
-
-        // Erstes Projekt anlegen
-        CreateProject(mainWindow, "Bestehendes-Projekt");
-        // Projektdetailansicht öffnen
         OpenProject(mainWindow, "Bestehendes-Projekt");
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
-        // Neuanlage über Zurück abbrechen
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
+        // Zurück zur Übersicht
+        ZurueckZurProjektuebersicht(mainWindow);
 
-        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
-
-        // Projektdetailansicht erneut öffnen
-        OpenProject(mainWindow, "Bestehendes-Projekt");
-
-        zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        var projektTile = WaitForElement(mainWindow, cf => cf.ByName("Bestehendes-Projekt"), Short);
+        Assert.NotNull(projektTile);
     }
 
     /// <summary>
-    /// Szenario: Projektnamen ändern, zurücknavigieren, erneut öffnen.
-    /// Prüft: Projektkachel zeigt aktualisierten Namen und lässt sich erneut öffnen.
+    /// Szenario: Projekt anlegen und öffnen, Namen ändern und speichern, zur Übersicht
+    /// zurücknavigieren, Projektkachel erneut öffnen, erneut umbenennen und speichern.
+    /// Prüft: Die Projektkachel zeigt nach dem ersten Speichern den aktualisierten Namen; die
+    /// erneute Bearbeitung (UpdateAsync-Pfad) hält den aktualisierten Namen im Textfeld.
     /// </summary>
     [Fact]
-    public void ProjektNamenAendern_KachelAktualisiert_UndErneutoeffnen_E2E()
+    public void ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E()
     {
         var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Umbenennen-Original");
+        CreateAndOpenProject(mainWindow, "Umbenennen-Test");
 
-        // Namen ändern und speichern (UpdateAsync-Pfad, bleibt in Detailansicht)
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        nameBox.Click();
-        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
-        Keyboard.Type("Umbenennen-Aktualisiert");
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        ProjektNamenAendernUndSpeichern(mainWindow, "Umbenennen-Test-Aktualisiert");
 
         // Zurück zur Übersicht navigieren
         var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         zurueckButton.AsButton().Click();
 
         // Projektkachel zeigt jetzt den neuen Namen
-        var aktualisierteKachel = WaitForElement(mainWindow, cf => cf.ByName("Umbenennen-Aktualisiert"), Short);
+        var aktualisierteKachel = WaitForElement(mainWindow, cf => cf.ByName("Umbenennen-Test-Aktualisiert"), Short);
         Assert.NotNull(aktualisierteKachel);
 
         // Kachel erneut anklicken → Detailansicht öffnet sich
         aktualisierteKachel.Click();
-
-        // Speichern-Button bestätigt, dass die Detailansicht geöffnet ist
-        var speichernNachWiederoeffnen = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        Assert.NotNull(speichernNachWiederoeffnen);
-    }
-
-    /// <summary>
-    /// Szenario: Projekt bearbeiten und speichern.
-    /// Prüft: Feld bearbeitbar, Update-Speichern ändert Namen dauerhaft.
-    /// </summary>
-    [Fact]
-    public void ProjektBearbeitenUndSpeichern_AktualisierterNameBleibt_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Edit-Test");
-
-        // Namen aktualisieren und erneut speichern (UpdateAsync-Pfad)
         var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        nameBox.Click();
-        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
-        Keyboard.Type("Edit-Test-Aktualisiert");
+        Assert.NotNull(nameBox);
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-
-        // Warten bis Speichern abgeschlossen (LadenAsync lädt Daten neu)
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-
-        // Feld zeigt aktualisierten Namen
-        Assert.Equal("Edit-Test-Aktualisiert", nameBox.AsTextBox().Text);
+        // Erneut bearbeiten und speichern (UpdateAsync-Pfad); Name bleibt aktualisiert
+        ProjektNamenAendernUndSpeichern(mainWindow, "Umbenennen-Test-Aktualisiert-Erneut");
+        var nameBoxNachReload = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
+        Assert.Equal("Umbenennen-Test-Aktualisiert-Erneut", nameBoxNachReload.AsTextBox().Text);
     }
 
     /// <summary>
@@ -169,35 +121,6 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Overlay geschlossen — "Speichern" nicht mehr sichtbar
         WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
-    }
-
-    /// <summary>
-    /// Szenario: Aufgabe neu anlegen.
-    /// Prüft: "AufgabeNeu"-Button erstellt eine Aufgabe und navigiert zur separaten TaskDetailView;
-    /// nach Zurück-Navigation erscheint die neue Aufgabe in der Aufgabenliste der Projektdetailansicht.
-    /// </summary>
-    [Fact]
-    public void AufgabeNeuAnlegen_ErscheintInAufgabenliste_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Aufgabe-Test");
-
-        // Neue Aufgabe erstellen (AutomationProperties.Name="AufgabeNeu")
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
-
-        // Navigation zur separaten TaskDetailView (Edit-Panel, da Status == Neu)
-        var editTitelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Medium);
-        Assert.NotNull(editTitelBox);
-
-        // Zurück zur Projektdetailansicht navigieren
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
-
-        // Aufgabenliste enthält jetzt mindestens eine Aufgabe
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
-        var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
-        Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
     }
 
     /// <summary>
@@ -249,14 +172,28 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     }
 
     /// <summary>
-    /// Szenario: Aufgaben filtern.
-    /// Prüft: Filter-Overlay erscheint, RadioButton wählbar, Overlay schließt wieder.
+    /// Szenario: Aufgabe neu anlegen und in die Aufgabenliste zurückkehren; anschließend das
+    /// Filter-Overlay öffnen, den RadioButton "Aktiv" wählen und das Overlay wieder schließen.
+    /// Prüft: "AufgabeNeu" erstellt eine Aufgabe und navigiert zur separaten TaskDetailView; nach
+    /// Zurück-Navigation erscheint die neue Aufgabe in der Aufgabenliste; das Filter-Overlay öffnet
+    /// und schließt sich korrekt.
     /// </summary>
     [Fact]
-    public void AufgabenFiltern_OverlayOeffnetUndSchliesst_E2E()
+    public void AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E()
     {
         var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Filter-Test");
+        CreateAndOpenProject(mainWindow, "Aufgabe-Test");
+
+        // Neue Aufgabe erstellen; Navigation zur separaten TaskDetailView (Edit-Panel, da Status == Neu)
+        var editTitelBox = NeueAufgabeAnlegen(mainWindow);
+        Assert.NotNull(editTitelBox);
+
+        // Zurück zur Projektdetailansicht navigieren
+        AufgabeDetailZurueck(mainWindow);
+
+        // Aufgabenliste enthält jetzt mindestens eine Aufgabe
+        var items = OffeneAufgabenItems(mainWindow);
+        Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
 
         // Filter-Overlay öffnen
         var filterButton = WaitForElement(mainWindow, cf => cf.ByName("Filter"), Short);
@@ -281,41 +218,21 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     }
 
     /// <summary>
-    /// Szenario: Repository zuweisen.
-    /// Prüft: "Zuweisen"-Button öffnet den Dialog, Dialog schließt über "Abbrechen".
+    /// Szenario: "Öffnen"-Button in der Detailansicht prüfen; anschließend den
+    /// Repository-Zuweisungs-Dialog öffnen und die SCM-Plugin- sowie die
+    /// Arbeitsverzeichnis-ComboBox prüfen; Dialog über "Abbrechen" schließen.
+    /// Prüft: Der "Öffnen"-Button existiert; der Dialog enthält mindestens eine ComboBox für die
+    /// Plugin-Auswahl sowie das Label und eine zweite ComboBox für die Arbeitsverzeichnis-Auswahl;
+    /// nach "Abbrechen" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
     /// </summary>
     [Fact]
-    public void RepositoryZuweisen_DialogOeffnetUndSchliessbarPerAbbrechen_E2E()
+    public void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E()
     {
         var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Repo-Zuweisen-Test");
+        CreateAndOpenProject(mainWindow, "Repository-Dialog-Test");
 
-        // "Zuweisen"-Button im Ribbon klicken
-        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
-
-        // RepositoryAssignDialog erscheint als separates Fenster
-        var dialog = WaitForWindow("Repository zuweisen", Short);
-        Assert.NotNull(dialog);
-
-        // Dialog über "Abbrechen" schließen
-        var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
-        abbrechenButton.AsButton().Click();
-
-        // Hauptfenster-Overlay noch offen (Speichern-Button sichtbar)
-        var speichernNachAbbrechen = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        Assert.NotNull(speichernNachAbbrechen);
-    }
-
-    /// <summary>
-    /// Szenario: Repository-Zuweisungsdialog öffnen und SCM-Plugin-ComboBox prüfen.
-    /// Prüft: Die ComboBox für die SCM-Plugin-Auswahl ist vorhanden und enthält die erwarteten Einträge.
-    /// </summary>
-    [Fact]
-    public void RepositoryZuweisenDialog_ScmPluginListe_EnthaeltErwartetePlugins_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "SCM-Plugin-Test");
+        var oeffnenButton = WaitForElement(mainWindow, cf => cf.ByName("Öffnen"), Short);
+        Assert.NotNull(oeffnenButton);
 
         // "Zuweisen"-Button im Ribbon klicken
         var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
@@ -329,86 +246,32 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         var comboBoxen = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.ComboBox));
         Assert.True(comboBoxen.Length >= 1, "RepositoryAssignDialog muss mindestens eine ComboBox für die Plugin-Auswahl enthalten.");
 
-        var pluginComboBox = comboBoxen[0].AsComboBox();
-
-        // ComboBox öffnen und Items zählen
-        pluginComboBox.Click();
-        Thread.Sleep(300);
-
-        // Die ComboBox muss mindestens einen Eintrag oder leer sein (je nach installierten Plugins)
-        // Wichtig: die ComboBox ist vorhanden und reagiert auf Interaktion
-        Assert.NotNull(pluginComboBox);
-
-        // Dialog schließen
-        var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
-        abbrechenButton.AsButton().Click();
-    }
-
-    /// <summary>
-    /// Szenario: Repository-Zuweisungsdialog öffnen und Arbeitsverzeichnis-Auswahl prüfen.
-    /// Prüft: Label und ComboBox für die Arbeitsverzeichnis-Auswahl sind im Dialog vorhanden.
-    /// </summary>
-    [Fact]
-    public void RepositoryZuweisenDialog_ArbeitsverzeichnisAuswahl_IstVorhanden_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Arbeitsverzeichnis-Test");
-
-        // "Zuweisen"-Button im Ribbon klicken
-        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
-
-        // RepositoryAssignDialog erscheint als separates Fenster
-        var dialog = WaitForWindow("Repository zuweisen", Short);
-        Assert.NotNull(dialog);
-
         // Label "Arbeitsverzeichnis im Repository" ist vorhanden
         var label = WaitForElement(dialog, cf => cf.ByName("Arbeitsverzeichnis im Repository"), Short);
         Assert.NotNull(label);
 
         // Zweite ComboBox (Arbeitsverzeichnis-Auswahl) ist zusätzlich zur Plugin-Auswahl vorhanden
-        var comboBoxen = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.ComboBox));
         Assert.True(comboBoxen.Length >= 2, "RepositoryAssignDialog muss zusätzlich zur Plugin-Auswahl eine ComboBox für die Arbeitsverzeichnis-Auswahl enthalten.");
 
-        // Dialog schließen
+        // Dialog über "Abbrechen" schließen
         var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
         abbrechenButton.AsButton().Click();
+
+        // Hauptfenster-Overlay noch offen (Speichern-Button sichtbar)
+        var speichernNachAbbrechen = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        Assert.NotNull(speichernNachAbbrechen);
     }
 
     /// <summary>
-    /// Szenario: Repository öffnen.
-    /// Prüft: "Öffnen"-Button existiert in der Detailansicht.
-    /// (Tatsächliches Browser-Öffnen ist im E2E nicht zuverlässig prüfbar.)
+    /// Klickt den "Zurück"-Button in der Projektdetailansicht und wartet auf das Verschwinden des
+    /// "Speichern"-Buttons (Bestätigung, dass das Overlay geschlossen und die Übersicht wieder sichtbar ist).
     /// </summary>
-    [Fact]
-    public void RepositoryOeffnen_ButtonExistiertInDetailansicht_E2E()
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    private void ZurueckZurProjektuebersicht(AutomationElement mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Repo-Oeffnen-Test");
-
-        var oeffnenButton = WaitForElement(mainWindow, cf => cf.ByName("Öffnen"), Short);
-        Assert.NotNull(oeffnenButton);
-    }
-
-    /// <summary>
-    /// Szenario: Zurück zur Übersicht.
-    /// Prüft: "Zurück"-Button schließt das Detailoverlay, Projektkachel in der Liste sichtbar.
-    /// </summary>
-    [Fact]
-    public void ZurueckZurUebersicht_SchliesstOverlayUndZeigtListe_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects();
-        CreateAndOpenProject(mainWindow, "Zurueck-Test");
-
-        // Zurück klicken
         var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         zurueckButton.AsButton().Click();
 
-        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
         WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
-
-        // Das eben erstellte Projekt erscheint als Kachel in der Liste
-        var projektTile = WaitForElement(mainWindow, cf => cf.ByName("Zurueck-Test"), Short);
-        Assert.NotNull(projektTile);
     }
 }

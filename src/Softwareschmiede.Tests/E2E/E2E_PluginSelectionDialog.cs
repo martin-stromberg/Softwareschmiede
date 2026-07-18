@@ -21,62 +21,50 @@ public sealed class E2E_PluginSelectionDialog : WpfTestBase
 {
     /// <summary>
     /// Szenario: Beim ersten Start einer Aufgabe ohne gespeichertes Plugin (kein Aufgaben-,
-    /// Projekt- oder globaler Default) wird der Plugin-Auswahl-Dialog angezeigt.
-    /// Prüft: Dialog erscheint mit Dropdown der verfügbaren KI-Plugins; nach Auswahl und OK
-    /// wird der kombinierte Start-Ablauf fortgesetzt (CLI startet).
+    /// Projekt- oder globaler Default) wird der Plugin-Auswahl-Dialog angezeigt. Zunächst wird die
+    /// Auswahl über "Abbrechen" verworfen (Phase Abbrechen); anschließend wird derselbe Start erneut
+    /// versucht, ein Plugin ausgewählt und mit "OK" bestätigt (Phase OK).
+    /// Prüft: Im Abbrechen-Pfad wird der Start-Ablauf nicht fortgesetzt (Aufgabe bleibt im Status
+    /// "Neu", Edit-Panel weiterhin sichtbar). Im OK-Pfad wird nach Auswahl und Bestätigung der
+    /// kombinierte Start-Ablauf fortgesetzt (CLI startet).
     /// </summary>
     [SkippableFact]
-    public void StartenOhneGespeichertesPlugin_ZeigtPluginAuswahlDialog_E2E()
+    public void PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E()
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var mainWindow = SetupProjectMitNeuerAufgabe("PluginDialog-Repo", "PluginDialog-Projekt");
 
+        // Phase Abbrechen
         var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
         startenButton.AsButton().Click();
 
-        // Plugin-Auswahl-Dialog erscheint als separates Fenster
-        var dialog = WaitForWindow("KI-Plugin auswählen", Medium);
-        Assert.NotNull(dialog);
+        var abbrechenDialog = WaitForWindow("KI-Plugin auswählen", Medium);
 
-        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
-        Assert.NotNull(pluginAuswahlBox);
-
-        // Dropdown enthält mindestens den KI-Simulator (im Test-Modus immer verfügbar)
-        SelectComboBoxItemByClick(pluginAuswahlBox, "Softwareschmiede.KiSimulator", Short);
-
-        var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);
-        okButton.AsButton().Click();
-
-        // Nach Bestätigung: kombinierter Start-Ablauf läuft weiter, CLI startet
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        Assert.NotNull(stoppenButton);
-    }
-
-    /// <summary>
-    /// Szenario: Im Plugin-Auswahl-Dialog wird die Auswahl über "Abbrechen" verworfen.
-    /// Prüft: Dialog schließt sich, der Start-Ablauf wird nicht fortgesetzt
-    /// (Aufgabe bleibt im Status "Neu", Edit-Panel weiterhin sichtbar).
-    /// </summary>
-    [Fact]
-    public void PluginAuswahlAbbrechen_StartetNichtUndBleibtImStatusNeu_E2E()
-    {
-        var mainWindow = SetupProjectMitNeuerAufgabe("PluginDialog-Abbrechen-Repo", "PluginDialog-Abbrechen-Projekt");
-
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
-        startenButton.AsButton().Click();
-
-        var dialog = WaitForWindow("KI-Plugin auswählen", Medium);
-
-        var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
+        var abbrechenButton = WaitForElement(abbrechenDialog, cf => cf.ByName("Abbrechen"), Short);
         abbrechenButton.AsButton().Click();
 
         // Edit-Panel weiterhin sichtbar (Status nach wie vor "Neu")
         var editTitel = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
         Assert.NotNull(editTitel);
 
-        var stoppenButton = mainWindow.FindFirstDescendant(cf =>
+        var stoppenButtonNachAbbrechen = mainWindow.FindFirstDescendant(cf =>
             cf.ByName("CliStoppen").And(cf.ByControlType(ControlType.Button)));
-        Assert.Null(stoppenButton);
+        Assert.Null(stoppenButtonNachAbbrechen);
+
+        // Phase OK
+        var startenButtonErneut = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+        startenButtonErneut.AsButton().Click();
+
+        var okDialog = WaitForWindow("KI-Plugin auswählen", Medium);
+        var pluginAuswahlBox = WaitForElement(okDialog, cf => cf.ByName("PluginAuswahl"), Short);
+        SelectComboBoxItemByClick(pluginAuswahlBox, "Softwareschmiede.KiSimulator", Short);
+
+        var okButton = WaitForElement(okDialog, cf => cf.ByName("OK"), Short);
+        okButton.AsButton().Click();
+
+        // Nach Bestätigung: kombinierter Start-Ablauf läuft weiter, CLI startet
+        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        Assert.NotNull(stoppenButton);
     }
 }

@@ -55,16 +55,10 @@ public sealed class E2E_PluginProjectDefault_NextTask : WpfTestBase
         Thread.Sleep(300);
 
         // Zurück zur Projektdetailansicht
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+        AufgabeDetailZurueck(mainWindow);
 
         // Zweite Aufgabe erstellen und starten
-        var zweiteAufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        zweiteAufgabeNeuButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        NeueAufgabeAnlegen(mainWindow);
 
         var zweiterStartenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
         zweiterStartenButton.AsButton().Click();

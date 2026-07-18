@@ -1,3 +1,18 @@
+## 2026-07-18 — E2E-Test-Struktur: Konsolidierung logisch zusammenhängender Szenarien
+
+- Feature: Testlaufzeiten reduzieren durch Zusammenfassung logisch zusammenhängender E2E-Szenarien (z. B. Aufgabe anlegen → speichern vs. abbrechen) in weniger Testmethoden; dadurch weniger App-Prozess-Starts pro Testlauf (ca. 11 eingesparte App-Starts ≈ 2–4 Minuten Zeiteinsparung).
+- **Neue Hilfsmethoden in `WpfTestBase`:** Acht neue `protected`-Methoden kapseln häufig wiederholte UI-Interaktionen: `NeueAufgabeAnlegen()`, `AufgabeTitelSetzen()`, `AufgabeDetailSpeichern()`, `AufgabeDetailZurueck()`, `OffeneAufgabenItems()`, `ErsteOffeneAufgabeOeffnen()`, `AufgabeAusListeOeffnen()`, `ProjektNamenAendernUndSpeichern()`. Jede Methode nutzt bestehende FlaUI-Aufrufe als Facade-Schicht und dokumentiert Voraussetzungen via XML-Kommentare.
+- **Test-Konsolidierung:** Sieben E2E-Testklassen konsolidiert (insgesamt −18 Testmethoden → −11 Methoden):
+  - `E2E_CreateNewTaskNavigation`: 2 Tests → 1 konsolidierte Methode (Speichern-Phase + Abbrechen-Phase mit granularen Asserts).
+  - `E2E_TaskDetailNavigation`: 3 Tests → 1 konsolidierte Methode (Daten prüfen → Zurück → Öffnen).
+  - `E2E_PluginSelectionDialog`: 2 Tests → 1 konsolidierte `[SkippableFact]` (Abbrechen-Pfad + OK-Pfad an derselben Aufgabe).
+  - `ProjectDetailE2ETests`: 13 Tests → 6 Methoden (Navigation, Bearbeitung, Aufgaben, Repository-Dialog; Löschen und DB-seeded Trennung bleiben eigenständig).
+  - `E2E_TaskWechselUeberMenue`, `E2E_PluginProjectDefault_NextTask`, `E2E_AutoStartCli`: Einzelmethoden-Klassen (keine Konsolidierung möglich) werden auf neue Hilfsmethoden refaktoriert (DRY-Prinzip).
+- **Fehlerbehandlung & Diagnostik:** Fail-Fast-Semantik erhalten — bei fehlendem Element wirft die Hilfsmethode `TimeoutException`; Fehlerbanner-Check in `WaitForElement()` bleibt aktiv.
+- **Keine Architekturveränderung:** FlaUI-Basis unverändert, `WaitForElement()`, `Keyboard.Type()`, `DoubleClick()` bleiben funktional identisch. Alle Tests unter `[Collection("E2E")]`-Isolation, keine gegenseitigen Abhängigkeiten.
+- Tests: Alle Akzeptanzkriterien aus requirement und plan sind als granulare Asserts in konsolidierten Methoden enthalten; Regressionsszenarios (Aufgabenwechsel, Plugin-Default, Auto-CLI-Start) unverändert abgedeckt.
+- Dokumentation: Technische Beschreibung der Hilfsmethoden und Testkonsolidierung unter `docs/features/test-infrastructure/e2e-test-konsolidierung.md`.
+
 ## 2026-07-18 — Korrektur der CLI-Ausgabeanzeige (Zeilenumbrüche, Resize, Screen-Clear)
 
 - Behebung von Darstellungsfehlern in der Terminal-Rendering-Pipeline: Zeilenumbrüche wurden nicht korrekt normalisiert (Treppeneffekt bei reinem LF), alte Zeilen blieben nach Screen-Clear sichtbar, und bei Verkleinerung des Terminals wurden die falschen Zeilen angezeigt.

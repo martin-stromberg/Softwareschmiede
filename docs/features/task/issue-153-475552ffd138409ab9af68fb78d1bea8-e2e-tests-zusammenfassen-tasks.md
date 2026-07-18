@@ -2,23 +2,23 @@
 
 | # | Bereich | Aufgabe | Status | Testnachweis |
 |---|---------|---------|--------|--------------|
-| 1 | Hilfsmethoden | `NeueAufgabeAnlegen(mainWindow)` in `WpfTestBase` anlegen (klickt `AufgabeNeu`, wartet auf `EditTitel`, liefert TextBox) | Offen | — |
-| 2 | Hilfsmethoden | `AufgabeTitelSetzen(mainWindow, titel)` in `WpfTestBase` anlegen (Ctrl+A + Tippen in `EditTitel`) | Offen | — |
-| 3 | Hilfsmethoden | `AufgabeDetailSpeichern(mainWindow)` in `WpfTestBase` anlegen (klickt `Speichern`, wartet auf `ProjektName`) | Offen | — |
-| 4 | Hilfsmethoden | `AufgabeDetailZurueck(mainWindow)` in `WpfTestBase` anlegen (klickt `Zurück`, wartet auf `ProjektName`) | Offen | — |
-| 5 | Hilfsmethoden | `OffeneAufgabenItems(mainWindow)` in `WpfTestBase` anlegen (liefert `ListItem`-Kinder der `OffeneAufgabenListe`) | Offen | — |
-| 6 | Hilfsmethoden | `ErsteOffeneAufgabeOeffnen(mainWindow)` in `WpfTestBase` anlegen (öffnet erstes Item per Doppelklick) | Offen | — |
-| 7 | Hilfsmethoden | `AufgabeAusListeOeffnen(mainWindow, titel)` in `WpfTestBase` anlegen (öffnet benannte Aufgabe per Doppelklick, wartet auf `Zurück`) | Offen | — |
-| 8 | Hilfsmethoden | `ProjektNamenAendernUndSpeichern(mainWindow, neuerName)` in `WpfTestBase` anlegen (Ctrl+A + Tippen in `ProjektName`, speichern) | Offen | — |
-| 9 | E2E-Tests | `E2E_CreateNewTaskNavigation`: beide `[Fact]` zu einer konsolidierten Methode zusammenführen; Listenlängen-Assert auf „≥ 2" | Offen | — |
-| 10 | E2E-Tests | `E2E_TaskDetailNavigation`: drei `[Fact]` zu einer konsolidierten Methode zusammenführen | Offen | — |
-| 11 | E2E-Tests | `E2E_PluginSelectionDialog`: beide Methoden zu einer `[SkippableFact]` (Abbrechen + OK) zusammenführen | Offen | — |
-| 12 | E2E-Tests | `ProjectDetailE2ETests`: vier Navigations-/Zurück-Tests zu einer Methode „Projekt-Navigation" zusammenführen | Offen | — |
-| 13 | E2E-Tests | `ProjectDetailE2ETests`: zwei Umbenennungs-/Bearbeiten-Tests zu einer Methode „Projekt bearbeiten" zusammenführen (nutzt `ProjektNamenAendernUndSpeichern`) | Offen | — |
-| 14 | E2E-Tests | `ProjectDetailE2ETests`: `AufgabeNeuAnlegen_...` + `AufgabenFiltern_...` zu einer Methode „Aufgaben in Projektdetail" zusammenführen | Offen | — |
-| 15 | E2E-Tests | `ProjectDetailE2ETests`: vier Repository-Dialog-Tests zu einer Methode „Repository-Dialog" zusammenführen | Offen | — |
-| 16 | E2E-Tests | `ProjectDetailE2ETests`: `ProjektLoeschen_...` und `Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E` eigenständig belassen | Offen | — |
-| 17 | E2E-Tests | `E2E_TaskWechselUeberMenue`: `ErstelleUndStarteAufgabe` auf Basishelfer umstellen, `OeffneAufgabeAusListe` entfernen | Offen | — |
-| 18 | E2E-Tests | `E2E_PluginProjectDefault_NextTask`: Inline-Blöcke auf `NeueAufgabeAnlegen`/`AufgabeDetailZurueck` umstellen | Offen | — |
-| 19 | E2E-Tests | `E2E_AutoStartCli`: Inline-Blöcke auf `AufgabeDetailZurueck`/`OffeneAufgabenItems`/`ErsteOffeneAufgabeOeffnen` umstellen | Offen | — |
-| 20 | Verifikation | Vollständiger Build + OS-Interface-/E2E-Lane (`--filter "Category=OsInterface"`, `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`) grün; reduzierte Methodenanzahl bestätigen | Offen | — |
+| 1 | Hilfsmethoden | `NeueAufgabeAnlegen(mainWindow)` in `WpfTestBase` anlegen (klickt `AufgabeNeu`, wartet auf `EditTitel`, liefert TextBox) | Erledigt | `E2E_TaskDetailNavigation.TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E` (schlägt fehl, wenn Helfer fehlt) |
+| 2 | Hilfsmethoden | `AufgabeTitelSetzen(mainWindow, titel)` in `WpfTestBase` anlegen (Ctrl+A + Tippen in `EditTitel`) | Erledigt | `E2E_CreateNewTaskNavigation.AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E` |
+| 3 | Hilfsmethoden | `AufgabeDetailSpeichern(mainWindow)` in `WpfTestBase` anlegen (klickt `Speichern`, wartet auf `ProjektName`) | Erledigt | `E2E_CreateNewTaskNavigation.AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E` |
+| 4 | Hilfsmethoden | `AufgabeDetailZurueck(mainWindow)` in `WpfTestBase` anlegen (klickt `Zurück`, wartet auf `ProjektName`) | Erledigt | `E2E_TaskDetailNavigation.TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E` |
+| 5 | Hilfsmethoden | `OffeneAufgabenItems(mainWindow)` in `WpfTestBase` anlegen (liefert `ListItem`-Kinder der `OffeneAufgabenListe`) | Erledigt | `E2E_AutoStartCli.AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E` |
+| 6 | Hilfsmethoden | `ErsteOffeneAufgabeOeffnen(mainWindow)` in `WpfTestBase` anlegen (öffnet erstes Item per Doppelklick) | Erledigt | `E2E_AutoStartCli.AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E` |
+| 7 | Hilfsmethoden | `AufgabeAusListeOeffnen(mainWindow, titel)` in `WpfTestBase` anlegen (öffnet benannte Aufgabe per Doppelklick, wartet auf `Zurück`) | Erledigt | `E2E_TaskWechselUeberMenue.AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E` |
+| 8 | Hilfsmethoden | `ProjektNamenAendernUndSpeichern(mainWindow, neuerName)` in `WpfTestBase` anlegen (Ctrl+A + Tippen in `ProjektName`, speichern) | Erledigt | `ProjectDetailE2ETests.ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E` |
+| 9 | E2E-Tests | `E2E_CreateNewTaskNavigation`: beide `[Fact]` zu einer konsolidierten Methode zusammenführen; Listenlängen-Assert auf „≥ 2" | Erledigt | `E2E_CreateNewTaskNavigation.AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E` (`items.Length >= 2`) |
+| 10 | E2E-Tests | `E2E_TaskDetailNavigation`: drei `[Fact]` zu einer konsolidierten Methode zusammenführen | Erledigt | `E2E_TaskDetailNavigation.TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E` |
+| 11 | E2E-Tests | `E2E_PluginSelectionDialog`: beide Methoden zu einer `[SkippableFact]` (Abbrechen + OK) zusammenführen | Erledigt | `E2E_PluginSelectionDialog.PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E` |
+| 12 | E2E-Tests | `ProjectDetailE2ETests`: vier Navigations-/Zurück-Tests zu einer Methode „Projekt-Navigation" zusammenführen | Erledigt | `ProjectDetailE2ETests.ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E` |
+| 13 | E2E-Tests | `ProjectDetailE2ETests`: zwei Umbenennungs-/Bearbeiten-Tests zu einer Methode „Projekt bearbeiten" zusammenführen (nutzt `ProjektNamenAendernUndSpeichern`) | Erledigt | `ProjectDetailE2ETests.ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E` |
+| 14 | E2E-Tests | `ProjectDetailE2ETests`: `AufgabeNeuAnlegen_...` + `AufgabenFiltern_...` zu einer Methode „Aufgaben in Projektdetail" zusammenführen | Erledigt | `ProjectDetailE2ETests.AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E` |
+| 15 | E2E-Tests | `ProjectDetailE2ETests`: vier Repository-Dialog-Tests zu einer Methode „Repository-Dialog" zusammenführen | Erledigt | `ProjectDetailE2ETests.RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E` |
+| 16 | E2E-Tests | `ProjectDetailE2ETests`: `ProjektLoeschen_...` und `Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E` eigenständig belassen | Erledigt | `ProjectDetailE2ETests.ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E`, `ProjectDetailE2ETests.Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E` |
+| 17 | E2E-Tests | `E2E_TaskWechselUeberMenue`: `ErstelleUndStarteAufgabe` auf Basishelfer umstellen, `OeffneAufgabeAusListe` entfernen | Erledigt | `E2E_TaskWechselUeberMenue.AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E` (`OeffneAufgabeAusListe` in `src/` nicht mehr vorhanden) |
+| 18 | E2E-Tests | `E2E_PluginProjectDefault_NextTask`: Inline-Blöcke auf `NeueAufgabeAnlegen`/`AufgabeDetailZurueck` umstellen | Erledigt | `E2E_PluginProjectDefault_NextTask.ZweiteAufgabeImProjekt_UebernimmtGespeichertenProjektStandardOhneDialog_E2E` |
+| 19 | E2E-Tests | `E2E_AutoStartCli`: Inline-Blöcke auf `AufgabeDetailZurueck`/`OffeneAufgabenItems`/`ErsteOffeneAufgabeOeffnen` umstellen | Erledigt | `E2E_AutoStartCli.AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E` |
+| 20 | Verifikation | Vollständiger Build + OS-Interface-/E2E-Lane (`--filter "Category=OsInterface"`, `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`) grün; reduzierte Methodenanzahl bestätigen | Erledigt | Build `Softwareschmiede.Tests.csproj` erfolgreich (0 Warnungen/0 Fehler); Methodenreduktion in allen sieben Klassen bestätigt. Hinweis: Der Lauf der OS-Interface-/E2E-Lane selbst wurde in diesem Review nicht ausgeführt (siehe review.md, Hinweise). |
