@@ -546,10 +546,7 @@ public abstract class WpfTestBase : IDisposable
 
         AssignLocalDirectoryRepository(mainWindow);
 
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        NeueAufgabeAnlegen(mainWindow);
 
         return mainWindow;
     }
@@ -573,9 +570,15 @@ public abstract class WpfTestBase : IDisposable
 
     /// <summary>
     /// Klickt den "Starten"-Button und bedient den anschließend erscheinenden Plugin-Auswahl-Dialog:
-    /// wählt das angegebene KI-Plugin aus und bestätigt mit "OK".
+    /// wählt das angegebene KI-Plugin aus, setzt optional die "FuerProjektVerwenden"-Checkbox
+    /// (Projekt-Standard speichern) und bestätigt mit "OK".
     /// </summary>
-    protected void StartenUndPluginWaehlen(AutomationElement mainWindow, string pluginName)
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
+    /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird vor dem Bestätigen die
+    /// "FuerProjektVerwenden"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard
+    /// gespeichert wird.</param>
+    protected void StartenUndPluginWaehlen(AutomationElement mainWindow, string pluginName, bool fuerProjektVerwenden = false)
     {
         var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
         startenButton.AsButton().Click();
@@ -583,6 +586,12 @@ public abstract class WpfTestBase : IDisposable
         var dialog = WaitForWindow("KI-Plugin auswählen", Medium);
         var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
         SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
+
+        if (fuerProjektVerwenden)
+        {
+            var checkbox = WaitForElement(dialog, cf => cf.ByName("FuerProjektVerwenden"), Short);
+            checkbox.AsCheckBox().IsChecked = true;
+        }
 
         var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);
         okButton.AsButton().Click();
@@ -720,8 +729,14 @@ public abstract class WpfTestBase : IDisposable
     /// derselben Liste zu vermeiden. Voraussetzung: <paramref name="items"/> enthält mindestens ein Element.
     /// </summary>
     /// <param name="items">Die bereits ermittelten Items der "OffeneAufgabenListe".</param>
+    /// <exception cref="InvalidOperationException">Wird geworfen, wenn <paramref name="items"/> leer ist.</exception>
     protected static void ErsteOffeneAufgabeOeffnen(AutomationElement[] items)
     {
+        if (items.Length == 0)
+            throw new InvalidOperationException(
+                "ErsteOffeneAufgabeOeffnen wurde mit einer leeren Aufgabenliste aufgerufen. " +
+                "Aufrufer müssen zuvor sicherstellen, dass OffeneAufgabenItems mindestens ein Element liefert.");
+
         items[0].DoubleClick();
     }
 
@@ -741,10 +756,15 @@ public abstract class WpfTestBase : IDisposable
 
     /// <summary>
     /// Fokussiert das "ProjektName"-Feld, markiert dessen Inhalt (Strg+A), tippt <paramref name="neuerName"/>
-    /// und klickt "Speichern" (UpdateAsync-Pfad, bleibt in der Detailansicht). Wartet anschließend auf das
-    /// Wiedererscheinen von "Speichern" (Ladevorgang abgeschlossen).
+    /// und klickt "Speichern" (UpdateAsync-Pfad, bleibt in der Detailansicht). Der "Speichern"-Button
+    /// verschwindet in diesem Pfad nicht (im Gegensatz zur Neuanlage) - als echtes Synchronisationssignal
+    /// für den Abschluss von Speichern + anschließendem Reload wird stattdessen gewartet, bis das
+    /// "ProjektName"-Feld den nach dem Reload aus der Datenbank zurückgebundenen (getrimmten) Namen
+    /// tatsächlich anzeigt.
     /// Voraussetzung: <c>ProjectDetailView</c> im Edit-Modus sichtbar.
     /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    /// <param name="neuerName">Der neue Projektname.</param>
     protected void ProjektNamenAendernUndSpeichern(AutomationElement mainWindow, string neuerName)
     {
         var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
@@ -753,7 +773,36 @@ public abstract class WpfTestBase : IDisposable
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
 
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        WaitForTextBoxText(mainWindow, "ProjektName", neuerName.Trim(), Medium);
+    }
+
+    /// <summary>
+    /// Wartet, bis die per <paramref name="automationName"/> gefundene TextBox im Teilbaum von
+    /// <paramref name="parent"/> exakt <paramref name="expectedText"/> anzeigt. Dient als echtes
+    /// Synchronisationssignal für Abläufe, bei denen ein Button nach dem Speichern nicht verschwindet,
+    /// der zugrunde liegende Wert aber nach einem Reload sichtbar aktualisiert wird.
+    /// </summary>
+    /// <param name="parent">Das Element, dessen Teilbaum durchsucht wird.</param>
+    /// <param name="automationName">Der Automation-Name der gesuchten TextBox.</param>
+    /// <param name="expectedText">Der erwartete Textinhalt.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <exception cref="TimeoutException">Wird geworfen, wenn die TextBox nicht innerhalb von <paramref name="timeout"/> den erwarteten Text anzeigt.</exception>
+    private static void WaitForTextBoxText(AutomationElement parent, string automationName, string expectedText, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        string? aktuellerText = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            var box = parent.FindFirstDescendant(cf => cf.ByName(automationName));
+            aktuellerText = box?.AsTextBox().Text;
+            if (string.Equals(aktuellerText, expectedText, StringComparison.Ordinal))
+                return;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"TextBox '{automationName}' zeigte nicht innerhalb von {timeout.TotalSeconds}s den erwarteten Text '{expectedText}'. Aktuell: '{aktuellerText}'.");
     }
 
     /// <summary>

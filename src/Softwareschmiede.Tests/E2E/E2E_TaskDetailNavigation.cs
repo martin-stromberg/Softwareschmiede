@@ -34,8 +34,7 @@ public sealed class E2E_TaskDetailNavigation : WpfTestBase
 
         // Rücknavigation
         AufgabeDetailZurueck(mainWindow);
-        var projektNameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        Assert.NotNull(projektNameBox);
+        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
 
         // Fensterumfassendes Öffnen aus der Liste
         var items = OffeneAufgabenItems(mainWindow);
@@ -43,8 +42,7 @@ public sealed class E2E_TaskDetailNavigation : WpfTestBase
         ErsteOffeneAufgabeOeffnen(items);
 
         // TaskDetailView zeigt eigenes Ribbon mit "Speichern"-Button (Edit-Panel bei Status Neu)
-        var speichernInTask = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        Assert.NotNull(speichernInTask);
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
         // ProjektName-TextBox (Teil der ProjectDetailView) ist nicht mehr sichtbar
         var projektNameBoxNachOeffnen = mainWindow.FindFirstDescendant(cf => cf.ByName("ProjektName"));

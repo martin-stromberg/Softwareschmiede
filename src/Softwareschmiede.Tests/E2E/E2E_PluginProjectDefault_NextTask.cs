@@ -34,18 +34,7 @@ public sealed class E2E_PluginProjectDefault_NextTask : WpfTestBase
             useInSourceDirectoryMode: false);
 
         // Erste Aufgabe: Plugin auswählen, Projekt-Standard speichern
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
-        startenButton.AsButton().Click();
-
-        var dialog = WaitForWindow("KI-Plugin auswählen", Medium);
-        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
-        SelectComboBoxItemByClick(pluginAuswahlBox, "Softwareschmiede.KiSimulator", Short);
-
-        var checkbox = WaitForElement(dialog, cf => cf.ByName("FuerProjektVerwenden"), Short);
-        checkbox.AsCheckBox().IsChecked = true;
-
-        var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);
-        okButton.AsButton().Click();
+        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator", fuerProjektVerwenden: true);
 
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
@@ -64,8 +53,7 @@ public sealed class E2E_PluginProjectDefault_NextTask : WpfTestBase
         zweiterStartenButton.AsButton().Click();
 
         // Kein Plugin-Auswahl-Dialog erscheint: CLI startet direkt mit dem Projekt-Standard
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        Assert.NotNull(stoppenButton);
+        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
         var pluginDialogFenster = Automation.GetDesktop().FindFirstChild(cf =>
             cf.ByName("KI-Plugin auswählen").And(cf.ByControlType(ControlType.Window)));

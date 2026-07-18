@@ -88,24 +88,22 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
         // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe B.
         var infoToggle = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Medium);
         infoToggle.Click();
-        var titelBImInfoPanel = WaitForElement(mainWindow, cf => cf.ByName(TitelB), Short);
-        Assert.NotNull(titelBImInfoPanel);
+        WaitForElement(mainWindow, cf => cf.ByName(TitelB), Short);
 
         // Über die Aufgabenliste in der Seitenleiste("Aktive Aufgaben") zu Aufgabe A wechseln,
         // OHNE über "Zurück" zu navigieren — genau das im Bug-Report beschriebene Szenario.
         var navigateZuA = WaitForElement(mainWindow, cf => cf.ByName($"AufgabeNavigieren:{TitelA}"), Medium);
         navigateZuA.AsButton().Click();
 
-        // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe B gehören (nicht mehr zu Aufgabe A).
+        // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe A gehören (nicht mehr zu Aufgabe B).
         pidNachWechsel = WaitForTerminalProzessId(mainWindow, Medium);
         Assert.NotEqual(pidB, pidNachWechsel);
         Assert.Equal(pidA, pidNachWechsel);
 
-        // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe B.
+        // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe A.
         infoToggle = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Medium);
         infoToggle.Click();
-        var titelAImInfoPanel = WaitForElement(mainWindow, cf => cf.ByName(TitelA), Short);
-        Assert.NotNull(titelAImInfoPanel);
+        WaitForElement(mainWindow, cf => cf.ByName(TitelA), Short);
     }
 
     /// <summary>Legt eine neue Aufgabe im aktuell geöffneten Projekt an, benennt sie um, öffnet sie erneut und startet die CLI mit dem KI-Simulator-Plugin.</summary>
