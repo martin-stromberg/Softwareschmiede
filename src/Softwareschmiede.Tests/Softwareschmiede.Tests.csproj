@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="1.5.0" />
     <PackageReference Include="bunit" Version="2.7.2" />
     <PackageReference Include="FlaUI.Core" Version="5.0.0">
       <PrivateAssets>all</PrivateAssets>
