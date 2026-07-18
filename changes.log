@@ -1,3 +1,12 @@
+## 2026-07-17 — Anzeige der Programmversion in der Seitenleiste
+
+- Feature: Die aktuell installierte Programmversion wird dauerhaft in der Fußzeile der Navigations-Seitenleiste angezeigt — Benutzer erkennen die aktuelle Version auf einen Blick, ohne auf Einstellungen oder Dialoge zugreifen zu müssen.
+- Implementierung: Neue Property `CurrentVersion` in `MainWindowViewModel` mit asynchronem Laden über `IApplicationVersionProvider` im Fire-and-Forget-Muster; Format: „Version X.Y.Z" (z. B. „Version 1.2.3").
+- Fallback bei fehlender/ungültiger `version.json`: Text „Version unbekannt" ohne Programmabsturz.
+- UI: Neuer `TextBlock` in der Fußzeile der `MainWindow.xaml` mit Visibility-Binding an `IsNavigationExpanded` — Version ist nur bei aufgeklappter Navigation sichtbar; Styling (`FontSize="11"`, `SecondaryTextBrush`) konsistent mit bestehenden Navigations-Elementen.
+- Tests: Unit-Tests in `MainWindowViewModelTests` prüfen Wertübergabe und Fallback-Verhalten; E2E-Test in `E2E_VersionAnzeige.cs` prüft UI-Anzeige der Version.
+- Abhängigkeitsinjizierung: `IApplicationVersionProvider` wird als optionaler Konstruktor-Parameter injiziert (bereits im DI-Container registriert in `App.xaml.cs`); keine neuen Registrierungen oder Konfigurationsänderungen erforderlich.
+
 ## 2026-07-17 — E2E-Test-Isolation: Credential-Store-Cleanup zentralisieren
 
 - Problem: E2E-Tests schreiben produktive Parameter (z. B. `Softwareschmiede.Codex.CommandLineParameters`) in den OS-weiten Windows Credential Store, ohne diese vorher zu sichern. Wenn ein Test abbricht, bevor der manuelle `DeleteCredential()`-Aufruf erfolgt, bleiben Test-Parameter dauerhaft gespeichert und überschreiben produktive Konfiguration.

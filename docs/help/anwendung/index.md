@@ -5,3 +5,4 @@ Die Softwareschmiede WPF-Desktopanwendung präsentiert sich mit visueller Marken
 ## Inhalt
 
 - [Programmsymbol](beschreibung.md)
+- [Versionsanzeige](versions-anzeige.md)
