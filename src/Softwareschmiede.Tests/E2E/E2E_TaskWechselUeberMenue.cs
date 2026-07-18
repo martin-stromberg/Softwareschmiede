@@ -1,7 +1,4 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
-using FlaUI.Core.Input;
-using System.Runtime.ConstrainedExecution;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -63,9 +60,7 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
         var pidA = WaitForTerminalProzessId(mainWindow, Medium);
 
         // Zurück zum Projekt, um Aufgabe B anzulegen
-        var zurueckNachA = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckNachA.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+        AufgabeDetailZurueck(mainWindow);
 
         // Aufgabe B anlegen, öffnen und CLI starten (eigener Prozess, andere PID als Aufgabe A)
         ErstelleUndStarteAufgabe(mainWindow, TitelB);
@@ -73,11 +68,9 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
         Assert.NotEqual(pidA, pidB);
 
         // Zurück zum Projekt und Aufgabe A erneut öffnen — Aufgabe A ist nun die "geöffnete" Aufgabe
-        var zurueckNachB = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckNachB.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+        AufgabeDetailZurueck(mainWindow);
 
-        OeffneAufgabeAusListe(mainWindow, TitelA);
+        AufgabeAusListeOeffnen(mainWindow, TitelA);
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
         var pidAErneutGeoeffnet = WaitForTerminalProzessId(mainWindow, Medium);
         Assert.Equal(pidA, pidAErneutGeoeffnet);
@@ -120,36 +113,14 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
     /// <param name="titel">Der Titel, auf den die neue Aufgabe umbenannt werden soll.</param>
     private void ErstelleUndStarteAufgabe(AutomationElement mainWindow, string titel)
     {
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
+        NeueAufgabeAnlegen(mainWindow);
+        AufgabeTitelSetzen(mainWindow, titel);
+        AufgabeDetailSpeichern(mainWindow);
 
-        var editTitelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-        editTitelBox.Click();
-        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
-        Keyboard.Type(titel);
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
-
-        OeffneAufgabeAusListe(mainWindow, titel);
+        AufgabeAusListeOeffnen(mainWindow, titel);
 
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-    }
-
-    /// <summary>Öffnet eine Aufgabe mit dem angegebenen Titel per Doppelklick aus der Aufgabenliste der Projektdetailansicht.</summary>
-    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    /// <param name="titel">Der Titel der zu öffnenden Aufgabe.</param>
-    private static void OeffneAufgabeAusListe(AutomationElement mainWindow, string titel)
-    {
-        var listenEintrag = WaitForElement(
-            mainWindow,
-            cf => cf.ByName(titel).And(cf.ByControlType(ControlType.ListItem)),
-            Medium);
-        listenEintrag.DoubleClick();
-        WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
     }
 
     /// <summary>

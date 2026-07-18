@@ -47,13 +47,11 @@ public sealed class E2E_AutoStartCli : WpfTestBase
         Assert.NotNull(statusGestartetNachStop);
 
         // Zurück navigieren und Aufgabe erneut öffnen (löst TaskDetailViewModel.LadenAsync neu aus)
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
+        AufgabeDetailZurueck(mainWindow);
 
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
-        var items = listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
+        var items = OffeneAufgabenItems(mainWindow);
         Assert.True(items.Length >= 1, "Aufgabenliste sollte die gestartete Aufgabe enthalten.");
-        items[0].DoubleClick();
+        ErsteOffeneAufgabeOeffnen(items);
 
         // Automatischer CLI-Neustart beim Laden: Stoppen-Button erscheint ohne manuellen Start-Klick
         var stoppenButtonNachAutoStart = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);

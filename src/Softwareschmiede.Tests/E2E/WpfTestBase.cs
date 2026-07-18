@@ -659,4 +659,111 @@ public abstract class WpfTestBase : IDisposable
             Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Warten auf den vollständigen Prozess-Exit: {ex}");
         }
     }
+
+    /// <summary>
+    /// Klickt den "AufgabeNeu"-Button; die App legt die Aufgabe sofort mit Status "Neu" an und
+    /// navigiert in die separate <c>TaskDetailView</c>. Wartet auf das "EditTitel"-Feld und gibt es zurück.
+    /// </summary>
+    protected AutomationElement NeueAufgabeAnlegen(AutomationElement mainWindow)
+    {
+        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
+        aufgabeNeuButton.AsButton().Click();
+
+        return WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+    }
+
+    /// <summary>
+    /// Fokussiert das "EditTitel"-Feld, markiert dessen Inhalt (Strg+A) und tippt <paramref name="titel"/>.
+    /// Voraussetzung: <c>TaskDetailView</c> im Edit-Modus sichtbar (z. B. nach <see cref="NeueAufgabeAnlegen"/>).
+    /// </summary>
+    protected void AufgabeTitelSetzen(AutomationElement mainWindow, string titel)
+    {
+        var titelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        FeldInhaltErsetzen(titelBox, titel);
+    }
+
+    /// <summary>
+    /// Klickt den "Speichern"-Button in der <c>TaskDetailView</c> und wartet auf das Wiedererscheinen
+    /// von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>).
+    /// </summary>
+    protected void AufgabeDetailSpeichern(AutomationElement mainWindow)
+    {
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        speichernButton.AsButton().Click();
+
+        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+    }
+
+    /// <summary>
+    /// Verwirft die Bearbeitung über den "Zurück"-Button in der <c>TaskDetailView</c> und wartet auf
+    /// das Wiedererscheinen von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>).
+    /// </summary>
+    protected void AufgabeDetailZurueck(AutomationElement mainWindow)
+    {
+        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        zurueckButton.AsButton().Click();
+
+        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+    }
+
+    /// <summary>Wartet auf die "OffeneAufgabenListe" und gibt deren ListItem-Kinder zurück.</summary>
+    protected AutomationElement[] OffeneAufgabenItems(AutomationElement mainWindow)
+    {
+        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
+        return listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
+    }
+
+    /// <summary>
+    /// Öffnet das erste Item aus einer bereits ermittelten Aufgabenliste per Doppelklick, wodurch die
+    /// <c>TaskDetailView</c> fensterumfassend erscheint. Für Aufrufer, die <see cref="OffeneAufgabenItems"/>
+    /// bereits selbst (z. B. für ein eigenes Assert) abgefragt haben, um eine erneute UI-Automation-Abfrage
+    /// derselben Liste zu vermeiden. Voraussetzung: <paramref name="items"/> enthält mindestens ein Element.
+    /// </summary>
+    /// <param name="items">Die bereits ermittelten Items der "OffeneAufgabenListe".</param>
+    protected static void ErsteOffeneAufgabeOeffnen(AutomationElement[] items)
+    {
+        items[0].DoubleClick();
+    }
+
+    /// <summary>
+    /// Sucht in der Aufgabenliste das ListItem mit dem angegebenen <paramref name="titel"/>, öffnet es
+    /// per Doppelklick und wartet auf den "Zurück"-Button (Bestätigung, dass die <c>TaskDetailView</c> geladen ist).
+    /// </summary>
+    protected void AufgabeAusListeOeffnen(AutomationElement mainWindow, string titel)
+    {
+        var listenEintrag = WaitForElement(
+            mainWindow,
+            cf => cf.ByName(titel).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
+            Medium);
+        listenEintrag.DoubleClick();
+        WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+    }
+
+    /// <summary>
+    /// Fokussiert das "ProjektName"-Feld, markiert dessen Inhalt (Strg+A), tippt <paramref name="neuerName"/>
+    /// und klickt "Speichern" (UpdateAsync-Pfad, bleibt in der Detailansicht). Wartet anschließend auf das
+    /// Wiedererscheinen von "Speichern" (Ladevorgang abgeschlossen).
+    /// Voraussetzung: <c>ProjectDetailView</c> im Edit-Modus sichtbar.
+    /// </summary>
+    protected void ProjektNamenAendernUndSpeichern(AutomationElement mainWindow, string neuerName)
+    {
+        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
+        FeldInhaltErsetzen(nameBox, neuerName);
+
+        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        speichernButton.AsButton().Click();
+
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+    }
+
+    /// <summary>
+    /// Fokussiert <paramref name="box"/> per Klick, markiert dessen Inhalt (Strg+A) und ersetzt ihn
+    /// durch <paramref name="text"/>.
+    /// </summary>
+    private static void FeldInhaltErsetzen(AutomationElement box, string text)
+    {
+        box.Click();
+        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
+        Keyboard.Type(text);
+    }
 }

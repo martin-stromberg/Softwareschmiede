@@ -1,5 +1,4 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -18,72 +17,37 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class E2E_TaskDetailNavigation : WpfTestBase
 {
     /// <summary>
-    /// Szenario: Projekt öffnen, Doppelklick auf Aufgabe in der Aufgabenliste.
-    /// Prüft: TaskDetailView wird fensterumfassend angezeigt (ProjectDetailView nicht mehr sichtbar).
+    /// Szenario: Neue Aufgabe anlegen (korrekte Daten prüfen), über "Zurück" zur ProjectDetailView
+    /// zurücknavigieren, anschließend die Aufgabe per Doppelklick aus der Aufgabenliste erneut öffnen.
+    /// Prüft: Die TaskDetailView zeigt beim Anlegen den korrekten Standardtitel; "Zurück" navigiert zur
+    /// ProjectDetailView zurück; das Öffnen aus der Liste zeigt die TaskDetailView fensterumfassend
+    /// (ProjectDetailView nicht mehr sichtbar).
     /// </summary>
     [Fact]
-    public void AufgabeOeffnen_ZeigtTaskDetailViewFensterumfassend_E2E()
+    public void TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E()
     {
-        var mainWindow = StartAndNavigateToProjects("TaskNav-Oeffnen-Test");
+        var mainWindow = StartAndNavigateToProjects("TaskNav-Test");
 
-        // Aufgabe anlegen, damit ein Listeneintrag existiert
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
+        // Korrekte Daten
+        var editTitelBox = NeueAufgabeAnlegen(mainWindow);
+        Assert.Equal("Neue Aufgabe", editTitelBox.AsTextBox().Text);
 
-        // Neu angelegte Aufgabe öffnet bereits die TaskDetailView; zurück zur Projektansicht navigieren
-        var zurueckInTask = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckInTask.AsButton().Click();
+        // Rücknavigation
+        AufgabeDetailZurueck(mainWindow);
+        var projektNameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
+        Assert.NotNull(projektNameBox);
 
-        // Aufgabenliste enthält jetzt die Aufgabe; Doppelklick öffnet TaskDetailView erneut
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
-        var items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+        // Fensterumfassendes Öffnen aus der Liste
+        var items = OffeneAufgabenItems(mainWindow);
         Assert.True(items.Length >= 1, "Aufgabenliste sollte mindestens eine Aufgabe enthalten.");
-        items[0].DoubleClick();
+        ErsteOffeneAufgabeOeffnen(items);
 
         // TaskDetailView zeigt eigenes Ribbon mit "Speichern"-Button (Edit-Panel bei Status Neu)
         var speichernInTask = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         Assert.NotNull(speichernInTask);
 
         // ProjektName-TextBox (Teil der ProjectDetailView) ist nicht mehr sichtbar
-        var projektNameBox = mainWindow.FindFirstDescendant(cf => cf.ByName("ProjektName"));
-        Assert.Null(projektNameBox);
-    }
-
-    /// <summary>
-    /// Szenario: TaskDetailView zeigt die korrekten Aufgabendaten (Titel) an.
-    /// </summary>
-    [Fact]
-    public void TaskDetailView_ZeigtKorrekteAufgabendaten_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects("TaskNav-Daten-Test");
-
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
-
-        // EditTitel-Feld zeigt den Standardtitel der neu erstellten Aufgabe
-        var editTitelBox = WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-        Assert.Equal("Neue Aufgabe", editTitelBox.AsTextBox().Text);
-    }
-
-    /// <summary>
-    /// Szenario: Klick auf "Zurück" in der TaskDetailView.
-    /// Prüft: Navigation zurück zur ProjectDetailView funktioniert.
-    /// </summary>
-    [Fact]
-    public void ZurueckButtonInTaskDetail_NavigiertZuProjectDetailView_E2E()
-    {
-        var mainWindow = StartAndNavigateToProjects("TaskNav-Zurueck-Test");
-
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
-
-        // ProjectDetailView ist wieder sichtbar (ProjektName-Feld vorhanden)
-        var projektNameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        Assert.NotNull(projektNameBox);
+        var projektNameBoxNachOeffnen = mainWindow.FindFirstDescendant(cf => cf.ByName("ProjektName"));
+        Assert.Null(projektNameBoxNachOeffnen);
     }
 }
