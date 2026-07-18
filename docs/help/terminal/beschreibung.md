@@ -36,13 +36,19 @@ Das `TerminalControl` passt Spalten- und Zeilenanzahl automatisch an verfügbare
 - Codex CLI mit voller Farbunterstützung (SGR 3-bit, 8-bit, 24-bit) interaktiv nutzen.
 - Tastatureingaben (Pfeiltasten, F1–F12, Ctrl+C) funktionieren nativ ohne Verzögerung.
 
-### Neuerungen: Buffer-Stabilitäts-Optimierung und Clipboard-Paste
+### Neuerungen: Buffer-Stabilitäts-Optimierung, Clipboard-Paste und Zeilenvorschub-Normalisierung
 
-Das Terminal-System wurde mit zwei Verbesserungen erweitert:
+Das Terminal-System wurde mit mehreren Verbesserungen erweitert:
 
 1. **Buffer-Snapshot für stabiles Rendering:** Die Rendering-Engine nutzt jetzt `TerminalBuffer.GetSnapshot()`, eine Methode, die einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock erstellt. Dies verhindert Race Conditions zwischen paralleler CLI-Ausgabe und gleichzeitigen Render-Operationen — die Ausgabe bleibt stabil und vermischt sich nicht mehr bei schnellen, aufeinanderfolgenden CLI-Ausgaben.
 
 2. **Clipboard-Paste-Support:** Benutzer können nun mit **Ctrl+V** Text aus der Zwischenablage direkt in die CLI einfügen. Die Text-Eingabe wird zeilenweise normalisiert (alle Newline-Varianten → `\r`) und als UTF-8 kodiert, um mit Windows-Standard-Clipboard-Verhalten kompatibel zu sein.
+
+3. **Zeilenvorschub-Normalisierung:** Das Terminal behandelt Unix-Style Line Feeds (`\n`) jetzt identisch wie Windows-Style CRLF (`\r\n`) — beide erzeugen einen Zeilenvorschub **und** setzen die Cursor-Spalte auf 0. Dies verhindert den „Treppeneffekt", der entsteht, wenn Programme nur `\n` senden. Carriage Return (`\r`) allein wird weiterhin korrekt als Spalte-0-Rückkehr in der gleichen Zeile behandelt.
+
+4. **Screen-Clear mit vollständiger Bereinigung:** Der ESC-Befehl `ESC[2J` (Clear Entire Screen) leert nun nicht nur das sichtbare Terminal-Grid, sondern auch den internen Scrollback-Puffer — genau wie in echten Windows-Konsolen. Dies stellt sicher, dass der Bildschirmzustand nach dem Clear vollständig konsistent ist.
+
+5. **Robustes Terminal-Resize:** Bei Verkleinerung des Terminals werden nun die **aktuellen (unteren) Zeilen** beibehalten und alte obere Zeilen in den Scrollback verschoben — der aktuelle Prompt/Cursor bleibt sichtbar am unteren Rand. Dies behebt das Problem, dass nach Verkleinerung veraltete alte Zeilen in die Anzeige rutschten.
 
 ## Einschränkungen
 

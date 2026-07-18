@@ -158,4 +158,17 @@ public sealed class AnsiSequenceParserTests
         events.Should().ContainSingle(e => e is CursorVisibilityChangedEvent);
         ((CursorVisibilityChangedEvent)events[0]).Visible.Should().BeTrue();
     }
+
+    /// <summary>Text mit CRLF wird unverändert im TextWrittenEvent belassen — die Zeilenvorschub-Semantik
+    /// liegt bewusst im TerminalBuffer, nicht im Parser.</summary>
+    [Fact]
+    public void Parse_CrLfText_ErgibtTextMitCrLf()
+    {
+        var sut = new AnsiSequenceParser();
+
+        var events = sut.Parse(Encode("A\r\nB")).ToList();
+
+        events.Should().ContainSingle(e => e is TextWrittenEvent);
+        ((TextWrittenEvent)events[0]).Text.Should().Be("A\r\nB");
+    }
 }

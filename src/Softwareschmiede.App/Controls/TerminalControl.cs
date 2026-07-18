@@ -252,6 +252,7 @@ public sealed class TerminalControl : FrameworkElement
             var rows = CalculateRows();
             buffer.Resize(cols, rows);
             session.Resize(cols, rows);
+            InvalidateVisual();
         }
 
         base.OnRenderSizeChanged(sizeInfo);

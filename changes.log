@@ -1,3 +1,13 @@
+## 2026-07-18 — Korrektur der CLI-Ausgabeanzeige (Zeilenumbrüche, Resize, Screen-Clear)
+
+- Behebung von Darstellungsfehlern in der Terminal-Rendering-Pipeline: Zeilenumbrüche wurden nicht korrekt normalisiert (Treppeneffekt bei reinem LF), alte Zeilen blieben nach Screen-Clear sichtbar, und bei Verkleinerung des Terminals wurden die falschen Zeilen angezeigt.
+- **Zeilenvorschub-Normalisierung in `TerminalBuffer.ApplyText()`:** LF (`\n`) wird nun wie CRLF behandelt — setzt zusätzlich zu `AdvanceLine()` die Cursor-Spalte auf 0, um Treppeneffekte zu vermeiden. CR (`\r`) allein bleibt unverändert (setzt nur Spalte 0 ohne Zeilenvorschub).
+- **Vollständige Grid-Bereinigung bei Screen-Clear:** Neue private Methode `ClearAllCells()` füllt das gesamte Terminal-Grid mit `TerminalCell.Default` **und leert zusätzlich den `_scrollback`-Ringpuffer**, wodurch die Windows-Konsolensemantik korrekt abgebildet wird.
+- **Resize beim Verkleinern der Zeilenzahl:** `TerminalBuffer.Resize()` behält nun beim Verkleinern die **unteren (aktuellen) Zeilen** und verschiebt herausgeschobene obere Zeilen in den Scrollback; Cursor-Zeile wird um den Versatz reduziert. Dies behebt das Problem, dass alte Zeilen nach Verkleinerung sichtbar blieben — stattdessen wird der aktuelle Prompt/Cursor korrekt am unteren Rand angezeigt.
+- **Explicit Invalidate nach Resize in `TerminalControl`:** `OnRenderSizeChanged` ruft nach Resize-Operationen `InvalidateVisual()` auf, um garantierte Neuzeichnung zu sichern.
+- Unit-Tests: Neue und angepasste Tests in `TerminalBufferTests` für LF/CRLF-Normalisierung, Verkleinerungs-Resize, Clear-Scrollback-Leeren; E2E-Test für Anzeige-Integrität mehrzeiliger CLI-Ausgabe.
+- Keine Endbenutzer-sichtbaren Konfigurationsänderungen; Feature ist Bugfix für Anzeige-Zuverlässigkeit.
+
 ## 2026-07-17 — Anzeige der Programmversion in der Seitenleiste
 
 - Feature: Die aktuell installierte Programmversion wird dauerhaft in der Fußzeile der Navigations-Seitenleiste angezeigt — Benutzer erkennen die aktuelle Version auf einen Blick, ohne auf Einstellungen oder Dialoge zugreifen zu müssen.
