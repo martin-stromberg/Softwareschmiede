@@ -129,6 +129,13 @@
                             Background="{DynamicResource BorderBrush}"
                             Margin="4,0,4,8" />
 
+                    <TextBlock Text="{Binding CurrentVersion}"
+                               AutomationProperties.AutomationId="AppVersionText"
+                               FontSize="11"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               Margin="8,0,8,8"
+                               Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" />
+
                     <Button Command="{Binding UpdateStartenCommand}"
                             Visibility="{Binding UpdateVerfuegbar, Converter={StaticResource BoolToVisibilityConverter}}"
                             AutomationProperties.Name="Programmupdate starten"

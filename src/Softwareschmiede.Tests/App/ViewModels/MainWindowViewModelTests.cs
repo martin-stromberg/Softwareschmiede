@@ -76,7 +76,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         IUpdateService? updateService = null,
         ICliUpdateSafetyService? cliUpdateSafetyService = null,
         IUpdateProgressDialogService? updateProgressDialogService = null,
-        IDialogService? dialogService = null)
+        IDialogService? dialogService = null,
+        IApplicationVersionProvider? versionProvider = null)
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
@@ -93,7 +94,8 @@ public sealed class MainWindowViewModelTests : IDisposable
             updateService,
             cliUpdateSafetyService,
             updateProgressDialogService,
-            dialogService);
+            dialogService,
+            versionProvider);
     }
 
     private ProjectListViewModel CreateProjectListViewModel(ProjektService projektService)
@@ -716,6 +718,46 @@ public sealed class MainWindowViewModelTests : IDisposable
         await Task.Delay(TimeSpan.FromMilliseconds(300));
         sut.AktiveAufgabenListe.Should().NotContain(a => a.Id == aufgabe.Id,
             "nach Dispose() darf RunningCountChanged keine Aktualisierung mehr auslösen");
+    }
+
+    /// <summary>CurrentVersion wird bei erfolgreichem GetInstalledVersionAsync mit der formatierten Version gefüllt.</summary>
+    [Fact]
+    public async Task CurrentVersion_ShouldExposeInstalledVersion_WhenProviderReturnsValue()
+    {
+        // Arrange
+        var versionProviderMock = new Mock<IApplicationVersionProvider>();
+        versionProviderMock.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
+
+        // Act
+        var sut = CreateSut(versionProvider: versionProviderMock.Object);
+
+        // Assert
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.CurrentVersion is null)
+            await Task.Delay(50);
+
+        sut.CurrentVersion.Should().Be("Version 1.2.3");
+    }
+
+    /// <summary>CurrentVersion fällt auf den Fallback-Text zurück, wenn der Provider null zurückgibt, ohne eine Exception auszulösen.</summary>
+    [Fact]
+    public async Task CurrentVersion_ShouldUseFallback_WhenProviderReturnsNull()
+    {
+        // Arrange
+        var versionProviderMock = new Mock<IApplicationVersionProvider>();
+        versionProviderMock.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((InstalledVersionInfo?)null);
+
+        // Act
+        var sut = CreateSut(versionProvider: versionProviderMock.Object);
+
+        // Assert
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.CurrentVersion is null)
+            await Task.Delay(50);
+
+        sut.CurrentVersion.Should().Be("Version unbekannt");
     }
 
     /// <summary>EF-Core-Interceptor, der die Materialisierung von Entitäten künstlich verzögert, um in Tests echte Nebenläufigkeit zu erzwingen.</summary>

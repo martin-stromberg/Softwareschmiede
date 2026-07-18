@@ -18,6 +18,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private const int AktualisierungsIntervallSekunden = 5;
     private const string AktiveAufgabenAktualisierenKontext = "MainWindowViewModel.AktiveAufgabenAktualisierenAsync";
+    private const string VersionUnbekanntText = "Version unbekannt";
 
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
@@ -29,6 +30,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ICliUpdateSafetyService? _cliUpdateSafetyService;
     private readonly IUpdateProgressDialogService? _updateProgressDialogService;
     private readonly IDialogService? _dialogService;
+    private readonly IApplicationVersionProvider? _versionProvider;
     private readonly IPluginManager? _pluginManager;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
@@ -42,6 +44,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _updateCheckLaeuft;
     private bool _updateWirdVorbereitet;
     private string? _updateHinweis;
+    private string? _currentVersion;
     private bool _disposed;
 
     /// <summary>Gibt den Fenstertitel zurück.</summary>
@@ -104,6 +107,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _updateHinweis, value);
     }
 
+    /// <summary>Die aktuell installierte Programmversion als Anzeigetext.</summary>
+    public string? CurrentVersion
+    {
+        get => _currentVersion;
+        private set => SetProperty(ref _currentVersion, value);
+    }
+
     /// <summary>Aktuell aktive Aufgaben (Status Gestartet oder Wartend) für die Seitenleisten-Anzeige.</summary>
     public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe { get; } = new();
 
@@ -146,7 +156,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         IUpdateService? updateService = null,
         ICliUpdateSafetyService? cliUpdateSafetyService = null,
         IUpdateProgressDialogService? updateProgressDialogService = null,
-        IDialogService? dialogService = null)
+        IDialogService? dialogService = null,
+        IApplicationVersionProvider? versionProvider = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
@@ -158,6 +169,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _cliUpdateSafetyService = cliUpdateSafetyService;
         _updateProgressDialogService = updateProgressDialogService;
         _dialogService = dialogService;
+        _versionProvider = versionProvider;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -182,6 +194,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         NavigateToDashboard();
         UpdatePruefenImHintergrund();
+        VersionLadenImHintergrund();
     }
 
     private DashboardViewModel? _dashboardViewModel;
@@ -437,5 +450,29 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         // (Timer-Tick oder RunningCountChanged kurz vor dem Schließen) würde in seinem finally-Block
         // sonst auf ein bereits entsorgtes Semaphore treffen (ObjectDisposedException). Reine
         // WaitAsync(0)/Release()-Nutzung ohne Zugriff auf AvailableWaitHandle benötigt kein Dispose.
+    }
+
+    private void VersionLadenImHintergrund()
+    {
+        VersionLadenAsync(CancellationToken.None).SafeFireAndForget(_logger, "MainWindowViewModel.VersionLadenAsync");
+    }
+
+    private async Task VersionLadenAsync(CancellationToken ct)
+    {
+        var versionText = VersionUnbekanntText;
+        try
+        {
+            var versionInfo = _versionProvider is not null
+                ? await _versionProvider.GetInstalledVersionAsync(ct)
+                : null;
+            if (versionInfo is not null)
+                versionText = $"Version {versionInfo.Version}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Laden der installierten Programmversion.");
+        }
+
+        _dispatcherInvoke(() => CurrentVersion = versionText);
     }
 }
