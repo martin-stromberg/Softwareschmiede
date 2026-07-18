@@ -30,7 +30,67 @@ Beteiligte Komponenten:
 7. Event `CliProcessStatusChanged(Gestartet)` wird gefeuert
 8. Event `PseudoConsoleSessionGestartet(session)` wird an `TaskDetailViewModel` propagiert
 
-### 2. Terminal-Rendering-Loop mit Buffer-Snapshot (Leseschleife läuft in der Session, nicht im Control)
+### 2. Zeilenvorschub-Normalisierung in der Textverarbeitung
+
+Beteiligte Komponenten:
+- `TerminalBuffer.ApplyText(string text)` — Zeichen-für-Zeichen-Verarbeitung von Text-Events
+- `TerminalBuffer.NewLine()` — kombinierte Zeilenvorschub und Spalte-0-Setzung
+
+**Detailschritte:**
+
+1. `TextWrittenEvent` enthält rohen Text mit möglichen Sonderzeichen (`\r`, `\n`, `\x08`, druckbare Zeichen)
+2. `TerminalBuffer.ApplyText()` verarbeitet jedes Zeichen:
+   - `\r` (Carriage Return) → `_cursorCol = 0` (Spalte 0, kein Zeilenvorschub)
+   - `\n` (Line Feed) → `NewLine()` aufrufen, was `AdvanceLine()` + `_cursorCol = 0` ausführt
+   - `\r\n` (CRLF) → zwei aufeinanderfolgende Zeichen: zuerst `\r` (nur Spalte 0), dann `\n` (Vorschub + Spalte 0) = genau ein Zeilenvorschub
+   - `\x08` (Backspace) → `_cursorCol--` (minimal 0)
+   - Druckbare Zeichen → bei Spaltenüberlauf `NewLine()` aufrufen, dann Zeichen in Grid schreiben, `_cursorCol++`
+
+3. **Resultat:** Unix-LF (`\n`), Windows-CRLF (`\r\n`) und Mac-CR (`\r`) werden semantisch korrekt behandelt — kein Treppeneffekt.
+
+### 3. Screen-Clear mit vollständiger Bereinigung
+
+Beteiligte Komponenten:
+- `TerminalBuffer.ApplyClearScreen(int mode)` — Mode-spezifische Clear-Operationen
+- `TerminalBuffer.ClearAllCells()` — private Hilfsmethode für vollständige Bereinigung
+
+**Detailschritte:**
+
+1. Parser erzeugt `ScreenClearedEvent` mit Mode (0=Cursor bis Ende, 1=Anfang bis Cursor, 2=ganzer Bildschirm)
+2. `TerminalBuffer.Apply(ScreenClearedEvent)` → `ApplyClearScreen(mode)`
+3. **Mode 0 und 1:** Teilweise Löschen wie bisher (zeilenweise Clearup/Cleardown von aktueller Cursor-Position)
+4. **Mode 2 (Ganzer Bildschirm):** Aufrufen von `ClearAllCells()`:
+   - Gesamtes Grid wird mit `TerminalCell.Default` gefüllt (alle Zellen leer/weiß auf schwarz)
+   - **Wichtig:** `_scrollback`-Ringpuffer wird geleert (`_scrollback.Clear()`)
+   - Cursor wird auf (0, 0) gesetzt
+5. **Resultat:** Sauberer, komplett leerer Bildschirm ohne alte Zeilen im Scrollback (auch nicht sichtbar in Zukunft)
+
+### 4. Terminal-Resize mit Erhalt aktueller Zeilen
+
+Beteiligte Komponenten:
+- `TerminalControl.OnRenderSizeChanged(SizeChangedInfo)` — misst neue Pixel-Dimensionen
+- `TerminalBuffer.Resize(int cols, int rows)` — passt Grid-Größe an
+- `PseudoConsoleSession.Resize(int cols, int rows)` — aktualisiert echte Terminal-Größe
+
+**Detailschritte:**
+
+1. Fenster wird vergrößert/verkleinert → `OnRenderSizeChanged` wird ausgelöst
+2. Neue Spalten/Zeilen berechnet: `newCols = ActualWidth / _cellWidth`, `newRows = ActualHeight / _cellHeight`
+3. `TerminalBuffer.Resize(newCols, newRows)`:
+   - Neues, leeres Grid anlegen (gefüllt mit `TerminalCell.Default`)
+   - **Falls Zeilenzahl vergrößert/gleich (`rows >= _rows`):** Kopie ab Zeile 0 (top-aligned), Rest leer
+   - **Falls Zeilenzahl verkleinert (`rows < _rows`):**
+     - Berechne Versatz: `offset = _rows - rows` (Anzahl herausgeschobener Zeilen)
+     - Verschiebe obere `offset` Zeilen in `_scrollback` (unter Beachtung von `MaxScrollbackLines`)
+     - Kopiere untere `rows` Zeilen des alten Grids in das neue Grid (bottom-aligned)
+     - Spalten: immer rechts abschneiden, kein Reflow auf nächste Zeile
+   - Cursor-Zeile: um `offset` reduzieren, dann auf `[0, rows-1]` klemmen
+   - Cursor-Spalte: auf `[0, cols-1]` klemmen
+4. `PseudoConsoleSession.Resize(newCols, newRows)` → API `ResizePseudoConsole` aktualisiert echtes Terminal
+5. `TerminalControl.InvalidateVisual()` → erzwingt Neuzeichnung
+6. **Resultat:** Nach Verkleinerung sieht Benutzer den aktuellen Prompt/Cursor am unteren Rand, nicht veraltete alte Zeilen oben
+
+### 5. Terminal-Rendering-Loop mit Buffer-Snapshot (Leseschleife läuft in der Session, nicht im Control)
 
 Seit der Behebung von Issue-86 (parallele CLI-Ausführungen) läuft die Leseschleife nicht mehr im
 `TerminalControl`, sondern in `PseudoConsoleSession` selbst — ab Konstruktion der Session bis zu ihrem
@@ -74,7 +134,7 @@ Beteiligte Komponenten:
    - Zeichnet Vordergrund-Text (`FormattedText`) mit Font-Attributen
    - Rendert Cursor-Rechteck bei Snapshot-CursorRow/CursorCol
 
-### 3. Tastatureingabe
+### 6. Tastatureingabe
 
 Beteiligte Komponenten:
 - `TerminalControl.PreviewKeyDown` / `TextInput` — WPF-Key-Events
@@ -92,7 +152,7 @@ Beteiligte Komponenten:
    - Enter: `\r`
 3. Bytes werden asynchron in `session.InputStream` geschrieben
 
-### 4. Clipboard-Paste-Eingabe (Ctrl+V)
+### 7. Clipboard-Paste-Eingabe (Ctrl+V)
 
 Beteiligte Komponenten:
 - `TerminalControl.OnPreviewKeyDown` — fängt Tastaturereignisse ab
@@ -114,7 +174,7 @@ Beteiligte Komponenten:
    - `Session.MarkInputActivity()` wird aufgerufen, um Runtime-Status zu aktualisieren
    - Bei Exception: Error wird geloggt (`_logger.LogWarning`), Tastatureingabe läuft weiter
 
-### 5. ConPTY-Resize
+### 8. ConPTY-Resize
 
 Beteiligte Komponenten:
 - `TerminalControl.SizeChanged` — Layout-Änderungen
@@ -131,7 +191,7 @@ Beteiligte Komponenten:
 4. `PseudoConsole.Resize(cols, rows)` ruft `ResizePseudoConsole(hpcon, size)` auf
 5. `TerminalBuffer.Resize(newCols, newRows)` passt Grid an (erhält sichtbare Zeilen, trunciert wenn nötig)
 
-### 6. Prozessende
+### 9. Prozessende
 
 Beteiligte Komponenten:
 - `Process.Exited` — Win32-Event

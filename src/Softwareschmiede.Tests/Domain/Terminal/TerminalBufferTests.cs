@@ -211,4 +211,126 @@ public sealed class TerminalBufferTests
 
         readerException.Should().BeNull("GetSnapshot() muss auch unter parallelen Apply()/Resize()-Aufrufen einen intern konsistenten Zustand liefern");
     }
+
+    /// <summary>Ein alleinstehendes Linefeed setzt die Cursor-Spalte auf 0 (kein Treppeneffekt).</summary>
+    [Fact]
+    public void Buffer_LineFeed_SetztSpalteAufNull()
+    {
+        var sut = new TerminalBuffer(80, 24);
+
+        sut.Apply(new TextWrittenEvent("A\nB"));
+
+        var row = sut.GetRow(1);
+        row[0].Character.Should().Be('B', "ein bloßes Linefeed muss wie CRLF wirken und die Spalte auf 0 zurücksetzen");
+    }
+
+    /// <summary>"A\r\nB" erzeugt genau einen Zeilenvorschub, B landet in Zeile 1 Spalte 0.</summary>
+    [Fact]
+    public void Buffer_CarriageReturnLineFeed_ErgibtEinenUmbruch()
+    {
+        var sut = new TerminalBuffer(80, 24);
+
+        sut.Apply(new TextWrittenEvent("A\r\nB"));
+
+        sut.CursorRow.Should().Be(1, "CRLF darf nur genau einen Zeilenvorschub erzeugen");
+        var row = sut.GetRow(1);
+        row[0].Character.Should().Be('B');
+    }
+
+    /// <summary>Ein alleinstehendes Carriage Return überschreibt Spalte 0 der aktuellen Zeile ohne Zeilenvorschub.</summary>
+    [Fact]
+    public void Buffer_CarriageReturnAllein_BleibtInZeile()
+    {
+        var sut = new TerminalBuffer(80, 24);
+
+        sut.Apply(new TextWrittenEvent("AAA\rB"));
+
+        sut.CursorRow.Should().Be(0, "ein alleinstehendes CR darf keinen Zeilenvorschub auslösen");
+        var row = sut.GetRow(0);
+        row[0].Character.Should().Be('B');
+        row[1].Character.Should().Be('A');
+        row[2].Character.Should().Be('A');
+    }
+
+    /// <summary>Verkleinert man die Zeilenzahl, bleiben die zuletzt geschriebenen (unteren) Zeilen sichtbar, obere entfernt.</summary>
+    [Fact]
+    public void Buffer_ResizeKleiner_ErhaeltUntereZeilen()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        for (var r = 0; r < 5; r++)
+        {
+            sut.Apply(new CursorMovedEvent(r, 0, true));
+            sut.Apply(new TextWrittenEvent(r.ToString()));
+        }
+
+        sut.Resize(10, 3);
+
+        sut.GetRow(0)[0].Character.Should().Be('2', "nach Verkleinerung müssen die untersten Zeilen des alten Grids erhalten bleiben");
+        sut.GetRow(1)[0].Character.Should().Be('3');
+        sut.GetRow(2)[0].Character.Should().Be('4');
+    }
+
+    /// <summary>Die Cursor-Zeile wird nach Verkleinerung um den Versatz reduziert und anschließend geklemmt.</summary>
+    [Fact]
+    public void Buffer_ResizeKleiner_CursorFolgtUnterenZeilen()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        sut.Apply(new CursorMovedEvent(1, 0, true));
+
+        sut.Resize(10, 2);
+
+        sut.CursorRow.Should().Be(0, "der Cursor lag vor der Verkleinerung oberhalb des neuen sichtbaren Bereichs und muss auf die erste sichtbare Zeile geklemmt werden");
+    }
+
+    /// <summary>Verkleinert man die Spaltenzahl, wird der Zeileninhalt rechts abgeschnitten statt in die nächste Zeile umzubrechen.</summary>
+    [Fact]
+    public void Buffer_ResizeSchmaler_SchneidetRechtsAb()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        sut.Apply(new TextWrittenEvent("ABCDEFGHIJ"));
+
+        sut.Resize(5, 5);
+
+        var row0 = sut.GetRow(0);
+        row0[0].Character.Should().Be('A');
+        row0[4].Character.Should().Be('E');
+        var row1 = sut.GetRow(1);
+        row1[0].Character.Should().Be(' ', "Spaltenverkleinerung darf keinen Reflow in die nächste Zeile erzeugen");
+    }
+
+    /// <summary>Nach ScreenClearedEvent(2) sind alle Zellen TerminalCell.Default und der Cursor steht bei (0,0).</summary>
+    [Fact]
+    public void Buffer_ClearScreenMode2_AlleZellenLeer()
+    {
+        var sut = new TerminalBuffer(10, 5);
+        sut.Apply(new TextWrittenEvent("Hallo"));
+        sut.Apply(new CursorMovedEvent(3, 3, true));
+
+        sut.Apply(new ScreenClearedEvent(2));
+
+        sut.CursorRow.Should().Be(0);
+        sut.CursorCol.Should().Be(0);
+        for (var r = 0; r < sut.Rows; r++)
+        {
+            var row = sut.GetRow(r);
+            foreach (var cell in row)
+                cell.Should().Be(TerminalCell.Default);
+        }
+    }
+
+    /// <summary>Nach genügend Zeilenvorschüben (gefülltem Scrollback) und anschließendem ScreenClearedEvent(2)
+    /// muss der Scrollback geleert sein.</summary>
+    [Fact]
+    public void Buffer_ClearScreenMode2_LeertScrollback()
+    {
+        var sut = new TerminalBuffer(10, 2);
+        for (var i = 0; i < 10; i++)
+            sut.Apply(new TextWrittenEvent("X\n"));
+
+        sut.ScrollbackCount.Should().BeGreaterThan(0, "Vorbedingung: der Scrollback muss vor dem Clear gefüllt sein");
+
+        sut.Apply(new ScreenClearedEvent(2));
+
+        sut.ScrollbackCount.Should().Be(0, "ScreenClearedEvent(2) muss auch den Scrollback leeren");
+    }
 }

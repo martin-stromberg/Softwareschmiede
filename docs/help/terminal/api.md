@@ -454,6 +454,7 @@ for (var r = 0; r < snapshot.Rows; r++)
 - `Cols`: Aktuelle Spaltenanzahl
 - `CursorRow`: Cursor-Zeile (0-basiert)
 - `CursorCol`: Cursor-Spalte (0-basiert)
+- `ScrollbackCount` (internal): Anzahl der aktuell im Scrollback-Ringpuffer gehaltenen Zeilen. Diese Eigenschaft ist nur für Tests sichtbar (interne API).
 
 ## Enums
 

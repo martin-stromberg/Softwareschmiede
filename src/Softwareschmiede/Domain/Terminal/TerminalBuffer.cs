@@ -56,6 +56,12 @@ public sealed class TerminalBuffer
         get { lock (_lock) return _cursorCol; }
     }
 
+    /// <summary>Anzahl der aktuell im Scrollback-Ringpuffer gehaltenen Zeilen. Nur für Tests sichtbar.</summary>
+    internal int ScrollbackCount
+    {
+        get { lock (_lock) return _scrollback.Count; }
+    }
+
     /// <summary>Wendet ein Terminal-Ereignis auf den Buffer an.</summary>
     /// <param name="evt">Das anzuwendende Ereignis.</param>
     public void Apply(TerminalEvent evt)
@@ -110,17 +116,33 @@ public sealed class TerminalBuffer
 
             var newGrid = new TerminalCell[rows, cols];
             FillGrid(newGrid, rows, cols);
-
-            var copyRows = Math.Min(_rows, rows);
             var copyCols = Math.Min(_cols, cols);
-            for (var r = 0; r < copyRows; r++)
-                for (var c = 0; c < copyCols; c++)
-                    newGrid[r, c] = _grid[r, c];
+
+            if (rows < _rows)
+            {
+                var offset = _rows - rows;
+                for (var r = 0; r < offset; r++)
+                    PushToScrollback(CaptureRow(r));
+
+                for (var r = 0; r < rows; r++)
+                    for (var c = 0; c < copyCols; c++)
+                        newGrid[r, c] = _grid[r + offset, c];
+
+                _cursorRow = Clamp(_cursorRow - offset, 0, rows - 1);
+            }
+            else
+            {
+                var copyRows = Math.Min(_rows, rows);
+                for (var r = 0; r < copyRows; r++)
+                    for (var c = 0; c < copyCols; c++)
+                        newGrid[r, c] = _grid[r, c];
+
+                _cursorRow = Clamp(_cursorRow, 0, rows - 1);
+            }
 
             _grid = newGrid;
             _cols = cols;
             _rows = rows;
-            _cursorRow = Clamp(_cursorRow, 0, _rows - 1);
             _cursorCol = Clamp(_cursorCol, 0, _cols - 1);
         }
     }
@@ -152,17 +174,14 @@ public sealed class TerminalBuffer
                     _cursorCol = 0;
                     break;
                 case '\n':
-                    AdvanceLine();
+                    NewLine();
                     break;
                 case '\x08':
                     if (_cursorCol > 0) _cursorCol--;
                     break;
                 default:
                     if (_cursorCol >= _cols)
-                    {
-                        _cursorCol = 0;
-                        AdvanceLine();
-                    }
+                        NewLine();
                     _grid[_cursorRow, _cursorCol] = new TerminalCell
                     {
                         Character = ch,
@@ -178,6 +197,12 @@ public sealed class TerminalBuffer
         }
     }
 
+    private void NewLine()
+    {
+        AdvanceLine();
+        _cursorCol = 0;
+    }
+
     private void AdvanceLine()
     {
         _cursorRow++;
@@ -190,13 +215,7 @@ public sealed class TerminalBuffer
 
     private void ScrollUp()
     {
-        var topRow = new TerminalCell[_cols];
-        for (var c = 0; c < _cols; c++)
-            topRow[c] = _grid[0, c];
-
-        if (_scrollback.Count >= MaxScrollbackLines)
-            _scrollback.Dequeue();
-        _scrollback.Enqueue(topRow);
+        PushToScrollback(CaptureRow(0));
 
         for (var r = 0; r < _rows - 1; r++)
             for (var c = 0; c < _cols; c++)
@@ -204,6 +223,21 @@ public sealed class TerminalBuffer
 
         for (var c = 0; c < _cols; c++)
             _grid[_rows - 1, c] = TerminalCell.Default;
+    }
+
+    private TerminalCell[] CaptureRow(int rowIndex)
+    {
+        var row = new TerminalCell[_cols];
+        for (var c = 0; c < _cols; c++)
+            row[c] = _grid[rowIndex, c];
+        return row;
+    }
+
+    private void PushToScrollback(TerminalCell[] row)
+    {
+        if (_scrollback.Count >= MaxScrollbackLines)
+            _scrollback.Dequeue();
+        _scrollback.Enqueue(row);
     }
 
     private void ApplyColor(ColorChangedEvent e)
@@ -244,7 +278,7 @@ public sealed class TerminalBuffer
                     _grid[_cursorRow, c] = TerminalCell.Default;
                 break;
             default:
-                FillGrid(_grid, _rows, _cols);
+                ClearAllCells();
                 _cursorRow = 0;
                 _cursorCol = 0;
                 break;
@@ -292,6 +326,12 @@ public sealed class TerminalBuffer
             Array.Copy(_grid, gridCopy, _grid.Length);
             return new TerminalBufferSnapshot(gridCopy, _rows, _cols, _cursorRow, _cursorCol);
         }
+    }
+
+    private void ClearAllCells()
+    {
+        FillGrid(_grid, _rows, _cols);
+        _scrollback.Clear();
     }
 }
 
