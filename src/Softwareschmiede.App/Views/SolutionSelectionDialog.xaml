@@ -1,0 +1,62 @@
+<Window x:Class="Softwareschmiede.App.Views.SolutionSelectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Solution auswählen"
+        Background="{DynamicResource SurfaceBrush}"
+        Width="640"
+        Height="400"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Titel -->
+        <TextBlock Grid.Row="0"
+                   Text="Solution auswählen"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   Margin="0,0,0,16" />
+
+        <!-- Solution-Liste -->
+        <ListBox Grid.Row="1"
+                 AutomationProperties.Name="SolutionAuswahl"
+                 ItemsSource="{Binding Solutions}"
+                 SelectedItem="{Binding SelectedSolution, Mode=TwoWay}"
+                 Background="{DynamicResource BackgroundBrush}"
+                 BorderBrush="{DynamicResource BorderBrush}"
+                 BorderThickness="1"
+                 Margin="0,0,0,16">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}"
+                               Foreground="{DynamicResource PrimaryTextBrush}"
+                               FontSize="13"
+                               Padding="4" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Abbrechen"
+                    AutomationProperties.Name="Abbrechen"
+                    Command="{Binding AbbrechenCommand}"
+                    Padding="12,6"
+                    Margin="0,0,8,0" />
+            <Button Content="OK"
+                    AutomationProperties.Name="OK"
+                    Command="{Binding BestaetigenCommand}"
+                    Padding="12,6"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="White"
+                    BorderThickness="0" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -2,41 +2,41 @@
 
 | # | Bereich | Aufgabe | Status | Testnachweis |
 |---|---------|---------|--------|--------------|
-| 1 | Datenmodell | `ProzessStartAnfrage` Value Object anlegen (`DateiName`, `Argumente`, `ShellAusfuehren`) | Offen | — |
-| 2 | Logik | `IProzessStarter` Interface anlegen (`Starten(ProzessStartAnfrage)`) | Offen | — |
-| 3 | Logik | `SystemProzessStarter` implementieren (reale `Process.Start`-Implementierung mit Logging) | Offen | — |
-| 4 | Logik | `AufzeichnenderProzessStarter` implementieren (Testmodus, Anfragen in Logdatei schreiben) | Offen | — |
-| 5 | Logik | `ArbeitsverzeichnisOeffnenService.Oeffne(arbeitsverzeichnis)` implementieren (Plattformbefehl-Auflösung) | Offen | — |
-| 6 | Logik | `IdeOeffnenService.FindeSolutions(arbeitsverzeichnis)` implementieren (alle `*.sln` oberste Ebene, alphabetisch sortiert) | Offen | — |
-| 7 | Logik | `IdeOeffnenService.OeffneSolution(solutionPfad)` implementieren (Shell-Execute) | Offen | — |
-| 8 | UI | `SolutionSelectionDialogViewModel` anlegen (`Solutions`, `SelectedSolution`) | Offen | — |
-| 9 | UI | `SolutionSelectionDialog` (WPF-Window) anlegen, analog `IssueSelectionDialog`, mit `AutomationName`s | Offen | — |
-| 10 | UI | `IDialogService.ShowSolutionSelectionDialogAsync(...)` deklarieren | Offen | — |
-| 11 | UI | `WpfDialogService.ShowSolutionSelectionDialogAsync(...)` implementieren (modaler Dialog, Rückgabe Pfad/`null`) | Offen | — |
-| 12 | Konfiguration | DI-Registrierung `IProzessStarter` mit Testmodus-Switch in `App.xaml.cs` | Offen | — |
-| 13 | Konfiguration | DI-Registrierung `ArbeitsverzeichnisOeffnenService` und `IdeOeffnenService` in `App.xaml.cs` | Offen | — |
-| 14 | Logik | `TaskDetailViewModel`: neue Konstruktorparameter + Felder für beide Dienste | Offen | — |
-| 15 | Logik | `TaskDetailViewModel`: `SolutionFileExists`-Property + `_solutionPfade`-Caching im `Aufgabe`-Setter | Offen | — |
-| 16 | Logik | `TaskDetailViewModel`: `OeffneArbeitsverzeichnisCommand` + Methode `OeffneArbeitsverzeichnis()` | Offen | — |
-| 17 | Logik | `TaskDetailViewModel`: `OeffneIdeCommand` + Methode `OeffneIdeAsync()` inkl. Einzel-/Mehrfach-Auswahl-Dialog-Logik | Offen | — |
-| 18 | UI | Ribbon-Gruppe „Dateien" in `TaskDetailView.xaml` mit vier überführten Buttons (Sichtbarkeit an `ShowFileExplorerPanel`) | Offen | — |
-| 19 | UI | Ribbon-Gruppe „Werkzeuge" in `TaskDetailView.xaml` mit „Arbeitsverzeichnis öffnen" + „IDE öffnen" (immer sichtbar) | Offen | — |
-| 20 | UI | CLI-Ribbon-Gruppe: `Visibility`-Bindung an `ShowCliPanel` ergänzen | Offen | — |
-| 21 | UI | `FileExplorerView.xaml`: überführte Aktionsbuttons entfernen (Diff-Navigation belassen) | Offen | — |
-| 22 | Tests | `TaskDetailViewModelTestFactory` an neue Konstruktorsignatur + `IDialogService`-Setup anpassen | Offen | — |
-| 23 | Tests | `ArbeitsverzeichnisOeffnenServiceTests`: Plattformbefehl-Aufruf prüfen | Offen | — |
-| 24 | Tests | `IdeOeffnenServiceTests`: `FindeSolutions` (alle sortiert / leere Liste) prüfen | Offen | — |
-| 25 | Tests | `IdeOeffnenServiceTests`: `OeffneSolution` (Shell-Execute) prüfen | Offen | — |
-| 26 | Tests | `AufzeichnenderProzessStarterTests`: Serialisierung der Anfrage in Logdatei prüfen | Offen | — |
-| 27 | Tests | `TaskDetailViewModelTests`: `CanExecute` von `OeffneArbeitsverzeichnisCommand` (`ShowFileExplorerPanel`) | Offen | — |
-| 28 | Tests | `TaskDetailViewModelTests`: Delegation von `OeffneArbeitsverzeichnisCommand` an den Dienst | Offen | — |
-| 29 | Tests | `TaskDetailViewModelTests`: `SolutionFileExists` wird beim Laden gesetzt | Offen | — |
-| 30 | Tests | `TaskDetailViewModelTests`: `OeffneIdeCommand` mit einer Solution öffnet ohne Dialog | Offen | — |
-| 31 | Tests | `TaskDetailViewModelTests`: `OeffneIdeCommand` mit mehreren Solutions zeigt Auswahl-Dialog und öffnet Auswahl | Offen | — |
-| 32 | Tests | `TaskDetailViewModelTests`: `OeffneIdeCommand` mit mehreren Solutions öffnet bei Dialog-Abbruch keine | Offen | — |
-| 33 | E2E-Tests | `WpfTestBase.WaitForProzessStartEintragAsync(substring)` Hilfsmethode ergänzen | Offen | — |
-| 34 | E2E-Tests | E2E: „Arbeitsverzeichnis öffnen" zeichnet OS-Dateiexplorer-Start mit `LokalerKlonPfad` auf | Offen | — |
-| 35 | E2E-Tests | E2E: „IDE öffnen" bei genau einer `*.sln` zeichnet Shell-Execute-Start der `.sln` auf (kein Dialog) | Offen | — |
-| 36 | E2E-Tests | E2E: „IDE öffnen" bei mehreren `*.sln` zeigt Auswahl-Dialog, gewählte `.sln` wird gestartet | Offen | — |
-| 37 | E2E-Tests | E2E: „IDE öffnen" ohne `*.sln` ist deaktiviert | Offen | — |
-| 38 | E2E-Tests | `E2E_FileExplorer` an ins Ribbon überführte Buttons (neue `AutomationName`s) anpassen | Offen | — |
+| 1 | Datenmodell | `ProzessStartAnfrage` Value Object anlegen (`DateiName`, `Argumente`, `ShellAusfuehren`) | Erledigt | `AufzeichnenderProzessStarterTests.Starten_SchreibtAnfrageInLogdatei` (schlägt fehl, wenn Record/Felder fehlen) |
+| 2 | Logik | `IProzessStarter` Interface anlegen (`Starten(ProzessStartAnfrage)`) | Erledigt | `ArbeitsverzeichnisOeffnenServiceTests.Oeffne_StartetPlattformbefehlMitVerzeichnis` (mockt `IProzessStarter`) |
+| 3 | Logik | `SystemProzessStarter` implementieren (reale `Process.Start`-Implementierung mit Logging) | Erledigt | Kein direkter Test (realer `Process.Start`); DI-Registrierung durch `App.xaml.cs`-Switch abgedeckt |
+| 4 | Logik | `AufzeichnenderProzessStarter` implementieren (Testmodus, Anfragen in Logdatei schreiben) | Erledigt | `AufzeichnenderProzessStarterTests.Starten_SchreibtAnfrageInLogdatei` |
+| 5 | Logik | `ArbeitsverzeichnisOeffnenService.Oeffne(arbeitsverzeichnis)` implementieren (Plattformbefehl-Auflösung) | Erledigt | `ArbeitsverzeichnisOeffnenServiceTests.Oeffne_StartetPlattformbefehlMitVerzeichnis` |
+| 6 | Logik | `IdeOeffnenService.FindeSolutions(arbeitsverzeichnis)` implementieren (alle `*.sln` oberste Ebene, alphabetisch sortiert) | Erledigt | `IdeOeffnenServiceTests.FindeSolutions_LiefertAlleSlnAlphabetischSortiert`, `IdeOeffnenServiceTests.FindeSolutions_OhneSln_LiefertLeereListe` |
+| 7 | Logik | `IdeOeffnenService.OeffneSolution(solutionPfad)` implementieren (Shell-Execute) | Erledigt | `IdeOeffnenServiceTests.OeffneSolution_StartetShellExecuteFuerSln` |
+| 8 | UI | `SolutionSelectionDialogViewModel` anlegen (`Solutions`, `SelectedSolution`) | Erledigt | `TaskDetailViewModelTests.OeffneIdeCommand_MitMehrerenSolutions_ZeigtAuswahlDialog` (Dialog-Pfad), E2E `E2E_VerzeichnisAktionen` Phase 4 |
+| 9 | UI | `SolutionSelectionDialog` (WPF-Window) anlegen, analog `IssueSelectionDialog`, mit `AutomationName`s | Erledigt | `E2E_VerzeichnisAktionen.VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E` (Dialog „Solution auswählen", ListBox `SolutionAuswahl`, `OK`) |
+| 10 | UI | `IDialogService.ShowSolutionSelectionDialogAsync(...)` deklarieren | Erledigt | `TaskDetailViewModelTests.OeffneIdeCommand_MitMehrerenSolutions_ZeigtAuswahlDialog` |
+| 11 | UI | `WpfDialogService.ShowSolutionSelectionDialogAsync(...)` implementieren (modaler Dialog, Rückgabe Pfad/`null`) | Erledigt | `E2E_VerzeichnisAktionen.VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E` Phase 4 |
+| 12 | Konfiguration | DI-Registrierung `IProzessStarter` mit Testmodus-Switch in `App.xaml.cs` | Erledigt | `E2E_VerzeichnisAktionen` (nutzt `AufzeichnenderProzessStarter`-Aufzeichnung über `WaitForProzessStartEintragAsync`) |
+| 13 | Konfiguration | DI-Registrierung `ArbeitsverzeichnisOeffnenService` und `IdeOeffnenService` in `App.xaml.cs` | Erledigt | `E2E_VerzeichnisAktionen` (App-Startup löst die Dienste auf) |
+| 14 | Logik | `TaskDetailViewModel`: neue Konstruktorparameter + Felder für beide Dienste | Erledigt | `TaskDetailViewModelTests.OeffneArbeitsverzeichnisCommand_RuftDienstMitLokalemKlonPfad` (Konstruktion über `TaskDetailViewModelTestFactory`) |
+| 15 | Logik | `TaskDetailViewModel`: `SolutionFileExists`-Property + `_solutionPfade`-Caching im `Aufgabe`-Setter | Erledigt | `TaskDetailViewModelTests.SolutionFileExists_WirdBeimLadenGesetzt` |
+| 16 | Logik | `TaskDetailViewModel`: `OeffneArbeitsverzeichnisCommand` + Methode `OeffneArbeitsverzeichnis()` | Erledigt | `TaskDetailViewModelTests.OeffneArbeitsverzeichnisCommand_CanExecute_FolgtShowFileExplorerPanel`, `TaskDetailViewModelTests.OeffneArbeitsverzeichnisCommand_RuftDienstMitLokalemKlonPfad` |
+| 17 | Logik | `TaskDetailViewModel`: `OeffneIdeCommand` + Methode `OeffneIdeAsync()` inkl. Einzel-/Mehrfach-Auswahl-Dialog-Logik | Erledigt | `TaskDetailViewModelTests.OeffneIdeCommand_MitEinerSolution_OeffnetOhneDialog`, `...MitMehrerenSolutions_ZeigtAuswahlDialog`, `...MitMehrerenSolutions_AbbruchOeffnetKeine` |
+| 18 | UI | Ribbon-Gruppe „Dateien" in `TaskDetailView.xaml` mit vier überführten Buttons (Sichtbarkeit an `ShowFileExplorerPanel`) | Erledigt | `E2E_FileExplorer.DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E` (`DateiStandard`/`DateiVergleich`/`DateiAktualisieren`/`DateiOeffnen`) |
+| 19 | UI | Ribbon-Gruppe „Werkzeuge" in `TaskDetailView.xaml` mit „Arbeitsverzeichnis öffnen" + „IDE öffnen" (immer sichtbar) | Erledigt | `E2E_VerzeichnisAktionen.VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E` (`ArbeitsverzeichnisOeffnen`/`IdeOeffnen`) |
+| 20 | UI | CLI-Ribbon-Gruppe: `Visibility`-Bindung an `ShowCliPanel` ergänzen | Erledigt | Kein direkter Test (reine Sichtbarkeitsbindung); Binding in `TaskDetailView.xaml` Zeile 63 vorhanden |
+| 21 | UI | `FileExplorerView.xaml`: überführte Aktionsbuttons entfernen (Diff-Navigation belassen) | Erledigt | `E2E_FileExplorer.DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E` (Buttons jetzt über Ribbon-`AutomationName`s; Diff-Navigation `FileExplorerVorherigeAenderungButton`/`FileExplorerNaechsteAenderungButton` bleibt) |
+| 22 | Tests | `TaskDetailViewModelTestFactory` an neue Konstruktorsignatur + `IDialogService`-Setup anpassen | Erledigt | Alle `TaskDetailViewModelTests` (Kompilation + Ausführung über die Factory) |
+| 23 | Tests | `ArbeitsverzeichnisOeffnenServiceTests`: Plattformbefehl-Aufruf prüfen | Erledigt | `ArbeitsverzeichnisOeffnenServiceTests.Oeffne_StartetPlattformbefehlMitVerzeichnis` |
+| 24 | Tests | `IdeOeffnenServiceTests`: `FindeSolutions` (alle sortiert / leere Liste) prüfen | Erledigt | `IdeOeffnenServiceTests.FindeSolutions_LiefertAlleSlnAlphabetischSortiert`, `IdeOeffnenServiceTests.FindeSolutions_OhneSln_LiefertLeereListe` |
+| 25 | Tests | `IdeOeffnenServiceTests`: `OeffneSolution` (Shell-Execute) prüfen | Erledigt | `IdeOeffnenServiceTests.OeffneSolution_StartetShellExecuteFuerSln` |
+| 26 | Tests | `AufzeichnenderProzessStarterTests`: Serialisierung der Anfrage in Logdatei prüfen | Erledigt | `AufzeichnenderProzessStarterTests.Starten_SchreibtAnfrageInLogdatei` |
+| 27 | Tests | `TaskDetailViewModelTests`: `CanExecute` von `OeffneArbeitsverzeichnisCommand` (`ShowFileExplorerPanel`) | Erledigt | `TaskDetailViewModelTests.OeffneArbeitsverzeichnisCommand_CanExecute_FolgtShowFileExplorerPanel` |
+| 28 | Tests | `TaskDetailViewModelTests`: Delegation von `OeffneArbeitsverzeichnisCommand` an den Dienst | Erledigt | `TaskDetailViewModelTests.OeffneArbeitsverzeichnisCommand_RuftDienstMitLokalemKlonPfad` |
+| 29 | Tests | `TaskDetailViewModelTests`: `SolutionFileExists` wird beim Laden gesetzt | Erledigt | `TaskDetailViewModelTests.SolutionFileExists_WirdBeimLadenGesetzt` |
+| 30 | Tests | `TaskDetailViewModelTests`: `OeffneIdeCommand` mit einer Solution öffnet ohne Dialog | Erledigt | `TaskDetailViewModelTests.OeffneIdeCommand_MitEinerSolution_OeffnetOhneDialog` |
+| 31 | Tests | `TaskDetailViewModelTests`: `OeffneIdeCommand` mit mehreren Solutions zeigt Auswahl-Dialog und öffnet Auswahl | Erledigt | `TaskDetailViewModelTests.OeffneIdeCommand_MitMehrerenSolutions_ZeigtAuswahlDialog` |
+| 32 | Tests | `TaskDetailViewModelTests`: `OeffneIdeCommand` mit mehreren Solutions öffnet bei Dialog-Abbruch keine | Erledigt | `TaskDetailViewModelTests.OeffneIdeCommand_MitMehrerenSolutions_AbbruchOeffnetKeine` |
+| 33 | E2E-Tests | `WpfTestBase.WaitForProzessStartEintragAsync(substring)` Hilfsmethode ergänzen | Erledigt | `E2E_VerzeichnisAktionen` (nutzt `WaitForProzessStartEintragAsync`) |
+| 34 | E2E-Tests | E2E: „Arbeitsverzeichnis öffnen" zeichnet OS-Dateiexplorer-Start mit `LokalerKlonPfad` auf | Erledigt | `E2E_VerzeichnisAktionen.VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E` (Phase 1) |
+| 35 | E2E-Tests | E2E: „IDE öffnen" bei genau einer `*.sln` zeichnet Shell-Execute-Start der `.sln` auf (kein Dialog) | Erledigt | `E2E_VerzeichnisAktionen.VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E` (Phase 3) |
+| 36 | E2E-Tests | E2E: „IDE öffnen" bei mehreren `*.sln` zeigt Auswahl-Dialog, gewählte `.sln` wird gestartet | Erledigt | `E2E_VerzeichnisAktionen.VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E` (Phase 4) |
+| 37 | E2E-Tests | E2E: „IDE öffnen" ohne `*.sln` ist deaktiviert | Erledigt | `E2E_VerzeichnisAktionen.VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E` (Phase 2) |
+| 38 | E2E-Tests | `E2E_FileExplorer` an ins Ribbon überführte Buttons (neue `AutomationName`s) anpassen | Erledigt | `E2E_FileExplorer.DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E` |

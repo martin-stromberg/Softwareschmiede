@@ -47,10 +47,10 @@ public sealed class E2E_FileExplorer : WpfTestBase
         dateiViewButton.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerStandardButton"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerVergleichButton"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerAktualisierenButton"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerDateiOeffnenButton"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiStandard"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiVergleich"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiAktualisieren"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiOeffnen"), Short);
 
         var infoButton = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Short);
         infoButton.AsButton().Click();

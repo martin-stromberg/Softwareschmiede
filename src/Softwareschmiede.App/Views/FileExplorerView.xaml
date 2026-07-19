@@ -36,42 +36,8 @@
         </Style>
     </UserControl.Resources>
     <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- Mode-Umschaltung -->
-        <StackPanel Grid.Row="0"
-                    Orientation="Horizontal"
-                    Margin="0,0,0,8">
-            <Button Content="📁"
-                    ToolTip="Standard"
-                    AutomationProperties.Name="FileExplorerStandardButton"
-                    AutomationProperties.HelpText="Standard"
-                    Command="{Binding StandardAnsichtCommand}"
-                    Padding="10,4"
-                    Margin="0,0,6,0"
-                    FontSize="14" />
-            <Button Content="🔀"
-                    ToolTip="Vergleich"
-                    AutomationProperties.Name="FileExplorerVergleichButton"
-                    AutomationProperties.HelpText="Vergleich"
-                    Command="{Binding VergleichCommand}"
-                    Padding="10,4"
-                    Margin="0,0,6,0"
-                    FontSize="14" />
-            <Button Content="🔄"
-                    ToolTip="Aktualisieren"
-                    AutomationProperties.Name="FileExplorerAktualisierenButton"
-                    AutomationProperties.HelpText="Aktualisieren"
-                    Command="{Binding AktualisierenCommand}"
-                    Padding="10,4"
-                    FontSize="14" />
-        </StackPanel>
-
         <!-- Split-View: Baum + Inhalt -->
-        <Grid Grid.Row="1">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="250" MinWidth="150" />
                 <ColumnDefinition Width="Auto" />
@@ -185,13 +151,6 @@
                                 Margin="0,0,6,0"
                                 FontSize="12" />
                     </StackPanel>
-                    <Button Content="📂"
-                            ToolTip="Mit Standardanwendung öffnen"
-                            AutomationProperties.Name="FileExplorerDateiOeffnenButton"
-                            AutomationProperties.HelpText="Mit Standardanwendung öffnen"
-                            Command="{Binding DateiMitStandardanwendungOeffnenCommand}"
-                            Padding="10,4"
-                            FontSize="14" />
                 </StackPanel>
 
                 <Grid Grid.Row="1">
