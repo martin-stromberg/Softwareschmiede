@@ -36,3 +36,16 @@ MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 
 - `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName=Softwareschmiede.Tests.Application.Services.KiAusfuehrungsServiceTests.ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash"`: bestanden, 1/1.
 - `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName=Softwareschmiede.Tests.E2E.E2E_TaskWechselUeberMenue.AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E"`: bestanden, 1/1.
+
+---
+
+# Aufgabe: Pull-Request-Aktionsbuttons in der UI fehlen
+
+- [x] In der UI fehlen Aktionsbuttons fuer den Pull Request. Anwender koennen die Pull-Request-Aktion deshalb nicht ueber die Oberflaeche ausloesen, obwohl die fachliche Pull-Request-Erstellung vorhanden ist.
+
+- [x] Es fehlen Tests, die sicherstellen, dass die Pull-Request-Aktionsbuttons in der UI vorhanden sind. Die Tests muessen ergaenzt werden, muessen in diesem Lauf aber nicht ausgefuehrt werden.
+
+## Verifikation am 2026-07-19
+
+- `dotnet build src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-restore`: erfolgreich, 0 Fehler.
+- Die neu ergaenzten Pull-Request-UI-Button-Tests wurden gemaess Nutzervorgabe nicht ausgefuehrt.

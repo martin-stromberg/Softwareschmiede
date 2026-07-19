@@ -110,6 +110,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowFileExplorerPanel));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
+            OnPropertyChanged(nameof(KannPullRequestErstellen));
             OnPropertyChanged(nameof(CanAssignIssue));
             OnPropertyChanged(nameof(CurrentIssueReferenz));
             OnPropertyChanged(nameof(ShowInfoPanel));
@@ -157,6 +158,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannPromptVorlageSenden));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
+            OnPropertyChanged(nameof(KannPullRequestErstellen));
             OnPropertyChanged(nameof(CanAssignIssue));
             OnPropertyChanged(nameof(KannPromptPlanen));
         }
@@ -351,6 +353,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         && _aufgabe != null
         && !_isCliRunning;
 
+    /// <summary>true wenn für die Aufgabe ein Pull Request erstellt werden kann.</summary>
+    public bool KannPullRequestErstellen => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet
+        && !_isCliRunning
+        && !string.IsNullOrWhiteSpace(_aufgabe.BranchName)
+        && !string.IsNullOrWhiteSpace(_aufgabe.GitRepository?.RepositoryUrl)
+        && _pluginManager.GetSourceCodeManagementPlugins().Any(p => p is IGitPlugin);
+
     /// <summary>true wenn Aufgabe vorhanden, SCM-Plugin Issues unterstützt und kein CLI läuft.</summary>
     public bool CanAssignIssue => _aufgabe != null
         && !_isCliRunning
@@ -382,6 +391,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Löscht die Aufgabe nach Bestätigungsdialog.</summary>
     public ICommand LoeschenCommand { get; }
+
+    /// <summary>Erstellt einen Pull Request für die Aufgabe.</summary>
+    public ICommand PullRequestErstellenCommand { get; }
 
     /// <summary>Toggled IsInfoViewVisible zwischen Info-Panel und CLI-Fenster.</summary>
     public ICommand InfoCliToggleCommand { get; }
@@ -476,6 +488,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => ShowCliPanel && !_isCliRunning);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
         LoeschenCommand = new AsyncRelayCommand(LoeschenAsync, () => KannLoeschen);
+        PullRequestErstellenCommand = new AsyncRelayCommand(PullRequestErstellenAsync, () => KannPullRequestErstellen && !_isLoading);
         InfoCliToggleCommand = new RelayCommand(InfoCliToggle);
         InfoViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Info));
         CliViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Cli), () => ShowCliPanel);
@@ -754,6 +767,63 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    private async Task PullRequestErstellenAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty || _aufgabe is null)
+            return;
+
+        IsLoading = true;
+        FehlerMeldung = null;
+
+        try
+        {
+            var repositoryId = _aufgabe.GitRepository?.RepositoryUrl;
+            if (string.IsNullOrWhiteSpace(repositoryId))
+                throw new InvalidOperationException($"Aufgabe {_aufgabeId} hat kein verknüpftes Repository.");
+
+            var pullRequest = await _entwicklungsprozessService.PullRequestErstellenAsync(
+                _aufgabeId,
+                repositoryId,
+                title: _aufgabe.Titel,
+                body: _aufgabe.AnforderungsBeschreibung ?? string.Empty,
+                ct: ct);
+
+            await LadenAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(pullRequest.Url))
+                OeffnePullRequestUrl(pullRequest.Url);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen des Pull Requests für Aufgabe {AufgabeId}.", _aufgabeId);
+            SetFehler(ex);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void OeffnePullRequestUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Pull-Request-URL {PullRequestUrl} konnte nicht geöffnet werden.", url);
         }
     }
 
