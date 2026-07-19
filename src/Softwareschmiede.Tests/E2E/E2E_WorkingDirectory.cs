@@ -15,25 +15,25 @@ namespace Softwareschmiede.Tests.E2E;
 /// Arbeitsverzeichnis weiterhin gezielt in der Test-Datenbank, weil dort die spätere CLI-Auswirkung
 /// im Vordergrund steht.
 ///
-/// Konsolidierung (Issue #153) geprüft und bewusst NICHT durchgeführt: Drei unabhängige
-/// Zusammenlegungsversuche (Zuweisen-Erfolg + Zuweisen-Fallback als zweites Repository desselben
-/// Projekts; Zuweisen-Erfolg + Bearbeiten-Fallback als zweites, DB-geseedetes Projekt; ein zweites
-/// vollständiges Projekt per <c>CreateProject</c>) scheiterten jeweils reproduzierbar (mehrfach
-/// wiederholt, nicht transient) an unterschiedlichen technischen Ursachen:
-/// 1. Ein zweiter vollständiger <c>CreateAndOpenProject</c>-Aufruf innerhalb desselben App-Lifecycles
-///    öffnete das "Neu"-Overlay der Projektliste nicht zuverlässig (kein bestehender Test dieser
-///    Codebasis ruft <c>CreateProject</c>/<c>CreateAndOpenProject</c> mehrfach im selben Lifecycle auf).
-/// 2. Ein direkt per <c>OpenTestDbContext</c> DB-geseedetes Projekt erschien nach einer bereits zuvor
-///    im selben Lifecycle erfolgten Navigation zur Projektliste nicht mehr in dieser (Projektliste
-///    lädt vermutlich nicht bei jeder Navigation neu aus der DB, sondern hält den einmal geladenen
-///    Bestand vor).
-/// 3. Das Löschen eines frisch angelegten lokalen Git-Testrepositories (zur Simulation eines
-///    fehlgeschlagenen Strukturabrufs) schlug mit <see cref="UnauthorizedAccessException"/> auf einer
-///    Git-Objektdatei fehl - reproduzierbar auch im unveränderten, eigenständigen Einzeltest
-///    (<see cref="RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E"/>),
-///    also umgebungsbedingt und nicht durch eine Konsolidierung verursacht.
-/// Diese Klasse bleibt daher unkonsolidiert; alle sechs Szenarien laufen als eigenständige Tests mit
-/// jeweils eigenem App-Lifecycle.
+/// Konsolidierung (Issue #153): <see cref="RepositoryZuweisung"/> führt fünf der sechs Szenarien
+/// (beide Repository-Zuweisungs-Pfade, die Arbeitsverzeichnis-Bearbeitung sowie die beiden
+/// Start-Fehlerfälle) als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle aus. Jede
+/// Phase räumt ihr Projekt bzw. ihre Aufgabe über <see cref="DeleteCurrentProject"/> /
+/// <see cref="DeleteCurrentTask"/> wieder auf, bevor die nächste Phase beginnt - damit bleiben
+/// DB-Abfragen wie <c>Single()</c>/<c>SingleOrDefault()</c> gültig, obwohl mehrere Projekte/Repositories
+/// nacheinander im selben Prozess angelegt werden. Die Fallback-Zuweisung
+/// (<see cref="RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E"/>)
+/// initialisiert ihr lokales Quellverzeichnis bewusst ohne Git (<c>CreateLocalSourceDirectory(..., false)</c>):
+/// Der zuvor beobachtete <see cref="UnauthorizedAccessException"/> beim Löschen des Repository-Ordners
+/// trat gezielt bei einem tatsächlich initialisierten Git-Repository auf (der Zuweisungsdialog hält
+/// währenddessen einen Datei-Zugriff auf das Git-Verzeichnis offen); da dieser Test lediglich den
+/// Fallback-Pfad ohne Strukturabruf prüft, ist kein echtes Git-Repository nötig.
+///
+/// <see cref="AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E"/> bleibt
+/// als eigenständiger <c>[SkippableFact]</c> mit eigenem App-Lifecycle bestehen, da er als einziges
+/// Szenario einen erfolgreich laufenden CLI-Prozess (Status "CliStoppen") hinterlässt und daher vor
+/// einer Konsolidierung mit den übrigen Phasen zusätzliches Stoppen des Prozesses vor dem Aufräumen
+/// erfordern würde.
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
@@ -43,22 +43,51 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class E2E_WorkingDirectory : WpfTestBase
 {
     /// <summary>
+    /// Führt fünf Arbeitsverzeichnis-Szenarien nacheinander in einem gemeinsamen App-Lifecycle aus:
+    /// Repository-Zuweisung mit fehlgeschlagenem Strukturabruf (manueller Pfad), Repository-Zuweisung
+    /// mit erfolgreichem Strukturabruf (Auswahlbox), Arbeitsverzeichnis-Bearbeitung mit fehlgeschlagenem
+    /// Strukturabruf, sowie die beiden Start-Fehlerfälle (fehlendes Arbeitsverzeichnis, Path-Traversal).
+    /// Jede Phase räumt ihr Projekt bzw. ihre Aufgabe auf, bevor die nächste beginnt (siehe
+    /// <see cref="DeleteCurrentProject"/>, <see cref="DeleteCurrentTask"/>).
+    /// </summary>
+    [Fact]
+    public async Task RepositoryZuweisung()
+    {
+        var mainWindow = LaunchAppAndGetMainWindow();
+
+        await RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E(mainWindow);
+        await RepositoryZuweisen_MitErfolgreichemStrukturabruf_ZeigtUndSpeichertArbeitsverzeichnis_E2E(mainWindow);
+        
+        await ArbeitsverzeichnisBearbeiten_MitFehlgeschlagenemStrukturabruf_ZeigtUndBestaetigtVorhandenenWert_E2E(mainWindow);
+        await AufgabeStarten_MitFehlendemArbeitsverzeichnis_ZeigtFehler_E2E(mainWindow);
+        await AufgabeStarten_MitPathTraversalArbeitsverzeichnis_ZeigtFehler_E2E(mainWindow);
+    }
+
+    private string CreateLocalSourceDirectoryWithSubdirectories(string repositoryFolderName, params string[] subdirectories)
+    {
+        var sourceDirectory = CreateLocalSourceDirectory(repositoryFolderName);
+        foreach (var subdirectory in subdirectories)
+        {
+            Directory.CreateDirectory(Path.Combine(sourceDirectory, repositoryFolderName, subdirectory));
+        }
+        return sourceDirectory;
+    }
+
+    
+    /// <summary>
     /// Szenario: Repository-Zuweisung mit erfolgreichem Strukturabruf.
     /// Erwartung: Die Auswahlbox zeigt Unterverzeichnisse und die Auswahl wird gespeichert.
     /// </summary>
-    [Fact]
-    public async Task RepositoryZuweisen_MitErfolgreichemStrukturabruf_ZeigtUndSpeichertArbeitsverzeichnis_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private async Task RepositoryZuweisen_MitErfolgreichemStrukturabruf_ZeigtUndSpeichertArbeitsverzeichnis_E2E(Window mainWindow)
     {
-        var sourceDirectory = CreateLocalSourceDirectory("WorkingDir-Assign-Success-Repo");
-        Directory.CreateDirectory(Path.Combine(sourceDirectory, "WorkingDir-Assign-Success-Repo", "backend"));
-        Directory.CreateDirectory(Path.Combine(sourceDirectory, "WorkingDir-Assign-Success-Repo", "frontend"));
-
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        var repoFolderName = "WorkingDir-Assign-Success-Repo";
+        var sourceDirectory = CreateLocalSourceDirectoryWithSubdirectories(repoFolderName, "backend", "frontend");
+        var projektName = "WorkingDir-Assign-Success-Projekt";
 
         ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory);
-        NavigateToProjecten(mainWindow);
-        CreateAndOpenProject(mainWindow, "WorkingDir-Assign-Success-Projekt");
+        NavigateToProjects(mainWindow);
+        CreateAndOpenProject(mainWindow, projektName);
 
         var dialog = OpenRepositoryAssignDialog(mainWindow);
         var repositoryItem = WaitForFirstRepositoryItem(dialog);
@@ -69,26 +98,26 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
 
         ConfirmDialog(dialog, "Zuweisen");
 
-        var saved = await WaitForSavedWorkingDirectoryAsync("backend");
+        var saved = await WaitForSavedWorkingDirectoryAsync(repoFolderName, "backend");
         Assert.Equal("backend", saved);
+
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
     /// Szenario: Repository-Zuweisung mit fehlgeschlagenem Strukturabruf.
     /// Erwartung: Eine TextBox erscheint und speichert einen manuellen relativen Pfad.
     /// </summary>
-    [Fact]
-    public async Task RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private async Task RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E(Window mainWindow)
     {
         var repositoryName = "WorkingDir-Assign-Fallback-Repo";
-        var sourceDirectory = CreateLocalSourceDirectory(repositoryName);
+        var sourceDirectory = CreateLocalSourceDirectory(repositoryName, false);
         var repositoryPath = Path.Combine(sourceDirectory, repositoryName);
 
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-
         ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory);
-        NavigateToProjecten(mainWindow);
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "WorkingDir-Assign-Fallback-Projekt");
 
         var dialog = OpenRepositoryAssignDialog(mainWindow);
@@ -102,28 +131,28 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
 
         ConfirmDialog(dialog, "Zuweisen");
 
-        var saved = await WaitForSavedWorkingDirectoryAsync("manual/backend");
+        var saved = await WaitForSavedWorkingDirectoryAsync(repositoryName, "manual/backend");
         Assert.Equal("manual/backend", saved);
+
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
     /// Szenario: Arbeitsverzeichnis-Bearbeitung mit fehlgeschlagenem Strukturabruf.
     /// Erwartung: Der vorhandene manuelle Wert erscheint im Textfeld und kann bestätigt werden.
     /// </summary>
-    [Fact]
-    public async Task ArbeitsverzeichnisBearbeiten_MitFehlgeschlagenemStrukturabruf_ZeigtUndBestaetigtVorhandenenWert_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private async Task ArbeitsverzeichnisBearbeiten_MitFehlgeschlagenemStrukturabruf_ZeigtUndBestaetigtVorhandenenWert_E2E(Window mainWindow)
     {
         var projektName = "WorkingDir-Edit-Fallback-Projekt";
         var repositoryName = "WorkingDir-Edit-Fallback-Repo";
         var repositoryUrl = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_missing_repo_{Guid.NewGuid():N}");
         const string existingWorkingDirectory = "legacy/backend";
 
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-
         await SeedProjectRepositoryWithWorkingDirectoryAsync(projektName, repositoryName, repositoryUrl, existingWorkingDirectory);
 
-        NavigateToProjecten(mainWindow);
+        NavigateToProjects(mainWindow);
         OpenProject(mainWindow, projektName);
 
         var bearbeitenButton = WaitForElement(mainWindow, cf => cf.ByName("ArbeitsverzeichnisBearbeiten"), Short);
@@ -135,8 +164,10 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
 
         ConfirmDialog(dialog, "Speichern");
 
-        var saved = await WaitForSavedWorkingDirectoryAsync(existingWorkingDirectory);
+        var saved = await WaitForSavedWorkingDirectoryAsync(repositoryName, existingWorkingDirectory);
         Assert.Equal(existingWorkingDirectory, saved);
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
@@ -176,10 +207,10 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
     /// erfolgt daher über diesen und den analogen Path-Traversal-Test (beide mehrfach wiederholt grün, siehe
     /// continue.md).
     /// </remarks>
-    [Fact]
-    public async Task AufgabeStarten_MitFehlendemArbeitsverzeichnis_ZeigtFehler_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private async Task AufgabeStarten_MitFehlendemArbeitsverzeichnis_ZeigtFehler_E2E(Window mainWindow)
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("WorkingDir-Missing-Repo", "WorkingDir-Missing-Projekt");
+        _ = SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, "WorkingDir-Missing-Repo", "WorkingDir-Missing-Projekt");
 
         await SeedWorkingDirectoryAsync("does-not-exist", createSubdirectory: false);
 
@@ -191,16 +222,20 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
 
         var stoppenButton = mainWindow.FindFirstDescendant(cf => cf.ByName("CliStoppen"));
         Assert.Null(stoppenButton);
+
+        DeleteCurrentTask(mainWindow);
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
     /// Szenario: Konfiguriertes Arbeitsverzeichnis versucht, das Repository-Verzeichnis per Path-Traversal
     /// zu verlassen. Erwartung: Fehlerbanner erscheint, CLI startet nicht.
     /// </summary>
-    [Fact]
-    public async Task AufgabeStarten_MitPathTraversalArbeitsverzeichnis_ZeigtFehler_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private async Task AufgabeStarten_MitPathTraversalArbeitsverzeichnis_ZeigtFehler_E2E(Window mainWindow)
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("WorkingDir-Traversal-Repo", "WorkingDir-Traversal-Projekt");
+        _ = SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, "WorkingDir-Traversal-Repo", "WorkingDir-Traversal-Projekt");
 
         await SeedWorkingDirectoryAsync(Path.Combine("..", "..", "etc"), createSubdirectory: false);
 
@@ -212,6 +247,10 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
 
         var stoppenButton = mainWindow.FindFirstDescendant(cf => cf.ByName("CliStoppen"));
         Assert.Null(stoppenButton);
+
+        DeleteCurrentTask(mainWindow);
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
@@ -340,14 +379,15 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
         await db.SaveChangesAsync();
     }
 
-    private async Task<string?> WaitForSavedWorkingDirectoryAsync(string expected)
+    private async Task<string?> WaitForSavedWorkingDirectoryAsync(string repositoryName, string expected)
     {
         var deadline = DateTime.UtcNow + Medium;
         string? saved = null;
         while (DateTime.UtcNow < deadline)
         {
             await using var db = OpenTestDbContext();
-            saved = db.RepositoryStartKonfigurationen.SingleOrDefault()?.WorkingDirectoryRelativePath;
+            var repo = db.GitRepositories.FirstOrDefault(r => r.RepositoryName == repositoryName);
+            saved = db.RepositoryStartKonfigurationen.Where(c => c.GitRepositoryId == repo.Id).SingleOrDefault()?.WorkingDirectoryRelativePath;
             if (string.Equals(saved, expected, StringComparison.Ordinal))
                 return saved;
 

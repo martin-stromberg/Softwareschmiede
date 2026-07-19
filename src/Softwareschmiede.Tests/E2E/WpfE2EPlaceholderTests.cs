@@ -34,7 +34,7 @@ public sealed class WpfE2ETests : WpfTestBase
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
-        NavigateToProjecten(mainWindow);
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "E2E-Startprojekt");
 
         WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(10));

@@ -51,7 +51,7 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
         var mainWindow = app.GetMainWindow(Automation, Long)!;
         ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory, useInSourceDirectoryMode: false);
 
-        NavigateToProjecten(mainWindow);
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "Wechsel-Projekt");
         AssignLocalDirectoryRepository(mainWindow);
 

@@ -13,6 +13,15 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Windows-Desktop-Session (kein Headless-CI)
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein
 ///
+/// Konsolidierung (Issue #153): <see cref="ProjektDetailSzenarien"/> führt alle sechs Szenarien
+/// (Navigation, Bearbeiten, Aufgaben/Filtern, Repository-Dialog, Offene/beendete Aufgaben-Trennung,
+/// Löschen) als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle aus. Jede Phase räumt ihr
+/// Projekt über <see cref="WpfTestBase.DeleteCurrentProject"/> auf und kehrt über
+/// <see cref="WpfTestBase.NavigateBackToDashboard"/> zum Dashboard zurück, bevor die nächste Phase mit
+/// <see cref="WpfTestBase.NavigateToProjects"/> neu beginnt - ein erneuter Klick auf " Projekte" direkt
+/// aus einer bereits geöffneten Projektdetailansicht heraus navigiert nicht zuverlässig zur Übersicht,
+/// sondern bleibt in der zuletzt geöffneten Projektansicht (daher immer zuerst zurück zum Dashboard).
+///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]
@@ -21,16 +30,35 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class ProjectDetailE2ETests : WpfTestBase
 {
     /// <summary>
+    /// Führt sechs Projektdetail-Szenarien nacheinander in einem gemeinsamen App-Lifecycle aus:
+    /// Navigation (Neuanlage abbrechen, öffnen/schließen), Bearbeiten (umbenennen), Aufgaben anlegen
+    /// und filtern, Repository-Dialog prüfen, Trennung offener/beendeter Aufgaben, sowie Löschen.
+    /// Jede Phase räumt ihr Projekt auf, bevor die nächste beginnt.
+    /// </summary>
+    [Fact]
+    public async Task ProjektDetailSzenarien()
+    {
+        var mainWindow = LaunchAppAndGetMainWindow();
+
+        ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E(mainWindow);
+        ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E(mainWindow);
+        AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E(mainWindow);
+        RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(mainWindow);
+        await Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E(mainWindow);
+        ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E(mainWindow);
+    }
+
+    /// <summary>
     /// Szenario: Projekt anlegen; Neuanlage starten und über "Zurück" abbrechen; erstes Projekt
     /// öffnen und wieder verlassen; erneut öffnen; zuletzt zur Übersicht zurücknavigieren.
     /// Prüft: Nach Abbrechen der Neuanlage ist das erste Projekt noch in der Liste aufrufbar; das
     /// wiederholte Öffnen/Verlassen der Detailansicht funktioniert; die Übersicht zeigt die
     /// Projektkachel nach dem finalen "Zurück".
     /// </summary>
-    [Fact]
-    public void ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private void ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E(AutomationElement mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects();
+        NavigateToProjects(mainWindow);
 
         // Erstes Projekt anlegen
         CreateProject(mainWindow, "Bestehendes-Projekt");
@@ -56,6 +84,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         ZurueckZurProjektuebersicht(mainWindow);
 
         WaitForElement(mainWindow, cf => cf.ByName("Bestehendes-Projekt"), Short);
+
+        OpenProject(mainWindow, "Bestehendes-Projekt");
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
@@ -64,10 +96,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Prüft: Die Projektkachel zeigt nach dem ersten Speichern den aktualisierten Namen; die
     /// erneute Bearbeitung (UpdateAsync-Pfad) hält den aktualisierten Namen im Textfeld.
     /// </summary>
-    [Fact]
-    public void ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private void ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E(AutomationElement mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects();
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "Umbenennen-Test");
 
         ProjektNamenAendernUndSpeichern(mainWindow, "Umbenennen-Test-Aktualisiert");
@@ -87,48 +119,31 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         ProjektNamenAendernUndSpeichern(mainWindow, "Umbenennen-Test-Aktualisiert-Erneut");
         var nameBoxNachReload = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
         Assert.Equal("Umbenennen-Test-Aktualisiert-Erneut", nameBoxNachReload.AsTextBox().Text);
+
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
     /// Szenario: Projekt löschen.
     /// Prüft: Bestätigungsdialog erscheint, Löschen schließt das Overlay.
     /// </summary>
-    [Fact]
-    public void ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private void ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E(AutomationElement mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects();
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "Loeschen-Test");
 
-        var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
-        loeschenButton.AsButton().Click();
-
-        // MessageBox "Löschen bestätigen" erscheint als separates Fenster. Der Titel stammt aus der
-        // Anwendung (App-Ressource, daher sprachunabhängig sprachlich "Löschen bestätigen"), die
-        // Button-Beschriftung "Ja"/"Nein" dagegen wird vom nativen Win32-MessageBox-Control anhand
-        // der Systemsprache des ausführenden Betriebssystems gerendert (System.Windows.MessageBox
-        // erlaubt keine eigenen Button-Texte) - auf einem englischsprachigen CI-Runner (z. B.
-        // windows-latest bei GitHub Actions) heißt der Button "Yes" statt "Ja", wodurch die Suche
-        // nach dem Namen dort unabhängig vom Timeout nie etwas findet. Die Automation-ID des
-        // Ja/Yes-Buttons entspricht dagegen der stabilen, sprachunabhängigen Win32-Dialog-Control-ID
-        // IDYES (6) und funktioniert auf jeder Systemsprache identisch.
-        var msgBox = WaitForWindow("Löschen bestätigen", Short);
-        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
-        jaButton.AsButton().Click();
-
-        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>
     /// Szenario: Projektdetailansicht trennt offene und beendete Aufgaben.
     /// Prueft: Offene Aufgaben sind direkt sichtbar, beendete Aufgaben erst nach Aufklappen des Expanders.
     /// </summary>
-    [Fact]
-    public async Task Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private async Task Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E(AutomationElement mainWindow)
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-
         var projektName = "Archivierte-Aufgaben-E2E";
         var offeneAufgabeTitel = "Offene Aufgabe E2E";
         var beendeteAufgabeTitel = "Beendete Aufgabe E2E";
@@ -144,7 +159,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
             await aufgabeService.StatusSetzenAsync(beendeteAufgabe.Id, AufgabeStatus.Beendet);
         }
 
-        NavigateToProjecten(mainWindow);
+        NavigateToProjects(mainWindow);
         OpenProject(mainWindow, projektName);
 
         var offeneItems = OffeneAufgabenItems(mainWindow);
@@ -160,6 +175,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         var beendeteItems = beendeteAufgabenListe.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
         Assert.Contains(beendeteItems, item => item.Name == beendeteAufgabeTitel);
+
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
@@ -169,10 +187,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Zurück-Navigation erscheint die neue Aufgabe in der Aufgabenliste; das Filter-Overlay öffnet
     /// und schließt sich korrekt.
     /// </summary>
-    [Fact]
-    public void AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private void AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E(AutomationElement mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects();
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "Aufgabe-Test");
 
         // Neue Aufgabe erstellen; Navigation zur separaten TaskDetailView (Edit-Panel, da Status == Neu)
@@ -204,6 +222,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Overlay weg
         WaitUntilGone(mainWindow, cf => cf.ByName("Aufgaben filtern"), Short);
+
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
@@ -214,10 +235,10 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Plugin-Auswahl sowie das Label und eine zweite ComboBox für die Arbeitsverzeichnis-Auswahl;
     /// nach "Abbrechen" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
     /// </summary>
-    [Fact]
-    public void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E()
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
+    private void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(AutomationElement mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects();
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "Repository-Dialog-Test");
 
         WaitForElement(mainWindow, cf => cf.ByName("Öffnen"), Short);
@@ -245,6 +266,9 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Hauptfenster-Overlay noch offen (Speichern-Button sichtbar)
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
