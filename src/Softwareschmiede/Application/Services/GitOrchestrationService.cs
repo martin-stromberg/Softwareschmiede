@@ -195,11 +195,21 @@ public sealed class GitOrchestrationService
         var prBody = PullRequestBodyBuilder.Build(aufgabe, body);
         var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
 
+        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
+            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+
+        await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
         var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, prTitle, prBody, ct);
 
         var issueLogSuffix = issueNummer is > 0
             ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
             : string.Empty;
+
+        await _protokollService.AddEintragAsync(
+            aufgabeId,
+            ProtokollTyp.GitAktion,
+            $"Push: Branch '{aufgabe.BranchName}' vor Pull-Request-Erstellung gepusht.",
+            ct: ct);
 
         await _protokollService.AddEintragAsync(
             aufgabeId,

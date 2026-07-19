@@ -128,7 +128,7 @@ Im Status **Gestartet** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") 
 
 ### 9. Pull Request erstellen
 
-Wenn die Aufgabe einen Branch hat und ein verknüpftes Git-Repository mit Pull-Request-Unterstützung vorhanden ist, erscheint im Ribbon die Gruppe **Pull Request**. Klicke dort auf **PR erstellen**, um aus dem Aufgabenbranch einen Pull Request zu erstellen. Bei Aufgaben mit verknüpfter Issue-Nummer ergänzt die Anwendung den Pull-Request-Body automatisch um `Closes #<Issue>`.
+Wenn die Aufgabe einen Branch hat und ein verknüpftes Git-Repository mit Pull-Request-Unterstützung vorhanden ist, erscheint im Ribbon die Gruppe **Pull Request**. Klicke dort auf **PR erstellen**, um aus dem Aufgabenbranch einen Pull Request zu erstellen. Die Anwendung pusht den Aufgabenbranch vorher automatisch zum Remote. Bei Aufgaben mit verknüpfter Issue-Nummer ergänzt die Anwendung den Pull-Request-Body automatisch um `Closes #<Issue>`. Enthält der Branch keine Commits gegenüber dem Zielbranch, kann GitHub keinen Pull Request erstellen.
 
 ### 10. Aufgabe löschen
 

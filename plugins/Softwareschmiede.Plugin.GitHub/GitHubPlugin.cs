@@ -161,6 +161,15 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
         return sanitizedMessage.Trim();
     }
 
+    private static bool IsNoCommitsBetweenFailure(string error)
+    {
+        var normalizedError = error.ToLowerInvariant();
+        return normalizedError.Contains("no commits between", StringComparison.Ordinal)
+               || (normalizedError.Contains("head sha", StringComparison.Ordinal)
+                   && normalizedError.Contains("blank", StringComparison.Ordinal)
+                   && normalizedError.Contains("base sha", StringComparison.Ordinal));
+    }
+
     private async Task EnsureRemoteCredentialsAsync(string localPath, CancellationToken ct = default)
     {
         var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
@@ -472,8 +481,16 @@ password {token}
 
         if (!result.IsSuccess)
         {
-            _logger.LogError("gh pr create fehlgeschlagen: {StdErr}", result.StdErr);
-            throw new InvalidOperationException($"gh pr create fehlgeschlagen: {result.StdErr}");
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            _logger.LogError("gh pr create fehlgeschlagen: {StdErr}", sanitizedError);
+
+            if (IsNoCommitsBetweenFailure(result.StdErr))
+            {
+                throw new InvalidOperationException(
+                    $"gh pr create fehlgeschlagen: Der Branch '{branchName}' enthält keine Commits gegenüber dem Zielbranch. Bitte stelle sicher, dass Änderungen committet wurden. Details: {sanitizedError}");
+            }
+
+            throw new InvalidOperationException($"gh pr create fehlgeschlagen: {sanitizedError}");
         }
 
         // Parse the output text: "https://github.com/owner/repo/pull/123"
