@@ -330,19 +330,23 @@ Ablauf:
 ### 7.1. Pull Request erstellen und Issue automatisch schliessen
 
 Beteiligte Komponenten:
+- `TaskDetailView` — Ribbon-Gruppe `Pull Request` mit Button `PullRequestErstellen`
+- `TaskDetailViewModel.PullRequestErstellenCommand` — UI-Command fuer beendete Aufgaben mit Branch und verknuepftem Repository
 - `GitOrchestrationService.PullRequestErstellenAsync` — Hauptpfad fuer Git-Aktionen aus der Aufgabe
 - `EntwicklungsprozessService.PullRequestErstellenAsync` — aelterer PR-Pfad mit identischem Body-Aufbau
 - `PullRequestBodyBuilder` — zentrale Normalisierung des Pull-Request-Bodys
 - `IGitPlugin.CreatePullRequestAsync` — Provider-Aufruf mit normalisiertem Titel, Branch und Body
 
 Ablauf:
-1. Der Service laedt die Aufgabe inklusive `IssueReferenz`.
-2. Der Branch-Name der Aufgabe wird validiert; ohne Branch wird kein Pull Request erstellt.
-3. Der Pull-Request-Body wird ueber `PullRequestBodyBuilder.Build(aufgabe, body)` normalisiert.
-4. Falls `IssueReferenz.IssueNummer > 0` gilt und der Body noch keine Closing-Direktive fuer dieselbe Issue enthaelt, wird `Closes #<IssueNummer>` ergaenzt.
-5. Bestehende Closing-Direktiven fuer dieselbe Issue werden erkannt und nicht dupliziert; Direktiven fuer andere Issues bleiben erhalten.
-6. Das aufgeloeste Git-Plugin erstellt den Pull Request mit dem normalisierten Body.
-7. Bei gueltiger Issue-Nummer wird im Aufgabenprotokoll vermerkt, dass Auto-Close aktiv ist.
+1. Die UI zeigt den PR-Button nur fuer beendete Aufgaben mit Branch, verknuepftem Repository und SCM-Plugin an.
+2. Der Anwender klickt `PR erstellen`; `TaskDetailViewModel.PullRequestErstellenAsync` ruft den PR-Servicepfad auf.
+3. Der Service laedt die Aufgabe inklusive `IssueReferenz`.
+4. Der Branch-Name der Aufgabe wird validiert; ohne Branch wird kein Pull Request erstellt.
+5. Der Pull-Request-Body wird ueber `PullRequestBodyBuilder.Build(aufgabe, body)` normalisiert.
+6. Falls `IssueReferenz.IssueNummer > 0` gilt und der Body noch keine Closing-Direktive fuer dieselbe Issue enthaelt, wird `Closes #<IssueNummer>` ergaenzt.
+7. Bestehende Closing-Direktiven fuer dieselbe Issue werden erkannt und nicht dupliziert; Direktiven fuer andere Issues bleiben erhalten.
+8. Das aufgeloeste Git-Plugin erstellt den Pull Request mit dem normalisierten Body.
+9. Bei gueltiger Issue-Nummer wird im Aufgabenprotokoll vermerkt, dass Auto-Close aktiv ist.
 
 Bei GitHub schliesst die `Closes #<IssueNummer>`-Direktive das verknuepfte Issue automatisch, sobald der Pull Request gemergt wird. Andere SCM-Provider erhalten dieselbe Information als normalen Pull-Request-Text, falls sie keine GitHub-kompatible Schliesslogik auswerten.
 

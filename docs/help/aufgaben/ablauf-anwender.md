@@ -126,7 +126,11 @@ Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alte
 
 Im Status **Gestartet** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") auf **Beenden**. Der Status wechselt auf **Beendet**. Die **Diff-Ansicht** wird angezeigt und zeigt die Änderungen im Repository. Die **Info-Ansicht** bleibt weiterhin auswählbar.
 
-### 9. Aufgabe löschen
+### 9. Pull Request erstellen
+
+Wenn die Aufgabe **Beendet** ist und ein verknüpftes Git-Repository mit Pull-Request-Unterstützung vorhanden ist, erscheint im Ribbon die Gruppe **Pull Request**. Klicke dort auf **PR erstellen**, um aus dem Aufgabenbranch einen Pull Request zu erstellen. Bei Aufgaben mit verknüpfter Issue-Nummer ergänzt die Anwendung den Pull-Request-Body automatisch um `Closes #<Issue>`.
+
+### 10. Aufgabe löschen
 
 Im Status **Neu** oder **Gestartet** (nicht **Beendet** oder **Archiviert**), klicke im Ribbon (Gruppe „Aufgabe") auf **Löschen**:
 
