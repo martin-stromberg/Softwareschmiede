@@ -327,6 +327,25 @@ Ablauf:
 
 - `EntwicklungsprozessService.AbschliessenAsync` — Setzt Status auf `Beendet`, löscht optional Klonverzeichnis
 
+### 7.1. Pull Request erstellen und Issue automatisch schliessen
+
+Beteiligte Komponenten:
+- `GitOrchestrationService.PullRequestErstellenAsync` — Hauptpfad fuer Git-Aktionen aus der Aufgabe
+- `EntwicklungsprozessService.PullRequestErstellenAsync` — aelterer PR-Pfad mit identischem Body-Aufbau
+- `PullRequestBodyBuilder` — zentrale Normalisierung des Pull-Request-Bodys
+- `IGitPlugin.CreatePullRequestAsync` — Provider-Aufruf mit normalisiertem Titel, Branch und Body
+
+Ablauf:
+1. Der Service laedt die Aufgabe inklusive `IssueReferenz`.
+2. Der Branch-Name der Aufgabe wird validiert; ohne Branch wird kein Pull Request erstellt.
+3. Der Pull-Request-Body wird ueber `PullRequestBodyBuilder.Build(aufgabe, body)` normalisiert.
+4. Falls `IssueReferenz.IssueNummer > 0` gilt und der Body noch keine Closing-Direktive fuer dieselbe Issue enthaelt, wird `Closes #<IssueNummer>` ergaenzt.
+5. Bestehende Closing-Direktiven fuer dieselbe Issue werden erkannt und nicht dupliziert; Direktiven fuer andere Issues bleiben erhalten.
+6. Das aufgeloeste Git-Plugin erstellt den Pull Request mit dem normalisierten Body.
+7. Bei gueltiger Issue-Nummer wird im Aufgabenprotokoll vermerkt, dass Auto-Close aktiv ist.
+
+Bei GitHub schliesst die `Closes #<IssueNummer>`-Direktive das verknuepfte Issue automatisch, sobald der Pull Request gemergt wird. Andere SCM-Provider erhalten dieselbe Information als normalen Pull-Request-Text, falls sie keine GitHub-kompatible Schliesslogik auswerten.
+
 ### 8. Aufgabe löschen (`LoeschenAsync`)
 
 Ausgelöst durch den „Löschen"-Button im Ribbon.

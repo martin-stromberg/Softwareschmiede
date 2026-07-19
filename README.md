@@ -63,7 +63,7 @@ Die wichtigsten Features:
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI und Codex CLI mit Echtzeit-Streaming der Ausgabe
 - **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
-- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung
+- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. `Closes #<Issue>` fuer verknuepfte Issues
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
 - **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
@@ -160,7 +160,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 3. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 4. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt).
 5. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
-6. **Commits durchführen**, bei Remote-SCM optional Push/PR (bei Issue inkl. `Closes #<Issue>`), und Aufgabe abschließen oder abbrechen.
+6. **Commits durchführen**, bei Remote-SCM optional Push/PR; bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst. Danach Aufgabe abschließen oder abbrechen.
 
 ### `start.ps1` für Visual-Studio-Debug (freier HTTP-Port)
 
