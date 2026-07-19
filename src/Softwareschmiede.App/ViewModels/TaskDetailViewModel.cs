@@ -837,13 +837,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var repositoryId = _aufgabe.GitRepository?.RepositoryUrl;
-            if (string.IsNullOrWhiteSpace(repositoryId))
-                throw new InvalidOperationException($"Aufgabe {_aufgabeId} hat kein verknüpftes Repository.");
-
-            var pullRequest = await _entwicklungsprozessService.PullRequestErstellenAsync(
+            var gitOrchestrationService = _serviceProvider.GetRequiredService<GitOrchestrationService>();
+            var pullRequest = await gitOrchestrationService.PullRequestErstellenAsync(
                 _aufgabeId,
-                repositoryId,
                 title: _aufgabe.Titel,
                 body: _aufgabe.AnforderungsBeschreibung ?? string.Empty,
                 ct: ct);

@@ -1250,6 +1250,86 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.PullRequestErstellenCommand.CanExecute(null).Should().BeTrue();
     }
 
+    /// <summary>PullRequestErstellenCommand nutzt die Git-Orchestrierung und übergibt dem Plugin die aufgelöste Repository-ID.</summary>
+    [Fact]
+    public async Task PullRequestErstellenCommand_ShouldResolveRepositoryIdFromRepositoryUrl()
+    {
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginName).Returns("Test Git");
+        gitPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestGit");
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        gitPluginMock.Setup(p => p.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitActionCapabilities(
+                RepositoryKind.RemoteGit,
+                IsWorkingDirectoryCopy: false,
+                CanPush: true,
+                CanPull: true,
+                CanCreatePullRequest: true,
+                CanMergeToSource: false));
+        gitPluginMock.Setup(p => p.CreatePullRequestAsync(
+                "test/repo",
+                "feature/pr-url",
+                "PR aus UI",
+                "Beschreibung",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(7, "PR aus UI", string.Empty, "feature/pr-url"));
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+        pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(gitPluginMock.Object);
+        pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.TestGit",
+            RepositoryUrl = "https://github.com/test/repo.git",
+            RepositoryName = "Test Repository",
+            Aktiv = true
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR aus UI", "Beschreibung", repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-url", Path.GetTempPath());
+
+        var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
+        var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance, pluginManagerMock.Object);
+        var gitOrchestrationService = new GitOrchestrationService(
+            _aufgabeService,
+            projektService,
+            _protokollService,
+            gitPluginMock.Object,
+            pluginSelectionService,
+            NullLogger<GitOrchestrationService>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(GitOrchestrationService))).Returns(gitOrchestrationService);
+
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.PullRequestErstellenCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().BeNull();
+        gitPluginMock.Verify(p => p.CreatePullRequestAsync(
+                "test/repo",
+                "feature/pr-url",
+                "PR aus UI",
+                "Beschreibung",
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        gitPluginMock.Verify(p => p.CreatePullRequestAsync(
+                "https://github.com/test/repo.git",
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     /// <summary>PullRequestErstellenCommand bleibt trotz Branch und Repository deaktiviert, wenn das Git-Plugin keine PR-Erstellung unterstützt.</summary>
     [Fact]
     public async Task PullRequestErstellenCommand_CannotExecute_WhenPrCapabilityMissing()
