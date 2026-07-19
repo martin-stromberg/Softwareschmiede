@@ -1,6 +1,5 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using FlaUI.Core.Input;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -11,6 +10,11 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Windows-Desktop-Session (kein Headless-CI)
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein (dotnet build src/Softwareschmiede.App)
 ///
+/// Konsolidierung (Issue #153): Die ursprünglich acht Einzeltests laufen als Phasen in zwei
+/// gemeinsamen App-Lifecycles - ein Projekt-/Aufgaben-Flow und ein Einstellungen-Flow -, da alle
+/// Tests dieser Klasse denselben einfachen Interaktionsmustern folgen und keine sich gegenseitig
+/// ausschließenden Vorbedingungen haben.
+///
 /// Ausführung (lokal): dotnet test --filter Category=E2E
 /// CI-Regular-Lauf:    dotnet test --filter "Category!=OsInterface"
 /// </summary>
@@ -19,25 +23,13 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public sealed class WpfE2ETests : WpfTestBase
 {
-    /// <summary>Prüft, dass nach dem Anlegen eines Projekts die Aufgabenliste sichtbar ist.</summary>
+    /// <summary>
+    /// Szenario: Projekt anlegen und öffnen (Aufgabenliste sichtbar); neue Aufgabe anlegen (Liste
+    /// weiterhin sichtbar, kein Status "Gestartet"); "Starten"-Button sichtbar, Hauptfenster besitzt
+    /// ein gültiges Handle.
+    /// </summary>
     [Fact]
-    public void ProjektErstellen_ZeigtAufgabenListe_E2E()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
-
-        NavigateToProjecten(mainWindow);
-
-        CreateProject(mainWindow, "E2E-Testprojekt");
-        OpenProject(mainWindow, "E2E-Testprojekt");
-
-        var aufgabeListe = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(10));
-        Assert.NotNull(aufgabeListe);
-    }
-
-    /// <summary>Prüft, dass nach Projekterstellung eine neue Aufgabe angelegt werden kann und der Status nicht "Gestartet" ist.</summary>
-    [Fact]
-    public void ProjektErstellen_UndNeueAufgabeAnlegen_E2E()
+    public void Projekt_ErstellenUndAufgabeAnlegen_ZeigtListeUndStartenButton_E2E()
     {
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
@@ -45,53 +37,51 @@ public sealed class WpfE2ETests : WpfTestBase
         NavigateToProjecten(mainWindow);
         CreateAndOpenProject(mainWindow, "E2E-Startprojekt");
 
+        WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(10));
+
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
         aufgabeNeuButton.AsButton().Click();
 
-        var aufgabeListe = WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), Short);
-        Assert.NotNull(aufgabeListe);
+        WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), Short);
 
         var statusGestartetText = mainWindow.FindFirstDescendant(cf =>
             cf.ByControlType(ControlType.Text).And(cf.ByName("Gestartet")));
         Assert.Null(statusGestartetText);
-    }
 
-    /// <summary>Prüft, dass nach dem Anlegen einer Aufgabe der "Starten"-Button sichtbar ist und das Fenster ein gültiges Handle besitzt.</summary>
-    [Fact]
-    public void AufgabeAnlegen_ZeigtStartenButton_E2E()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
-
-        NavigateToProjecten(mainWindow);
-        CreateAndOpenProject(mainWindow, "E2E-CLI-Projekt");
-
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
-        aufgabeNeuButton.AsButton().Click();
-
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), TimeSpan.FromSeconds(10));
-        Assert.NotNull(startenButton);
+        WaitForElement(mainWindow, cf => cf.ByName("Starten"), TimeSpan.FromSeconds(10));
 
         var windowHandle = mainWindow.FrameworkAutomationElement.NativeWindowHandle;
         Assert.NotEqual(IntPtr.Zero, windowHandle);
     }
 
-    /// <summary>Prüft, dass der Dark Mode in den Einstellungen umgeschaltet und nach Rückkehr persistiert wird.</summary>
+    /// <summary>
+    /// Szenario: Sauberer Start ohne Recovery-Banner; Einstellungsseite öffnen (Speichern sichtbar);
+    /// Dark Mode umschalten, speichern und nach Rückkehr Persistenz prüfen; Arbeitsverzeichnis ändern
+    /// und speichern; mehrfache Navigation zwischen Dashboard und Einstellungen bleibt stabil.
+    /// </summary>
     [Fact]
-    public void DarkModeAktivierenUndPersistieren_E2E()
+    public void Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E()
     {
         SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");
 
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
 
+        // Sauberer Start: kein Recovery-Banner
+        WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(10));
+
+        var recoveryBanner = mainWindow.FindFirstDescendant(cf =>
+            cf.ByName("Aufgabe(n) benötigen Wiederherstellung."));
+        Assert.Null(recoveryBanner);
+
         // Einstellungen öffnen
         var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), TimeSpan.FromSeconds(10));
         einstellungenButton.AsButton().Click();
 
-        // Speichern-Button im Ribbon bestätigt, dass die Einstellungsseite geladen ist
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        // Ribbon-Speichern-Button bestätigt, dass die Einstellungsseite geladen ist
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
 
+        // Dark Mode umschalten
         var designComboBoxElement = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
         var designComboBox = designComboBoxElement.AsComboBox();
         var originalValue = designComboBox.SelectedItem?.Name ?? string.Empty;
@@ -105,18 +95,17 @@ public sealed class WpfE2ETests : WpfTestBase
         // wird hier dieselbe bereits andernorts (z. B. E2E_SettingsKiPluginPersistence) erprobte Hilfsmethode
         // verwendet, die den Eintrag im Scope der ComboBox selbst sucht und definierte Settle-Pausen einhält.
         SelectComboBoxItemByClick(designComboBoxElement, neuerWert, Short);
-
         WaitForSelectedComboBoxItem(designComboBoxElement, neuerWert, Short);
 
         // Einstellungen speichern über Ribbon-Button
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        var speichernButtonDarkMode = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        speichernButtonDarkMode.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
 
         // Einstellungsseite verlassen und zurückkehren
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
+        var dashboardButtonNachDarkMode = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
+        dashboardButtonNachDarkMode.AsButton().Click();
 
         einstellungenButton.Click();
 
@@ -125,94 +114,32 @@ public sealed class WpfE2ETests : WpfTestBase
         // vorausgehenden awaits (Arbeitsverzeichnis, Standard-KI-Plugin) neu gesetzt. Ein direktes Assert
         // unmittelbar nach dem Auffinden der ComboBox liest daher auf langsameren/kalten CI-Runnern
         // gelegentlich noch den alten Wert, bevor der Reload abgeschlossen ist — deshalb wird hier wie beim
-        // ersten Auswählen oben (Zeile 106) auf den erwarteten Wert gepollt statt einmalig geprüft.
+        // ersten Auswählen oben auf den erwarteten Wert gepollt statt einmalig geprüft.
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
 
         WaitForSelectedComboBoxItem(designComboBoxNachRueckkehr, neuerWert, Short);
-    }
 
-    /// <summary>Prüft, dass beim sauberen Start kein Recovery-Banner angezeigt wird.</summary>
-    [Fact]
-    public void Dashboard_KeineRecoveryBanner_BeiSauberemStart_E2E()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
-
-        var dashboardText = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(10));
-        Assert.NotNull(dashboardText);
-
-        var recoveryBanner = mainWindow.FindFirstDescendant(cf =>
-            cf.ByName("Aufgabe(n) benötigen Wiederherstellung."));
-        Assert.Null(recoveryBanner);
-    }
-
-    /// <summary>Prüft, dass die Einstellungsseite geöffnet werden kann und der Speichern-Button sichtbar ist.</summary>
-    [Fact]
-    public void EinstellungenOeffnen_ZeigtEinstellungsSeite_E2E()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
-
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), TimeSpan.FromSeconds(10));
-        einstellungenButton.AsButton().Click();
-
-        // Ribbon-Speichern-Button bestätigt, dass die Einstellungsseite geladen ist
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
-        Assert.NotNull(speichernButton);
-    }
-
-    /// <summary>Prüft, dass das Arbeitsverzeichnis in den Einstellungen geändert und gespeichert werden kann.</summary>
-    [Fact]
-    public void EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E()
-    {
-        SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");
-
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
-
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), TimeSpan.FromSeconds(10));
-        einstellungenButton.AsButton().Click();
-
-        // Warten bis Einstellungsseite geladen ist
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-
+        // Arbeitsverzeichnis ändern und speichern
         var textBoxen = mainWindow.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit));
         Assert.True(textBoxen.Length > 0, "Kein Textfeld auf der Einstellungsseite gefunden.");
 
         var arbeitsverzeichnisBox = textBoxen[0].AsTextBox();
         arbeitsverzeichnisBox.Text = @"C:\TestArbeitsverzeichnis";
 
-        // Speichern über Ribbon-Button
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        var speichernButtonArbeitsverzeichnis = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        speichernButtonArbeitsverzeichnis.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
-    }
 
-    /// <summary>Prüft, dass mehrfache Navigation zur Einstellungsseite stabil bleibt und der Speichern-Button nach Rückkehr wieder erscheint.</summary>
-    [Fact]
-    public void EinstellungenNavigation_BleibtNachMehrerenKlicks_Stabil_E2E()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
+        // Mehrfache Navigation bleibt stabil: Dashboard -> Projekte-Kachel sichtbar -> erneut Einstellungen
+        var dashboardButtonNavigation = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
+        dashboardButtonNavigation.AsButton().Click();
 
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), TimeSpan.FromSeconds(10));
-        einstellungenButton.AsButton().Click();
-
-        // Ribbon-Speichern-Button bestätigt, dass die Einstellungsseite geladen ist
-        var speichernButton1 = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        Assert.NotNull(speichernButton1);
-
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
-
-        var projekteKachel = WaitForElement(mainWindow, cf => cf.ByName("Projekte"), Short);
-        Assert.NotNull(projekteKachel);
+        WaitForElement(mainWindow, cf => cf.ByName("Projekte"), Short);
 
         einstellungenButton.Click();
 
-        var speichernButton2 = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        Assert.NotNull(speichernButton2);
+        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
     }
 }

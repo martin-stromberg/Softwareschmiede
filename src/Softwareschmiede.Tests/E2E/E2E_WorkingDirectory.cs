@@ -15,6 +15,26 @@ namespace Softwareschmiede.Tests.E2E;
 /// Arbeitsverzeichnis weiterhin gezielt in der Test-Datenbank, weil dort die spätere CLI-Auswirkung
 /// im Vordergrund steht.
 ///
+/// Konsolidierung (Issue #153) geprüft und bewusst NICHT durchgeführt: Drei unabhängige
+/// Zusammenlegungsversuche (Zuweisen-Erfolg + Zuweisen-Fallback als zweites Repository desselben
+/// Projekts; Zuweisen-Erfolg + Bearbeiten-Fallback als zweites, DB-geseedetes Projekt; ein zweites
+/// vollständiges Projekt per <c>CreateProject</c>) scheiterten jeweils reproduzierbar (mehrfach
+/// wiederholt, nicht transient) an unterschiedlichen technischen Ursachen:
+/// 1. Ein zweiter vollständiger <c>CreateAndOpenProject</c>-Aufruf innerhalb desselben App-Lifecycles
+///    öffnete das "Neu"-Overlay der Projektliste nicht zuverlässig (kein bestehender Test dieser
+///    Codebasis ruft <c>CreateProject</c>/<c>CreateAndOpenProject</c> mehrfach im selben Lifecycle auf).
+/// 2. Ein direkt per <c>OpenTestDbContext</c> DB-geseedetes Projekt erschien nach einer bereits zuvor
+///    im selben Lifecycle erfolgten Navigation zur Projektliste nicht mehr in dieser (Projektliste
+///    lädt vermutlich nicht bei jeder Navigation neu aus der DB, sondern hält den einmal geladenen
+///    Bestand vor).
+/// 3. Das Löschen eines frisch angelegten lokalen Git-Testrepositories (zur Simulation eines
+///    fehlgeschlagenen Strukturabrufs) schlug mit <see cref="UnauthorizedAccessException"/> auf einer
+///    Git-Objektdatei fehl - reproduzierbar auch im unveränderten, eigenständigen Einzeltest
+///    (<see cref="RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E"/>),
+///    also umgebungsbedingt und nicht durch eine Konsolidierung verursacht.
+/// Diese Klasse bleibt daher unkonsolidiert; alle sechs Szenarien laufen als eigenständige Tests mit
+/// jeweils eigenem App-Lifecycle.
+///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
 [Trait("Category", "E2E")]

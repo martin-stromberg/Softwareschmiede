@@ -1,3 +1,15 @@
+## 2026-07-19 — E2E-Test-Struktur: Weitere Konsolidierung (Nacharbeit zu Issue #153)
+
+- Nacharbeit zur E2E-Testkonsolidierung vom 2026-07-18: Die ursprüngliche Bestandsaufnahme hatte nicht systematisch alle E2E-Klassen mit mehreren Testmethoden als Konsolidierungskandidaten erfasst. Ein erneuter, vollständiger Scan aller `[Fact]`/`[SkippableFact]`-Methoden je Datei unter `src/Softwareschmiede.Tests/E2E/` deckte drei übersehene Kandidaten auf.
+- **Weitere Test-Konsolidierung** (zusätzlich −9 Testmethoden):
+  - `WpfE2ETests` (`WpfE2EPlaceholderTests.cs`): 8 Tests → 2 Methoden (Projekt-/Aufgaben-Flow, Einstellungen-Flow).
+  - `E2E_SettingsCommandLineParameters`: 3 Tests → 1 Methode (Feld-Sichtbarkeit, Persistenz, Hilfe-Dialog).
+  - `E2E_FileExplorer`: 2 Tests → 1 Methode (Baum-/Mode-Buttons, Info-/CLI-Registerwechsel).
+- **`E2E_WorkingDirectory` geprüft, bewusst nicht konsolidiert:** Drei unabhängige Konsolidierungsversuche wurden implementiert, gebaut und mehrfach ausgeführt; alle scheiterten reproduzierbar an unterschiedlichen technischen Ursachen (Projekt-Overlay bei zweitem `CreateAndOpenProject` im selben Lifecycle, DB-geseedetes Projekt erscheint nach vorheriger Navigation nicht in der Liste, umgebungsbedingter `UnauthorizedAccessException`-Datei-Lock beim Löschen eines Git-Testrepositories). Begründung ist als Klassendoku-Kommentar in der Datei hinterlegt; die Klasse bleibt bei 6 eigenständigen Testmethoden.
+- **Code-Qualität:** Bei der Konsolidierung übernommene, bereits vorher in diesen drei Dateien vorhandene `Assert.NotNull(WaitForElement(...))`-Zusicherungen (immer wahr, da `WaitForElement` bei Nichtfinden wirft statt `null` zurückzugeben) entfernt — analog zur Bereinigung vom 2026-07-18 in den damals konsolidierten Klassen.
+- Laufzeitgewinn insgesamt (beide Runden): ≈ 20 eingesparte App-Starts pro Testlauf (≈ 4–7 Minuten).
+- Dokumentation aktualisiert: `docs/features/test-infrastructure/e2e-test-konsolidierung.md`.
+
 ## 2026-07-18 — E2E-Test-Struktur: Konsolidierung logisch zusammenhängender Szenarien
 
 - Feature: Testlaufzeiten reduzieren durch Zusammenfassung logisch zusammenhängender E2E-Szenarien (z. B. Aufgabe anlegen → speichern vs. abbrechen) in weniger Testmethoden; dadurch weniger App-Prozess-Starts pro Testlauf (ca. 11 eingesparte App-Starts ≈ 2–4 Minuten Zeiteinsparung).

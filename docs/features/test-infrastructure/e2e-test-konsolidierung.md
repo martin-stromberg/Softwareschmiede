@@ -4,7 +4,7 @@
 
 Diese technische Dokumentation beschreibt die Konsolidierung logisch zusammenhängender E2E-Szenarien in der Test-Suite, um Testlaufzeiten durch weniger App-Prozess-Starts zu reduzieren. Das Feature schafft eine Facade-Schicht für wiederholte UI-Interaktionen in `WpfTestBase`, sodass Tests lesbarer und wartbarer werden, und fasst mehrere eng verwandte Szenarien in einer Testmethode zusammen.
 
-**Laufzeitgewinn:** Ungefähr 11 eingesparte App-Starts pro Testlauf (≈ 2–4 Minuten Zeiteinsparung).
+**Laufzeitgewinn:** Ungefähr 20 eingesparte App-Starts pro Testlauf (≈ 4–7 Minuten Zeiteinsparung), verteilt über zwei Bearbeitungsrunden (11 + 9 App-Starts).
 
 ---
 
@@ -255,6 +255,46 @@ public void PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E()
 6. **Offene/beendete Aufgaben trennen** (1 Test): Eigenständig (DB-seeded, async).
 
 **Gewinn:** Sieben App-Starts weniger durch Konsolidierung, zwei Szenarien bleiben eigenständig aus fachlichen Gründen.
+
+---
+
+### `WpfE2ETests` (Datei `WpfE2EPlaceholderTests.cs`, 8 → 2 Methoden)
+
+**Ursprüngliche Tests:** `ProjektErstellen_ZeigtAufgabenListe_E2E`, `ProjektErstellen_UndNeueAufgabeAnlegen_E2E`, `AufgabeAnlegen_ZeigtStartenButton_E2E` (Projekt-/Aufgaben-Flow); `Dashboard_KeineRecoveryBanner_BeiSauberemStart_E2E`, `EinstellungenOeffnen_ZeigtEinstellungsSeite_E2E`, `DarkModeAktivierenUndPersistieren_E2E`, `EinstellungenArbeitsverzeichnis_Aendern_UndSpeichern_E2E`, `EinstellungenNavigation_BleibtNachMehrerenKlicks_Stabil_E2E` (Einstellungen-Flow).
+
+**Neue konsolidierte Methoden:**
+- `Projekt_ErstellenUndAufgabeAnlegen_ZeigtListeUndStartenButton_E2E()` — Projekt anlegen/öffnen, Aufgabe anlegen, Starten-Button und Fenster-Handle prüfen (3 alte Szenarien).
+- `Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E()` — sauberer Start ohne Recovery-Banner, Einstellungen öffnen, Dark Mode umschalten und Persistenz prüfen, Arbeitsverzeichnis ändern und speichern, mehrfache Navigation bleibt stabil (5 alte Szenarien).
+
+**Gewinn:** Sechs App-Starts weniger, zwei kohärente Phasen-Flows statt acht isolierter Einzeltests.
+
+---
+
+### `E2E_SettingsCommandLineParameters` (3 → 1 Methode)
+
+**Ursprüngliche Tests:** `Einstellungen_ZeigtCommandLineParametersTextBox_BeiCodexCliPlugin_E2E()`, `Einstellungen_SpeichertUndLaeadtCommandLineParameters_E2E()`, `Einstellungen_HilfeButton_OeffnetDialogDerMitSchliessen_GeschlossenWerdenKann_E2E()` — alle drei teilen dieselbe Vorbedingung (`OpenKiSettingsWithCodexCli`).
+
+**Neue konsolidierte Methode:** `CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E()` — Feld-Sichtbarkeit, Speichern/Neuladen-Persistenz und Hilfe-Dialog in einem Durchlauf.
+
+**Gewinn:** Zwei App-Starts weniger.
+
+---
+
+### `E2E_FileExplorer` (2 → 1 Methode)
+
+**Ursprüngliche Tests:** `DateiViewButton_ZeigtExplorerMitBaumUndModeButtons_E2E()`, `DateiViewButton_DannInfoRegister_BlendetDateiexplorerAusUndZeigtInfoWiederAn_E2E()` — beide teilen dasselbe Setup (Repository klonen, Aufgabe starten, Dateiexplorer öffnen).
+
+**Neue konsolidierte Methode:** `DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E()` — Baum- und Mode-Buttons, anschließend Wechsel zu Info- und CLI-Register in einem Durchlauf.
+
+**Gewinn:** Ein App-Start weniger.
+
+---
+
+### `E2E_WorkingDirectory` — geprüft, bewusst NICHT konsolidiert (bleibt bei 6 Methoden)
+
+Drei unabhängige Konsolidierungsversuche (Zuweisen-Erfolg + Zuweisen-Fallback als zweites Repository desselben Projekts; Zuweisen-Erfolg + Bearbeiten-Fallback als zweites, DB-geseedetes Projekt; zwei vollständige Projekte per `CreateAndOpenProject` im selben App-Lifecycle) wurden implementiert, gebaut und mehrfach ausgeführt. Alle drei scheiterten reproduzierbar an unterschiedlichen technischen Ursachen (siehe Klassendoku-Kommentar in `E2E_WorkingDirectory.cs` für Details): ein zweiter `CreateAndOpenProject`-Aufruf im selben Lifecycle öffnet das Projekt-Overlay nicht zuverlässig; ein direkt per `OpenTestDbContext` DB-geseedetes Projekt erscheint nach vorheriger Navigation zur Projektliste nicht mehr darin; das Löschen eines lokalen Git-Testrepositories (zur Simulation eines fehlgeschlagenen Strukturabrufs) scheitert umgebungsbedingt mit `UnauthorizedAccessException` auf einer Git-Objektdatei — reproduzierbar auch im unveränderten Einzeltest, also nicht durch eine Konsolidierung verursacht.
+
+Diese Klasse bleibt daher bewusst unkonsolidiert; alle sechs Szenarien laufen als eigenständige Tests mit jeweils eigenem App-Lifecycle.
 
 ---
 
