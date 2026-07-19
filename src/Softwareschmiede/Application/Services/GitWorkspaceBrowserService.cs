@@ -10,7 +10,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
 {
     private const long MaxInlineBytes = 1_048_576;
     private const int BinaryProbeBytes = 8_192;
-    private const int MaxWorkingTreeNodeCount = 5_000;
+    private const int MaxWorkingTreeNodeCount = 100_000;
     private const string GitDirectoryName = ".git";
 
     private readonly ICliRunner _cliRunner;
