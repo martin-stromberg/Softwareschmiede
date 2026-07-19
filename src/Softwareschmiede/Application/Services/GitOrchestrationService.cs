@@ -15,6 +15,7 @@ public sealed class GitOrchestrationService
     private readonly IGitPlugin _gitPlugin;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly ILogger<GitOrchestrationService> _logger;
+    private readonly IGitWorkspaceBrowserService? _gitWorkspaceBrowserService;
 
     /// <inheritdoc cref="GitOrchestrationService"/>
     public GitOrchestrationService(
@@ -23,7 +24,8 @@ public sealed class GitOrchestrationService
         ProtokollService protokollService,
         IGitPlugin gitPlugin,
         PluginSelectionService pluginSelectionService,
-        ILogger<GitOrchestrationService> logger)
+        ILogger<GitOrchestrationService> logger,
+        IGitWorkspaceBrowserService? gitWorkspaceBrowserService = null)
     {
         _aufgabeService = aufgabeService;
         _projektService = projektService;
@@ -31,6 +33,7 @@ public sealed class GitOrchestrationService
         _gitPlugin = gitPlugin;
         _pluginSelectionService = pluginSelectionService;
         _logger = logger;
+        _gitWorkspaceBrowserService = gitWorkspaceBrowserService;
     }
 
     /// <summary>Ruft Issues aus einem Repository ab.</summary>
@@ -192,11 +195,12 @@ public sealed class GitOrchestrationService
         var repositoryId = await ResolveRepositoryIdAsync(aufgabe, ct);
 
         var prTitle = title ?? aufgabe.Titel;
-        var prBody = PullRequestBodyBuilder.Build(aufgabe, body);
         var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
 
         if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+
+        var prBody = await BuildPullRequestBodyAsync(aufgabe, body, ct);
 
         await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
         var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, prTitle, prBody, ct);
@@ -220,6 +224,26 @@ public sealed class GitOrchestrationService
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellt.", aufgabeId);
 
         return pullRequest;
+    }
+
+    private async Task<string> BuildPullRequestBodyAsync(Aufgabe aufgabe, string? fallbackBody, CancellationToken ct)
+    {
+        if (_gitWorkspaceBrowserService is null || string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
+        {
+            return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
+        }
+
+        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(aufgabe.LokalerKlonPfad, ct);
+        if (snapshot.HasError)
+        {
+            _logger.LogWarning(
+                "Commit-Liste für Pull Request von Aufgabe {AufgabeId} konnte nicht geladen werden: {Error}",
+                aufgabe.Id,
+                snapshot.ErrorMessage);
+            return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
+        }
+
+        return PullRequestBodyBuilder.BuildFromCommits(aufgabe, snapshot.BranchCommits);
     }
 
     /// <summary>
