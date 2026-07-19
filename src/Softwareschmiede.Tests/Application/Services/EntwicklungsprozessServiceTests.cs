@@ -527,6 +527,49 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    /// <summary>PullRequestErstellenAsync ergänzt im älteren Prozesspfad die Closing-Direktive aus der Issue-Referenz.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldAppendClosingDirective_WhenLegacyPathHasIssueReference()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Legacy PR mit Issue", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/legacy-pr", @"C:\repos\task-legacy-pr");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = 17,
+            Titel = "Issue 17",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        var expectedBody = $"Legacy Body{Environment.NewLine}{Environment.NewLine}Closes #17";
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/repo",
+                "feature/legacy-pr",
+                "Legacy Titel",
+                expectedBody,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(17, "Legacy Titel", "https://example/pr/17", "feature/legacy-pr"));
+
+        await _sut.PullRequestErstellenAsync(
+            aufgabe.Id,
+            "test/repo",
+            "Legacy Titel",
+            "Legacy Body");
+
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/repo",
+            "feature/legacy-pr",
+            "Legacy Titel",
+            expectedBody,
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Issue #17"));
+    }
+
     /// <summary>ProzessStartenAsync verwendet das konfigurierte Arbeitsverzeichnis als Basis für den Klon-Pfad.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldUseConfiguredWorkdirBase_ForClonePath()

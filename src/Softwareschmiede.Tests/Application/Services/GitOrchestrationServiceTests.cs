@@ -453,9 +453,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             Times.Once);
     }
 
-    /// <summary><summary>PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference.</summary>.</summary>
+    /// <summary>PullRequestErstellenAsync ergänzt die Closing-Direktive und protokolliert die Issue-Referenz.</summary>
     [Fact]
-    /// <summary>PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference.</summary>
     public async Task PullRequestErstellenAsync_ShouldAppendClosingDirectiveAndLogIssue_WhenAufgabeHasIssueReference()
     {
         var projekt = await _projektService.CreateAsync("Projekt mit Issue", null);
@@ -499,9 +498,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Issue #123"));
     }
 
-    /// <summary><summary>PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective.</summary>.</summary>
+    /// <summary>PullRequestErstellenAsync dupliziert keine bereits vorhandene Closing-Direktive.</summary>
     [Fact]
-    /// <summary>PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective.</summary>
     public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyAlreadyContainsDirective()
     {
         var projekt = await _projektService.CreateAsync("Projekt mit bestehender Direktive", null);
@@ -632,6 +630,180 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             "feature/other-directive",
             "Titel",
             expectedBody,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync lässt den Body unverändert, wenn die Issue-Referenz keine Nummer enthält.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueReferenceHasNoIssueNumber()
+    {
+        var projekt = await _projektService.CreateAsync("Projekt mit Issue ohne Nummer", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/no-issue-number",
+            "test/no-issue-number");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Issue-Nummer", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-issue-number", @"C:\repos\task-no-issue-number");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = null,
+            Titel = "Issue ohne Nummer",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/no-issue-number",
+                "feature/no-issue-number",
+                "Titel",
+                "Body",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(82, "PR", "https://example/pr/82", "feature/no-issue-number"));
+
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/no-issue-number",
+            "feature/no-issue-number",
+            "Titel",
+            "Body",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync lässt den Body bei nicht positiven Issue-Nummern unverändert.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-7)]
+    public async Task PullRequestErstellenAsync_ShouldKeepBodyUnchanged_WhenIssueNumberIsNotPositive(int issueNummer)
+    {
+        var projekt = await _projektService.CreateAsync($"Projekt mit Issue {issueNummer}", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            $"https://github.com/test/non-positive-{Math.Abs(issueNummer)}",
+            $"test/non-positive-{Math.Abs(issueNummer)}");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, $"PR mit Issue {issueNummer}", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, $"feature/non-positive-{Math.Abs(issueNummer)}", @"C:\repos\task-non-positive");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = issueNummer,
+            Titel = $"Issue {issueNummer}",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                $"test/non-positive-{Math.Abs(issueNummer)}",
+                $"feature/non-positive-{Math.Abs(issueNummer)}",
+                "Titel",
+                "Body",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(83, "PR", "https://example/pr/83", $"feature/non-positive-{Math.Abs(issueNummer)}"));
+
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            $"test/non-positive-{Math.Abs(issueNummer)}",
+            $"feature/non-positive-{Math.Abs(issueNummer)}",
+            "Titel",
+            "Body",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync erkennt qualifizierte Issue-Referenzen als bestehende Closing-Direktive.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyContainsQualifiedIssueReference()
+    {
+        var projekt = await _projektService.CreateAsync("Projekt mit qualifizierter Direktive", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/qualified-directive",
+            "test/qualified-directive");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit qualifizierter Direktive", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/qualified-directive", @"C:\repos\task-qualified-directive");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = 321,
+            Titel = "Issue 321",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        const string existingBody = "Implementierung abgeschlossen.\nFixes owner/repo#321";
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/qualified-directive",
+                "feature/qualified-directive",
+                "Titel",
+                existingBody,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(84, "PR", "https://example/pr/84", "feature/qualified-directive"));
+
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/qualified-directive",
+            "feature/qualified-directive",
+            "Titel",
+            existingBody,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync erkennt alternative Closing-Verben als bestehende Direktive.</summary>
+    [Theory]
+    [InlineData("resolved #654")]
+    [InlineData("Closed #654")]
+    public async Task PullRequestErstellenAsync_ShouldNotDuplicateClosingDirective_WhenBodyUsesAlternativeClosingVerb(string directive)
+    {
+        var projekt = await _projektService.CreateAsync($"Projekt mit Direktive {directive}", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/alternative-directive",
+            "test/alternative-directive");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit alternativer Direktive", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/alternative-directive", @"C:\repos\task-alternative-directive");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = 654,
+            Titel = "Issue 654",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        var existingBody = $"Implementierung abgeschlossen.{Environment.NewLine}{directive}";
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/alternative-directive",
+                "feature/alternative-directive",
+                "Titel",
+                existingBody,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(85, "PR", "https://example/pr/85", "feature/alternative-directive"));
+
+        await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: existingBody);
+
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/alternative-directive",
+            "feature/alternative-directive",
+            "Titel",
+            existingBody,
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
