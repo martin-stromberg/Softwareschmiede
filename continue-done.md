@@ -49,3 +49,17 @@ MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 
 - `dotnet build src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-restore`: erfolgreich, 0 Fehler.
 - Die neu ergaenzten Pull-Request-UI-Button-Tests wurden gemaess Nutzervorgabe nicht ausgefuehrt.
+
+---
+
+# Fehler in der Umsetzung: Pull-Request-Button faelschlich an Status Beendet gekoppelt
+
+- [x] Der Pull-Request-Aktionsbutton wurde faelschlich so umgesetzt, dass er nur bei Aufgaben im Status `Beendet` sichtbar/aktiv ist. Diese Status-Einschraenkung war nicht gefordert und soll entfernt werden.
+
+- [x] Der Button soll sichtbar/aktiv sein, sobald ein Pull Request technisch erstellt werden kann, insbesondere wenn ein Branch vorhanden ist, ein verknuepftes Git-Repository vorhanden ist und ein SCM-/Git-Plugin bzw. PR-Capability verfuegbar ist. Der Aufgabenstatus `Beendet` darf keine zwingende Voraussetzung sein.
+
+- [x] Die Tests zur Command-Verfuegbarkeit und UI-Button-Praesenz muessen entsprechend angepasst oder ergaenzt werden, sodass sie die Nicht-Kopplung an `Beendet` absichern.
+
+## Verifikation am 2026-07-19
+
+- `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~TaskDetailViewModelTests.PullRequestErstellenCommand|FullyQualifiedName~TaskDetailViewTests"`: bestanden, 3/3.

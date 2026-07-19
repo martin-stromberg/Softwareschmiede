@@ -1188,12 +1188,21 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
     // --- CanAssignIssue ---
 
-    private Mock<IPluginManager> ErstelleGitPluginManager()
+    private Mock<IPluginManager> ErstelleGitPluginManager(bool canCreatePullRequest = true)
     {
         var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestGit");
         gitPluginMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
         gitPluginMock.Setup(p => p.GetIssuesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        gitPluginMock.Setup(p => p.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitActionCapabilities(
+                RepositoryKind.RemoteGit,
+                IsWorkingDirectoryCopy: false,
+                CanPush: true,
+                CanPull: true,
+                CanCreatePullRequest: canCreatePullRequest,
+                CanMergeToSource: false));
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
@@ -1214,9 +1223,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.CanAssignIssue.Should().BeTrue();
     }
 
-    /// <summary>PullRequestErstellenCommand ist verfügbar, wenn die Aufgabe beendet ist, einen Branch hat und ein Git-Plugin vorhanden ist.</summary>
+    /// <summary>PullRequestErstellenCommand ist verfügbar, wenn Branch, Repository und PR-Capability vorhanden sind; der Aufgabenstatus muss nicht Beendet sein.</summary>
     [Fact]
-    public async Task PullRequestErstellenCommand_CanExecute_WhenAufgabeBeendetMitBranchUndGitPlugin()
+    public async Task PullRequestErstellenCommand_CanExecute_WhenAufgabeGestartetMitBranchRepositoryUndPrCapability()
     {
         var repository = new GitRepository
         {
@@ -1231,14 +1240,40 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await _db.SaveChangesAsync();
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-aktionen", Path.GetTempPath());
-        await _aufgabeService.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Beendet);
         var sut = CreateSut(pluginManager: ErstelleGitPluginManager().Object);
 
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
+        sut.AufgabeStatus.Should().Be(AufgabeStatus.Gestartet);
         sut.KannPullRequestErstellen.Should().BeTrue();
         sut.PullRequestErstellenCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    /// <summary>PullRequestErstellenCommand bleibt trotz Branch und Repository deaktiviert, wenn das Git-Plugin keine PR-Erstellung unterstützt.</summary>
+    [Fact]
+    public async Task PullRequestErstellenCommand_CannotExecute_WhenPrCapabilityMissing()
+    {
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.TestGit",
+            RepositoryUrl = "test/repo",
+            RepositoryName = "Test Repository",
+            Aktiv = true
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe ohne Capability", "Beschreibung", repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pr-ohne-capability", Path.GetTempPath());
+        var sut = CreateSut(pluginManager: ErstelleGitPluginManager(canCreatePullRequest: false).Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.KannPullRequestErstellen.Should().BeFalse();
+        sut.PullRequestErstellenCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>CanAssignIssue ist false wenn IsCliRunning == true.</summary>

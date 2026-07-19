@@ -331,14 +331,14 @@ Ablauf:
 
 Beteiligte Komponenten:
 - `TaskDetailView` — Ribbon-Gruppe `Pull Request` mit Button `PullRequestErstellen`
-- `TaskDetailViewModel.PullRequestErstellenCommand` — UI-Command fuer beendete Aufgaben mit Branch und verknuepftem Repository
+- `TaskDetailViewModel.PullRequestErstellenCommand` — UI-Command fuer Aufgaben mit Branch, verknuepftem Repository und Pull-Request-Capability des Git-Plugins
 - `GitOrchestrationService.PullRequestErstellenAsync` — Hauptpfad fuer Git-Aktionen aus der Aufgabe
 - `EntwicklungsprozessService.PullRequestErstellenAsync` — aelterer PR-Pfad mit identischem Body-Aufbau
 - `PullRequestBodyBuilder` — zentrale Normalisierung des Pull-Request-Bodys
 - `IGitPlugin.CreatePullRequestAsync` — Provider-Aufruf mit normalisiertem Titel, Branch und Body
 
 Ablauf:
-1. Die UI zeigt den PR-Button nur fuer beendete Aufgaben mit Branch, verknuepftem Repository und SCM-Plugin an.
+1. Die UI zeigt den PR-Button fuer Aufgaben mit Branch, verknuepftem Repository und Pull-Request-Capability des SCM-/Git-Plugins an; der Aufgabenstatus ist keine Voraussetzung.
 2. Der Anwender klickt `PR erstellen`; `TaskDetailViewModel.PullRequestErstellenAsync` ruft den PR-Servicepfad auf.
 3. Der Service laedt die Aufgabe inklusive `IssueReferenz`.
 4. Der Branch-Name der Aufgabe wird validiert; ohne Branch wird kein Pull Request erstellt.

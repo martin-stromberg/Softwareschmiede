@@ -65,6 +65,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _scheduledPromptStatus;
     private string? _scheduledPromptTimeDisplay;
     private bool _showFileExplorerPanel;
+    private bool _canCreatePullRequest;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -354,11 +355,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         && !_isCliRunning;
 
     /// <summary>true wenn für die Aufgabe ein Pull Request erstellt werden kann.</summary>
-    public bool KannPullRequestErstellen => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet
-        && !_isCliRunning
+    public bool KannPullRequestErstellen => _aufgabe != null
         && !string.IsNullOrWhiteSpace(_aufgabe.BranchName)
         && !string.IsNullOrWhiteSpace(_aufgabe.GitRepository?.RepositoryUrl)
-        && _pluginManager.GetSourceCodeManagementPlugins().Any(p => p is IGitPlugin);
+        && _canCreatePullRequest;
 
     /// <summary>true wenn Aufgabe vorhanden, SCM-Plugin Issues unterstützt und kein CLI läuft.</summary>
     public bool CanAssignIssue => _aufgabe != null
@@ -543,6 +543,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             await LadeVerfuegbarePluginsAsync(ct);
             await LadePromptVorlagenAsync(ct);
+            await AktualisierePullRequestCapabilityAsync(ct);
 
             // Unmittelbar vor dem Auto-Restart nochmals live prüfen, ob der Prozess läuft.
             // Verhindert doppelten CLI-Start, wenn der Prozess nach dem Starten extrem schnell
@@ -665,6 +666,62 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             _logger.LogError(ex, "Fehler beim manuellen CLI-Neustart für Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"CLI konnte nicht gestartet werden: {ex.Message}";
         }
+    }
+
+    private async Task AktualisierePullRequestCapabilityAsync(CancellationToken ct)
+    {
+        _canCreatePullRequest = false;
+
+        if (_aufgabe is null
+            || string.IsNullOrWhiteSpace(_aufgabe.BranchName)
+            || string.IsNullOrWhiteSpace(_aufgabe.GitRepository?.RepositoryUrl))
+        {
+            OnPropertyChanged(nameof(KannPullRequestErstellen));
+            return;
+        }
+
+        var gitPlugin = ResolveGitPluginForAufgabe();
+        if (gitPlugin is null)
+        {
+            OnPropertyChanged(nameof(KannPullRequestErstellen));
+            return;
+        }
+
+        try
+        {
+            var capabilities = await gitPlugin.GetGitActionCapabilitiesAsync(_aufgabe.LokalerKlonPfad, ct);
+            _canCreatePullRequest = capabilities.CanCreatePullRequest;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Pull-Request-Capability für Aufgabe {AufgabeId} konnte nicht ermittelt werden.", _aufgabeId);
+        }
+        finally
+        {
+            OnPropertyChanged(nameof(KannPullRequestErstellen));
+        }
+    }
+
+    private IGitPlugin? ResolveGitPluginForAufgabe()
+    {
+        var gitPlugins = _pluginManager.GetSourceCodeManagementPlugins().OfType<IGitPlugin>().ToList();
+        if (gitPlugins.Count == 0)
+            return null;
+
+        var pluginTyp = _aufgabe?.GitRepository?.PluginTyp;
+        if (!string.IsNullOrWhiteSpace(pluginTyp))
+        {
+            var matchingPlugin = gitPlugins.FirstOrDefault(p =>
+                string.Equals(p.PluginPrefix, pluginTyp, StringComparison.OrdinalIgnoreCase));
+            if (matchingPlugin is not null)
+                return matchingPlugin;
+        }
+
+        return gitPlugins.FirstOrDefault();
     }
 
     private async Task AufgabeAbschliessenAsync(CancellationToken ct)
