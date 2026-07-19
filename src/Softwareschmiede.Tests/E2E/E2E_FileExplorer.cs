@@ -29,6 +29,15 @@ public sealed class E2E_FileExplorer : WpfTestBase
     /// erreichbar. Regressionstest für ein defektes Visibility-Binding (RelativeSource
     /// AncestorType=UserControl auf eine Eigenschaft, die nur im DataContext existiert), das das
     /// FileExplorerView zuvor dauerhaft sichtbar hielt und damit die anderen Register überdeckte.
+    ///
+    /// Prüft zusätzlich: Die Ribbon-Gruppen "CLI" und "Dateien" folgen der tatsächlich ausgewählten
+    /// Ansicht (IsCliViewSelected/IsFileExplorerViewSelected), nicht nur der grundsätzlichen
+    /// Verfügbarkeit des Panels (ShowCliPanel/ShowFileExplorerPanel). Während der ganzen Testdauer
+    /// bleiben sowohl ShowCliPanel (Status=Gestartet) als auch ShowFileExplorerPanel (Arbeitsverzeichnis
+    /// existiert) durchgehend true - ein an diese Properties gebundenes Ribbon würde die jeweilige
+    /// Gruppe daher fälschlich dauerhaft sichtbar lassen, unabhängig von der ausgewählten Ansicht.
+    /// Regressionstest für Issue #157 Nacharbeit: die Ribbon-Gruppen waren an ShowCliPanel/
+    /// ShowFileExplorerPanel statt an IsCliViewSelected/IsFileExplorerViewSelected gebunden.
     /// </summary>
     [SkippableFact]
     public void DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E()
@@ -41,16 +50,27 @@ public sealed class E2E_FileExplorer : WpfTestBase
 
         // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt) und
         // das CLI-Panel sichtbar - das bestätigt, dass der kombinierte Klon-/Start-Ablauf durchlief.
+        // Ab hier bleiben ShowCliPanel (Status=Gestartet) und ShowFileExplorerPanel (Klonpfad
+        // existiert) für den Rest des Tests durchgehend true.
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+
+        // In der initial ausgewählten CLI-Ansicht ist die Ribbon-Gruppe "CLI" sichtbar, die Gruppe
+        // "Dateien" dagegen nicht - obwohl das Arbeitsverzeichnis (ShowFileExplorerPanel) bereits existiert.
+        WaitForElement(mainWindow, cf => cf.ByName("PluginAendern"), Short);
+        WaitUntilGone(mainWindow, cf => cf.ByName("DateiStandard"), Short);
 
         var dateiViewButton = WaitForElement(mainWindow, cf => cf.ByName("DateiViewButton"), Short);
         dateiViewButton.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerStandardButton"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerVergleichButton"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerAktualisierenButton"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerDateiOeffnenButton"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiStandard"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiVergleich"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiAktualisieren"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("DateiOeffnen"), Short);
+
+        // Sobald zur Dateien-Ansicht gewechselt wurde, muss die Ribbon-Gruppe "CLI" verschwinden -
+        // obwohl ShowCliPanel (Status=Gestartet) weiterhin true ist.
+        WaitUntilGone(mainWindow, cf => cf.ByName("PluginAendern"), Short);
 
         var infoButton = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Short);
         infoButton.AsButton().Click();
@@ -59,9 +79,19 @@ public sealed class E2E_FileExplorer : WpfTestBase
         // sichtbar und überdeckte das Info-Register.
         WaitUntilGone(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
 
+        // In der Info-Ansicht ist weder die CLI- noch die Dateien-Ansicht ausgewählt - beide
+        // Ribbon-Gruppen müssen daher verschwinden, obwohl ShowCliPanel und ShowFileExplorerPanel
+        // beide weiterhin true sind.
+        WaitUntilGone(mainWindow, cf => cf.ByName("PluginAendern"), Short);
+        WaitUntilGone(mainWindow, cf => cf.ByName("DateiStandard"), Short);
+
         var cliViewButton = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
         cliViewButton.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("TerminalConsole"), Short);
+
+        // Zurück in der CLI-Ansicht: Ribbon-Gruppe "CLI" erscheint wieder, "Dateien" bleibt verborgen.
+        WaitForElement(mainWindow, cf => cf.ByName("PluginAendern"), Short);
+        WaitUntilGone(mainWindow, cf => cf.ByName("DateiStandard"), Short);
     }
 }

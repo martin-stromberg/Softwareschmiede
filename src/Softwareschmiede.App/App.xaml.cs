@@ -194,6 +194,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<PromptVorlagenPlatzhalterService>();
         services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();
         services.AddSingleton<ITextDiffService, TextDiffService>();
+        services.AddScoped<ArbeitsverzeichnisOeffnenService>();
+        services.AddScoped<IdeOeffnenService>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();
@@ -202,10 +204,14 @@ public sealed partial class App : System.Windows.Application
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH")))
         {
             services.AddSingleton<IPseudoConsoleProcessLauncher, SimulatedPseudoConsoleProcessLauncher>();
+            services.AddSingleton<IProzessStarter>(sp => new AufzeichnenderProzessStarter(
+                sp.GetRequiredService<ILogger<AufzeichnenderProzessStarter>>(),
+                AufzeichnenderProzessStarter.ResolveLogDateiPfad(dbPath)));
         }
         else
         {
             services.AddSingleton<IPseudoConsoleProcessLauncher, Win32PseudoConsoleProcessLauncher>();
+            services.AddSingleton<IProzessStarter, SystemProzessStarter>();
         }
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton(TimeProvider.System);

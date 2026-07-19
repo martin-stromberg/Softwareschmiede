@@ -63,7 +63,8 @@ Die wichtigsten Features:
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI und Codex CLI mit Echtzeit-Streaming der Ausgabe
 - **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
-- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung aus der Aufgabendetailansicht inkl. `Closes #<Issue>` fuer verknuepfte Issues
+- **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
+- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
 - **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
@@ -561,6 +562,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |
 | [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering und Clipboard-Paste |
 | [Dateiexplorer](docs/help/dateiexplorer/index.md) | Arbeitsbaum- und Diff-Ansicht in der Aufgabendetailansicht |
+| [Dateisystem-Integration](docs/help/dateisystem-integration/index.md) | Öffnen des Arbeitsverzeichnisses im OS-Dateiexplorer und von Visual-Studio-Solutions direkt aus dem Ribbon |
 | [Diff-Funktionalität](docs/help/diff/index.md) | Diff-Erzeugung, Persistenz und Viewer-Integration |
 | [Stabilität & Fehlerbehandlung](docs/help/stabilitaet/index.md) | Globale Exception-Handler und Absturzstabilisierung |
 | [Programmupdate](docs/help/programmupdate/index.md) | Update-Prüfung, Sidebar-Update/Refresh und Fortschrittsdialog |

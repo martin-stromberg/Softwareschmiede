@@ -29,6 +29,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Guid _projektId = Guid.NewGuid();
+    private readonly TestTempDirectoryFixture _tempDirectoryFixture = new();
 
     /// <summary>TaskDetailViewModelTests.</summary>
     public TaskDetailViewModelTests()
@@ -107,12 +108,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         _kiService.Dispose();
         _db.Dispose();
+        _tempDirectoryFixture.Dispose();
     }
+
+    private string CreateTempDirectory()
+        => _tempDirectoryFixture.CreateTempDirectory("tdvm_tests");
 
     private TaskDetailViewModel CreateSut(
         Action? zurueckAction = null,
         IPluginManager? pluginManager = null,
-        IServiceProvider? serviceProvider = null)
+        IServiceProvider? serviceProvider = null,
+        Mock<IProzessStarter>? prozessStarterMock = null)
     {
         if (pluginManager == null)
         {
@@ -125,6 +131,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
+
+        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(prozessStarterMock);
 
         var vm = new TaskDetailViewModel(
             _aufgabeService,
@@ -140,7 +148,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
             serviceProviderObj,
             NullLogger<TaskDetailViewModel>.Instance,
             TimeProvider.System,
-            fileExplorerViewModel);
+            fileExplorerViewModel,
+            arbeitsverzeichnisOeffnenService,
+            ideOeffnenService);
         vm.ZurueckAction = zurueckAction;
         return vm;
     }
@@ -1505,5 +1515,154 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.CurrentIssueReferenz.Should().NotBeNull();
         sut.CurrentIssueReferenz!.IssueNummer.Should().Be(42);
         sut.CurrentIssueReferenz.IssueUrl.Should().Be("https://github.com/test/42");
+    }
+
+    // --- OeffneArbeitsverzeichnisCommand ---
+
+    /// <summary>CanExecute von OeffneArbeitsverzeichnisCommand folgt ShowFileExplorerPanel: ohne Arbeitsverzeichnis false, mit existierendem Arbeitsverzeichnis true.</summary>
+    [Fact]
+    public async Task OeffneArbeitsverzeichnisCommand_CanExecute_FolgtShowFileExplorerPanel()
+    {
+        var aufgabe = await ErstelleAufgabe();
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.OeffneArbeitsverzeichnisCommand.CanExecute(null).Should().BeFalse("die Aufgabe hat noch kein Arbeitsverzeichnis");
+
+        var arbeitsverzeichnis = CreateTempDirectory();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.OeffneArbeitsverzeichnisCommand.CanExecute(null).Should().BeTrue("das Arbeitsverzeichnis existiert jetzt");
+    }
+
+    /// <summary>Ausführung von OeffneArbeitsverzeichnisCommand delegiert an ArbeitsverzeichnisOeffnenService mit dem LokalerKlonPfad der Aufgabe.</summary>
+    [Fact]
+    public async Task OeffneArbeitsverzeichnisCommand_RuftDienstMitLokalemKlonPfad()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var aufgabe = await ErstelleAufgabe();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var sut = CreateSut(prozessStarterMock: prozessStarterMock);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.OeffneArbeitsverzeichnisCommand.Execute(null);
+
+        prozessStarterMock.Verify(
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.Argumente == $"\"{arbeitsverzeichnis}\"")),
+            Times.Once);
+    }
+
+    // --- SolutionsVorhanden / OeffneIdeCommand ---
+
+    /// <summary>SolutionsVorhanden und OeffneIdeCommand.CanExecute folgen dem Ergebnis von IdeOeffnenService.FindeSolutions beim Laden der Aufgabe.</summary>
+    [Fact]
+    public async Task SolutionsVorhanden_WirdBeimLadenGesetzt()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var aufgabe = await ErstelleAufgabe();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SolutionsVorhanden.Should().BeFalse("das Arbeitsverzeichnis enthält noch keine .sln-Datei");
+        sut.OeffneIdeCommand.CanExecute(null).Should().BeFalse();
+
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Loesung.sln"), string.Empty);
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SolutionsVorhanden.Should().BeTrue("es wurde eine .sln-Datei im Arbeitsverzeichnis angelegt");
+        sut.OeffneIdeCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    /// <summary>Bei genau einer gefundenen Solution öffnet OeffneIdeCommand diese direkt, ohne den Auswahl-Dialog anzuzeigen.</summary>
+    [Fact]
+    public async Task OeffneIdeCommand_MitEinerSolution_OeffnetOhneDialog()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var solutionPfad = Path.Combine(arbeitsverzeichnis, "Loesung.sln");
+        File.WriteAllText(solutionPfad, string.Empty);
+
+        var aufgabe = await ErstelleAufgabe();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var sut = CreateSut(prozessStarterMock: prozessStarterMock);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+
+        prozessStarterMock.Verify(
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == solutionPfad && a.ShellAusfuehren)),
+            Times.Once);
+        _dialogServiceMock.Verify(
+            d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>Bei mehreren gefundenen Solutions zeigt OeffneIdeCommand den Auswahl-Dialog und öffnet die dort gewählte Solution.</summary>
+    [Fact]
+    public async Task OeffneIdeCommand_MitMehrerenSolutions_ZeigtAuswahlDialog()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var ersteSolution = Path.Combine(arbeitsverzeichnis, "Erste.sln");
+        var zweiteSolution = Path.Combine(arbeitsverzeichnis, "Zweite.sln");
+        File.WriteAllText(ersteSolution, string.Empty);
+        File.WriteAllText(zweiteSolution, string.Empty);
+
+        var aufgabe = await ErstelleAufgabe();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        _dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(zweiteSolution);
+
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var sut = CreateSut(prozessStarterMock: prozessStarterMock);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+
+        _dialogServiceMock.Verify(
+            d => d.ShowSolutionSelectionDialogAsync(
+                It.Is<IReadOnlyList<string>>(liste => liste.Contains(ersteSolution) && liste.Contains(zweiteSolution)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        prozessStarterMock.Verify(
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == zweiteSolution && a.ShellAusfuehren)),
+            Times.Once);
+    }
+
+    /// <summary>Bricht der Nutzer den Auswahl-Dialog bei mehreren Solutions ab (Rückgabe null), wird keine Solution geöffnet.</summary>
+    [Fact]
+    public async Task OeffneIdeCommand_MitMehrerenSolutions_AbbruchOeffnetKeine()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Erste.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Zweite.sln"), string.Empty);
+
+        var aufgabe = await ErstelleAufgabe();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        _dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var sut = CreateSut(prozessStarterMock: prozessStarterMock);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+
+        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 }

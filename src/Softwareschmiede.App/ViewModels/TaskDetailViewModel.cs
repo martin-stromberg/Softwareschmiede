@@ -40,6 +40,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly IPluginManager _pluginManager;
     private readonly IServiceProvider _serviceProvider;
     private readonly FileExplorerViewModel _fileExplorerViewModel;
+    private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
+    private readonly IdeOeffnenService _ideOeffnenService;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -65,6 +67,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _scheduledPromptStatus;
     private string? _scheduledPromptTimeDisplay;
     private bool _showFileExplorerPanel;
+    private IReadOnlyList<string> _solutionPfade = [];
     private bool _canCreatePullRequest;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
@@ -100,6 +103,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             SetProperty(ref _aufgabe, value);
             _showFileExplorerPanel = !string.IsNullOrEmpty(value?.LokalerKlonPfad) && Directory.Exists(value.LokalerKlonPfad);
+            _solutionPfade = ErmittleSolutionPfade(value);
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
             OnPropertyChanged(nameof(AufgabeBranchName));
@@ -109,6 +113,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowCliPanel));
             OnPropertyChanged(nameof(ShowDiffPanel));
             OnPropertyChanged(nameof(ShowFileExplorerPanel));
+            OnPropertyChanged(nameof(SolutionsVorhanden));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(KannPullRequestErstellen));
@@ -337,6 +342,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="Aufgabe"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
     public bool ShowFileExplorerPanel => _showFileExplorerPanel;
 
+    /// <summary>True wenn beim Laden der Aufgabe mindestens eine <c>*.sln</c>-Datei im Arbeitsverzeichnis gefunden wurde. Steuert <see cref="OeffneIdeCommand"/>.CanExecute.</summary>
+    public bool SolutionsVorhanden => _solutionPfade.Count > 0;
+
     /// <summary>True wenn die Info-Ansicht angezeigt werden soll.</summary>
     public bool ShowInfoPanel => IsInfoViewSelected;
 
@@ -425,6 +433,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Plant den Versand der aktuell gewählten Promptvorlage zur eingegebenen Zielzeit.</summary>
     public ICommand SchedulePromptCommand { get; }
 
+    /// <summary>Öffnet das Arbeitsverzeichnis der Aufgabe im OS-Dateiexplorer.</summary>
+    public ICommand OeffneArbeitsverzeichnisCommand { get; }
+
+    /// <summary>Öffnet die Solution des Arbeitsverzeichnisses mit der registrierten IDE.</summary>
+    public ICommand OeffneIdeCommand { get; }
+
     /// <summary>Wird gefeuert, wenn eine neue <see cref="PseudoConsoleSession"/> gestartet wurde. Löst weiterhin
     /// das Binden von <c>TerminalControl.Session</c> in <c>TaskDetailView</c> aus, unabhängig davon, ob die
     /// Leseschleife der Session bereits vor der UI-Bindung läuft (parallele CLI-Ausführungen, Issue-86).</summary>
@@ -459,6 +473,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         ILogger<TaskDetailViewModel> logger,
         TimeProvider timeProvider,
         FileExplorerViewModel fileExplorerViewModel,
+        ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
+        IdeOeffnenService ideOeffnenService,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -474,6 +490,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _serviceProvider = serviceProvider;
         _logger = logger;
         _fileExplorerViewModel = fileExplorerViewModel;
+        _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
+        _ideOeffnenService = ideOeffnenService;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -503,6 +521,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
         SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
+        OeffneArbeitsverzeichnisCommand = new RelayCommand(OeffneArbeitsverzeichnis, () => ShowFileExplorerPanel);
+        OeffneIdeCommand = new AsyncRelayCommand(OeffneIdeAsync, () => SolutionsVorhanden);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -1335,5 +1355,69 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ScheduledPromptTimeDisplay = null;
             WaehleAnsicht(DetailAnsicht.Cli);
         });
+    }
+
+    private IReadOnlyList<string> ErmittleSolutionPfade(Aufgabe? aufgabe)
+    {
+        if (!_showFileExplorerPanel)
+            return [];
+
+        try
+        {
+            return _ideOeffnenService.FindeSolutions(aufgabe!.LokalerKlonPfad);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Suchen nach Solutions im Arbeitsverzeichnis {LokalerKlonPfad}.", aufgabe!.LokalerKlonPfad);
+            return [];
+        }
+    }
+
+    private void OeffneArbeitsverzeichnis()
+    {
+        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
+            return;
+
+        FehlerMeldung = null;
+
+        try
+        {
+            _arbeitsverzeichnisOeffnenService.Oeffne(lokalerKlonPfad);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Öffnen des Arbeitsverzeichnisses {LokalerKlonPfad}.", lokalerKlonPfad);
+            FehlerMeldung = $"Arbeitsverzeichnis konnte nicht geöffnet werden: {ex.Message}";
+        }
+    }
+
+    private async Task OeffneIdeAsync(CancellationToken ct)
+    {
+        if (_solutionPfade.Count == 0)
+            return;
+
+        FehlerMeldung = null;
+
+        string? solutionPfad;
+        if (_solutionPfade.Count == 1)
+        {
+            solutionPfad = _solutionPfade[0];
+        }
+        else
+        {
+            solutionPfad = await _dialogService.ShowSolutionSelectionDialogAsync(_solutionPfade, ct);
+            if (solutionPfad is null)
+                return;
+        }
+
+        try
+        {
+            _ideOeffnenService.OeffneSolution(solutionPfad);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Öffnen der Solution {SolutionPfad}.", solutionPfad);
+            FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
+        }
     }
 }

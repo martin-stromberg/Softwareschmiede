@@ -25,4 +25,9 @@ public interface IDialogService
     Task<Issue?> ShowIssueSelectionDialogAsync(
         IssueSelectionDialogViewModel viewModel,
         CancellationToken ct = default);
+
+    /// <summary>Zeigt den Solution-Auswahl-Dialog und gibt den gewählten Solution-Pfad zurück, oder null wenn abgebrochen.</summary>
+    Task<string?> ShowSolutionSelectionDialogAsync(
+        IReadOnlyList<string> solutionPfade,
+        CancellationToken ct = default);
 }

@@ -95,6 +95,61 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
+    /// Löscht die Logdatei des <see cref="Infrastructure.Services.AufzeichnenderProzessStarter"/>, falls sie existiert.
+    /// Verhindert, dass Einträge aus vorherigen Testläufen die Substring-Prüfungen von
+    /// <see cref="WaitForProzessStartEintragAsync"/> verfälschen.
+    /// </summary>
+    private void DeleteProzessStartLog()
+    {
+        var pfad = ResolveProzessStartLogPfad();
+        if (File.Exists(pfad))
+            File.Delete(pfad);
+    }
+
+    private string ResolveProzessStartLogPfad()
+        => AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
+
+    /// <summary>
+    /// Wartet, bis die Logdatei des <see cref="Infrastructure.Services.AufzeichnenderProzessStarter"/> einen
+    /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
+    /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>IProzessStarter</c> auf
+    /// <see cref="Infrastructure.Services.AufzeichnenderProzessStarter"/> zeigt.
+    /// </summary>
+    /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags.</param>
+    /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>
+    /// <exception cref="TimeoutException">Wird geworfen, wenn kein passender Eintrag innerhalb von <paramref name="timeout"/> erscheint.</exception>
+    protected async Task WaitForProzessStartEintragAsync(string substring, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? Short;
+        var pfad = ResolveProzessStartLogPfad();
+        var deadline = DateTime.UtcNow + effectiveTimeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (File.Exists(pfad))
+            {
+                try
+                {
+                    var inhalt = await File.ReadAllTextAsync(pfad);
+                    if (inhalt.Contains(substring, StringComparison.Ordinal))
+                        return;
+                }
+                catch (IOException)
+                {
+                    // Die Logdatei wird gerade parallel von der App per File.AppendAllText beschrieben
+                    // (AufzeichnenderProzessStarter.Starten). Ein kollidierender Zugriff wird beim
+                    // nächsten Poll-Intervall erneut versucht, statt den Test abzubrechen.
+                }
+            }
+
+            await Task.Delay(200);
+        }
+
+        throw new TimeoutException(
+            $"Die Prozessstart-Logdatei enthielt nicht innerhalb von {effectiveTimeout.TotalSeconds}s einen Eintrag mit '{substring}'.");
+    }
+
+    /// <summary>
     /// Startet die Anwendung als Prozess mit einem temporären Datenbankpfad.
     /// Wartet, bis das Hauptfenster sichtbar ist.
     /// </summary>
@@ -105,6 +160,8 @@ public abstract class WpfTestBase : IDisposable
         {
             DeleteTestDatabase();
         }
+
+        DeleteProzessStartLog();
 
         var appPath = ResolveAppExePath();
 
@@ -179,6 +236,9 @@ public abstract class WpfTestBase : IDisposable
 
         try { DeleteTestDatabase(); }
         catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Testdatenbank: {ex}"); }
+
+        try { DeleteProzessStartLog(); }
+        catch (Exception ex) { Debug.WriteLine($"WpfTestBase.Dispose: Fehler beim Löschen der Prozessstart-Logdatei: {ex}"); }
 
         // Umgebungsvariable zurücksetzen, damit sie nicht in andere Tests im selben Prozess
         // hineinleckt (z. B. PluginManagerTests, die ohne Test-Modus-Einschränkung laufen sollen).

@@ -68,4 +68,21 @@ public sealed class WpfDialogService : IDialogService
             return result == true ? viewModel.SelectedIssue : null;
         }).Task;
     }
+
+    /// <inheritdoc/>
+    public Task<string?> ShowSolutionSelectionDialogAsync(
+        IReadOnlyList<string> solutionPfade,
+        CancellationToken ct = default)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var viewModel = new SolutionSelectionDialogViewModel(solutionPfade);
+            var dialog = new SolutionSelectionDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            var result = dialog.ShowDialog();
+            return result == true ? viewModel.SelectedSolution : null;
+        }).Task;
+    }
 }

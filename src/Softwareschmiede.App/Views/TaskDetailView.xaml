@@ -19,6 +19,9 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="8,8,8,8">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled"
+                          VerticalAlignment="Bottom">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
 
                 <!-- Gruppe: Navigation -->
@@ -56,7 +59,8 @@
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: CLI -->
-                <controls:RibbonGroup GruppenName="CLI">
+                <controls:RibbonGroup GruppenName="CLI"
+                                      Visibility="{Binding IsCliViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="🔌"
@@ -130,6 +134,47 @@
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
+                <!-- Gruppe: Dateien -->
+                <controls:RibbonGroup GruppenName="Dateien"
+                                      Visibility="{Binding IsFileExplorerViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="📁"
+                                                        ButtonText="Standard"
+                                                        AutomationName="DateiStandard"
+                                                        ButtonCommand="{Binding FileExplorer.StandardAnsichtCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🔀"
+                                                        ButtonText="Vergleich"
+                                                        AutomationName="DateiVergleich"
+                                                        ButtonCommand="{Binding FileExplorer.VergleichCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🔄"
+                                                        ButtonText="Aktualisieren"
+                                                        AutomationName="DateiAktualisieren"
+                                                        ButtonCommand="{Binding FileExplorer.AktualisierenCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="📂"
+                                                        ButtonText="Datei öffnen"
+                                                        AutomationName="DateiOeffnen"
+                                                        ButtonCommand="{Binding FileExplorer.DateiMitStandardanwendungOeffnenCommand}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
+                <!-- Gruppe: Werkzeuge -->
+                <controls:RibbonGroup GruppenName="Werkzeuge">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="🗀"
+                                                        ButtonText="Arbeitsverzeichnis öffnen"
+                                                        AutomationName="ArbeitsverzeichnisOeffnen"
+                                                        ButtonCommand="{Binding OeffneArbeitsverzeichnisCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🛠"
+                                                        ButtonText="IDE öffnen"
+                                                        AutomationName="IdeOeffnen"
+                                                        ButtonCommand="{Binding OeffneIdeCommand}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
                 <!-- Gruppe: Issue -->
                 <controls:RibbonGroup GruppenName="Issue"
                                       Visibility="{Binding CanAssignIssue, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -162,6 +207,7 @@
                 </controls:RibbonGroup>
 
             </StackPanel>
+            </ScrollViewer>
         </Border>
 
         <!-- Fehler -->

@@ -1,3 +1,23 @@
+## 2026-07-19 — Überführen der Verzeichnis-Aktionsbuttons in das Ribbon-Menü
+
+- Feature: Buttons des Dateiexplorers (Ansichtswechsel, Refresh, Dateiöffnung) werden aus der Baum-UI in eine neue Ribbon-Gruppe „Dateien" integriert. Zwei neue Aktionsbuttons „Arbeitsverzeichnis öffnen" (startet den OS-Dateiexplorer) und „IDE öffnen" (öffnet die `.sln`-Datei mit dem Standard-Handler) werden in neuer Ribbon-Gruppe „Werkzeuge" hinzugefügt.
+- Neue Infrastruktur: Gateway-Abstraktion `IProzessStarter` mit Value Object `ProzessStartAnfrage` entkoppelt Prozessstart-Logik; `SystemProzessStarter` (real) und `AufzeichnenderProzessStarter` (Test) implementieren Betriebssystem-Integration.
+- Neue Services:
+  - `ArbeitsverzeichnisOeffnenService`: Startet den Windows-Dateiexplorer (`explorer.exe`); auf anderen Plattformen wird `PlatformNotSupportedException` geworfen.
+  - `IdeOeffnenService`: Findet alle `.sln`-Dateien (oberste Verzeichnisebene, alphabetisch sortiert) und öffnet sie per Shell-Execute.
+- UI-Dialog: `SolutionSelectionDialogViewModel` + `SolutionSelectionDialog` (modales Fenster) ermöglichen Auswahl bei mehreren gefundenen Solutions.
+- ViewModel-Erweiterung: `TaskDetailViewModel` cached Solution-Pfade beim Laden der Aufgabe, stellt neue Commands `OeffneArbeitsverzeichnisCommand` und `OeffneIdeCommand` bereit.
+- Sichtbarkeitsbindungen: Ribbon-Gruppe „Dateien" (sichtbar wenn Dateien-Ansicht ausgewählt ist), Gruppe „CLI" (sichtbar wenn CLI-Ansicht ausgewählt ist), Gruppe „Werkzeuge" (immer sichtbar, Buttons deaktiviert ohne Repository/Solution).
+- Fehlerbehandlung: Prozessstart-Fehler (z. B. IDE nicht installiert) werden geloggt und als `FehlerMeldung`-Banner angezeigt.
+- Tests: Unit-Tests für Services (`ArbeitsverzeichnisOeffnenServiceTests`, `IdeOeffnenServiceTests`, `AufzeichnenderProzessStarterTests`); E2E-Tests prüfen Ribbon-Button-Funktionalität und Dialog-Auswahl.
+- Dokumentation: `docs/help/dateisystem-integration/` mit Beschreibungen, technischem Ablauf, Benutzerablauf und Architektur.
+
+## 2026-07-19 — Fix: Ribbon-Gruppen „CLI"/„Dateien" folgten Panel-Verfügbarkeit statt ausgewählter Ansicht (Nacharbeit zu Issue #157)
+
+- Nutzerfeedback: Die Ribbon-Gruppen „CLI" und „Dateien" waren an `ShowCliPanel`/`ShowFileExplorerPanel` gebunden (Panel grundsätzlich verfügbar, abhängig von Aufgabenstatus bzw. Verzeichnisexistenz) statt an `IsCliViewSelected`/`IsFileExplorerViewSelected` (Panel tatsächlich angezeigt). Dadurch blieben beide Gruppen dauerhaft sichtbar, sobald das jeweilige Panel einmal verfügbar war — unabhängig davon, welche Ansicht der Nutzer gerade ausgewählt hatte.
+- Fix: `TaskDetailView.xaml` bindet die `Visibility` beider Ribbon-Gruppen jetzt an `IsCliViewSelected` bzw. `IsFileExplorerViewSelected`.
+- Regressionstest: `E2E_FileExplorer.DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E` erweitert um Prüfungen, dass beide Ribbon-Gruppen beim Ansichtswechsel (CLI → Dateien → Info → CLI) korrekt ein-/ausgeblendet werden, obwohl die zugrundeliegende Panel-Verfügbarkeit während des gesamten Szenarios unverändert bleibt.
+
 ## 2026-07-19 — E2E-Test-Struktur: Dritte Konsolidierungsrunde inkl. `E2E_WorkingDirectory` (Nacharbeit zu Issue #153)
 
 - Nutzerfeedback zur zweiten Runde: `E2E_WorkingDirectory` wurde vorschnell als "nicht konsolidierbar" eingestuft — die drei zuvor beobachteten Fehler hatten konkrete, behebbare Ursachen statt einer grundsätzlichen technischen Grenze.

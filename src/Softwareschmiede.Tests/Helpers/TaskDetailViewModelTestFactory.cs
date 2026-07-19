@@ -19,6 +19,9 @@ public static class TaskDetailViewModelTestFactory
     public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService)
     {
         var dialogServiceMock = new Mock<IDialogService>();
+        dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
         var kiService = TestKiAusfuehrungsServiceFactory.Create();
         var protokollService = new ProtokollService(db, NullLogger<ProtokollService>.Instance);
         var pluginManagerMock = new Mock<IPluginManager>();
@@ -44,6 +47,8 @@ public static class TaskDetailViewModelTestFactory
 
         var fileExplorerViewModel = CreateStub();
 
+        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = CreateVerzeichnisAktionenServices();
+
         return new TaskDetailViewModel(
             aufgabeService,
             protokollService,
@@ -58,7 +63,9 @@ public static class TaskDetailViewModelTestFactory
             serviceProviderMock.Object,
             NullLogger<TaskDetailViewModel>.Instance,
             TimeProvider.System,
-            fileExplorerViewModel);
+            fileExplorerViewModel,
+            arbeitsverzeichnisOeffnenService,
+            ideOeffnenService);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
@@ -68,4 +75,16 @@ public static class TaskDetailViewModelTestFactory
             new Mock<IGitWorkspaceBrowserService>().Object,
             new Mock<ITextDiffService>().Object,
             NullLogger<FileExplorerViewModel>.Instance);
+
+    /// <summary>Erstellt ArbeitsverzeichnisOeffnenService und IdeOeffnenService, die denselben IProzessStarter-Mock verwenden.</summary>
+    /// <param name="prozessStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
+    /// <returns>Ein Tupel aus ArbeitsverzeichnisOeffnenService und IdeOeffnenService.</returns>
+    public static (ArbeitsverzeichnisOeffnenService ArbeitsverzeichnisOeffnenService, IdeOeffnenService IdeOeffnenService) CreateVerzeichnisAktionenServices(
+        Mock<IProzessStarter>? prozessStarterMock = null)
+    {
+        prozessStarterMock ??= new Mock<IProzessStarter>();
+        return (
+            new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object),
+            new IdeOeffnenService(prozessStarterMock.Object));
+    }
 }
