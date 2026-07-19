@@ -255,6 +255,29 @@ public sealed class GitHubPluginTests
         result.BranchName.Should().Be("feature/branch");
     }
 
+    /// <summary>CreatePullRequestAsync liefert eine verständliche Meldung, wenn kein Commit-Unterschied zum Zielbranch existiert.</summary>
+    [Fact]
+    public async Task CreatePullRequestAsync_ShouldExplainNoCommitsBetweenFailure()
+    {
+        // Arrange
+        const string ghError = "pull request create failed: GraphQL: Head sha can't be blank. Base sha can't be blank, No commits between main and feature/branch";
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, ghError));
+
+        // Act
+        var act = () => _sut.CreatePullRequestAsync("owner/repo", "feature/branch", "My PR", "Body");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*enthält keine Commits gegenüber dem Zielbranch*");
+    }
+
     /// <summary>CheckHealthAsync gibt true zurück wenn gh auth status erfolgreich ist.</summary>
     [Fact]
     public async Task CheckHealthAsync_ShouldReturnTrue_WhenGhAuthStatusSucceeds()

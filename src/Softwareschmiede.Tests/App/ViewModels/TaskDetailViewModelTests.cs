@@ -1267,6 +1267,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
                 CanPull: true,
                 CanCreatePullRequest: true,
                 CanMergeToSource: false));
+        gitPluginMock.Setup(p => p.PushBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         gitPluginMock.Setup(p => p.CreatePullRequestAsync(
                 "test/repo",
                 "feature/pr-url",
@@ -1314,6 +1316,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.PullRequestErstellenCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().BeNull();
+        gitPluginMock.Verify(p => p.PushBranchAsync(
+                It.IsAny<string>(),
+                "feature/pr-url",
+                It.IsAny<CancellationToken>()),
+            Times.Once);
         gitPluginMock.Verify(p => p.CreatePullRequestAsync(
                 "test/repo",
                 "feature/pr-url",

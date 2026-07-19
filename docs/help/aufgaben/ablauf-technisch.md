@@ -345,8 +345,9 @@ Ablauf:
 5. Der Pull-Request-Body wird ueber `PullRequestBodyBuilder.Build(aufgabe, body)` normalisiert.
 6. Falls `IssueReferenz.IssueNummer > 0` gilt und der Body noch keine Closing-Direktive fuer dieselbe Issue enthaelt, wird `Closes #<IssueNummer>` ergaenzt.
 7. Bestehende Closing-Direktiven fuer dieselbe Issue werden erkannt und nicht dupliziert; Direktiven fuer andere Issues bleiben erhalten.
-8. Das aufgeloeste Git-Plugin erstellt den Pull Request mit dem normalisierten Body.
-9. Bei gueltiger Issue-Nummer wird im Aufgabenprotokoll vermerkt, dass Auto-Close aktiv ist.
+8. Das aufgeloeste Git-Plugin pusht den Aufgabenbranch zum Remote, damit `gh pr create` eine Head-Revision findet.
+9. Das aufgeloeste Git-Plugin erstellt den Pull Request mit dem normalisierten Body.
+10. Bei gueltiger Issue-Nummer wird im Aufgabenprotokoll vermerkt, dass Auto-Close aktiv ist.
 
 Bei GitHub schliesst die `Closes #<IssueNummer>`-Direktive das verknuepfte Issue automatisch, sobald der Pull Request gemergt wird. Andere SCM-Provider erhalten dieselbe Information als normalen Pull-Request-Text, falls sie keine GitHub-kompatible Schliesslogik auswerten.
 

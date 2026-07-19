@@ -33,6 +33,8 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.SetupGet(plugin => plugin.PluginPrefix).Returns("Mock.Git");
         _gitPluginMock.SetupGet(plugin => plugin.PluginType).Returns(PluginType.SourceCodeManagement);
         _gitPluginMock.Setup(plugin => plugin.GetSettingGroups()).Returns([]);
+        _gitPluginMock.Setup(plugin => plugin.PushBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
         pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
@@ -414,9 +416,13 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         // Assert
         result.Should().Be(expectedPr);
         _gitPluginMock.Verify(
+            g => g.PushBranchAsync(@"C:\repos\task-4", "feature/pr", It.IsAny<CancellationToken>()),
+            Times.Once);
+        _gitPluginMock.Verify(
             g => g.CreatePullRequestAsync("test/repo", "feature/pr", "Custom title", "Custom body", It.IsAny<CancellationToken>()),
             Times.Once);
         var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
+        protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("vor Pull-Request-Erstellung gepusht"));
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Pull Request erstellt: #42"));
     }
 
