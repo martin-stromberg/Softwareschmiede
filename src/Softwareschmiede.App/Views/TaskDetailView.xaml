@@ -60,7 +60,7 @@
 
                 <!-- Gruppe: CLI -->
                 <controls:RibbonGroup GruppenName="CLI"
-                                      Visibility="{Binding ShowCliPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+                                      Visibility="{Binding IsCliViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="🔌"
@@ -136,7 +136,7 @@
 
                 <!-- Gruppe: Dateien -->
                 <controls:RibbonGroup GruppenName="Dateien"
-                                      Visibility="{Binding ShowFileExplorerPanel, Converter={StaticResource BoolToVisibilityConverter}}">
+                                      Visibility="{Binding IsFileExplorerViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="📁"
