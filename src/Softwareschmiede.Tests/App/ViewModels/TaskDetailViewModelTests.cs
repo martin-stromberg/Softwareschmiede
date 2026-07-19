@@ -1273,7 +1273,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
                 "test/repo",
                 "feature/pr-url",
                 "PR aus UI",
-                "Beschreibung",
+                It.Is<string>(body =>
+                    body.Contains("## Commits")
+                    && body.Contains("- `abc1234` feat: UI-PR erstellt Commitliste")
+                    && !body.Contains("Beschreibung")),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequest(7, "PR aus UI", string.Empty, "feature/pr-url"));
 
@@ -1299,13 +1302,31 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
         var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance, pluginManagerMock.Object);
+        var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
+        workspaceBrowserMock
+            .Setup(browser => browser.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WorkspaceSnapshot
+            {
+                RepositoryPath = Path.GetTempPath(),
+                CommitCount = 1,
+                BranchCommits =
+                [
+                    new BranchCommit
+                    {
+                        Sha = "abc1234abc1234abc1234abc1234abc1234abc1",
+                        ShortSha = "abc1234",
+                        Subject = "feat: UI-PR erstellt Commitliste"
+                    }
+                ]
+            });
         var gitOrchestrationService = new GitOrchestrationService(
             _aufgabeService,
             projektService,
             _protokollService,
             gitPluginMock.Object,
             pluginSelectionService,
-            NullLogger<GitOrchestrationService>.Instance);
+            NullLogger<GitOrchestrationService>.Instance,
+            workspaceBrowserMock.Object);
         var serviceProviderMock = new Mock<IServiceProvider>();
         serviceProviderMock.Setup(sp => sp.GetService(typeof(GitOrchestrationService))).Returns(gitOrchestrationService);
 
@@ -1325,7 +1346,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
                 "test/repo",
                 "feature/pr-url",
                 "PR aus UI",
-                "Beschreibung",
+                It.Is<string>(body =>
+                    body.Contains("## Commits")
+                    && body.Contains("- `abc1234` feat: UI-PR erstellt Commitliste")
+                    && !body.Contains("Beschreibung")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         gitPluginMock.Verify(p => p.CreatePullRequestAsync(

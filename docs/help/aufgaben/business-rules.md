@@ -58,6 +58,7 @@
 - Fuer dieselbe Issue existiert im Pull-Request-Body noch keine Closing-Direktive.
 
 **Verhalten:**
+- Der Pull-Request-Body aus der Aufgabendetailansicht enthaelt primaer die Commits des Aufgabenbranches statt der urspruenglichen Anforderungsbeschreibung.
 - Der Pull-Request-Body wird um `Closes #<IssueNummer>` ergaenzt.
 - Ein leerer oder nur aus Whitespace bestehender Body wird durch die Closing-Direktive ersetzt.
 - Bereits vorhandene Direktiven fuer dieselbe Issue, z. B. `Fixes #17`, `Closed #17` oder `Fixes owner/repo#17`, werden nicht dupliziert.

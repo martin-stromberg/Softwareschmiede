@@ -426,6 +426,82 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("Pull Request erstellt: #42"));
     }
 
+    /// <summary>PullRequestErstellenAsync baut den PR-Body aus den Branch-Commits statt aus der ursprünglichen Anforderungsbeschreibung.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldUseCommitListBody_WhenWorkspaceSnapshotAvailable()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt mit Commitliste", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/commit-body",
+            "test/commit-body");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Commits", "Alte Anforderung", repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/commit-body", @"C:\repos\task-commit-body");
+
+        var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
+        workspaceBrowserMock
+            .Setup(browser => browser.LoadSnapshotAsync(@"C:\repos\task-commit-body", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WorkspaceSnapshot
+            {
+                RepositoryPath = @"C:\repos\task-commit-body",
+                CommitCount = 2,
+                BranchCommits =
+                [
+                    new BranchCommit { Sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ShortSha = "aaaaaaa", Subject = "feat: PR Body aus Commits" },
+                    new BranchCommit { Sha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", ShortSha = "bbbbbbb", Subject = "test: Commitliste absichern" }
+                ]
+            });
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
+        pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+
+        var sut = new GitOrchestrationService(
+            _aufgabeService,
+            _projektService,
+            _protokollService,
+            _gitPluginMock.Object,
+            new PluginSelectionService(
+                pluginManagerMock.Object,
+                new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object),
+                new Mock<ILogger<PluginSelectionService>>().Object),
+            new Mock<ILogger<GitOrchestrationService>>().Object,
+            workspaceBrowserMock.Object);
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/commit-body",
+                "feature/commit-body",
+                "PR mit Commits",
+                It.Is<string>(body =>
+                    body.Contains("## Commits")
+                    && body.Contains("- `aaaaaaa` feat: PR Body aus Commits")
+                    && body.Contains("- `bbbbbbb` test: Commitliste absichern")
+                    && !body.Contains("Alte Anforderung")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(44, "PR mit Commits", "https://example/pr/44", "feature/commit-body"));
+
+        // Act
+        await sut.PullRequestErstellenAsync(aufgabe.Id);
+
+        // Assert
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/commit-body",
+            "feature/commit-body",
+            "PR mit Commits",
+            It.Is<string>(body =>
+                body.Contains("## Commits")
+                && body.Contains("- `aaaaaaa` feat: PR Body aus Commits")
+                && body.Contains("- `bbbbbbb` test: Commitliste absichern")
+                && !body.Contains("Alte Anforderung")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     /// <summary>PullRequestErstellenAsync nutzt das aktive Projekt-Repository, wenn die Aufgabe keines zugewiesen hat.</summary>
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldUseProjectRepository_WhenAufgabeHasNoLinkedRepository()

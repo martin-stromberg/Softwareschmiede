@@ -334,7 +334,8 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel.PullRequestErstellenCommand` — UI-Command fuer Aufgaben mit Branch, verknuepftem Repository und Pull-Request-Capability des Git-Plugins
 - `GitOrchestrationService.PullRequestErstellenAsync` — Hauptpfad fuer Git-Aktionen aus der Aufgabe
 - `EntwicklungsprozessService.PullRequestErstellenAsync` — aelterer PR-Pfad mit identischem Body-Aufbau
-- `PullRequestBodyBuilder` — zentrale Normalisierung des Pull-Request-Bodys
+- `IGitWorkspaceBrowserService.LoadSnapshotAsync` — ermittelt die Branch-Commits relativ zur Basisreferenz
+- `PullRequestBodyBuilder` — zentrale Normalisierung des Pull-Request-Bodys inklusive Commitliste und Closing-Direktive
 - `IGitPlugin.CreatePullRequestAsync` — Provider-Aufruf mit normalisiertem Titel, Branch und Body
 
 Ablauf:
@@ -342,7 +343,7 @@ Ablauf:
 2. Der Anwender klickt `PR erstellen`; `TaskDetailViewModel.PullRequestErstellenAsync` ruft den PR-Servicepfad auf.
 3. Der Service laedt die Aufgabe inklusive `IssueReferenz`.
 4. Der Branch-Name der Aufgabe wird validiert; ohne Branch wird kein Pull Request erstellt.
-5. Der Pull-Request-Body wird ueber `PullRequestBodyBuilder.Build(aufgabe, body)` normalisiert.
+5. Der Service laedt die Branch-Commits aus dem lokalen Arbeitsverzeichnis und baut daraus eine Markdown-Liste fuer den Pull-Request-Body.
 6. Falls `IssueReferenz.IssueNummer > 0` gilt und der Body noch keine Closing-Direktive fuer dieselbe Issue enthaelt, wird `Closes #<IssueNummer>` ergaenzt.
 7. Bestehende Closing-Direktiven fuer dieselbe Issue werden erkannt und nicht dupliziert; Direktiven fuer andere Issues bleiben erhalten.
 8. Das aufgeloeste Git-Plugin pusht den Aufgabenbranch zum Remote, damit `gh pr create` eine Head-Revision findet.
