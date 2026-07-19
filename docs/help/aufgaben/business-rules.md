@@ -48,6 +48,27 @@
 
 ---
 
+## Automatische Issue-Schliessung bei Pull Requests
+
+**Beschreibung:** Wenn eine Aufgabe aus einem GitHub-Issue erstellt wurde, bleibt die Issue-Referenz an der Aufgabe erhalten und wird beim Erstellen eines Pull Requests automatisch in den Pull-Request-Body uebernommen.
+
+**Bedingungen:**
+- Die Aufgabe hat eine `IssueReferenz`.
+- `IssueReferenz.IssueNummer` ist groesser als 0.
+- Fuer dieselbe Issue existiert im Pull-Request-Body noch keine Closing-Direktive.
+
+**Verhalten:**
+- Der Pull-Request-Body aus der Aufgabendetailansicht enthaelt primaer die Commits des Aufgabenbranches statt der urspruenglichen Anforderungsbeschreibung.
+- Der Pull-Request-Body wird um `Closes #<IssueNummer>` ergaenzt.
+- Ein leerer oder nur aus Whitespace bestehender Body wird durch die Closing-Direktive ersetzt.
+- Bereits vorhandene Direktiven fuer dieselbe Issue, z. B. `Fixes #17`, `Closed #17` oder `Fixes owner/repo#17`, werden nicht dupliziert.
+- Direktiven fuer andere Issues bleiben erhalten; die aktuelle Issue wird zusaetzlich ergaenzt.
+- Aufgaben ohne Issue-Referenz oder ohne gueltige Issue-Nummer behalten das bisherige Pull-Request-Verhalten.
+
+**Umsetzung:** `PullRequestBodyBuilder`, `GitOrchestrationService.PullRequestErstellenAsync` und der aeltere PR-Pfad `EntwicklungsprozessService.PullRequestErstellenAsync`.
+
+---
+
 ## Sichtbarer Aufgabenkontext
 
 **Beschreibung:** Die Aufgabendetailansicht zeigt den Kontext der aktuell geöffneten Aufgabe und der laufenden CLI-Ausführung.

@@ -288,18 +288,24 @@ public sealed class EntwicklungsprozessService
     {
         _logger.LogInformation("Pull Request für Aufgabe {AufgabeId} erstellen.", aufgabeId);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
+        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
 
         if (string.IsNullOrEmpty(aufgabe.BranchName))
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen Branch-Namen.");
 
-        var pullRequest = await _gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, title, body, ct);
+        var prBody = PullRequestBodyBuilder.Build(aufgabe, body);
+        var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
+        var pullRequest = await _gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, title, prBody, ct);
+
+        var issueLogSuffix = issueNummer is > 0
+            ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
+            : string.Empty;
 
         await _protokollService.AddEintragAsync(
             aufgabeId,
             ProtokollTyp.GitAktion,
-            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Titel} ({pullRequest.Url})",
+            $"Pull Request erstellt: #{pullRequest.Nummer} – {pullRequest.Titel} ({pullRequest.Url}){issueLogSuffix}",
             ct: ct);
 
         return pullRequest;

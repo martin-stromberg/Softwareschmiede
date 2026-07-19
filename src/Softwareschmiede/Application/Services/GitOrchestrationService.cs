@@ -3,7 +3,6 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
-using System.Text.RegularExpressions;
 
 namespace Softwareschmiede.Application.Services;
 
@@ -16,6 +15,7 @@ public sealed class GitOrchestrationService
     private readonly IGitPlugin _gitPlugin;
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly ILogger<GitOrchestrationService> _logger;
+    private readonly IGitWorkspaceBrowserService? _gitWorkspaceBrowserService;
 
     /// <inheritdoc cref="GitOrchestrationService"/>
     public GitOrchestrationService(
@@ -24,7 +24,8 @@ public sealed class GitOrchestrationService
         ProtokollService protokollService,
         IGitPlugin gitPlugin,
         PluginSelectionService pluginSelectionService,
-        ILogger<GitOrchestrationService> logger)
+        ILogger<GitOrchestrationService> logger,
+        IGitWorkspaceBrowserService? gitWorkspaceBrowserService = null)
     {
         _aufgabeService = aufgabeService;
         _projektService = projektService;
@@ -32,6 +33,7 @@ public sealed class GitOrchestrationService
         _gitPlugin = gitPlugin;
         _pluginSelectionService = pluginSelectionService;
         _logger = logger;
+        _gitWorkspaceBrowserService = gitWorkspaceBrowserService;
     }
 
     /// <summary>Ruft Issues aus einem Repository ab.</summary>
@@ -193,14 +195,25 @@ public sealed class GitOrchestrationService
         var repositoryId = await ResolveRepositoryIdAsync(aufgabe, ct);
 
         var prTitle = title ?? aufgabe.Titel;
-        var prBody = BuildPullRequestBody(aufgabe, body);
         var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
 
+        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
+            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+
+        var prBody = await BuildPullRequestBodyAsync(aufgabe, body, ct);
+
+        await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
         var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, prTitle, prBody, ct);
 
         var issueLogSuffix = issueNummer is > 0
             ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
             : string.Empty;
+
+        await _protokollService.AddEintragAsync(
+            aufgabeId,
+            ProtokollTyp.GitAktion,
+            $"Push: Branch '{aufgabe.BranchName}' vor Pull-Request-Erstellung gepusht.",
+            ct: ct);
 
         await _protokollService.AddEintragAsync(
             aufgabeId,
@@ -213,36 +226,24 @@ public sealed class GitOrchestrationService
         return pullRequest;
     }
 
-    private string BuildPullRequestBody(Aufgabe aufgabe, string? body)
+    private async Task<string> BuildPullRequestBodyAsync(Aufgabe aufgabe, string? fallbackBody, CancellationToken ct)
     {
-        var prBody = body ?? $"Automatisch erstellt für Aufgabe: {aufgabe.Titel}";
-        var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
-
-        if (issueNummer is not > 0)
+        if (_gitWorkspaceBrowserService is null || string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
         {
-            return prBody;
+            return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
         }
 
-        if (ContainsClosingDirectiveForIssue(prBody, issueNummer.Value))
+        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(aufgabe.LokalerKlonPfad, ct);
+        if (snapshot.HasError)
         {
-            return prBody;
+            _logger.LogWarning(
+                "Commit-Liste für Pull Request von Aufgabe {AufgabeId} konnte nicht geladen werden: {Error}",
+                aufgabe.Id,
+                snapshot.ErrorMessage);
+            return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
         }
 
-        var trimmedBody = prBody.TrimEnd();
-        return string.IsNullOrWhiteSpace(trimmedBody)
-            ? $"Closes #{issueNummer.Value}"
-            : $"{trimmedBody}{Environment.NewLine}{Environment.NewLine}Closes #{issueNummer.Value}";
-    }
-
-    private static bool ContainsClosingDirectiveForIssue(string body, int issueNummer)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return false;
-        }
-
-        var pattern = $@"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#{issueNummer}\b";
-        return Regex.IsMatch(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return PullRequestBodyBuilder.BuildFromCommits(aufgabe, snapshot.BranchCommits);
     }
 
     /// <summary>

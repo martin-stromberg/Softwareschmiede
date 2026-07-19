@@ -193,6 +193,19 @@
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
+                <!-- Gruppe: Pull Request -->
+                <controls:RibbonGroup GruppenName="Pull Request"
+                                      Visibility="{Binding KannPullRequestErstellen, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="↗"
+                                                        ButtonText="PR erstellen"
+                                                        AutomationName="PullRequestErstellen"
+                                                        ButtonCommand="{Binding PullRequestErstellenCommand}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
             </StackPanel>
             </ScrollViewer>
         </Border>
