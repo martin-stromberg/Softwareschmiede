@@ -1141,7 +1141,6 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     internal string GetBitbucketApiBaseUrl()
     {
         var hostingMode = _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud";
-
         if (hostingMode.Equals("SelfHosted", StringComparison.OrdinalIgnoreCase))
         {
             var selfHostedUrl = _credentialStore.GetCredential(BitbucketSelfHostedUrlKey);

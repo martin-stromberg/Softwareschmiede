@@ -4,7 +4,7 @@
 
 Diese technische Dokumentation beschreibt die Konsolidierung logisch zusammenhängender E2E-Szenarien in der Test-Suite, um Testlaufzeiten durch weniger App-Prozess-Starts zu reduzieren. Das Feature schafft eine Facade-Schicht für wiederholte UI-Interaktionen in `WpfTestBase`, sodass Tests lesbarer und wartbarer werden, und fasst mehrere eng verwandte Szenarien in einer Testmethode zusammen.
 
-**Laufzeitgewinn:** Ungefähr 20 eingesparte App-Starts pro Testlauf (≈ 4–7 Minuten Zeiteinsparung), verteilt über zwei Bearbeitungsrunden (11 + 9 App-Starts).
+**Laufzeitgewinn:** Ungefähr 34 eingesparte App-Starts pro Testlauf (≈ 7–12 Minuten Zeiteinsparung), verteilt über drei Bearbeitungsrunden (11 + 9 + 14 App-Starts).
 
 ---
 
@@ -120,6 +120,32 @@ ProjektNamenAendernUndSpeichern(mainWindow, "Projekt-Aktualisiert");
 ```
 
 **Voraussetzung:** `ProjectDetailView` im Edit-Modus sichtbar.
+
+---
+
+#### `DeleteCurrentProject(AutomationElement mainWindow)` / `DeleteCurrentTask(AutomationElement mainWindow)`
+
+Löschen des aktuell geöffneten Projekts bzw. der aktuell geöffneten Aufgabe über den "Löschen"-Button inklusive Bestätigung des nativen Win32-Dialogs (sprachunabhängig über die Automation-ID `6` = `IDYES`, statt über den lokalisierten Button-Text). Für mehrphasige Tests, die nach einer Phase ihre Daten aufräumen müssen, damit DB-Abfragen der nächsten Phase (z. B. `Single()`/`SingleOrDefault()`) gültig bleiben, obwohl mehrere Projekte/Aufgaben nacheinander im selben App-Lifecycle angelegt wurden.
+
+```csharp
+// Beispiel: Phase abschließen und für die nächste Phase aufräumen
+DeleteCurrentProject(mainWindow);
+NavigateBackToDashboard(mainWindow);
+```
+
+**Voraussetzung:** `DeleteCurrentProject` erwartet `ProjectDetailView` (Element `AufgabeNeu` sichtbar); `DeleteCurrentTask` erwartet die Aufgabenansicht im nicht-laufenden Zustand (Element `Starten` sichtbar — bei laufendem CLI-Prozess zuerst stoppen).
+
+---
+
+#### `NavigateBackToDashboard(AutomationElement mainWindow)` / `NavigateBackFromProjectCardToProjectsList(AutomationElement mainWindow)`
+
+Navigiert explizit zum Dashboard bzw. von einer geöffneten Projektkachel zurück zur Projektliste. Notwendig, weil ein erneuter Klick auf den " Projekte"-Navigationsbutton direkt aus einer bereits geöffneten Projektdetailansicht heraus nicht zuverlässig zur Übersicht navigiert, sondern in der zuletzt geöffneten Projektansicht hängen bleibt — vor jeder erneuten Navigation über `NavigateToProjects` sollte daher zunächst explizit zum Dashboard bzw. zur Liste zurückgekehrt werden.
+
+---
+
+#### `LaunchAppAndGetMainWindow()` / `SetupProjectMitNeuerAufgabeForStartedApp(AutomationElement mainWindow, ...)`
+
+`LaunchAppAndGetMainWindow()` startet die Anwendung und liefert direkt das Hauptfenster. `SetupProjectMitNeuerAufgabeForStartedApp` ist das Gegenstück zu `SetupProjectMitNeuerAufgabe`, das kein neues `LaunchApp()` mehr durchführt, sondern ein bereits laufendes Hauptfenster entgegennimmt — für Testphasen, die als weiterer Schritt in einem gemeinsamen App-Lifecycle laufen, statt jeweils eine eigene Anwendung zu starten.
 
 ---
 
@@ -290,11 +316,57 @@ public void PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E()
 
 ---
 
-### `E2E_WorkingDirectory` — geprüft, bewusst NICHT konsolidiert (bleibt bei 6 Methoden)
+### `E2E_WorkingDirectory` (6 → 2 Methoden)
 
-Drei unabhängige Konsolidierungsversuche (Zuweisen-Erfolg + Zuweisen-Fallback als zweites Repository desselben Projekts; Zuweisen-Erfolg + Bearbeiten-Fallback als zweites, DB-geseedetes Projekt; zwei vollständige Projekte per `CreateAndOpenProject` im selben App-Lifecycle) wurden implementiert, gebaut und mehrfach ausgeführt. Alle drei scheiterten reproduzierbar an unterschiedlichen technischen Ursachen (siehe Klassendoku-Kommentar in `E2E_WorkingDirectory.cs` für Details): ein zweiter `CreateAndOpenProject`-Aufruf im selben Lifecycle öffnet das Projekt-Overlay nicht zuverlässig; ein direkt per `OpenTestDbContext` DB-geseedetes Projekt erscheint nach vorheriger Navigation zur Projektliste nicht mehr darin; das Löschen eines lokalen Git-Testrepositories (zur Simulation eines fehlgeschlagenen Strukturabrufs) scheitert umgebungsbedingt mit `UnauthorizedAccessException` auf einer Git-Objektdatei — reproduzierbar auch im unveränderten Einzeltest, also nicht durch eine Konsolidierung verursacht.
+Die ursprünglich als "bewusst nicht konsolidierbar" eingestufte Klasse wurde in einer weiteren Runde doch konsolidiert, nachdem die tatsächlichen Ursachen der drei früher fehlgeschlagenen Versuche identifiziert wurden (statt der Konsolidierung selbst zugeschrieben zu werden):
 
-Diese Klasse bleibt daher bewusst unkonsolidiert; alle sechs Szenarien laufen als eigenständige Tests mit jeweils eigenem App-Lifecycle.
+- **Navigation nach Projekt-Detailansicht:** Ein erneuter Klick auf " Projekte" direkt aus einer bereits geöffneten Projektdetailansicht heraus navigiert nicht zuverlässig zur Übersicht, sondern bleibt in der zuletzt geöffneten Projektansicht hängen. Fix: Vor jeder erneuten Navigation zu " Projekte" zuerst explizit über `NavigateBackToDashboard`/`NavigateBackFromProjectCardToProjectsList` zum Dashboard bzw. zur Liste zurückkehren.
+- **`UnauthorizedAccessException` beim Löschen eines lokalen Git-Testrepositories:** Trat nur auf, wenn im Quellverzeichnis tatsächlich ein Git-Repository initialisiert wurde (der Zuweisungsdialog hält währenddessen einen Datei-Zugriff auf das Git-Verzeichnis offen). Der betroffene Fallback-Test benötigt aber gar kein echtes Git-Repository, um den fehlgeschlagenen Strukturabruf zu simulieren — Fix: `CreateLocalSourceDirectory(..., initializeGitRepository: false)`.
+- **DB-fragile Abfragen bei mehreren Projekten/Repositories im selben Lifecycle:** Einzelne Abfragen (`Single()`/`SingleOrDefault()`) setzten implizit voraus, dass zu jedem Zeitpunkt nur ein Projekt/Repository in der Test-DB existiert. Fix: Jede Phase räumt ihr Projekt über die neuen Basishelfer `DeleteCurrentProject`/`DeleteCurrentTask` auf, bevor die nächste Phase beginnt; betroffene Abfragen wurden zusätzlich auf Repository-Namen statt auf implizite Eindeutigkeit umgestellt.
+
+**Neue konsolidierte Methode:** `RepositoryZuweisung()` führt fünf der sechs Szenarien (beide Repository-Zuweisungs-Pfade, Arbeitsverzeichnis-Bearbeitung, beide Start-Fehlerfälle) als Phasen in einem App-Lifecycle aus. `AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E` bleibt eigenständig, da sie als einziges Szenario einen erfolgreich laufenden CLI-Prozess hinterlässt.
+
+**Gewinn:** Vier App-Starts weniger.
+
+---
+
+### `ProjectDetailE2ETests` (6 → 1 Methode)
+
+Die beiden zuvor als "bewusst eigenständig" eingestuften Methoden (`ProjektLoeschen_...`, destruktiv; `Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E`, DB-seeded) wurden nach demselben Muster in die übrigen vier Phasen integriert: `DeleteCurrentProject` räumt nach jeder Phase auf, `NavigateBackToDashboard` stellt sicher, dass die nächste Phase sauber ab dem Dashboard startet. Da keine der sechs Phasen eine implizite DB-Eindeutigkeit voraussetzt (alle Lookups erfolgen namensbasiert), war für diese Klasse — anders als bei `E2E_WorkingDirectory` — keine Anpassung an DB-Abfragen nötig.
+
+**Neue konsolidierte Methode:** `ProjektDetailSzenarien()` führt alle sechs Szenarien (Navigation, Bearbeiten, Aufgaben/Filtern, Repository-Dialog, Offene/beendete-Aufgaben-Trennung, Löschen) nacheinander aus; Löschen steht bewusst als letzte Phase.
+
+**Gewinn:** Fünf App-Starts weniger.
+
+---
+
+### ConPTY-Lifecycle: `E2E_ConPtyTerminalStart`, `E2E_ConPtyResize`, `E2E_ConPtyProcessEnd`, `E2E_ConPtyKeyboardInput` (4 → 1 Methode)
+
+Alle vier Tests teilten exakt dasselbe Setup (`SetupProjectMitNeuerAufgabe` + `StartenUndPluginWaehlen`) und prüften nacheinander Facetten **derselben laufenden ConPTY-Session** (Start, Resize, Tastatureingabe, Prozessende) — anders als beim Lösch-Cleanup-Muster ist hier **kein** Aufräumen zwischen den Phasen nötig, da alle bis auf die letzte Phase denselben laufenden Prozess voraussetzen.
+
+**Neue Klasse `E2E_ConPtyLifecycle`, Methode:** `ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E()`. Prozessende steht bewusst als letzte Phase, da sie den Prozess beendet.
+
+**Gewinn:** Drei App-Starts weniger.
+
+---
+
+### Plugin-Auswahl und -Wechsel: `E2E_PluginSelectionDialog` + `E2E_PluginWechsel` (2 → 1 Methode)
+
+Die "OK"-Phase des Auswahl-Dialogs endet bereits mit laufender CLI (Softwareschmiede.KiSimulator) — genau die Vorbedingung, die der Plugin-Wechsel-Test benötigt.
+
+**Neue Klasse `E2E_PluginAuswahlUndWechsel`, Methode:** `PluginAuswahlAbbrechenOkUndWechsel_E2E()` führt Abbrechen-Phase, OK-Phase (CLI startet) und Plugin-Wechsel-Phase (CLI läuft bereits) nacheinander an derselben Aufgabe aus.
+
+**Gewinn:** Ein App-Start weniger.
+
+---
+
+### `E2E_PluginProjectDefault` + `E2E_PluginProjectDefault_NextTask` (2 → 1 Methode)
+
+Beide Tests waren bereits im XML-Doc-Kommentar der ersten Methode explizit als zusammengehörig cross-referenziert (die zweite Aufgabe muss zwingend im selben Projekt liegen wie die erste, die den Projekt-Standard speichert).
+
+**Neue konsolidierte Methode:** `PluginProjectDefault_SpeichernUndAutomatischeUebernahmeInFolgeaufgabe_E2E()` führt beide Phasen im selben Projekt aus.
+
+**Gewinn:** Ein App-Start weniger.
 
 ---
 

@@ -1,13 +1,14 @@
-using System.Diagnostics;
-using System.IO;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Input;
 using FlaUI.UIA3;
 using Microsoft.EntityFrameworkCore;
+using Softwareschmiede.App.Views;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Services;
 using Softwareschmiede.Tests.Infrastructure.Services;
+using System.Diagnostics;
+using System.IO;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -140,6 +141,16 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
+    /// Startet die Anwendung und gibt das Hauptfenster zurück. Wartet, bis das Hauptfenster sichtbar ist.
+    /// </summary>
+    /// <returns>Das Hauptfenster der gestarteten Anwendung.</returns>
+    protected Window LaunchAppAndGetMainWindow()
+    {
+        var app = LaunchApp();
+        return app.GetMainWindow(Automation, Long)!;
+    }
+
+    /// <summary>
     /// Öffnet einen <see cref="SoftwareschmiededDbContext"/> gegen die SQLite-Testdatenbank des laufenden
     /// App-Prozesses (<see cref="TestDbPath"/>). Für Testvorbedingungen, die über die UI nicht abbildbar sind.
     /// </summary>
@@ -264,10 +275,29 @@ public abstract class WpfTestBase : IDisposable
         => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title), timeout);
 
     /// <summary>Navigiert zur Projektliste.</summary>
-    protected void NavigateToProjecten(AutomationElement mainWindow)
+    protected void NavigateToProjects(AutomationElement mainWindow)
     {
         var button = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), Short);
         button.AsButton().Click();
+    }
+    /// <summary>
+    /// Navigiert von der Projekt-Kachel zurück zur Projektliste. Wird benötigt, wenn ein Test nach dem Öffnen eines Projekts wieder zur Projektliste zurückkehren muss.
+    /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    protected void NavigateBackFromProjectCardToProjectsList(AutomationElement mainWindow)
+    {
+        var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        button.AsButton().Click();
+    }
+
+    /// <summary>
+    /// Navigiert vom Dashboard zurück zur Projektliste. Wird benötigt, wenn ein Test nach dem Öffnen des Dashboards wieder zur Projektliste zurückkehren muss. 
+    /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    protected void NavigateBackToDashboard(AutomationElement mainWindow)
+    {
+        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
+        dashboardButton.AsButton().Click();
     }
 
     /// <summary>Navigiert zur Einstellungsseite und wartet, bis die Settings-Tabs geladen sind.</summary>
@@ -357,7 +387,7 @@ public abstract class WpfTestBase : IDisposable
     {
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, Long)!;
-        NavigateToProjecten(mainWindow);
+        NavigateToProjects(mainWindow);
 
         if (projektName is not null)
             CreateAndOpenProject(mainWindow, projektName);
@@ -534,14 +564,32 @@ public abstract class WpfTestBase : IDisposable
         bool useInSourceDirectoryMode = true,
         bool initializeSourceGitRepository = true)
     {
-        var sourceDirectory = CreateLocalSourceDirectory(repositoryFolderName, initializeSourceGitRepository);
-
         var app = LaunchApp();
         var mainWindow = app.GetMainWindow(Automation, Long)!;
+        return SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, repositoryFolderName, projektName, useInSourceDirectoryMode, initializeSourceGitRepository);
+    }
+    /// <summary>
+    /// Konfiguriert das LocalDirectoryPlugin mit einem neu erstellten lokalen Quellverzeichnis, legt ein Projekt an, öffnet es, weist das Repository zu und erstellt eine neue Aufgabe. Gibt das Hauptfenster zurück, in dem die Aufgabe im Edit-Panel (Status "Neu") bereit zum Starten ist.
+    /// Im Gegensatz zu <see cref="SetupProjectMitNeuerAufgabe"/> startet diese Überladung keine neue Anwendung, sondern nutzt ein bereits laufendes Hauptfenster - für Testphasen, die als weiterer Schritt in einem gemeinsamen App-Lifecycle laufen.
+    /// </summary>
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem Projekt und Aufgabe angelegt werden.</param>
+    /// <param name="repositoryFolderName">Name des lokalen Quellverzeichnisses/Repositorys, das angelegt wird.</param>
+    /// <param name="projektName">Name des anzulegenden Projekts.</param>
+    /// <param name="useInSourceDirectoryMode">Ob das LocalDirectoryPlugin im In-Source-Directory-Modus konfiguriert wird.</param>
+    /// <param name="initializeSourceGitRepository">Ob im lokalen Quellverzeichnis ein Git-Repository initialisiert wird.</param>
+    /// <returns>Das Hauptfenster mit der neu angelegten Aufgabe im Edit-Panel.</returns>
+    protected AutomationElement SetupProjectMitNeuerAufgabeForStartedApp(
+        Window mainWindow,
+        string repositoryFolderName,
+        string projektName,
+        bool useInSourceDirectoryMode = true,
+        bool initializeSourceGitRepository = true)
+    {
+        var sourceDirectory = CreateLocalSourceDirectory(repositoryFolderName, initializeSourceGitRepository);
 
         ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory, useInSourceDirectoryMode);
 
-        NavigateToProjecten(mainWindow);
+        NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, projektName);
 
         AssignLocalDirectoryRepository(mainWindow);
@@ -550,6 +598,7 @@ public abstract class WpfTestBase : IDisposable
 
         return mainWindow;
     }
+
 
     /// <summary>
     /// Überspringt den aufrufenden Test (via <c>Skip.If</c>), wenn die Umgebungsvariable
@@ -713,6 +762,57 @@ public abstract class WpfTestBase : IDisposable
         zurueckButton.AsButton().Click();
 
         WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+    }
+
+    /// <summary>
+    /// Löscht das aktuell in der <c>ProjectDetailView</c> geöffnete Projekt über den "Löschen"-Button
+    /// und bestätigt den nativen Win32-Bestätigungsdialog. Für mehrphasige Tests, die nach einer Phase
+    /// ihr Projekt aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt.
+    /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster mit geöffneter <c>ProjectDetailView</c> (Voraussetzung: "AufgabeNeu" sichtbar).</param>
+    protected void DeleteCurrentProject(AutomationElement mainWindow)
+    {
+        WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
+
+        var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
+        loeschenButton.AsButton().Click();
+
+        // MessageBox "Löschen bestätigen" erscheint als separates Fenster. Der Titel stammt aus der
+        // Anwendung (App-Ressource, daher sprachunabhängig sprachlich "Löschen bestätigen"), die
+        // Button-Beschriftung "Ja"/"Nein" dagegen wird vom nativen Win32-MessageBox-Control anhand
+        // der Systemsprache des ausführenden Betriebssystems gerendert (System.Windows.MessageBox
+        // erlaubt keine eigenen Button-Texte) - auf einem englischsprachigen CI-Runner (z. B.
+        // windows-latest bei GitHub Actions) heißt der Button "Yes" statt "Ja", wodurch die Suche
+        // nach dem Namen dort unabhängig vom Timeout nie etwas findet. Die Automation-ID des
+        // Ja/Yes-Buttons entspricht dagegen der stabilen, sprachunabhängigen Win32-Dialog-Control-ID
+        // IDYES (6) und funktioniert auf jeder Systemsprache identisch.
+        var msgBox = WaitForWindow("Löschen bestätigen", Short);
+        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
+        jaButton.AsButton().Click();
+
+        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
+        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
+    }
+
+    /// <summary>
+    /// Löscht die aktuell im Edit-Panel geöffnete Aufgabe über den "Löschen"-Button und bestätigt den
+    /// nativen Win32-Bestätigungsdialog. Für mehrphasige Tests, die nach einer Phase ihre Aufgabe
+    /// aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt.
+    /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster mit geöffneter Aufgabe (Voraussetzung: "Starten" sichtbar, d. h. kein laufender CLI-Prozess).</param>
+    protected void DeleteCurrentTask(AutomationElement mainWindow)
+    {
+        WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+
+        var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
+        loeschenButton.AsButton().Click();
+
+        var msgBox = WaitForWindow("Löschen bestätigen", Short);
+        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
+        jaButton.AsButton().Click();
+
+        // Overlay geschlossen — "Starten" nicht mehr sichtbar
+        WaitUntilGone(mainWindow, cf => cf.ByName("Starten"), Short);
     }
 
     /// <summary>Wartet auf die "OffeneAufgabenListe" und gibt deren ListItem-Kinder zurück.</summary>

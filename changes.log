@@ -1,3 +1,21 @@
+## 2026-07-19 — E2E-Test-Struktur: Dritte Konsolidierungsrunde inkl. `E2E_WorkingDirectory` (Nacharbeit zu Issue #153)
+
+- Nutzerfeedback zur zweiten Runde: `E2E_WorkingDirectory` wurde vorschnell als "nicht konsolidierbar" eingestuft — die drei zuvor beobachteten Fehler hatten konkrete, behebbare Ursachen statt einer grundsätzlichen technischen Grenze.
+- **Root-Cause-Fixes statt Umgehung:**
+  - Navigation: Ein erneuter Klick auf " Projekte" direkt aus einer geöffneten Projektdetailansicht heraus navigiert nicht zuverlässig zur Übersicht. Fix: neue Basishelfer `NavigateBackToDashboard`/`NavigateBackFromProjectCardToProjectsList` navigieren vor jeder erneuten " Projekte"-Navigation explizit zurück.
+  - `UnauthorizedAccessException` beim Löschen eines lokalen Git-Testrepositories trat nur bei tatsächlich initialisiertem Git-Repository auf (Zuweisungsdialog hält währenddessen einen Datei-Zugriff offen); der betroffene Test benötigt dafür gar kein echtes Git-Repository — Fix: `initializeGitRepository: false`.
+  - DB-fragile `Single()`/`SingleOrDefault()`-Abfragen setzten implizit ein einzelnes Projekt/Repository voraus. Fix: neue Basishelfer `DeleteCurrentProject`/`DeleteCurrentTask` räumen nach jeder Phase auf; betroffene Abfragen zusätzlich auf Repository-Namen statt implizite Eindeutigkeit umgestellt.
+- **Weitere Konsolidierung** (zusätzlich −18 Testmethoden):
+  - `E2E_WorkingDirectory`: 6 → 2 Methoden (`RepositoryZuweisung()` führt fünf Szenarien als Phasen aus; der einzige Test mit erfolgreich laufendem CLI-Prozess am Ende bleibt eigenständig).
+  - `ProjectDetailE2ETests`: 6 → 1 Methode (`ProjektDetailSzenarien()`) — nach demselben Cleanup-Muster wurden auch die beiden zuvor als "bewusst eigenständig" eingestuften Methoden (Löschen, DB-seeded Aufgabentrennung) integriert.
+  - `E2E_ConPtyTerminalStart`, `E2E_ConPtyResize`, `E2E_ConPtyProcessEnd`, `E2E_ConPtyKeyboardInput` → neue Klasse `E2E_ConPtyLifecycle`: 4 → 1 Methode. Alle vier prüfen Facetten derselben laufenden ConPTY-Session, daher kein Cleanup zwischen den Phasen nötig (nur die letzte Phase beendet den Prozess).
+  - `E2E_PluginSelectionDialog` + `E2E_PluginWechsel` → neue Klasse `E2E_PluginAuswahlUndWechsel`: 2 → 1 Methode (die "OK"-Phase des Auswahl-Dialogs endet bereits mit der Vorbedingung des Wechsel-Tests: laufende CLI).
+  - `E2E_PluginProjectDefault` + `E2E_PluginProjectDefault_NextTask`: 2 → 1 Methode (beide waren bereits im XML-Doc-Kommentar als zusammengehörig cross-referenziert).
+- **Neue Hilfsmethoden in `WpfTestBase`:** `DeleteCurrentProject()`, `DeleteCurrentTask()`, `NavigateBackToDashboard()`, `NavigateBackFromProjectCardToProjectsList()`, `LaunchAppAndGetMainWindow()`, `SetupProjectMitNeuerAufgabeForStartedApp()` (Gegenstück zu `SetupProjectMitNeuerAufgabe` für bereits laufende Anwendungen).
+- Laufzeitgewinn insgesamt (drei Runden): ≈ 34 eingesparte App-Starts pro Testlauf (≈ 7–12 Minuten). Test-Gesamtzahl der OS-Interface-Lane sank von 67 auf 53 (bei unveränderter Szenario-Abdeckung).
+- Tests: Stabile Lane weiterhin 925/925 grün; OS-Interface-Lane 51/53 grün (2 erwartet übersprungen, ConPTY-Gate). Alle neu konsolidierten Klassen mehrfach wiederholt grün verifiziert.
+- Dokumentation aktualisiert: `docs/features/test-infrastructure/e2e-test-konsolidierung.md`.
+
 ## 2026-07-19 — E2E-Test-Struktur: Weitere Konsolidierung (Nacharbeit zu Issue #153)
 
 - Nacharbeit zur E2E-Testkonsolidierung vom 2026-07-18: Die ursprüngliche Bestandsaufnahme hatte nicht systematisch alle E2E-Klassen mit mehreren Testmethoden als Konsolidierungskandidaten erfasst. Ein erneuter, vollständiger Scan aller `[Fact]`/`[SkippableFact]`-Methoden je Datei unter `src/Softwareschmiede.Tests/E2E/` deckte drei übersehene Kandidaten auf.
