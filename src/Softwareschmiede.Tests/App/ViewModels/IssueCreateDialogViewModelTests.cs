@@ -152,6 +152,99 @@ public sealed class IssueCreateDialogViewModelTests
         _issueProvider.Request.Should().BeNull();
     }
 
+    /// <summary>Provider-Fehler bleiben im Dialog, behalten die Eingaben und schliessen nicht erfolgreich.</summary>
+    [Fact]
+    public async Task Submit_ShouldShowErrorAndKeepInputs_WhenProviderReturnsFailure()
+    {
+        var sut = CreateSut();
+        _issueProvider.Result = IssueCreateResult.Failed("Berechtigung fehlt");
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
+        bool? closed = null;
+        sut.CloseRequested += (_, result) => closed = result;
+
+        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+
+        _issueProvider.Request.Should().Be(new IssueCreateRequest("Aufgabe", "Original"));
+        sut.CreatedIssue.Should().BeNull();
+        sut.ErrorMessage.Should().Be("Berechtigung fehlt");
+        sut.Title.Should().Be("Aufgabe");
+        sut.Body.Should().Be("Original");
+        closed.Should().BeNull();
+        sut.CanSubmit.Should().BeTrue();
+    }
+
+    /// <summary>Unerwartete Provider-Ausnahmen werden als Dialogfehler angezeigt und erzeugen kein Issue.</summary>
+    [Fact]
+    public async Task Submit_ShouldShowErrorAndKeepDialogOpen_WhenProviderThrows()
+    {
+        var sut = CreateSut();
+        _issueProvider.ExceptionToThrow = new InvalidOperationException("Netzwerkfehler");
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
+        bool? closed = null;
+        sut.CloseRequested += (_, result) => closed = result;
+
+        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+
+        sut.CreatedIssue.Should().BeNull();
+        sut.ErrorMessage.Should().Contain("Netzwerkfehler");
+        closed.Should().BeNull();
+        sut.IsSubmitting.Should().BeFalse();
+    }
+
+    /// <summary>Cancellation waehrend Submit wird nicht als Providerfehler angezeigt und hinterlaesst kein Ergebnis.</summary>
+    [Fact]
+    public async Task Submit_ShouldResetSubmittingWithoutCreatedIssue_WhenProviderIsCancelled()
+    {
+        var sut = CreateSut();
+        _issueProvider.ExceptionToThrow = new OperationCanceledException();
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
+
+        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+
+        sut.CreatedIssue.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
+        sut.IsSubmitting.Should().BeFalse();
+        sut.CanSubmit.Should().BeTrue();
+    }
+
+    /// <summary>Doppelte Submit-Ausfuehrungen waehrend eines laufenden Provider-Aufrufs erzeugen nur ein Issue.</summary>
+    [Fact]
+    public async Task Submit_ShouldIgnoreSecondExecution_WhileProviderCallIsRunning()
+    {
+        var sut = CreateSut();
+        _issueProvider.Release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
+
+        var first = ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await _issueProvider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        sut.CanSubmit.Should().BeFalse();
+        sut.ErstellenCommand.CanExecute(null).Should().BeFalse();
+
+        var second = ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        _issueProvider.Release.SetResult(null);
+        await Task.WhenAll(first, second);
+
+        _issueProvider.CallCount.Should().Be(1);
+        sut.CreatedIssue.Should().NotBeNull();
+    }
+
+    /// <summary>Cancellation beim Template-Laden setzt den Ladezustand zurueck und blockiert Submit nicht.</summary>
+    [Fact]
+    public async Task LoadTemplatesAsync_ShouldResetLoading_WhenCancelled()
+    {
+        var sut = CreateSut();
+        _templateProvider.ExceptionToThrow = new OperationCanceledException();
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
+
+        await ((AsyncRelayCommand)sut.LoadTemplatesCommand).ExecuteAsync();
+
+        sut.IsLoadingTemplates.Should().BeFalse();
+        sut.Templates.Should().BeEmpty();
+        sut.ErrorMessage.Should().BeNull();
+        sut.CanSubmit.Should().BeTrue();
+    }
+
     /// <summary>KI-Ausfüllhilfe übernimmt das generierte Ergebnis in den editierbaren Body.</summary>
     [Fact]
     public async Task KiAusfuellen_ShouldReplaceBodyWithGeneratedText()
@@ -199,25 +292,64 @@ public sealed class IssueCreateDialogViewModelTests
         sut.ErrorMessage.Should().Contain("KI-Ausfüllhilfe fehlgeschlagen");
     }
 
+    /// <summary>Cancellation waehrend der KI-Ausfuellhilfe erhaelt den bisherigen Body und setzt den Laufzustand zurueck.</summary>
+    [Fact]
+    public async Task KiAusfuellen_ShouldKeepBodyAndResetGenerating_WhenCancelled()
+    {
+        var kiPlugin = new FakeCancellingKiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "CancelKi");
+        sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
+        sut.Body = "Bisheriger Body";
+
+        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+
+        sut.Body.Should().Be("Bisheriger Body");
+        sut.ErrorMessage.Should().BeNull();
+        sut.IsGenerating.Should().BeFalse();
+        sut.CanUseAi.Should().BeTrue();
+    }
+
     private sealed class FakeIssueProvider : IIssueCreateProvider
     {
         public IssueCreateRequest? Request { get; private set; }
+        public int CallCount { get; private set; }
+        public IssueCreateResult? Result { get; set; }
+        public Exception? ExceptionToThrow { get; set; }
+        public TaskCompletionSource<object?> Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<object?>? Release { get; set; }
 
         public Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default) => Task.FromResult(true);
 
-        public Task<IssueCreateResult> CreateIssueAsync(string repositoryId, IssueCreateRequest request, CancellationToken ct = default)
+        public async Task<IssueCreateResult> CreateIssueAsync(string repositoryId, IssueCreateRequest request, CancellationToken ct = default)
         {
+            CallCount++;
+            Started.TrySetResult(null);
+            if (Release is not null)
+            {
+                await Release.Task.WaitAsync(ct);
+            }
+
             Request = request;
-            return Task.FromResult(IssueCreateResult.Success(new Issue(7, request.Title, request.Body, [], null, "https://example.test/issues/7")));
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
+            return Result ?? IssueCreateResult.Success(new Issue(7, request.Title, request.Body, [], null, "https://example.test/issues/7"));
         }
     }
 
     private sealed class FakeTemplateProvider : IIssueTemplateProvider
     {
         public IssueTemplateLoadResult Result { get; set; } = IssueTemplateLoadResult.Success([]);
+        public Exception? ExceptionToThrow { get; set; }
 
         public Task<IssueTemplateLoadResult> GetIssueTemplatesAsync(string repositoryId, CancellationToken ct = default)
-            => Task.FromResult(Result);
+            => ExceptionToThrow is not null
+                ? Task.FromException<IssueTemplateLoadResult>(ExceptionToThrow)
+                : Task.FromResult(Result);
     }
 
     private sealed class FakeKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
@@ -246,6 +378,20 @@ public sealed class IssueCreateDialogViewModelTests
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
             => throw new InvalidOperationException("Providerfehler");
+    }
+
+    private sealed class FakeCancellingKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
+    {
+        public string PluginName => "Cancel KI";
+        public string PluginPrefix => "CancelKi";
+        public PluginType PluginType => PluginType.DevelopmentAutomation;
+        public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
+        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
+        public string GetProcessWindowTitle(Guid aufgabeId) => "Cancel KI";
+        public bool SupportsSessionContinuation() => false;
+        public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
+            => throw new OperationCanceledException(ct);
     }
 
     private sealed class FakePlainKiPlugin : IKiPlugin

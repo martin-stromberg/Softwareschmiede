@@ -489,6 +489,75 @@ public sealed class BitbucketPluginTests
         payload.Should().Contain("Zeile 2");
     }
 
+    /// <summary>CanCreateIssueAsync ist false, wenn Jira-URL oder Projekt-Key fehlen.</summary>
+    [Theory]
+    [InlineData(null, "PROJ")]
+    [InlineData("https://jira.example.test", null)]
+    [InlineData(" ", "PROJ")]
+    [InlineData("https://jira.example.test", " ")]
+    public async Task CanCreateIssueAsync_ShouldReturnFalse_WhenJiraConfigurationIsMissing(string? jiraUrl, string? jiraProject)
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns(jiraUrl);
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
+            .Returns(jiraProject);
+
+        var result = await _sut.CanCreateIssueAsync("workspace/repo");
+
+        result.Should().BeFalse();
+    }
+
+    /// <summary>CreateIssueAsync liefert NotSupported ohne Curl-Aufruf, wenn Jira nicht konfiguriert ist.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldReturnNotSupported_WhenJiraConfigurationIsMissing()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns((string?)null);
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
+            .Returns("PROJ");
+
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Body"));
+
+        result.Status.Should().Be(IssueCreateResultStatus.NotSupported);
+        result.Issue.Should().BeNull();
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>CreateIssueAsync validiert leere Jira-Summaries ohne Curl-Aufruf.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldReturnFailed_WhenTitleIsMissing()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("credential");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns("https://jira.example.test");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
+            .Returns("PROJ");
+
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest(" ", "Body"));
+
+        result.Status.Should().Be(IssueCreateResultStatus.Failed);
+        result.ErrorMessage.Should().Contain("Summary");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     /// <summary>CreateIssueAsync gibt Jira-Validierungsfehler als Fehlerergebnis zurück.</summary>
     [Fact]
     public async Task CreateIssueAsync_ShouldReturnFailed_WhenJiraReturnsErrors()
@@ -516,6 +585,35 @@ public sealed class BitbucketPluginTests
         result.Status.Should().Be(IssueCreateResultStatus.Failed);
         result.Issue.Should().BeNull();
         result.ErrorMessage.Should().Contain("summary");
+    }
+
+    /// <summary>CreateIssueAsync propagiert Cancellation statt eine lokale Referenz vorzutäuschen.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldPropagateCancellation_WhenCurlIsCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("credential");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns("https://jira.example.test");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
+            .Returns("PROJ");
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "curl",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                null,
+                cts.Token))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+
+        var act = () => _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Body"), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     /// <summary>ResolveGitCloneUrl wandelt Browser-URL korrekt um.</summary>

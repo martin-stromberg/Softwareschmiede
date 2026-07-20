@@ -113,6 +113,38 @@ public sealed class GitHubPluginTests
         result.Issue.IssueUrl.Should().Be("https://github.com/owner/repo/issues/17");
     }
 
+    /// <summary>CreateIssueAsync validiert fehlende Repository-ID ohne CLI-Aufruf.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldReturnFailed_WhenRepositoryIdIsMissing()
+    {
+        var result = await _sut.CreateIssueAsync(" ", new IssueCreateRequest("Titel", "Body"));
+
+        result.Status.Should().Be(IssueCreateResultStatus.Failed);
+        result.ErrorMessage.Should().Contain("Repository-ID");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>CreateIssueAsync validiert leere Titel ohne CLI-Aufruf.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldReturnFailed_WhenTitleIsMissing()
+    {
+        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest(" ", "Body"));
+
+        result.Status.Should().Be(IssueCreateResultStatus.Failed);
+        result.ErrorMessage.Should().Contain("Titel");
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     /// <summary>CreateIssueAsync liefert bei CLI-Fehler ein Fehlerergebnis ohne Issue.</summary>
     [Fact]
     public async Task CreateIssueAsync_ShouldReturnFailed_WhenCliFails()
@@ -131,6 +163,26 @@ public sealed class GitHubPluginTests
         result.Status.Should().Be(IssueCreateResultStatus.Failed);
         result.Issue.Should().BeNull();
         result.ErrorMessage.Should().Contain("permission denied");
+    }
+
+    /// <summary>CreateIssueAsync propagiert Cancellation statt daraus einen Providerfehler zu machen.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldPropagateCancellation_WhenCliIsCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => a.Contains("create")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                cts.Token))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+
+        var act = () => _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     /// <summary>GetIssueTemplatesAsync lädt Markdown-Templates aus .github/ISSUE_TEMPLATE.</summary>
@@ -225,6 +277,26 @@ public sealed class GitHubPluginTests
 
         result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
         result.Templates.Should().BeEmpty();
+    }
+
+    /// <summary>GetIssueTemplatesAsync unterscheidet echte Providerfehler von fehlenden Templates.</summary>
+    [Fact]
+    public async Task GetIssueTemplatesAsync_ShouldReturnFailed_WhenTemplateApiFailsWithProviderError()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "HTTP 403: insufficient permissions"));
+
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+
+        result.Status.Should().Be(IssueTemplateLoadResultStatus.Failed);
+        result.Templates.Should().BeEmpty();
+        result.ErrorMessage.Should().Contain("insufficient permissions");
     }
 
     /// <summary>CloneRepositoryAsync ruft git clone mit korrekten Argumenten auf.</summary>

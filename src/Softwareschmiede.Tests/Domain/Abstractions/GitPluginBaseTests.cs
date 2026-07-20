@@ -51,6 +51,28 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git checkout -b fehlgeschlagen*");
     }
 
+    /// <summary>CancellationToken wird an die Basisklassen-Git-Ausfuehrung weitergereicht und als Abbruch propagiert.</summary>
+    [Fact]
+    public async Task CreateBranchAsync_ShouldPropagateCancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var cli = new Mock<ICliRunner>();
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "checkout", "-b", "feature/x" })),
+                "/repo",
+                null,
+                cts.Token))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+        var sut = new TestGitPlugin(cli.Object);
+
+        var act = () => sut.CreateBranchAsync("/repo", "feature/x", cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        cli.VerifyAll();
+    }
+
     /// <summary><summary>CommitAsync_ShouldRunAddAndCommit.</summary>.</summary>
     [Fact]
     /// <summary>CommitAsync_ShouldRunAddAndCommit.</summary>

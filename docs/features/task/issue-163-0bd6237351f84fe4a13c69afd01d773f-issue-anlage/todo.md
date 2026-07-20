@@ -21,5 +21,5 @@ Branch: `task/issue-163-0bd6237351f84fe4a13c69afd01d773f-issue-anlage`
 | [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
 | [ ] | - | Feature-Verzeichnis loeschen | - |
-| [ ] | 10 | Nacharbeiten abschliessen (offene Punkte aus `continue.md`) | `continue-done.md` |
+| [x] | 10 | Nacharbeiten abschliessen (offene Punkte aus `continue.md`) | `continue-done.md` |
 | [x] | - | Commit durchfuehren | - |

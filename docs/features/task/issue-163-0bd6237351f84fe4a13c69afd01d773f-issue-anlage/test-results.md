@@ -1,41 +1,57 @@
 # Testresultate
 
-Status: Keine Fehler
-
-## Build
-
-Kommando:
-
-```text
-dotnet build Softwareschmiede.slnx --no-restore --nologo
-```
-
-Ergebnis: erfolgreich, 0 Warnungen, 0 Fehler. Dauer: ca. 1,5 Sekunden.
+Status: Keine Fehler in den relevanten Nacharbeits-Tests
 
 ## Fokussierte Tests
 
-Kommando Unit-/Provider-/KI-/ViewModel-Tests:
+Kommando:
 
 ```text
-dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build --nologo --filter "FullyQualifiedName~IssueCreateDialogViewModelTests|FullyQualifiedName~IssueSelectionDialogViewModelTests|FullyQualifiedName~TaskDetailViewModelTests|FullyQualifiedName~AufgabeServiceTests|FullyQualifiedName~GitPluginBaseTests|FullyQualifiedName~GitHubPluginTests|FullyQualifiedName~BitbucketPluginTests|FullyQualifiedName~LocalDirectoryPluginTests|FullyQualifiedName~ClaudeCliPluginTests|FullyQualifiedName~CodexPluginTests|FullyQualifiedName~GitHubCopilotPluginTests|FullyQualifiedName~KiSimulatorPluginTests|FullyQualifiedName~CliKiPluginBaseTests" --logger "console;verbosity=minimal"
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~IssueCreateDialogViewModelTests|FullyQualifiedName~TaskDetailViewModelTests|FullyQualifiedName~GitPluginBaseTests|FullyQualifiedName~GitHubPluginTests|FullyQualifiedName~BitbucketPluginTests"
 ```
 
-Ergebnis: 311 Tests bestanden, 0 fehlgeschlagen, 0 übersprungen.
+Ergebnis: erfolgreich.
 
-Kommando `AufgabeService`-Integrationstests:
+- Gesamt: 212
+- Bestanden: 212
+- Fehlgeschlagen: 0
+- Uebersprungen: 0
 
-```text
-dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build --nologo --filter "FullyQualifiedName~AufgabeServiceTests" --logger "console;verbosity=minimal"
-```
-
-Ergebnis: 15 Tests bestanden, 0 fehlgeschlagen, 0 übersprungen.
-
-## Breite Tests
+## Nicht-E2E-Tests
 
 Kommando:
 
 ```text
-dotnet test Softwareschmiede.slnx --no-build --nologo --logger "console;verbosity=minimal"
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build --filter "FullyQualifiedName!~Softwareschmiede.Tests.E2E" --logger "trx;LogFileName=non-e2e.trx" --results-directory TestResults
 ```
 
-Ergebnis: erfolgreich mit Exit-Code 0. Dauer: ca. 4 Minuten 12 Sekunden. Die Testadapter-Ausgabe enthielt in dieser Umgebung keine abschließende Testanzahl.
+Ergebnis: erfolgreich.
+
+- Gesamt: 1060
+- Bestanden: 1059
+- Fehlgeschlagen: 0
+- Uebersprungen: 1 (`ArbeitsverzeichnisOeffnenServiceTests.Oeffne_AufNichtWindows_WirftPlatformNotSupportedException`, erwarteter OS-Skip auf Windows)
+
+## Vollstaendiger Testlauf inklusive E2E
+
+Kommando:
+
+```text
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build --logger "trx;LogFileName=issue-create-full.trx" --results-directory TestResults
+```
+
+Ergebnis: nicht erfolgreich wegen eines E2E-Timeouts ausserhalb der geaenderten Issue-Anlage-Nachweise.
+
+- Gesamt: 1090
+- Ausgefuehrt: 1089
+- Bestanden: 1088
+- Fehlgeschlagen: 1
+- Nicht ausgefuehrt: 1
+
+Fehlgeschlagen:
+
+- `Softwareschmiede.Tests.E2E.E2E_AufgabeStarten.AufgabeStarten_KlontRepositoryUndStartetCli_E2E`
+- Fehler: `System.TimeoutException: Element wurde nicht innerhalb von 15s gefunden.`
+- Reproduktionslauf nur fuer diesen Test: ebenfalls fehlgeschlagen mit derselben Meldung.
+
+Bewertung: Die relevanten Unit-/Provider-/Dialog-/TaskDetail-Nachweise fuer die offenen Punkte aus `continue.md` sind gruen. Der verbleibende E2E-Timeout betrifft den allgemeinen Aufgabe-Start-E2E und wurde nicht durch die Test-/Nachweisergaenzungen in dieser Nacharbeit veraendert.
