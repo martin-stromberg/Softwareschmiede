@@ -61,4 +61,22 @@ public sealed partial class FileExplorerView : UserControl
             vm.CommitAufklappenAsync(commit).SafeFireAndForget(_logger, "FileExplorerView.CommitAufklappenAsync");
         }
     }
+
+    private void OnBaumKnotenExpanded(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is TreeViewItem { DataContext: WorkspaceFileNode node }
+            && DataContext is FileExplorerViewModel vm)
+        {
+            vm.LadeKinderAsync(node).SafeFireAndForget(_logger, "FileExplorerView.LadeKinderAsync");
+        }
+    }
+
+    private void OnBaumKnotenCollapsed(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is TreeViewItem { DataContext: WorkspaceFileNode node }
+            && DataContext is FileExplorerViewModel vm)
+        {
+            vm.BeraeumeKnoten(node);
+        }
+    }
 }

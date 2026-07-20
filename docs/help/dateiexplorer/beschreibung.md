@@ -11,8 +11,12 @@ Nachdem ein Task-Repository geklont wurde, zeigt der Dateiexplorer die lokale Da
 Der Explorer präsentiert sich in zwei Grundmodi:
 
 ### Standardmodus
-Der **Standardmodus** ist beim Öffnen des Registers die Standardeinstellung. Er zeigt den **kompletten Arbeitsbaum** des geklonten Repositories:
+Der **Standardmodus** ist beim Öffnen des Registers die Standardeinstellung. Er zeigt den **Arbeitsbaum des geklonten Repositories mit Lazy-Loading**:
 - Links eine hierarchische Verzeichnis-/Dateistruktur (TreeView)
+- **Initial werden nur die obersten zwei Ebenen geladen** (Wurzel + eine Ebene tiefer) — dies verbessert die Performance bei großen Repositories
+- Verzeichnisse, deren Kinder noch nicht geladen sind, zeigen einen Aufklapp-Pfeil an (mit Platzhalter-Knoten)
+- Beim **Aufklappen eines Verzeichnisses** wird die nächste Ebene nachgeladen
+- Beim **Zuklappen eines Verzeichnisses** werden tiefer geladene Ebenen wieder entfernt (um die Speichernutzung zu optimieren) — die Invariante „pro Verzeichnis immer eine Ebene mehr geladen als sichtbar" bleibt erhalten
 - Das `.git`-Verzeichnis wird aus der Anzeige ausgeschlossen
 - Rechts wird der Inhalt der ausgewählten Datei als Klartext (Read-Only) angezeigt
 - Bei sehr großen Dateien (> 1 MB) oder Binärdateien erscheint statt des Inhalts ein Hinweis
@@ -42,7 +46,9 @@ Der **Vergleichsmodus** blendet aus, was sich nicht verändert hat. Er zeigt:
 ## Einschränkungen
 
 - Das `.git`-Verzeichnis wird nicht angezeigt, um die Baumgröße und Ladezeit überschaubar zu halten
-- Sehr große Repositories (mit tausenden Dateien) können mehrere Sekunden zum Laden benötigen
+- Beim Lazy-Loading werden nur bei Bedarf (beim Aufklappen) weitere Ebenen geladen — dies führt zu kurzfristigen Wartezeiten beim Aufklappen von Verzeichnissen mit vielen Kindern
+- Verzeichnisse auf maximaler Ladetiefe zeigen zunächst nur einen technischen Platzhalter-Knoten bis zum ersten Aufklappen
+- Die maximale Ladetiefe ist auf 64 Ebenen begrenzt — ein Schutz gegen zirkuläre Symlinks und unendliche Rekursion
 - Binärdateien und Dateien über 1 MB werden nicht vollständig angezeigt, sondern mit Hinweis gekennzeichnet
 - Das Inline-Highlighting bei Modified-Zeilen im Diff arbeitet auf Basis des gemeinsamen Präfix/Suffix (Wortabschnitte), nicht auf Token-Ebene
 - Die Benutzerauswahl zwischen Standard- und Vergleichsmodus wird nicht persistent gespeichert — bei erneutem Öffnen der Aufgabe startet der Explorer immer im Standardmodus

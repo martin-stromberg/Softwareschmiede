@@ -14,19 +14,22 @@
 
 Klicke auf den Button **„Dateien"** in der Registergruppe der Aufgabendetailansicht (neben „Info", „CLI", „Diff").
 
-Der Explorer wird angezeigt und lädt sofort den vollständigen Dateiebaum des geklonten Repositories im **Standardmodus**.
+Der Explorer wird angezeigt und lädt im **Standardmodus** die obersten zwei Ebenen des Dateiebaums des geklonten Repositories (Wurzel + eine Ebene tiefer).
 
-> **Hinweis:** Das Laden kann je nach Repositorygröße einige Sekunden dauern. Während des Ladens erscheint ein Hinweis.
+> **Hinweis:** Das initiale Laden ist schnell. Tiefer liegende Verzeichnisse laden sich erst beim Aufklappen nach (Lazy-Loading).
 
 ### 2. Datei im Standardmodus suchen
 
 Klicke die Verzeichnisse links in der Baumstruktur an, um sie auf- oder zuzuklappen:
 - `src` → `Softwareschmiede.App` → `Views` → `TaskDetailView.xaml` zum Beispiel
 - Nutze das Verzeichnis-Icon (📁) und Datei-Icon (📄) zur visuellen Orientierung
+- Verzeichnisse, deren Kinder noch nicht geladen sind, zeigen einen Aufklapp-Pfeil an (▶) — beim Aufklappen wird die nächste Ebene nachgeladen
 
 Wenn du eine Datei auswählst (Einfach-Klick), wird ihr Inhalt sofort rechts angezeigt (Read-Only Ansicht).
 
 > **Hinweis:** Bei Binärdateien oder Dateien über 1 MB erscheint ein Hinweis statt des Inhalts (z. B. „[Binärdatei kann nicht angezeigt werden]").
+
+> **Lazy-Loading Tipp:** Beim Aufklappen eines Verzeichnisses kann es eine kurze Moment dauern, bis die Kinder geladen werden. Dies ist normal und speichert Speicher bei großen Repositories.
 
 ### 3. In den Vergleichsmodus wechseln
 

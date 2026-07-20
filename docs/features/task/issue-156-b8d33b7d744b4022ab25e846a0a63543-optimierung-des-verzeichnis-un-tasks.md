@@ -1,47 +1,26 @@
-# Tasks: Lazy-Loading des Verzeichnisbaums mit progressiver Tiefenentwicklung
+# Aufgaben: Lazy-Loading des Verzeichnisbaums (Issue #156)
 
-| # | Bereich | Aufgabe | Status | Testnachweis |
-|---|---------|---------|--------|--------------|
-| 1 | Datenmodell | `WorkspaceFileNode.Depth` (`int`, init) hinzufügen | Offen | — |
-| 2 | Datenmodell | `WorkspaceFileNode.IsPlaceholder` (`bool`, init, Default `false`) hinzufügen | Offen | — |
-| 3 | Datenmodell | `WorkspaceFileNode.Children` von `List<WorkspaceFileNode>` auf `ObservableCollection<WorkspaceFileNode>` umstellen | Offen | — |
-| 4 | Logik | `GitWorkspaceBrowserService.SortNodes` auf `IList<WorkspaceFileNode>` + in-place-Sortierung umstellen | Offen | — |
-| 5 | Logik | `GitWorkspaceBrowserService.InsertNode` an neuen `Children`-Typ anpassen | Offen | — |
-| 6 | Logik | `IGitWorkspaceBrowserService.LoadWorkingTreeAsync` um `maxInitialDepth = 2` erweitern | Offen | — |
-| 7 | Logik | `GitWorkspaceBrowserService.WalkWorkingTreeDirectory` um `currentDepth`/`maxDepth` erweitern, `Depth` setzen, Rekursion begrenzen | Offen | — |
-| 8 | Logik | Grenztiefen-Verzeichnisse mit `ChildrenLoaded = false` + Platzhalter-Kind markieren | Offen | — |
-| 9 | Logik | `MaxLazyLoadDepth`-Konstante gegen zirkuläre Symlinks ergänzen | Offen | — |
-| 10 | Logik | `IGitWorkspaceBrowserService.LoadSubtreeAsync(...)` deklarieren | Offen | — |
-| 11 | Logik | `GitWorkspaceBrowserService.LoadSubtreeAsync` implementieren (eine Ebene, Depth, Platzhalter, `.git`-Ausschluss, Knotenlimit) | Offen | — |
-| 12 | ViewModel | `InitialLoadDepth`-Konstante in `FileExplorerViewModel` | Offen | — |
-| 13 | ViewModel | `LadeArbeitsbaumAsync` mit `InitialLoadDepth` aufrufen | Offen | — |
-| 14 | ViewModel | `FileExplorerViewModel.LadeKinderAsync(knoten, ct)` implementieren (Lazy-Load beim Aufklappen) | Offen | — |
-| 15 | ViewModel | `FileExplorerViewModel.BeraeumeKnoten(knoten)` implementieren (stets aktive Cleanup beim Zuklappen) | Offen | — |
-| 16 | Validierung | Platzhalter-Guard in `AusgewaehlterKnoten`/`DateiLadenAsync` (Auswahl/Vorschau ignorieren) | Offen | — |
-| 17 | UI | `StandardBaum` in `FileExplorerView.xaml` um `TreeViewItem.Expanded="OnBaumKnotenExpanded"` erweitern | Offen | — |
-| 18 | UI | `StandardBaum` um `TreeViewItem.Collapsed="OnBaumKnotenCollapsed"` erweitern (stets aktive Zuklapp-Bereinigung) | Offen | — |
-| 19 | UI | Code-Behind-Handler `OnBaumKnotenExpanded` (ruft `vm.LadeKinderAsync`) | Offen | — |
-| 20 | UI | Code-Behind-Handler `OnBaumKnotenCollapsed` (ruft `vm.BeraeumeKnoten`) | Offen | — |
-| 21 | UI | Optional: dezente Lade-/Platzhalteranzeige im `HierarchicalDataTemplate` für `WorkspaceFileNode` | Offen | — |
-| 22 | Tests | `LoadWorkingTreeAsync_LaedtNurMaxInitialDepthEbenen` | Offen | — |
-| 23 | Tests | `LoadWorkingTreeAsync_SetztDepthKorrekt` | Offen | — |
-| 24 | Tests | `LoadWorkingTreeAsync_GrenztiefeVerzeichnis_ChildrenLoadedFalseUndPlatzhalter` | Offen | — |
-| 25 | Tests | `LoadWorkingTreeAsync_ObereEbeneVerzeichnis_ChildrenLoadedTrue` | Offen | — |
-| 26 | Tests | `LoadSubtreeAsync_LaedtEineEbeneUnterhalbParent` | Offen | — |
-| 27 | Tests | `LoadSubtreeAsync_SetztDepthAufUebergebenenWert` | Offen | — |
-| 28 | Tests | `LoadSubtreeAsync_UnterverzeichnisMitPlatzhalterUndChildrenLoadedFalse` | Offen | — |
-| 29 | Tests | `LoadSubtreeAsync_NichtExistierenderPfad_LeereListe` | Offen | — |
-| 30 | Tests | `FileExplorerViewModelTests_LazyLoading` (neue Testklasse) anlegen | Offen | — |
-| 31 | Tests | `LadeKinderAsync_LaedtKinderUndSetztChildrenLoaded` | Offen | — |
-| 32 | Tests | `LadeKinderAsync_BereitsGeladen_LaedtNichtErneut` | Offen | — |
-| 33 | Tests | `LadeKinderAsync_KeinVerzeichnis_TutNichts` | Offen | — |
-| 34 | Tests | `LadeKinderAsync_Fehler_LaesstChildrenLoadedFalse` | Offen | — |
-| 35 | Tests | `BeraeumeKnoten_EntferntGrossEnkel` | Offen | — |
-| 36 | Tests | `BeraeumeKnoten_BehaeltDirekteKinderUndPlatzhalterInvariante` | Offen | — |
-| 37 | Tests | `Platzhalterknoten_WirdNichtAlsAuswahlBehandelt` | Offen | — |
-| 38 | Tests | `LoadWorkingTreeAsync_ListetDateienUndVerzeichnisse` an Tiefenbegrenzung anpassen | Offen | — |
-| 39 | Tests | Moq-Setups in `FileExplorerViewModelTests` auf neue `LoadWorkingTreeAsync`-Signatur (`It.IsAny<int>()`) anpassen | Offen | — |
-| 40 | Tests | `GitWorkspaceBrowserServiceTests.FindNode`/Assertions an `ObservableCollection`-`Children` anpassen | Offen | — |
-| 41 | E2E-Tests | `E2E_FileExplorer.DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E` (Aufklappen lädt Kinder nach) | Offen | — |
-| 42 | E2E-Tests | `E2E_FileExplorer.DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E` (Zuklappen bereinigt, erneutes Aufklappen lädt nach) | Offen | — |
-| 43 | E2E-Tests | Test-Datenbereitstellung: geklontes Test-Repository um mindestens dreistufige Verzeichnisstruktur ergänzen | Offen | — |
+| # | Aufgabe | Status | Testnachweis |
+|---|---------|--------|--------------|
+| 1 | `WorkspaceFileNode`: `Depth` (int, init) hinzufügen | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests.LoadWorkingTreeAsync_SetztDepthKorrekt` |
+| 2 | `WorkspaceFileNode`: `IsPlaceholder` (bool, init, Default false) hinzufügen | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests.LoadWorkingTreeAsync_GrenztiefeVerzeichnis_ChildrenLoadedFalseUndPlatzhalter` |
+| 3 | `WorkspaceFileNode`: `Children` von `List` auf `ObservableCollection` umstellen | Erledigt | `FileExplorerViewModelTests_LazyLoading.LadeKinderAsync_LaedtKinderUndSetztChildrenLoaded` (ReplaceAll auf Children) |
+| 4 | `IGitWorkspaceBrowserService.LoadWorkingTreeAsync`: Signatur um `maxInitialDepth = 2` erweitern | Erledigt | `FileExplorerViewModelTests.Standard_LaedtWurzelknotenUeberWorkingTree` |
+| 5 | `IGitWorkspaceBrowserService.LoadSubtreeAsync` deklarieren | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests.LoadSubtreeAsync_LaedtEineEbeneUnterhalbParent` |
+| 6 | `GitWorkspaceBrowserService.LoadWorkingTreeAsync`: `maxInitialDepth` durchreichen | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests.LoadWorkingTreeAsync_LaedtNurMaxInitialDepthEbenen` |
+| 7 | `WalkWorkingTreeDirectory`: `currentDepth`/`maxDepth`, `Depth` setzen, Grenztiefe = ChildrenLoaded=false + Platzhalter | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests.LoadWorkingTreeAsync_ObereEbeneVerzeichnis_ChildrenLoadedTrue` + `..._GrenztiefeVerzeichnis_ChildrenLoadedFalseUndPlatzhalter` |
+| 8 | `SortNodes` auf `IList`, in-place-Sortierung, Platzhalter ausgenommen | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests.LoadWorkingTreeAsync_ListetDateienUndVerzeichnisse` |
+| 9 | `InsertNode` auf `IList` anpassen (Commit-Baum unverändert) | Erledigt | `FileExplorerViewModelTests.CommitAufklappen_LaedtGeaenderteDateien` |
+| 10 | `GitWorkspaceBrowserService.LoadSubtreeAsync` implementieren (eine Ebene, .git aus, Platzhalter, Limit, MaxLazyLoadDepth, leere Liste bei ungültigem Pfad) | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests.LoadSubtreeAsync_SetztDepthAufUebergebenenWert`, `..._UnterverzeichnisMitPlatzhalterUndChildrenLoadedFalse`, `..._NichtExistierenderPfad_LeereListe` |
+| 11 | Konstante `MaxLazyLoadDepth = 64` im Service | Erledigt | Kein direkter Test (Begrenzung greift in `LoadWorkingTreeAsync`/`LoadSubtreeAsync`; fehlte sie, würde die Tiefenbegrenzung nicht deckeln) |
+| 12 | `FileExplorerViewModel`: Konstante `InitialLoadDepth = 2` | Erledigt | `FileExplorerViewModelTests.Standard_LaedtWurzelknotenUeberWorkingTree` (Aufruf mit int-Argument) |
+| 13 | `FileExplorerViewModel.LadeArbeitsbaumAsync`: mit `InitialLoadDepth` aufrufen | Erledigt | `FileExplorerViewModelTests.Standard_LaedtWurzelknotenUeberWorkingTree` |
+| 14 | `FileExplorerViewModel.LadeKinderAsync` implementieren | Erledigt | `FileExplorerViewModelTests_LazyLoading.LadeKinderAsync_LaedtKinderUndSetztChildrenLoaded`, `..._BereitsGeladen_LaedtNichtErneut`, `..._KeinVerzeichnis_TutNichts`, `..._Fehler_LaesstChildrenLoadedFalse` |
+| 15 | `FileExplorerViewModel.BeraeumeKnoten` implementieren (stets aktiv) | Erledigt | `FileExplorerViewModelTests_LazyLoading.BeraeumeKnoten_EntferntGrossEnkel`, `..._BehaeltDirekteKinderUndPlatzhalterInvariante` |
+| 16 | Platzhalter-Guard in `DateiLadenAsync`/`AusgewaehlterKnoten` | Erledigt | `FileExplorerViewModelTests_LazyLoading.Platzhalterknoten_WirdNichtAlsAuswahlBehandelt` |
+| 17 | `FileExplorerView.xaml`: `TreeViewItem.Expanded`/`Collapsed` am `StandardBaum` | Erledigt | `E2E_FileExplorer.DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E` |
+| 18 | Code-Behind `OnBaumKnotenExpanded` | Erledigt | `E2E_FileExplorer.DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E` |
+| 19 | Code-Behind `OnBaumKnotenCollapsed` | Erledigt | `E2E_FileExplorer.DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E` |
+| 20 | Bestehende Service-/VM-Tests an neue Signatur anpassen | Erledigt | `FileExplorerViewModelTests.*` (Moq `It.IsAny<int>()`), `GitWorkspaceBrowserServiceWorkingTreeTests.LoadWorkingTreeAsync_ListetDateienUndVerzeichnisse` |
+| 21 | Neue Unit-Tests (Service + VM Lazy-Loading) | Erledigt | `GitWorkspaceBrowserServiceWorkingTreeTests` (8 Tests), `FileExplorerViewModelTests_LazyLoading` (7 Tests) |
+| 22 | Neue E2E-Tests für Aufklappen und Zuklappen/erneut Aufklappen | Erledigt | `E2E_FileExplorer.DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E`, `..._KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E` |

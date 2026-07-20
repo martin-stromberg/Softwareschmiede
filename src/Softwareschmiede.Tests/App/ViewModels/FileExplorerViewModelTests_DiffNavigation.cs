@@ -98,7 +98,7 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
         var diffMock = new Mock<ITextDiffService>();
         var sut = new FileExplorerViewModel(gitMock.Object, diffMock.Object, NullLogger<FileExplorerViewModel>.Instance);
 
-        gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         await sut.InitialisierenAsync(RepositoryPath);
 
         var node = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };

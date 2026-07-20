@@ -34,6 +34,9 @@
         <Style x:Key="FileExplorerBaumItemContainerStyle" TargetType="TreeViewItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
+        <Style x:Key="StandardBaumItemContainerStyle" TargetType="TreeViewItem" BasedOn="{StaticResource FileExplorerBaumItemContainerStyle}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+        </Style>
     </UserControl.Resources>
     <Grid Margin="16">
         <!-- Split-View: Baum + Inhalt -->
@@ -53,7 +56,9 @@
                       BorderThickness="1"
                       ItemsSource="{Binding Wurzelknoten}"
                       SelectedItemChanged="OnBaumSelectedItemChanged"
-                      ItemContainerStyle="{StaticResource FileExplorerBaumItemContainerStyle}">
+                      TreeViewItem.Expanded="OnBaumKnotenExpanded"
+                      TreeViewItem.Collapsed="OnBaumKnotenCollapsed"
+                      ItemContainerStyle="{StaticResource StandardBaumItemContainerStyle}">
                 <TreeView.Style>
                     <Style TargetType="TreeView">
                         <Style.Triggers>

@@ -16,6 +16,8 @@ namespace Softwareschmiede.App.ViewModels;
 /// </summary>
 public sealed class FileExplorerViewModel : ViewModelBase
 {
+    private const int InitialLoadDepth = 2;
+
     private readonly IGitWorkspaceBrowserService _gitWorkspaceBrowserService;
     private readonly ITextDiffService _textDiffService;
     private readonly ILogger<FileExplorerViewModel> _logger;
@@ -123,13 +125,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
     {
         _repositoryPath = repositoryPath;
         AktuellerModus = DateibrowserAnsichtsmodus.Standard;
-        _dateiLadenCts?.Cancel();
-        _dateiLadenCts?.Dispose();
-        _dateiLadenCts = null;
-        _ausgewaehlterKnoten = null;
-        OnPropertyChanged(nameof(AusgewaehlterKnoten));
-        DateiInhalt = null;
-        ClearDiffZeilen();
+        AuswahlUndLadevorgangZuruecksetzen();
 
         if (string.IsNullOrWhiteSpace(repositoryPath))
         {
@@ -176,9 +172,55 @@ public sealed class FileExplorerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Lädt die Kinder eines Verzeichnisknotens nach, sofern sie noch nicht geladen wurden.</summary>
+    /// <param name="knoten">Der aufzuklappende Verzeichnisknoten.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    public async Task LadeKinderAsync(WorkspaceFileNode knoten, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(knoten);
+
+        if (!knoten.IsDirectory || knoten.ChildrenLoaded || string.IsNullOrWhiteSpace(_repositoryPath))
+            return;
+
+        try
+        {
+            var kinder = await _gitWorkspaceBrowserService.LoadSubtreeAsync(_repositoryPath, knoten.RelativePath, knoten.Depth + 1, ct);
+
+            _dispatcherInvoke(() =>
+            {
+                knoten.Children.ReplaceAll(kinder);
+                knoten.ChildrenLoaded = true;
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Kinder für {RelativePath} konnten nicht geladen werden.", knoten.RelativePath);
+        }
+    }
+
+    /// <summary>Räumt beim Zuklappen eines Verzeichnisknotens dessen Groß-Enkel-Knoten auf, sodass pro Verzeichnis stets eine Ebene mehr geladen als sichtbar ist.</summary>
+    /// <param name="knoten">Der zugeklappte Verzeichnisknoten.</param>
+    public void BeraeumeKnoten(WorkspaceFileNode knoten)
+    {
+        ArgumentNullException.ThrowIfNull(knoten);
+
+        foreach (var kind in knoten.Children)
+        {
+            if (kind.IsDirectory && kind.ChildrenLoaded)
+            {
+                kind.Children.ReplaceAll([WorkspaceFileNode.CreatePlaceholder(kind.Depth + 1)]);
+                kind.ChildrenLoaded = false;
+            }
+        }
+    }
+
     private async Task DateiLadenAsync(WorkspaceFileNode? knoten, CancellationToken ct)
     {
-        if (knoten is null || knoten.IsDirectory)
+        if (knoten is null || knoten.IsDirectory || knoten.IsPlaceholder)
         {
             DateiInhalt = null;
             ClearDiffZeilen();
@@ -247,13 +289,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
     {
         Wurzelknoten.Clear();
         CommitGruppen.Clear();
-        DateiInhalt = null;
-        ClearDiffZeilen();
-        _dateiLadenCts?.Cancel();
-        _dateiLadenCts?.Dispose();
-        _dateiLadenCts = null;
-        _ausgewaehlterKnoten = null;
-        OnPropertyChanged(nameof(AusgewaehlterKnoten));
+        AuswahlUndLadevorgangZuruecksetzen();
 
         if (AktuellerModus == DateibrowserAnsichtsmodus.Vergleich)
             await LadeCommitsAsync(ct);
@@ -268,7 +304,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
 
         try
         {
-            var nodes = await _gitWorkspaceBrowserService.LoadWorkingTreeAsync(_repositoryPath, ct);
+            var nodes = await _gitWorkspaceBrowserService.LoadWorkingTreeAsync(_repositoryPath, InitialLoadDepth, ct);
             _dispatcherInvoke(() =>
             {
                 Wurzelknoten.Clear();
@@ -374,6 +410,17 @@ public sealed class FileExplorerViewModel : ViewModelBase
         {
             _logger.LogError(ex, "Datei {RelativePath} konnte nicht mit der Standardanwendung geöffnet werden.", knoten.RelativePath);
         }
+    }
+
+    private void AuswahlUndLadevorgangZuruecksetzen()
+    {
+        _dateiLadenCts?.Cancel();
+        _dateiLadenCts?.Dispose();
+        _dateiLadenCts = null;
+        _ausgewaehlterKnoten = null;
+        OnPropertyChanged(nameof(AusgewaehlterKnoten));
+        DateiInhalt = null;
+        ClearDiffZeilen();
     }
 
     private List<int> ErmittleAenderungsBlockStartIndizes()

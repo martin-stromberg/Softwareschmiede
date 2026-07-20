@@ -28,9 +28,18 @@ public interface IGitWorkspaceBrowserService
     /// <param name="ct">Cancellation Token.</param>
     Task<FilePreview> LoadCommitPreviewAsync(string repositoryPath, WorkspaceFileNode node, CancellationToken ct = default);
 
-    /// <summary>Lädt den vollständigen Arbeitsbaum eines geklonten Repositories (Verzeichnisse und Dateien, <c>.git</c> ausgeschlossen).</summary>
+    /// <summary>Lädt den Arbeitsbaum eines geklonten Repositories bis zu einer maximalen Tiefe (Verzeichnisse und Dateien, <c>.git</c> ausgeschlossen). Verzeichnisse auf der Grenztiefe erhalten <see cref="WorkspaceFileNode.ChildrenLoaded"/> <c>false</c> und einen Platzhalter-Kindknoten für Lazy-Loading.</summary>
     /// <param name="repositoryPath">Pfad des lokalen Repositories.</param>
+    /// <param name="maxInitialDepth">Maximale Anzahl initial geladener Ebenen (0 = nur Wurzelebene).</param>
     /// <param name="ct">Cancellation Token.</param>
     /// <returns>Die Wurzelknoten des Arbeitsbaums, oder eine leere Liste, wenn der Pfad nicht existiert.</returns>
-    Task<IReadOnlyList<WorkspaceFileNode>> LoadWorkingTreeAsync(string repositoryPath, CancellationToken ct = default);
+    Task<IReadOnlyList<WorkspaceFileNode>> LoadWorkingTreeAsync(string repositoryPath, int maxInitialDepth = 2, CancellationToken ct = default);
+
+    /// <summary>Lädt eine einzelne Ebene unmittelbarer Kinder unterhalb <paramref name="parentPath"/> nach (Lazy-Loading beim Aufklappen eines Verzeichnisknotens).</summary>
+    /// <param name="repositoryPath">Pfad des lokalen Repositories.</param>
+    /// <param name="parentPath">Relativer Pfad des Verzeichnisses, dessen Kinder geladen werden sollen.</param>
+    /// <param name="depth">Ebene, die den zurückgegebenen Knoten zugewiesen wird.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Die unmittelbaren Kindknoten von <paramref name="parentPath"/>, oder eine leere Liste, wenn der Pfad nicht existiert.</returns>
+    Task<IReadOnlyList<WorkspaceFileNode>> LoadSubtreeAsync(string repositoryPath, string parentPath, int depth, CancellationToken ct = default);
 }
