@@ -5,7 +5,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Domain.Abstractions;
 
 /// <summary>Gemeinsame Basis für Git-Plugins. Öffentlich zugänglich für externe Plugin-Assemblies.</summary>
-public abstract class GitPluginBase<TPlugin> : IGitPlugin
+public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider, IIssueTemplateProvider
 {
     private readonly ICliRunner _cliRunner;
 
@@ -22,6 +22,15 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin
     public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
     public virtual IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
     public abstract Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
+    public virtual Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default)
+        => Task.FromResult(false);
+
+    public virtual Task<IssueCreateResult> CreateIssueAsync(string repositoryId, IssueCreateRequest request, CancellationToken ct = default)
+        => Task.FromResult(IssueCreateResult.NotSupported($"Issue-Anlage wird von Plugin '{PluginPrefix}' nicht unterstützt."));
+
+    public virtual Task<IssueTemplateLoadResult> GetIssueTemplatesAsync(string repositoryId, CancellationToken ct = default)
+        => Task.FromResult(IssueTemplateLoadResult.NotSupported($"Issue-Templates werden von Plugin '{PluginPrefix}' nicht unterstützt."));
+
     public abstract Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default);
     public abstract Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default);
     public abstract Task PullAsync(string localPath, CancellationToken ct = default);

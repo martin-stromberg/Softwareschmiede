@@ -275,6 +275,64 @@ public sealed class AufgabeService
         _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} aktualisiert.", id);
     }
 
+    /// <summary>
+    /// Weist einer Aufgabe eine IssueReferenz nur dann zu, wenn noch keine Referenz existiert.
+    /// Gibt false zurück, wenn die Aufgabe bereits eine Referenz besitzt oder parallel eine Referenz gesetzt wurde.
+    /// </summary>
+    public async Task<bool> TryAssignIssueReferenzIfNoneAsync(Guid id, Issue issue, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(issue);
+
+        _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} zuweisen, falls noch keine Referenz existiert.", id);
+
+        var aufgabeExists = await _db.Aufgaben
+            .AsNoTracking()
+            .AnyAsync(a => a.Id == id, ct);
+        if (!aufgabeExists)
+        {
+            throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+        }
+
+        if (await _db.IssueReferenzen.AsNoTracking().AnyAsync(i => i.AufgabeId == id, ct))
+        {
+            return false;
+        }
+
+        _db.IssueReferenzen.Add(CreateIssueReferenz(id, issue));
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            _db.ChangeTracker.Clear();
+            _logger.LogInformation("IssueReferenz für Aufgabe {AufgabeId} neu zugewiesen.", id);
+            return true;
+        }
+        catch (DbUpdateException ex)
+        {
+            _db.ChangeTracker.Clear();
+
+            if (await _db.IssueReferenzen.AsNoTracking().AnyAsync(i => i.AufgabeId == id, ct))
+            {
+                _logger.LogWarning(ex, "IssueReferenz für Aufgabe {AufgabeId} wurde parallel zugewiesen.", id);
+                return false;
+            }
+
+            throw;
+        }
+    }
+
+    private static IssueReferenz CreateIssueReferenz(Guid aufgabeId, Issue issue) => new()
+    {
+        Id = Guid.NewGuid(),
+        AufgabeId = aufgabeId,
+        IssueNummer = issue.Nummer,
+        Titel = issue.Titel,
+        Body = issue.Body,
+        LabelsJson = System.Text.Json.JsonSerializer.Serialize(issue.Labels),
+        Milestone = issue.Milestone,
+        IssueUrl = issue.IssueUrl
+    };
+
     /// <summary>Löscht eine Aufgabe.</summary>
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {

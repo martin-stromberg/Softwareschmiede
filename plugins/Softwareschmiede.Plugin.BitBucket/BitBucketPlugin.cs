@@ -15,6 +15,9 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     private const string BitbucketWorkspaceKey = "Softwareschmiede.Bitbucket.Workspace";
     private const string BitbucketHostingModeKey = "Softwareschmiede.Bitbucket.HostingMode";
     private const string BitbucketSelfHostedUrlKey = "Softwareschmiede.Bitbucket.SelfHostedUrl";
+    private const string JiraUrlKey = "Softwareschmiede.Bitbucket.JiraUrl";
+    private const string JiraProjectKey = "Softwareschmiede.Bitbucket.JiraProjectKey";
+    private const string JiraIssueTypeKey = "Softwareschmiede.Bitbucket.JiraIssueType";
 
     private const string RepositoryUrlKey = "RepositoryUrl";
     private const string RepositoryNameKey = "RepositoryName";
@@ -102,7 +105,15 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 FieldType: PluginSettingFieldType.Secret,
                 Placeholder: "xxxx-xxxx",
                 Description: "Jira API Token (nicht Bitbucket App Password!).",
-                IsRequired: true)
+                IsRequired: true),
+
+            new PluginSettingField(
+                Key: "JiraIssueType",
+                Label: "Jira Issue Type",
+                FieldType: PluginSettingFieldType.Text,
+                Placeholder: "Task",
+                Description: "Issue-Typ für neue Jira-Issues. Standard: Task.",
+                IsRequired: false)
         ]),
         new PluginSettingGroup("BitBucket-Hosting",
         [
@@ -325,8 +336,8 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <inheritdoc/>
     public override async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
-        var jiraProject = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey");
-        var jiraUrl = _credentialStore.GetCredential("Softwareschmiede.Bitbucket.JiraUrl");
+        var jiraProject = _credentialStore.GetCredential(JiraProjectKey);
+        var jiraUrl = _credentialStore.GetCredential(JiraUrlKey);
 
         if (string.IsNullOrWhiteSpace(jiraUrl))
             return [];
@@ -357,6 +368,90 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         }
 
         return ParseJiraIssues(doc.RootElement);
+    }
+
+    /// <inheritdoc/>
+    public override Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default)
+    {
+        var jiraUrl = _credentialStore.GetCredential(JiraUrlKey);
+        var jiraProject = _credentialStore.GetCredential(JiraProjectKey);
+        return Task.FromResult(!string.IsNullOrWhiteSpace(jiraUrl) && !string.IsNullOrWhiteSpace(jiraProject));
+    }
+
+    /// <inheritdoc/>
+    public override async Task<IssueCreateResult> CreateIssueAsync(
+        string repositoryId,
+        IssueCreateRequest request,
+        CancellationToken ct = default)
+    {
+        var jiraUrl = _credentialStore.GetCredential(JiraUrlKey);
+        var jiraProject = _credentialStore.GetCredential(JiraProjectKey);
+        var issueType = _credentialStore.GetCredential(JiraIssueTypeKey);
+
+        if (string.IsNullOrWhiteSpace(jiraUrl) || string.IsNullOrWhiteSpace(jiraProject))
+        {
+            return IssueCreateResult.NotSupported("Jira-URL oder Jira-Projekt-Key ist nicht konfiguriert.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return IssueCreateResult.Failed("Der Jira-Summary darf nicht leer sein.");
+        }
+
+        issueType = string.IsNullOrWhiteSpace(issueType) ? "Task" : issueType.Trim();
+        var payload = JsonSerializer.Serialize(new
+        {
+            fields = new
+            {
+                project = new { key = jiraProject.Trim() },
+                summary = request.Title.Trim(),
+                issuetype = new { name = issueType },
+                description = BuildJiraDescriptionAdf(request.Body)
+            }
+        });
+
+        var apiUrl = $"{jiraUrl.TrimEnd('/')}/rest/api/3/issue";
+        var result = await _cliRunner.RunAsync(
+            "curl",
+            [
+                "-s",
+                "-X", "POST",
+                ..GetJiraCurlAuthArgs(),
+                "-H", "Accept: application/json",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+                apiUrl
+            ],
+            null,
+            null,
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            return IssueCreateResult.Failed($"Jira-Issue konnte nicht erstellt werden: {result.StdErr}");
+        }
+
+        using var doc = JsonDocument.Parse(result.StdOut);
+        if (TryReadJiraError(doc.RootElement, out var errorMessage))
+        {
+            return IssueCreateResult.Failed($"Jira-Issue konnte nicht erstellt werden: {errorMessage}");
+        }
+
+        var key = doc.RootElement.TryGetProperty("key", out var keyEl) ? keyEl.GetString() : null;
+        var self = doc.RootElement.TryGetProperty("self", out var selfEl) ? selfEl.GetString() : null;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return IssueCreateResult.Failed("Jira-Issue wurde nicht erstellt oder die Antwort enthält keinen Issue-Key.");
+        }
+
+        var issueUrl = $"{jiraUrl.TrimEnd('/')}/browse/{key}";
+        return IssueCreateResult.Success(new Issue(
+            Nummer: 0,
+            Titel: $"{key}: {request.Title.Trim()}",
+            Body: request.Body,
+            Labels: [],
+            Milestone: null,
+            IssueUrl: string.IsNullOrWhiteSpace(issueUrl) ? self : issueUrl));
     }
 
     private static IEnumerable<Issue> ParseJiraIssues(JsonElement root)
@@ -458,6 +553,54 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             return;
         foreach (var child in content.EnumerateArray())
             RenderAdfNode(child, sb);
+    }
+
+    internal static object BuildJiraDescriptionAdf(string? text)
+    {
+        var paragraphs = (text ?? string.Empty)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n')
+            .Select(line => new
+            {
+                type = "paragraph",
+                content = string.IsNullOrEmpty(line)
+                    ? []
+                    : new[] { new { type = "text", text = line } }.Cast<object>().ToArray()
+            })
+            .Cast<object>()
+            .ToArray();
+
+        return new
+        {
+            type = "doc",
+            version = 1,
+            content = paragraphs.Length == 0
+                ? [new { type = "paragraph", content = Array.Empty<object>() }]
+                : paragraphs
+        };
+    }
+
+    private static bool TryReadJiraError(JsonElement root, out string message)
+    {
+        if (root.TryGetProperty("errorMessages", out var errorMessages)
+            && errorMessages.ValueKind == JsonValueKind.Array
+            && errorMessages.GetArrayLength() > 0)
+        {
+            message = string.Join("; ", errorMessages.EnumerateArray().Select(e => e.GetString()).Where(e => !string.IsNullOrWhiteSpace(e)));
+            return true;
+        }
+
+        if (root.TryGetProperty("errors", out var errors)
+            && errors.ValueKind == JsonValueKind.Object
+            && errors.EnumerateObject().Any())
+        {
+            message = string.Join("; ", errors.EnumerateObject().Select(e => $"{e.Name}: {e.Value.GetString()}"));
+            return true;
+        }
+
+        message = string.Empty;
+        return false;
     }
 
     /// <inheritdoc/>

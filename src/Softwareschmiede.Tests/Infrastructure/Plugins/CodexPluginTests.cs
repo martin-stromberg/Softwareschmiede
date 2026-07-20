@@ -50,6 +50,13 @@ public sealed class CodexPluginTests
         _sut.SupportsSessionContinuation().Should().BeFalse();
     }
 
+    /// <summary>Codex bietet die rückgabefähige Issue-Template-Ausfüllhilfe an.</summary>
+    [Fact]
+    public void Plugin_ShouldExposeIssueTemplateTextGeneratorCapability()
+    {
+        _sut.Should().BeAssignableTo<IIssueTemplateTextGenerator>();
+    }
+
     /// <summary>StartCliAsync uses default codex command when no path is configured.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldUseCodexCommand_WhenNoPathConfigured()

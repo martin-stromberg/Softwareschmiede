@@ -9,7 +9,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Codex CLI plugin for AI-assisted development.</summary>
-public sealed class CodexPlugin : CliKiPluginBase
+public sealed class CodexPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 
@@ -73,6 +73,24 @@ public sealed class CodexPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Pruefe Codex-CLI-Plugin-Health.");
         return await CheckHealthWithVersionCommandAsync(GetCodexCommand(), ct);
+    }
+
+    /// <inheritdoc/>
+    public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = GetCodexCommand(),
+            WorkingDirectory = Path.GetTempPath(),
+        };
+        psi.ArgumentList.Add("exec");
+        psi.ArgumentList.Add("--skip-git-repo-check");
+        psi.ArgumentList.Add("-");
+
+        return RunOneShotTextGenerationAsync(
+            psi,
+            BuildIssueTemplateFillPrompt(templateBody, originalRequirement),
+            ct);
     }
 
     /// <inheritdoc/>

@@ -70,6 +70,22 @@ public sealed class WpfDialogService : IDialogService
     }
 
     /// <inheritdoc/>
+    public Task<Issue?> ShowIssueCreateDialogAsync(
+        IssueCreateDialogViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new IssueCreateDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            var result = dialog.ShowDialog();
+            return result == true ? viewModel.CreatedIssue : null;
+        }).Task;
+    }
+
+    /// <inheritdoc/>
     public Task<string?> ShowSolutionSelectionDialogAsync(
         IReadOnlyList<string> solutionPfade,
         CancellationToken ct = default)

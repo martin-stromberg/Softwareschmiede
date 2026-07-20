@@ -76,6 +76,55 @@ public sealed class AufgabeServiceTests : IDisposable
         result.IssueReferenz.Milestone.Should().Be("v1.0");
     }
 
+    /// <summary>TryAssignIssueReferenzIfNoneAsync speichert eine IssueReferenz, wenn noch keine existiert.</summary>
+    [Fact]
+    public async Task TryAssignIssueReferenzIfNoneAsync_ShouldPersistIssueReference_WhenNoneExists()
+    {
+        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", null);
+        var issue = new Issue(23, "Neu", "Body", ["feature"], "v1", "https://example.test/23");
+
+        var assigned = await _sut.TryAssignIssueReferenzIfNoneAsync(aufgabe.Id, issue);
+
+        assigned.Should().BeTrue();
+        var reloaded = await _sut.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz.Should().NotBeNull();
+        reloaded.IssueReferenz!.IssueNummer.Should().Be(23);
+        reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/23");
+    }
+
+    /// <summary>TryAssignIssueReferenzIfNoneAsync überschreibt keine vorhandene IssueReferenz.</summary>
+    [Fact]
+    public async Task TryAssignIssueReferenzIfNoneAsync_ShouldReturnFalseAndKeepExistingReference_WhenReferenceExists()
+    {
+        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", null);
+        var existingIssue = new Issue(99, "Vorhanden", "Body", [], null, "https://example.test/99");
+        var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://example.test/23");
+        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, existingIssue);
+
+        var assigned = await _sut.TryAssignIssueReferenzIfNoneAsync(aufgabe.Id, createdIssue);
+
+        assigned.Should().BeFalse();
+        var reloaded = await _sut.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz!.IssueNummer.Should().Be(99);
+        reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/99");
+    }
+
+    /// <summary>UpdateIssueReferenzAsync behält die bestehende Issue-zuweisen-Semantik bei und überschreibt vorhandene Referenzen.</summary>
+    [Fact]
+    public async Task UpdateIssueReferenzAsync_ShouldOverwriteExistingReference_WhenReferenceExists()
+    {
+        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Zuweisung", null);
+        var existingIssue = new Issue(99, "Vorhanden", "Body", [], null, "https://example.test/99");
+        var selectedIssue = new Issue(42, "Auswahl", "Body", [], null, "https://example.test/42");
+        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, existingIssue);
+
+        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, selectedIssue);
+
+        var reloaded = await _sut.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz!.IssueNummer.Should().Be(42);
+        reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/42");
+    }
+
     /// <summary>GetByProjektAsync gibt alle Aufgaben eines Projekts zurück.</summary>
     [Fact]
     public async Task GetByProjektAsync_ShouldReturnAufgabenForProjekt_WhenAufgabenExist()

@@ -179,6 +179,77 @@ public abstract class CliKiPluginBase : IKiPlugin
     /// <inheritdoc/>
     public abstract Task<bool> CheckHealthAsync(CancellationToken ct = default);
 
+    /// <summary>Erstellt den Prompt für eine einmalige Issue-Template-Ausfüllung.</summary>
+    protected static string BuildIssueTemplateFillPrompt(string templateBody, string? originalRequirement)
+        => $"""
+           Fülle das folgende GitHub-/Issue-Template anhand der Originalanforderung aus.
+           Gib ausschließlich den fertigen Issue-Body zurück. Keine Einleitung, keine Markdown-Codefences, keine Erklärungen.
+           Erhalte sinnvolle Überschriften und Platzhalter, wenn sie ohne weitere Fachinformation nicht sicher ausgefüllt werden können.
+
+           Template:
+           {templateBody}
+
+           Originalanforderung:
+           {originalRequirement ?? string.Empty}
+           """;
+
+    /// <summary>Führt einen CLI-basierten Einmal-Prompt aus und gibt stdout zurück.</summary>
+    protected static async Task<string> RunOneShotTextGenerationAsync(
+        ProcessStartInfo psi,
+        string? standardInput,
+        CancellationToken ct)
+    {
+        psi.UseShellExecute = false;
+        psi.RedirectStandardOutput = true;
+        psi.RedirectStandardError = true;
+        psi.RedirectStandardInput = standardInput is not null;
+        psi.CreateNoWindow = true;
+
+        if (!psi.EnvironmentVariables.ContainsKey("PATH"))
+        {
+            psi.EnvironmentVariables["PATH"] = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        }
+
+        using var process = new Process { StartInfo = psi };
+        process.Start();
+
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
+        var stderrTask = process.StandardError.ReadToEndAsync(ct);
+
+        if (standardInput is not null)
+        {
+            await process.StandardInput.WriteAsync(standardInput.AsMemory(), ct).ConfigureAwait(false);
+            process.StandardInput.Close();
+        }
+
+        try
+        {
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { /* Best effort. */ }
+            throw;
+        }
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+
+        if (process.ExitCode != 0)
+        {
+            var details = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+            throw new InvalidOperationException($"KI-CLI wurde mit ExitCode {process.ExitCode} beendet: {details.Trim()}");
+        }
+
+        var result = stdout.Trim();
+        if (string.IsNullOrWhiteSpace(result))
+        {
+            throw new InvalidOperationException("KI-CLI hat keinen Text zurückgegeben.");
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// Liest alle Agenten aus dem angegebenen Unterverzeichnis eines Agentenpakets.
     /// </summary>

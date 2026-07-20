@@ -91,6 +91,142 @@ public sealed class GitHubPluginTests
         result.Should().BeEmpty();
     }
 
+    /// <summary>CreateIssueAsync ruft gh issue create auf und mappt die URL auf eine Issue-Referenz.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldReturnIssue_WhenCliSucceeds()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "issue", "create", "--repo", "owner/repo", "--title", "Titel", "--body", "Body")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo/issues/17", string.Empty));
+
+        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"));
+
+        result.IsSuccess.Should().BeTrue();
+        result.Issue!.Nummer.Should().Be(17);
+        result.Issue.Titel.Should().Be("Titel");
+        result.Issue.Body.Should().Be("Body");
+        result.Issue.IssueUrl.Should().Be("https://github.com/owner/repo/issues/17");
+    }
+
+    /// <summary>CreateIssueAsync liefert bei CLI-Fehler ein Fehlerergebnis ohne Issue.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldReturnFailed_WhenCliFails()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => a.Contains("create")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "permission denied"));
+
+        var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"));
+
+        result.Status.Should().Be(IssueCreateResultStatus.Failed);
+        result.Issue.Should().BeNull();
+        result.ErrorMessage.Should().Contain("permission denied");
+    }
+
+    /// <summary>GetIssueTemplatesAsync lädt Markdown-Templates aus .github/ISSUE_TEMPLATE.</summary>
+    [Fact]
+    public async Task GetIssueTemplatesAsync_ShouldReturnTemplates_WhenRepositoryContainsTemplates()
+    {
+        var listJson = """
+            [
+              {"type":"file","name":"bug.md","path":".github/ISSUE_TEMPLATE/bug.md"},
+              {"type":"dir","name":"ignored","path":".github/ISSUE_TEMPLATE/ignored"}
+            ]
+            """;
+        var contentJson = $$"""
+            {"content":"{{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Template Body"))}}"}
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.SetupSequence(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, listJson, string.Empty))
+            .ReturnsAsync(new CliResult(0, contentJson, string.Empty));
+
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+
+        result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
+        result.Templates.Should().ContainSingle()
+            .Which.Should().Be(new IssueTemplate("bug.md", "Template Body"));
+    }
+
+    /// <summary>GetIssueTemplatesAsync blendet GitHub Issue Forms und config.yml aus.</summary>
+    [Fact]
+    public async Task GetIssueTemplatesAsync_ShouldIgnoreYamlIssueFormsAndConfig()
+    {
+        var listJson = """
+            [
+              {"type":"file","name":"bug.md","path":".github/ISSUE_TEMPLATE/bug.md"},
+              {"type":"file","name":"feature.yml","path":".github/ISSUE_TEMPLATE/feature.yml"},
+              {"type":"file","name":"config.yml","path":".github/ISSUE_TEMPLATE/config.yml"},
+              {"type":"file","name":"task.yaml","path":".github/ISSUE_TEMPLATE/task.yaml"}
+            ]
+            """;
+        var contentJson = $$"""
+            {"content":"{{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Markdown Template"))}}"}
+            """;
+        var loadedPaths = new List<string>();
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) =>
+            {
+                var pathArg = args.LastOrDefault();
+                if (pathArg is not null && pathArg.Contains("/contents/.github/ISSUE_TEMPLATE/", StringComparison.Ordinal))
+                {
+                    loadedPaths.Add(pathArg);
+                }
+            })
+            .ReturnsAsync((string _, IEnumerable<string> args, string? _, IDictionary<string, string>? _, CancellationToken _) =>
+                args.Last().EndsWith("/contents/.github/ISSUE_TEMPLATE", StringComparison.Ordinal)
+                    ? new CliResult(0, listJson, string.Empty)
+                    : new CliResult(0, contentJson, string.Empty));
+
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+
+        result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
+        result.Templates.Should().ContainSingle()
+            .Which.Should().Be(new IssueTemplate("bug.md", "Markdown Template"));
+        loadedPaths.Should().ContainSingle()
+            .Which.Should().EndWith("/contents/.github/ISSUE_TEMPLATE/bug.md");
+    }
+
+    /// <summary>GetIssueTemplatesAsync behandelt fehlende Template-Verzeichnisse als leere Template-Liste.</summary>
+    [Fact]
+    public async Task GetIssueTemplatesAsync_ShouldReturnEmpty_WhenTemplateDirectoryDoesNotExist()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "HTTP 404: Not Found"));
+
+        var result = await _sut.GetIssueTemplatesAsync("owner/repo");
+
+        result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
+        result.Templates.Should().BeEmpty();
+    }
+
     /// <summary>CloneRepositoryAsync ruft git clone mit korrekten Argumenten auf.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldCallGitClone_WhenCalled()

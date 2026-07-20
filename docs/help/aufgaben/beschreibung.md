@@ -83,7 +83,16 @@ Aktionsgruppen:
 - **Navigation:** „Zurück"-Button zur Rückkehr zur Projektdetailansicht
 - **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Plugin ändern (nur bei laufender CLI)
 - **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv)
+- **Issue:** „Issue anlegen" wird angeboten, wenn das Repository die Anlage unterstützt und der Aufgabe noch kein Issue zugeordnet ist. „Issue zuweisen" bleibt für die Auswahl eines vorhandenen Issues verfügbar; nach erfolgreicher Anlage zeigt „Issue öffnen" die gespeicherte Referenz.
 - **Pull Request:** „PR erstellen" Button, sobald Branch, verknüpftes Git-Repository und Pull-Request-Unterstützung des Git-Plugins vorhanden sind
+
+### Issue aus einer Aufgabe anlegen
+
+Über „Issue anlegen" wird ein neues Issue im Provider des zugeordneten Repositorys vorbereitet. Der Aufgabentitel ist als Titel vorausgefüllt, die Anforderungsbeschreibung als editierbare Beschreibung. Falls der Provider Templates liefert, können diese ausgewählt werden. Der Dialog ergänzt dann den Template-Inhalt, eine Trennlinie und den Abschnitt `Originalanforderung:`; der gesamte Inhalt bleibt bearbeitbar.
+
+Optional kann ein ausgewählter Template-Text mit einem im Dialog gewählten KI-Provider ausgefüllt werden. Die KI-Ausfüllhilfe ist unabhängig von der normalen Issue-Anlage und kann bei fehlendem oder nicht geeignetem KI-Provider nicht verwendet werden.
+
+Beim Absenden wird das Issue zuerst extern erstellt. Erst danach wird die Issue-Referenz an der Aufgabe gespeichert und die Detailansicht aktualisiert. Abbrechen, Providerfehler oder eine fehlgeschlagene lokale Zuordnung erzeugen keine erfolgreiche Zuordnung. Ist bereits ein Issue zugeordnet, wird die Anlageaktion für diese Aufgabe nicht mehr angeboten.
 
 ### Zeitgesteuerter Prompt-Versand
 

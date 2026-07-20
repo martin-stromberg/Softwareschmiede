@@ -38,6 +38,13 @@ public sealed class ClaudeCliPluginTests
         _sut.SupportsSessionContinuation().Should().BeTrue();
     }
 
+    /// <summary>Claude bietet die rückgabefähige Issue-Template-Ausfüllhilfe an.</summary>
+    [Fact]
+    public void Plugin_ShouldExposeIssueTemplateTextGeneratorCapability()
+    {
+        _sut.Should().BeAssignableTo<IIssueTemplateTextGenerator>();
+    }
+
     /// <summary>StartCliAsync returns ProcessStartInfo with claude as filename (absolute path from PATH or fallback).</summary>
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfo_WithClaudeCommand()

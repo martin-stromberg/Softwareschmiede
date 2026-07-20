@@ -69,6 +69,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _showFileExplorerPanel;
     private IReadOnlyList<string> _solutionPfade = [];
     private bool _canCreatePullRequest;
+    private bool _canCreateIssue;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -118,6 +119,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(KannPullRequestErstellen));
             OnPropertyChanged(nameof(CanAssignIssue));
+            OnPropertyChanged(nameof(CanCreateIssue));
+            OnPropertyChanged(nameof(ShowIssueGroup));
             OnPropertyChanged(nameof(CurrentIssueReferenz));
             OnPropertyChanged(nameof(ShowInfoPanel));
             WaehleStandardAnsicht();
@@ -142,7 +145,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public bool IsLoading
     {
         get => _isLoading;
-        private set => SetProperty(ref _isLoading, value);
+        private set
+        {
+            SetProperty(ref _isLoading, value);
+            OnPropertyChanged(nameof(CanCreateIssue));
+            OnPropertyChanged(nameof(ShowIssueGroup));
+        }
     }
 
     /// <summary>Fehlermeldung bei Fehlern.</summary>
@@ -166,6 +174,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(KannPullRequestErstellen));
             OnPropertyChanged(nameof(CanAssignIssue));
+            OnPropertyChanged(nameof(CanCreateIssue));
+            OnPropertyChanged(nameof(ShowIssueGroup));
             OnPropertyChanged(nameof(KannPromptPlanen));
         }
     }
@@ -373,6 +383,17 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         && !_isCliRunning
         && _pluginManager.GetSourceCodeManagementPlugins().Any(p => p is IGitPlugin);
 
+    /// <summary>true wenn ein neues Issue für die Aufgabe angelegt werden kann.</summary>
+    public bool CanCreateIssue => _aufgabe != null
+        && !_isLoading
+        && !_isCliRunning
+        && _aufgabe.IssueReferenz is null
+        && !string.IsNullOrWhiteSpace(_aufgabe.GitRepository?.RepositoryUrl)
+        && _canCreateIssue;
+
+    /// <summary>true wenn die Issue-Ribbon-Gruppe sichtbar sein soll.</summary>
+    public bool ShowIssueGroup => CanAssignIssue || CanCreateIssue || CurrentIssueReferenz?.IssueUrl is not null;
+
     /// <summary>Aktuelle Issue-Zuweisung der Aufgabe.</summary>
     public IssueReferenz? CurrentIssueReferenz => _aufgabe?.IssueReferenz;
 
@@ -423,6 +444,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Öffnet den Issue-Auswahl-Dialog und weist das gewählte Issue der Aufgabe zu.</summary>
     public ICommand IssueZuweisenCommand { get; }
+
+    /// <summary>Öffnet den Issue-Anlage-Dialog und weist das neu erstellte Issue der Aufgabe zu.</summary>
+    public ICommand IssueAnlegenCommand { get; }
 
     /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
     public ICommand IssueBrowserOeffnenCommand { get; }
@@ -514,6 +538,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         DateiViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Dateibrowser), () => ShowFileExplorerPanel);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
+        IssueAnlegenCommand = new AsyncRelayCommand(IssueAnlegenAsync, () => CanCreateIssue);
         IssueBrowserOeffnenCommand = new RelayCommand(
             IssueBrowserOeffnen,
             () => CurrentIssueReferenz?.IssueUrl != null);
@@ -564,6 +589,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await LadeVerfuegbarePluginsAsync(ct);
             await LadePromptVorlagenAsync(ct);
             await AktualisierePullRequestCapabilityAsync(ct);
+            await AktualisiereIssueCreateCapabilityAsync(ct);
 
             // Unmittelbar vor dem Auto-Restart nochmals live prüfen, ob der Prozess läuft.
             // Verhindert doppelten CLI-Start, wenn der Prozess nach dem Starten extrem schnell
@@ -726,6 +752,46 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async Task AktualisiereIssueCreateCapabilityAsync(CancellationToken ct)
+    {
+        _canCreateIssue = false;
+
+        if (_aufgabe is null
+            || _aufgabe.IssueReferenz is not null
+            || string.IsNullOrWhiteSpace(_aufgabe.GitRepository?.RepositoryUrl))
+        {
+            OnPropertyChanged(nameof(CanCreateIssue));
+            OnPropertyChanged(nameof(ShowIssueGroup));
+            return;
+        }
+
+        var gitPlugin = ResolveGitPluginForAufgabe();
+        if (gitPlugin is not IIssueCreateProvider issueCreateProvider)
+        {
+            OnPropertyChanged(nameof(CanCreateIssue));
+            OnPropertyChanged(nameof(ShowIssueGroup));
+            return;
+        }
+
+        try
+        {
+            _canCreateIssue = await issueCreateProvider.CanCreateIssueAsync(GetRepositoryIdentifier(_aufgabe), ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Issue-Anlage-Capability für Aufgabe {AufgabeId} konnte nicht ermittelt werden.", _aufgabeId);
+        }
+        finally
+        {
+            OnPropertyChanged(nameof(CanCreateIssue));
+            OnPropertyChanged(nameof(ShowIssueGroup));
+        }
+    }
+
     private IGitPlugin? ResolveGitPluginForAufgabe()
     {
         var gitPlugins = _pluginManager.GetSourceCodeManagementPlugins().OfType<IGitPlugin>().ToList();
@@ -743,6 +809,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         return gitPlugins.FirstOrDefault();
     }
+
+    private static string GetRepositoryIdentifier(Aufgabe aufgabe)
+        => !string.IsNullOrWhiteSpace(aufgabe.GitRepository?.RepositoryName)
+            ? aufgabe.GitRepository.RepositoryName
+            : aufgabe.GitRepository?.RepositoryUrl ?? string.Empty;
 
     private async Task AufgabeAbschliessenAsync(CancellationToken ct)
     {
@@ -936,6 +1007,117 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             _logger.LogError(ex, "Fehler beim Zuweisen des Issues für Aufgabe {AufgabeId}.", _aufgabeId);
             SetFehler(ex);
         }
+    }
+
+    private async Task IssueAnlegenAsync(CancellationToken ct)
+    {
+        if (_aufgabe == null)
+            return;
+
+        var aktuellerStand = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+        if (aktuellerStand?.IssueReferenz is not null)
+        {
+            Aufgabe = aktuellerStand;
+            FehlerMeldung = "Der Aufgabe ist bereits ein Issue zugeordnet.";
+            return;
+        }
+
+        var gitPlugin = ResolveGitPluginForAufgabe();
+        if (gitPlugin is not IIssueCreateProvider issueCreateProvider)
+        {
+            FehlerMeldung = "Der Repository-Provider unterstützt die Issue-Anlage nicht.";
+            return;
+        }
+
+        var repositoryId = GetRepositoryIdentifier(_aufgabe);
+        if (!await issueCreateProvider.CanCreateIssueAsync(repositoryId, ct))
+        {
+            FehlerMeldung = "Der Repository-Provider unterstützt die Issue-Anlage für dieses Repository nicht.";
+            return;
+        }
+
+        var dialogVm = _serviceProvider.GetRequiredService<IssueCreateDialogViewModel>();
+        var preferredKiPluginPrefix = await ResolvePreferredKiPluginPrefixAsync(ct);
+        dialogVm.Initialize(
+            issueCreateProvider,
+            gitPlugin as IIssueTemplateProvider,
+            repositoryId,
+            _aufgabe.Titel,
+            _aufgabe.AnforderungsBeschreibung,
+            preferredKiPluginPrefix,
+            () => _aufgabe?.IssueReferenz is not null,
+            async token => (await _aufgabeService.GetDetailAsync(_aufgabeId, token))?.IssueReferenz is not null);
+
+        var createdIssue = await _dialogService.ShowIssueCreateDialogAsync(dialogVm, ct);
+        if (createdIssue is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var standVorZuordnung = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+            if (standVorZuordnung?.IssueReferenz is not null)
+            {
+                Aufgabe = standVorZuordnung;
+                FehlerMeldung = $"Issue wurde extern erstellt ({DescribeIssue(createdIssue)}), aber nicht lokal zugeordnet, weil der Aufgabe inzwischen ein Issue zugeordnet ist.";
+                return;
+            }
+
+            if (!await _aufgabeService.TryAssignIssueReferenzIfNoneAsync(_aufgabeId, createdIssue, ct))
+            {
+                var standNachFehlgeschlagenerZuordnung = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+                if (standNachFehlgeschlagenerZuordnung is not null)
+                {
+                    Aufgabe = standNachFehlgeschlagenerZuordnung;
+                }
+
+                FehlerMeldung = $"Issue wurde extern erstellt ({DescribeIssue(createdIssue)}), aber nicht lokal zugeordnet, weil der Aufgabe inzwischen ein Issue zugeordnet ist.";
+                return;
+            }
+
+            await LadenAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Externes Issue wurde erstellt, lokale Zuordnung für Aufgabe {AufgabeId} ist fehlgeschlagen.", _aufgabeId);
+            FehlerMeldung = $"Issue wurde extern erstellt ({DescribeIssue(createdIssue)}), konnte aber nicht lokal zugeordnet werden: {ex.Message}";
+        }
+    }
+
+    private async Task<string?> ResolvePreferredKiPluginPrefixAsync(CancellationToken ct)
+    {
+        if (_aufgabe is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _pluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync(
+                _aufgabe.KiPluginPrefix,
+                _aufgabe.ProjektId,
+                ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Standard-KI-Provider für Issue-Anlage konnte nicht ermittelt werden.");
+            return _selectedKiPluginPrefix;
+        }
+    }
+
+    private static string DescribeIssue(Issue issue)
+    {
+        if (!string.IsNullOrWhiteSpace(issue.IssueUrl))
+        {
+            return issue.IssueUrl;
+        }
+
+        return issue.Nummer > 0 ? $"#{issue.Nummer}" : issue.Titel;
     }
 
     private void IssueBrowserOeffnen()

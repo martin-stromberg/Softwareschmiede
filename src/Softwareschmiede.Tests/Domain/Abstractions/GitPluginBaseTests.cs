@@ -205,6 +205,24 @@ public sealed class GitPluginBaseTests
         capabilities.CanMergeToSource.Should().BeFalse();
     }
 
+    /// <summary>Issue-Anlage ist in der Basisklasse standardmäßig nicht unterstützt.</summary>
+    [Fact]
+    public async Task IssueCreateCapability_ShouldReturnNotSupported_ByDefault()
+    {
+        var sut = new TestGitPlugin(new Mock<ICliRunner>().Object);
+
+        var canCreate = await sut.CanCreateIssueAsync("repo");
+        var createResult = await sut.CreateIssueAsync("repo", new IssueCreateRequest("Titel", "Body"));
+        var templateResult = await sut.GetIssueTemplatesAsync("repo");
+
+        canCreate.Should().BeFalse();
+        createResult.Status.Should().Be(IssueCreateResultStatus.NotSupported);
+        createResult.IsSuccess.Should().BeFalse();
+        createResult.Issue.Should().BeNull();
+        templateResult.Status.Should().Be(IssueTemplateLoadResultStatus.NotSupported);
+        templateResult.Templates.Should().BeEmpty();
+    }
+
     /// <summary>Prüft, dass MergeToSource standardmäßig als nicht unterstützt markiert ist.</summary>
     [Fact]
     public async Task MergeToSourceAsync_ShouldThrowNotSupportedException_ByDefault()

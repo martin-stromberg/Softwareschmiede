@@ -444,6 +444,80 @@ public sealed class BitbucketPluginTests
         issues[0].Body.Should().BeNull();
     }
 
+    /// <summary>CreateIssueAsync erstellt Jira-Issue mit Summary, Projekt, Issue-Typ und ADF-Beschreibung.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldPostJiraAdfPayload()
+    {
+        IEnumerable<string>? capturedArgs = null;
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("credential");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns("https://jira.example.test");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
+            .Returns("PROJ");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraIssueType"))
+            .Returns("Bug");
+
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "curl",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) => capturedArgs = args.ToList())
+            .ReturnsAsync(new CliResult(0, """{"key":"PROJ-42","self":"https://jira.example.test/rest/api/3/issue/42"}""", string.Empty));
+
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Zeile 1\nZeile 2"));
+
+        result.IsSuccess.Should().BeTrue();
+        result.Issue!.Titel.Should().Be("PROJ-42: Titel");
+        result.Issue.IssueUrl.Should().Be("https://jira.example.test/browse/PROJ-42");
+        capturedArgs.Should().NotBeNull();
+        capturedArgs!.Should().Contain("POST");
+        capturedArgs.Should().Contain("https://jira.example.test/rest/api/3/issue");
+        var payload = capturedArgs.SkipWhile(a => a != "-d").Skip(1).First();
+        payload.Should().Contain("\"summary\":\"Titel\"");
+        payload.Should().Contain("\"key\":\"PROJ\"");
+        payload.Should().Contain("\"name\":\"Bug\"");
+        payload.Should().Contain("\"type\":\"doc\"");
+        payload.Should().Contain("Zeile 1");
+        payload.Should().Contain("Zeile 2");
+    }
+
+    /// <summary>CreateIssueAsync gibt Jira-Validierungsfehler als Fehlerergebnis zurück.</summary>
+    [Fact]
+    public async Task CreateIssueAsync_ShouldReturnFailed_WhenJiraReturnsErrors()
+    {
+        _credentialStoreMock
+            .Setup(c => c.GetCredential(It.IsAny<string>()))
+            .Returns("credential");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraUrl"))
+            .Returns("https://jira.example.test");
+        _credentialStoreMock
+            .Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.JiraProjectKey"))
+            .Returns("PROJ");
+        _cliRunnerMock
+            .Setup(c => c.RunAsync(
+                "curl",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, """{"errors":{"summary":"Summary is required"}}""", string.Empty));
+
+        var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Body"));
+
+        result.Status.Should().Be(IssueCreateResultStatus.Failed);
+        result.Issue.Should().BeNull();
+        result.ErrorMessage.Should().Contain("summary");
+    }
+
     /// <summary>ResolveGitCloneUrl wandelt Browser-URL korrekt um.</summary>
     [Theory]
     [InlineData(
