@@ -12,8 +12,9 @@
 | `DiffViewer` | UI (App) | Wiederverwendbarer UserControl für zeilenweises Diff-Rendering mit Farbkodierung |
 | `DiffLineStatusToBrushConverter` | UI (App) | IValueConverter für Umwandlung von DiffLineStatus in Hintergrund-Brush |
 | `DateibrowserAnsichtsmodus` | Presentation (App) | Enum für Modus-Steuerung (Standard vs. Vergleich) |
-| `IGitWorkspaceBrowserService` | Application | Interface für Git-Backend-Operationen (Arbeitsbaum, Commits, Dateivorschauen) |
-| `GitWorkspaceBrowserService` | Application | Konkrete Implementierung; nutzt `ICliRunner` für Git-Aufrufe und File-System-APIs |
+| `IGitWorkspaceBrowserService` | Application | Interface für Git-Backend-Operationen (Arbeitsbaum mit Lazy-Loading, Commits, Dateivorschauen) |
+| `GitWorkspaceBrowserService` | Application | Konkrete Implementierung mit Directory-Walk, Lazy-Loading-Support; nutzt `ICliRunner` für Git-Aufrufe und File-System-APIs |
+| `WorkingTreeWalkContext` | Application | Interne Hilfsklasse für Directory-Walk-Kontext (speichert `RootPath`, `MaxDepth`, `CancellationToken`, `NodeCount`) |
 | `ITextDiffService` | Application | Interface für zeilenweisen Präsentations-Diff |
 | `TextDiffService` | Application | Konkrete Implementierung; berechnet Diff ohne DB-Abhängigkeit |
 | `WorkspaceFileNode` | Domain | Value Object für Baum-Knoten (Directory-Walk und Commit-Files) |
@@ -85,8 +86,9 @@ graph TB
 - Delegation an Application-Layer Services, nicht direkte Datenbankzugriffe
 
 ### Application-Schicht
-- **IGitWorkspaceBrowserService**: Abstrahiert Git-Backend-Operationen
-  - `LoadWorkingTreeAsync()` — Directory-Walk
+- **IGitWorkspaceBrowserService**: Abstrahiert Git-Backend-Operationen mit Lazy-Loading-Support
+  - `LoadWorkingTreeAsync(repositoryPath, maxInitialDepth = 2, ...)` — Directory-Walk mit Tiefenbegrenzung (initial 2 Ebenen)
+  - `LoadSubtreeAsync(repositoryPath, parentPath, depth, ...)` — Lazy-Load einzelner Ebenen beim Aufklappen
   - `LoadSnapshotAsync()` — Commit-Listing
   - `LoadPreviewAsync()` / `LoadCommitPreviewAsync()` — Datei-Inhalt
   - `LoadCommitFilesAsync()` — Commit-spezifische Dateien
@@ -100,7 +102,7 @@ graph TB
 
 ## Datenfluss
 
-### Standardmodus — Directory-Walk
+### Standardmodus — Lazy-Loading Directory-Walk
 
 ```
 Benutzer öffnet Register
@@ -109,16 +111,48 @@ TaskDetailViewModel.Aufgabe.LokalerKlonPfad
   ↓
 FileExplorerViewModel.InitialisierenAsync(pfad)
   ↓
-IGitWorkspaceBrowserService.LoadWorkingTreeAsync(pfad)
+IGitWorkspaceBrowserService.LoadWorkingTreeAsync(pfad, maxInitialDepth=2)
   ↓
-  Directory.EnumerateFileSystemEntries() → File-System
-  skip .git, baue WorkspaceFileNode-Baum
+  WorkingTreeWalkContext(pfad, maxDepth=2, ct)
+  Directory.EnumerateFileSystemEntries() → File-System (nur 2 Ebenen)
+  skip .git, baue WorkspaceFileNode-Baum mit Platzhaltern auf Grenztiefe
   ↓
-Wurzelknoten: ObservableCollection<WorkspaceFileNode>
+Wurzelknoten: ObservableCollection<WorkspaceFileNode> (2 Ebenen + Platzhalter)
   ↓
 FileExplorerView.TreeView.ItemsSource → Wurzelknoten
   ↓
-HierarchicalDataTemplate rendert Baum
+HierarchicalDataTemplate rendert Baum (Verzeichnisse mit Platzhaltern zeigen ▶-Pfeil)
+
+Benutzer: Klick auf ▶ neben Verzeichnis
+  ↓
+TreeViewItem.Expanded-Event
+  ↓
+FileExplorerView.OnBaumKnotenExpanded(node)
+  ↓
+FileExplorerViewModel.LadeKinderAsync(node)
+  ↓
+IGitWorkspaceBrowserService.LoadSubtreeAsync(pfad, node.RelativePath, node.Depth+1)
+  ↓
+  Lade eine Ebene unterhalb node.RelativePath
+  ↓
+node.Children.ReplaceAll(neueKinder)
+node.ChildrenLoaded = true
+  ↓
+TreeView zeigt neue Kinder statt Platzhalter
+
+Benutzer: Klick auf ▼ neben Verzeichnis
+  ↓
+TreeViewItem.Collapsed-Event
+  ↓
+FileExplorerView.OnBaumKnotenCollapsed(node)
+  ↓
+FileExplorerViewModel.BeraeumeKnoten(node)
+  ↓
+Für jedes Kind in node.Children mit IsDirectory && ChildrenLoaded:
+  Ersetze echte Großkinder durch Platzhalter
+  ChildrenLoaded = false
+  ↓
+Speicher wird freigegeben, Invariante bleibt konsistent
 ```
 
 ### Vergleichsmodus — Git Diff
@@ -191,10 +225,12 @@ Inline-Runs für geänderte Wortteile
 
 ## Performance-Charakteristiken
 
-- **Standardmodus:** O(n) Directory-Walk mit n = Dateien im Repo; Obergrenze ~10.000 Knoten zur Rendering-Sicherheit
-- **Vergleichsmodus:** O(c) für Commits, dann O(f) pro aufgeklapptem Commit mit f = Dateien im Commit
+- **Standardmodus Initial:** O(k) Directory-Walk mit k = Dateien in den ersten 2 Ebenen; deutlich schneller als vollständiger Walk
+- **Standardmodus Lazy-Load:** O(f) pro aufgeklapptem Verzeichnis mit f = direkte Kinder; auf Abruf nachgeladen
+- **Vergleichsmodus:** O(c) für Commits, dann O(f) pro aufgeklapptem Commit mit f = Dateien im Commit (bereits mit Lazy-Loading)
 - **Diff-Berechnung:** O(n log n) für `ComputeLineOperations()` (Longest Common Subsequence-ähnlich); inline-Segmente O(m) mit m = Zeilenlänge
 - **UI-Rendering:** TreeView ist virtualisiert; DiffViewer ist nicht virtualisiert (kann bei 1000+ Zeilen langsam werden)
+- **Speicher:** Lazy-Loading spielt bei tiefen Navigationen gut — pro Knoten ist maximal eine Ebene mehr geladen als angezeigt; Zuklappen-Bereinigung gibt Speicher frei
 
 ## Zuverlässigkeit und Fehlertoleranz
 

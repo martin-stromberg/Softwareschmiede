@@ -1,3 +1,18 @@
+## 2026-07-20 — Lazy-Loading des Verzeichnisbaums mit progressiver Tiefenentwicklung
+
+- Feature: Der Standardmodus des Dateiexplorers lädt initial nur die obersten zwei Ebenen des Arbeitsbaums statt alle Ebenen auf einmal — dies verbessert die Performance erheblich bei großen Repositories.
+- Lazy-Laden beim Aufklappen: Beim Aufklappen eines Verzeichnisknotens wird die nächste Ebene nachgeladen via `IGitWorkspaceBrowserService.LoadSubtreeAsync()`.
+- Zuklapp-Bereinigung: Beim Zuklappen werden Groß-Enkel-Knoten (`Depth > node.Depth + 1`) entfernt — die Invariante „pro Verzeichnis immer eine Ebene mehr geladen als sichtbar" bleibt erhalten.
+- Datenmodell-Erweiterung: `WorkspaceFileNode` erhält neue Properties `Depth` (int, Ebene relativ zur Wurzel) und `IsPlaceholder` (bool, für technische Platzhalter-Knoten zum Erzwingen des Aufklapp-Pfeils); `Children` wird von `List<WorkspaceFileNode>` auf `ObservableCollection<WorkspaceFileNode>` umgestellt.
+- Service-Erweiterung: `IGitWorkspaceBrowserService.LoadWorkingTreeAsync()` erhält Parameter `int maxInitialDepth = 2`; neue Methode `LoadSubtreeAsync()` für Lazy-Loading einzelner Ebenen. `GitWorkspaceBrowserService` nutzt neue interne Klasse `WorkingTreeWalkContext` und Konstante `MaxLazyLoadDepth = 64` als Schutz gegen zirkuläre Symlinks.
+- ViewModel-Erweiterung: `FileExplorerViewModel` erhält Konstante `InitialLoadDepth = 2`, neue Methoden `LadeKinderAsync()` (lädt Kinder beim Aufklappen) und `BeraeumeKnoten()` (bereinigt Groß-Enkel beim Zuklappen).
+- UI-Integration: `FileExplorerView.xaml.cs` erhält neue Event-Handler `OnBaumKnotenExpanded()` und `OnBaumKnotenCollapsed()` an `TreeViewItem.Expanded` / `TreeViewItem.Collapsed` für den `StandardBaum`.
+- Platzhalter-Logik: Verzeichnisse auf der maximalen Ladetiefe erhalten einen Platzhalter-Kindknoten (mit `IsPlaceholder=true`), um den Aufklapp-Pfeil anzuzeigen. Der Platzhalter wird beim ersten Aufklappen durch echte Kinder ersetzt.
+- Guard gegen Platzhalter: Auswahl eines Platzhalter-Knotens (`IsPlaceholder=true`) lädt keine Vorschau.
+- Tests: Neue Unit-Tests in `FileExplorerViewModelTests_LazyLoading` für Lazy-Load-Logik, Bereinigung und Tiefenmanagement; angepasste bestehende Tests an neue `LoadWorkingTreeAsync`-Signatur und `ObservableCollection`-Typ.
+- Performance: Initiales Laden reduziert auf 2 Ebenen (von unbegrenzt) — deutliche Beschleunigung bei großen Repositories. Vergleichsmodus (`BranchCommit.ChildrenLoaded` + `CommitAufklappenAsync`) bleibt unverändert und dient als architektonisches Vorbild.
+- Dokumentation aktualisiert: `docs/help/dateiexplorer/beschreibung.md`, `ablauf-technisch.md`, `ablauf-anwender.md`, `architektur.md`.
+
 ## 2026-07-19 — Überführen der Verzeichnis-Aktionsbuttons in das Ribbon-Menü
 
 - Feature: Buttons des Dateiexplorers (Ansichtswechsel, Refresh, Dateiöffnung) werden aus der Baum-UI in eine neue Ribbon-Gruppe „Dateien" integriert. Zwei neue Aktionsbuttons „Arbeitsverzeichnis öffnen" (startet den OS-Dateiexplorer) und „IDE öffnen" (öffnet die `.sln`-Datei mit dem Standard-Handler) werden in neuer Ribbon-Gruppe „Werkzeuge" hinzugefügt.
