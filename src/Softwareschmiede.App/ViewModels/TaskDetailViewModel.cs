@@ -42,6 +42,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
     private readonly IdeOeffnenService _ideOeffnenService;
+    private readonly AppEinstellungService _einstellungService;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -69,6 +70,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _showFileExplorerPanel;
     private IReadOnlyList<string> _solutionPfade = [];
     private bool _canCreatePullRequest;
+    private bool _openVisualStudioCodeWhenNoSolutionFound;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -114,6 +116,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowDiffPanel));
             OnPropertyChanged(nameof(ShowFileExplorerPanel));
             OnPropertyChanged(nameof(SolutionsVorhanden));
+            OnPropertyChanged(nameof(KannIdeOeffnen));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
             OnPropertyChanged(nameof(KannPullRequestErstellen));
@@ -125,6 +128,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             _fileExplorerViewModel.InitialisierenAsync(value?.LokalerKlonPfad, CancellationToken.None)
                 .SafeFireAndForget(_logger, "TaskDetailViewModel.FileExplorer.InitialisierenAsync");
+
+            CommandManager.InvalidateRequerySuggested();
         }
     }
 
@@ -345,6 +350,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn beim Laden der Aufgabe mindestens eine <c>*.sln</c>-Datei im Arbeitsverzeichnis gefunden wurde. Steuert <see cref="OeffneIdeCommand"/>.CanExecute.</summary>
     public bool SolutionsVorhanden => _solutionPfade.Count > 0;
 
+    /// <summary>True wenn die IDE-Aktion eine Solution oder den opt-in VS-Code-Fallback öffnen kann.</summary>
+    public bool KannIdeOeffnen => SolutionsVorhanden
+        || (ShowFileExplorerPanel && _openVisualStudioCodeWhenNoSolutionFound);
+
     /// <summary>True wenn die Info-Ansicht angezeigt werden soll.</summary>
     public bool ShowInfoPanel => IsInfoViewSelected;
 
@@ -475,6 +484,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         FileExplorerViewModel fileExplorerViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
         IdeOeffnenService ideOeffnenService,
+        AppEinstellungService einstellungService,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -492,6 +502,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _fileExplorerViewModel = fileExplorerViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
         _ideOeffnenService = ideOeffnenService;
+        _einstellungService = einstellungService;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -522,7 +533,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             vorlage => vorlage is not null && KannPromptVorlageSenden);
         SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
         OeffneArbeitsverzeichnisCommand = new RelayCommand(OeffneArbeitsverzeichnis, () => ShowFileExplorerPanel);
-        OeffneIdeCommand = new AsyncRelayCommand(OeffneIdeAsync, () => SolutionsVorhanden);
+        OeffneIdeCommand = new AsyncRelayCommand(OeffneIdeAsync, () => KannIdeOeffnen);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -536,6 +547,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
+            await AktualisiereIdeFallbackEinstellungAsync(ct);
             IsCliRunning = _kiService.IsRunning(_aufgabeId);
 
             var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
@@ -1373,6 +1385,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async Task AktualisiereIdeFallbackEinstellungAsync(CancellationToken ct)
+    {
+        _openVisualStudioCodeWhenNoSolutionFound =
+            await _einstellungService.GetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, ct)
+            ?? false;
+
+        OnPropertyChanged(nameof(KannIdeOeffnen));
+        CommandManager.InvalidateRequerySuggested();
+    }
+
     private void OeffneArbeitsverzeichnis()
     {
         if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
@@ -1393,10 +1415,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private async Task OeffneIdeAsync(CancellationToken ct)
     {
-        if (_solutionPfade.Count == 0)
-            return;
-
         FehlerMeldung = null;
+
+        if (_solutionPfade.Count == 0)
+        {
+            OeffneVisualStudioCodeFallback();
+            return;
+        }
 
         string? solutionPfad;
         if (_solutionPfade.Count == 1)
@@ -1417,6 +1442,31 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Öffnen der Solution {SolutionPfad}.", solutionPfad);
+            FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
+        }
+    }
+
+    private void OeffneVisualStudioCodeFallback()
+    {
+        if (!_openVisualStudioCodeWhenNoSolutionFound)
+            return;
+
+        var arbeitsverzeichnis = _aufgabe?.LokalerKlonPfad;
+        if (string.IsNullOrWhiteSpace(arbeitsverzeichnis))
+            return;
+
+        try
+        {
+            _ideOeffnenService.OeffneVisualStudioCode(arbeitsverzeichnis);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(ex, "Visual Studio Code wurde für Arbeitsverzeichnis {LokalerKlonPfad} nicht gefunden.", arbeitsverzeichnis);
+            FehlerMeldung = "Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Öffnen von Visual Studio Code für Arbeitsverzeichnis {LokalerKlonPfad}.", arbeitsverzeichnis);
             FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
         }
     }

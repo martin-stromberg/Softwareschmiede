@@ -42,11 +42,24 @@ Für die Verwendung dieser Funktionen muss:
 
 > **Hinweis:** Der Dialog zeigt die vollständigen Pfade der gefundenen Solutions an.
 
+### IDE öffnen (ohne Solution mit Visual Studio Code)
+
+1. Öffnen Sie **Einstellungen** → **Allgemein**.
+2. Aktivieren Sie **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde**.
+3. Klicken Sie **Speichern**.
+4. Öffnen Sie eine Aufgabe mit vorhandenem Arbeitsverzeichnis, aber ohne `*.sln`-Datei.
+5. Klicken Sie **IDE öffnen**.
+   - Ist Visual Studio Code verfügbar, wird das Arbeitsverzeichnis in VS Code geöffnet.
+   - Ist Visual Studio Code nicht verfügbar, erscheint die Meldung: „Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden."
+
+> **Hinweis:** Wenn später eine `*.sln`-Datei im Arbeitsverzeichnis vorhanden ist, öffnet die Aktion wieder die Solution. Die Solution hat Vorrang vor VS Code.
+
 ## Ergebnis
 
 Nach erfolgreicher Ausführung:
 - **Arbeitsverzeichnis öffnen:** Der System-Dateiexplorer zeigt die Verzeichnisstruktur des Arbeitsverzeichnisses.
 - **IDE öffnen:** Die IDE (z. B. Visual Studio) ist mit der Solution geladen und bereit zur Bearbeitung.
+- **IDE öffnen ohne Solution und mit aktiviertem Fallback:** Visual Studio Code zeigt das Arbeitsverzeichnis an.
 
 ## Barrierefreiheit
 

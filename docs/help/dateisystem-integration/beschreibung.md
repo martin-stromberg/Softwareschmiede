@@ -26,9 +26,10 @@ Der Button ist nur aktiv, wenn ein gültiges Arbeitsverzeichnis vorhanden ist (d
 - **Bei genau einer Solution:** Öffnet diese direkt ohne Dialog.
 - **Bei mehreren Solutions:** Zeigt einen Auswahl-Dialog mit allen gefundenen Solutions (alphabetisch sortiert nach Dateinamen). Der Benutzer wählt die gewünschte Solution und bestätigt mit OK.
 - **Bei Abbruch:** Die ausgewählte Solution wird nicht geöffnet.
-- **Ohne Solution:** Der Button ist deaktiviert.
+- **Ohne Solution:** Standardmäßig ist der Button deaktiviert. Wenn in den Programmeinstellungen der VS-Code-Fallback aktiviert ist, öffnet der Button stattdessen das Arbeitsverzeichnis in Visual Studio Code.
 
 Solutions werden nur auf der obersten Verzeichnisebene des Arbeitsverzeichnisses gesucht (nicht rekursiv).
+Gefundene `*.sln`-Dateien haben immer Vorrang vor dem VS-Code-Fallback.
 
 ## Beispiele
 
@@ -46,8 +47,16 @@ Solutions werden nur auf der obersten Verzeichnisebene des Arbeitsverzeichnisses
 4. Ist genau eine Solution vorhanden: Visual Studio öffnet sich mit dieser Solution.
 5. Sind mehrere Solutions vorhanden: Auswahl-Dialog erscheint → Solution wählen → OK klicken → Visual Studio öffnet die gewählte Solution.
 
+### Arbeitsverzeichnis in Visual Studio Code öffnen
+
+1. In den Einstellungen im Tab „Allgemein" die Option „Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde" aktivieren und speichern.
+2. Eine Aufgabe ohne `*.sln`-Datei, aber mit vorhandenem Arbeitsverzeichnis öffnen.
+3. Im Ribbon auf „IDE öffnen" klicken.
+4. Visual Studio Code öffnet das Arbeitsverzeichnis, sofern `code`/`code.cmd` über `PATH` oder eine typische Windows-Installation gefunden wird.
+
 ## Einschränkungen
 
 - Die Anwendung prüft nicht, ob die IDE (z. B. Visual Studio) auf dem System installiert ist. Ist sie nicht vorhanden oder kein Betriebssystem-Handler für `.sln`-Dateien registriert, wird eine Fehlermeldung angezeigt.
+- Der VS-Code-Fallback ist opt-in und standardmäßig deaktiviert. Ist er aktiviert, aber Visual Studio Code nicht auffindbar, zeigt die Aufgabendetailansicht einen Hinweis.
 - Solutions werden nur auf der obersten Verzeichnisebene erkannt (keine rekursive Suche in Unterverzeichnissen).
 - Das Arbeitsverzeichnis muss auf der Festplatte vorhanden sein. Ist der konfigurierte Pfad gelöscht oder nicht erreichbar, sind die Buttons inaktiv.

@@ -26,6 +26,7 @@ Bekannte Schlüssel:
 | `NotificationMode` | Enum | Benachrichtigungsmodus (`Deaktiviert` / `Banner` / `Ton`) |
 | `NotificationAudioPath` | string | Pfad zur Benachrichtigungs-Audiodatei (MP3/WAV) |
 | `LogLevel` | Enum | Logging-Granularität (`Debug` / `Information`) |
+| `ide.vscode.openWhenNoSolutionFound` | bool | Öffnet bei aktivierter Option Visual Studio Code mit dem Arbeitsverzeichnis, wenn keine `*.sln` gefunden wurde. Default: `false` |
 
 ### `BenachrichtigungsEinstellung`
 
