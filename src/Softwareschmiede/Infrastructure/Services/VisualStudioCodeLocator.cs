@@ -49,6 +49,10 @@ public sealed class VisualStudioCodeLocator : IVisualStudioCodeLocator
 
         foreach (var entry in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
+            if (string.Equals(Path.GetFileName(entry), "bin", StringComparison.OrdinalIgnoreCase))
+                yield return Path.Combine(Directory.GetParent(entry)?.FullName ?? entry, "Code.exe");
+
+            yield return Path.Combine(entry, "Code.exe");
             yield return Path.Combine(entry, "code.cmd");
             yield return Path.Combine(entry, "code");
         }
@@ -59,8 +63,8 @@ public sealed class VisualStudioCodeLocator : IVisualStudioCodeLocator
         var localAppData = _getEnvironmentVariable("LOCALAPPDATA");
         if (!string.IsNullOrWhiteSpace(localAppData))
         {
-            yield return Path.Combine(localAppData, "Programs", "Microsoft VS Code", "bin", "code.cmd");
             yield return Path.Combine(localAppData, "Programs", "Microsoft VS Code", "Code.exe");
+            yield return Path.Combine(localAppData, "Programs", "Microsoft VS Code", "bin", "code.cmd");
         }
 
         foreach (var root in new[]
@@ -72,8 +76,8 @@ public sealed class VisualStudioCodeLocator : IVisualStudioCodeLocator
             if (string.IsNullOrWhiteSpace(root))
                 continue;
 
-            yield return Path.Combine(root, "Microsoft VS Code", "bin", "code.cmd");
             yield return Path.Combine(root, "Microsoft VS Code", "Code.exe");
+            yield return Path.Combine(root, "Microsoft VS Code", "bin", "code.cmd");
         }
     }
 }
