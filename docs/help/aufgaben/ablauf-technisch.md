@@ -104,20 +104,32 @@ Nach dem erfolgreichen Repository-Klon werden automatisch die Aufgabendaten in l
 Beteiligte Komponenten:
 - `EntwicklungsprozessService.CreateIssueFileAsync` — Erstellt die Datei `issue.md` mit Aufgabebeschreibung
 - `EntwicklungsprozessService.UpdateGitignoreAsync` — Aktualisiert `.gitignore` mit Eintrag für `issue.md`
+- `EntwicklungsprozessService.EnsureEffectiveWorkingDirectory` — Ermittelt das effektive Zielverzeichnis und stellt es sicher
+- `WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory` — Kombiniert Repository-Root mit relativem Arbeitsverzeichnispfad
 - `ILogger<EntwicklungsprozessService>` — Protokolliert erfolgreiche Operationen und Fehler
 
 Ablauf:
-1. Nach `gitPlugin.CloneRepositoryAsync()` wird `CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, ct)` aufgerufen
-   - Markdown-Datei `{lokalerKlonPfad}/issue.md` wird erstellt
+1. Nach `gitPlugin.CloneRepositoryAsync()` wird `CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, startKonfiguration, ct)` aufgerufen
+   - Pfad-Ermittlung via `EnsureEffectiveWorkingDirectory(lokalerKlonPfad, startKonfiguration)`:
+     - Falls `startKonfiguration?.WorkingDirectoryRelativePath` gesetzt: Effektiver Pfad = `Path.Combine(lokalerKlonPfad, relativePath)`
+     - Andernfalls (null, leer, oder `"."` ): Effektiver Pfad = Repository-Root
+     - Verzeichnis wird mit `Directory.CreateDirectory` sichergestellt
+   - Markdown-Datei `{effektiverPfad}/issue.md` wird erstellt
    - Inhalt: `# Aufgabe: [Titel]`; Metadaten (Aufgaben-ID, Branch-Name, Erstellungsdatum); `## Anforderung` mit Aufgabenbeschreibung
    - Falls `AnforderungsBeschreibung` null oder leer: Fallback-Text `[Keine Anforderungsbeschreibung verfügbar]` wird verwendet
    - Bei Exception (z. B. IOException): Warnung wird geloggt via `_logger.LogWarning`, Prozess wird nicht unterbrochen
-2. Danach wird `UpdateGitignoreAsync(lokalerKlonPfad, ct)` aufgerufen
-   - `.gitignore`-Datei wird gelesen (oder neue Datei erstellt falls nicht vorhanden)
+2. Danach wird `UpdateGitignoreAsync(lokalerKlonPfad, startKonfiguration, ct)` aufgerufen
+   - Pfad-Ermittlung (analog zu Schritt 1) via `EnsureEffectiveWorkingDirectory`
+   - `.gitignore`-Datei wird in `{effektiverPfad}/.gitignore` gelesen (oder neue Datei erstellt falls nicht vorhanden)
    - Prüfung: Ist `issue.md` bereits als Eintrag vorhanden? (Case-insensitive)
    - Falls nicht vorhanden: Zeile `issue.md` am Ende der Datei hinzufügen (Newline-safe)
    - Geschrieben via `File.WriteAllTextAsync` mit UTF8-Encoding ohne BOM
    - Bei Exception: Warnung wird geloggt, Prozess wird nicht unterbrochen
+
+**Platzierungsvarianten:**
+
+- **Ohne Arbeitsverzeichnis:** `issue.md` und `.gitignore`-Eintrag liegen im Repository-Root (bisheriges Verhalten).
+- **Mit Arbeitsverzeichnis:** `issue.md` und `.gitignore`-Eintrag liegen im konfigurierten Arbeitsverzeichnis (z.B. `<Klon>/backend/`), damit Datei und ihr Ignore-Eintrag zusammen sind.
 
 Die Dateien `issue.md` und `.gitignore`-Eintrag sind lokale Dateien und gehören nicht zum VCS. Sie unterstützen den Entwickler, indem sie die Aufgabeninformationen verfügbar machen, ohne sie im Repository zu committen.
 

@@ -557,7 +557,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 |----------|-------------|
 | [Anwendungsdokumentation (Index)](docs/help/index.md) | Einstiegspunkt zur fachlichen und technischen Dokumentation je Anwendungsbereich |
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
-| [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, Statusmodell, Promptvorlagen und zeitgesteuerter Prompt-Versand |
+| [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket-Plugin |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |
 | [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering und Clipboard-Paste |
