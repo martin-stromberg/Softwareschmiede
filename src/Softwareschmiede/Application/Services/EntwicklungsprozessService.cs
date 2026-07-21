@@ -631,9 +631,10 @@ public sealed class EntwicklungsprozessService
 
     private async Task UpdateGitignoreAsync(string lokalerKlonPfad, RepositoryStartKonfiguration? startKonfiguration, CancellationToken ct)
     {
+        var effektivesVerzeichnis = lokalerKlonPfad;
         try
         {
-            var effektivesVerzeichnis = EnsureEffectiveWorkingDirectory(lokalerKlonPfad, startKonfiguration);
+            effektivesVerzeichnis = EnsureEffectiveWorkingDirectory(lokalerKlonPfad, startKonfiguration);
 
             var gitignorePath = Path.Combine(effektivesVerzeichnis, ".gitignore");
             var existingContent = File.Exists(gitignorePath)
@@ -651,7 +652,7 @@ public sealed class EntwicklungsprozessService
                 : existingContent + "issue.md\n";
 
             await File.WriteAllTextAsync(gitignorePath, newContent, new System.Text.UTF8Encoding(false), ct);
-            _logger.LogInformation(".gitignore für '{KlonPfad}' aktualisiert: 'issue.md' eingetragen.", lokalerKlonPfad);
+            _logger.LogInformation(".gitignore für '{KlonPfad}' aktualisiert: 'issue.md' eingetragen.", effektivesVerzeichnis);
         }
         catch (OperationCanceledException)
         {
@@ -659,7 +660,7 @@ public sealed class EntwicklungsprozessService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Fehler beim Aktualisieren von .gitignore in '{KlonPfad}'.", lokalerKlonPfad);
+            _logger.LogWarning(ex, "Fehler beim Aktualisieren von .gitignore in '{KlonPfad}'.", effektivesVerzeichnis);
         }
     }
 
