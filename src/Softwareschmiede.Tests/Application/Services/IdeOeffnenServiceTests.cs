@@ -74,7 +74,7 @@ public sealed class IdeOeffnenServiceTests : IDisposable
     public void OeffneSolution_StartetShellExecuteFuerSln()
     {
         var prozessStarterMock = new Mock<IProzessStarter>();
-        var service = new IdeOeffnenService(prozessStarterMock.Object);
+        var service = new IdeOeffnenService(prozessStarterMock.Object, CreateLocator(VisualStudioCodeAvailability.NotAvailable));
         var solutionPfad = Path.Combine(CreateTempDirectory(), "Loesung.sln");
 
         service.OeffneSolution(solutionPfad);
@@ -94,7 +94,7 @@ public sealed class IdeOeffnenServiceTests : IDisposable
     public void OeffneSolution_MitLeeremPfad_WirftArgumentException(string solutionPfad)
     {
         var prozessStarterMock = new Mock<IProzessStarter>();
-        var service = new IdeOeffnenService(prozessStarterMock.Object);
+        var service = new IdeOeffnenService(prozessStarterMock.Object, CreateLocator(VisualStudioCodeAvailability.NotAvailable));
 
         var aufruf = () => service.OeffneSolution(solutionPfad);
 
@@ -109,7 +109,7 @@ public sealed class IdeOeffnenServiceTests : IDisposable
         var prozessStarterMock = new Mock<IProzessStarter>();
         var erwarteteAusnahme = new InvalidOperationException("Prozess konnte nicht gestartet werden.");
         prozessStarterMock.Setup(p => p.Starten(It.IsAny<ProzessStartAnfrage>())).Throws(erwarteteAusnahme);
-        var service = new IdeOeffnenService(prozessStarterMock.Object);
+        var service = new IdeOeffnenService(prozessStarterMock.Object, CreateLocator(VisualStudioCodeAvailability.NotAvailable));
         var solutionPfad = Path.Combine(CreateTempDirectory(), "Loesung.sln");
 
         var aufruf = () => service.OeffneSolution(solutionPfad);
@@ -117,9 +117,67 @@ public sealed class IdeOeffnenServiceTests : IDisposable
         aufruf.Should().Throw<InvalidOperationException>().Which.Should().BeSameAs(erwarteteAusnahme);
     }
 
+    /// <summary>OeffneVisualStudioCode startet den aufgelösten VS-Code-Befehl ohne ShellExecute.</summary>
+    [Fact]
+    public void OeffneVisualStudioCode_StartetAufgeloestenBefehl()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var executable = Path.Combine(CreateTempDirectory(), "code.cmd");
+        var service = new IdeOeffnenService(
+            prozessStarterMock.Object,
+            CreateLocator(new VisualStudioCodeAvailability(true, executable)));
+
+        service.OeffneVisualStudioCode(arbeitsverzeichnis);
+
+        prozessStarterMock.Verify(
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
+                a.DateiName == executable
+                && a.Argumente == $"\"{arbeitsverzeichnis}\""
+                && a.ShellAusfuehren == false)),
+            Times.Once);
+    }
+
+    /// <summary>OeffneVisualStudioCode validiert leere und fehlende Arbeitsverzeichnisse.</summary>
+    [Fact]
+    public void OeffneVisualStudioCode_MitFehlendemArbeitsverzeichnis_Wirft()
+    {
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var service = new IdeOeffnenService(
+            prozessStarterMock.Object,
+            CreateLocator(new VisualStudioCodeAvailability(true, "code.cmd")));
+
+        var aufruf = () => service.OeffneVisualStudioCode(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+
+        aufruf.Should().Throw<DirectoryNotFoundException>();
+        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
+    }
+
+    /// <summary>OeffneVisualStudioCode wirft prüfbar, wenn VS Code nicht auflösbar ist.</summary>
+    [Fact]
+    public void OeffneVisualStudioCode_WennVsCodeNichtVerfuegbar_Wirft()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var service = new IdeOeffnenService(prozessStarterMock.Object, CreateLocator(VisualStudioCodeAvailability.NotAvailable));
+
+        var aufruf = () => service.OeffneVisualStudioCode(arbeitsverzeichnis);
+
+        aufruf.Should().Throw<InvalidOperationException>().WithMessage("*Visual Studio Code*");
+        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
+    }
+
     private string CreateTempDirectory()
         => _tempDirectoryFixture.CreateTempDirectory("ide_oeffnen_tests");
 
     private static IdeOeffnenService CreateService()
-        => new(new Mock<IProzessStarter>().Object);
+        => new(new Mock<IProzessStarter>().Object, CreateLocator(VisualStudioCodeAvailability.NotAvailable));
+
+    private static IVisualStudioCodeLocator CreateLocator(VisualStudioCodeAvailability availability)
+        => new TestVisualStudioCodeLocator(availability);
+
+    private sealed class TestVisualStudioCodeLocator(VisualStudioCodeAvailability availability) : IVisualStudioCodeLocator
+    {
+        public VisualStudioCodeAvailability Locate() => availability;
+    }
 }

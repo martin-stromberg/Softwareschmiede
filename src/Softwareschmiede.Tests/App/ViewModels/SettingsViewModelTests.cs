@@ -165,6 +165,49 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedScmPluginSettings[0].GroupName.Should().Be("Auth");
     }
 
+    /// <summary>Der VS-Code-Fallback ist ohne gespeicherte Einstellung standardmäßig deaktiviert.</summary>
+    [Fact]
+    public async Task LadenAsync_VsCodeFallbackDefaultIstFalse()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.OpenVisualStudioCodeWhenNoSolutionFound.Should().BeFalse();
+    }
+
+    /// <summary>SpeichernAsync persistiert die VS-Code-Fallback-Einstellung.</summary>
+    [Fact]
+    public async Task SpeichernAsync_PersistiertVsCodeFallback()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.OpenVisualStudioCodeWhenNoSolutionFound = true;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        var gespeicherterWert = await _einstellungService.GetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey);
+        gespeicherterWert.Should().BeTrue();
+    }
+
+    /// <summary>LadenAsync liest einen gespeicherten VS-Code-Fallback-Wert.</summary>
+    [Fact]
+    public async Task LadenAsync_LiestGespeichertenVsCodeFallback()
+    {
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.OpenVisualStudioCodeWhenNoSolutionFound.Should().BeTrue();
+    }
+
     /// <summary>LadenAsync verwendet erstes Plugin als Fallback, wenn der gespeicherte Name nicht existiert.</summary>
     [Fact]
     public async Task LadenAsync_VerwendetErstesPlugin_WennGespeicherterNameNichtExistiert()

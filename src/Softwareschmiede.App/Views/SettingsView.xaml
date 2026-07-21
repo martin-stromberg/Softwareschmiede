@@ -208,6 +208,17 @@
                                  Padding="8,6"
                                  BorderBrush="{DynamicResource BorderBrush}" />
                     </StackPanel>
+
+                    <!-- IDE -->
+                    <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
+                        <TextBlock Text="IDE"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,8" />
+                        <CheckBox Content="Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde"
+                                  AutomationProperties.Name="OpenVisualStudioCodeWhenNoSolutionFound"
+                                  IsChecked="{Binding OpenVisualStudioCodeWhenNoSolutionFound, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
             <TabItem>

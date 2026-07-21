@@ -499,8 +499,8 @@ public sealed class EntwicklungsprozessService
             }
         }
 
-        await CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, ct);
-        await UpdateGitignoreAsync(lokalerKlonPfad, ct);
+        await CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, repository.StartKonfiguration, ct);
+        await UpdateGitignoreAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
 
         await _aufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad, ct);
 
@@ -593,7 +593,7 @@ public sealed class EntwicklungsprozessService
         return string.IsNullOrEmpty(slug) ? "aufgabe" : slug;
     }
 
-    private async Task CreateIssueFileAsync(string lokalerKlonPfad, Aufgabe aufgabe, string branchName, CancellationToken ct)
+    private async Task CreateIssueFileAsync(string lokalerKlonPfad, Aufgabe aufgabe, string branchName, RepositoryStartKonfiguration? startKonfiguration, CancellationToken ct)
     {
         try
         {
@@ -613,7 +613,9 @@ public sealed class EntwicklungsprozessService
                 {beschreibung}
                 """;
 
-            var issueFilePath = Path.Combine(lokalerKlonPfad, "issue.md");
+            var effektivesVerzeichnis = EnsureEffectiveWorkingDirectory(lokalerKlonPfad, startKonfiguration);
+
+            var issueFilePath = Path.Combine(effektivesVerzeichnis, "issue.md");
             await File.WriteAllTextAsync(issueFilePath, inhalt, ct);
             _logger.LogInformation("issue.md für Aufgabe {AufgabeId} erfolgreich erstellt.", aufgabe.Id);
         }
@@ -627,11 +629,14 @@ public sealed class EntwicklungsprozessService
         }
     }
 
-    private async Task UpdateGitignoreAsync(string lokalerKlonPfad, CancellationToken ct)
+    private async Task UpdateGitignoreAsync(string lokalerKlonPfad, RepositoryStartKonfiguration? startKonfiguration, CancellationToken ct)
     {
+        var effektivesVerzeichnis = lokalerKlonPfad;
         try
         {
-            var gitignorePath = Path.Combine(lokalerKlonPfad, ".gitignore");
+            effektivesVerzeichnis = EnsureEffectiveWorkingDirectory(lokalerKlonPfad, startKonfiguration);
+
+            var gitignorePath = Path.Combine(effektivesVerzeichnis, ".gitignore");
             var existingContent = File.Exists(gitignorePath)
                 ? await File.ReadAllTextAsync(gitignorePath, ct)
                 : string.Empty;
@@ -647,7 +652,7 @@ public sealed class EntwicklungsprozessService
                 : existingContent + "issue.md\n";
 
             await File.WriteAllTextAsync(gitignorePath, newContent, new System.Text.UTF8Encoding(false), ct);
-            _logger.LogInformation(".gitignore für '{KlonPfad}' aktualisiert: 'issue.md' eingetragen.", lokalerKlonPfad);
+            _logger.LogInformation(".gitignore für '{KlonPfad}' aktualisiert: 'issue.md' eingetragen.", effektivesVerzeichnis);
         }
         catch (OperationCanceledException)
         {
@@ -655,8 +660,16 @@ public sealed class EntwicklungsprozessService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Fehler beim Aktualisieren von .gitignore in '{KlonPfad}'.", lokalerKlonPfad);
+            _logger.LogWarning(ex, "Fehler beim Aktualisieren von .gitignore in '{KlonPfad}'.", effektivesVerzeichnis);
         }
+    }
+
+    private static string EnsureEffectiveWorkingDirectory(string lokalerKlonPfad, RepositoryStartKonfiguration? startKonfiguration)
+    {
+        var effektivesVerzeichnis = WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory(
+            lokalerKlonPfad, startKonfiguration?.WorkingDirectoryRelativePath);
+        Directory.CreateDirectory(effektivesVerzeichnis);
+        return effektivesVerzeichnis;
     }
 
     private static void DeleteDirectoryForce(string path)

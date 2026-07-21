@@ -87,6 +87,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
         var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices();
+        var einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -104,7 +105,8 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             _timeProvider,
             fileExplorerViewModel,
             arbeitsverzeichnisOeffnenService,
-            ideOeffnenService);
+            ideOeffnenService,
+            einstellungService);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe(AufgabeStatus status = AufgabeStatus.Neu)

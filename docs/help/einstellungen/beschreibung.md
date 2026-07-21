@@ -7,9 +7,10 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 1. **Plugin-Einstellungen** — Tokens und Zugangsdaten für SCM- und KI-Plugins
 2. **Standard-Plugins** — Welches Plugin bei neuen Aufgaben standardmäßig genutzt wird
 3. **Arbeitsverzeichnis** — Wo geklonte Repositories lokal abgelegt werden
-4. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
-5. **Erscheinungsbild** — Dark Mode ein-/ausschalten
-6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
+4. **IDE-Verhalten** — Optionaler Visual-Studio-Code-Fallback, wenn keine Solution vorhanden ist
+5. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
+6. **Erscheinungsbild** — Dark Mode ein-/ausschalten
+7. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
 
 ## Funktionsweise
 
@@ -38,6 +39,10 @@ Für das Codex-Plugin gilt eine zusätzliche Schutzregel: Der Wert `Softwareschm
 ### Arbeitsverzeichnis
 
 Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons anlegt. Der Pfad wird als `AppEinstellung` in der SQLite-Datenbank gespeichert. Ist kein Verzeichnis konfiguriert oder ist der Pfad ungültig, greift ein Fallback auf das Temp-Verzeichnis. Der Fallback wird im Aufgabenprotokoll protokolliert.
+
+### IDE-Verhalten
+
+Im Tab **Allgemein** kann die Option **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde** aktiviert werden. Sie ist standardmäßig deaktiviert. Bei aktivierter Option öffnet die Aktion **IDE öffnen** in der Aufgabendetailansicht das Arbeitsverzeichnis in Visual Studio Code, wenn keine `*.sln`-Datei auf oberster Ebene vorhanden ist. Gefundene Solutions haben weiterhin Vorrang.
 
 ### Benachrichtigungen
 

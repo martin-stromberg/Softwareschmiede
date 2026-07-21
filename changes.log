@@ -1,3 +1,13 @@
+## 2026-07-21 — issue.md und .gitignore im Arbeitsverzeichnis erstellen
+
+- Feature: Die automatisch erstellte `issue.md`-Datei (mit Aufgabenbeschreibung) und der zugehörige `.gitignore`-Eintrag werden jetzt im konfigurierten Arbeitsverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`) statt immer im Repository-Root erstellt, falls ein Arbeitsverzeichnis konfiguriert ist.
+- Service-Erweiterung: `EntwicklungsprozessService.CreateIssueFileAsync` erhält neuen Parameter `RepositoryStartKonfiguration? startKonfiguration`; ermittelt via `WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory` das effektive Zielverzeichnis und sichert es mit `Directory.CreateDirectory`. Analog: `EntwicklungsprozessService.UpdateGitignoreAsync`.
+- Neue statische Hilfsmethode: `EntwicklungsprozessService.EnsureEffectiveWorkingDirectory()` kapselt die Pfad-Auflösung und Verzeichnis-Bereitstellung.
+- Fehlerbehandlung: Bestehendes Verhalten bleibt unverändert — Warnungen werden geloggt, nicht fatal behandelt; kein Fallback auf Root bei fehlendem Arbeitsverzeichnis (wird bereits früh via `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync()` erkannt).
+- Rückwärtskompatibilität: Repositories ohne konfiguriertes Arbeitsverzeichnis (`StartKonfiguration == null` oder `WorkingDirectoryRelativePath == null`/`"."`) verhalten sich exakt wie bisher — Datei im Root.
+- Tests: Neue Unit-/Integrationstests in `EntwicklungsprozessServiceTests` für Datei-Platzierung mit und ohne Arbeitsverzeichnis; bestehende Tests bleiben grün.
+- Dokumentation erweitert: `docs/help/aufgaben/beschreibung.md` und `ablauf-technisch.md` dokumentieren das neue Verhalten.
+
 ## 2026-07-20 — Lazy-Loading des Verzeichnisbaums mit progressiver Tiefenentwicklung
 
 - Feature: Der Standardmodus des Dateiexplorers lädt initial nur die obersten zwei Ebenen des Arbeitsbaums statt alle Ebenen auf einmal — dies verbessert die Performance erheblich bei großen Repositories.
