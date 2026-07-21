@@ -402,6 +402,34 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         aufgaben.Should().ContainSingle(a => a.Status == AufgabeStatus.Neu);
     }
 
+    /// <summary>AufgabeErstellenCommand uebernimmt das im Projekt ausgewaehlte Repository.</summary>
+    [Fact]
+    public async Task AufgabeErstellen_AssignsSelectedRepositoryToNewTask()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Erstellungs-Test-Projekt mit Repository", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "Softwareschmiede.GitHub",
+            "https://github.com/test/repo",
+            "test/repo");
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
+            .Returns(() => CreateTaskDetailViewModel());
+
+        // Act
+        await ((AsyncRelayCommand)sut.AufgabeErstellenCommand).ExecuteAsync();
+
+        // Assert
+        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        aufgaben.Should().ContainSingle(a => a.GitRepositoryId == repository.Id);
+    }
+
     /// <summary>ReloadAufgabenListAsync (über AufgabeListeAktualisierenCallback) aktualisiert nur das geänderte Element in der Aufgabenliste.</summary>
     [Fact]
     public async Task ReloadAufgabenList_UpdatesSingleItemAsync_WhenCallbackInvoked()

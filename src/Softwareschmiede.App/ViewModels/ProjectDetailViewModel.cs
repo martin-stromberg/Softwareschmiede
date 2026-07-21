@@ -281,7 +281,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 _projektId,
                 "Neue Aufgabe",
                 string.Empty,
-                null,
+                SelectedRepository?.Id,
                 ct);
 
             Aufgaben.Add(aufgabe);
