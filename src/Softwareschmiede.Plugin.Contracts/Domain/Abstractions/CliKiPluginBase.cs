@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -203,6 +204,9 @@ public abstract class CliKiPluginBase : IKiPlugin
         psi.RedirectStandardOutput = true;
         psi.RedirectStandardError = true;
         psi.RedirectStandardInput = standardInput is not null;
+        psi.StandardOutputEncoding = Encoding.UTF8;
+        psi.StandardErrorEncoding = Encoding.UTF8;
+        psi.StandardInputEncoding = Encoding.UTF8;
         psi.CreateNoWindow = true;
 
         if (!psi.EnvironmentVariables.ContainsKey("PATH"))

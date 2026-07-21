@@ -119,6 +119,37 @@ public sealed class CliKiPluginBaseTests
         result.Arguments.Should().Be("--initial");
     }
 
+    /// <summary>RunOneShotTextGenerationAsync verarbeitet stdin und stdout explizit als UTF-8.</summary>
+    [Fact]
+    public async Task RunOneShotTextGenerationAsync_ShouldRoundtripGermanUtf8Characters()
+    {
+        var psi = new ProcessStartInfo { FileName = "powershell" };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-NonInteractive");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("""
+            $inputStream = [Console]::OpenStandardInput()
+            $memory = [System.IO.MemoryStream]::new()
+            $inputStream.CopyTo($memory)
+            $inputText = [System.Text.Encoding]::UTF8.GetString($memory.ToArray())
+            $outputText = "$inputText`nKI-Ausgabe: plötzlich für Selbstwertgefühl äöüß €"
+            $outputBytes = [System.Text.Encoding]::UTF8.GetBytes($outputText)
+            [Console]::OpenStandardOutput().Write($outputBytes, 0, $outputBytes.Length)
+            """);
+
+        var result = await TestCliKiPlugin.RunOneShotAsync(
+            psi,
+            "Originalanforderung: Größe ändern, Straße prüfen & fürs Team dokumentieren.");
+
+        result.Should().Contain("Größe ändern, Straße prüfen & fürs Team dokumentieren.");
+        result.Should().Contain("plötzlich für Selbstwertgefühl äöüß €");
+        result.Should().NotContain("Ã");
+        result.Should().NotContain("â‚¬");
+        psi.StandardInputEncoding.Should().BeSameAs(System.Text.Encoding.UTF8);
+        psi.StandardOutputEncoding.Should().BeSameAs(System.Text.Encoding.UTF8);
+        psi.StandardErrorEncoding.Should().BeSameAs(System.Text.Encoding.UTF8);
+    }
+
     private abstract class BaseTestPlugin(string providerPraefix = "test") : CliKiPluginBase
     {
         public override string ProviderDateiPraefix => providerPraefix;
@@ -139,6 +170,9 @@ public sealed class CliKiPluginBaseTests
 
         protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
             => new() { FileName = "test-cli", Arguments = parameters ?? string.Empty, WorkingDirectory = localRepoPath };
+
+        public static Task<string> RunOneShotAsync(ProcessStartInfo psi, string standardInput)
+            => RunOneShotTextGenerationAsync(psi, standardInput, CancellationToken.None);
     }
 
     private sealed class TestCliKiPluginWithHelpOverride() : BaseTestPlugin("nonexistent-cli-xyz")

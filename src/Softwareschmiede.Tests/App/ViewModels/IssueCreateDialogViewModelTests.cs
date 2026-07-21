@@ -262,6 +262,25 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Body.Should().Be("KI-Ergebnis: Template / Original");
     }
 
+    /// <summary>KI-Ausfüllhilfe übernimmt deutsche Umlaute und Sonderzeichen unverändert in den editierbaren Body.</summary>
+    [Fact]
+    public async Task KiAusfuellen_ShouldKeepGermanSpecialCharactersInBody()
+    {
+        var generatedBody = "KI-Ergebnis: plötzlich für Selbstwertgefühl, Größe, Straße, äöüß & €.";
+        var kiPlugin = new FakeKiPlugin(generatedBody);
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
+        sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
+
+        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+
+        sut.Body.Should().Be(generatedBody);
+        sut.Body.Should().NotContain("plÃ");
+        sut.Body.Should().NotContain("fÃ");
+        sut.Body.Should().NotContain("SelbstwertgefÃ");
+    }
+
     /// <summary>KI-Aktion bleibt deaktiviert, wenn nur KI-Plugins ohne Textgenerator-Fähigkeit verfügbar sind.</summary>
     [Fact]
     public void Initialize_ShouldHideKiAction_WhenNoTextGeneratorIsAvailable()
@@ -354,7 +373,7 @@ public sealed class IssueCreateDialogViewModelTests
                 : Task.FromResult(Result);
     }
 
-    private sealed class FakeKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class FakeKiPlugin(string? generatedBody = null) : IKiPlugin, IIssueTemplateTextGenerator
     {
         public string? ReceivedTemplateBody { get; private set; }
         public string? ReceivedOriginalRequirement { get; private set; }
@@ -370,7 +389,7 @@ public sealed class IssueCreateDialogViewModelTests
         {
             ReceivedTemplateBody = templateBody;
             ReceivedOriginalRequirement = originalRequirement;
-            return Task.FromResult($"KI-Ergebnis: {templateBody} / {originalRequirement}");
+            return Task.FromResult(generatedBody ?? $"KI-Ergebnis: {templateBody} / {originalRequirement}");
         }
     }
 

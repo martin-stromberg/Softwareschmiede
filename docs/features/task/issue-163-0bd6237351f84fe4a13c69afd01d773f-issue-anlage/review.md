@@ -5,10 +5,11 @@ Status: Vollstaendig umgesetzt
 
 ## Gepruefte Punkte
 
-- Der Dialogpfad `IssueCreateDialogViewModel.KiAusfuellenAsync` uebergibt weiterhin `SelectedTemplate.Body` und `_originalRequirement` an `IIssueTemplateTextGenerator.FillIssueTemplateAsync`.
-- `CodexPlugin.FillIssueTemplateAsync` baut den Prompt aus Template-Body und Originalanforderung und transportiert ihn verlaesslich ueber StandardInput an `codex exec`.
-- `ClaudeCliPlugin.FillIssueTemplateAsync` baut denselben Prompt und transportiert ihn im Print-Modus ueber StandardInput, statt den kompletten Template-Inhalt als Kommandozeilenargument zu verwenden.
-- Neue Tests belegen die Dialog-Weitergabe, den Codex-Invocation-Aufbau und den Claude-Invocation-Aufbau.
+- Die Korrekturrueckmeldung aus `continue.md` wurde ausschliesslich auf den Encoding-Pfad der KI-Ausfuellhilfe begrenzt.
+- `CliKiPluginBase.RunOneShotTextGenerationAsync` konfiguriert stdin, stdout und stderr jetzt explizit mit UTF-8.
+- `CodexPlugin.FillIssueTemplateAsync` und `ClaudeCliPlugin.FillIssueTemplateAsync` nutzen weiterhin den gemeinsamen One-Shot-Pfad und profitieren damit beide von der zentralen Encoding-Korrektur.
+- `IssueCreateDialogViewModel.KiAusfuellenAsync` uebernimmt das vom Generator gelieferte Ergebnis direkt in `Body`; ein zusaetzlicher Encoding-Umbau im ViewModel ist nicht erforderlich.
+- Die Tests decken deutsche Umlaute, `ß`, kaufmaennisches Und und Euro-Zeichen im Prozesspfad und im Dialog-Body ab.
 
 ## Offene Aufgaben
 
