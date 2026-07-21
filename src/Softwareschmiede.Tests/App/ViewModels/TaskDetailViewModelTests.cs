@@ -29,6 +29,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly AppEinstellungService _einstellungService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IKiPlugin> _kiPluginMock;
+    private readonly Mock<IGitPlugin> _gitPluginForResolutionMock;
     private readonly Guid _projektId = Guid.NewGuid();
     private readonly TestTempDirectoryFixture _tempDirectoryFixture = new();
 
@@ -55,21 +56,21 @@ public sealed class TaskDetailViewModelTests : IDisposable
                 CreateNoWindow = true,
             });
 
-        var gitPluginForResolutionMock = new Mock<IGitPlugin>();
-        gitPluginForResolutionMock.SetupGet(p => p.PluginName).Returns("Test Git");
-        gitPluginForResolutionMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestGit");
-        gitPluginForResolutionMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
-        gitPluginForResolutionMock.Setup(p => p.GetSettingGroups()).Returns([]);
-        gitPluginForResolutionMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginForResolutionMock = new Mock<IGitPlugin>();
+        _gitPluginForResolutionMock.SetupGet(p => p.PluginName).Returns("Test Git");
+        _gitPluginForResolutionMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestGit");
+        _gitPluginForResolutionMock.SetupGet(p => p.PluginType).Returns(Softwareschmiede.Domain.Enums.PluginType.SourceCodeManagement);
+        _gitPluginForResolutionMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        _gitPluginForResolutionMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitPluginForResolutionMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginForResolutionMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
         pluginManagerMock.Setup(p => p.GetDefaultDevelopmentAutomationPlugin()).Returns(_kiPluginMock.Object);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
-        pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(gitPluginForResolutionMock.Object);
+        pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginForResolutionMock.Object);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
         _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
@@ -905,8 +906,62 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         sut.IsCliRunning.Should().BeTrue();
         sut.AktiverCliName.Should().Be("Test KI");
+        sut.CliStatusText.Should().NotBe("Bereit Repository vor...");
         var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         aktualisiert!.Status.Should().Be(AufgabeStatus.Gestartet);
+    }
+
+    /// <summary>StartenAsync zeigt während eines laufenden Repository-Klons den Vorbereitungsstatus.</summary>
+    [Fact]
+    public async Task StartenAsync_ShouldShowRepositoryPreparationStatus_WhileCloneIsRunning()
+    {
+        var cloneStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cloneContinue = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _gitPluginForResolutionMock
+            .Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => cloneStarted.SetResult())
+            .Returns(() => cloneContinue.Task);
+
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        var startTask = ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        await cloneStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        sut.CliStatusText.Should().Be("Bereit Repository vor...");
+
+        cloneContinue.SetResult();
+        await startTask;
+    }
+
+    /// <summary>StartenAsync lässt den Vorbereitungsstatus nach einem Clone-Fehler nicht stehen.</summary>
+    [Fact]
+    public async Task StartenAsync_ShouldClearRepositoryPreparationStatus_WhenCloneFails()
+    {
+        _gitPluginForResolutionMock
+            .Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Clone fehlgeschlagen"));
+
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        sut.CliStatusText.Should().NotBe("Bereit Repository vor...");
+        sut.CliStatusText.Should().Be("CLI inaktiv");
+        sut.FehlerMeldung.Should().Contain("Aufgabe konnte nicht gestartet werden");
     }
 
     /// <summary>CliStoppenCommand leert den aktiven CLI-Namen.</summary>

@@ -20,6 +20,8 @@ namespace Softwareschmiede.App.ViewModels;
 /// </summary>
 public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 {
+    private const string RepositoryPreparationStatusText = "Bereit Repository vor...";
+
     private enum DetailAnsicht
     {
         Info,
@@ -1293,6 +1295,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             var repositoryUrl = _aufgabe.GitRepository?.RepositoryUrl ?? string.Empty;
 
+            CliStatusText = RepositoryPreparationStatusText;
+
             await _entwicklungsprozessService.ProzessStartenUndCliStartenAsync(
                 _aufgabeId,
                 repositoryUrl,
@@ -1312,11 +1316,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
         catch (OperationCanceledException)
         {
+            AttachCliStatusSession(null);
             throw;
         }
         catch (Exception ex)
         {
             AktiverCliName = null;
+            AttachCliStatusSession(null);
             _logger.LogError(ex, "Fehler beim Starten der Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"Aufgabe konnte nicht gestartet werden: {ex.Message}";
         }
