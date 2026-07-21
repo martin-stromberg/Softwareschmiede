@@ -71,8 +71,8 @@ public sealed class E2E_VerzeichnisAktionen : WpfTestBase
         var dialogNachEinerSln = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
         dialogNachEinerSln.Should().BeNull("bei genau einer Solution darf kein Auswahl-Dialog erscheinen");
 
-        // Eine zweite "*.sln" anlegen und die Aufgabe erneut neu laden.
-        var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.sln");
+        // Eine zweite "*.slnx" anlegen und die Aufgabe erneut neu laden.
+        var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.slnx");
         File.WriteAllText(zweiteSolution, string.Empty);
         ReloadTaskDetail(mainWindow);
 

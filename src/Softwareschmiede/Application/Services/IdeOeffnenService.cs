@@ -19,6 +19,7 @@ public sealed class IdeOeffnenService(
             return [];
 
         return Directory.EnumerateFiles(arbeitsverzeichnis, "*.sln", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.EnumerateFiles(arbeitsverzeichnis, "*.slnx", SearchOption.TopDirectoryOnly))
             .OrderBy(pfad => pfad, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
