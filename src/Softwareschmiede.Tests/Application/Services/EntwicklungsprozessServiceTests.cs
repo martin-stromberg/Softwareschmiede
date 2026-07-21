@@ -304,13 +304,25 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var clonePath = SetupCloneWithDirectoryCreation();
 
         var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
+        var pluginSelectionService = CreatePluginSelectionService(_kiPluginMock.Object);
+        // GitOrchestrationService wird hier bewusst mitkonfiguriert (wie auch in der echten App-Verdrahtung,
+        // siehe App.xaml.cs), damit das fehlende Arbeitsverzeichnis direkt nach dem Klon erkannt wird — und
+        // nicht erst durch CreateIssueFileAsync/UpdateGitignoreAsync stillschweigend angelegt wird, bevor der
+        // spätere CLI-Start es prüfen könnte.
+        var gitOrchestrationService = new GitOrchestrationService(
+            _aufgabeService,
+            projektService,
+            _protokollService,
+            _gitPluginMock.Object,
+            pluginSelectionService,
+            new Mock<ILogger<GitOrchestrationService>>().Object);
         var sut = new EntwicklungsprozessService(
             _aufgabeService,
             _protokollService,
             _gitPluginMock.Object,
-            CreatePluginSelectionService(_kiPluginMock.Object),
+            pluginSelectionService,
             _arbeitsverzeichnisResolverMock.Object,
-            new EntwicklungsprozessServiceOptions(ProjektService: projektService, KiAusfuehrungsService: _kiAusfuehrungsService),
+            new EntwicklungsprozessServiceOptions(ProjektService: projektService, KiAusfuehrungsService: _kiAusfuehrungsService, GitOrchestrationService: gitOrchestrationService),
             new Mock<ILogger<EntwicklungsprozessService>>().Object);
 
         try
@@ -692,7 +704,11 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
         // Assert
         _gitPluginMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", expectedClonePath, It.IsAny<CancellationToken>()), Times.Once);
-        Directory.Exists(expectedClonePath).Should().BeFalse();
+        // Das alte, schreibgeschützte Verzeichnis wird vor dem Klonen komplett entfernt. Dass anschließend
+        // CreateIssueFileAsync das (vom Clone-Mock nicht neu angelegte) Zielverzeichnis als Sicherheitsnetz
+        // per Directory.CreateDirectory wiederherstellt, ist gewolltes Verhalten und kein Hinweis auf ein
+        // fehlgeschlagenes Löschen — daher wird hier gezielt die alte Datei statt des ganzen Verzeichnisses geprüft.
+        File.Exists(readOnlyFile).Should().BeFalse();
         DeleteDirectoryIfExists(configuredBase);
     }
 
@@ -900,6 +916,67 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         lines.Count(l => l == "issue.md").Should().Be(1);
 
         DeleteDirectoryIfExists(uniqueBase);
+    }
+
+    /// <summary>
+    /// ProzessStartenAsync schreibt issue.md und den .gitignore-Eintrag in das konfigurierte Arbeitsverzeichnis
+    /// (RepositoryStartKonfiguration.WorkingDirectoryRelativePath), statt in den Repository-Root.
+    /// </summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldWriteIssueFileAndGitignoreIntoWorkingDirectory_WhenWorkingDirectoryConfigured()
+    {
+        // Arrange
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "https://github.com/test/repo-issuefile-workdir",
+            RepositoryName = "repo-issuefile-workdir",
+            Aktiv = true
+        };
+        repository.StartKonfiguration = new RepositoryStartKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            WorkingDirectoryRelativePath = "backend",
+            Aktiv = true,
+            GitRepository = repository
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Datei im Arbeitsverzeichnis", "Beschreibung", repository.Id);
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string path, CancellationToken _) =>
+            {
+                Directory.CreateDirectory(Path.Combine(path, "backend"));
+                return Task.CompletedTask;
+            });
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+
+            // Assert
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            var repositoryRoot = updatedAufgabe!.LokalerKlonPfad!;
+            var workingDirectory = Path.Combine(repositoryRoot, "backend");
+
+            File.Exists(Path.Combine(repositoryRoot, "issue.md")).Should().BeFalse();
+            File.Exists(Path.Combine(workingDirectory, "issue.md")).Should().BeTrue();
+
+            File.Exists(Path.Combine(repositoryRoot, ".gitignore")).Should().BeFalse();
+            var gitignorePath = Path.Combine(workingDirectory, ".gitignore");
+            File.Exists(gitignorePath).Should().BeTrue();
+            var lines = await File.ReadAllLinesAsync(gitignorePath);
+            lines.Should().Contain("issue.md");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(uniqueBase);
+        }
     }
 
     /// <summary>UpdateGitignoreAsync loggt Warnung wenn .gitignore nicht geschrieben werden kann, wirft keine Exception.</summary>

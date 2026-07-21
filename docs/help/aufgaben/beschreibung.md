@@ -49,7 +49,14 @@ Beim Start einer Aufgabe (Repository-Klon) werden automatisch zwei lokale Dateie
 
 - **`.gitignore`-Eintrag** — Die `.gitignore`-Datei wird automatisch um den Eintrag `issue.md` erweitert, um sicherzustellen, dass diese lokale, aufgabenspezifische Datei nicht in die Versionskontrolle gelangt. Falls die `.gitignore` nicht vorhanden ist, wird sie automatisch erstellt.
 
+**Platzierung — Repository-Root oder Arbeitsverzeichnis:**
+
 Beide Dateien werden lokal im geklonten Repository gespeichert und sind nur für diese spezifische Aufgabe relevant. Sie werden nicht in den Git-Remote-Repositories committet.
+
+- Wenn für das Repository **kein Arbeitsverzeichnis konfiguriert** ist: Die Dateien werden im **Repository-Root** erstellt (`issue.md`, `.gitignore` im Klonverzeichnis).
+- Wenn ein **Arbeitsverzeichnis konfiguriert** ist (z.B. `backend`, `frontend`): Die Dateien werden im **konfigurierten Arbeitsverzeichnis** erstellt (z.B. `<Klon>/backend/issue.md`, `<Klon>/backend/.gitignore`), damit sich Datei und ihr `.gitignore`-Eintrag im gleichen Verzeichnis befinden.
+
+Diese Platzierungslogik ermöglicht es dem KI-Agenten und dem Entwickler, die Aufgabenbeschreibung dort zu finden, wo sie tatsächlich arbeiten — insbesondere bei Monorepos mit mehreren Arbeitsverzeichnissen.
 
 ### Lebenszyklus
 

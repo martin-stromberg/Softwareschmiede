@@ -4,7 +4,7 @@
 
 ## Übersicht
 
-Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen über eine abstrakte `IProzessStarter`-Schnittstelle. Prozessstart-Anfragen werden gekapselt, geloggt und entweder direkt ausgeführt (Production) oder aufgezeichnet (Test). Solutions werden beim Laden der Aufgabe gecacht; ein modaler Dialog ermöglicht Auswahl bei mehreren Dateien.
+Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen über eine abstrakte `IProzessStarter`-Schnittstelle. Prozessstart-Anfragen werden gekapselt, geloggt und entweder direkt ausgeführt (Production) oder aufgezeichnet (Test). Solutions werden beim Laden der Aufgabe gecacht; ein modaler Dialog ermöglicht Auswahl bei mehreren Dateien. Ohne Solution kann optional ein VS-Code-Fallback greifen, wenn die Programmeinstellung aktiviert ist.
 
 ## Ablauf
 
@@ -41,7 +41,9 @@ Beim Laden einer Aufgabe (Property `Aufgabe` wird gesetzt):
    - Sortiert die Ergebnisse alphabetisch (OrdinalIgnoreCase).
    - Gibt die Liste als `IReadOnlyList<string>` zurück (leer, wenn keine Solutions gefunden).
 4. Feld `_solutionPfade` speichert das Ergebnis.
-5. Property `SolutionsVorhanden` / Binding `SolutionFileExists` wird geändert → `OeffneIdeCommand.CanExecute` wird neu ausgewertet.
+5. Property `SolutionsVorhanden` / Binding `SolutionFileExists` wird geändert.
+6. `TaskDetailViewModel` lädt `ide.vscode.openWhenNoSolutionFound` über `AppEinstellungService`.
+7. `KannIdeOeffnen` wird neu bewertet: `true` bei vorhandener Solution oder bei vorhandenem Arbeitsverzeichnis und aktiviertem VS-Code-Fallback.
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.Aufgabe` Setter — Trigger für Solution-Suche
@@ -54,7 +56,7 @@ Beteiligte Komponenten:
 2. Prüfung der gecachten `_solutionPfade`:
    - **Genau eine Solution:** Sprung zu Schritt 4 (direkt öffnen).
    - **Mehrere Solutions:** Weiterfahrt mit Schritt 3a.
-   - **Keine Solution:** Button ist deaktiviert, Schritt wird nicht erreicht.
+   - **Keine Solution:** Wenn der VS-Code-Fallback deaktiviert ist, ist der Button deaktiviert. Wenn er aktiviert ist, wird das Arbeitsverzeichnis in VS Code geöffnet.
 3a. **Dialog anzeigen:**
    - `TaskDetailViewModel` ruft `_dialogService.ShowSolutionSelectionDialogAsync(_solutionPfade, ct)` auf.
    - `WpfDialogService.ShowSolutionSelectionDialogAsync()`:
@@ -74,6 +76,16 @@ Beteiligte Komponenten:
 - `WpfDialogService` — Dialog-Anzeige und Koordination
 - `SolutionSelectionDialog` — WPF-Fenster (Modal)
 - `SolutionSelectionDialogViewModel` — Presentation Model
+
+### 3b. IDE öffnen (VS-Code-Fallback)
+
+1. Bei `0` gefundenen Solutions prüft `TaskDetailViewModel`, ob `_openVisualStudioCodeWhenNoSolutionFound` gesetzt ist.
+2. Ist die Einstellung deaktiviert, endet der Ablauf ohne Prozessstart.
+3. Ist die Einstellung aktiviert, ruft `TaskDetailViewModel` `IdeOeffnenService.OeffneVisualStudioCode(Aufgabe.LokalerKlonPfad)` auf.
+4. `IdeOeffnenService` validiert das Arbeitsverzeichnis und fragt `IVisualStudioCodeLocator.Locate()` ab.
+5. `VisualStudioCodeLocator` sucht zuerst `code.cmd` und `code` in `PATH`, danach typische Windows-Pfade unter `%LOCALAPPDATA%`, `%ProgramFiles%` und `%ProgramFiles(x86)%`.
+6. Bei Treffer erstellt der Service `ProzessStartAnfrage(DateiName=<code-Pfad>, Argumente="\"<Arbeitsverzeichnis>\"", ShellAusfuehren=false)`.
+7. Wenn kein VS Code gefunden wird, setzt das ViewModel die Meldung: „Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden."
 
 ### 4. IDE öffnen (Prozessstart)
 
@@ -108,7 +120,13 @@ flowchart TD
     
     D --> L["_solutionPfade lesen"]
     L --> M{Anzahl Solutions?}
-    M -->|0| N["Button deaktiviert"]
+    M -->|0| N{"VS-Code-Fallback aktiv?"}
+    N -->|Nein| U["Button deaktiviert"]
+    N -->|Ja| V["VisualStudioCodeLocator"]
+    V --> W{"VS Code gefunden?"}
+    W -->|Nein| X["FehlerMeldung"]
+    W -->|Ja| Y["IdeOeffnenService.OeffneVisualStudioCode"]
+    Y --> H
     M -->|1| O["Direkt öffnen"]
     M -->|>1| P["Dialog anzeigen"]
     P --> Q{"Benutzer bestätigt?"}
@@ -136,9 +154,9 @@ Wenn `SystemProzessStarter.Starten()` eine Ausnahme wirft (z. B. Befehl nicht ge
 Wenn `IdeOeffnenService.FindeSolutions()` eine leere Liste zurückgibt:
 
 1. Property `SolutionFileExists` wird `false`.
-2. `OeffneIdeCommand.CanExecute()` gibt `false` zurück.
-3. Button im Ribbon ist sichtbar, aber deaktiviert (ausgegraut).
-4. Benutzer kann Button nicht klicken.
+2. Ist `ide.vscode.openWhenNoSolutionFound` deaktiviert, gibt `OeffneIdeCommand.CanExecute()` `false` zurück.
+3. Ist die Einstellung aktiviert und ein Arbeitsverzeichnis vorhanden, kann der Button geklickt werden.
+4. Beim Klick wird VS Code über `IVisualStudioCodeLocator` gesucht. Ohne Treffer wird eine verständliche Fehlermeldung angezeigt.
 
 ### Dialog-Abbruch
 

@@ -93,6 +93,7 @@ Die wichtigsten UI-Abläufe sind in der [Anwendungsdokumentation](docs/help/inde
 | **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
 | **Claude CLI** (`claude`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
 | **Codex CLI** (`codex`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.Codex` (`codex --version`) |
+| **Visual Studio Code** (`code`) | aktuell | Optional – nur für den aktivierbaren IDE-Fallback, wenn im Aufgaben-Arbeitsverzeichnis keine `.sln`-Datei gefunden wird |
 | **GitHub Copilot** | aktives Abo | Optional – nur für Copilot-basierte KI-Läufe |
 | **Anthropic API Key** | vorhanden | Optional – nur für Claude-CLI-Läufe (Credential `Softwareschmiede.ClaudeCli.Token`) |
 
@@ -172,6 +173,14 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 - Exit-Codes: `0` (Erfolg), `10` (kein launchSettings.json gefunden), `11` (JSON/Profil ungültig), `12` (Port ungültig/nicht verfügbar), `13` (Schreibfehler), `99` (unerwarteter Fehler).
 
 Weiterführende Bedienungshinweise (Arbeitsverzeichnis-Konfiguration für Repository-Startskripte, LocalDirectoryPlugin-Workspace-Modi, KI-Plugin-Auswahl und Standardplugins, Folgeanweisungen mit Kontextsteuerung, Benachrichtigungssystem u. a.) finden Sie in der [Anwendungsdokumentation](docs/help/index.md).
+
+### IDE öffnen und VS-Code-Fallback
+
+Die Aktion **IDE öffnen** in der Aufgabendetailansicht öffnet weiterhin bevorzugt eine gefundene Visual-Studio-Solution (`*.sln`). Bei mehreren Solutions zeigt die Anwendung einen Auswahl-Dialog; bei genau einer Solution wird diese direkt geöffnet.
+
+Wenn keine Solution im Arbeitsverzeichnis vorhanden ist, kann Softwareschmiede optional Visual Studio Code mit dem Arbeitsverzeichnis starten. Dieser Fallback ist ausdrücklich opt-in, standardmäßig deaktiviert und wird in **Einstellungen → Allgemein** über **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde** aktiviert. Intern wird die Programmeinstellung unter `ide.vscode.openWhenNoSolutionFound` als boolescher Wert gespeichert, Default `false`.
+
+VS Code wird über `code.cmd`/`code` im `PATH` oder typische Windows-Installationspfade erkannt. Ist der Fallback aktiviert, aber VS Code nicht verfügbar, wird kein Prozess gestartet und die Aufgabendetailansicht zeigt einen nachvollziehbaren Hinweis. Sobald eine `.sln` vorhanden ist, hat Visual Studio beziehungsweise der registrierte `.sln`-Handler immer Vorrang vor VS Code.
 
 ---
 
@@ -559,12 +568,12 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 |----------|-------------|
 | [Anwendungsdokumentation (Index)](docs/help/index.md) | Einstiegspunkt zur fachlichen und technischen Dokumentation je Anwendungsbereich |
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
-| [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, Statusmodell, Promptvorlagen und zeitgesteuerter Prompt-Versand |
+| [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket-Plugin |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |
 | [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering und Clipboard-Paste |
 | [Dateiexplorer](docs/help/dateiexplorer/index.md) | Arbeitsbaum- und Diff-Ansicht in der Aufgabendetailansicht |
-| [Dateisystem-Integration](docs/help/dateisystem-integration/index.md) | Öffnen des Arbeitsverzeichnisses im OS-Dateiexplorer und von Visual-Studio-Solutions direkt aus dem Ribbon |
+| [Dateisystem-Integration](docs/help/dateisystem-integration/index.md) | Öffnen des Arbeitsverzeichnisses im OS-Dateiexplorer, von Visual-Studio-Solutions und optional von Visual Studio Code direkt aus dem Ribbon |
 | [Diff-Funktionalität](docs/help/diff/index.md) | Diff-Erzeugung, Persistenz und Viewer-Integration |
 | [Stabilität & Fehlerbehandlung](docs/help/stabilitaet/index.md) | Globale Exception-Handler und Absturzstabilisierung |
 | [Programmupdate](docs/help/programmupdate/index.md) | Update-Prüfung, Sidebar-Update/Refresh und Fortschrittsdialog |
