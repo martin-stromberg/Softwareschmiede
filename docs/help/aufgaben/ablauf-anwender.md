@@ -73,6 +73,7 @@ Nach erfolgreicher Anlage wird die Issue-Referenz in der Aufgabe angezeigt; die 
 
 Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 
+- Während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`.
 - Die Anwendung klont das Repository in das konfigurierte Arbeitsverzeichnis.
 - Ein `task/`-Branch wird angelegt.
 - Eine lokale `issue.md`-Datei wird automatisch erstellt, die die Aufgabebeschreibung enthält (Titel, ID, Branch-Name, Erstellungsdatum, Anforderung).

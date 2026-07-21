@@ -161,7 +161,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
 2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
 3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen und das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen).
-4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
+4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt).
 6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 7. **Commits durchführen**, Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst. Alternativ Aufgabe abbrechen.
