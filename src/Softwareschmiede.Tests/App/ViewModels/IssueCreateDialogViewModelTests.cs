@@ -257,6 +257,8 @@ public sealed class IssueCreateDialogViewModelTests
 
         await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
 
+        kiPlugin.ReceivedTemplateBody.Should().Be("Template");
+        kiPlugin.ReceivedOriginalRequirement.Should().Be("Original");
         sut.Body.Should().Be("KI-Ergebnis: Template / Original");
     }
 
@@ -354,6 +356,8 @@ public sealed class IssueCreateDialogViewModelTests
 
     private sealed class FakeKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
     {
+        public string? ReceivedTemplateBody { get; private set; }
+        public string? ReceivedOriginalRequirement { get; private set; }
         public string PluginName => "Fake KI";
         public string PluginPrefix => "FakeKi";
         public PluginType PluginType => PluginType.DevelopmentAutomation;
@@ -363,7 +367,11 @@ public sealed class IssueCreateDialogViewModelTests
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
-            => Task.FromResult($"KI-Ergebnis: {templateBody} / {originalRequirement}");
+        {
+            ReceivedTemplateBody = templateBody;
+            ReceivedOriginalRequirement = originalRequirement;
+            return Task.FromResult($"KI-Ergebnis: {templateBody} / {originalRequirement}");
+        }
     }
 
     private sealed class FakeFailingKiPlugin : IKiPlugin, IIssueTemplateTextGenerator

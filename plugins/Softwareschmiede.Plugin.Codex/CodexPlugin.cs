@@ -78,6 +78,14 @@ public sealed class CodexPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     /// <inheritdoc/>
     public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
     {
+        var invocation = BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+        return RunOneShotTextGenerationAsync(invocation.ProcessStartInfo, invocation.StandardInput, ct);
+    }
+
+    internal (ProcessStartInfo ProcessStartInfo, string StandardInput) BuildIssueTemplateFillInvocation(
+        string templateBody,
+        string? originalRequirement)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = GetCodexCommand(),
@@ -85,12 +93,8 @@ public sealed class CodexPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
         };
         psi.ArgumentList.Add("exec");
         psi.ArgumentList.Add("--skip-git-repo-check");
-        psi.ArgumentList.Add("-");
 
-        return RunOneShotTextGenerationAsync(
-            psi,
-            BuildIssueTemplateFillPrompt(templateBody, originalRequirement),
-            ct);
+        return (psi, BuildIssueTemplateFillPrompt(templateBody, originalRequirement));
     }
 
     /// <inheritdoc/>

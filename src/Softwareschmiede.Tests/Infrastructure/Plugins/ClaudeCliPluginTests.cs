@@ -45,6 +45,23 @@ public sealed class ClaudeCliPluginTests
         _sut.Should().BeAssignableTo<IIssueTemplateTextGenerator>();
     }
 
+    /// <summary>Die Issue-Ausfuellhilfe uebergibt Template und Originalanforderung vollstaendig ueber stdin.</summary>
+    [Fact]
+    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InStandardInput()
+    {
+        const string templateBody = "## Akzeptanzkriterien\n- offen";
+        const string originalRequirement = "Die Issue-Anlage soll Templates per KI ausfuellen.";
+
+        var invocation = _sut.BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+
+        Path.GetFileNameWithoutExtension(invocation.ProcessStartInfo.FileName).Should().BeEquivalentTo("claude");
+        invocation.ProcessStartInfo.ArgumentList.Should().Equal("-p");
+        invocation.StandardInput.Should().Contain("Template:");
+        invocation.StandardInput.Should().Contain(templateBody);
+        invocation.StandardInput.Should().Contain("Originalanforderung:");
+        invocation.StandardInput.Should().Contain(originalRequirement);
+    }
+
     /// <summary>StartCliAsync returns ProcessStartInfo with claude as filename (absolute path from PATH or fallback).</summary>
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfo_WithClaudeCommand()

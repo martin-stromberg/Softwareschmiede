@@ -97,13 +97,20 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase, IIssueTemplateTextGenerat
     /// <inheritdoc/>
     public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
     {
+        var invocation = BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+        return RunOneShotTextGenerationAsync(invocation.ProcessStartInfo, invocation.StandardInput, ct);
+    }
+
+    internal (ProcessStartInfo ProcessStartInfo, string StandardInput) BuildIssueTemplateFillInvocation(
+        string templateBody,
+        string? originalRequirement)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = _claudeExecutablePath.Value,
             WorkingDirectory = Path.GetTempPath(),
         };
         psi.ArgumentList.Add("-p");
-        psi.ArgumentList.Add(BuildIssueTemplateFillPrompt(templateBody, originalRequirement));
 
         var token = _credentialStore.GetCredential($"{PluginPrefix}.Token");
         if (!string.IsNullOrEmpty(token))
@@ -111,7 +118,7 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase, IIssueTemplateTextGenerat
             psi.EnvironmentVariables["ANTHROPIC_API_KEY"] = token;
         }
 
-        return RunOneShotTextGenerationAsync(psi, null, ct);
+        return (psi, BuildIssueTemplateFillPrompt(templateBody, originalRequirement));
     }
 
     /// <inheritdoc/>
