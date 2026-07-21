@@ -1464,6 +1464,27 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.IssueAnlegenCommand.CanExecute(null).Should().BeTrue();
     }
 
+    /// <summary>IssueAnlegenCommand prueft die Provider-Capability mit der Repository-URL statt dem Anzeigenamen.</summary>
+    [Fact]
+    public async Task IssueAnlegenCommand_ShouldUseRepositoryUrl_ForProviderCapability()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: false);
+        gitPluginMock.As<IIssueCreateProvider>()
+            .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanCreateIssue.Should().BeTrue();
+        gitPluginMock.As<IIssueCreateProvider>()
+            .Verify(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    }
+
     /// <summary>IssueAnlegenCommand ist deaktiviert, wenn der Provider die Issue-Anlage nicht unterstützt.</summary>
     [Fact]
     public async Task IssueAnlegenCommand_CannotExecute_WhenProviderDoesNotSupportCreate()
@@ -1506,7 +1527,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
         var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
         gitPluginMock.As<IIssueCreateProvider>()
-            .Setup(p => p.CanCreateIssueAsync("owner/repo", It.IsAny<CancellationToken>()))
+            .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Provider nicht erreichbar"));
         var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object);
@@ -1957,7 +1978,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
                 CanCreatePullRequest: false,
                 CanMergeToSource: false));
         gitPluginMock.As<IIssueCreateProvider>()
-            .Setup(p => p.CanCreateIssueAsync("owner/repo", It.IsAny<CancellationToken>()))
+            .Setup(p => p.CanCreateIssueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(canCreateIssue);
         gitPluginMock.As<IIssueTemplateProvider>()
             .Setup(p => p.GetIssueTemplatesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))

@@ -215,6 +215,42 @@ public sealed class GitHubPluginTests
             .Which.Should().Be(new IssueTemplate("bug.md", "Template Body"));
     }
 
+    /// <summary>GetIssueTemplatesAsync normalisiert gespeicherte GitHub-URLs zu owner/repo.</summary>
+    [Fact]
+    public async Task GetIssueTemplatesAsync_ShouldNormalizeRepositoryUrl()
+    {
+        var listJson = """
+            [
+              {"type":"file","name":"bug.md","path":".github/ISSUE_TEMPLATE/bug.md"}
+            ]
+            """;
+        var contentJson = $$"""
+            {"content":"{{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Template Body"))}}"}
+            """;
+        var calledPaths = new List<string>();
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) =>
+            {
+                calledPaths.Add(args.Last());
+            })
+            .ReturnsAsync((string _, IEnumerable<string> args, string? _, IDictionary<string, string>? _, CancellationToken _) =>
+                args.Last().EndsWith("/contents/.github/ISSUE_TEMPLATE", StringComparison.Ordinal)
+                    ? new CliResult(0, listJson, string.Empty)
+                    : new CliResult(0, contentJson, string.Empty));
+
+        var result = await _sut.GetIssueTemplatesAsync("https://github.com/owner/repo.git");
+
+        result.Status.Should().Be(IssueTemplateLoadResultStatus.Success);
+        result.Templates.Should().ContainSingle();
+        calledPaths.Should().OnlyContain(path => path.Contains("repos/owner/repo/contents/", StringComparison.Ordinal));
+    }
+
     /// <summary>GetIssueTemplatesAsync blendet GitHub Issue Forms und config.yml aus.</summary>
     [Fact]
     public async Task GetIssueTemplatesAsync_ShouldIgnoreYamlIssueFormsAndConfig()

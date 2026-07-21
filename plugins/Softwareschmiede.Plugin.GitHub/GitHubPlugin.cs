@@ -324,18 +324,24 @@ password {token}
     /// <inheritdoc/>
     public override async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Rufe Issues für Repository {RepositoryId} ab.", repositoryId);
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return [];
+        }
+
+        _logger.LogInformation("Rufe Issues für Repository {RepositoryId} ab.", normalizedRepositoryId);
 
         var result = await _cliRunner.RunAsync(
             "gh",
-            ["issue", "list", "--repo", repositoryId, "--json", "number,title,body,labels,milestone", "--limit", "100"],
+            ["issue", "list", "--repo", normalizedRepositoryId, "--json", "number,title,body,labels,milestone", "--limit", "100"],
             null,
             GetGhEnvironment(),
             ct);
 
         if (!result.IsSuccess)
         {
-            _logger.LogError("gh issue list fehlgeschlagen für {RepositoryId}: {StdErr}", repositoryId, result.StdErr);
+            _logger.LogError("gh issue list fehlgeschlagen für {RepositoryId}: {StdErr}", normalizedRepositoryId, result.StdErr);
             return [];
         }
 
@@ -344,7 +350,7 @@ password {token}
 
     /// <inheritdoc/>
     public override Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default)
-        => Task.FromResult(!string.IsNullOrWhiteSpace(repositoryId));
+        => Task.FromResult(!string.IsNullOrWhiteSpace(NormalizeRepositoryId(repositoryId)));
 
     /// <inheritdoc/>
     public override async Task<IssueCreateResult> CreateIssueAsync(
@@ -352,7 +358,8 @@ password {token}
         IssueCreateRequest request,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(repositoryId))
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
         {
             return IssueCreateResult.Failed("Repository-ID fehlt.");
         }
@@ -366,7 +373,7 @@ password {token}
             "gh",
             [
                 "issue", "create",
-                "--repo", repositoryId,
+                "--repo", normalizedRepositoryId,
                 "--title", request.Title.Trim(),
                 "--body", request.Body ?? string.Empty
             ],
@@ -377,7 +384,7 @@ password {token}
         if (!result.IsSuccess)
         {
             var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
-            _logger.LogError("gh issue create fehlgeschlagen für {RepositoryId}: {StdErr}", repositoryId, sanitizedError);
+            _logger.LogError("gh issue create fehlgeschlagen für {RepositoryId}: {StdErr}", normalizedRepositoryId, sanitizedError);
             return IssueCreateResult.Failed($"GitHub-Issue konnte nicht erstellt werden: {sanitizedError}");
         }
 
@@ -399,14 +406,15 @@ password {token}
     /// <inheritdoc/>
     public override async Task<IssueTemplateLoadResult> GetIssueTemplatesAsync(string repositoryId, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(repositoryId))
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
         {
             return IssueTemplateLoadResult.Success([]);
         }
 
         var listResult = await _cliRunner.RunAsync(
             "gh",
-            ["api", $"repos/{repositoryId}/contents/.github/ISSUE_TEMPLATE"],
+            ["api", $"repos/{normalizedRepositoryId}/contents/.github/ISSUE_TEMPLATE"],
             null,
             GetGhEnvironment(),
             ct);
@@ -441,7 +449,7 @@ password {token}
                     continue;
                 }
 
-                var content = await LoadTemplateContentAsync(repositoryId, path, ct);
+                var content = await LoadTemplateContentAsync(normalizedRepositoryId, path, ct);
                 if (!string.IsNullOrWhiteSpace(content))
                 {
                     templates.Add(new IssueTemplate(name, content));
@@ -502,6 +510,17 @@ password {token}
 
     private static bool IsSupportedTemplateFile(string name)
         => name.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
+
+    private static string? NormalizeRepositoryId(string repositoryId)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryId))
+        {
+            return null;
+        }
+
+        var extracted = TryExtractRepositoryId(repositoryId);
+        return extracted ?? repositoryId.Trim().Trim('/');
+    }
 
     private static bool IsNotFound(string error)
         => error.Contains("404", StringComparison.OrdinalIgnoreCase)

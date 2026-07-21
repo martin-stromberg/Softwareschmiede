@@ -811,9 +811,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     private static string GetRepositoryIdentifier(Aufgabe aufgabe)
-        => !string.IsNullOrWhiteSpace(aufgabe.GitRepository?.RepositoryName)
-            ? aufgabe.GitRepository.RepositoryName
-            : aufgabe.GitRepository?.RepositoryUrl ?? string.Empty;
+        => !string.IsNullOrWhiteSpace(aufgabe.GitRepository?.RepositoryUrl)
+            ? aufgabe.GitRepository.RepositoryUrl
+            : aufgabe.GitRepository?.RepositoryName ?? string.Empty;
 
     private async Task AufgabeAbschliessenAsync(CancellationToken ct)
     {
