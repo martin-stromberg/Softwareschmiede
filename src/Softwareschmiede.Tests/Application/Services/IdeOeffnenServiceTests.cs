@@ -25,14 +25,16 @@ public sealed class IdeOeffnenServiceTests : IDisposable
         var verzeichnis = CreateTempDirectory();
         File.WriteAllText(Path.Combine(verzeichnis, "Zweite.sln"), string.Empty);
         File.WriteAllText(Path.Combine(verzeichnis, "Erste.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(verzeichnis, "Dritte.slnx"), string.Empty);
         File.WriteAllText(Path.Combine(verzeichnis, "readme.txt"), string.Empty);
         var service = CreateService();
 
         var solutions = service.FindeSolutions(verzeichnis);
 
-        solutions.Should().HaveCount(2);
+        solutions.Should().HaveCount(3);
         solutions.Should().BeInAscendingOrder(StringComparer.OrdinalIgnoreCase);
         solutions.Should().Contain(Path.Combine(verzeichnis, "Erste.sln"));
+        solutions.Should().Contain(Path.Combine(verzeichnis, "Dritte.slnx"));
         solutions.Should().Contain(Path.Combine(verzeichnis, "Zweite.sln"));
     }
 
