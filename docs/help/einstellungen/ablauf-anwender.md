@@ -27,6 +27,16 @@
 
 > **Hinweis:** Änderungen am Arbeitsverzeichnis wirken sich nur auf neue Aufgaben aus. Bereits gestartete Aufgaben behalten ihren ursprünglichen Klonpfad.
 
+### Visual-Studio-Code-Fallback aktivieren
+
+1. Öffnen Sie die Registerkarte **Allgemein**
+2. Aktivieren Sie **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde**
+3. Klicken Sie **Speichern**
+4. Öffnen Sie danach eine Aufgabe ohne `*.sln`-Datei im Arbeitsverzeichnis
+5. **IDE öffnen** startet nun Visual Studio Code mit dem Arbeitsverzeichnis, sofern VS Code gefunden wird
+
+> **Hinweis:** Die Option ist standardmäßig ausgeschaltet. Bestehende Installationen ändern ihr Verhalten erst, wenn Sie diese Einstellung aktivieren.
+
 ## Quellcodeverwaltung (Registerkarte)
 
 ### Standard-SCM-Plugin auswählen

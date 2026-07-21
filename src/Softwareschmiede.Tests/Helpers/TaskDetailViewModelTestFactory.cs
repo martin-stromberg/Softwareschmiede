@@ -48,6 +48,7 @@ public static class TaskDetailViewModelTestFactory
         var fileExplorerViewModel = CreateStub();
 
         var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = CreateVerzeichnisAktionenServices();
+        var einstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
 
         return new TaskDetailViewModel(
             aufgabeService,
@@ -65,7 +66,8 @@ public static class TaskDetailViewModelTestFactory
             TimeProvider.System,
             fileExplorerViewModel,
             arbeitsverzeichnisOeffnenService,
-            ideOeffnenService);
+            ideOeffnenService,
+            einstellungService);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
@@ -78,13 +80,21 @@ public static class TaskDetailViewModelTestFactory
 
     /// <summary>Erstellt ArbeitsverzeichnisOeffnenService und IdeOeffnenService, die denselben IProzessStarter-Mock verwenden.</summary>
     /// <param name="prozessStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
+    /// <param name="visualStudioCodeLocator">Der zu verwendende VS-Code-Locator, oder null für nicht verfügbares VS Code.</param>
     /// <returns>Ein Tupel aus ArbeitsverzeichnisOeffnenService und IdeOeffnenService.</returns>
     public static (ArbeitsverzeichnisOeffnenService ArbeitsverzeichnisOeffnenService, IdeOeffnenService IdeOeffnenService) CreateVerzeichnisAktionenServices(
-        Mock<IProzessStarter>? prozessStarterMock = null)
+        Mock<IProzessStarter>? prozessStarterMock = null,
+        IVisualStudioCodeLocator? visualStudioCodeLocator = null)
     {
         prozessStarterMock ??= new Mock<IProzessStarter>();
+        visualStudioCodeLocator ??= new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
         return (
             new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object),
-            new IdeOeffnenService(prozessStarterMock.Object));
+            new IdeOeffnenService(prozessStarterMock.Object, visualStudioCodeLocator));
+    }
+
+    private sealed class TestVisualStudioCodeLocator(VisualStudioCodeAvailability availability) : IVisualStudioCodeLocator
+    {
+        public VisualStudioCodeAvailability Locate() => availability;
     }
 }

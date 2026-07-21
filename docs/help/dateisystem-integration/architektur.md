@@ -11,7 +11,9 @@
 | `SystemProzessStarter` | Klasse (Infrastructure.Services) | Reale Implementierung von `IProzessStarter`; mappt auf `ProcessStartInfo` und ruft `Process.Start()` auf. |
 | `AufzeichnenderProzessStarter` | Klasse (Infrastructure.Services) | Test-Implementierung von `IProzessStarter`; schreibt `ProzessStartAnfrage` in Logdatei statt echte Prozesse zu starten. |
 | `ArbeitsverzeichnisOeffnenService` | Klasse (Application.Services) | Löst Plattformbefehl auf (Windows/Linux/macOS) und delegiert Prozessstart. |
-| `IdeOeffnenService` | Klasse (Application.Services) | Findet `.sln`-Dateien und öffnet sie per Shell-Execute. |
+| `IVisualStudioCodeLocator` | Interface (Application.Services) | Abstraktion zur Auflösung eines startbaren Visual-Studio-Code-Befehls. |
+| `VisualStudioCodeLocator` | Klasse (Infrastructure.Services) | Sucht `code.cmd`/`code` in `PATH` und typischen Windows-Installationspfaden. |
+| `IdeOeffnenService` | Klasse (Application.Services) | Findet `.sln`-Dateien, öffnet sie per Shell-Execute und startet optional VS Code mit dem Arbeitsverzeichnis. |
 | `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe. |
 | `IDialogService` / `WpfDialogService` | Interface / Klasse (App.Services) | Dialog-Gateway; implementiert `ShowSolutionSelectionDialogAsync()`. |
 | `SolutionSelectionDialog` | WPF-Window (App.Views) | Modales Fenster für Solution-Auswahl bei mehreren Dateien. |
@@ -32,13 +34,15 @@ Application-Schicht (Services):
 ├─ ArbeitsverzeichnisOeffnenService
 │  └─ Abhängigkeit: IProzessStarter
 ├─ IdeOeffnenService
-│  └─ Abhängigkeit: IProzessStarter
+│  ├─ Abhängigkeit: IProzessStarter
+│  └─ Abhängigkeit: IVisualStudioCodeLocator
 └─ (keine DB/Repository-Abhängigkeiten)
 
 App-Schicht (UI/ViewModels):
 ├─ TaskDetailViewModel
 │  ├─ ArbeitsverzeichnisOeffnenService
 │  ├─ IdeOeffnenService
+│  ├─ AppEinstellungService
 │  └─ IDialogService
 ├─ WpfDialogService (implementiert IDialogService)
 │  └─ Erstellt SolutionSelectionDialog und SolutionSelectionDialogViewModel
@@ -90,7 +94,7 @@ TaskDetailViewModel.OeffneIdeAsync()
 _solutionPfade lesen (beim Aufgabe-Laden gecacht)
   ↓
 Verzweigung nach Anzahl der Solutions:
-  ├─→ Keine: Button deaktiviert (kein Klick möglich)
+  ├─→ Keine: Bei deaktiviertem Fallback kein Klick; bei aktiviertem Fallback VS Code starten
   ├─→ Eine: Direkt zu Prozessstart
   └─→ Mehrere: Dialog anzeigen
        ↓
@@ -115,6 +119,28 @@ IProzessStarter.Starten(anfrage)
   └─→ AufzeichnenderProzessStarter: Logdatei schreiben
   ↓
 IDE (z. B. Visual Studio) öffnet Solution
+```
+
+### IDE öffnen ohne Solution mit VS Code
+
+```
+TaskDetailViewModel lädt Aufgabe
+  ↓
+IdeOeffnenService.FindeSolutions() liefert leere Liste
+  ↓
+AppEinstellungService liest ide.vscode.openWhenNoSolutionFound
+  ↓
+KannIdeOeffnen = Arbeitsverzeichnis vorhanden und Einstellung true
+  ↓
+Benutzer klickt IDE öffnen
+  ↓
+IdeOeffnenService.OeffneVisualStudioCode(LokalerKlonPfad)
+  ↓
+IVisualStudioCodeLocator.Locate()
+  ├─→ Kein Treffer: FehlerMeldung
+  └─→ Treffer: ProzessStartAnfrage für code "<Arbeitsverzeichnis>"
+      ↓
+      IProzessStarter.Starten(anfrage)
 ```
 
 ## Diagramm
