@@ -34,6 +34,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private string? _erfolgsMeldung;
     private IReadOnlyList<PluginSettingGroupEntry> _selectedScmPluginSettings = [];
     private IReadOnlyList<PluginSettingGroupEntry> _selectedKiPluginSettings = [];
+    private bool _openVisualStudioCodeWhenNoSolutionFound;
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
     public string? Arbeitsverzeichnis
@@ -115,6 +116,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _selectedKiPluginSettings, value);
     }
 
+    /// <summary>Gibt an, ob ohne gefundene Visual-Studio-Solution optional Visual Studio Code geöffnet wird.</summary>
+    public bool OpenVisualStudioCodeWhenNoSolutionFound
+    {
+        get => _openVisualStudioCodeWhenNoSolutionFound;
+        set => SetProperty(ref _openVisualStudioCodeWhenNoSolutionFound, value);
+    }
+
     /// <summary>Editierbare Promptvorlagen.</summary>
     public ObservableCollection<PromptVorlageEntry> PromptVorlagen { get; } = [];
 
@@ -190,6 +198,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             _defaultKiPlugin = await _einstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
             OnPropertyChanged(nameof(DefaultKiPlugin));
 
+            _openVisualStudioCodeWhenNoSolutionFound =
+                await _einstellungService.GetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, ct)
+                ?? false;
+            OnPropertyChanged(nameof(OpenVisualStudioCodeWhenNoSolutionFound));
+
             var savedMode = await _einstellungService.GetSettingAsync(AppEinstellungService.DesignModeKey, ct);
             _designMode = savedMode ?? _darkModeService.Current;
             OnPropertyChanged(nameof(DesignMode));
@@ -248,6 +261,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _arbeitsverzeichnisService.SaveArbeitsverzeichnisAsync(_arbeitsverzeichnis, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultScmPluginKey, _defaultScmPlugin?.PluginName, ct);
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey,
+                OpenVisualStudioCodeWhenNoSolutionFound,
+                ct);
             await SpeicherePromptVorlagenAsync(ct);
 
             try
