@@ -5,11 +5,11 @@ Status: Vollstaendig umgesetzt
 
 ## Gepruefte Punkte
 
-- Die Korrekturrueckmeldung aus `continue.md` wurde ausschliesslich auf den Encoding-Pfad der KI-Ausfuellhilfe begrenzt.
-- `CliKiPluginBase.RunOneShotTextGenerationAsync` konfiguriert stdin, stdout und stderr jetzt explizit mit UTF-8.
-- `CodexPlugin.FillIssueTemplateAsync` und `ClaudeCliPlugin.FillIssueTemplateAsync` nutzen weiterhin den gemeinsamen One-Shot-Pfad und profitieren damit beide von der zentralen Encoding-Korrektur.
-- `IssueCreateDialogViewModel.KiAusfuellenAsync` uebernimmt das vom Generator gelieferte Ergebnis direkt in `Body`; ein zusaetzlicher Encoding-Umbau im ViewModel ist nicht erforderlich.
-- Die Tests decken deutsche Umlaute, `ß`, kaufmaennisches Und und Euro-Zeichen im Prozesspfad und im Dialog-Body ab.
+- Die Korrektur beschraenkt sich auf den in `continue-done.2.md` benannten PR-Test `AktiveAufgabenAktualisierenAsync_ShouldSkip_WhenAlreadyRunning`.
+- Der Test synchronisiert den ersten Refresh deterministisch bis in eine kontrolliert blockierende Test-Datenquelle, bevor der zweite parallele Aufruf gestartet wird.
+- Die Absicherung prueft die Re-Entrancy-Semantik direkt: Der zweite Aufruf wird uebersprungen und loest keinen zweiten Abruf der verzögerten Datenquelle aus.
+- Das vorherige absolute Laufzeitlimit von 250 ms wurde entfernt. Verbleibende 5-Sekunden-Timeouts dienen nur als Deadlock-/Fehlergrenze fuer den Testablauf.
+- Die Produktivlogik wurde nicht veraendert; `MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` verwendet weiterhin `SemaphoreSlim.WaitAsync(0, ct)`. Ergaenzt wurde nur die kleine Schnittstelle `IAktiveAufgabenService`, damit der Test den Datenquellenabruf direkt zaehlen kann.
 
 ## Offene Aufgaben
 

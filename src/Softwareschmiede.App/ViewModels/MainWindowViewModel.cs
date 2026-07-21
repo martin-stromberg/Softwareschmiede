@@ -22,7 +22,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
-    private readonly AufgabeService _aufgabeService;
+    private readonly IAktiveAufgabenService _aufgabeService;
     private readonly PromptZeitVersandService _promptZeitVersandService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
@@ -148,7 +148,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public MainWindowViewModel(
         DarkModeService darkModeService,
         IServiceProvider serviceProvider,
-        AufgabeService aufgabeService,
+        IAktiveAufgabenService aufgabeService,
         PromptZeitVersandService promptZeitVersandService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,

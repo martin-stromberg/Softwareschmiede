@@ -5,9 +5,11 @@ Status: Keine Befunde
 
 ## Gepruefte Dateien
 
-- `src/Softwareschmiede.Plugin.Contracts/Domain/Abstractions/CliKiPluginBase.cs`
-- `src/Softwareschmiede.Tests/Domain/Abstractions/CliKiPluginBaseTests.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/IssueCreateDialogViewModelTests.cs`
+- `src/Softwareschmiede/Application/Services/IAktiveAufgabenService.cs`
+- `src/Softwareschmiede/Application/Services/AufgabeService.cs`
+- `src/Softwareschmiede.App/App.xaml.cs`
+- `src/Softwareschmiede.App/ViewModels/MainWindowViewModel.cs`
+- `src/Softwareschmiede.Tests/App/ViewModels/MainWindowViewModelTests.cs`
 
 ## Befunde
 
@@ -15,4 +17,4 @@ Keine.
 
 ## Restrisiko
 
-Der echte Codex-/Claude-Dienstaufruf wurde nicht gegen externe Dienste ausgefuehrt. Der lokale Test prueft den gemeinsamen Prozesskanal mit echten stdin-/stdout-Streams und UTF-8-Rohbytes.
+Der Test nutzt weiterhin Timeouts, aber nur zum Begrenzen eines haengenden Testablaufs. Die fachliche Assertion basiert auf dem Zaehler der verzögerten Test-Datenquelle und nicht auf einer absoluten Dauer des zweiten Aufrufs.

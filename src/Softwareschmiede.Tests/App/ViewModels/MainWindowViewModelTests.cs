@@ -1,7 +1,4 @@
-using System.Diagnostics;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -72,7 +69,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     private MainWindowViewModel CreateSut(
-        AufgabeService? aufgabeService = null,
+        IAktiveAufgabenService? aufgabeService = null,
         IUpdateService? updateService = null,
         ICliUpdateSafetyService? cliUpdateSafetyService = null,
         IUpdateProgressDialogService? updateProgressDialogService = null,
@@ -659,43 +656,53 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task AktiveAufgabenAktualisierenAsync_ShouldSkip_WhenAlreadyRunning()
     {
-        // Arrange: eigener, künstlich verzögerter DbContext, damit ein Aufruf lange genug läuft, um echte Nebenläufigkeit zu erzwingen
-        var interceptor = new VerzoegerndeMaterialisierungsInterceptor();
-        var options = new DbContextOptionsBuilder<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .AddInterceptors(interceptor)
-            .Options;
-        using var db = new Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext(options);
-        db.Database.EnsureCreated();
-        db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        // Arrange: kontrolliert verzögerte Datenquelle, damit ein Aufruf lange genug läuft, um echte Nebenläufigkeit zu erzwingen
+        var aufgabe = new Softwareschmiede.Domain.Entities.Aufgabe
         {
-            Id = _projektId,
-            Name = "Testprojekt",
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Projekt = new Softwareschmiede.Domain.Entities.Projekt
+            {
+                Id = _projektId,
+                Name = "Testprojekt",
+                ErstellungsDatum = DateTimeOffset.UtcNow,
+                Status = ProjektStatus.Aktiv
+            },
+            Titel = "Verzoegerte Aufgabe",
+            Status = AufgabeStatus.Gestartet,
             ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
-        });
-        db.SaveChanges();
-
-        var aufgabeService = new AufgabeService(db, NullLogger<AufgabeService>.Instance);
-        var aufgabe = await aufgabeService.CreateAsync(_projektId, "Verzoegerte Aufgabe", null);
-        await aufgabeService.StartenAsync(aufgabe.Id, "feature/verzoegert", "/tmp/klon");
+            BranchName = "feature/verzoegert",
+            LokalerKlonPfad = "/tmp/klon"
+        };
+        var aufgabeService = new VerzoegernderAktiveAufgabenService([aufgabe]);
 
         var sut = CreateSut(aufgabeService);
 
-        interceptor.Verzoegerung = TimeSpan.FromMilliseconds(400);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.AktiveAufgabenListe.All(a => a.Id != aufgabe.Id))
+            await Task.Delay(25);
+
+        sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id,
+            "der vom Konstruktor gestartete Hintergrund-Refresh soll vor der Re-Entrancy-Pruefung abgeschlossen sein");
+
+        aufgabeService.Aktivieren();
         var ersterAufrufTask = Task.Run(() => sut.AktiveAufgabenAktualisierenAsync());
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
+        await aufgabeService.ErsterVerzoegerterAbruf.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Act: der zweite Aufruf überlappt den noch laufenden, verzögerten ersten Aufruf
-        var stopwatch = Stopwatch.StartNew();
-        await sut.AktiveAufgabenAktualisierenAsync();
-        stopwatch.Stop();
+        try
+        {
+            await sut.AktiveAufgabenAktualisierenAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
-        await ersterAufrufTask;
-
-        // Assert: der übersprungene Aufruf kehrt sofort zurück, statt erneut die (verzögerte) Datenquelle abzufragen
-        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(250),
-            "ein zweiter, gleichzeitiger Aufruf muss übersprungen werden, statt erneut auf die verzögerte Datenquelle zuzugreifen");
+            // Assert: der übersprungene Aufruf fragt die verzögerte Datenquelle kein zweites Mal ab
+            aufgabeService.VerzoegerteAbrufe.Should().Be(1,
+                "ein zweiter, gleichzeitiger Aufruf muss uebersprungen werden, statt erneut auf die verzögerte Datenquelle zuzugreifen");
+        }
+        finally
+        {
+            aufgabeService.Fortsetzen();
+            await ersterAufrufTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
     }
 
     /// <summary>Nach Dispose() löst ein erneutes RunningCountChanged kein Neuladen aus und wirft nicht.</summary>
@@ -760,18 +767,45 @@ public sealed class MainWindowViewModelTests : IDisposable
         sut.CurrentVersion.Should().Be("Version unbekannt");
     }
 
-    /// <summary>EF-Core-Interceptor, der die Materialisierung von Entitäten künstlich verzögert, um in Tests echte Nebenläufigkeit zu erzwingen.</summary>
-    private sealed class VerzoegerndeMaterialisierungsInterceptor : IMaterializationInterceptor
+    /// <summary>Test-Datenquelle, die aktive Aufgaben kontrolliert blockierend zurueckgibt.</summary>
+    private sealed class VerzoegernderAktiveAufgabenService : IAktiveAufgabenService
     {
-        /// <summary>Die künstliche Verzögerung, die bei jeder Materialisierung angewendet wird.</summary>
-        public TimeSpan Verzoegerung { get; set; }
+        private readonly ManualResetEventSlim _fortsetzen = new();
+        private readonly TaskCompletionSource _ersterVerzoegerterAbruf = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly List<Softwareschmiede.Domain.Entities.Aufgabe> _aufgaben;
+        private int _aktiv;
+        private int _verzoegerteAbrufe;
 
-        /// <inheritdoc/>
-        public object CreatedInstance(MaterializationInterceptionData materializationData, object instance)
+        /// <summary>Initialisiert eine neue Test-Datenquelle.</summary>
+        /// <param name="aufgaben">Die zurueckzugebenden Aufgaben.</param>
+        public VerzoegernderAktiveAufgabenService(List<Softwareschmiede.Domain.Entities.Aufgabe> aufgaben)
         {
-            if (Verzoegerung > TimeSpan.Zero)
-                Thread.Sleep(Verzoegerung);
-            return instance;
+            _aufgaben = aufgaben;
+        }
+
+        /// <summary>Task, der abgeschlossen wird, sobald der erste künstlich verzögerte Abruf erreicht wurde.</summary>
+        public Task ErsterVerzoegerterAbruf => _ersterVerzoegerterAbruf.Task;
+
+        /// <summary>Anzahl der Abrufe, die nach Aktivierung der künstlichen Verzögerung erreicht wurden.</summary>
+        public int VerzoegerteAbrufe => Volatile.Read(ref _verzoegerteAbrufe);
+
+        /// <summary>Aktiviert die kuenstliche Verzoegerung fuer nachfolgende Abrufe.</summary>
+        public void Aktivieren() => Volatile.Write(ref _aktiv, 1);
+
+        /// <summary>Gibt blockierte Abrufe wieder frei.</summary>
+        public void Fortsetzen() => _fortsetzen.Set();
+
+        /// <inheritdoc />
+        public Task<List<Softwareschmiede.Domain.Entities.Aufgabe>> GetAktiveAufgabenAsync(CancellationToken ct = default)
+        {
+            if (Volatile.Read(ref _aktiv) == 1)
+            {
+                Interlocked.Increment(ref _verzoegerteAbrufe);
+                _ersterVerzoegerterAbruf.TrySetResult();
+                _fortsetzen.Wait(ct);
+            }
+
+            return Task.FromResult(_aufgaben);
         }
     }
 }

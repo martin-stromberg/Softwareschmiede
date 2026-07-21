@@ -5,21 +5,15 @@ Status: Keine Fehler
 
 ## Ausgefuehrt
 
-- `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~CliKiPluginBaseTests|FullyQualifiedName~IssueCreateDialogViewModelTests" -p:BaseOutputPath=$out`
-  - Ergebnis: Bestanden, 30 erfolgreich, 0 fehlgeschlagen, 0 uebersprungen.
-  - Hinweis: Separater `BaseOutputPath` wurde verwendet, weil eine laufende `Softwareschmiede.App`-Instanz die normalen Debug-DLLs sperrte.
-- `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore --filter "Category!=OsInterface" -p:BaseOutputPath=.tmp-test-bin/<guid>`
-  - Ergebnis: Bestanden, 1041 erfolgreich, 0 fehlgeschlagen, 1 uebersprungen.
-  - Hinweis: Der separate `BaseOutputPath` lag innerhalb des Repositories, damit bestehende Tests, die `Softwareschmiede.slnx` relativ zum Test-Binaerpfad suchen, funktionieren.
+- `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests.AktiveAufgabenAktualisierenAsync_ShouldSkip_WhenAlreadyRunning"`
+  - Ergebnis: Bestanden, 1 erfolgreich, 0 fehlgeschlagen, 0 uebersprungen.
+- `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests"`
+  - Ergebnis: Bestanden, 31 erfolgreich, 0 fehlgeschlagen, 0 uebersprungen.
 
-## Nicht erfolgreich abgeschlossen
+## Hinweise
 
-- `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~CliKiPluginBaseTests|FullyQualifiedName~IssueCreateDialogViewModelTests"`
-  - Ergebnis: Build abgebrochen durch gesperrte Dateien im normalen `bin`-Ordner. Sperrende Prozesse: `Microsoft Visual Studio (4920)`, `Softwareschmiede.App (17400)`.
-  - Bewertung: Infrastruktur-/Dateisperre, kein fehlgeschlagener Test. Der gleiche fokussierte Lauf war mit separatem Ausgabepfad erfolgreich.
-- `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore --filter "Category!=OsInterface" -p:BaseOutputPath=$env:TEMP/<guid>`
-  - Ergebnis: 1 bestehender Test (`TaskDetailViewTests.Xaml_ContainsPullRequestActionButton`) konnte `Softwareschmiede.slnx` nicht finden, weil der Test-Binaerpfad ausserhalb des Repositories lag.
-  - Bewertung: Ausgabepfad-Artefakt, kein Produktfehler. Der gleiche breite Lauf war mit separatem Ausgabepfad innerhalb des Repositories erfolgreich.
+- Beim ersten Lauf wurden bestehende Compiler-/Analyzer-Warnungen ausgegeben; sie betreffen nicht die geaenderte Teststelle.
+- Der korrigierte Test ersetzt die bisherige 250-ms-Stoppuhr-Assertion durch eine direkte Re-Entrancy-Absicherung ueber eine kontrolliert blockierte und gezaehlte Test-Datenquelle.
 
 ## Fehlgeschlagene Tests
 

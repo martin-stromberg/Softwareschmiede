@@ -9,7 +9,7 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Service für Aufgabenverwaltung (CRUD + Lebenszyklus).</summary>
-public sealed class AufgabeService
+public sealed class AufgabeService : IAktiveAufgabenService
 {
     // AktivOderWartendStatus ist die einzige Quelle der Wahrheit für die Regel "Aufgabe ist aktiv oder
     // wartend" (siehe AufgabeStatusExtensions.IstAktivOderWartend). Für EF-Core-Queries wird die Array-
