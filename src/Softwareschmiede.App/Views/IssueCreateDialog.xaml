@@ -1,0 +1,138 @@
+<Window x:Class="Softwareschmiede.App.Views.IssueCreateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Issue anlegen"
+        Background="{DynamicResource SurfaceBrush}"
+        Width="760"
+        Height="640"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Issue anlegen"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   Margin="0,0,0,16" />
+
+        <Border Grid.Row="1"
+                Background="{DynamicResource ErrorBrush}"
+                Padding="10,7"
+                Margin="0,0,0,12"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding ErrorMessage}"
+                       AutomationProperties.Name="IssueAnlageFehler"
+                       Foreground="White"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                <TextBlock Text="Titel"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Margin="0,0,0,4" />
+                <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="IssueTitel"
+                         Padding="8,6" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Margin="0,0,12,0"
+                        Visibility="{Binding HasTemplates, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="Template"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Margin="0,0,0,4" />
+                <ComboBox ItemsSource="{Binding Templates}"
+                          SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
+                          DisplayMemberPath="Name"
+                          AutomationProperties.Name="IssueTemplateAuswahl"
+                          Padding="6,4" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="KI"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Margin="0,0,0,4" />
+                <StackPanel Orientation="Horizontal">
+                    <ComboBox ItemsSource="{Binding VerfuegbareKiPlugins}"
+                              SelectedItem="{Binding SelectedKiPluginPrefix, Mode=TwoWay}"
+                              AutomationProperties.Name="IssueKiProvider"
+                              Width="180"
+                              Padding="6,4"
+                              IsEnabled="{Binding CanUseAi}" />
+                    <Button Content="Ausfüllen"
+                            AutomationProperties.Name="IssueKiAusfuellen"
+                            Command="{Binding KiAusfuellenCommand}"
+                            Padding="10,6"
+                            Margin="8,0,0,0" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0"
+                       Text="Beschreibung"
+                       FontSize="12"
+                       Foreground="{DynamicResource SecondaryTextBrush}"
+                       Margin="0,0,0,4" />
+            <TextBox Grid.Row="1"
+                     Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="IssueBeschreibung"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     Padding="8,6" />
+        </Grid>
+
+        <DockPanel Grid.Row="4" Margin="0,16,0,0">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <TextBlock Text="Templates werden geladen…"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Visibility="{Binding IsLoadingTemplates, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock Text="Issue wird erstellt…"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Visibility="{Binding IsSubmitting, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock Text="KI läuft…"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisibilityConverter}}" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Content="Abbrechen"
+                        AutomationProperties.Name="IssueAnlageAbbrechen"
+                        Command="{Binding AbbrechenCommand}"
+                        Padding="12,6"
+                        Margin="0,0,8,0" />
+                <Button Content="Anlegen"
+                        AutomationProperties.Name="IssueAnlegen"
+                        Command="{Binding ErstellenCommand}"
+                        Padding="12,6"
+                        Background="{DynamicResource AccentBrush}"
+                        Foreground="White"
+                        BorderThickness="0" />
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

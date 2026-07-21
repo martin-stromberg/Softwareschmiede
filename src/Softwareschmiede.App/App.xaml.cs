@@ -166,6 +166,7 @@ public sealed partial class App : System.Windows.Application
 
         // Domain Services
         services.AddScoped<AufgabeService>();
+        services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
         services.AddScoped<ProjektService>();
         services.AddScoped<ProtokollService>();
         services.AddScoped<RepositoryStartskriptService>();
@@ -258,6 +259,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<TaskDetailViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<IssueSelectionDialogViewModel>();
+        services.AddTransient<IssueCreateDialogViewModel>();
         services.AddTransient<FileExplorerViewModel>();
 
         // Windows

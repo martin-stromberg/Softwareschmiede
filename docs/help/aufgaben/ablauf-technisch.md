@@ -339,7 +339,36 @@ Ablauf:
 
 - `EntwicklungsprozessService.AbschliessenAsync` — Setzt Status auf `Beendet`, löscht optional Klonverzeichnis
 
-### 7.1. Pull Request erstellen und Issue automatisch schliessen
+### 7.1. Issue anlegen und der Aufgabe zuordnen
+
+Beteiligte Komponenten:
+- `TaskDetailView` — Ribbon-Gruppe `Issue` mit `IssueAnlegen`-Button
+- `TaskDetailViewModel.IssueAnlegenCommand` — Capability-/CanExecute-Prüfung und Ablaufsteuerung
+- `IssueCreateDialogViewModel` / `IssueCreateDialog` — editierbare Issue-Daten, optionale Templates und KI-Ausfüllhilfe
+- `IIssueCreateProvider` — providerunabhängige Anlage mit Titel und Beschreibung
+- `IIssueTemplateProvider` — optionale Template-Fähigkeit
+- `IIssueTemplateTextGenerator` — optionale einmalige KI-Textgenerierung
+- `AufgabeService.TryAssignIssueReferenzIfNoneAsync` — konkurrenzsichere lokale Zuordnung
+
+Ablauf:
+1. Beim Laden der Aufgabe prüft `TaskDetailViewModel`, ob Repository, Provider und `IIssueCreateProvider` verfügbar sind, ob die Anlage für das Repository unterstützt wird und ob noch keine `IssueReferenz` existiert.
+2. Der Anwender öffnet den Dialog. Titel und `AnforderungsBeschreibung` werden initialisiert; `null` oder Whitespace wird als leerer Beschreibungstext behandelt.
+3. Ein Provider mit `IIssueTemplateProvider` lädt Templates. Nichtunterstützung oder eine leere Trefferliste blendet die Template-Auswahl aus; ein Ladefehler wird angezeigt, blockiert die Anlage ohne Template aber nicht.
+4. Bei Template-Auswahl wird der Body als `Template-Inhalt`, `---`, `Originalanforderung:` und optional der ursprünglichen Beschreibung aufgebaut. Der Body bleibt über die TextBox editierbar.
+5. Für die KI-Aktion wird der ausgewählte KI-Provider mit Template-Inhalt und Originalanforderung aufgerufen. Das Ergebnis ersetzt den editierbaren Body; Fehler ändern den bisherigen Body nicht.
+6. Vor dem Erstellen wird die Zuordnung erneut live geprüft. Bei leerem Titel, laufender Operation oder bestehender Zuordnung bleibt „Anlegen" deaktiviert.
+7. `IIssueCreateProvider.CreateIssueAsync` erstellt das externe Issue. Bei einem nicht erfolgreichen Ergebnis wird keine lokale Referenz gespeichert.
+8. Nach erfolgreicher Provider-Antwort wird `TryAssignIssueReferenzIfNoneAsync` ausgeführt. Die Methode verhindert auch bei parallelen Aktionen eine zweite Zuordnung.
+9. Bei erfolgreicher Speicherung ruft das ViewModel `LadenAsync` auf. Die neue Referenz wird angezeigt und die Anlageaktion wird ausgeblendet.
+10. Schlägt die lokale Zuordnung nach externer Anlage fehl, werden URL oder Nummer des externen Issues in der Fehlermeldung genannt; ein automatischer erneuter Create-Versuch erfolgt nicht.
+
+Providerumfang:
+- GitHub unterstützt Issue-Anlage und das Laden von Repository-Templates über `gh`.
+- Der Jira-Pfad im Bitbucket-Plugin unterstützt die Issue-Anlage mit konfiguriertem Jira-URL, Projekt-Key und Issue-Typ; die Beschreibung wird als Jira-ADF übertragen.
+- Nicht unterstützte Template-Fähigkeiten bei Jira/Bitbucket verhindern den No-Template-Pfad nicht.
+- Provider ohne `IIssueCreateProvider`, etwa LocalDirectory, bieten die Aktion nicht an.
+
+### 7.2. Pull Request erstellen und Issue automatisch schliessen
 
 Beteiligte Komponenten:
 - `TaskDetailView` — Ribbon-Gruppe `Pull Request` mit Button `PullRequestErstellen`

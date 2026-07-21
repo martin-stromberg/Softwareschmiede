@@ -11,6 +11,22 @@ namespace Softwareschmiede.Tests.Infrastructure.Plugins;
 /// <summary>LocalDirectoryPluginTests.</summary>
 public sealed class LocalDirectoryPluginTests
 {
+    /// <summary>LocalDirectory unterstützt die providerseitige Issue-Anlage nicht.</summary>
+    [Fact]
+    public async Task IssueCreateCapability_ShouldReturnNotSupported()
+    {
+        var cli = new Mock<ICliRunner>(MockBehavior.Strict);
+        var store = new Mock<ICredentialStore>();
+        var sut = new LocalDirectoryPlugin(cli.Object, store.Object, NullLogger<LocalDirectoryPlugin>.Instance);
+
+        var canCreate = await sut.CanCreateIssueAsync("local");
+        var result = await sut.CreateIssueAsync("local", new IssueCreateRequest("Titel", "Body"));
+
+        canCreate.Should().BeFalse();
+        result.Status.Should().Be(IssueCreateResultStatus.NotSupported);
+        result.Issue.Should().BeNull();
+    }
+
     /// <summary><summary>CloneRepositoryAsync_ShouldRequireExplicitConfirmation_ForGitInitInSourceDirectory.</summary>.</summary>
     [Fact]
     /// <summary>CloneRepositoryAsync_ShouldRequireExplicitConfirmation_ForGitInitInSourceDirectory.</summary>

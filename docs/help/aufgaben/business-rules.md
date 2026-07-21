@@ -48,6 +48,28 @@
 
 ---
 
+## Issue-Anlage aus der Aufgabendetailansicht
+
+**Beschreibung:** Ein neues Issue kann aus einer Aufgabe angelegt und anschließend genau einmal mit dieser Aufgabe verknüpft werden.
+
+**Bedingungen:**
+- Die Aufgabe besitzt noch keine `IssueReferenz`.
+- Ein zugeordnetes Repository und ein Provider mit `IIssueCreateProvider` sind verfügbar.
+- Der Provider meldet die Issue-Anlage für das Repository als unterstützt.
+
+**Verhalten:**
+- Der Ribbon-Button und der Dialog werden nur bei verfügbarer Issue-Anlage angeboten.
+- Titel und Anforderungsbeschreibung werden als editierbare Initialwerte übernommen.
+- Provider-Templates sind optional. Bei einem ausgewählten Template werden Template-Inhalt, Trennlinie und `Originalanforderung:` zusammengesetzt; der Text bleibt bearbeitbar.
+- Die KI-Ausfüllhilfe ist optional und verwendet nur Provider mit `IIssueTemplateTextGenerator`.
+- Das externe Issue wird vor der lokalen Speicherung erstellt. Die lokale `IssueReferenz` wird nur bei erfolgreicher Anlage und erfolgreicher konkurrenzsicherer Zuordnung gespeichert.
+- Nach erfolgreicher Zuordnung wird die Aufgabe neu geladen; der Button „Issue anlegen" verschwindet.
+- Abbruch, nicht unterstützte Templates, Providerfehler und Validierungsfehler führen nicht zu einer lokalen Issue-Zuordnung. Ein Fehler bei der lokalen Speicherung nach externer Anlage wird mit Issue-URL oder -Nummer angezeigt; ein allgemeines Provider-Rollback ist nicht garantiert.
+
+**Umsetzung:** `TaskDetailViewModel.IssueAnlegenAsync`, `IssueCreateDialogViewModel`, `AufgabeService.TryAssignIssueReferenzIfNoneAsync` sowie `IIssueCreateProvider` und optionale Template-/KI-Fähigkeiten.
+
+---
+
 ## Automatische Issue-Schliessung bei Pull Requests
 
 **Beschreibung:** Wenn eine Aufgabe aus einem GitHub-Issue erstellt wurde, bleibt die Issue-Referenz an der Aufgabe erhalten und wird beim Erstellen eines Pull Requests automatisch in den Pull-Request-Body uebernommen.

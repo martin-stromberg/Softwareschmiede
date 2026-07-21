@@ -265,6 +265,40 @@ public sealed class AufgabeServiceTests
     }
 
     /// <summary>
+    /// Deckt das Rennen zwischen zweiter ViewModel-Prüfung und Persistenz ab: eine parallel gesetzte
+    /// IssueReferenz darf durch die Issue-Anlage nicht überschrieben werden.
+    /// </summary>
+    [Fact]
+    public async Task TryAssignIssueReferenzIfNoneAsync_ShouldNotOverwrite_WhenReferenceIsAssignedAfterCallerCheck()
+    {
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektId = await CreateTestProjektAsync(db);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabe = await service.CreateAsync(projektId, "Issue-Anlage", null);
+        var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://example.test/23");
+        var parallelIssue = new Issue(99, "Parallel", "Body", [], null, "https://example.test/99");
+
+        var standVorZuordnung = await service.GetDetailAsync(aufgabe.Id);
+        standVorZuordnung!.IssueReferenz.Should().BeNull();
+
+        await using (var parallelContext = db.CreateNewContext())
+        {
+            var parallelService = new AufgabeService(parallelContext, NullLogger<AufgabeService>.Instance);
+            await parallelService.UpdateIssueReferenzAsync(aufgabe.Id, parallelIssue);
+        }
+
+        var assigned = await service.TryAssignIssueReferenzIfNoneAsync(aufgabe.Id, createdIssue);
+
+        assigned.Should().BeFalse();
+        await using var assertContext = db.CreateNewContext();
+        var reloaded = await assertContext.Aufgaben
+            .Include(a => a.IssueReferenz)
+            .SingleAsync(a => a.Id == aufgabe.Id);
+        reloaded.IssueReferenz!.IssueNummer.Should().Be(99);
+        reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/99");
+    }
+
+    /// <summary>
     /// Testet, dass GetByProjektAsync alle Aufgaben eines Projekts absteigend nach Erstellungsdatum zurückgibt.
     /// </summary>
     [Fact]

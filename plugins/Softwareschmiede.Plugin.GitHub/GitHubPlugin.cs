@@ -324,23 +324,207 @@ password {token}
     /// <inheritdoc/>
     public override async Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Rufe Issues für Repository {RepositoryId} ab.", repositoryId);
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return [];
+        }
+
+        _logger.LogInformation("Rufe Issues für Repository {RepositoryId} ab.", normalizedRepositoryId);
 
         var result = await _cliRunner.RunAsync(
             "gh",
-            ["issue", "list", "--repo", repositoryId, "--json", "number,title,body,labels,milestone", "--limit", "100"],
+            ["issue", "list", "--repo", normalizedRepositoryId, "--json", "number,title,body,labels,milestone", "--limit", "100"],
             null,
             GetGhEnvironment(),
             ct);
 
         if (!result.IsSuccess)
         {
-            _logger.LogError("gh issue list fehlgeschlagen für {RepositoryId}: {StdErr}", repositoryId, result.StdErr);
+            _logger.LogError("gh issue list fehlgeschlagen für {RepositoryId}: {StdErr}", normalizedRepositoryId, result.StdErr);
             return [];
         }
 
         return ParseIssues(result.StdOut);
     }
+
+    /// <inheritdoc/>
+    public override Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default)
+        => Task.FromResult(!string.IsNullOrWhiteSpace(NormalizeRepositoryId(repositoryId)));
+
+    /// <inheritdoc/>
+    public override async Task<IssueCreateResult> CreateIssueAsync(
+        string repositoryId,
+        IssueCreateRequest request,
+        CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return IssueCreateResult.Failed("Repository-ID fehlt.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return IssueCreateResult.Failed("Der Issue-Titel darf nicht leer sein.");
+        }
+
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            [
+                "issue", "create",
+                "--repo", normalizedRepositoryId,
+                "--title", request.Title.Trim(),
+                "--body", request.Body ?? string.Empty
+            ],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            _logger.LogError("gh issue create fehlgeschlagen für {RepositoryId}: {StdErr}", normalizedRepositoryId, sanitizedError);
+            return IssueCreateResult.Failed($"GitHub-Issue konnte nicht erstellt werden: {sanitizedError}");
+        }
+
+        var issueUrl = result.StdOut.Trim();
+        if (!TryParseIssueNumber(issueUrl, out var issueNumber))
+        {
+            return IssueCreateResult.Failed($"GitHub-Issue wurde erstellt, die Antwort konnte aber nicht ausgewertet werden: {issueUrl}");
+        }
+
+        return IssueCreateResult.Success(new Issue(
+            issueNumber,
+            request.Title.Trim(),
+            request.Body,
+            [],
+            null,
+            issueUrl));
+    }
+
+    /// <inheritdoc/>
+    public override async Task<IssueTemplateLoadResult> GetIssueTemplatesAsync(string repositoryId, CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return IssueTemplateLoadResult.Success([]);
+        }
+
+        var listResult = await _cliRunner.RunAsync(
+            "gh",
+            ["api", $"repos/{normalizedRepositoryId}/contents/.github/ISSUE_TEMPLATE"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!listResult.IsSuccess)
+        {
+            return IsNotFound(listResult.StdErr)
+                ? IssueTemplateLoadResult.Success([])
+                : IssueTemplateLoadResult.Failed($"GitHub-Issue-Templates konnten nicht geladen werden: {SanitizeSensitiveOutput(listResult.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey))}");
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(listResult.StdOut);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return IssueTemplateLoadResult.Success([]);
+            }
+
+            var templates = new List<IssueTemplate>();
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                var type = item.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null;
+                var name = item.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+                var path = item.TryGetProperty("path", out var pathEl) ? pathEl.GetString() : null;
+
+                if (!string.Equals(type, "file", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(name)
+                    || string.IsNullOrWhiteSpace(path)
+                    || !IsSupportedTemplateFile(name))
+                {
+                    continue;
+                }
+
+                var content = await LoadTemplateContentAsync(normalizedRepositoryId, path, ct);
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    templates.Add(new IssueTemplate(name, content));
+                }
+            }
+
+            return IssueTemplateLoadResult.Success(templates);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Auswerten der GitHub-Issue-Templates für {RepositoryId}.", repositoryId);
+            return IssueTemplateLoadResult.Failed("GitHub-Issue-Templates konnten nicht ausgewertet werden.");
+        }
+    }
+
+    private async Task<string?> LoadTemplateContentAsync(string repositoryId, string path, CancellationToken ct)
+    {
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            ["api", $"repos/{repositoryId}/contents/{path}"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("GitHub-Issue-Template {TemplatePath} konnte nicht geladen werden: {StdErr}", path, result.StdErr);
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(result.StdOut);
+        if (!doc.RootElement.TryGetProperty("content", out var contentEl))
+        {
+            return null;
+        }
+
+        var encoded = contentEl.GetString();
+        if (string.IsNullOrWhiteSpace(encoded))
+        {
+            return null;
+        }
+
+        return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded.Replace("\n", string.Empty, StringComparison.Ordinal)));
+    }
+
+    private static bool TryParseIssueNumber(string issueUrl, out int issueNumber)
+    {
+        issueNumber = 0;
+        var lastSlashIndex = issueUrl.LastIndexOf('/');
+        return lastSlashIndex > 0
+               && lastSlashIndex < issueUrl.Length - 1
+               && int.TryParse(issueUrl[(lastSlashIndex + 1)..], out issueNumber);
+    }
+
+    private static bool IsSupportedTemplateFile(string name)
+        => name.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
+
+    private static string? NormalizeRepositoryId(string repositoryId)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryId))
+        {
+            return null;
+        }
+
+        var extracted = TryExtractRepositoryId(repositoryId);
+        return extracted ?? repositoryId.Trim().Trim('/');
+    }
+
+    private static bool IsNotFound(string error)
+        => error.Contains("404", StringComparison.OrdinalIgnoreCase)
+           || error.Contains("not found", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<Issue> ParseIssues(string json)
     {

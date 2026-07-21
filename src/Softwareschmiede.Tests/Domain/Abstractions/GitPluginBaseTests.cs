@@ -51,6 +51,28 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git checkout -b fehlgeschlagen*");
     }
 
+    /// <summary>CancellationToken wird an die Basisklassen-Git-Ausfuehrung weitergereicht und als Abbruch propagiert.</summary>
+    [Fact]
+    public async Task CreateBranchAsync_ShouldPropagateCancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var cli = new Mock<ICliRunner>();
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "checkout", "-b", "feature/x" })),
+                "/repo",
+                null,
+                cts.Token))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+        var sut = new TestGitPlugin(cli.Object);
+
+        var act = () => sut.CreateBranchAsync("/repo", "feature/x", cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        cli.VerifyAll();
+    }
+
     /// <summary><summary>CommitAsync_ShouldRunAddAndCommit.</summary>.</summary>
     [Fact]
     /// <summary>CommitAsync_ShouldRunAddAndCommit.</summary>
@@ -203,6 +225,24 @@ public sealed class GitPluginBaseTests
         capabilities.CanPull.Should().BeTrue();
         capabilities.CanCreatePullRequest.Should().BeTrue();
         capabilities.CanMergeToSource.Should().BeFalse();
+    }
+
+    /// <summary>Issue-Anlage ist in der Basisklasse standardmäßig nicht unterstützt.</summary>
+    [Fact]
+    public async Task IssueCreateCapability_ShouldReturnNotSupported_ByDefault()
+    {
+        var sut = new TestGitPlugin(new Mock<ICliRunner>().Object);
+
+        var canCreate = await sut.CanCreateIssueAsync("repo");
+        var createResult = await sut.CreateIssueAsync("repo", new IssueCreateRequest("Titel", "Body"));
+        var templateResult = await sut.GetIssueTemplatesAsync("repo");
+
+        canCreate.Should().BeFalse();
+        createResult.Status.Should().Be(IssueCreateResultStatus.NotSupported);
+        createResult.IsSuccess.Should().BeFalse();
+        createResult.Issue.Should().BeNull();
+        templateResult.Status.Should().Be(IssueTemplateLoadResultStatus.NotSupported);
+        templateResult.Templates.Should().BeEmpty();
     }
 
     /// <summary>Prüft, dass MergeToSource standardmäßig als nicht unterstützt markiert ist.</summary>

@@ -8,7 +8,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Claude-CLI Plugin für KI-gestützte Entwicklung.</summary>
-public sealed class ClaudeCliPlugin : CliKiPluginBase
+public sealed class ClaudeCliPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
 {
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<ClaudeCliPlugin> _logger;
@@ -92,6 +92,33 @@ public sealed class ClaudeCliPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Pruefe Claude-CLI-Plugin-Health.");
         return await CheckHealthWithVersionCommandAsync(_claudeExecutablePath.Value, ct);
+    }
+
+    /// <inheritdoc/>
+    public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
+    {
+        var invocation = BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+        return RunOneShotTextGenerationAsync(invocation.ProcessStartInfo, invocation.StandardInput, ct);
+    }
+
+    internal (ProcessStartInfo ProcessStartInfo, string StandardInput) BuildIssueTemplateFillInvocation(
+        string templateBody,
+        string? originalRequirement)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = _claudeExecutablePath.Value,
+            WorkingDirectory = Path.GetTempPath(),
+        };
+        psi.ArgumentList.Add("-p");
+
+        var token = _credentialStore.GetCredential($"{PluginPrefix}.Token");
+        if (!string.IsNullOrEmpty(token))
+        {
+            psi.EnvironmentVariables["ANTHROPIC_API_KEY"] = token;
+        }
+
+        return (psi, BuildIssueTemplateFillPrompt(templateBody, originalRequirement));
     }
 
     /// <inheritdoc/>

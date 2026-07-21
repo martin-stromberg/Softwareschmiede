@@ -50,6 +50,32 @@ public sealed class CodexPluginTests
         _sut.SupportsSessionContinuation().Should().BeFalse();
     }
 
+    /// <summary>Codex bietet die rückgabefähige Issue-Template-Ausfüllhilfe an.</summary>
+    [Fact]
+    public void Plugin_ShouldExposeIssueTemplateTextGeneratorCapability()
+    {
+        _sut.Should().BeAssignableTo<IIssueTemplateTextGenerator>();
+    }
+
+    /// <summary>Die Issue-Ausfuellhilfe uebergibt Template und Originalanforderung vollstaendig ueber stdin.</summary>
+    [Fact]
+    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InStandardInput()
+    {
+        const string templateBody = "## Fehlerbeschreibung\nBitte ausfuellen.";
+        const string originalRequirement = "Als Nutzer moechte ich ein Issue aus einer Aufgabe anlegen.";
+        _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Codex.ExecutablePath"))
+            .Returns(@"C:\tools\codex.exe");
+
+        var invocation = _sut.BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+
+        invocation.ProcessStartInfo.FileName.Should().Be(@"C:\tools\codex.exe");
+        invocation.ProcessStartInfo.ArgumentList.Should().Equal("exec", "--skip-git-repo-check");
+        invocation.StandardInput.Should().Contain("Template:");
+        invocation.StandardInput.Should().Contain(templateBody);
+        invocation.StandardInput.Should().Contain("Originalanforderung:");
+        invocation.StandardInput.Should().Contain(originalRequirement);
+    }
+
     /// <summary>StartCliAsync uses default codex command when no path is configured.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldUseCodexCommand_WhenNoPathConfigured()

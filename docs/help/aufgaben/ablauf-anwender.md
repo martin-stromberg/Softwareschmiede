@@ -57,6 +57,18 @@ Nach dem Speichern können Sie bleiben, um die Aufgabe weiterzubearbeiten, oder 
 
 Befindest du dich im Status **Neu** oder **Gestartet**, kannst du die **Info-Ansicht** öffnen und Titel oder Anforderungsbeschreibung ändern. Klicke auf **Speichern** im Ribbon, um die Änderungen zu übernehmen.
 
+### 2a. Issue aus der Aufgabe anlegen (optional)
+
+Wenn der Aufgabe noch kein Issue zugeordnet ist und der Repository-Provider die Issue-Anlage unterstützt, erscheint im Ribbon die Gruppe **Issue** mit dem Button **Issue anlegen**:
+
+1. Öffne die **Info-Ansicht** der Aufgabe und klicke auf **Issue anlegen**.
+2. Prüfe oder bearbeite den vorausgefüllten **Titel** und die **Beschreibung**. Die Anforderungsbeschreibung der Aufgabe wird als Ausgangstext übernommen; ein leerer Text ist zulässig.
+3. Falls Templates verfügbar sind, wähle ein **Template** aus. Die Beschreibung enthält danach den Template-Inhalt, eine Trennlinie und `Originalanforderung:` mit der ursprünglichen Anforderungsbeschreibung. Der zusammengesetzte Text kann vollständig geändert werden.
+4. Optional: Wähle einen angebotenen KI-Provider und klicke auf **Ausfüllen**, um das ausgewählte Template anhand der Originalanforderung ausfüllen zu lassen. Prüfe und bearbeite das Ergebnis vor dem Absenden.
+5. Klicke auf **Anlegen**. Mit **Abbrechen** wird der Dialog ohne Provider- oder Speichervorgang geschlossen.
+
+Nach erfolgreicher Anlage wird die Issue-Referenz in der Aufgabe angezeigt; die Anlage eines weiteren Issues ist für diese Aufgabe nicht mehr verfügbar. Wenn der Provider keine Templates unterstützt oder keine Templates findet, kannst du direkt ohne Template fortfahren. Fehler werden im Dialog angezeigt und die bisherigen Eingaben bleiben zur Korrektur erhalten.
+
 ### 3. Aufgabe starten (Repository einrichten)
 
 Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:

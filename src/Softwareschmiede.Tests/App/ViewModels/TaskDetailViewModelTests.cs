@@ -1453,6 +1453,268 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.IssueZuweisenCommand.CanExecute(null).Should().BeFalse();
     }
 
+    /// <summary>IssueAnlegenCommand ist nur verfügbar, wenn Provider-Capability vorhanden ist und noch keine Referenz existiert.</summary>
+    [Fact]
+    public async Task IssueAnlegenCommand_CanExecute_WhenProviderSupportsCreateAndNoReferenceExists()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanCreateIssue.Should().BeTrue();
+        sut.IssueAnlegenCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    /// <summary>IssueAnlegenCommand prueft die Provider-Capability mit der Repository-URL statt dem Anzeigenamen.</summary>
+    [Fact]
+    public async Task IssueAnlegenCommand_ShouldUseRepositoryUrl_ForProviderCapability()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: false);
+        gitPluginMock.As<IIssueCreateProvider>()
+            .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanCreateIssue.Should().BeTrue();
+        gitPluginMock.As<IIssueCreateProvider>()
+            .Verify(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    }
+
+    /// <summary>IssueAnlegenCommand ist deaktiviert, wenn der Provider die Issue-Anlage nicht unterstützt.</summary>
+    [Fact]
+    public async Task IssueAnlegenCommand_CannotExecute_WhenProviderDoesNotSupportCreate()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: false);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanCreateIssue.Should().BeFalse();
+        sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>IssueAnlegenCommand ist deaktiviert, wenn das SCM-Plugin keine Issue-Create-Capability implementiert.</summary>
+    [Fact]
+    public async Task IssueAnlegenCommand_CannotExecute_WhenProviderHasNoCreateCapability()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleGitPluginOhneIssueCreateMock();
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanCreateIssue.Should().BeFalse();
+        sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>Providerfehler bei der Capability-Ermittlung deaktivieren die Anlage statt einen falschen Buttonzustand zu zeigen.</summary>
+    [Fact]
+    public async Task IssueAnlegenCommand_CannotExecute_WhenProviderCapabilityFails()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        gitPluginMock.As<IIssueCreateProvider>()
+            .Setup(p => p.CanCreateIssueAsync("https://github.com/test/repo", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Provider nicht erreichbar"));
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanCreateIssue.Should().BeFalse();
+        sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>IssueAnlegenCommand ist bei bestehender Referenz deaktiviert.</summary>
+    [Fact]
+    public async Task IssueAnlegenCommand_CannotExecute_WhenIssueReferenceExists()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        await _aufgabeService.UpdateIssueReferenzAsync(aufgabe.Id, new Issue(1, "Vorhanden", "Body", [], null, "https://example.test/1"));
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanCreateIssue.Should().BeFalse();
+        sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>IssueAnlegenAsync speichert erst nach erfolgreichem Dialog-Provider-Ergebnis die lokale Referenz.</summary>
+    [Fact]
+    public async Task IssueAnlegenAsync_ShouldPersistCreatedIssueAndReloadTask()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdIssue);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+
+        sut.CurrentIssueReferenz.Should().NotBeNull();
+        sut.CurrentIssueReferenz!.IssueNummer.Should().Be(23);
+        sut.CurrentIssueReferenz.IssueUrl.Should().Be("https://github.com/test/repo/issues/23");
+        sut.CanCreateIssue.Should().BeFalse();
+    }
+
+    /// <summary>Nach extern erstelltem Issue nennt ein lokaler Persistenzfehler die externe URL und speichert keine Referenz.</summary>
+    [Fact]
+    public async Task IssueAnlegenAsync_ShouldShowExternalIssueUrl_WhenLocalPersistenceFails()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .Returns<IssueCreateDialogViewModel, CancellationToken>(async (_, token) =>
+            {
+                await _aufgabeService.DeleteAsync(aufgabe.Id, token);
+                return createdIssue;
+            });
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().Contain("konnte aber nicht lokal zugeordnet werden");
+        sut.FehlerMeldung.Should().Contain("https://github.com/test/repo/issues/23");
+        (await _aufgabeService.GetDetailAsync(aufgabe.Id)).Should().BeNull();
+    }
+
+    /// <summary>IssueAnlegenAsync speichert keine lokale Referenz, wenn der Dialog abgebrochen wird.</summary>
+    [Fact]
+    public async Task IssueAnlegenAsync_ShouldNotPersistReference_WhenDialogIsCancelled()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Issue?)null);
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+
+        var reloaded = await _aufgabeService.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz.Should().BeNull();
+    }
+
+    /// <summary>Ein zweiter Klick waehrend laufender Issue-Anlage oeffnet keinen zweiten Dialog.</summary>
+    [Fact]
+    public async Task IssueAnlegenAsync_ShouldIgnoreSecondExecution_WhileCreateDialogIsOpen()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
+        var dialogStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogRelease = new TaskCompletionSource<Issue?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCalls = 0;
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .Returns<IssueCreateDialogViewModel, CancellationToken>((_, _) =>
+            {
+                dialogCalls++;
+                dialogStarted.SetResult(null);
+                return dialogRelease.Task;
+            });
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        var first = ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+        await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        sut.IssueAnlegenCommand.CanExecute(null).Should().BeFalse();
+
+        var second = ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+        dialogRelease.SetResult(null);
+        await Task.WhenAll(first, second);
+
+        dialogCalls.Should().Be(1);
+        (await _aufgabeService.GetDetailAsync(aufgabe.Id))!.IssueReferenz.Should().BeNull();
+    }
+
+    /// <summary>Nach extern erstelltem Issue wird keine lokale Referenz überschrieben, wenn parallel bereits zugeordnet wurde.</summary>
+    [Fact]
+    public async Task IssueAnlegenAsync_ShouldNotOverwriteReference_WhenIssueWasAssignedAfterDialog()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Beschreibung", repository.Id);
+        var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://github.com/test/repo/issues/23");
+        var parallelIssue = new Issue(99, "Parallel", "Body", [], null, "https://github.com/test/repo/issues/99");
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .Returns<IssueCreateDialogViewModel, CancellationToken>(async (_, token) =>
+            {
+                await _aufgabeService.UpdateIssueReferenzAsync(aufgabe.Id, parallelIssue, token);
+                return createdIssue;
+            });
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+
+        var reloaded = await _aufgabeService.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz!.IssueNummer.Should().Be(99);
+        sut.FehlerMeldung.Should().Contain("extern erstellt");
+        sut.FehlerMeldung.Should().Contain("https://github.com/test/repo/issues/23");
+    }
+
     /// <summary>IssueZuweisenAsync tut nichts wenn Dialog abgebrochen wird.</summary>
     [Fact]
     public async Task IssueZuweisenAsync_UserAbortDoesNothing()
@@ -1750,6 +2012,74 @@ public sealed class TaskDetailViewModelTests : IDisposable
         prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 
+    private async Task<GitRepository> ErstelleRepositoryAsync(string pluginTyp, string repositoryUrl, string repositoryName)
+    {
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = pluginTyp,
+            RepositoryUrl = repositoryUrl,
+            RepositoryName = repositoryName,
+            Aktiv = true
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+        return repository;
+    }
+
+    private static Mock<IGitPlugin> ErstelleGitPluginOhneIssueCreateMock()
+    {
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginName).Returns("Test Git");
+        gitPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestGit");
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        gitPluginMock.Setup(p => p.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitActionCapabilities(
+                RepositoryKind.RemoteGit,
+                IsWorkingDirectoryCopy: false,
+                CanPush: true,
+                CanPull: true,
+                CanCreatePullRequest: false,
+                CanMergeToSource: false));
+        return gitPluginMock;
+    }
+
+    private static Mock<IGitPlugin> ErstelleIssueCreateGitPluginMock(bool canCreateIssue)
+    {
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginName).Returns("Test Git");
+        gitPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestGit");
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        gitPluginMock.Setup(p => p.GetGitActionCapabilitiesAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitActionCapabilities(
+                RepositoryKind.RemoteGit,
+                IsWorkingDirectoryCopy: false,
+                CanPush: true,
+                CanPull: true,
+                CanCreatePullRequest: false,
+                CanMergeToSource: false));
+        gitPluginMock.As<IIssueCreateProvider>()
+            .Setup(p => p.CanCreateIssueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(canCreateIssue);
+        gitPluginMock.As<IIssueTemplateProvider>()
+            .Setup(p => p.GetIssueTemplatesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(IssueTemplateLoadResult.NotSupported());
+        return gitPluginMock;
+    }
+
+    private Mock<IPluginManager> ErstellePluginManagerMitGitPlugin(IGitPlugin gitPlugin)
+    {
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPlugin]);
+        pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(gitPlugin);
+        pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
+        pluginManagerMock.Setup(p => p.GetDefaultDevelopmentAutomationPlugin()).Returns(_kiPluginMock.Object);
+        return pluginManagerMock;
+    }
+    
     private sealed class TestVisualStudioCodeLocator(VisualStudioCodeAvailability availability) : IVisualStudioCodeLocator
     {
         public VisualStudioCodeAvailability Locate() => availability;

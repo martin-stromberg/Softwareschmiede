@@ -177,9 +177,14 @@
 
                 <!-- Gruppe: Issue -->
                 <controls:RibbonGroup GruppenName="Issue"
-                                      Visibility="{Binding CanAssignIssue, Converter={StaticResource BoolToVisibilityConverter}}">
+                                      Visibility="{Binding ShowIssueGroup, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="＋"
+                                                        ButtonText="Issue anlegen"
+                                                        AutomationName="IssueAnlegen"
+                                                        ButtonCommand="{Binding IssueAnlegenCommand}"
+                                                        Visibility="{Binding CanCreateIssue, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="🔗"
                                                         ButtonText="Issue zuweisen"
                                                         AutomationName="IssueZuweisen"
