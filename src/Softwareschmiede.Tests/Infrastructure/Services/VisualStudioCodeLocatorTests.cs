@@ -12,9 +12,27 @@ public sealed class VisualStudioCodeLocatorTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _tempDirectoryFixture.Dispose();
 
-    /// <summary>PATH-Einträge werden zuerst auf code.cmd geprüft.</summary>
+    /// <summary>PATH-Einträge bevorzugen eine daneben liegende Code.exe vor code.cmd.</summary>
     [Fact]
-    public void Locate_FindetCodeCmdInPath()
+    public void Locate_BevorzugtCodeExeNebenBinPathVorCodeCmd()
+    {
+        var installDirectory = _tempDirectoryFixture.CreateTempDirectory("vscode_locator_path");
+        var binDirectory = Path.Combine(installDirectory, "bin");
+        Directory.CreateDirectory(binDirectory);
+        var executable = Path.Combine(installDirectory, "Code.exe");
+        File.WriteAllText(executable, string.Empty);
+        File.WriteAllText(Path.Combine(binDirectory, "code.cmd"), string.Empty);
+        var locator = CreateLocator(new Dictionary<string, string?> { ["PATH"] = binDirectory });
+
+        var availability = locator.Locate();
+
+        availability.IsAvailable.Should().BeTrue();
+        availability.ExecutablePath.Should().Be(executable);
+    }
+
+    /// <summary>code.cmd im PATH bleibt Fallback, wenn keine Code.exe gefunden wird.</summary>
+    [Fact]
+    public void Locate_FindetCodeCmdInPathWennCodeExeFehlt()
     {
         var pathDirectory = _tempDirectoryFixture.CreateTempDirectory("vscode_locator_path");
         var executable = Path.Combine(pathDirectory, "code.cmd");
@@ -42,14 +60,16 @@ public sealed class VisualStudioCodeLocatorTests : IDisposable
         availability.ExecutablePath.Should().Be(executable);
     }
 
-    /// <summary>Typische Windows-Installationspfade werden nach PATH geprüft.</summary>
+    /// <summary>Typische Windows-Installationspfade bevorzugen Code.exe vor code.cmd.</summary>
     [Fact]
-    public void Locate_FindetBekanntenWindowsInstallationspfad()
+    public void Locate_BevorzugtCodeExeImBekanntenWindowsInstallationspfad()
     {
         var localAppData = _tempDirectoryFixture.CreateTempDirectory("vscode_locator_localappdata");
-        var executable = Path.Combine(localAppData, "Programs", "Microsoft VS Code", "bin", "code.cmd");
-        Directory.CreateDirectory(Path.GetDirectoryName(executable)!);
+        var executable = Path.Combine(localAppData, "Programs", "Microsoft VS Code", "Code.exe");
+        var command = Path.Combine(localAppData, "Programs", "Microsoft VS Code", "bin", "code.cmd");
+        Directory.CreateDirectory(Path.GetDirectoryName(command)!);
         File.WriteAllText(executable, string.Empty);
+        File.WriteAllText(command, string.Empty);
         var locator = CreateLocator(new Dictionary<string, string?>
         {
             ["PATH"] = null,
@@ -62,12 +82,12 @@ public sealed class VisualStudioCodeLocatorTests : IDisposable
         availability.ExecutablePath.Should().Be(executable);
     }
 
-    /// <summary>Die Benutzerinstallation wird auch über Code.exe erkannt, wenn code.cmd fehlt.</summary>
+    /// <summary>code.cmd im Benutzerinstallationspfad bleibt Fallback, wenn Code.exe fehlt.</summary>
     [Fact]
-    public void Locate_FindetCodeExeImBenutzerInstallationspfad()
+    public void Locate_FindetCodeCmdImBenutzerInstallationspfadWennCodeExeFehlt()
     {
         var localAppData = _tempDirectoryFixture.CreateTempDirectory("vscode_locator_localappdata");
-        var executable = Path.Combine(localAppData, "Programs", "Microsoft VS Code", "Code.exe");
+        var executable = Path.Combine(localAppData, "Programs", "Microsoft VS Code", "bin", "code.cmd");
         Directory.CreateDirectory(Path.GetDirectoryName(executable)!);
         File.WriteAllText(executable, string.Empty);
         var locator = CreateLocator(new Dictionary<string, string?>
