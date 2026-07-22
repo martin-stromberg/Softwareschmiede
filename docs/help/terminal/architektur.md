@@ -267,5 +267,5 @@ ViewModel.PseudoConsoleSessionGestartet += session =>
 - **Speicherverbrauch:** 1000-Zeilen-Scrollback × Spaltenanzahl × `TerminalCell`-Größe (ca. 30 Bytes). Bei 120 Spalten: ~3.6 MB.
 - **CPU-Last:** Rendering per `DrawingContext` ist effizient; Parser läuft on-demand (Byte-basiert).
 - **Hängende Prozesse:** Keine speziellen Timeouts; `Process.Exited`-Event ist Source of Truth.
-- **CLI-Protokollierung:** `CliOutputProtokollWriter.QueueCapacity` begrenzt die ausstehenden Ausgabezeilen auf 4096. Der Abschluss ist idempotent und kann über `CompleteAsync(timeout)` begrenzt auf die Persistenz bereits angenommener Zeilen warten.
+- **CLI-Protokollierung:** `CliOutputProtokollWriter.QueueCapacity` begrenzt die ausstehenden Ausgabezeilen auf 4096. Der Abschluss ist idempotent, synchronisiert sich mit einer aktiven Producer-Queue-Phase und kann über `CompleteAsync(timeout)` begrenzt auf die Persistenz bereits angenommener Zeilen warten.
 - **Windows-Versionen:** Erfordert Windows 10 Build 17763+; kein Fallback auf ältere Versionen.

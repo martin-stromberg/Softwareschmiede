@@ -52,7 +52,7 @@ Beteiligte Komponenten:
 7. Beim Ende der Leseschleife ruft `PseudoConsoleSession` `outputSink.Complete()` auf; beim Prozess-Cleanup ruft `KiAusfuehrungsService` zusätzlich `CompleteAsync(...)` mit Timeout auf.
 8. Persistenzfehler werden geloggt. Sie beenden weder Prozess noch Terminal-Rendering.
 
-**Hinweis:** Der drainbare Abschluss wartet auf bereits angenommene Queue-Einträge. Ein verbleibender bekannter Race-Fall bei voller Queue und parallelem `CompleteAsync` ist als Nacharbeit dokumentiert: Zeilen aus einem bereits dekodierten, aber noch nicht vollständig gequeuten Chunk können im Abschlussrennen verloren gehen.
+**Hinweis:** Der drainbare Abschluss wartet auf bereits angenommene Queue-Einträge. Die Queue-Phase eines aktiven `OnOutputChunk(...)` ist mit dem Abschluss synchronisiert: `CompleteAsync(...)` schliesst den Channel erst, nachdem bereits dekodierte Zeilen aus einem laufenden Chunk vollständig gequeut wurden.
 
 ### 2. Zeilenvorschub-Normalisierung in der Textverarbeitung
 

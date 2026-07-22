@@ -471,7 +471,7 @@ public interface IKiPlugin : IPlugin { /* AI operations */ }
 
 ### Architekturbezug: Automatische CLI-Ausgabeprotokollierung
 
-ConPTY-gestartete KI-CLI-Sitzungen schreiben ihre Ausgabe automatisch in das aufgabenbezogene Protokoll. `PseudoConsoleSession` erfasst den Terminal-Output UI-unabhängig in der Session-Leseschleife; `KiAusfuehrungsService` bindet dafür pro Aufgabe einen `CliOutputProtokollWriter` an. Der Writer rekonstruiert Ausgabezeilen über Chunk-Grenzen hinweg, persistiert sie über den bestehenden `ProtokollService.AddCliOutputAsync`-Pfad als `CliOutput` und entkoppelt Terminal-Rendering und Datenbankzugriff über eine bounded Queue mit Backpressure.
+ConPTY-gestartete KI-CLI-Sitzungen schreiben ihre Ausgabe automatisch in das aufgabenbezogene Protokoll. `PseudoConsoleSession` erfasst den Terminal-Output UI-unabhängig in der Session-Leseschleife; `KiAusfuehrungsService` bindet dafür pro Aufgabe einen `CliOutputProtokollWriter` an. Der Writer rekonstruiert Ausgabezeilen über Chunk-Grenzen hinweg, persistiert sie über den bestehenden `ProtokollService.AddCliOutputAsync`-Pfad als `CliOutput` und entkoppelt Terminal-Rendering und Datenbankzugriff über eine bounded Queue mit Backpressure. Der Abschluss ist mit aktiven Queue-Phasen synchronisiert, damit ein paralleles `CompleteAsync(...)` keine bereits dekodierten Zeilen verwirft.
 
 ### Architekturbezug: Absturzstabilisierung (Stabilität & Fehlerbehandlung)
 

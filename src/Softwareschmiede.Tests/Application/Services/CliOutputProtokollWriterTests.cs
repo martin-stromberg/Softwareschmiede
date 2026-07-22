@@ -1,11 +1,13 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Infrastructure.Data;
 using System.Text;
 
 namespace Softwareschmiede.Tests.Application.Services;
@@ -105,13 +107,108 @@ public sealed class CliOutputProtokollWriterTests
         await sut.CompleteAsync(TimeSpan.FromSeconds(5));
     }
 
-    private static ServiceProvider CreateCliOutputServiceProvider()
+    /// <summary>CompleteAsync schliesst den Channel nicht, solange ein Chunk noch Zeilen in die volle Queue schreibt.</summary>
+    [Fact]
+    public async Task CompleteAsync_BackpressureWaerendAktivemChunk_VerliertKeineDekodiertenZeilen()
+    {
+        var saveBlocker = new BlockingSaveChangesInterceptor();
+        await using var provider = CreateCliOutputServiceProvider(saveBlocker);
+        var aufgabeId = Guid.NewGuid();
+        var queueFullLogged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loggerMock = new Mock<ILogger<CliOutputProtokollWriter>>();
+        loggerMock
+            .Setup(l => l.Log(
+                It.Is<LogLevel>(lvl => lvl == LogLevel.Warning),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("ist voll", StringComparison.Ordinal)),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
+            .Callback(() => queueFullLogged.TrySetResult());
+
+        var sut = new CliOutputProtokollWriter(
+            aufgabeId,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            loggerMock.Object);
+        var expectedLines = Enumerable.Range(0, CliOutputProtokollWriter.QueueCapacity + 20)
+            .Select(i => $"zeile {i}")
+            .ToArray();
+        var output = string.Concat(expectedLines.Select(line => line + "\n"));
+
+        var writeTask = Task.Run(() => sut.OnOutputChunk(Encoding.UTF8.GetBytes(output)));
+
+        await saveBlocker.FirstSaveStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        var queueFull = await Task.WhenAny(queueFullLogged.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        queueFull.Should().Be(queueFullLogged.Task, "der Test muss einen vollen Channel und einen blockierten Producer erreichen");
+        writeTask.IsCompleted.Should().BeFalse("OnOutputChunk muss noch Zeilen aus dem bereits dekodierten Chunk queuen");
+
+        var cleanupTask = Task.Run(() => sut.CompleteAsync(TimeSpan.FromMilliseconds(100)));
+        await cleanupTask.WaitAsync(TimeSpan.FromSeconds(5));
+        writeTask.IsCompleted.Should().BeFalse("der Timeout-Cleanup darf den Channel nicht schliessen, waehrend der Producer noch schreibt");
+
+        saveBlocker.Release();
+
+        await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(10));
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var persistedLines = db.Protokolleintraege
+            .AsNoTracking()
+            .Where(e => e.AufgabeId == aufgabeId && e.Typ == ProtokollTyp.CliOutput)
+            .OrderBy(e => e.Zeitstempel)
+            .Select(e => e.Inhalt)
+            .ToList();
+
+        persistedLines.Should().Equal(expectedLines);
+    }
+
+    private static ServiceProvider CreateCliOutputServiceProvider(params IInterceptor[] interceptors)
     {
         var databaseName = Guid.NewGuid().ToString();
         return new ServiceCollection()
-            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(databaseName))
+            .AddDbContext<SoftwareschmiededDbContext>(options =>
+            {
+                options.UseInMemoryDatabase(databaseName);
+                if (interceptors.Length > 0)
+                    options.AddInterceptors(interceptors);
+            })
             .AddScoped<ProtokollService>()
             .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance)
             .BuildServiceProvider();
+    }
+
+    private sealed class BlockingSaveChangesInterceptor : SaveChangesInterceptor
+    {
+        private readonly TaskCompletionSource _firstSaveStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ManualResetEventSlim _release = new(false);
+        private int _blockFirstSave = 1;
+
+        public Task FirstSaveStarted => _firstSaveStarted.Task;
+
+        public void Release() => _release.Set();
+
+        public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
+        {
+            BlockFirstSave();
+            return result;
+        }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            BlockFirstSave(cancellationToken);
+            return new ValueTask<InterceptionResult<int>>(result);
+        }
+
+        private void BlockFirstSave(CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Exchange(ref _blockFirstSave, 0) != 1)
+                return;
+
+            _firstSaveStarted.SetResult();
+            _release.Wait(cancellationToken);
+        }
     }
 }
