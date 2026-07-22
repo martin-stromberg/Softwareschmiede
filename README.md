@@ -61,7 +61,7 @@ Die wichtigsten Features:
 - **Projekt- und Aufgabenverwaltung** – Dashboard, Statusmodell und chronologisches Aufgabenprotokoll
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI und Codex CLI mit Echtzeit-Streaming der Ausgabe
-- **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht
+- **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
 - **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen und anschließend der Aufgabe zuordnen
@@ -162,7 +162,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
 3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen und das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen).
 4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
-5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt).
+5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt). Die eingebettete CLI-Konsole zeigt laufende Ausgabe mit vertikaler Scrollbar, Mausrad/Page-/Line-Scroll, 1000-Zeilen-Scrollback und Auto-Follow, solange Sie am Ende der Ausgabe bleiben.
 6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 7. **Commits durchführen**, Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst. Alternativ Aufgabe abbrechen.
 
@@ -472,6 +472,8 @@ public interface IKiPlugin : IPlugin { /* AI operations */ }
 ### Architekturbezug: Automatische CLI-Ausgabeprotokollierung
 
 ConPTY-gestartete KI-CLI-Sitzungen schreiben ihre Ausgabe automatisch in das aufgabenbezogene Protokoll. `PseudoConsoleSession` erfasst den Terminal-Output UI-unabhängig in der Session-Leseschleife; `KiAusfuehrungsService` bindet dafür pro Aufgabe einen `CliOutputProtokollWriter` an. Der Writer rekonstruiert Ausgabezeilen über Chunk-Grenzen hinweg, persistiert sie über den bestehenden `ProtokollService.AddCliOutputAsync`-Pfad als `CliOutput` und entkoppelt Terminal-Rendering und Datenbankzugriff über eine bounded Queue mit Backpressure. Der Abschluss ist mit aktiven Queue-Phasen synchronisiert, damit ein paralleles `CompleteAsync(...)` keine bereits dekodierten Zeilen verwirft.
+
+Die sichtbare CLI-Konsole nutzt denselben Terminal-Buffer mit begrenztem Scrollback: Bis zu 1000 ältere Zeilen bleiben per vertikaler Scrollbar, Mausrad und Page-/Line-Scroll erreichbar. Solange die Ansicht am Ende steht, folgt sie neuer Ausgabe automatisch; nach manuellem Hochscrollen bleibt die Position stabil.
 
 ### Architekturbezug: Absturzstabilisierung (Stabilität & Fehlerbehandlung)
 

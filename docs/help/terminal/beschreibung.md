@@ -14,6 +14,8 @@ Die Leseschleife läuft unabhängig vom `TerminalControl`-Lebenszyklus in `Pseud
 
 Die Aufgabendetailansicht zeigt den Laufzeitstatus der CLI in der Fusszeile. `PseudoConsoleSession` verfolgt dafür die letzte Ausgabe- und Eingabeaktivität: Frische I/O-Aktivität wird als laufende Ausführung angezeigt (`Laeuft`); bleibt Ausgabe bei weiterhin laufendem Prozess aus, wird nach kurzer Zeit "Wartet auf Eingabe" angezeigt (`WartetAufEingabe`).
 
+Die CLI-Ausgabe ist vertikal scrollbar. `TerminalBuffer` hält dafür bis zu 1000 Scrollback-Zeilen vor; `TerminalControl` stellt den Verlauf zeilenbasiert über den WPF-`ScrollViewer` bereit. Anwender können ältere Ausgaben per Scrollbar, Mausrad oder Page-Scroll lesen. Solange die Ansicht am Ende steht, folgt sie neuer Ausgabe automatisch; nach manuellem Hochscrollen bleibt die Leseposition stabil. Der Eingabefokus bleibt dabei auf dem Terminalbereich, sodass Tastatureingaben und Zwischenablage-Einfügungen weiterhin an die aktive CLI gehen.
+
 ### Prozess-Lifecycle
 
 1. `KiAusfuehrungsService.StartWithPseudoConsoleAsync` erstellt eine Pseudo Console mit `CreatePseudoConsole` API.
@@ -23,7 +25,7 @@ Die Aufgabendetailansicht zeigt den Laufzeitstatus der CLI in der Fusszeile. `Ps
 5. `TaskDetailViewModel.PseudoConsoleSessionGestartet`-Event propagiert die Session an `TaskDetailView`.
 6. `TerminalControl.Session`-Property wird gesetzt; Control abonniert das `BufferChanged`-Event der Session.
 7. `TerminalControl.OnBufferChanged` wird aufgerufen, wenn neue Ausgabe verarbeitet wurde, und triggert `InvalidateVisual()`.
-8. `TerminalControl.OnRender` rendert aktuellen `TerminalBuffer`-Inhalt per `DrawingContext`.
+8. `TerminalControl.OnRender` rendert den anhand des Scroll-Offsets sichtbaren Ausschnitt aus Scrollback und aktuellem `TerminalBuffer`-Grid per `DrawingContext`.
 9. `TaskDetailViewModel.CliStatusText` aktualisiert die Fusszeile bei Laufzeitstatus-Änderungen der Session (Event `RuntimeStatusChanged`).
 
 ### Aufgabenprotokollierung
@@ -42,21 +44,23 @@ Das `TerminalControl` passt Spalten- und Zeilenanzahl automatisch an verfügbare
 - Codex CLI mit voller Farbunterstützung (SGR 3-bit, 8-bit, 24-bit) interaktiv nutzen.
 - Tastatureingaben (Pfeiltasten, F1–F12, Ctrl+C) funktionieren nativ ohne Verzögerung.
 
-### Neuerungen: Buffer-Stabilitäts-Optimierung, Clipboard-Paste und Zeilenvorschub-Normalisierung
+### Neuerungen: Buffer-Stabilität, Scrollback-Anzeige, Clipboard-Paste und Zeilenvorschub-Normalisierung
 
 Das Terminal-System wurde mit mehreren Verbesserungen erweitert:
 
 1. **Buffer-Snapshot für stabiles Rendering:** Die Rendering-Engine nutzt jetzt `TerminalBuffer.GetSnapshot()`, eine Methode, die einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock erstellt. Dies verhindert Race Conditions zwischen paralleler CLI-Ausgabe und gleichzeitigen Render-Operationen — die Ausgabe bleibt stabil und vermischt sich nicht mehr bei schnellen, aufeinanderfolgenden CLI-Ausgaben.
 
-2. **Clipboard-Paste-Support:** Benutzer können nun mit **Ctrl+V** Text aus der Zwischenablage direkt in die CLI einfügen. Die Text-Eingabe wird zeilenweise normalisiert (alle Newline-Varianten → `\r`) und als UTF-8 kodiert, um mit Windows-Standard-Clipboard-Verhalten kompatibel zu sein.
+2. **Scrollbare CLI-Ausgabe:** Der Snapshot enthält Scrollback-Zeilen, Scrollback-Anzahl und Gesamtzeilenzahl. `TerminalControl` implementiert zeilenbasiertes Scrollen, sodass lange Ausgaben über vertikale Scrollbar, Mausrad und Page-Scroll erreichbar bleiben. Am Ende des Verlaufs folgt die Anzeige neuer Ausgabe automatisch; eine manuell hochgescrollte Position bleibt stabil.
 
-3. **Zeilenvorschub-Normalisierung:** Das Terminal behandelt Unix-Style Line Feeds (`\n`) jetzt identisch wie Windows-Style CRLF (`\r\n`) — beide erzeugen einen Zeilenvorschub **und** setzen die Cursor-Spalte auf 0. Dies verhindert den „Treppeneffekt", der entsteht, wenn Programme nur `\n` senden. Carriage Return (`\r`) allein wird weiterhin korrekt als Spalte-0-Rückkehr in der gleichen Zeile behandelt.
+3. **Clipboard-Paste-Support:** Benutzer können nun mit **Ctrl+V** Text aus der Zwischenablage direkt in die CLI einfügen. Die Text-Eingabe wird zeilenweise normalisiert (alle Newline-Varianten → `\r`) und als UTF-8 kodiert, um mit Windows-Standard-Clipboard-Verhalten kompatibel zu sein.
 
-4. **Screen-Clear mit vollständiger Bereinigung:** Der ESC-Befehl `ESC[2J` (Clear Entire Screen) leert nun nicht nur das sichtbare Terminal-Grid, sondern auch den internen Scrollback-Puffer — genau wie in echten Windows-Konsolen. Dies stellt sicher, dass der Bildschirmzustand nach dem Clear vollständig konsistent ist.
+4. **Zeilenvorschub-Normalisierung:** Das Terminal behandelt Unix-Style Line Feeds (`\n`) jetzt identisch wie Windows-Style CRLF (`\r\n`) — beide erzeugen einen Zeilenvorschub **und** setzen die Cursor-Spalte auf 0. Dies verhindert den „Treppeneffekt", der entsteht, wenn Programme nur `\n` senden. Carriage Return (`\r`) allein wird weiterhin korrekt als Spalte-0-Rückkehr in der gleichen Zeile behandelt.
 
-5. **Robustes Terminal-Resize:** Bei Verkleinerung des Terminals werden nun die **aktuellen (unteren) Zeilen** beibehalten und alte obere Zeilen in den Scrollback verschoben — der aktuelle Prompt/Cursor bleibt sichtbar am unteren Rand. Dies behebt das Problem, dass nach Verkleinerung veraltete alte Zeilen in die Anzeige rutschten.
+5. **Screen-Clear mit vollständiger Bereinigung:** Der ESC-Befehl `ESC[2J` (Clear Entire Screen) leert nun nicht nur das sichtbare Terminal-Grid, sondern auch den internen Scrollback-Puffer — genau wie in echten Windows-Konsolen. Dies stellt sicher, dass der Bildschirmzustand nach dem Clear vollständig konsistent ist.
 
-6. **Automatische CLI-Ausgabe-Protokollierung:** Terminal-Output wird nicht nur gerendert, sondern zeilenweise im aufgabenbezogenen Protokoll gespeichert. Dadurch bleibt die Ausgabe nach Abschluss, Unterbrechung oder erneutem Öffnen der Aufgabe nachvollziehbar.
+6. **Robustes Terminal-Resize:** Bei Verkleinerung des Terminals werden nun die **aktuellen (unteren) Zeilen** beibehalten und alte obere Zeilen in den Scrollback verschoben — der aktuelle Prompt/Cursor bleibt sichtbar am unteren Rand. Dies behebt das Problem, dass nach Verkleinerung veraltete alte Zeilen in die Anzeige rutschten.
+
+7. **Automatische CLI-Ausgabe-Protokollierung:** Terminal-Output wird nicht nur gerendert, sondern zeilenweise im aufgabenbezogenen Protokoll gespeichert. Dadurch bleibt die Ausgabe nach Abschluss, Unterbrechung oder erneutem Öffnen der Aufgabe nachvollziehbar.
 
 ## Einschränkungen
 

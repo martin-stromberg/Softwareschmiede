@@ -29,6 +29,8 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
     [SkippableFact]
     public void AufgabeStarten_KlontRepositoryUndStartetCli_E2E()
     {
+        new WindowsCredentialStore().DeleteCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory");
+
         var mainWindow = SetupProjectMitNeuerAufgabe(
             "AufgabeStarten-Repo",
             "AufgabeStarten-Projekt",

@@ -114,7 +114,7 @@ Beteiligte Komponenten:
 5. `TerminalControl.InvalidateVisual()` → erzwingt Neuzeichnung
 6. **Resultat:** Nach Verkleinerung sieht Benutzer den aktuellen Prompt/Cursor am unteren Rand, nicht veraltete alte Zeilen oben
 
-### 5. Terminal-Rendering-Loop mit Buffer-Snapshot (Leseschleife läuft in der Session, nicht im Control)
+### 5. Terminal-Rendering-Loop mit Buffer-Snapshot und Scrollback-Anzeige (Leseschleife läuft in der Session, nicht im Control)
 
 Seit der Behebung von Issue-86 (parallele CLI-Ausführungen) läuft die Leseschleife nicht mehr im
 `TerminalControl`, sondern in `PseudoConsoleSession` selbst — ab Konstruktion der Session bis zu ihrem
@@ -123,7 +123,11 @@ CLI-Prozesse parallel weiter und puffern ihre Ausgabe, auch wenn die zugehörige
 angezeigt wird. `TerminalControl` ist ein reiner Renderer: Es abonniert `PseudoConsoleSession.BufferChanged`
 und zeichnet bei jedem Ereignis den aktuellen Bufferinhalt neu.
 
-**Stabilisierung durch Snapshot:** Um Race Conditions zwischen paralleler Ausgabe und Rendering zu vermeiden, erstellt `TerminalControl.OnRender()` einen konsistenten Snapshot des Buffer-Zustands über `TerminalBuffer.GetSnapshot()`, die unter einem einzigen Lock Grid, Cursor und Größe kopiert. Dies verhindert, dass Render-Operationen durch gleichzeitige Buffer-Updates gestört werden.
+**Stabilisierung durch Snapshot:** Um Race Conditions zwischen paralleler Ausgabe und Rendering zu vermeiden, erstellt `TerminalControl.OnRender()` einen konsistenten Snapshot des Buffer-Zustands über `TerminalBuffer.GetSnapshot()`, die unter einem einzigen Lock Grid, Scrollback-Zeilen, Cursor und Größe kopiert. Dies verhindert, dass Render-Operationen durch gleichzeitige Buffer-Updates gestört werden.
+
+**Scrollback-Anzeige:** `TerminalControl` ist in der Aufgabendetailansicht in einen vertikalen `ScrollViewer` eingebettet und implementiert `IScrollInfo`. Die Scroll-Einheiten sind Terminalzeilen: Mausrad, Scrollbar, Line-Scroll und Page Up/Page Down verschieben den sichtbaren Ausschnitt über den logischen Verlauf aus Scrollback-Zeilen plus aktuellem Grid. Der Scrollback ist auf `TerminalBuffer.MaxScrollbackLines` begrenzt, aktuell 1000 Zeilen.
+
+**Auto-Follow:** Solange der vertikale Offset am Ende des Verlaufs steht, setzt das Control den Offset bei neuer Ausgabe wieder auf das neue Ende. Wird manuell nach oben gescrollt, bleibt der Offset stabil und wird nur geklemmt, wenn alte Scrollback-Zeilen wegen der 1000-Zeilen-Grenze aus dem Ringpuffer fallen. Klicks in die Terminalfläche fokussieren weiterhin `TerminalControl`; Klicks auf die Scrollbar werden nicht als Terminalfokus-Eingriff behandelt.
 
 Beteiligte Komponenten:
 - `TaskDetailView.xaml.cs` — empfängt `OnPseudoConsoleSessionGestartet(session)`
@@ -131,9 +135,10 @@ Beteiligte Komponenten:
 - `PseudoConsoleSession.ReadLoopAsync` — liest bytes aus `OutputStream`, läuft ab Konstruktion der Session
 - `AnsiSequenceParser.Parse` — zerlegt Bytes in `TerminalEvent`-Instanzen
 - `TerminalBuffer.Apply` — wendet Events auf Grid an (Schreiben, Cursor-Bewegung, Farben, Erase), synchronisiert via `lock`
-- `TerminalBuffer.GetSnapshot()` — erstellt konsistenten Snapshot unter Lock für sichere Render-Operationen
+- `TerminalBuffer.GetSnapshot()` — erstellt konsistenten Snapshot unter Lock für sichere Render- und Scroll-Operationen
 - `PseudoConsoleSession.BufferChanged` — Event, das nach jeder verarbeiteten Ausgabe gefeuert wird
-- `TerminalControl.OnBufferChanged` / `TerminalControl.OnRender` — rendert über Snapshot-Daten per `DrawingContext`
+- `TerminalControl.OnBufferChanged` / `TerminalControl.OnRender` — aktualisiert Scroll-Informationen und rendert über Snapshot-Daten per `DrawingContext`
+- `TerminalControl.IScrollInfo` — meldet `ExtentHeight`, `ViewportHeight` und `VerticalOffset` an den umgebenden `ScrollViewer`
 
 **Detailschritte:**
 
@@ -143,6 +148,7 @@ Beteiligte Komponenten:
    - Deregistriert den `BufferChanged`-Handler der zuvor gebundenen Session (falls vorhanden).
    - Übernimmt `session.Buffer` als eigene `_buffer`-Referenz und passt dessen Größe an die aktuellen Pixel-Dimensionen an.
    - Registriert `OnBufferChanged` auf `session.BufferChanged`.
+   - Setzt den Scrollzustand auf Follow-End, damit vorhandene Ausgabe der neuen Session am aktuellen Ende sichtbar ist.
    - Ruft `InvalidateVisual()` für die initiale Darstellung des bereits vorhandenen Bufferinhalts auf.
 4. In `PseudoConsoleSession.ReadLoopAsync` (läuft unabhängig weiter, auch ohne gebundenes Control):
    - `await OutputStream.ReadAsync(buffer)` liest bytes
@@ -153,11 +159,12 @@ Beteiligte Komponenten:
 5. `TerminalControl.OnBufferChanged` ruft `Dispatcher.InvokeAsync(InvalidateVisual)` auf.
 6. `TerminalControl.OnRender(DrawingContext dc)`:
    - Misst Zellenbreite/-höhe aus Schriftgröße (Consolas 13pt)
-   - **Neu:** Ruft `buffer.GetSnapshot()` auf, um einen konsistenten Snapshot unter Lock zu erhalten
-   - Iteriert über sichtbare Zeilen im Snapshot-Grid
+   - Ruft `buffer.GetSnapshot()` auf, um einen konsistenten Snapshot unter Lock zu erhalten
+   - Berechnet den sichtbaren Startindex aus `VerticalOffset`, `ScrollbackCount`, `TotalRows` und der aktuellen Viewport-Zeilenanzahl
+   - Iteriert über die sichtbaren Zeilen aus Scrollback und aktuellem Snapshot-Grid
    - Zeichnet Hintergrund-Rechtecke für jede Zelle
    - Zeichnet Vordergrund-Text (`FormattedText`) mit Font-Attributen
-   - Rendert Cursor-Rechteck bei Snapshot-CursorRow/CursorCol
+   - Rendert das Cursor-Rechteck nur, wenn die logische Cursor-Zeile im sichtbaren Ausschnitt liegt
 
 ### 6. Tastatureingabe
 
