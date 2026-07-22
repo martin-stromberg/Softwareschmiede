@@ -8,13 +8,14 @@ namespace Softwareschmiede.Tests.Helpers;
 public static class TestPseudoConsoleSessionFactory
 {
     /// <summary>Erstellt eine Session mit No-Op-PseudoConsole und aktuellem Testprozess.</summary>
-    public static PseudoConsoleSession Create(Stream inputStream, Stream outputStream, ILogger? logger = null)
+    public static PseudoConsoleSession Create(Stream inputStream, Stream outputStream, ILogger? logger = null, ITerminalOutputSink? outputSink = null)
         => new(
             NullPseudoConsoleHandle.Instance,
             Process.GetCurrentProcess(),
             inputStream,
             outputStream,
-            logger);
+            logger,
+            outputSink);
 
     /// <summary>Erstellt eine Session mit kontrollierbarer Zeitquelle und No-Op-PseudoConsole.</summary>
     public static PseudoConsoleSession Create(
@@ -22,7 +23,8 @@ public static class TestPseudoConsoleSessionFactory
         Stream outputStream,
         TimeProvider timeProvider,
         TimeSpan waitingThreshold,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        ITerminalOutputSink? outputSink = null)
         => new(
             NullPseudoConsoleHandle.Instance,
             Process.GetCurrentProcess(),
@@ -30,5 +32,6 @@ public static class TestPseudoConsoleSessionFactory
             outputStream,
             timeProvider,
             waitingThreshold,
-            logger);
+            logger,
+            outputSink);
 }

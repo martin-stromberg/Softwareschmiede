@@ -9,6 +9,7 @@ public interface IPseudoConsoleProcessLauncher
     /// <param name="aufgabeId">ID der Aufgabe (für Logging).</param>
     /// <param name="effectiveWorkingDirectory">Effektives Arbeitsverzeichnis des Prozesses.</param>
     /// <param name="pluginCommand">Der später an die Sitzung zu sendende Plugin-Befehl (nur für Logging verwendet).</param>
+    /// <param name="outputSink">Optionale Senke für Terminal-Ausgabe.</param>
     /// <returns>Den gestarteten <see cref="Process"/>, die zugehörige <see cref="PseudoConsoleSession"/> und das native Prozess-Handle für eine zuverlässige Exit-Code-Ermittlung (<see cref="IntPtr.Zero"/>, wenn nicht zutreffend).</returns>
-    (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand);
+    (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand, ITerminalOutputSink? outputSink = null);
 }

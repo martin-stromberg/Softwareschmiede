@@ -4,7 +4,7 @@
 
 ## Übersicht
 
-Das Terminal-System exponiert drei öffentliche Schnittstellen: die `PseudoConsoleSession` zum Starten und Steuern von Prozessen, die `TerminalControl` als WPF-Rendering-Component und das `PseudoConsoleSessionGestartet`-Event zum Lifecycle-Management.
+Das Terminal-System exponiert die `PseudoConsoleSession` zum Starten und Steuern von Prozessen, die `TerminalControl` als WPF-Rendering-Component, das `PseudoConsoleSessionGestartet`-Event zum Lifecycle-Management und optionale Output-Senken für die UI-unabhängige Weiterverarbeitung gelesener Terminalausgaben.
 
 ## PseudoConsoleSession
 
@@ -25,6 +25,8 @@ Koordiniert einen Pseudo Console-Prozess, Input-Pipe und Output-Pipe.
 #### `BufferChanged`
 
 Wird nach jeder erfolgreichen Verarbeitung eines Ausgabe-Chunks durch die interne Leseschleife (`ReadLoopAsync`) ausgelöst. Die Leseschleife läuft ab Konstruktion der Session bis zu ihrem `Dispose()` unabhängig vom Lebenszyklus eines gebundenen `TerminalControl` — mehrere CLI-Prozesse können dadurch parallel weiterlaufen und puffern, auch wenn ihre Aufgabenseite gerade nicht angezeigt wird (Issue-86).
+
+Wenn die Session mit einer `ITerminalOutputSink` konstruiert wurde, meldet die Leseschleife denselben Chunk vor der ANSI-Parser-Verarbeitung an die Senke. Das `BufferChanged`-Event bleibt ausschließlich das Rendering-Signal.
 
 **Typ:** `EventHandler?`
 
@@ -88,7 +90,7 @@ session.MarkInputActivity();
 
 #### `Dispose()`
 
-Schließt alle Ressourcen: HPCON-Handle, Input-Pipe, Output-Pipe. Bricht die interne Leseschleife (`ReadLoopAsync`) ab, wartet mit 5-Sekunden-Timeout auf deren Beendigung und schließt danach die Streams. Der Prozess wird **nicht** beendet (muss über `Process.Kill()` manuell beendet werden, falls erforderlich).
+Schließt alle Ressourcen: HPCON-Handle, Input-Pipe, Output-Pipe. Bricht die interne Leseschleife (`ReadLoopAsync`) ab und schließt danach die Streams. Der Prozess wird **nicht** beendet (muss über `Process.Kill()` manuell beendet werden, falls erforderlich). Eine angebundene Output-Senke wird durch die Leseschleife idempotent abgeschlossen; der Service-Cleanup kann zusätzlich `CompleteAsync(...)` aufrufen, um begrenzt auf Persistenz zu warten.
 
 **Beispiel:**
 ```csharp
@@ -271,6 +273,8 @@ Startet einen KI-CLI-Prozess über die Pseudo Console API.
 
 **Rückgabe:** `Task<CliProcessHandle>`
 
+**Output-Protokollierung:** Für ConPTY-Starts erzeugt der Service einen `CliOutputProtokollWriter`, reicht ihn als `ITerminalOutputSink` an den Launcher weiter und hält ihn im `CliProcessHandle.OutputSink`. Der Writer speichert Ausgabezeilen über `ProtokollService.AddCliOutputAsync` als `ProtokollTyp.CliOutput`.
+
 **Exceptions:**
 - `InvalidOperationException`: `CreatePseudoConsole` fehlgeschlagen oder Plugin-Fehler
 
@@ -342,6 +346,36 @@ Wird gefeuert, wenn der Prozess seine Zustand ändert (z.B. startet, stoppt, feh
 **EventArgs:**
 - `AufgabeId`: Betroffene Aufgaben-ID
 - `Status`: Neuer Status (Gestartet, Gestoppt, Fehler)
+
+## ITerminalOutputSink
+
+Optionale Schnittstelle für rohe Terminal-Ausgaben einer `PseudoConsoleSession`.
+
+### Methoden
+
+#### `OnOutputChunk(ReadOnlySpan<byte> bytes)`
+
+Wird durch `PseudoConsoleSession.ReadLoopAsync` für jeden gelesenen Output-Chunk aufgerufen. Implementierungen müssen die benötigten Bytes sofort kopieren, weil der Lesepuffer wiederverwendet wird.
+
+#### `Complete()`
+
+Schließt die Senke idempotent ab und flusht ausstehende Restdaten. Diese Methode darf mehrfach aufgerufen werden.
+
+#### `CompleteAsync(TimeSpan timeout, CancellationToken ct = default)`
+
+Schließt die Senke ab und wartet begrenzt auf die Persistenz bereits angenommener Daten.
+
+## CliOutputProtokollWriter
+
+Implementiert `ITerminalOutputSink` für Aufgabenläufe.
+
+| Merkmal | Verhalten |
+|---------|-----------|
+| Zuordnung | Ein Writer gehört genau zu einer `aufgabeId` |
+| Zeilenbildung | `CliOutputLineAccumulator` dekodiert UTF-8 über Chunk-Grenzen und trennt auf LF, CRLF und einzelnes CR |
+| Queue | Bounded Channel mit `QueueCapacity = 4096`; bei voller Queue wartet der Output-Reader auf freie Kapazität |
+| Persistenz | Hintergrund-Worker schreibt sequenziell über `ProtokollService.AddCliOutputAsync` |
+| Fehler | Persistenzfehler werden geloggt und nicht in die Terminal-Session zurückgeworfen |
 
 ## AnsiSequenceParser
 

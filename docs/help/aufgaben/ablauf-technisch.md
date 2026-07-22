@@ -83,10 +83,12 @@ Ablauf:
    - Repository wird geklont in `{workdir}/softwareschmiede/{aufgabeId}`
    - Branch wird erstellt oder checked out; ohne `IssueReferenz` wird ein Branch im Format `task/{aufgabe.Id:N}-{slug}` erzeugt, mit Issue-Nummer im Format `task/issue-{nummer}-{aufgabe.Id:N}-{slug}`
    - Status wird auf `Gestartet` gesetzt (nicht zwischendurch auf andere Status)
-8. `KiAusfuehrungsService.StartCliAsync(aufgabeId, kiPluginPrefix)` wird aufgerufen:
+8. `KiAusfuehrungsService.StartCliAsync(aufgabeId, kiPluginPrefix)` startet intern den ConPTY-Pfad über `StartWithPseudoConsoleAsync`:
    - KI-Plugin wird geladen
    - `IKiPlugin.StartCliAsync` liefert `ProcessStartInfo`
-   - `Process.Start()` startet den nativen Prozess
+   - `KiAusfuehrungsService` erzeugt einen `CliOutputProtokollWriter` für die Aufgabe
+   - `IPseudoConsoleProcessLauncher.Start(..., outputSink)` startet den nativen Prozess und erstellt die `PseudoConsoleSession`
+   - Die Session meldet gelesene Terminal-Output-Chunks an den Writer; dieser speichert Ausgabezeilen als `ProtokollTyp.CliOutput`
    - Event `CliProcessStatusChanged` → `IsCliRunning = true`
    - `CliProcessManager.OnCliProcessStatusChanged` (ebenfalls auf das Event abonniert) startet den
      30s-Heartbeat-Timer **und** persistiert sofort `Aufgabe.AktiveRunId` (neue Lauf-ID) sowie
@@ -132,6 +134,26 @@ Ablauf:
 - **Mit Arbeitsverzeichnis:** `issue.md` und `.gitignore`-Eintrag liegen im konfigurierten Arbeitsverzeichnis (z.B. `<Klon>/backend/`), damit Datei und ihr Ignore-Eintrag zusammen sind.
 
 Die Dateien `issue.md` und `.gitignore`-Eintrag sind lokale Dateien und gehören nicht zum VCS. Sie unterstützen den Entwickler, indem sie die Aufgabeninformationen verfügbar machen, ohne sie im Repository zu committen.
+
+### 0.4. CLI-Ausgaben automatisch im Aufgabenprotokoll speichern
+
+Beteiligte Komponenten:
+- `KiAusfuehrungsService.StartWithPseudoConsoleAsync` — erzeugt den aufgabenbezogenen Output-Writer und hält ihn im Prozess-Handle
+- `IPseudoConsoleProcessLauncher.Start(..., outputSink)` — reicht die optionale Senke an die `PseudoConsoleSession` weiter
+- `PseudoConsoleSession.ReadLoopAsync` — meldet gelesene Output-Bytes vor der ANSI-Verarbeitung an die Senke
+- `CliOutputLineAccumulator` — dekodiert UTF-8 über Chunk-Grenzen und bildet Protokollzeilen
+- `CliOutputProtokollWriter` — queued Zeilen bounded und persistiert sie sequenziell
+- `ProtokollService.AddCliOutputAsync` — speichert `ProtokollTyp.CliOutput` und erkennt Rate-Limit-Marker
+
+Ablauf:
+1. Beim ConPTY-Start wird ein `CliOutputProtokollWriter` mit der aktuellen `aufgabeId` erstellt.
+2. Die `PseudoConsoleSession` liest Output weiter unabhängig vom `TerminalControl`; jeder Chunk wird an `OnOutputChunk` gemeldet.
+3. Der Writer dekodiert die Bytes als UTF-8 und trennt Zeilen auf LF, CRLF und einzelnem CR.
+4. Abgeschlossene Zeilen landen in einer bounded Queue. Bei voller Queue wartet der Output-Reader, bis der Hintergrund-Worker wieder Kapazität schafft.
+5. Der Hintergrund-Worker schreibt Zeilen in Stream-Reihenfolge über `ProtokollService.AddCliOutputAsync`.
+6. Beim Prozessende oder Cleanup wird die Senke idempotent abgeschlossen; `CompleteAsync` wartet begrenzt auf bereits angenommene Queue-Einträge.
+
+Die Protokollierung ist UI-unabhängig. Neue `CliOutput`-Einträge müssen nicht live in der Info-Ansicht auftauchen; nach erneutem Laden der Aufgabe werden sie über den normalen Protokollabruf sichtbar.
 
 ### 0.5. Aufgabe anlegen und bearbeiten (Status: Neu)
 

@@ -25,7 +25,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
     }
 
     /// <inheritdoc/>
-    public (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand)
+    public (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand, ITerminalOutputSink? outputSink = null)
     {
         var workingDir = !string.IsNullOrEmpty(effectiveWorkingDirectory) && Directory.Exists(effectiveWorkingDirectory)
             ? effectiveWorkingDirectory
@@ -53,7 +53,8 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
             process,
             process.StandardInput.BaseStream,
             process.StandardOutput.BaseStream,
-            _loggerFactory.CreateLogger<PseudoConsoleSession>());
+            _loggerFactory.CreateLogger<PseudoConsoleSession>(),
+            outputSink);
 
         return (process, session, IntPtr.Zero);
     }

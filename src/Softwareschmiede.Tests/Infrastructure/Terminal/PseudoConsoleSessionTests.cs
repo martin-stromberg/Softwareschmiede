@@ -207,6 +207,26 @@ public sealed class PseudoConsoleSessionTests
             "der Bufferinhalt muss zum Zeitpunkt des BufferChanged-Events bereits vollständig angewendet sein");
     }
 
+    /// <summary>Die Leseschleife meldet gelesene Rohbytes an die optionale Output-Senke und aktualisiert den
+    /// Terminal-Buffer weiterhin wie bisher.</summary>
+    [Fact]
+    public void ReadLoopAsync_MeldetOutputChunksAnSink_UndAktualisiertBufferWeiterhin()
+    {
+        var sink = new CapturingOutputSink();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            new MemoryStream(),
+            new FixedContentStream("HELLO"),
+            outputSink: sink);
+        var bufferChanged = new ManualResetEventSlim(false);
+
+        session.BufferChanged += (_, _) => bufferChanged.Set();
+
+        bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
+        sink.Output.Should().Be("HELLO");
+        sink.IsCompleted.Should().BeTrue("die Senke muss beim Ende der Leseschleife abgeschlossen werden");
+        session.Buffer.GetRow(0)[0].Character.Should().Be('H');
+    }
+
     private static Task GetReadLoopTask(PseudoConsoleSession session)
     {
         var field = typeof(PseudoConsoleSession).GetField("_readLoopTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -216,6 +236,27 @@ public sealed class PseudoConsoleSessionTests
     private static PseudoConsoleSession CreateSession(Stream outputStream, ILogger? logger = null)
     {
         return TestPseudoConsoleSessionFactory.Create(new MemoryStream(), outputStream, logger);
+    }
+
+    private sealed class CapturingOutputSink : ITerminalOutputSink
+    {
+        private readonly MemoryStream _output = new();
+
+        public string Output => System.Text.Encoding.UTF8.GetString(_output.ToArray());
+
+        public bool IsCompleted { get; private set; }
+
+        public void OnOutputChunk(ReadOnlySpan<byte> bytes)
+            => _output.Write(bytes);
+
+        public void Complete()
+            => IsCompleted = true;
+
+        public Task CompleteAsync(TimeSpan timeout, CancellationToken ct = default)
+        {
+            Complete();
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>Stream, der beim Lesevorgang eine Exception wirft (z. B. simulierter Pipe-Fehler).</summary>
