@@ -1,7 +1,10 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
+using Softwareschmiede.App.Controls;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Infrastructure.Terminal;
 
@@ -88,6 +91,41 @@ public sealed partial class TaskDetailView : UserControl
             TerminalConsole.Focus();
             Keyboard.Focus(TerminalConsole);
         }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+    }
+
+    private void OnTerminalScrollViewerPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!ShouldFocusTerminalFromScrollViewerMouseSource(e.OriginalSource))
+            return;
+
+        TerminalConsole.Focus();
+        Keyboard.Focus(TerminalConsole);
+    }
+
+    internal static bool ShouldFocusTerminalFromScrollViewerMouseSource(object? originalSource)
+    {
+        var current = originalSource as DependencyObject;
+        while (current is not null)
+        {
+            if (current is ScrollBar)
+                return false;
+
+            current = GetDependencyParent(current);
+        }
+
+        return true;
+    }
+
+    private static DependencyObject? GetDependencyParent(DependencyObject current)
+    {
+        if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+        {
+            var visualParent = VisualTreeHelper.GetParent(current);
+            if (visualParent is not null)
+                return visualParent;
+        }
+
+        return LogicalTreeHelper.GetParent(current);
     }
 
     /// <summary>Setzt die im TerminalControl angezeigte Sitzung und legt deren Prozess-ID zu Testzwecken als AutomationProperties.HelpText ab (siehe E2E_TaskWechselUeberMenue).</summary>

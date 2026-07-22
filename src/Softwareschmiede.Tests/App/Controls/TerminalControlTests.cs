@@ -1,4 +1,7 @@
 using System.Reflection;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Threading;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -188,6 +191,161 @@ public sealed partial class TerminalControlTests
         });
     }
 
+    /// <summary>TerminalControl stellt dem umgebenden ScrollViewer zeilenbasierte Scrollinformationen bereit.</summary>
+    [Fact]
+    public void ScrollInfo_LangerVerlauf_MeldetExtentGroesserAlsViewport()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            WriteLines(session, 20);
+
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            scrollInfo.ExtentHeight.Should().BeGreaterThan(scrollInfo.ViewportHeight);
+            scrollInfo.VerticalOffset.Should().Be(scrollInfo.ScrollOwner?.ScrollableHeight ?? scrollInfo.ExtentHeight - scrollInfo.ViewportHeight);
+        });
+    }
+
+    /// <summary>SetVerticalOffset sowie Line-/Page-Scrollen klemmen den Offset auf den gültigen Bereich.</summary>
+    [Fact]
+    public void ScrollInfo_SetVerticalOffsetUndNavigation_KlemmenOffset()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            WriteLines(session, 20);
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            var maxOffset = scrollInfo.ExtentHeight - scrollInfo.ViewportHeight;
+
+            scrollInfo.SetVerticalOffset(-10);
+            scrollInfo.VerticalOffset.Should().Be(0);
+
+            scrollInfo.LineDown();
+            scrollInfo.VerticalOffset.Should().Be(1);
+
+            scrollInfo.PageDown();
+            scrollInfo.VerticalOffset.Should().BeGreaterThan(1);
+
+            scrollInfo.SetVerticalOffset(9999);
+            scrollInfo.VerticalOffset.Should().Be(maxOffset);
+
+            scrollInfo.LineUp();
+            scrollInfo.VerticalOffset.Should().Be(maxOffset - 1);
+        });
+    }
+
+    /// <summary>Wenn der Anwender am Ende steht, folgt der Scroll-Offset neuem Output automatisch ans neue Ende.</summary>
+    [Fact]
+    public void ScrollInfo_NeueAusgabeAmEnde_FolgtNeuemEnde()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            WriteLines(session, 8);
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            var oldOffset = scrollInfo.VerticalOffset;
+
+            WriteLines(session, 8);
+            InvokeUpdateScrollInfo(control);
+
+            scrollInfo.VerticalOffset.Should().BeGreaterThan(oldOffset);
+            scrollInfo.VerticalOffset.Should().Be(scrollInfo.ExtentHeight - scrollInfo.ViewportHeight);
+        });
+    }
+
+    /// <summary>Scrollt der Anwender manuell nach oben, bleibt der Offset bei neuer Ausgabe erhalten.</summary>
+    [Fact]
+    public void ScrollInfo_ManuellNachOben_NeueAusgabeErhaeltOffset()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            WriteLines(session, 20);
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            scrollInfo.SetVerticalOffset(2);
+
+            WriteLines(session, 5);
+            InvokeUpdateScrollInfo(control);
+
+            scrollInfo.VerticalOffset.Should().Be(2);
+        });
+    }
+
+    /// <summary>Ein Sessionwechsel setzt den Scrollzustand wieder auf Follow-End.</summary>
+    [Fact]
+    public void OnSessionChanged_SetztScrollzustandAufEnde()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var sessionA = CreateSession(new ImmediateEofStream());
+            using var sessionB = CreateSession(new ImmediateEofStream());
+
+            control.Session = sessionA;
+            WriteLines(sessionA, 20);
+            InvokeUpdateScrollInfo(control);
+            ((IScrollInfo)control).SetVerticalOffset(0);
+
+            WriteLines(sessionB, 20);
+            control.Session = sessionB;
+
+            var scrollInfo = (IScrollInfo)control;
+            scrollInfo.VerticalOffset.Should().Be(scrollInfo.ExtentHeight - scrollInfo.ViewportHeight);
+        });
+    }
+
+    /// <summary>Im echten ScrollViewer-Layout mit CanContentScroll erhält das Terminal einen realen ScrollOwner
+    /// und berechnet den Viewport aus der begrenzten sichtbaren Höhe statt aus dem 50-Zeilen-Fallback.</summary>
+    [Fact]
+    public void ScrollViewerLayout_CanContentScroll_BegrenztViewportAufSichtbareHoehe()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            var scrollViewer = new ScrollViewer
+            {
+                Content = control,
+                CanContentScroll = true,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            };
+
+            var size = new Size(160, 64);
+            scrollViewer.Measure(size);
+            scrollViewer.Arrange(new Rect(size));
+            scrollViewer.UpdateLayout();
+
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            WriteLines(session, 20);
+            scrollViewer.UpdateLayout();
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            scrollInfo.ScrollOwner.Should().BeSameAs(scrollViewer);
+            control.ActualHeight.Should().BeApproximately(size.Height, 0.5);
+            session.Buffer.Rows.Should().BeInRange(3, 5);
+            scrollInfo.ViewportHeight.Should().Be(session.Buffer.Rows);
+            scrollInfo.ExtentHeight.Should().BeGreaterThan(scrollInfo.ViewportHeight);
+        });
+    }
+
     /// <summary>Schiebt <paramref name="content"/> in <paramref name="stream"/>, wartet auf die vollständige
     /// Verarbeitung durch die Leseschleife von <paramref name="session"/> und zählt dabei, wie viele Operationen
     /// währenddessen am aktuellen UI-Dispatcher angestoßen wurden. Ein gebundenes <c>TerminalControl</c> stößt bei
@@ -226,6 +384,27 @@ public sealed partial class TerminalControlTests
     {
         var field = typeof(TerminalControl).GetField("_logger", BindingFlags.NonPublic | BindingFlags.Instance)!;
         field.SetValue(control, logger);
+    }
+
+    private static TerminalControl CreateArrangedControl()
+    {
+        var control = new TerminalControl();
+        var size = new Size(160, 48);
+        control.Measure(size);
+        control.Arrange(new Rect(size));
+        return control;
+    }
+
+    private static void InvokeUpdateScrollInfo(TerminalControl control)
+    {
+        var method = typeof(TerminalControl).GetMethod("UpdateScrollInfo", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        method.Invoke(control, [true]);
+    }
+
+    private static void WriteLines(PseudoConsoleSession session, int count)
+    {
+        for (var i = 0; i < count; i++)
+            session.Buffer.Apply(new Softwareschmiede.Domain.Terminal.TextWrittenEvent($"{i}\n"));
     }
 
     private static PseudoConsoleSession CreateSession(Stream outputStream)

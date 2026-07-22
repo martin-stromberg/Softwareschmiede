@@ -40,6 +40,14 @@ Die Ansicht passt sich automatisch bei Größenänderungen an; das Terminal wird
 
 > **Hinweis zur Zwischenablage-Einfügung:** Wenn Sie `Ctrl+V` drücken, wird der gesamte Text aus der Windows-Zwischenablage eingefügt. Multi-line-Text wird automatisch normalisiert: Alle Zeilenumbrüche (`\n`, `\r\n`, `\r`) werden als `\r` (Carriage Return) eingefügt, was dem Windows-CLI-Standard entspricht.
 
+### 3.1. Lange Ausgaben lesen
+
+Wenn die CLI mehr Text ausgibt, als im sichtbaren Terminalbereich Platz hat, erscheint eine vertikale Scrollbar. Ältere Ausgabezeilen bleiben im Verlauf erreichbar und können per Scrollbar, Mausrad, Page Up/Page Down sowie zeilenweisem Scrollen gelesen werden.
+
+Die CLI-Ansicht folgt neuen Ausgaben automatisch, solange Sie am Ende des Verlaufs stehen. Wenn Sie manuell nach oben scrollen, bleibt diese Leseposition stabil und wird durch neue Ausgabe nicht sofort ans Ende zurückgesetzt. Sobald Sie wieder bis ans Ende scrollen, folgt die Ansicht neuen Ausgaben wieder automatisch.
+
+Der Verlauf umfasst bis zu 1000 Scrollback-Zeilen zusätzlich zum aktuell sichtbaren Terminalbereich. Ältere Zeilen werden verworfen, wenn diese Grenze überschritten wird. Klicks in die Terminalfläche setzen den Fokus weiterhin auf das Terminal, sodass Tastatureingaben und `Ctrl+V` auch nach dem Scrollen direkt an die CLI gehen.
+
 ### 4. CLI beenden
 
 Das CLI beendet sich entweder selbst (nach Abschluss einer Sitzung) oder kann über **Beenden** im Ribbon manuell beendet werden. Nach dem Beenden bleibt der letzte Zustand sichtbar. Der Button **Starten** wird wieder aktiv.
@@ -51,7 +59,9 @@ Das CLI hat seine Arbeit verrichtet und wird beendet. Der Anwender kann anschlie
 ## Besonderheiten
 
 - **Volle Farbe:** Das Terminal unterstützt ANSI 3-bit-, 8-bit- und 24-bit-Farben. Farbige CLI-Ausgaben werden korrekt dargestellt.
-- **Scroll-History:** Die letzten 1000 Zeilen bleiben im Speicher. Ältere Zeilen werden verworfen.
+- **Scrollbare Ausgabe:** Lange CLI-Ausgaben sind über vertikale Scrollbar, Mausrad und Page-Scroll erreichbar.
+- **Scroll-History:** Bis zu 1000 Scrollback-Zeilen bleiben im Speicher. Ältere Zeilen werden verworfen.
+- **Auto-Follow:** Neue Ausgabe bleibt sichtbar, solange Sie am Ende stehen; manuelles Hochscrollen wird respektiert.
 - **Tastatur-Direktweitergabe:** Tastatureingaben werden nicht gepuffert, sondern unmittelbar an den Prozess weitergeleitet.
 
 ## Parallele Ausführung mehrerer CLIs

@@ -324,7 +324,19 @@ public sealed class TerminalBuffer
         {
             var gridCopy = new TerminalCell[_rows, _cols];
             Array.Copy(_grid, gridCopy, _grid.Length);
-            return new TerminalBufferSnapshot(gridCopy, _rows, _cols, _cursorRow, _cursorCol);
+
+            var scrollbackRows = new TerminalCell[_scrollback.Count][];
+            var index = 0;
+            foreach (var row in _scrollback)
+            {
+                var rowCopy = new TerminalCell[_cols];
+                Array.Copy(row, rowCopy, Math.Min(row.Length, _cols));
+                if (row.Length < _cols)
+                    Array.Fill(rowCopy, TerminalCell.Default, row.Length, _cols - row.Length);
+                scrollbackRows[index++] = rowCopy;
+            }
+
+            return new TerminalBufferSnapshot(gridCopy, _rows, _cols, _cursorRow, _cursorCol, scrollbackRows);
         }
     }
 
@@ -342,5 +354,19 @@ public sealed class TerminalBuffer
 /// <param name="Cols">Spaltenanzahl des Buffers zum Snapshot-Zeitpunkt.</param>
 /// <param name="CursorRow">Cursor-Zeile zum Snapshot-Zeitpunkt.</param>
 /// <param name="CursorCol">Cursor-Spalte zum Snapshot-Zeitpunkt.</param>
+/// <param name="ScrollbackRows">Kopie der Scrollback-Zeilen, älteste Zeile zuerst.</param>
 /// <returns>Eine neue <see cref="TerminalBufferSnapshot"/>-Instanz.</returns>
-public sealed record TerminalBufferSnapshot(TerminalCell[,] Grid, int Rows, int Cols, int CursorRow, int CursorCol);
+public sealed record TerminalBufferSnapshot(
+    TerminalCell[,] Grid,
+    int Rows,
+    int Cols,
+    int CursorRow,
+    int CursorCol,
+    TerminalCell[][] ScrollbackRows)
+{
+    /// <summary>Anzahl der Scrollback-Zeilen im Snapshot.</summary>
+    public int ScrollbackCount => ScrollbackRows.Length;
+
+    /// <summary>Gesamtzahl aus Scrollback-Zeilen plus sichtbarem Terminal-Grid.</summary>
+    public int TotalRows => ScrollbackRows.Length + Rows;
+}

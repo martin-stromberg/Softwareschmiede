@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Automation.Peers;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +15,7 @@ namespace Softwareschmiede.App.Controls;
 /// <summary>WPF-Control, das eine <see cref="PseudoConsoleSession"/> rendert und Tastatureingaben weiterleitet.
 /// Reiner Renderer: Die Leseschleife läuft unabhängig vom Control-Lebenszyklus in der <see cref="PseudoConsoleSession"/>
 /// selbst; das Control abonniert lediglich deren <see cref="PseudoConsoleSession.BufferChanged"/>-Event.</summary>
-public sealed class TerminalControl : FrameworkElement
+public sealed class TerminalControl : FrameworkElement, IScrollInfo
 {
     private readonly ILogger<TerminalControl> _logger =
         App.Services?.GetService<ILogger<TerminalControl>>() ?? NullLogger<TerminalControl>.Instance;
@@ -21,8 +23,14 @@ public sealed class TerminalControl : FrameworkElement
     private PseudoConsoleSession? _currentSession;
     private static readonly Typeface ConsolasTypeface = new("Consolas");
     private const double FontSize = 13.0;
+    private const double ScrollEndEpsilon = 0.001;
+    private const int MouseWheelScrollLines = 3;
     private double _cellWidth;
     private double _cellHeight;
+    private double _extentHeight;
+    private double _viewportHeight;
+    private double _verticalOffset;
+    private bool _isFollowingEnd = true;
 
     private static readonly SolidColorBrush BlackBrush = CreateFrozenBrush(Colors.Black);
     private static readonly SolidColorBrush CursorBrush = CreateFrozenBrush(Color.FromArgb(180, 255, 255, 255));
@@ -42,6 +50,33 @@ public sealed class TerminalControl : FrameworkElement
         get => (PseudoConsoleSession?)GetValue(SessionProperty);
         set => SetValue(SessionProperty, value);
     }
+
+    /// <inheritdoc/>
+    public bool CanVerticallyScroll { get; set; } = true;
+
+    /// <inheritdoc/>
+    public bool CanHorizontallyScroll { get; set; }
+
+    /// <inheritdoc/>
+    public double ExtentWidth => ViewportWidth;
+
+    /// <inheritdoc/>
+    public double ExtentHeight => _extentHeight;
+
+    /// <inheritdoc/>
+    public double ViewportWidth => Math.Max(0, ActualWidth);
+
+    /// <inheritdoc/>
+    public double ViewportHeight => _viewportHeight;
+
+    /// <inheritdoc/>
+    public double HorizontalOffset => 0;
+
+    /// <inheritdoc/>
+    public double VerticalOffset => _verticalOffset;
+
+    /// <inheritdoc/>
+    public ScrollViewer? ScrollOwner { get; set; }
 
     /// <summary>Erstellt eine neue <see cref="TerminalControl"/>-Instanz.</summary>
     public TerminalControl()
@@ -66,6 +101,11 @@ public sealed class TerminalControl : FrameworkElement
         if (session == null)
         {
             _buffer = null;
+            _verticalOffset = 0;
+            _extentHeight = 0;
+            _viewportHeight = 0;
+            _isFollowingEnd = true;
+            ScrollOwner?.InvalidateScrollInfo();
             InvalidateVisual();
             return;
         }
@@ -78,6 +118,8 @@ public sealed class TerminalControl : FrameworkElement
         // Anwender zur Aufgabe zurücknavigiert, ohne dass neue Ausgabe eintreffen muss.
         _buffer = session.Buffer;
         _buffer.Resize(cols, rows);
+        _isFollowingEnd = true;
+        UpdateScrollInfo(followEndIfNeeded: true);
 
         session.BufferChanged += OnBufferChanged;
 
@@ -87,7 +129,11 @@ public sealed class TerminalControl : FrameworkElement
 
     private void OnBufferChanged(object? sender, EventArgs e)
     {
-        _ = Dispatcher.InvokeAsync(InvalidateVisual);
+        _ = Dispatcher.InvokeAsync(() =>
+        {
+            UpdateScrollInfo(followEndIfNeeded: true);
+            InvalidateVisual();
+        });
     }
 
     /// <summary>TerminalControl leitet direkt von <see cref="FrameworkElement"/> ab, dessen Standard-Implementierung
@@ -110,22 +156,25 @@ public sealed class TerminalControl : FrameworkElement
         MeasureCellSize();
 
         var snapshot = buffer.GetSnapshot();
-        var rows = snapshot.Rows;
         var cols = snapshot.Cols;
-        var cursorRow = snapshot.CursorRow;
         var cursorCol = snapshot.CursorCol;
-        var grid = snapshot.Grid;
+        var visibleRows = CalculateRows();
+        var totalRows = snapshot.TotalRows;
+        var visibleStart = _isFollowingEnd
+            ? Math.Max(0, totalRows - visibleRows)
+            : Clamp((int)Math.Round(_verticalOffset), 0, Math.Max(0, totalRows - visibleRows));
 
-        for (var r = 0; r < rows; r++)
+        for (var r = 0; r < visibleRows; r++)
         {
             var y = r * _cellHeight;
+            var logicalRow = visibleStart + r;
 
             var bgStart = 0;
             while (bgStart < cols)
             {
-                var bgColor = grid[r, bgStart].Background;
+                var bgColor = GetSnapshotCell(snapshot, logicalRow, bgStart).Background;
                 var bgEnd = bgStart + 1;
-                while (bgEnd < cols && grid[r, bgEnd].Background == bgColor)
+                while (bgEnd < cols && GetSnapshotCell(snapshot, logicalRow, bgEnd).Background == bgColor)
                     bgEnd++;
 
                 if (bgColor != System.Drawing.Color.Black)
@@ -139,7 +188,7 @@ public sealed class TerminalControl : FrameworkElement
 
             for (var c = 0; c < cols; c++)
             {
-                var cell = grid[r, c];
+                var cell = GetSnapshotCell(snapshot, logicalRow, c);
                 if (cell.Character == ' ' || cell.Character == '\0')
                     continue;
 
@@ -158,9 +207,14 @@ public sealed class TerminalControl : FrameworkElement
             }
         }
 
-        var cursorX = cursorCol * _cellWidth;
-        var cursorY = cursorRow * _cellHeight;
-        dc.DrawRectangle(CursorBrush, null, new Rect(cursorX, cursorY, _cellWidth, _cellHeight));
+        var cursorLogicalRow = snapshot.ScrollbackCount + snapshot.CursorRow;
+        var cursorRenderRow = cursorLogicalRow - visibleStart;
+        if (cursorRenderRow >= 0 && cursorRenderRow < visibleRows)
+        {
+            var cursorX = cursorCol * _cellWidth;
+            var cursorY = cursorRenderRow * _cellHeight;
+            dc.DrawRectangle(CursorBrush, null, new Rect(cursorX, cursorY, _cellWidth, _cellHeight));
+        }
     }
 
     private SolidColorBrush GetBrush(Color color)
@@ -252,6 +306,7 @@ public sealed class TerminalControl : FrameworkElement
             var rows = CalculateRows();
             buffer.Resize(cols, rows);
             session.Resize(cols, rows);
+            UpdateScrollInfo(followEndIfNeeded: true);
             InvalidateVisual();
         }
 
@@ -286,6 +341,133 @@ public sealed class TerminalControl : FrameworkElement
     {
         var h = ActualHeight > 0 ? ActualHeight : 50 * 16;
         return Math.Max(1, (int)(h / _cellHeight));
+    }
+
+    /// <inheritdoc/>
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        MeasureCellSize();
+        var width = double.IsInfinity(availableSize.Width) ? CalculateCols() * _cellWidth : availableSize.Width;
+        var height = double.IsInfinity(availableSize.Height) ? CalculateRows() * _cellHeight : availableSize.Height;
+        return new Size(width, height);
+    }
+
+    /// <inheritdoc/>
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var size = base.ArrangeOverride(finalSize);
+        UpdateScrollInfo(followEndIfNeeded: true);
+        return size;
+    }
+
+    /// <inheritdoc/>
+    public void LineUp() => SetVerticalOffset(_verticalOffset - 1);
+
+    /// <inheritdoc/>
+    public void LineDown() => SetVerticalOffset(_verticalOffset + 1);
+
+    /// <inheritdoc/>
+    public void LineLeft()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void LineRight()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void PageUp() => SetVerticalOffset(_verticalOffset - GetPageScrollRows());
+
+    /// <inheritdoc/>
+    public void PageDown() => SetVerticalOffset(_verticalOffset + GetPageScrollRows());
+
+    /// <inheritdoc/>
+    public void PageLeft()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void PageRight()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void MouseWheelUp() => SetVerticalOffset(_verticalOffset - MouseWheelScrollLines);
+
+    /// <inheritdoc/>
+    public void MouseWheelDown() => SetVerticalOffset(_verticalOffset + MouseWheelScrollLines);
+
+    /// <inheritdoc/>
+    public void MouseWheelLeft()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void MouseWheelRight()
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetHorizontalOffset(double offset)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void SetVerticalOffset(double offset)
+    {
+        var clamped = ClampOffset(offset, ScrollableHeight);
+        _verticalOffset = clamped;
+        _isFollowingEnd = clamped >= ScrollableHeight - ScrollEndEpsilon;
+        ScrollOwner?.InvalidateScrollInfo();
+        InvalidateVisual();
+    }
+
+    /// <inheritdoc/>
+    public Rect MakeVisible(Visual visual, Rect rectangle) => rectangle;
+
+    private double ScrollableHeight => Math.Max(0, _extentHeight - _viewportHeight);
+
+    private int GetPageScrollRows() => Math.Max(1, CalculateRows() - 1);
+
+    private void UpdateScrollInfo(bool followEndIfNeeded)
+    {
+        MeasureCellSize();
+        var snapshot = _buffer?.GetSnapshot();
+        var visibleRows = CalculateRows();
+        var totalRows = snapshot?.TotalRows ?? 0;
+
+        _viewportHeight = Math.Min(visibleRows, Math.Max(visibleRows, totalRows));
+        _extentHeight = Math.Max(_viewportHeight, totalRows);
+
+        var scrollableHeight = ScrollableHeight;
+        _verticalOffset = followEndIfNeeded && _isFollowingEnd
+            ? scrollableHeight
+            : ClampOffset(_verticalOffset, scrollableHeight);
+        _isFollowingEnd = _verticalOffset >= scrollableHeight - ScrollEndEpsilon;
+
+        ScrollOwner?.InvalidateScrollInfo();
+    }
+
+    private static TerminalCell GetSnapshotCell(TerminalBufferSnapshot snapshot, int logicalRow, int col)
+    {
+        if (logicalRow < 0 || logicalRow >= snapshot.TotalRows || col < 0 || col >= snapshot.Cols)
+            return TerminalCell.Default;
+
+        if (logicalRow < snapshot.ScrollbackCount)
+            return snapshot.ScrollbackRows[logicalRow][col];
+
+        return snapshot.Grid[logicalRow - snapshot.ScrollbackCount, col];
+    }
+
+    private static int Clamp(int value, int min, int max)
+        => value < min ? min : value > max ? max : value;
+
+    private static double ClampOffset(double value, double max)
+    {
+        if (double.IsNaN(value) || value < 0)
+            return 0;
+        return value > max ? max : value;
     }
 
     /// <summary>Liest den Text aus der Zwischenablage, kodiert ihn für die CLI und schreibt ihn in den

@@ -333,4 +333,69 @@ public sealed class TerminalBufferTests
 
         sut.ScrollbackCount.Should().Be(0, "ScreenClearedEvent(2) muss auch den Scrollback leeren");
     }
+
+    /// <summary>GetSnapshot() liefert Scrollback-Zeilen in chronologischer Reihenfolge vor dem sichtbaren Grid.</summary>
+    [Fact]
+    public void Buffer_GetSnapshot_EnthaeltScrollbackVorSichtbaremGrid()
+    {
+        var sut = new TerminalBuffer(4, 2);
+
+        sut.Apply(new TextWrittenEvent("A\nB\nC"));
+
+        var snapshot = sut.GetSnapshot();
+
+        snapshot.ScrollbackCount.Should().Be(1);
+        snapshot.TotalRows.Should().Be(3);
+        snapshot.ScrollbackRows[0][0].Character.Should().Be('A');
+        snapshot.Grid[0, 0].Character.Should().Be('B');
+        snapshot.Grid[1, 0].Character.Should().Be('C');
+    }
+
+    /// <summary>GetSnapshot() gibt auch für Scrollback-Zeilen Kopien zurück.</summary>
+    [Fact]
+    public void Buffer_GetSnapshot_ScrollbackRowsSindKopien()
+    {
+        var sut = new TerminalBuffer(4, 2);
+        sut.Apply(new TextWrittenEvent("A\nB\nC"));
+
+        var snapshot = sut.GetSnapshot();
+        snapshot.ScrollbackRows[0][0] = snapshot.ScrollbackRows[0][0] with { Character = 'Z' };
+
+        sut.GetSnapshot().ScrollbackRows[0][0].Character.Should().Be(
+            'A',
+            "Änderungen am Snapshot dürfen den Buffer-Scrollback nicht verändern");
+    }
+
+    /// <summary>Der Snapshot respektiert die bestehende Scrollback-Grenze von 1000 Zeilen.</summary>
+    [Fact]
+    public void Buffer_GetSnapshot_BegrenztScrollbackAufJuengste1000Zeilen()
+    {
+        var sut = new TerminalBuffer(8, 1);
+
+        for (var i = 0; i < 1005; i++)
+            sut.Apply(new TextWrittenEvent($"{i:D4}\n"));
+
+        var snapshot = sut.GetSnapshot();
+
+        snapshot.ScrollbackCount.Should().Be(1000);
+        snapshot.ScrollbackRows[0][0].Character.Should().Be('0');
+        snapshot.ScrollbackRows[0][1].Character.Should().Be('0');
+        snapshot.ScrollbackRows[0][2].Character.Should().Be('0');
+        snapshot.ScrollbackRows[0][3].Character.Should().Be('5');
+    }
+
+    /// <summary>ScreenClearedEvent(2) entfernt Scrollback auch aus dem erweiterten Snapshot.</summary>
+    [Fact]
+    public void Buffer_GetSnapshot_ClearScreenMode2_LeertSnapshotScrollback()
+    {
+        var sut = new TerminalBuffer(10, 2);
+        for (var i = 0; i < 10; i++)
+            sut.Apply(new TextWrittenEvent("X\n"));
+
+        sut.Apply(new ScreenClearedEvent(2));
+
+        var snapshot = sut.GetSnapshot();
+        snapshot.ScrollbackRows.Should().BeEmpty();
+        snapshot.TotalRows.Should().Be(snapshot.Rows);
+    }
 }

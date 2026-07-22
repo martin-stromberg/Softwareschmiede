@@ -150,6 +150,17 @@ Das Control rendert den Buffer mit:
 - **Attribute:** Bold, Dim, Underline (soweit unterstützt)
 - **Cursor:** Halbtransparentes weißes Rechteck
 
+Das Control implementiert `IScrollInfo` und wird in der Aufgabendetailansicht in einem vertikalen `ScrollViewer` gehostet. Dadurch meldet es dem `ScrollViewer` die logische Verlaufshöhe (`ExtentHeight`), die sichtbare Zeilenhöhe (`ViewportHeight`) und den aktuellen zeilenbasierten `VerticalOffset`.
+
+Unterstütztes Scrollverhalten:
+- Vertikale Scrollbar bei mehr Ausgabe als sichtbarer Höhe
+- Mausrad-Scroll um mehrere Terminalzeilen
+- Line-Scroll um eine Terminalzeile
+- Page Up/Page Down um ungefähr eine sichtbare Seite
+- Kein horizontaler UI-Scroll; die Terminalbreite bestimmt weiterhin die Spaltenanzahl
+
+Wenn der Offset am Ende des Verlaufs steht, folgt das Control neuer Ausgabe automatisch. Nach manuellem Hochscrollen bleibt die Position stabil, bis wieder ans Ende gescrollt wird. Eingabefokus und Tastaturweitergabe bleiben erhalten; Klicks in die Terminalfläche fokussieren `TerminalControl`, Scrollbar-Klicks werden nicht abgefangen.
+
 ### Tastatureingaben
 
 Das Control fängt `PreviewKeyDown`- und `TextInput`-Events ab und konvertiert sie via `KeyToVt100Encoder` zu VT100-Sequenzen, die in `Session.InputStream` geschrieben werden.
@@ -460,9 +471,9 @@ buffer.Apply(new TextWrittenEvent("World"));
 
 #### `GetSnapshot()`
 
-Erstellt einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock. Wird von Render-Operationen genutzt, um Race Conditions zwischen paralleler Buffer-Aktualisierung und Lesezugriffen zu vermeiden.
+Erstellt einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock. Wird von Render- und Scroll-Operationen genutzt, um Race Conditions zwischen paralleler Buffer-Aktualisierung und Lesezugriffen zu vermeiden.
 
-**Rückgabe:** `TerminalBufferSnapshot` (Record mit Grid-Kopie, Rows, Cols, CursorRow, CursorCol)
+**Rückgabe:** `TerminalBufferSnapshot` (Record mit Grid-Kopie, Scrollback-Zeilen, Rows, Cols, CursorRow, CursorCol, ScrollbackCount und TotalRows)
 
 **Thread-Sicherheit:** Intern synchronisiert; der Snapshot ist konsistent unter dem Lock erstellt
 
@@ -470,15 +481,13 @@ Erstellt einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem e
 ```csharp
 var snapshot = buffer.GetSnapshot();
 var gridCopy = snapshot.Grid;
+var scrollbackRows = snapshot.ScrollbackRows;
 var cursorRow = snapshot.CursorRow;
 // Render-Operationen ohne Lock-Contention
-for (var r = 0; r < snapshot.Rows; r++)
+for (var logicalRow = 0; logicalRow < snapshot.TotalRows; logicalRow++)
 {
-    for (var c = 0; c < snapshot.Cols; c++)
-    {
-        var cell = gridCopy[r, c];
-        // Zeichne Zelle
-    }
+    // Zeilen 0..ScrollbackCount-1 stammen aus dem Scrollback,
+    // danach folgt das sichtbare Grid.
 }
 ```
 
