@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -44,54 +45,79 @@ public sealed class CliOutputProtokollWriter : ITerminalOutputSink
     /// <inheritdoc/>
     public void OnOutputChunk(ReadOnlySpan<byte> bytes)
     {
-        if (Volatile.Read(ref _completed) != 0)
-            return;
-
-        string[] completedLines;
         lock (_sync)
         {
             if (Volatile.Read(ref _completed) != 0)
                 return;
 
-            completedLines = _accumulator.Append(bytes).ToArray();
+            foreach (var line in _accumulator.Append(bytes))
+                TryQueueLine(line);
         }
-
-        foreach (var line in completedLines)
-            TryQueueLine(line);
     }
 
     /// <inheritdoc/>
     public void Complete()
     {
-        if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
-            return;
-
-        string[] remainingLines;
         lock (_sync)
         {
-            remainingLines = _accumulator.Flush().ToArray();
+            CompleteLocked();
         }
-
-        foreach (var line in remainingLines)
-            TryQueueLine(line);
-
-        _lines.Writer.TryComplete();
     }
 
     /// <inheritdoc/>
     public async Task CompleteAsync(TimeSpan timeout, CancellationToken ct = default)
     {
-        Complete();
+        var hasTimeout = timeout > TimeSpan.Zero;
+        var remainingTimeout = timeout;
+        var stopwatch = hasTimeout ? Stopwatch.StartNew() : null;
+
+        if (hasTimeout)
+        {
+            if (!Monitor.TryEnter(_sync, timeout))
+            {
+                _logger.LogWarning(
+                    "Timeout beim Abschluss der CLI-Ausgabe fuer Aufgabe {AufgabeId}. Eine aktive Producer-Phase schreibt noch in die Queue. Noch ausstehende Zeilen: {QueuedLineCount}.",
+                    _aufgabeId,
+                    Volatile.Read(ref _queuedLineCount));
+                return;
+            }
+        }
+        else
+        {
+            Monitor.Enter(_sync);
+        }
 
         try
         {
-            if (timeout <= TimeSpan.Zero)
+            CompleteLocked();
+        }
+        finally
+        {
+            Monitor.Exit(_sync);
+        }
+
+        if (hasTimeout)
+        {
+            remainingTimeout = timeout - stopwatch!.Elapsed;
+            if (remainingTimeout <= TimeSpan.Zero)
+            {
+                _logger.LogWarning(
+                    "Timeout beim Drain der CLI-Ausgabe fuer Aufgabe {AufgabeId}. Noch ausstehende Zeilen: {QueuedLineCount}.",
+                    _aufgabeId,
+                    Volatile.Read(ref _queuedLineCount));
+                return;
+            }
+        }
+
+        try
+        {
+            if (!hasTimeout)
             {
                 await _workerTask.WaitAsync(ct).ConfigureAwait(false);
             }
             else
             {
-                await _workerTask.WaitAsync(timeout, ct).ConfigureAwait(false);
+                await _workerTask.WaitAsync(remainingTimeout, ct).ConfigureAwait(false);
             }
         }
         catch (TimeoutException ex)
@@ -110,6 +136,17 @@ public sealed class CliOutputProtokollWriter : ITerminalOutputSink
                 _aufgabeId,
                 Volatile.Read(ref _queuedLineCount));
         }
+    }
+
+    private void CompleteLocked()
+    {
+        if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+            return;
+
+        foreach (var line in _accumulator.Flush())
+            TryQueueLine(line);
+
+        _lines.Writer.TryComplete();
     }
 
     private void TryQueueLine(string line)

@@ -157,7 +157,7 @@
 - Die Protokollierung ist UI-unabhängig und läuft weiter, wenn kein `TerminalControl` gebunden ist.
 - Persistenzfehler werden geloggt, brechen den CLI-Prozess aber nicht ab.
 - Bei hoher Ausgaberate begrenzt eine bounded Queue den Speicherverbrauch und erzeugt Backpressure.
-- Bekannte Einschränkung: Bei voller Queue und gleichzeitigem Abschluss der Senke kann ein Race zwischen noch aktivem Producer und `CompleteAsync` bereits dekodierte, aber noch nicht gequeute Zeilen verwerfen.
+- Beim Abschluss wartet die Senke auf die aktive Queue-Phase eines bereits dekodierten Chunks, bevor der Channel geschlossen wird.
 
 **Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputProtokollWriter`, `PseudoConsoleSession.ReadLoopAsync`, `KiAusfuehrungsService.StartWithPseudoConsoleAsync`, `ProtokollService.AddCliOutputAsync`.
 
