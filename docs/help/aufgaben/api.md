@@ -8,6 +8,28 @@ Die Task-Detail-Ansicht exponiert zwei öffentliche Service-Schnittstellen für 
 
 - `AufgabeService` — Persistente Datenbankoperationen für Aufgaben
 - `PromptZeitVersandService` — Laufzeit-Verwaltung zeitgesteuerter Prompts
+- `ProtokollService` — Persistente Protokolleinträge, einschließlich automatischer CLI-Ausgaben
+
+## ProtokollService — CLI-Ausgabeprotokoll
+
+### `AddCliOutputAsync(Guid aufgabeId, string outputLine, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Speichert eine einzelne CLI-Ausgabezeile als Protokolleintrag vom Typ `ProtokollTyp.CliOutput`.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `aufgabeId` | `Guid` | ID der Aufgabe, deren CLI die Ausgabe erzeugt hat. |
+| `outputLine` | `string` | Dekodierte Ausgabezeile aus dem Terminal-Output. |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Verhalten:**
+
+- Erstellt einen `Protokolleintrag` mit `Typ = ProtokollTyp.CliOutput`.
+- Wird im ConPTY-Pfad automatisch durch `CliOutputProtokollWriter` aufgerufen.
+- Erkennt Rate-Limit-Marker in der Ausgabezeile und speichert dann zusätzlich einen `ProtokollTyp.RateLimit`-Eintrag.
+- Speichert pro Aufruf eine Zeile.
 
 ## PromptZeitVersandService — Zeitgesteuerte Prompt-Versendung
 

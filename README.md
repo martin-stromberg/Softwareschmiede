@@ -469,6 +469,10 @@ public interface IKiPlugin : IPlugin { /* AI operations */ }
 - `NavigateZuAufgabeCommand` nutzt Callbacks zur fensterübergreifenden Navigation zwischen Projekt- und Aufgabendetail (Presentation-Layer Orchestrierung).
 - `IsDashboardVisible` (computed Property) steuert die Sichtbarkeit der Seitenleisten-Sektion über XAML-Binding mit `InvertedBoolToVisibilityConverter`.
 
+### Architekturbezug: Automatische CLI-Ausgabeprotokollierung
+
+ConPTY-gestartete KI-CLI-Sitzungen schreiben ihre Ausgabe automatisch in das aufgabenbezogene Protokoll. `PseudoConsoleSession` erfasst den Terminal-Output UI-unabhängig in der Session-Leseschleife; `KiAusfuehrungsService` bindet dafür pro Aufgabe einen `CliOutputProtokollWriter` an. Der Writer rekonstruiert Ausgabezeilen über Chunk-Grenzen hinweg, persistiert sie über den bestehenden `ProtokollService.AddCliOutputAsync`-Pfad als `CliOutput` und entkoppelt Terminal-Rendering und Datenbankzugriff über eine bounded Queue mit Backpressure.
+
 ### Architekturbezug: Absturzstabilisierung (Stabilität & Fehlerbehandlung)
 
 - `App.OnStartup()` registriert vor dem Aufruf von `StartupAsync()` drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`), die ausschließlich über `Log.Logger` protokollieren; `DispatcherUnhandledException` setzt zusätzlich `e.Handled = true`, `UnobservedTaskException` ruft `e.SetObserved()` auf.

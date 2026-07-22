@@ -23,6 +23,7 @@ public sealed class PseudoConsoleSession : IDisposable
     private readonly DateTimeOffset _startedUtc;
     private readonly object _runtimeStatusLock = new();
     private readonly ILogger _logger;
+    private readonly ITerminalOutputSink? _outputSink;
     private readonly AnsiSequenceParser _parser = new();
     private readonly CancellationTokenSource _readCts = new();
     private readonly Task _readLoopTask;
@@ -69,8 +70,9 @@ public sealed class PseudoConsoleSession : IDisposable
     /// <param name="inputStream">Schreibbarer Stream für Eingaben an den Prozess.</param>
     /// <param name="outputStream">Lesbarer Stream für die Prozessausgabe.</param>
     /// <param name="logger">Logger für Fehler- und Diagnosemeldungen der Leseschleife (optional).</param>
-    internal PseudoConsoleSession(IPseudoConsoleHandle pseudoConsole, Process process, Stream inputStream, Stream outputStream, ILogger? logger = null)
-        : this(pseudoConsole, process, inputStream, outputStream, TimeProvider.System, TimeSpan.FromSeconds(4), logger)
+    /// <param name="outputSink">Optionale Senke für gelesene Terminal-Ausgabe.</param>
+    internal PseudoConsoleSession(IPseudoConsoleHandle pseudoConsole, Process process, Stream inputStream, Stream outputStream, ILogger? logger = null, ITerminalOutputSink? outputSink = null)
+        : this(pseudoConsole, process, inputStream, outputStream, TimeProvider.System, TimeSpan.FromSeconds(4), logger, outputSink)
     {
     }
 
@@ -81,7 +83,8 @@ public sealed class PseudoConsoleSession : IDisposable
         Stream outputStream,
         TimeProvider timeProvider,
         TimeSpan waitingThreshold,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        ITerminalOutputSink? outputSink = null)
     {
         _pseudoConsole = pseudoConsole;
         _process = process;
@@ -91,6 +94,7 @@ public sealed class PseudoConsoleSession : IDisposable
         _waitingThreshold = waitingThreshold;
         _startedUtc = _timeProvider.GetUtcNow();
         _logger = logger ?? NullLogger.Instance;
+        _outputSink = outputSink;
         _runtimeStatusTimer = new Timer(_ => RefreshRuntimeStatus(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         _readLoopTask = Task.Run(() => ReadLoopAsync(_readCts.Token));
     }
@@ -145,7 +149,8 @@ public sealed class PseudoConsoleSession : IDisposable
         // der eigenen Leseschleife benötigt werden – das führt unter ThreadPool-Druck zu mehrsekündigen
         // Verzögerungen bis hin zu Timeouts (siehe Dispose_ReadLoopNeverCompletes_ReturnsPromptlyWithoutWaiting).
         // OutputStream ist bereits geschlossen und der Read entsprechend bereits am Beenden; die Schleife läuft
-        // asynchron aus, ohne dass Dispose() darauf warten muss.
+        // asynchron aus, ohne dass Dispose() darauf warten muss. Die Output-Senke wird ausschliesslich am Ende
+        // der Leseschleife abgeschlossen, damit Tail-Output nicht durch ein vorzeitiges Complete() verworfen wird.
         // _readCts erst verwerfen, nachdem die Leseschleife tatsächlich beendet ist (nicht blockierend über eine
         // Continuation): Ein sofortiges Dispose des CTS, während die Schleife die Cancellation noch verarbeitet,
         // kann zu einer unerwarteten Exception im laufenden Read führen.
@@ -163,6 +168,37 @@ public sealed class PseudoConsoleSession : IDisposable
         try { _runtimeStatusTimer.Dispose(); } catch { }
         try { _pseudoConsole.Dispose(); } catch { }
         try { _process.Dispose(); } catch { }
+    }
+
+    /// <summary>Wartet begrenzt darauf, dass die Leseschleife den Output-Stream bis zum Ende verarbeitet hat.</summary>
+    /// <param name="timeout">Maximale Wartezeit auf das Ende der Leseschleife.</param>
+    /// <param name="ct">Abbruch-Token.</param>
+    /// <returns><c>true</c>, wenn die Leseschleife abgeschlossen wurde; andernfalls <c>false</c>.</returns>
+    public async Task<bool> DrainOutputAsync(TimeSpan timeout, CancellationToken ct = default)
+    {
+        try
+        {
+            if (timeout <= TimeSpan.Zero)
+            {
+                await _readLoopTask.WaitAsync(ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await _readLoopTask.WaitAsync(timeout, ct).ConfigureAwait(false);
+            }
+
+            return true;
+        }
+        catch (TimeoutException ex)
+        {
+            _logger.LogWarning(ex, "Timeout beim Drain der Terminal-Leseschleife vor dem Dispose der Sitzung.");
+            return false;
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Drain der Terminal-Leseschleife vor dem Dispose der Sitzung wurde abgebrochen.");
+            return false;
+        }
     }
 
     /// <summary>
@@ -199,6 +235,8 @@ public sealed class PseudoConsoleSession : IDisposable
 
                 MarkOutputActivity();
 
+                _outputSink?.OnOutputChunk(data.AsSpan(0, bytesRead));
+
                 var events = _parser.Parse(data.AsSpan(0, bytesRead));
                 foreach (var evt in events)
                     Buffer.Apply(evt);
@@ -212,6 +250,10 @@ public sealed class PseudoConsoleSession : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unerwarteter Fehler im Terminal-Lesevorgang der Sitzung.");
+        }
+        finally
+        {
+            _outputSink?.Complete();
         }
     }
 

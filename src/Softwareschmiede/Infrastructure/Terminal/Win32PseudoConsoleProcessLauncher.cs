@@ -19,7 +19,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
     }
 
     /// <inheritdoc/>
-    public (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand)
+    public (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand, ITerminalOutputSink? outputSink = null)
     {
         var workingDir = !string.IsNullOrEmpty(effectiveWorkingDirectory) && Directory.Exists(effectiveWorkingDirectory)
             ? effectiveWorkingDirectory
@@ -63,12 +63,12 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
             throw;
         }
 
-        var session = CreatePseudoConsoleSession(aufgabeId, pseudoConsole, process);
+        var session = CreatePseudoConsoleSession(aufgabeId, pseudoConsole, process, outputSink);
 
         return (process, session, startResult.ProcessHandle);
     }
 
-    private PseudoConsoleSession CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process)
+    private PseudoConsoleSession CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process, ITerminalOutputSink? outputSink)
     {
         FileStream? inputStream = null;
         FileStream? outputStream = null;
@@ -86,7 +86,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
                 bufferSize: 4096,
                 isAsync: false);
 
-            return new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream, _loggerFactory.CreateLogger<PseudoConsoleSession>());
+            return new PseudoConsoleSession(pseudoConsole, process, inputStream, outputStream, _loggerFactory.CreateLogger<PseudoConsoleSession>(), outputSink);
         }
         catch (Exception ex)
         {

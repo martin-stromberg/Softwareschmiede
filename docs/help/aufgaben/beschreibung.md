@@ -75,7 +75,7 @@ Eine Aufgabe durchläuft folgende Status:
 Die WPF-Aufgabendetailansicht (`TaskDetailView`) nutzt eine gemeinsame Ansichtsleiste oberhalb des Inhalts. Die verfügbaren Ansichten sind explizit benannt:
 
 #### Info-Ansicht
-Zeigt die Stammdaten der Aufgabe, insbesondere Titel, Status, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Bei neuen Aufgaben enthält sie die bearbeitbaren Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Die Info-Ansicht ist unabhängig vom Aufgabenstatus erreichbar, also auch bei gestarteten, wartenden und beendeten Aufgaben.
+Zeigt die Stammdaten der Aufgabe, insbesondere Titel, Status, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Bei neuen Aufgaben enthält sie die bearbeitbaren Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Die Info-Ansicht ist unabhängig vom Aufgabenstatus erreichbar, also auch bei gestarteten, wartenden und beendeten Aufgaben. CLI-Ausgaben laufender ConPTY-Sitzungen werden automatisch als Protokolleinträge gespeichert und sind nach erneutem Laden der Aufgabe über das Aufgabenprotokoll nachvollziehbar.
 
 #### CLI-Ansicht
 Zeigt das Terminalfenster des KI-Tools. Das Fenster wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`). Die CLI-Ansicht wird angeboten, wenn für die Aufgabe eine CLI-Ausführung sinnvoll ist, insbesondere bei gestarteten oder wartenden Aufgaben.
@@ -119,6 +119,12 @@ Der neue `PromptZeitVersandService` (Singleton) verwaltet intern pro Aufgabe ein
 
 Der `KiAusfuehrungsService` läuft als Singleton. Er startet und stoppt CLI-Prozesse und gibt Statusänderungen über das `CliProcessStatusChanged`-Event weiter. Für jede Aufgabe kann nur ein CLI-Prozess gleichzeitig laufen.
 
+### Automatisches CLI-Ausgabeprotokoll
+
+Für jeden ConPTY-Start erzeugt `KiAusfuehrungsService` einen `CliOutputProtokollWriter`, der an die `PseudoConsoleSession` angebunden wird. Die Session meldet gelesene Output-Bytes unabhängig von der UI an diese Senke. Der Writer dekodiert UTF-8 über Chunk-Grenzen, trennt Ausgabe auf `\n`, `\r\n` und einzelne `\r` und speichert jede abgeschlossene Zeile über `ProtokollService.AddCliOutputAsync` als `ProtokollTyp.CliOutput`.
+
+Die Protokollierung hängt nicht davon ab, dass die CLI-Ansicht geöffnet ist. Persistenzfehler werden geloggt und unterbrechen den CLI-Prozess nicht. Bei sehr schneller Ausgabe ist die interne Queue begrenzt; wenn sie voll ist, wartet der Output-Reader auf freie Kapazität. Ein bekannter Abschluss-Race bei voller Queue und parallelem Cleanup ist noch als Nacharbeit offen.
+
 ### Rate-Limit-Vorschlag
 
 Erkennt die KI ein Rate-Limit (Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601]]` in der Ausgabe), speichert der `ProtokollService` automatisch einen Prompt-Vorschlag mit Ausführungszeitpunkt in der Aufgabe. Der Status wechselt auf `Wartend`.
@@ -157,3 +163,4 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 - Die Aufgabenwiederherstellung (Recovery) steht nur zur Verfügung, wenn der letzte Heartbeat älter als 5 Minuten ist.
 - Der Status `Gestartet` bedeutet: Repository geklont und CLI läuft (oder sollte laufen). Wenn die Ansicht eines Status-`Gestartet`-Tasks ohne laufende CLI geöffnet wird, wird die CLI automatisch neu gestartet.
 - Zeitgesteuerter Prompt-Versand: Pro Aufgabe kann maximal ein Prompt gleichzeitig geplant sein; erneutes Planen ersetzt den vorhandenen Eintrag. Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts. Ist die CLI zur Zielzeit nicht mehr aktiv, wird der Prompt still verworfen.
+- Das CLI-Ausgabeprotokoll speichert dekodierte Zeilen aus dem Terminal-Rohstream. ANSI- und Control-Sequenzen werden nicht bereinigt und können im Protokoll sichtbar sein.

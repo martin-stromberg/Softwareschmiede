@@ -23,14 +23,15 @@ public static class TestKiAusfuehrungsServiceFactory
 
     private sealed class DeterministicPseudoConsoleProcessLauncher : IPseudoConsoleProcessLauncher
     {
-        public (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand)
+        public (Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(Guid aufgabeId, string effectiveWorkingDirectory, string pluginCommand, ITerminalOutputSink? outputSink = null)
         {
             var process = Process.GetCurrentProcess();
             var session = new PseudoConsoleSession(
                 NullPseudoConsoleHandle.Instance,
                 process,
                 new MemoryStream(),
-                new MemoryStream());
+                new MemoryStream(),
+                outputSink: outputSink);
             return (process, session, IntPtr.Zero);
         }
     }

@@ -10,7 +10,7 @@ Das Terminal-System ermöglicht die direkte, interaktive Bedienung von KI-CLI-To
 
 Das System nutzt Windows Pseudo Console (ConPTY) API zum Starten des CLI-Prozesses. Der Prozess-Output wird als Byte-Stream aus einer anonymen Pipe gelesen und durch den `AnsiSequenceParser` in strukturierte Terminal-Ereignisse (Text, Cursor-Bewegung, Farben, Erase-Befehle) zerlegt. Ein `TerminalBuffer` verwaltet einen 2D-Grid aus `TerminalCell`-Objekten mit Zeichen, Farben und Text-Attributen. Das `TerminalControl` ist ein reiner Renderer, der den `TerminalBuffer` per `DrawingContext` mit monospace-Schriftart darstellt; Tastatureingaben werden durch `KeyToVt100Encoder` in VT100-Escape-Sequenzen konvertiert und in die Prozess-Input-Pipe geschrieben.
 
-Die Leseschleife läuft unabhängig vom `TerminalControl`-Lebenszyklus in `PseudoConsoleSession` selbst — von der Session-Konstruktion bis zur Dispose — damit mehrere CLI-Prozesse parallel weiterlaufen können, auch wenn ihre Aufgabenseite nicht angezeigt wird (Issue-86).
+Die Leseschleife läuft unabhängig vom `TerminalControl`-Lebenszyklus in `PseudoConsoleSession` selbst — von der Session-Konstruktion bis zur Dispose — damit mehrere CLI-Prozesse parallel weiterlaufen können, auch wenn ihre Aufgabenseite nicht angezeigt wird (Issue-86). Dieselbe Leseschleife meldet jeden gelesenen Output-Chunk zusätzlich an eine optionale `ITerminalOutputSink`; für Aufgabenläufe ist dort ein `CliOutputProtokollWriter` angebunden, der Ausgabezeilen im Aufgabenprotokoll speichert.
 
 Die Aufgabendetailansicht zeigt den Laufzeitstatus der CLI in der Fusszeile. `PseudoConsoleSession` verfolgt dafür die letzte Ausgabe- und Eingabeaktivität: Frische I/O-Aktivität wird als laufende Ausführung angezeigt (`Laeuft`); bleibt Ausgabe bei weiterhin laufendem Prozess aus, wird nach kurzer Zeit "Wartet auf Eingabe" angezeigt (`WartetAufEingabe`).
 
@@ -19,12 +19,18 @@ Die Aufgabendetailansicht zeigt den Laufzeitstatus der CLI in der Fusszeile. `Ps
 1. `KiAusfuehrungsService.StartWithPseudoConsoleAsync` erstellt eine Pseudo Console mit `CreatePseudoConsole` API.
 2. Der CLI-Prozess wird via `PseudoConsoleProcessStarter.Start` mit Prozess-Attribut-Liste gestartet.
 3. `PseudoConsoleSession` wird erstellt und koordiniert Prozess, Input-Pipe und Output-Pipe. Im Konstruktor wird sofort die `ReadLoopAsync`-Leseschleife als Background-Task gestartet, unabhängig davon, ob ein `TerminalControl` gebunden ist.
-4. Die Leseschleife läuft kontinuierlich: `AnsiSequenceParser.Parse` zerlegt eingehende Bytes; `TerminalBuffer.Apply` wendet Events an; `BufferChanged`-Event wird nach jeder erfolgreichen Chunk-Verarbeitung gefeuert.
+4. Die Leseschleife läuft kontinuierlich: Gelesene Bytes werden zuerst an die Output-Senke gemeldet; danach zerlegt `AnsiSequenceParser.Parse` die Bytes, `TerminalBuffer.Apply` wendet Events an und `BufferChanged` wird nach jeder erfolgreichen Chunk-Verarbeitung gefeuert.
 5. `TaskDetailViewModel.PseudoConsoleSessionGestartet`-Event propagiert die Session an `TaskDetailView`.
 6. `TerminalControl.Session`-Property wird gesetzt; Control abonniert das `BufferChanged`-Event der Session.
 7. `TerminalControl.OnBufferChanged` wird aufgerufen, wenn neue Ausgabe verarbeitet wurde, und triggert `InvalidateVisual()`.
 8. `TerminalControl.OnRender` rendert aktuellen `TerminalBuffer`-Inhalt per `DrawingContext`.
 9. `TaskDetailViewModel.CliStatusText` aktualisiert die Fusszeile bei Laufzeitstatus-Änderungen der Session (Event `RuntimeStatusChanged`).
+
+### Aufgabenprotokollierung
+
+Bei über `KiAusfuehrungsService.StartWithPseudoConsoleAsync` gestarteten ConPTY-Sitzungen wird pro Aufgabe ein `CliOutputProtokollWriter` erzeugt. Er erhält rohe UTF-8-Bytes aus der `PseudoConsoleSession`, rekonstruiert daraus Ausgabezeilen über Chunk-Grenzen hinweg und speichert sie als `ProtokollTyp.CliOutput`. Die Terminalanzeige bleibt davon getrennt: Das `TerminalControl` rendert weiterhin den `TerminalBuffer`, während das Aufgabenprotokoll auch dann fortgeschrieben wird, wenn gerade keine Aufgabenseite gebunden ist.
+
+Die Persistenz läuft in einem Hintergrund-Worker mit bounded Queue. Bei sehr hoher Ausgabe wartet der Terminal-Output-Reader über Backpressure auf freie Queue-Kapazität; Persistenzfehler werden geloggt und beenden die CLI-Sitzung nicht.
 
 ### Größenanpassung
 
@@ -50,6 +56,8 @@ Das Terminal-System wurde mit mehreren Verbesserungen erweitert:
 
 5. **Robustes Terminal-Resize:** Bei Verkleinerung des Terminals werden nun die **aktuellen (unteren) Zeilen** beibehalten und alte obere Zeilen in den Scrollback verschoben — der aktuelle Prompt/Cursor bleibt sichtbar am unteren Rand. Dies behebt das Problem, dass nach Verkleinerung veraltete alte Zeilen in die Anzeige rutschten.
 
+6. **Automatische CLI-Ausgabe-Protokollierung:** Terminal-Output wird nicht nur gerendert, sondern zeilenweise im aufgabenbezogenen Protokoll gespeichert. Dadurch bleibt die Ausgabe nach Abschluss, Unterbrechung oder erneutem Öffnen der Aufgabe nachvollziehbar.
+
 ## Einschränkungen
 
 - `CreatePseudoConsole` ist erst ab Windows 10 Build 17763 verfügbar. Das Projekt zielt auf `net10.0-windows10.0.17763.0`, daher ist das kein praktisches Risiko.
@@ -57,3 +65,5 @@ Das Terminal-System wurde mit mehreren Verbesserungen erweitert:
 - Mouse-Tracking-Sequenzen werden nicht unterstützt (nicht erforderlich für Standard-CLI-Verwendung).
 - OSC-Sequenzen (z. B. Fenstertitel-Setzung) werden verworfen.
 - Clipboard-Paste ist auf System.Windows.Clipboard beschränkt (WPF-Standard) — andere Quellen von Zwischenablage-Daten werden nicht unterstützt.
+- Das Aufgabenprotokoll speichert dekodierte Ausgabezeilen nahe am Rohstream. ANSI- und Control-Sequenzen können daher im Protokollinhalt enthalten sein.
+- Bei gleichzeitigem Abschluss der Output-Senke und starker Backpressure gibt es eine bekannte Nacharbeit: Ein bereits dekodierter, aber noch nicht vollständig in die bounded Queue geschriebener Chunk kann im Race-Fall teilweise verloren gehen. Der drainbare Abschluss schützt bereits angenommene Queue-Einträge.

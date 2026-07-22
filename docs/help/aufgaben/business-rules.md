@@ -127,7 +127,7 @@
 
 ## Rate-Limit-Erkennung und Vorschlag
 
-**Beschreibung:** Erkennt die KI ein Rate-Limit in der Ausgabe, wird automatisch ein Prompt-Vorschlag mit Ausführungszeitpunkt gespeichert.
+**Beschreibung:** Erkennt die KI ein Rate-Limit in der CLI-Ausgabe, wird automatisch ein Prompt-Vorschlag mit Ausführungszeitpunkt gespeichert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync`, das von der automatischen ConPTY-Ausgabeprotokollierung aufgerufen wird.
 
 **Bedingungen:**
 - Ausgabezeile beginnt mit `[[SOFTWARESCHMIEDE_RATE_LIMIT]]`.
@@ -139,6 +139,27 @@
 - Kein automatischer Neustart — der Anwender muss manuell senden oder den Zeitpunkt anpassen.
 
 **Umsetzung:** `EntwicklungsprozessService.TryParseRateLimitSuggestion`, `AufgabeService.SavePromptVorschlagAsync`.
+
+---
+
+## Automatische CLI-Ausgabeprotokollierung
+
+**Beschreibung:** CLI-Ausgaben einer ConPTY-Sitzung werden automatisch dem Protokoll der zugehörigen Aufgabe zugeordnet.
+
+**Bedingungen:**
+- Der CLI-Prozess wird über `KiAusfuehrungsService.StartWithPseudoConsoleAsync` gestartet.
+- Die `PseudoConsoleSession` liefert Output-Bytes aus ihrer internen Leseschleife.
+
+**Verhalten:**
+- Pro ConPTY-Start wird ein `CliOutputProtokollWriter` für genau eine `aufgabeId` erzeugt.
+- Die Ausgabe wird zeilenweise als `ProtokollTyp.CliOutput` gespeichert.
+- Die Reihenfolge innerhalb einer Session bleibt durch einen sequenziellen Hintergrund-Worker erhalten.
+- Die Protokollierung ist UI-unabhängig und läuft weiter, wenn kein `TerminalControl` gebunden ist.
+- Persistenzfehler werden geloggt, brechen den CLI-Prozess aber nicht ab.
+- Bei hoher Ausgaberate begrenzt eine bounded Queue den Speicherverbrauch und erzeugt Backpressure.
+- Bekannte Einschränkung: Bei voller Queue und gleichzeitigem Abschluss der Senke kann ein Race zwischen noch aktivem Producer und `CompleteAsync` bereits dekodierte, aber noch nicht gequeute Zeilen verwerfen.
+
+**Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputProtokollWriter`, `PseudoConsoleSession.ReadLoopAsync`, `KiAusfuehrungsService.StartWithPseudoConsoleAsync`, `ProtokollService.AddCliOutputAsync`.
 
 ---
 

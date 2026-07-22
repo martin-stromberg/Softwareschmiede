@@ -1,11 +1,14 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Terminal;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -260,7 +263,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     }
 
     /// <summary>Beendet der CLI-Prozess einer ConPTY-Sitzung (hier über <see cref="KiAusfuehrungsService.StopCliAsync"/>),
-    /// muss <see cref="KiAusfuehrungsService.HandleProcessExited"/> die zugehörige <see cref="PseudoConsoleSession"/>
+    /// muss <c>HandleProcessExitedAsync</c> die zugehörige <see cref="PseudoConsoleSession"/>
     /// disposen (Leseschleife wird abgebrochen, Streams werden geschlossen), bevor das Handle aus <c>_handles</c>
     /// entfernt wird.</summary>
     [OsInterfaceFact]
@@ -455,5 +458,359 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         catch (InvalidOperationException)
         {
         }
+    }
+
+    /// <summary>StartWithPseudoConsoleAsync persistiert Ausgabe der PseudoConsoleSession automatisch im
+    /// Aufgabenprotokoll, ohne dass ein TerminalControl gebunden ist.</summary>
+    [OsInterfaceFact]
+    public async Task StartWithPseudoConsoleAsync_PersistiertSessionOutputAlsCliOutput()
+    {
+        await using var provider = CreateCliOutputServiceProvider();
+
+        var aufgabeId = Guid.NewGuid();
+        var launcher = new FixedOutputPseudoConsoleProcessLauncher("erste zeile\nzweite zeile\n");
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher);
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "echo",
+                Arguments = "irrelevant",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+
+        var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 2);
+        eintraege.Select(e => e.Inhalt).Should().Equal("erste zeile", "zweite zeile");
+        eintraege.All(e => e.Typ == ProtokollTyp.CliOutput).Should().BeTrue();
+
+        try
+        {
+            if (!handle.Process.HasExited)
+                handle.Process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    /// <summary>Zwei parallele ConPTY-Sitzungen schreiben ihre Ausgabe in getrennte Aufgabenprotokolle.</summary>
+    [OsInterfaceFact]
+    public async Task StartWithPseudoConsoleAsync_ParalleleAufgaben_TrenntProtokolleNachAufgabeId()
+    {
+        await using var provider = CreateCliOutputServiceProvider();
+        var aufgabeA = Guid.NewGuid();
+        var aufgabeB = Guid.NewGuid();
+        var outputs = new Dictionary<Guid, string>
+        {
+            [aufgabeA] = "a-1\na-2\n",
+            [aufgabeB] = "b-1\nb-2\n"
+        };
+        var launcher = new OutputByTaskPseudoConsoleProcessLauncher(id => outputs[id], exitImmediately: false);
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher);
+        var pluginMock = CreateNoOpPlugin();
+
+        var handleA = await sut.StartWithPseudoConsoleAsync(aufgabeA, pluginMock.Object, Path.GetTempPath());
+        var handleB = await sut.StartWithPseudoConsoleAsync(aufgabeB, pluginMock.Object, Path.GetTempPath());
+
+        var eintraegeA = await WaitForCliOutputAsync(provider, aufgabeA, expectedCount: 2);
+        var eintraegeB = await WaitForCliOutputAsync(provider, aufgabeB, expectedCount: 2);
+
+        eintraegeA.Select(e => e.Inhalt).Should().Equal("a-1", "a-2");
+        eintraegeB.Select(e => e.Inhalt).Should().Equal("b-1", "b-2");
+
+        KillIfRunning(handleA.Process);
+        KillIfRunning(handleB.Process);
+    }
+
+    /// <summary>Ein Rate-Limit-Marker aus Session-Output erzeugt ueber den Writer-Pfad einen RateLimit-Eintrag.</summary>
+    [OsInterfaceFact]
+    public async Task AddCliOutputAsync_RateLimitMarkerAusConPtyOutput_ErzeugtRateLimitEintrag()
+    {
+        await using var provider = CreateCliOutputServiceProvider();
+        var aufgabeId = Guid.NewGuid();
+        var marker = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
+        var launcher = new FixedOutputPseudoConsoleProcessLauncher(marker + "\n");
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher);
+
+        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+
+        var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, expectedCount: 2);
+        eintraege.Should().Contain(e => e.Typ == ProtokollTyp.CliOutput && e.Inhalt == marker);
+        eintraege.Should().Contain(e => e.Typ == ProtokollTyp.RateLimit);
+
+        KillIfRunning(handle.Process);
+    }
+
+    /// <summary>Eine Restzeile ohne abschliessenden Zeilentrenner wird ueber den Session-/Service-Pfad persistiert.</summary>
+    [OsInterfaceFact]
+    public async Task StartWithPseudoConsoleAsync_RestzeileOhneZeilentrenner_PersistiertCliOutput()
+    {
+        await using var provider = CreateCliOutputServiceProvider();
+        var aufgabeId = Guid.NewGuid();
+        var launcher = new FixedOutputPseudoConsoleProcessLauncher("letzte restzeile");
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher);
+
+        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+
+        var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 1);
+        eintraege.Single().Inhalt.Should().Be("letzte restzeile");
+
+        KillIfRunning(handle.Process);
+    }
+
+    /// <summary>Der kontrollierte Prozessende-Pfad wartet auf den ReadLoop-Drain, bevor der Writer abgeschlossen wird.</summary>
+    [OsInterfaceFact]
+    public async Task StartWithPseudoConsoleAsync_ProzessEndeVorReadLoopDrain_VerliertTailOutputNicht()
+    {
+        await using var provider = CreateCliOutputServiceProvider();
+        var aufgabeId = Guid.NewGuid();
+        var launcher = new DelayedOutputPseudoConsoleProcessLauncher("tail-output\n", TimeSpan.FromMilliseconds(200));
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher);
+
+        await sut.StartWithPseudoConsoleAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+
+        var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 1);
+        eintraege.Single().Inhalt.Should().Be("tail-output");
+    }
+
+    private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag>> WaitForCliOutputAsync(
+        ServiceProvider provider,
+        Guid aufgabeId,
+        int expectedCount)
+        => (await WaitForProtokollEntriesAsync(provider, aufgabeId, expectedCount, ProtokollTyp.CliOutput)).Where(e => e.Typ == ProtokollTyp.CliOutput).ToList();
+
+    private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag>> WaitForProtokollEntriesAsync(
+        ServiceProvider provider,
+        Guid aufgabeId,
+        int expectedCount,
+        ProtokollTyp? typ = null)
+    {
+        for (var i = 0; i < 50; i++)
+        {
+            var eintraege = GetProtokollEntries(provider, aufgabeId, typ);
+            if (eintraege.Count >= expectedCount)
+                return eintraege;
+
+            await Task.Delay(100);
+        }
+
+        return GetProtokollEntries(provider, aufgabeId, typ);
+    }
+
+    private static IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag> GetProtokollEntries(
+        ServiceProvider provider,
+        Guid aufgabeId,
+        ProtokollTyp? typ)
+    {
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
+        var query = db.Protokolleintraege
+            .AsNoTracking()
+            .Where(e => e.AufgabeId == aufgabeId);
+        if (typ is not null)
+            query = query.Where(e => e.Typ == typ.Value);
+
+        return query
+            .OrderBy(e => e.Zeitstempel)
+            .ToList();
+    }
+
+    private static ServiceProvider CreateCliOutputServiceProvider()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        return new ServiceCollection()
+            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(databaseName))
+            .AddScoped<ProtokollService>()
+            .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance)
+            .BuildServiceProvider();
+    }
+
+    private static Mock<IKiPlugin> CreateNoOpPlugin()
+    {
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "echo",
+                Arguments = "irrelevant",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+        return pluginMock;
+    }
+
+    private static void KillIfRunning(System.Diagnostics.Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private static System.Diagnostics.Process StartTestProcess(bool exitImmediately)
+        => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = exitImmediately ? "/c exit 0" : "/c timeout /t 30 /nobreak > nul",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        }) ?? throw new InvalidOperationException("Testprozess konnte nicht gestartet werden.");
+
+    private sealed class FixedOutputPseudoConsoleProcessLauncher : IPseudoConsoleProcessLauncher
+    {
+        private readonly string _output;
+
+        public FixedOutputPseudoConsoleProcessLauncher(string output)
+        {
+            _output = output;
+        }
+
+        public (System.Diagnostics.Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(
+            Guid aufgabeId,
+            string effectiveWorkingDirectory,
+            string pluginCommand,
+            ITerminalOutputSink? outputSink = null)
+        {
+            var process = StartTestProcess(exitImmediately: false);
+
+            var session = new PseudoConsoleSession(
+                NullPseudoConsoleHandle.Instance,
+                process,
+                new MemoryStream(),
+                new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_output)),
+                NullLogger<PseudoConsoleSession>.Instance,
+                outputSink);
+
+            return (process, session, IntPtr.Zero);
+        }
+    }
+
+    private sealed class OutputByTaskPseudoConsoleProcessLauncher : IPseudoConsoleProcessLauncher
+    {
+        private readonly Func<Guid, string> _outputFactory;
+        private readonly bool _exitImmediately;
+
+        public OutputByTaskPseudoConsoleProcessLauncher(Func<Guid, string> outputFactory, bool exitImmediately)
+        {
+            _outputFactory = outputFactory;
+            _exitImmediately = exitImmediately;
+        }
+
+        public (System.Diagnostics.Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(
+            Guid aufgabeId,
+            string effectiveWorkingDirectory,
+            string pluginCommand,
+            ITerminalOutputSink? outputSink = null)
+        {
+            var process = StartTestProcess(_exitImmediately);
+            var session = new PseudoConsoleSession(
+                NullPseudoConsoleHandle.Instance,
+                process,
+                new MemoryStream(),
+                new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_outputFactory(aufgabeId))),
+                NullLogger<PseudoConsoleSession>.Instance,
+                outputSink);
+
+            return (process, session, IntPtr.Zero);
+        }
+    }
+
+    private sealed class DelayedOutputPseudoConsoleProcessLauncher : IPseudoConsoleProcessLauncher
+    {
+        private readonly string _output;
+        private readonly TimeSpan _readDelay;
+
+        public DelayedOutputPseudoConsoleProcessLauncher(string output, TimeSpan readDelay)
+        {
+            _output = output;
+            _readDelay = readDelay;
+        }
+
+        public (System.Diagnostics.Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(
+            Guid aufgabeId,
+            string effectiveWorkingDirectory,
+            string pluginCommand,
+            ITerminalOutputSink? outputSink = null)
+        {
+            var process = StartTestProcess(exitImmediately: true);
+            var session = new PseudoConsoleSession(
+                NullPseudoConsoleHandle.Instance,
+                process,
+                new MemoryStream(),
+                new DelayedContentStream(_output, _readDelay),
+                NullLogger<PseudoConsoleSession>.Instance,
+                outputSink);
+
+            return (process, session, IntPtr.Zero);
+        }
+    }
+
+    private sealed class DelayedContentStream : Stream
+    {
+        private readonly byte[] _content;
+        private readonly TimeSpan _readDelay;
+        private bool _served;
+
+        public DelayedContentStream(string content, TimeSpan readDelay)
+        {
+            _content = System.Text.Encoding.UTF8.GetBytes(content);
+            _readDelay = readDelay;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => 0;
+        public override long Position { get; set; }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_served)
+                return 0;
+
+            _served = true;
+            await Task.Delay(_readDelay, cancellationToken);
+            _content.CopyTo(buffer);
+            return _content.Length;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

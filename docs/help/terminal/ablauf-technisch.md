@@ -16,6 +16,7 @@ Beteiligte Komponenten:
 - `IKiPlugin.StartCliAsync` — liefert `ProcessStartInfo` mit Executable-Pfad, Argumente, Arbeitsverzeichnis
 - `PseudoConsole.Create` — erstellt HPCON-Handle und Pipes via `CreatePseudoConsole` API
 - `PseudoConsoleProcessStarter.Start` — startet Win32-Prozess mit `STARTUPINFOEX` und `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`
+- `CliOutputProtokollWriter` — optionale Output-Senke für automatische Aufgabenprotokollierung
 - `PseudoConsoleSession` — koordiniert `PseudoConsole`, `Process`, Input-Stream, Output-Stream
 - `CliProcessHandle.PseudoConsoleSession` — Referenz zur Session für späteren Zugriff
 
@@ -25,10 +26,33 @@ Beteiligte Komponenten:
 2. `PseudoConsole.Create(cols, rows)` erstellt Input- und Output-Pipes via `CreatePipe`
 3. `CreatePseudoConsole(inputReadHandle, outputWriteHandle, size, ...)` erstellt HPCON
 4. `PseudoConsoleProcessStarter.Start(psi, pseudoConsole)` startet Prozess mit ConPTY via `CreateProcess`
-5. `PseudoConsoleSession` wird erzeugt mit Pipe-Streams und `PseudoConsole`
-6. `CliProcessHandle` wird mit `PseudoConsoleSession`-Referenz erstellt
-7. Event `CliProcessStatusChanged(Gestartet)` wird gefeuert
-8. Event `PseudoConsoleSessionGestartet(session)` wird an `TaskDetailViewModel` propagiert
+5. `KiAusfuehrungsService` erzeugt einen `CliOutputProtokollWriter` für die `aufgabeId`
+6. `PseudoConsoleSession` wird erzeugt mit Pipe-Streams, `PseudoConsole` und optionaler Output-Senke
+7. `CliProcessHandle` wird mit `PseudoConsoleSession`-Referenz und `OutputSink` erstellt
+8. Event `CliProcessStatusChanged(Gestartet)` wird gefeuert
+9. Event `PseudoConsoleSessionGestartet(session)` wird an `TaskDetailViewModel` propagiert
+
+### 1.5. Automatische CLI-Ausgabe-Protokollierung
+
+Beteiligte Komponenten:
+- `PseudoConsoleSession.ReadLoopAsync` — liest Output-Bytes aus der ConPTY-Pipe
+- `ITerminalOutputSink` — optionale Schnittstelle für rohe Terminal-Output-Chunks
+- `CliOutputProtokollWriter` — kopiert Chunks, segmentiert Zeilen und schreibt im Hintergrund
+- `CliOutputLineAccumulator` — dekodiert UTF-8 zustandsbehaftet und trennt auf `\n`, `\r\n` und einzelne `\r`
+- `ProtokollService.AddCliOutputAsync` — speichert eine Zeile als `ProtokollTyp.CliOutput`
+
+**Detailschritte:**
+
+1. `StartWithPseudoConsoleAsync` erstellt pro ConPTY-Start einen `CliOutputProtokollWriter`.
+2. Der Writer wird über `IPseudoConsoleProcessLauncher.Start(..., outputSink)` an die `PseudoConsoleSession` übergeben.
+3. `ReadLoopAsync` liest einen Byte-Chunk aus `OutputStream`.
+4. Nach `MarkOutputActivity()` und vor der ANSI-Parser-Verarbeitung ruft die Session `outputSink.OnOutputChunk(...)` auf.
+5. Der Writer kopiert die Daten in die eigene Verarbeitung. `CliOutputLineAccumulator` hält UTF-8-Decoderzustand über Chunk-Grenzen und liefert abgeschlossene Zeilen.
+6. Abgeschlossene Zeilen werden in eine bounded Queue mit Backpressure geschrieben. Ein Hintergrund-Worker liest sequenziell und ruft für jede Zeile `ProtokollService.AddCliOutputAsync(aufgabeId, line)` in einem Async-Scope auf.
+7. Beim Ende der Leseschleife ruft `PseudoConsoleSession` `outputSink.Complete()` auf; beim Prozess-Cleanup ruft `KiAusfuehrungsService` zusätzlich `CompleteAsync(...)` mit Timeout auf.
+8. Persistenzfehler werden geloggt. Sie beenden weder Prozess noch Terminal-Rendering.
+
+**Hinweis:** Der drainbare Abschluss wartet auf bereits angenommene Queue-Einträge. Ein verbleibender bekannter Race-Fall bei voller Queue und parallelem `CompleteAsync` ist als Nacharbeit dokumentiert: Zeilen aus einem bereits dekodierten, aber noch nicht vollständig gequeuten Chunk können im Abschlussrennen verloren gehen.
 
 ### 2. Zeilenvorschub-Normalisierung in der Textverarbeitung
 
@@ -122,6 +146,7 @@ Beteiligte Komponenten:
    - Ruft `InvalidateVisual()` für die initiale Darstellung des bereits vorhandenen Bufferinhalts auf.
 4. In `PseudoConsoleSession.ReadLoopAsync` (läuft unabhängig weiter, auch ohne gebundenes Control):
    - `await OutputStream.ReadAsync(buffer)` liest bytes
+   - `_outputSink?.OnOutputChunk(...)` meldet den rohen Chunk an die Aufgabenprotokollierung
    - `foreach (var evt in _parser.Parse(bytes))` zerlegt bytes
    - `Buffer.Apply(evt)` aktualisiert Zustand
    - `BufferChanged?.Invoke(this, EventArgs.Empty)` benachrichtigt ein ggf. gebundenes `TerminalControl`
@@ -205,7 +230,7 @@ Beteiligte Komponenten:
 2. `KiAusfuehrungsService.HandleProcessExited`-Handler wird aufgerufen
 3. `CliProcessStatusChanged(aufgabeId, Gestoppt|Fehler)` wird gefeuert
 4. `TaskDetailViewModel.OnCliProcessStatusChanged` setzt `IsCliRunning = false`; `TaskDetailView` setzt `TerminalControl.Session = null`, wodurch der `BufferChanged`-Handler deregistriert wird
-5. `PseudoConsoleSession.Dispose()` bricht die Leseschleife ab (`_readCts.Cancel()`), wartet mit Timeout auf `_readLoopTask` und schließt danach Input-/Output-Pipe und die PseudoConsole
+5. `CancelAndDisposeConPtyResourcesAsync` versucht einen kurzen Output-Drain der Session, disposed danach die `PseudoConsoleSession` und ruft `OutputSink.CompleteAsync(...)` mit Timeout auf
 6. `ReadLoopAsync` beendet sich (durch Abbruch oder EOF auf der Output-Pipe) — läuft bis dahin unabhängig davon weiter, ob ein `TerminalControl` gebunden war
 
 ## Diagramm
@@ -227,6 +252,7 @@ sequenceDiagram
     PLUGIN-->>SVC: ProcessStartInfo
     SVC->>WIN32: CreatePseudoConsole(...)
     SVC->>WIN32: CreateProcess(psi, pseudoConsole)
+    SVC->>SVC: new CliOutputProtokollWriter(aufgabeId)
     SVC->>SESSION: new PseudoConsoleSession(...)
     activate SESSION
     SESSION->>SESSION: ReadLoopAsync() (Hintergrund-Task, startet sofort)
@@ -236,6 +262,8 @@ sequenceDiagram
     CTRL->>SESSION: BufferChanged += OnBufferChanged
     par ReadLoop (läuft unabhängig vom Control weiter)
         SESSION->>SESSION: OutputStream.ReadAsync()
+        SESSION->>SVC: ITerminalOutputSink.OnOutputChunk(bytes)
+        SVC->>SVC: CliOutputProtokollWriter -> ProtokollService.AddCliOutputAsync
         SESSION->>PARSER: Parse(bytes)
         PARSER-->>SESSION: TerminalEvents
         SESSION->>BUF: Apply(event)
@@ -259,3 +287,5 @@ sequenceDiagram
 | `ReadLoopAsync` bei Prozessende | EOF wird gelesen; Schleife terminiert ordnungsgemäß; Buffer bleibt im letzten Zustand erhalten |
 | Unerwartete Exception in `ReadLoopAsync` | Generisches `catch (Exception)` protokolliert den Fehler und beendet die Schleife geordnet, statt sie unbehandelt zu lassen |
 | `TerminalControl` nicht gebunden, während Prozess Ausgabe produziert | `ReadLoopAsync` liest und puffert die Ausgabe trotzdem weiter im `Buffer` der Session; `BufferChanged` wird gefeuert, hat aber keinen Abonnenten — kein Datenverlust, sobald wieder ein Control bindet |
+| Persistenz eines CLI-Ausgabeprotokolls schlägt fehl | `CliOutputProtokollWriter` loggt den Fehler; die Terminal-Leseschleife und das Rendering werden nicht abgebrochen |
+| CLI-Ausgabe erzeugt schneller Zeilen als die DB persistiert | Die bounded Queue des Writers erzeugt Backpressure; Warnungen zeigen an, dass Persistenz hinterherläuft |

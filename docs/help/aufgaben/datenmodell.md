@@ -33,7 +33,7 @@
 | `Id` | `Guid` | Primärschlüssel |
 | `AufgabeId` | `Guid` | FK → Aufgabe |
 | `Zeitstempel` | `DateTimeOffset` | Zeitpunkt des Eintrags |
-| `Typ` | `ProtokollTyp` | `Prompt`, `KiAntwort`, `GitAktion`, `StatusUebergang`, `TestErgebnis` |
+| `Typ` | `ProtokollTyp` | `Prompt`, `KiAntwort`, `GitAktion`, `StatusUebergang`, `TestErgebnis`, `CliOutput`, `RateLimit`, `SystemMeldung` |
 | `Inhalt` | `string` | Inhalt (Markdown) |
 | `AgentName` | `string?` | Name des Agenten |
 
@@ -88,3 +88,16 @@ erDiagram
     Aufgabe ||--o{ Protokolleintrag : "hat"
     Aufgabe ||--o| IssueReferenz : "hat"
 ```
+
+## CLI-Ausgabeprotokoll
+
+CLI-Ausgaben werden ohne neue Tabelle im bestehenden `Protokolleintrag`-Modell gespeichert:
+
+| Feld | Wert bei CLI-Ausgabe |
+|------|----------------------|
+| `AufgabeId` | Die Aufgabe, deren ConPTY-Sitzung den Output erzeugt hat |
+| `Typ` | `ProtokollTyp.CliOutput` |
+| `Inhalt` | Eine dekodierte Ausgabezeile aus dem Terminal-Output |
+| `Zeitstempel` | Persistenzzeitpunkt des Protokolleintrags |
+
+`ProtokollService.AddCliOutputAsync` ist der zentrale Persistenzpfad. Erkennt die Methode in einer Ausgabezeile einen Rate-Limit-Marker, wird zusätzlich ein `ProtokollTyp.RateLimit`-Eintrag erzeugt.
