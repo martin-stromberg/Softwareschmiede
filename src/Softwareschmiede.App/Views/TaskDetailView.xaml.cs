@@ -98,6 +98,17 @@ public sealed partial class TaskDetailView : UserControl
         if (!ShouldFocusTerminalFromScrollViewerMouseSource(e.OriginalSource))
             return;
 
+        e.Handled = true;
+        FocusTerminalConsole();
+
+        _ = Dispatcher.InvokeAsync(
+            FocusTerminalConsole,
+            System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private void FocusTerminalConsole()
+    {
+        FocusManager.SetFocusedElement(this, TerminalConsole);
         TerminalConsole.Focus();
         Keyboard.Focus(TerminalConsole);
     }
