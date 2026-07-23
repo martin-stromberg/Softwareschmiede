@@ -20,6 +20,7 @@ public sealed class SettingsViewModelTests : IDisposable
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
     private readonly Mock<IPluginManager> _pluginManagerMock;
+    private readonly PluginActivationService _pluginActivationService;
     private readonly InMemoryCredentialStoreForSettings _credentialStore;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptVorlagenService _promptVorlagenService;
@@ -41,6 +42,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         _darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
         _pluginManagerMock = new Mock<IPluginManager>();
+        _pluginActivationService = new PluginActivationService(_einstellungService, _pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _credentialStore = new InMemoryCredentialStoreForSettings();
         _pluginSettingsService = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
         _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
@@ -55,6 +57,7 @@ public sealed class SettingsViewModelTests : IDisposable
             _arbeitsverzeichnisService,
             _darkModeService,
             _pluginManagerMock.Object,
+            _pluginActivationService,
             _pluginSettingsService,
             _promptVorlagenService,
             NullLogger<SettingsViewModel>.Instance);
@@ -82,9 +85,9 @@ public sealed class SettingsViewModelTests : IDisposable
         return mock;
     }
 
-    /// <summary>ScmPluginSelectedCommand lädt Setting-Groups des ausgewählten SCM-Plugins und füllt SelectedScmPluginSettings.</summary>
+    /// <summary>ScmPluginSelectedCommand lädt Setting-Groups des ausgewählten SCM-Plugins und füllt SelectedPluginSettings.</summary>
     [Fact]
-    public void ScmPluginSelectedCommand_LaeadtSettingsGroups_FuerAusgewaehltesPlugin()
+    public async Task ScmPluginSelectedCommand_LaeadtSettingsGroups_FuerAusgewaehltesPlugin()
     {
         var field = new PluginSettingField("token", "Token", PluginSettingFieldType.Secret);
         var group = new PluginSettingGroup("Authentifizierung", [field]);
@@ -92,18 +95,19 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.ScmPluginSelectedCommand.Execute(plugin);
 
-        sut.SelectedScmPluginSettings.Should().HaveCount(1);
-        sut.SelectedScmPluginSettings[0].GroupName.Should().Be("Authentifizierung");
-        sut.SelectedScmPluginSettings[0].Entries.Should().HaveCount(1);
-        sut.SelectedScmPluginSettings[0].Entries[0].Field.Key.Should().Be("token");
+        sut.SelectedPluginSettings.Should().HaveCount(1);
+        sut.SelectedPluginSettings[0].GroupName.Should().Be("Authentifizierung");
+        sut.SelectedPluginSettings[0].Entries.Should().HaveCount(1);
+        sut.SelectedPluginSettings[0].Entries[0].Field.Key.Should().Be("token");
     }
 
     /// <summary>ScmPluginSelectedCommand lädt alle Felder verschiedener Typen korrekt.</summary>
     [Fact]
-    public void ScmPluginSelectedCommand_WithMultipleFields_LoadsAllValues()
+    public async Task ScmPluginSelectedCommand_WithMultipleFields_LoadsAllValues()
     {
         var fields = new PluginSettingField[]
         {
@@ -116,18 +120,19 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.ScmPluginSelectedCommand.Execute(plugin);
 
-        sut.SelectedScmPluginSettings[0].Entries.Should().HaveCount(3);
-        sut.SelectedScmPluginSettings[0].Entries[0].FieldType.Should().Be(PluginSettingFieldType.Url);
-        sut.SelectedScmPluginSettings[0].Entries[1].FieldType.Should().Be(PluginSettingFieldType.Integer);
-        sut.SelectedScmPluginSettings[0].Entries[2].FieldType.Should().Be(PluginSettingFieldType.Boolean);
+        sut.SelectedPluginSettings[0].Entries.Should().HaveCount(3);
+        sut.SelectedPluginSettings[0].Entries[0].FieldType.Should().Be(PluginSettingFieldType.Url);
+        sut.SelectedPluginSettings[0].Entries[1].FieldType.Should().Be(PluginSettingFieldType.Integer);
+        sut.SelectedPluginSettings[0].Entries[2].FieldType.Should().Be(PluginSettingFieldType.Boolean);
     }
 
-    /// <summary>KiPluginSelectedCommand lädt Setting-Groups des ausgewählten KI-Plugins und füllt SelectedKiPluginSettings.</summary>
+    /// <summary>KiPluginSelectedCommand lädt Setting-Groups des ausgewählten KI-Plugins und füllt SelectedPluginSettings.</summary>
     [Fact]
-    public void KiPluginSelectedCommand_LaeadtSettingsGroups_FuerAusgewaehltesPlugin()
+    public async Task KiPluginSelectedCommand_LaeadtSettingsGroups_FuerAusgewaehltesPlugin()
     {
         var field = new PluginSettingField("model", "Modell", PluginSettingFieldType.Text);
         var group = new PluginSettingGroup("Modell-Konfiguration", [field]);
@@ -135,17 +140,18 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([plugin]);
         var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.KiPluginSelectedCommand.Execute(plugin);
 
-        sut.SelectedKiPluginSettings.Should().HaveCount(1);
-        sut.SelectedKiPluginSettings[0].GroupName.Should().Be("Modell-Konfiguration");
-        sut.SelectedKiPluginSettings[0].Entries[0].Field.Key.Should().Be("model");
+        sut.SelectedPluginSettings.Should().HaveCount(1);
+        sut.SelectedPluginSettings[0].GroupName.Should().Be("Modell-Konfiguration");
+        sut.SelectedPluginSettings[0].Entries[0].Field.Key.Should().Be("model");
     }
 
-    /// <summary>LadenAsync lädt Default-Plugins und initialisiert Settings für das Default-SCM-Plugin.</summary>
+    /// <summary>LadenAsync lädt die gespeicherten Default-Plugins. Die Einstellungen selbst werden erst nach Auswahl eines Eintrags im Plugins-Register geladen (SelectedPluginSettings).</summary>
     [Fact]
-    public async Task LadenAsync_LaedtDefaultPlugine_UndInitialeSettings()
+    public async Task LadenAsync_LaedtDefaultPlugine()
     {
         var field = new PluginSettingField("token", "Token", PluginSettingFieldType.Secret);
         var group = new PluginSettingGroup("Auth", [field]);
@@ -161,8 +167,6 @@ public sealed class SettingsViewModelTests : IDisposable
 
         sut.DefaultScmPlugin.Should().Be(scmPlugin);
         sut.DefaultKiPlugin.Should().Be("Claude");
-        sut.SelectedScmPluginSettings.Should().HaveCount(1);
-        sut.SelectedScmPluginSettings[0].GroupName.Should().Be("Auth");
     }
 
     /// <summary>Der VS-Code-Fallback ist ohne gespeicherte Einstellung standardmäßig deaktiviert.</summary>
@@ -234,8 +238,9 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.ScmPluginSelectedCommand.Execute(scmPlugin);
 
-        sut.SelectedScmPluginSettings[0].Entries[0].Value = "mein-token";
+        sut.SelectedPluginSettings[0].Entries[0].Value = "mein-token";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
@@ -257,8 +262,9 @@ public sealed class SettingsViewModelTests : IDisposable
         await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Claude");
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.KiPluginSelectedCommand.Execute(kiPlugin);
 
-        sut.SelectedKiPluginSettings[0].Entries[0].Value = "claude-opus";
+        sut.SelectedPluginSettings[0].Entries[0].Value = "claude-opus";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         var gespeicherterWert = _pluginSettingsService.GetValue(kiPlugin, field);
@@ -282,8 +288,9 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.KiPluginSelectedCommand.Execute(kiPlugin);
 
-        sut.SelectedKiPluginSettings[0].Entries[0].Value.Should().BeEmpty();
+        sut.SelectedPluginSettings[0].Entries[0].Value.Should().BeEmpty();
 
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
@@ -307,13 +314,15 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedKiPluginSettings[0].Entries[0].Value = "--user-choice --model custom";
+        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.SelectedPluginSettings[0].Entries[0].Value = "--user-choice --model custom";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.KiPluginSelectedCommand.Execute(kiPlugin);
 
         _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters")
             .Should().Be("--user-choice --model custom");
-        sut.SelectedKiPluginSettings[0].Entries[0].Value.Should().Be("--user-choice --model custom");
+        sut.SelectedPluginSettings[0].Entries[0].Value.Should().Be("--user-choice --model custom");
     }
 
     /// <summary>Entfernte Codex-CommandLineParameters bleiben leer und fallen nicht auf Defaults zurück.</summary>
@@ -334,12 +343,14 @@ public sealed class SettingsViewModelTests : IDisposable
         var sut = CreateSut();
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-        sut.SelectedKiPluginSettings[0].Entries[0].Value = string.Empty;
+        sut.KiPluginSelectedCommand.Execute(kiPlugin);
+        sut.SelectedPluginSettings[0].Entries[0].Value = string.Empty;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.KiPluginSelectedCommand.Execute(kiPlugin);
 
         _credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters").Should().BeEmpty();
-        sut.SelectedKiPluginSettings[0].Entries[0].Value.Should().BeEmpty();
+        sut.SelectedPluginSettings[0].Entries[0].Value.Should().BeEmpty();
     }
 
     /// <summary>SpeichernAsync zeigt Fehlermeldung wenn Pflichtfeld leer ist und speichert nicht.</summary>
@@ -353,8 +364,9 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.ScmPluginSelectedCommand.Execute(scmPlugin);
 
-        sut.SelectedScmPluginSettings[0].Entries[0].Value = string.Empty;
+        sut.SelectedPluginSettings[0].Entries[0].Value = string.Empty;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
@@ -374,8 +386,9 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.ScmPluginSelectedCommand.Execute(scmPlugin);
 
-        sut.SelectedScmPluginSettings[0].Entries[0].BoolValue = true;
+        sut.SelectedPluginSettings[0].Entries[0].BoolValue = true;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
         var gespeicherterWert = _pluginSettingsService.GetValue(scmPlugin, field);
@@ -437,6 +450,63 @@ public sealed class SettingsViewModelTests : IDisposable
 
         sut.FehlerMeldung.Should().Contain("Prompttext");
         (await _promptVorlagenService.GetAllAsync()).Should().BeEmpty();
+    }
+
+    /// <summary>LadenAsync befüllt die Aktivierungs-Collections mit dem aktuellen Status je Plugin.</summary>
+    [Fact]
+    public async Task Laden_BefuelltAktivierungsCollections_MitStatus()
+    {
+        var scmPlugin = CreateScmPluginMock("GitHub").Object;
+        var kiPlugin = CreateKiPluginMock("Claude").Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        await _pluginActivationService.SetPluginEnabledAsync("github", false);
+        var sut = CreateSut();
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SourceCodeManagementPlugins.Should().ContainSingle();
+        sut.SourceCodeManagementPlugins[0].PluginPrefix.Should().Be("github");
+        sut.SourceCodeManagementPlugins[0].IsEnabled.Should().BeFalse();
+        sut.DevelopmentAutomationPlugins.Should().ContainSingle();
+        sut.DevelopmentAutomationPlugins[0].PluginPrefix.Should().Be("claude");
+        sut.DevelopmentAutomationPlugins[0].IsEnabled.Should().BeTrue();
+    }
+
+    /// <summary>Umschalten eines Aktivierungsstatus und Speichern persistiert den Status über PluginActivationService.</summary>
+    [Fact]
+    public async Task TogglePlugin_UndSpeichern_PersistiertStatus()
+    {
+        var scmPlugin1 = CreateScmPluginMock("GitHub").Object;
+        var scmPlugin2 = CreateScmPluginMock("GitLab").Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin1, scmPlugin2]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SourceCodeManagementPlugins.Single(p => p.PluginPrefix == "gitlab").IsEnabled = false;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        var gespeichertesStatus = await _pluginActivationService.IsPluginEnabledAsync("gitlab");
+        gespeichertesStatus.Should().BeFalse();
+    }
+
+    /// <summary>SpeichernAsync verhindert das Deaktivieren des letzten aktiven Plugins einer Kategorie.</summary>
+    [Fact]
+    public async Task Speichern_VerhindertDeaktivierenDesLetztenPlugins()
+    {
+        var scmPlugin = CreateScmPluginMock("GitHub").Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.SourceCodeManagementPlugins[0].IsEnabled = false;
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().Contain("Mindestens ein");
+        var gespeichertesStatus = await _pluginActivationService.IsPluginEnabledAsync("github");
+        gespeichertesStatus.Should().BeTrue();
     }
 }
 

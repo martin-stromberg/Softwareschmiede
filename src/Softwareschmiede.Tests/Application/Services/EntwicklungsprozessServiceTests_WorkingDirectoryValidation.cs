@@ -49,9 +49,11 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
+            pluginActivationService,
             new Mock<ILogger<PluginSelectionService>>().Object);
 
         _gitOrchestrationService = new GitOrchestrationService(
@@ -218,6 +220,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
             new PluginSelectionService(
                 CreatePassthroughPluginManagerMock(),
                 new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object),
+                new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), CreatePassthroughPluginManagerMock(), new Mock<ILogger<PluginActivationService>>().Object),
                 new Mock<ILogger<PluginSelectionService>>().Object),
             _arbeitsverzeichnisResolverMock.Object,
             new EntwicklungsprozessServiceOptions(ProjektService: _projektService),

@@ -189,6 +189,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<AppEinstellungService>();
         services.AddScoped<ArbeitsverzeichnisSettingsService>();
         services.AddScoped<PluginSettingsService>();
+        services.AddScoped<PluginActivationService>();
         services.AddScoped<PluginSelectionService>();
         services.AddScoped<AufgabeRecoveryService>();
         services.AddScoped<PromptVorlagenService>();

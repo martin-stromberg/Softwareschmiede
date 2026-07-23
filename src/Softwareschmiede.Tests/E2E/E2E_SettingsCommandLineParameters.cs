@@ -64,8 +64,8 @@ public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
 
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
-        var kiTab = WaitForElement(mainWindow, cf => cf.ByName("KI"), Short);
-        kiTab.Click();
+        var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
+        pluginsTab.Click();
 
         var kiPluginBox = WaitForElement(mainWindow, cf => cf.ByName("DefaultKiPlugin"), Short);
         SelectComboBoxItemByClick(kiPluginBox, "Codex CLI", Short);

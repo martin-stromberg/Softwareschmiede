@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,22 +22,30 @@ public sealed partial class SettingsView : UserControl
         };
     }
 
-    private void OnScmPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
+    /// <summary>
+    /// Gemeinsamer Selektions-Handler für alle drei Plugin-Auswahlsteuerelemente im Plugins-Register
+    /// (Standard-SCM-ComboBox, Standard-KI-ComboBox, Aktivierungslisten). Leitet das ausgewählte
+    /// Element je nach Typ an das passende ViewModel-Kommando weiter.
+    /// </summary>
+    /// <param name="sender">Das auslösende Steuerelement.</param>
+    /// <param name="e">Die Ereignisargumente mit dem neu ausgewählten Element.</param>
+    private void OnPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (DataContext is not SettingsViewModel vm)
+        if (DataContext is not SettingsViewModel vm || e.AddedItems.Count == 0)
             return;
 
-        if (e.AddedItems.Count > 0 && e.AddedItems[0] is IGitPlugin plugin)
-            vm.ScmPluginSelectedCommand.Execute(plugin);
-    }
-
-    private void OnKiPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (DataContext is not SettingsViewModel vm)
-            return;
-
-        if (e.AddedItems.Count > 0 && e.AddedItems[0] is IKiPlugin plugin)
-            vm.KiPluginSelectedCommand.Execute(plugin);
+        switch (e.AddedItems[0])
+        {
+            case IGitPlugin gitPlugin:
+                vm.ScmPluginSelectedCommand.Execute(gitPlugin);
+                break;
+            case IKiPlugin kiPlugin:
+                vm.KiPluginSelectedCommand.Execute(kiPlugin);
+                break;
+            case PluginActivationEntry entry:
+                vm.PluginSelectedCommand.Execute(entry);
+                break;
+        }
     }
 
     private void OnPasswordBoxLoaded(object sender, RoutedEventArgs e)

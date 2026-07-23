@@ -1,3 +1,25 @@
+## 2026-07-23 — Plugins-Einstellungen UI-Verbesserungen (Nachfolge-Bugfix)
+
+- UI-Korrektur: Kontrast-Fehler in den Plugin-Aktivierungslisten behoben — Plugin-Namen in der linken Spalte sind nun mit korrekter Textfarbe sichtbar. Themed Background und Foreground sowie Selektions-/Hover-Styling hinzugefügt.
+- UI-Umgestaltung: Aktivierungs-CheckBoxen aus den Selektionslisten (linke Spalte) entfernt — die Listen sind nun reine Auswahllisten. Das Aktivieren/Deaktivieren erfolgt jetzt ausschließlich über eine CheckBox „Plugin aktiviert" im rechten Einstellungsbereich.
+- UI-Erweiterung: Der rechte Bereich zeigt jetzt den Plugin-Namen als Kopfzeile/Titel oberhalb der Aktivierungs-CheckBox, um bessere Orientierung zu bieten.
+- Validierungslogik bleibt erhalten: Die Regel „mindestens ein Plugin je Kategorie aktiv" wird weiterhin beim Speichern durchgesetzt, das Fehlermeldungs-Verhalten ist unverändert.
+- E2E-Tests angepasst: Test-Workflows (`E2E_PluginAktivierung`) an neue Auslöser-Mechanik angepasst (Listeneintrag-Selektion statt direkter Checkbox-Toggle).
+- Dokumentation aktualisiert: `docs/help/plugins/aktivierung.md` und `business-rules.md` korrigiert, um die neue UI-Struktur (Auswahllisten + rechter Toggle) korrekt zu beschreiben.
+
+## 2026-07-23 — Plugins deaktivieren und aktivieren
+
+- Feature: Neuer „Plugins"-Register in den Einstellungen ermöglicht individuelles Aktivieren und Deaktivieren von SCM- und KI-Plugins. Deaktivierte Plugins verschwinden aus allen Plugin-Auswahl-UIs (Projekt-/Aufgabenbearbeitung, Plugin-Auswahldialoge). Nur ein aktives Plugin je Kategorie führt zur automatischen Auswahl und Ausblendung des Selectors.
+- Neue Service-Klasse `PluginActivationService` (scoped): Verwaltet den persistierten Aktivierungsstatus je Plugin im `AppEinstellung`-Store via Key-Value-Einträge (`plugins.enabled.<PluginPrefix>`). Fehlerhafte Einträge gelten als aktiviert (Default-Verhalten für neue Plugins ohne DB-Migration).
+- Neue ViewModel-Klasse `PluginActivationEntry`: Darstellbarer Listeneintrag mit `PluginName`, `PluginPrefix`, `IsEnabled` (bindbar) und Referenz zum Plugin.
+- UI-Integration `SettingsView.xaml`: Alte Tabs „Quellcodeverwaltung" und „KI" entfernt; neuer Tab „Plugins" mit zweispaltiger Master-Detail-Oberfläche (links: reine Selektionslisten für SCM- und KI-Plugins ohne Aktivierungs-CheckBoxen, rechts: Plugin-Name als Titel, Aktivierungs-CheckBox „Plugin aktiviert" und Einstellungsgruppen des ausgewählten Plugins).
+- ViewModel-Erweiterung `SettingsViewModel`: Neue Eigenschaften `SourceCodeManagementPlugins`, `DevelopmentAutomationPlugins`, `SelectedPlugin`, `SelectedPluginSettings` und `PluginSelectedCommand`; erweiterte `LadenAsync()` und `SpeichernAsync()` für Aktivierungsstatus; neue Validierungsregel „mind. ein Plugin je Kategorie aktiv".
+- Service-Integration `PluginSelectionService`: Filtert KI-Plugin-Auswahl über `PluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync()`.
+- ViewModel-Erweiterung `TaskDetailViewModel`, `RepositoryAssignViewModel`, `IssueCreateDialogViewModel`: Verwenden nur aktive Plugins; `TaskDetailViewModel` blendet KI-Plugin-Selector aus bei genau einem aktiven Plugin.
+- Persistierung: Keine neue DB-Migration erforderlich — Aktivierungsstatus als String (`"true"`/`"false"`) in `AppEinstellung`-Tabelle via Schlüssel `plugins.enabled.<PluginPrefix>`.
+- Unit-Tests: Neue `PluginActivationServiceTests` für Persistierung, Filterung, Default-Verhalten; angepasste `SettingsViewModelTests`, `PluginSelectionServiceTests`, `TaskDetailViewModel`-Tests. E2E-Tests: Deaktivierung von Plugins, Single-Plugin-Verhalten, Persistenz nach Neustart.
+- Dokumentation: `docs/help/plugins/beschreibung.md` und neue `aktivierung.md`, `business-rules.md`, sowie aktualisierte `ablauf-technisch.md`.
+
 ## 2026-07-21 — issue.md und .gitignore im Arbeitsverzeichnis erstellen
 
 - Feature: Die automatisch erstellte `issue.md`-Datei (mit Aufgabenbeschreibung) und der zugehörige `.gitignore`-Eintrag werden jetzt im konfigurierten Arbeitsverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`) statt immer im Repository-Root erstellt, falls ein Arbeitsverzeichnis konfiguriert ist.

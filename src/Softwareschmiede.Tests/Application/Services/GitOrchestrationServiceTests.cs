@@ -41,9 +41,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
+            pluginActivationService,
             new Mock<ILogger<PluginSelectionService>>().Object);
         _sut = new GitOrchestrationService(
             _aufgabeService,
@@ -469,6 +471,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             new PluginSelectionService(
                 pluginManagerMock.Object,
                 new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object),
+                new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object),
                 new Mock<ILogger<PluginSelectionService>>().Object),
             new Mock<ILogger<GitOrchestrationService>>().Object,
             workspaceBrowserMock.Object);
@@ -1043,9 +1046,11 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
 
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
+            pluginActivationService,
             new Mock<ILogger<PluginSelectionService>>().Object);
 
         return new GitOrchestrationService(

@@ -19,6 +19,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
     private readonly DarkModeService _darkModeService;
     private readonly IPluginManager _pluginManager;
+    private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptVorlagenService _promptVorlagenService;
     private readonly ILogger<SettingsViewModel> _logger;
@@ -32,9 +33,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private bool _isLoading;
     private string? _fehlerMeldung;
     private string? _erfolgsMeldung;
-    private IReadOnlyList<PluginSettingGroupEntry> _selectedScmPluginSettings = [];
-    private IReadOnlyList<PluginSettingGroupEntry> _selectedKiPluginSettings = [];
     private bool _openVisualStudioCodeWhenNoSolutionFound;
+    private PluginActivationEntry? _selectedPlugin;
+    private IReadOnlyList<PluginSettingGroupEntry> _selectedPluginSettings = [];
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
     public string? Arbeitsverzeichnis
@@ -102,25 +103,31 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _erfolgsMeldung, value);
     }
 
-    /// <summary>Einstellungsgruppen des aktuell gewählten SCM-Plugins.</summary>
-    public IReadOnlyList<PluginSettingGroupEntry> SelectedScmPluginSettings
-    {
-        get => _selectedScmPluginSettings;
-        private set => SetProperty(ref _selectedScmPluginSettings, value);
-    }
-
-    /// <summary>Einstellungsgruppen des aktuell gewählten KI-Plugins.</summary>
-    public IReadOnlyList<PluginSettingGroupEntry> SelectedKiPluginSettings
-    {
-        get => _selectedKiPluginSettings;
-        private set => SetProperty(ref _selectedKiPluginSettings, value);
-    }
-
     /// <summary>Gibt an, ob ohne gefundene Visual-Studio-Solution optional Visual Studio Code geöffnet wird.</summary>
     public bool OpenVisualStudioCodeWhenNoSolutionFound
     {
         get => _openVisualStudioCodeWhenNoSolutionFound;
         set => SetProperty(ref _openVisualStudioCodeWhenNoSolutionFound, value);
+    }
+
+    /// <summary>SCM-Plugins mit Aktivierungsstatus für das Plugins-Register.</summary>
+    public ObservableCollection<PluginActivationEntry> SourceCodeManagementPlugins { get; } = [];
+
+    /// <summary>KI-Plugins mit Aktivierungsstatus für das Plugins-Register.</summary>
+    public ObservableCollection<PluginActivationEntry> DevelopmentAutomationPlugins { get; } = [];
+
+    /// <summary>Im Plugins-Register ausgewählter Eintrag.</summary>
+    public PluginActivationEntry? SelectedPlugin
+    {
+        get => _selectedPlugin;
+        private set => SetProperty(ref _selectedPlugin, value);
+    }
+
+    /// <summary>Einstellungsgruppen des im Plugins-Register ausgewählten Plugins.</summary>
+    public IReadOnlyList<PluginSettingGroupEntry> SelectedPluginSettings
+    {
+        get => _selectedPluginSettings;
+        private set => SetProperty(ref _selectedPluginSettings, value);
     }
 
     /// <summary>Editierbare Promptvorlagen.</summary>
@@ -141,6 +148,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Wird ausgelöst wenn der Nutzer ein KI-Plugin wählt. Lädt die Einstellungsgruppen des Plugins.</summary>
     public ICommand KiPluginSelectedCommand { get; }
 
+    /// <summary>Wird ausgelöst wenn der Nutzer im Plugins-Register einen Listeneintrag wählt. Lädt dessen Einstellungsgruppen.</summary>
+    public ICommand PluginSelectedCommand { get; }
+
     /// <summary>Fügt eine neue Promptvorlage hinzu.</summary>
     public ICommand PromptVorlageHinzufuegenCommand { get; }
 
@@ -153,6 +163,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         ArbeitsverzeichnisSettingsService arbeitsverzeichnisService,
         DarkModeService darkModeService,
         IPluginManager pluginManager,
+        PluginActivationService pluginActivationService,
         PluginSettingsService pluginSettingsService,
         PromptVorlagenService promptVorlagenService,
         ILogger<SettingsViewModel> logger)
@@ -161,6 +172,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _arbeitsverzeichnisService = arbeitsverzeichnisService;
         _darkModeService = darkModeService;
         _pluginManager = pluginManager;
+        _pluginActivationService = pluginActivationService;
         _pluginSettingsService = pluginSettingsService;
         _promptVorlagenService = promptVorlagenService;
         _logger = logger;
@@ -171,15 +183,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         LadenCommand = new AsyncRelayCommand(LadenAsync);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync);
         VerwerfenCommand = new AsyncRelayCommand(VerwerfenAsync);
-        ScmPluginSelectedCommand = new RelayCommand<IGitPlugin>(plugin =>
+        ScmPluginSelectedCommand = new RelayCommand<IGitPlugin>(SelectPluginByReference);
+        KiPluginSelectedCommand = new RelayCommand<IKiPlugin>(SelectPluginByReference);
+        PluginSelectedCommand = new RelayCommand<PluginActivationEntry>(entry =>
         {
-            if (plugin is not null)
-                LoadScmPluginSettings(plugin);
-        });
-        KiPluginSelectedCommand = new RelayCommand<IKiPlugin>(plugin =>
-        {
-            if (plugin is not null)
-                LoadKiPluginSettings(plugin);
+            if (entry is not null)
+                LoadSelectedPluginSettings(entry);
         });
         PromptVorlageHinzufuegenCommand = new RelayCommand(PromptVorlageHinzufuegen);
         PromptVorlageLoeschenCommand = new RelayCommand<PromptVorlageEntry>(PromptVorlageLoeschen, entry => entry is not null);
@@ -213,18 +222,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             KiPlugins = _pluginManager.GetDevelopmentAutomationPlugins();
             OnPropertyChanged(nameof(KiPlugins));
 
+            await LadePluginAktivierungAsync(ct);
+
             var savedScmPluginName = await _einstellungService.GetSettingAsync(AppEinstellungService.DefaultScmPluginKey, ct);
             _defaultScmPlugin = ScmPlugins.FirstOrDefault(p => p.PluginName == savedScmPluginName)
                 ?? ScmPlugins.FirstOrDefault();
             OnPropertyChanged(nameof(DefaultScmPlugin));
-
-            if (_defaultScmPlugin is not null)
-                LoadScmPluginSettings(_defaultScmPlugin);
-
-            var defaultKiPluginObj = KiPlugins.FirstOrDefault(p => p.PluginName == _defaultKiPlugin)
-                ?? KiPlugins.FirstOrDefault();
-            if (defaultKiPluginObj is not null)
-                LoadKiPluginSettings(defaultKiPluginObj);
 
             await LadePromptVorlagenAsync(ct);
         }
@@ -253,10 +256,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (!ValidierePflichtfelder())
                 return;
 
-            SpeicherePluginEinstellungen(_defaultScmPlugin, _selectedScmPluginSettings);
+            foreach (var entry in SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins))
+                await _pluginActivationService.SetPluginEnabledAsync(entry.PluginPrefix, entry.IsEnabled, ct);
 
-            var defaultKiPluginObj = KiPlugins.FirstOrDefault(p => p.PluginName == _defaultKiPlugin);
-            SpeicherePluginEinstellungen(defaultKiPluginObj, _selectedKiPluginSettings);
+            SpeicherePluginEinstellungen(_selectedPlugin?.Plugin, _selectedPluginSettings);
 
             await _arbeitsverzeichnisService.SaveArbeitsverzeichnisAsync(_arbeitsverzeichnis, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
@@ -298,14 +301,36 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         await LadenAsync(ct);
     }
 
-    private void LoadScmPluginSettings(IGitPlugin plugin)
+    private void LoadSelectedPluginSettings(PluginActivationEntry entry)
     {
-        SelectedScmPluginSettings = LadePluginEinstellungen(plugin);
+        SelectedPlugin = entry;
+        SelectedPluginSettings = LadePluginEinstellungen(entry.Plugin);
     }
 
-    private void LoadKiPluginSettings(IKiPlugin plugin)
+    /// <summary>Sucht den zu <paramref name="plugin"/> gehörenden Aktivierungseintrag über beide Kategorien und lädt dessen Einstellungen.</summary>
+    /// <param name="plugin">Das über eine der Standard-Plugin-ComboBoxen ausgewählte Plugin.</param>
+    private void SelectPluginByReference(IPlugin? plugin)
     {
-        SelectedKiPluginSettings = LadePluginEinstellungen(plugin);
+        var entry = SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins).FirstOrDefault(e => e.Plugin == plugin);
+        if (entry is not null)
+            LoadSelectedPluginSettings(entry);
+    }
+
+    private async Task LadePluginAktivierungAsync(CancellationToken ct)
+    {
+        SourceCodeManagementPlugins.Clear();
+        foreach (var plugin in ScmPlugins)
+        {
+            var enabled = await _pluginActivationService.IsPluginEnabledAsync(plugin.PluginPrefix, ct);
+            SourceCodeManagementPlugins.Add(new PluginActivationEntry(plugin, enabled));
+        }
+
+        DevelopmentAutomationPlugins.Clear();
+        foreach (var plugin in KiPlugins)
+        {
+            var enabled = await _pluginActivationService.IsPluginEnabledAsync(plugin.PluginPrefix, ct);
+            DevelopmentAutomationPlugins.Add(new PluginActivationEntry(plugin, enabled));
+        }
     }
 
     private IReadOnlyList<PluginSettingGroupEntry> LadePluginEinstellungen(IPlugin plugin)
@@ -341,9 +366,26 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     private bool ValidierePflichtfelder()
     {
-        return ValidierePflichtfelderFuerSettings(_selectedScmPluginSettings)
-            && ValidierePflichtfelderFuerSettings(_selectedKiPluginSettings)
+        return ValidierePluginAktivierung()
+            && ValidierePflichtfelderFuerSettings(_selectedPluginSettings)
             && ValidierePromptVorlagen();
+    }
+
+    private bool ValidierePluginAktivierung()
+    {
+        if (SourceCodeManagementPlugins.Count > 0 && SourceCodeManagementPlugins.All(entry => !entry.IsEnabled))
+        {
+            FehlerMeldung = "Mindestens ein Quellcodeverwaltungs-Plugin muss aktiv bleiben.";
+            return false;
+        }
+
+        if (DevelopmentAutomationPlugins.Count > 0 && DevelopmentAutomationPlugins.All(entry => !entry.IsEnabled))
+        {
+            FehlerMeldung = "Mindestens ein KI-Plugin muss aktiv bleiben.";
+            return false;
+        }
+
+        return true;
     }
 
     private bool ValidierePflichtfelderFuerSettings(IReadOnlyList<PluginSettingGroupEntry> settings)

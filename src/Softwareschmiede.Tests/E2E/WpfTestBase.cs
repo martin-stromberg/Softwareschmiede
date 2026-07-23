@@ -372,14 +372,14 @@ public abstract class WpfTestBase : IDisposable
             if (button is not null)
                 button.AsButton().Click();
 
-            var settingsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Quellcodeverwaltung"));
+            var settingsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Plugins"));
             if (settingsTab is not null)
                 return;
 
             Thread.Sleep(300);
         }
 
-        WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
     }
 
     /// <summary>
@@ -559,8 +559,13 @@ public abstract class WpfTestBase : IDisposable
     {
         NavigateToSettings(mainWindow);
 
-        var quellcodeTab = WaitForElement(mainWindow, cf => cf.ByName("Quellcodeverwaltung"), Short);
-        quellcodeTab.Click();
+        var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
+        pluginsTab.Click();
+
+        // Klickt gezielt auf das Namens-Label (nicht die Aktivierungs-CheckBox selbst), damit nur
+        // der Listeneintrag ausgewählt wird, ohne den Aktivierungsstatus des Plugins zu verändern.
+        var localDirectoryPluginEntry = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
+        localDirectoryPluginEntry.Click();
 
         var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), Short);
         var workspaceMode = useInSourceDirectoryMode ? "InSourceDirectory" : "SeparateWorkingDirectory";

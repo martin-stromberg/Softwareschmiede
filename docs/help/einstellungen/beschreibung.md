@@ -4,25 +4,36 @@
 
 Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne Code-Änderungen. Sie deckt folgende Bereiche ab:
 
-1. **Plugin-Einstellungen** — Tokens und Zugangsdaten für SCM- und KI-Plugins
-2. **Standard-Plugins** — Welches Plugin bei neuen Aufgaben standardmäßig genutzt wird
-3. **Arbeitsverzeichnis** — Wo geklonte Repositories lokal abgelegt werden
-4. **IDE-Verhalten** — Optionaler Visual-Studio-Code-Fallback, wenn keine Solution vorhanden ist
-5. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
-6. **Erscheinungsbild** — Dark Mode ein-/ausschalten
-7. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
+1. **Plugins** — Aktivierung/Deaktivierung von SCM- und KI-Plugins, Standard-Plugins pro Kategorie, Plugin-spezifische Tokens und Zugangsdaten
+2. **Arbeitsverzeichnis** — Wo geklonte Repositories lokal abgelegt werden
+3. **IDE-Verhalten** — Optionaler Visual-Studio-Code-Fallback, wenn keine Solution vorhanden ist
+4. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
+5. **Erscheinungsbild** — Dark Mode ein-/ausschalten
+6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
 
 ## Funktionsweise
 
-### Plugin-Einstellungen (SCM und KI)
+### Plugins-Register (zentrale Plugin-Verwaltung)
 
-Die Einstellungsseite bietet zwei dedizierte Registerkarten für die Konfiguration von Plugin-Einstellungen:
+Das Register „Plugins" in **Einstellungen → Plugins** bietet eine zentralisierte Verwaltung aller Plugins:
 
-**Register „Quellcodeverwaltung":** Hier wählen Sie das Standard-SCM-Plugin (z. B. GitHub, GitLab) und konfigurieren dessen Einstellungen. Die Einstellungen werden vom Plugin definiert — typischerweise sind das Authentifizierungs-Tokens, API-Keys oder Konfigurationsparameter für die Versionskontrolle.
+**Zwei-spaltige Master-Detail-Oberfläche:**
 
-**Register „KI":** Analog zur Quellcodeverwaltung können Sie hier das Standard-KI-Plugin (z. B. Claude, GitHub Copilot) auswählen und dessen Einstellungen konfigurieren. Dies sind meist API-Tokens, Modell-Parameter oder Verhaltenseinstellungen für die KI-Integration.
+- **Linke Spalte:** 
+  - Oben: Auswahl-DropDowns für Standard-SCM-Plugin und Standard-KI-Plugin
+  - Unten: Zwei gruppierte Listen (Quellcodeverwaltung und KI) mit Aktivierungs-CheckBoxen für jedes verfügbare Plugin
+  - Für jedes Plugin können Sie bestimmen, ob es aktiv (sichtbar in Auswahlflächen) oder inaktiv (gefiltert) ist
+  - **Validierungsregel:** Mindestens ein Plugin pro Kategorie muss aktiv bleiben
 
-Jedes Register zeigt dynamisch die Einstellungsfelder des gewählten Plugins an. Die Feldtypen werden automatisch erkannt und mit dem passenden Eingabeelement gerendert:
+- **Rechte Spalte:** 
+  - Zeigt die plugin-spezifischen Einstellungsgruppen des in der Aktivierungsliste gewählten Plugins an
+  - Sie können Tokens, API-Keys und andere Plugin-Parameter hier konfigurieren
+  - Die Einstellungsfelder werden vom Plugin definiert und dynamisch als passende Eingabeelemente gerendert
+
+**Feldtypen:**
+
+Die Plugin-Einstellungsfelder werden automatisch erkannt und mit dem passenden Eingabeelement gerendert:
+
 - **Text:** Einfaches Textfeld
 - **Geheim:** Passwort-Feld (maskiert)
 - **URL:** Textfeld für URLs
@@ -33,6 +44,15 @@ Jedes Register zeigt dynamisch die Einstellungsfelder des gewählten Plugins an.
 - **Kommandozeilenparameter:** Textfeld für zusätzliche CLI-Argumente, die beim Start eines CLI-basierten KI-Plugins angehängt werden
 
 Bei jedem Feldtyp wird die Beschreibung des Feldes (falls vom Plugin angegeben) unterhalb des Eingabeelements angezeigt.
+
+**Single-Plugin-Verhalten:**
+
+Wenn nur noch **ein Plugin** einer Kategorie aktiv ist, wird die Auswahl-UI in den betroffenen Views automatisch verborgen:
+- In der **Aufgabendetailansicht** verschwindet die KI-Plugin-Auswahl
+- Bei der **Aufgabenerstellung** wird der Auswahl-Dialog übersprungen
+- Bei der **Projekt-/Repository-Zuweisung** verschwindet die SCM-Plugin-Auswahl
+
+Das betreffende Plugin wird dann direkt und ohne Umweg über eine Auswahlliste verwendet.
 
 Für das Codex-Plugin gilt eine zusätzliche Schutzregel: Der Wert `Softwareschmiede.Codex.CommandLineParameters` wird ausschließlich als Anwenderwert behandelt. Beim Laden wird kein automatisch deklarierter `DefaultValue` in das Feld übernommen. Wenn noch kein Wert gespeichert ist, bleibt das Feld leer. Wenn ein Anwender den Wert bewusst leert und speichert, bleibt auch dieser leere Wert erhalten und automatische Defaults werden weiterhin nicht wieder eingesetzt.
 

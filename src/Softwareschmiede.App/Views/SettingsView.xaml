@@ -83,6 +83,40 @@
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.CommandLineParametersTemplate>
         </local:PluginSettingFieldTemplateSelector>
+
+        <Style x:Key="PluginActivationListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -132,7 +166,9 @@
                     Padding="12,8"
                     Margin="0,8,0,8"
                     Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-                <TextBlock Text="{Binding FehlerMeldung}" Foreground="White" />
+                <TextBlock AutomationProperties.Name="FehlerMeldung"
+                           AutomationProperties.HelpText="{Binding FehlerMeldung}"
+                           Text="{Binding FehlerMeldung}" Foreground="White" />
             </Border>
         </StackPanel>
 
@@ -224,138 +260,153 @@
             <TabItem>
                 <TabItem.Header >
                     <StackPanel Orientation="Horizontal" Margin="0">
-                        <TextBlock Margin="0,0,8,0" Foreground="{DynamicResource SecondaryTextBrush}" Opacity="0.88" >{}</TextBlock>
-                        <TextBlock Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}">Quellcodeverwaltung</TextBlock>
+                        <TextBlock Margin="0,0,8,0" Foreground="{DynamicResource SecondaryTextBrush}" Opacity="0.88" >🔌</TextBlock>
+                        <TextBlock Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}">Plugins</TextBlock>
                     </StackPanel>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="16">
-                        <!-- Standard SCM-Plugin -->
-                        <StackPanel Margin="0,0,0,24" MaxWidth="400" HorizontalAlignment="Left">
-                            <TextBlock Text="Standard SCM-Plugin"
-                                       FontWeight="SemiBold"
+                <Grid Margin="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="360" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Linke Spalte: Standard-Plugin-Auswahl und Aktivierungslisten -->
+                    <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Standard SCM-Plugin -->
+                            <StackPanel Margin="0,0,0,16">
+                                <TextBlock Text="Standard SCM-Plugin"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox SelectedValue="{Binding DefaultScmPlugin, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding ScmPlugins}"
+                                          Margin="0,0,0,12"
+                                          Padding="8,6"
+                                          SelectionChanged="OnPluginSelectionChanged">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding PluginName}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <!-- Standard KI-Plugin -->
+                                <TextBlock Text="Standard KI-Plugin"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,0,0,4" />
+                                <ComboBox SelectedValue="{Binding DefaultKiPlugin, UpdateSourceTrigger=PropertyChanged}"
+                                          SelectedValuePath="PluginName"
+                                          AutomationProperties.Name="DefaultKiPlugin"
+                                          ItemsSource="{Binding KiPlugins}"
+                                          Padding="8,6"
+                                          SelectionChanged="OnPluginSelectionChanged">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding PluginName}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Aktivierung SCM-Plugins -->
+                            <TextBlock Text="Quellcodeverwaltung"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="0,8,0,4" />
+                            <ListBox ItemsSource="{Binding SourceCodeManagementPlugins}"
+                                     Background="{DynamicResource SurfaceBrush}"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource BorderBrush}"
+                                     Margin="0,0,0,16"
+                                     ItemContainerStyle="{StaticResource PluginActivationListBoxItemStyle}"
+                                     SelectionChanged="OnPluginSelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding PluginName}"
+                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
+                                                       Margin="6,0,0,0"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <!-- Aktivierung KI-Plugins -->
+                            <TextBlock Text="KI"
+                                       FontWeight="Bold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,0,0,4" />
-                            <TextBlock Text="Standardplugin, das für Repository-Operationen verwendet wird (z.B. Klonen, Pull, Push)."
-                                       FontSize="12"
-                                       Foreground="{DynamicResource SecondaryTextBrush}"
-                                       Margin="0,0,0,8" />
-                            <ComboBox SelectedValue="{Binding DefaultScmPlugin, UpdateSourceTrigger=PropertyChanged}"
-                                      ItemsSource="{Binding ScmPlugins}"
-                                      Margin="0,0,0,12"
-                                      Padding="8,6"
-                                      SelectionChanged="OnScmPluginSelectionChanged">
-                                <ComboBox.ItemTemplate>
+                            <ListBox ItemsSource="{Binding DevelopmentAutomationPlugins}"
+                                     Background="{DynamicResource SurfaceBrush}"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource BorderBrush}"
+                                     ItemContainerStyle="{StaticResource PluginActivationListBoxItemStyle}"
+                                     SelectionChanged="OnPluginSelectionChanged">
+                                <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding PluginName}" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding PluginName}"
+                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
+                                                       Margin="6,0,0,0"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
                                     </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </StackPanel>
+                    </ScrollViewer>
 
-                        <!-- Plugin-Einstellungen SCM -->
-                        <ItemsControl ItemsSource="{Binding SelectedScmPluginSettings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,0,0,8">
-                                        <TextBlock Text="{Binding GroupName}"
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   Margin="0,10,0,5" />
-                                        <ItemsControl ItemsSource="{Binding Entries}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Margin="0,4,0,4">
-                                                        <TextBlock Text="{Binding Field.Label}"
-                                                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                                                   FontSize="12"
-                                                                   Margin="0,0,0,2" />
-                                                        <ContentControl Content="{Binding}"
-                                                                        ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
-                                                        <TextBlock Text="{Binding Field.Description}"
-                                                                   FontSize="11"
-                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                                                   Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                                                                   Margin="0,2,0,0" />
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-            <TabItem>
-                <TabItem.Header >
-                    <StackPanel Orientation="Horizontal" Margin="0">
-                        <TextBlock Margin="0,0,8,0" Foreground="{DynamicResource SecondaryTextBrush}" Opacity="0.88" >🤖</TextBlock>
-                        <TextBlock Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}">KI</TextBlock>
-                    </StackPanel>
-                </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="16">
-                        <!-- Standard KI-Plugin -->
-                        <StackPanel Margin="0,0,0,24" MaxWidth="400" HorizontalAlignment="Left">
-                            <TextBlock Text="Standard KI-Plugin"
-                                       FontWeight="SemiBold"
+                    <!-- Rechte Spalte: Einstellungen des im Aktivierungsregister ausgewählten Plugins -->
+                    <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedPlugin.PluginName}"
+                                       FontWeight="Bold"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
-                                       Margin="0,0,0,4" />
-                            <TextBlock Text="Standardplugin, das für KI-gestützte Funktionen verwendet wird (z.B. Planung, Implementierung, Code-Analyse, Vorschläge)."
-                                       FontSize="12"
-                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       Visibility="{Binding SelectedPlugin, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
                                        Margin="0,0,0,8" />
-                            <ComboBox SelectedValue="{Binding DefaultKiPlugin, UpdateSourceTrigger=PropertyChanged}"
-                                      SelectedValuePath="PluginName"
-                                      AutomationProperties.Name="DefaultKiPlugin"
-                                      ItemsSource="{Binding KiPlugins}"
-                                      Margin="0,0,0,12"
-                                      Padding="8,6"
-                                      SelectionChanged="OnKiPluginSelectionChanged">
-                                <ComboBox.ItemTemplate>
+                            <CheckBox Content="Plugin aktiviert"
+                                      AutomationProperties.Name="PluginAktiviert"
+                                      IsChecked="{Binding SelectedPlugin.IsEnabled, Mode=TwoWay}"
+                                      Visibility="{Binding SelectedPlugin, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                                      Margin="0,0,0,12" />
+                            <ItemsControl ItemsSource="{Binding SelectedPluginSettings}">
+                                <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding PluginName}" />
+                                        <StackPanel Margin="0,0,0,8">
+                                            <TextBlock Text="{Binding GroupName}"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       Margin="0,10,0,5" />
+                                            <ItemsControl ItemsSource="{Binding Entries}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="0,4,0,4">
+                                                            <TextBlock Text="{Binding Field.Label}"
+                                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                       FontSize="12"
+                                                                       Margin="0,0,0,2" />
+                                                            <ContentControl Content="{Binding}"
+                                                                            ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
+                                                            <TextBlock Text="{Binding Field.Description}"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                       Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                                                                       Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                     </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
-
-                        <!-- Plugin-Einstellungen KI -->
-                        <ItemsControl ItemsSource="{Binding SelectedKiPluginSettings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,0,0,8">
-                                        <TextBlock Text="{Binding GroupName}"
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   Margin="0,10,0,5" />
-                                        <ItemsControl ItemsSource="{Binding Entries}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Margin="0,4,0,4">
-                                                        <TextBlock Text="{Binding Field.Label}"
-                                                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                                                   FontSize="12"
-                                                                   Margin="0,0,0,2" />
-                                                        <ContentControl Content="{Binding}"
-                                                                        ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
-                                                        <TextBlock Text="{Binding Field.Description}"
-                                                                   FontSize="11"
-                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                                                   Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                                                                   Margin="0,2,0,0" />
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
+                    </ScrollViewer>
+                </Grid>
             </TabItem>
             <TabItem>
                 <TabItem.Header>

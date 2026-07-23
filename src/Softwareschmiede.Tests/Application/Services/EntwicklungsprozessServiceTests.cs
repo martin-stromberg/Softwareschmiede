@@ -78,7 +78,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPlugins.First());
 
         var defaultService = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        return new PluginSelectionService(pluginManagerMock.Object, defaultService, new Mock<ILogger<PluginSelectionService>>().Object);
+        var activationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        return new PluginSelectionService(pluginManagerMock.Object, defaultService, activationService, new Mock<ILogger<PluginSelectionService>>().Object);
     }
 
     private string SetupCloneWithDirectoryCreation(string? gitignoreContent = null)
@@ -1106,9 +1107,11 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(_kiPluginMock.Object);
 
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
+            pluginActivationService,
             new Mock<ILogger<PluginSelectionService>>().Object);
 
         var sut = new EntwicklungsprozessService(

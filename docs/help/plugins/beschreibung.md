@@ -37,7 +37,20 @@ Das Standard-SCM-Plugin und das Standard-KI-Plugin werden in den App-Einstellung
 - Für KI-Läufe mit Claude wird `ClaudeCliPlugin` gewählt; der Anthropic API Key wird optional als `ANTHROPIC_API_KEY`-Umgebungsvariable übergeben.
 - Für KI-Läufe mit Codex wird `CodexPlugin` gewählt; optional kann ein absoluter Pfad zur `codex`-Executable unter `Softwareschmiede.Codex.ExecutablePath` gespeichert werden. Zusätzliche Codex-Argumente werden unter `Softwareschmiede.Codex.CommandLineParameters` gespeichert und nur verwendet, wenn sie vom Anwender gesetzt wurden. Automatische Defaults werden für diesen Wert nicht übernommen.
 
+### Aktivierung und Deaktivierung
+
+Jedes Plugin kann in den Einstellungen (Tab „Plugins") einzeln aktiviert oder deaktiviert werden. Der Aktivierungsstatus wird persistiert und bleibt nach Anwendungsneust bestehen. Neue oder erstmals entdeckte Plugins sind standardmäßig aktiviert. Deaktivierte Plugins:
+
+- Erscheinen nicht in der Plugin-Auswahl von Projekten und Aufgaben
+- Werden nicht als Standard-Plugin vorgeschlagen
+- Sind nicht in der KI-Plugin-Auswahl von neuen Aufgaben verfügbar
+
+Wichtig: Es muss stets mindestens ein Plugin je Kategorie (SCM oder KI) aktiv bleiben. Das Deaktivieren des letzten aktiven Plugins einer Kategorie wird durch Validierung verhindert.
+
+**Single-Plugin-Verhalten:** Wenn genau ein Plugin einer Kategorie aktiv ist, wird es automatisch ohne Auswahldialog verwendet. Der Plugin-Selector wird in diesem Fall ausgeblendet.
+
 ## Einschränkungen
 
 - Plugins liegen als fest referenzierte Klassenbibliotheken vor; dynamisches Laden zur Laufzeit ist nicht implementiert.
 - Pro Aufgabe kann immer nur ein KI-Plugin und ein SCM-Plugin gleichzeitig aktiv sein.
+- Der globale Aktivierungsstatus ist nicht pro Projekt konfigurierbar; er gilt für die gesamte Anwendung.

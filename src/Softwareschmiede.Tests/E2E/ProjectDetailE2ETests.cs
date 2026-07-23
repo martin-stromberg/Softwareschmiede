@@ -229,11 +229,11 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
     /// <summary>
     /// Szenario: "Öffnen"-Button in der Detailansicht prüfen; anschließend den
-    /// Repository-Zuweisungs-Dialog öffnen und die SCM-Plugin- sowie die
-    /// Arbeitsverzeichnis-ComboBox prüfen; Dialog über "Abbrechen" schließen.
-    /// Prüft: Der "Öffnen"-Button existiert; der Dialog enthält mindestens eine ComboBox für die
-    /// Plugin-Auswahl sowie das Label und eine zweite ComboBox für die Arbeitsverzeichnis-Auswahl;
-    /// nach "Abbrechen" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
+    /// Repository-Zuweisungs-Dialog öffnen und die Arbeitsverzeichnis-ComboBox prüfen;
+    /// Dialog über "Abbrechen" schließen.
+    /// Prüft: Der "Öffnen"-Button existiert; der Dialog enthält das Label und die ComboBox für die
+    /// Arbeitsverzeichnis-Auswahl (die Plugin-Auswahl-ComboBox ist bei nur einem aktiven SCM-Plugin
+    /// ausgeblendet); nach "Abbrechen" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
     private void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(AutomationElement mainWindow)
@@ -250,15 +250,12 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         // RepositoryAssignDialog erscheint als separates Fenster
         var dialog = WaitForWindow("Repository zuweisen", Short);
 
-        // ComboBox für SCM-Plugin-Auswahl muss vorhanden sein
-        var comboBoxen = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.ComboBox));
-        Assert.True(comboBoxen.Length >= 1, "RepositoryAssignDialog muss mindestens eine ComboBox für die Plugin-Auswahl enthalten.");
-
         // Label "Arbeitsverzeichnis im Repository" ist vorhanden
         WaitForElement(dialog, cf => cf.ByName("Arbeitsverzeichnis im Repository"), Short);
 
-        // Zweite ComboBox (Arbeitsverzeichnis-Auswahl) ist zusätzlich zur Plugin-Auswahl vorhanden
-        Assert.True(comboBoxen.Length >= 2, "RepositoryAssignDialog muss zusätzlich zur Plugin-Auswahl eine ComboBox für die Arbeitsverzeichnis-Auswahl enthalten.");
+        // ComboBox für die Arbeitsverzeichnis-Auswahl ist vorhanden. Die Plugin-Auswahl-ComboBox
+        // wird nur angezeigt, wenn mehrere SCM-Plugins aktiv sind (hier nur LocalDirectoryPlugin).
+        WaitForElement(dialog, cf => cf.ByName("ArbeitsverzeichnisComboBox"), Short);
 
         // Dialog über "Abbrechen" schließen
         var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);

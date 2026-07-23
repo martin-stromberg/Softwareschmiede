@@ -108,6 +108,21 @@ public sealed class AppEinstellungService
     public Task SetBoolSettingAsync(string schluessel, bool wert, CancellationToken ct = default)
         => SetSettingAsync(schluessel, wert.ToString(), ct);
 
+    /// <summary>Liest die Werte mehrerer Einstellungen anhand ihrer Schlüssel in einer einzigen Datenbankabfrage.</summary>
+    /// <param name="schluessel">Die zu lesenden Schlüssel.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Eine Zuordnung von Schlüssel zu Wert; Schlüssel ohne gespeicherten Eintrag fehlen im Ergebnis.</returns>
+    public async Task<IReadOnlyDictionary<string, string?>> GetSettingsAsync(IReadOnlyCollection<string> schluessel, CancellationToken ct = default)
+    {
+        if (schluessel.Count == 0)
+            return new Dictionary<string, string?>();
+
+        return await _db.AppEinstellungen
+            .AsNoTracking()
+            .Where(s => schluessel.Contains(s.Schluessel))
+            .ToDictionaryAsync(s => s.Schluessel, s => s.Wert, ct);
+    }
+
     /// <summary>Liest alle Fenstergeometrie-Einstellungen in einer einzigen Datenbankabfrage.</summary>
     public async Task<WindowGeometrySettings> GetWindowGeometryAsync(CancellationToken ct = default)
     {
