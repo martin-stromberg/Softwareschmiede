@@ -393,9 +393,16 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <controls:TerminalControl x:Name="TerminalConsole"
-                                          AutomationProperties.Name="TerminalConsole"
-                                          Visibility="{Binding IsCliViewSelected, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <ScrollViewer x:Name="TerminalScrollViewer"
+                              AutomationProperties.Name="TerminalScrollViewer"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="True"
+                              PreviewMouseDown="OnTerminalScrollViewerPreviewMouseDown"
+                              Visibility="{Binding IsCliViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <controls:TerminalControl x:Name="TerminalConsole"
+                                              AutomationProperties.Name="TerminalConsole" />
+                </ScrollViewer>
 
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
