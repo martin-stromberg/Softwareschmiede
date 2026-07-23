@@ -61,6 +61,7 @@ Die wichtigsten Features:
 - **Projekt- und Aufgabenverwaltung** – Dashboard, Statusmodell und chronologisches Aufgabenprotokoll
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI und Codex CLI mit Echtzeit-Streaming der Ausgabe
+- **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM- und KI-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
 - **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
@@ -240,13 +241,31 @@ Für das Claude-CLI-Plugin kann der API-Key alternativ per `cmdkey` gesetzt werd
 cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANTHROPIC_API_KEY>
 ```
 
-### Standardplugin je Pluginart konfigurieren
+### Plugins-Register — Aktivierung und Standardplugins
 
-- In **Einstellungen → Quellcodeverwaltung** und **Einstellungen → KI** können Standard-Plugins pro Pluginart gewählt und konfiguriert werden:
-  - **Quellcodeverwaltung** (SourceCodeManagement): z. B. GitHub oder Local Directory
-  - **KI** (DevelopmentAutomation): z. B. GitHub Copilot, Claude CLI oder Codex CLI
+Das neue **Plugins-Register** in **Einstellungen → Plugins** bietet eine zentralisierte Verwaltung aller Plugins mit zwei Hauptfunktionen:
+
+**Aktivierung/Deaktivierung von Plugins:**
+
+- Linke Spalte zeigt zwei gruppierte Listen (Quellcodeverwaltung und KI) mit Aktivierungs-CheckBoxen je Plugin
+- Deaktivierte Plugins werden automatisch aus allen Plugin-Auswahlflächen gefiltert (Projekt-/Aufgabenbearbeitung, Aufgabenstart)
+- Neue Plugins sind standardmäßig aktiviert (fehlender Aktivierungsstatus = aktiviert)
+- **Validierungsregel:** Mindestens ein Plugin je Kategorie muss aktiv bleiben; das Deaktivieren des letzten aktiven Plugins einer Kategorie wird verhindert
+
+**Single-Plugin-Verhalten:**
+
+- Ist nur **ein Plugin** einer Kategorie aktiv, wird die Auswahl-UI in den betroffenen Views automatisch ausgeblendet und das Plugin wird direkt verwendet:
+  - In der **Aufgabendetailansicht** wird die KI-Plugin-Auswahl verborgen
+  - Bei der **Aufgabenerstellung** wird der KI-Plugin-Auswahl-Dialog übersprungen
+  - In der **Repository-Zuweisung** wird die SCM-Plugin-Auswahl verborgen
+
+**Standard-Plugins und Einstellungen:**
+
+- Im oberen Bereich des **Plugins-Registers** können Standard-Plugins pro Kategorie (SCM und KI) gewählt werden:
+  - **Standard SCM-Plugin:** z. B. GitHub oder Local Directory
+  - **Standard KI-Plugin:** z. B. GitHub Copilot, Claude CLI oder Codex CLI
 - Die Auswahl wird persistent in den App-Einstellungen (`DefaultScmPluginKey`, `DefaultKiPluginKey`) gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt
-- Nach Plugin-Auswahl können plugin-spezifische Einstellungen konfiguriert werden:
+- Nach Plugin-Auswahl (durch Klick auf einen Eintrag in den Aktivierungslisten) können plugin-spezifische Einstellungen in der rechten Spalte konfiguriert werden:
   - Die verfügbaren Felder werden vom Plugin via `GetSettingGroups()` definiert
   - Feldtypen (Text, Secret, Integer, Boolean, Enum, FilePath) werden entsprechend gerendert
   - Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert

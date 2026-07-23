@@ -311,9 +311,9 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
         var deadline = DateTime.UtcNow + Short;
         while (DateTime.UtcNow < deadline)
         {
-            var comboBoxes = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.ComboBox));
-            if (comboBoxes.Length >= 2)
-                return comboBoxes[1];
+            var comboBox = dialog.FindFirstDescendant(cf => cf.ByName("ArbeitsverzeichnisComboBox"));
+            if (comboBox is not null)
+                return comboBox;
 
             Thread.Sleep(200);
         }

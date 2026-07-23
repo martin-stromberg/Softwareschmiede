@@ -65,7 +65,9 @@ public sealed class EntwicklungsprozessServiceTests
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPlugin);
 
         var defaultService = new PluginDefaultSettingsService(db.Context, NullLogger<PluginDefaultSettingsService>.Instance);
-        return new PluginSelectionService(pluginManagerMock.Object, defaultService, NullLogger<PluginSelectionService>.Instance);
+        var einstellungService = new AppEinstellungService(db.Context, NullLogger<AppEinstellungService>.Instance);
+        var activationService = new PluginActivationService(einstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        return new PluginSelectionService(pluginManagerMock.Object, defaultService, activationService, NullLogger<PluginSelectionService>.Instance);
     }
 
     /// <summary>

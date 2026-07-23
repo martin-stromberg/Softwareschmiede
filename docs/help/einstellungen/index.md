@@ -1,6 +1,6 @@
 # Einstellungen
 
-Die Einstellungsseite bündelt alle systemweiten Konfigurationen der Anwendung. Anwender können hier die Standard-Plugins für Quellcodeverwaltung und KI auswählen, deren spezifische Einstellungen konfigurieren, Arbeitsverzeichnisse angeben und das Erscheinungsbild anpassen. Alle Einstellungen werden persistent gespeichert und beim nächsten Start automatisch wiederhergestellt.
+Die Einstellungsseite bündelt alle systemweiten Konfigurationen der Anwendung. Das zentrale **Plugins-Register** ermöglicht das Aktivieren/Deaktivieren von SCM- und KI-Plugins, die Wahl von Standard-Plugins je Kategorie und deren spezifische Konfiguration. Darüber hinaus können Anwender Arbeitsverzeichnisse angeben und das Erscheinungsbild anpassen. Alle Einstellungen werden persistent gespeichert und beim nächsten Start automatisch wiederhergestellt.
 
 ## Inhalt
 

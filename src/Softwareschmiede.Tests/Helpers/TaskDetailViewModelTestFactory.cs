@@ -28,7 +28,8 @@ public static class TaskDetailViewModelTestFactory
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
+        var pluginActivationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
         var promptVorlagenService = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
         var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
         var promptZeitVersandService = new PromptZeitVersandService(kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);

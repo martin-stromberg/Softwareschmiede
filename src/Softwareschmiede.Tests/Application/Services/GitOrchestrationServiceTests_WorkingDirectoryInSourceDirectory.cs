@@ -47,9 +47,11 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
+            pluginActivationService,
             new Mock<ILogger<PluginSelectionService>>().Object);
 
         _sut = new GitOrchestrationService(

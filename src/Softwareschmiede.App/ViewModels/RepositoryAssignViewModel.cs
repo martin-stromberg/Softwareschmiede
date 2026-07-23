@@ -13,11 +13,13 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     private readonly ILogger<RepositoryAssignViewModel> _logger;
     private readonly IPluginManager? _pluginManager;
     private readonly DirectoryStructureBrowserService? _directoryStructureService;
+    private readonly PluginActivationService? _pluginActivationService;
     private AvailableRepository? _selectedRepository;
     private bool _isLoading;
     private ObservableCollection<IGitPlugin> _availableScmPlugins = new();
     private IGitPlugin? _selectedScmPlugin;
     private bool _hasScmPlugins;
+    private bool _hasMultipleScmPlugins;
     private CancellationTokenSource? _reloadCts;
     private ObservableCollection<string> _availableWorkingDirectories = new();
     private string? _selectedWorkingDirectory;
@@ -66,6 +68,13 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     {
         get => _hasScmPlugins;
         private set => SetProperty(ref _hasScmPlugins, value);
+    }
+
+    /// <summary>Gibt an, ob mehr als ein SCM-Plugin aktiv ist (steuert die Sichtbarkeit des Selectors).</summary>
+    public bool HasMultipleScmPlugins
+    {
+        get => _hasMultipleScmPlugins;
+        private set => SetProperty(ref _hasMultipleScmPlugins, value);
     }
 
     /// <summary>Verfügbare Arbeitsverzeichnisse des ausgewählten Repositories.</summary>
@@ -133,11 +142,13 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     public RepositoryAssignViewModel(
         ILogger<RepositoryAssignViewModel> logger,
         IPluginManager? pluginManager = null,
-        DirectoryStructureBrowserService? directoryStructureService = null)
+        DirectoryStructureBrowserService? directoryStructureService = null,
+        PluginActivationService? pluginActivationService = null)
     {
         _logger = logger;
         _pluginManager = pluginManager;
         _directoryStructureService = directoryStructureService;
+        _pluginActivationService = pluginActivationService;
 
         BestaetigenCommand = new RelayCommand(
             Confirm,
@@ -145,19 +156,24 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
     }
 
-    /// <summary>Lädt alle verfügbaren SCM-Plugins.</summary>
+    /// <summary>Lädt alle verfügbaren (aktiven) SCM-Plugins.</summary>
+    /// <param name="ct">Abbruchtoken.</param>
     public async Task LadenAsync(CancellationToken ct = default)
     {
         IsLoading = true;
         try
         {
-            if (_pluginManager != null)
+            IReadOnlyList<IGitPlugin>? plugins = _pluginActivationService != null
+                ? await _pluginActivationService.GetEnabledSourceCodeManagementPluginsAsync(ct)
+                : _pluginManager?.GetSourceCodeManagementPlugins();
+
+            if (plugins != null)
             {
-                var plugins = _pluginManager.GetSourceCodeManagementPlugins();
                 AvailableScmPlugins.Clear();
                 foreach (var plugin in plugins)
                     AvailableScmPlugins.Add(plugin);
                 HasScmPlugins = AvailableScmPlugins.Count > 0;
+                HasMultipleScmPlugins = AvailableScmPlugins.Count > 1;
 
                 if (HasScmPlugins)
                 {

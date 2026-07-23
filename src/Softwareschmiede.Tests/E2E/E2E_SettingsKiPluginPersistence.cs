@@ -50,8 +50,8 @@ public sealed class E2E_SettingsKiPluginPersistence : WpfTestBase
 
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
-        var kiTab = WaitForElement(mainWindow, cf => cf.ByName("KI"), Short);
-        kiTab.Click();
+        var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
+        pluginsTab.Click();
     }
 
     private static AutomationElement SelectDefaultKiPlugin(AutomationElement mainWindow, string pluginName)

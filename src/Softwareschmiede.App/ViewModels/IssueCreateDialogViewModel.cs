@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
@@ -10,6 +11,7 @@ namespace Softwareschmiede.App.ViewModels;
 public sealed class IssueCreateDialogViewModel : ViewModelBase
 {
     private readonly IPluginManager _pluginManager;
+    private readonly PluginActivationService? _pluginActivationService;
     private readonly ILogger<IssueCreateDialogViewModel> _logger;
     private IIssueCreateProvider? _issueProvider;
     private IIssueTemplateProvider? _templateProvider;
@@ -163,10 +165,14 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     public ICommand AbbrechenCommand { get; }
 
     /// <inheritdoc cref="IssueCreateDialogViewModel"/>
-    public IssueCreateDialogViewModel(IPluginManager pluginManager, ILogger<IssueCreateDialogViewModel> logger)
+    public IssueCreateDialogViewModel(
+        IPluginManager pluginManager,
+        ILogger<IssueCreateDialogViewModel> logger,
+        PluginActivationService? pluginActivationService = null)
     {
         _pluginManager = pluginManager;
         _logger = logger;
+        _pluginActivationService = pluginActivationService;
 
         LoadTemplatesCommand = new AsyncRelayCommand(LoadTemplatesAsync);
         KiAusfuellenCommand = new AsyncRelayCommand(KiAusfuellenAsync, () => CanUseAi);
@@ -213,6 +219,66 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
                                      string.Equals(p, preferredKiPluginPrefix, StringComparison.OrdinalIgnoreCase))
                                  ?? VerfuegbareKiPlugins.FirstOrDefault();
         AktualisiereAbhaengigeZustaende();
+    }
+
+    /// <summary>Initialisiert den Dialog wie <see cref="Initialize"/> und filtert <see cref="VerfuegbareKiPlugins"/>
+    /// anschließend in einem Schritt auf aktive Plugins, sodass beide Schritte nicht mehr einzeln in der
+    /// richtigen Reihenfolge aufgerufen werden müssen.</summary>
+    /// <param name="issueProvider">Der Provider zum Anlegen des Issues.</param>
+    /// <param name="templateProvider">Optionaler Provider für Vorlagen.</param>
+    /// <param name="repositoryId">Die Kennung des Repositories.</param>
+    /// <param name="initialTitle">Der initial vorbelegte Titel.</param>
+    /// <param name="originalRequirement">Die ursprüngliche Anforderungsbeschreibung.</param>
+    /// <param name="preferredKiPluginPrefix">Der bevorzugte KI-Plugin-Prefix.</param>
+    /// <param name="issueAlreadyAssigned">Prüfung, ob bereits ein Issue zugeordnet ist.</param>
+    /// <param name="issueAlreadyAssignedLive">Asynchrone Live-Prüfung, ob bereits ein Issue zugeordnet ist.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public async Task InitializeAsync(
+        IIssueCreateProvider issueProvider,
+        IIssueTemplateProvider? templateProvider,
+        string repositoryId,
+        string? initialTitle,
+        string? originalRequirement,
+        string? preferredKiPluginPrefix,
+        Func<bool>? issueAlreadyAssigned = null,
+        Func<CancellationToken, Task<bool>>? issueAlreadyAssignedLive = null,
+        CancellationToken ct = default)
+    {
+        Initialize(
+            issueProvider,
+            templateProvider,
+            repositoryId,
+            initialTitle,
+            originalRequirement,
+            preferredKiPluginPrefix,
+            issueAlreadyAssigned,
+            issueAlreadyAssignedLive);
+        await FiltereAktivePluginsAsync(ct);
+    }
+
+    /// <summary>Filtert <see cref="VerfuegbareKiPlugins"/> zusätzlich auf aktive Plugins. Ohne konfigurierten <see cref="PluginActivationService"/> bleibt die Liste unverändert.</summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    public async Task FiltereAktivePluginsAsync(CancellationToken ct = default)
+    {
+        if (_pluginActivationService is null)
+        {
+            return;
+        }
+
+        var aktivePrefixe = (await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct))
+            .Select(p => p.PluginPrefix)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var deaktiviertePrefixe = VerfuegbareKiPlugins.Where(p => !aktivePrefixe.Contains(p)).ToList();
+        foreach (var prefix in deaktiviertePrefixe)
+        {
+            VerfuegbareKiPlugins.Remove(prefix);
+        }
+
+        if (SelectedKiPluginPrefix is not null && !aktivePrefixe.Contains(SelectedKiPluginPrefix))
+        {
+            SelectedKiPluginPrefix = VerfuegbareKiPlugins.FirstOrDefault();
+        }
     }
 
     /// <summary>Setzt Template-Inhalt und Originalanforderung deterministisch zusammen.</summary>

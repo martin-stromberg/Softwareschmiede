@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,22 +22,47 @@ public sealed partial class SettingsView : UserControl
         };
     }
 
-    private void OnScmPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
+    /// <summary>
+    /// Gemeinsamer Selektions-Handler für alle drei Plugin-Auswahlsteuerelemente im Plugins-Register
+    /// (Standard-SCM-ComboBox, Standard-KI-ComboBox, Aktivierungslisten). Leitet das ausgewählte
+    /// Element je nach Typ an das passende ViewModel-Kommando weiter.
+    /// </summary>
+    /// <param name="sender">Das auslösende Steuerelement.</param>
+    /// <param name="e">Die Ereignisargumente mit dem neu ausgewählten Element.</param>
+    private void OnPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (DataContext is not SettingsViewModel vm)
+        if (DataContext is not SettingsViewModel vm || e.AddedItems.Count == 0)
             return;
 
-        if (e.AddedItems.Count > 0 && e.AddedItems[0] is IGitPlugin plugin)
-            vm.ScmPluginSelectedCommand.Execute(plugin);
+        switch (e.AddedItems[0])
+        {
+            case IGitPlugin gitPlugin:
+                vm.ScmPluginSelectedCommand.Execute(gitPlugin);
+                break;
+            case IKiPlugin kiPlugin:
+                vm.KiPluginSelectedCommand.Execute(kiPlugin);
+                break;
+            case PluginActivationEntry entry:
+                vm.PluginSelectedCommand.Execute(entry);
+                break;
+        }
     }
 
-    private void OnKiPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
+    /// <summary>
+    /// Selektiert den ListBoxItem-Container bereits in der Tunneling-Phase, bevor die darin
+    /// enthaltene CheckBox das MouseLeftButtonDown-Ereignis für ihre eigene Umschalt-Logik als
+    /// behandelt markiert. Ohne dies erreicht der Klick niemals die bubbling-basierte
+    /// Selektionslogik von <see cref="ListBoxItem"/>, sodass ein Klick direkt auf die CheckBox
+    /// (z. B. per AutomationProperties.Name in E2E-Tests oder beim manuellen Anklicken) den
+    /// Eintrag toggelt, aber nicht auswählt und somit auch nicht <see cref="OnPluginSelectionChanged"/>
+    /// auslöst.
+    /// </summary>
+    /// <param name="sender">Der <see cref="ListBoxItem"/>-Container, an dem der Handler registriert ist.</param>
+    /// <param name="e">Die Ereignisargumente des Mausklicks.</param>
+    private void OnPluginActivationItemPreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (DataContext is not SettingsViewModel vm)
-            return;
-
-        if (e.AddedItems.Count > 0 && e.AddedItems[0] is IKiPlugin plugin)
-            vm.KiPluginSelectedCommand.Execute(plugin);
+        if (sender is ListBoxItem { IsSelected: false } item)
+            item.IsSelected = true;
     }
 
     private void OnPasswordBoxLoaded(object sender, RoutedEventArgs e)

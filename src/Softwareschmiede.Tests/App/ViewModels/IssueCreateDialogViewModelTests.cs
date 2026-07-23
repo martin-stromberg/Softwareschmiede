@@ -296,6 +296,29 @@ public sealed class IssueCreateDialogViewModelTests
         sut.CanUseAi.Should().BeFalse();
     }
 
+    /// <summary>FiltereAktivePluginsAsync entfernt deaktivierte Plugins aus VerfuegbareKiPlugins.</summary>
+    [Fact]
+    public async Task FiltereAktivePluginsAsync_ShouldRemoveDeactivatedPlugins()
+    {
+        var aktivesPlugin = new FakeKiPlugin();
+        var deaktiviertesPlugin = new FakeFailingKiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
+        await using var db = Softwareschmiede.Tests.Helpers.TestDbContextFactory.Create();
+        var einstellungService = new Softwareschmiede.Application.Services.AppEinstellungService(
+            db, NullLogger<Softwareschmiede.Application.Services.AppEinstellungService>.Instance);
+        var activationService = new Softwareschmiede.Application.Services.PluginActivationService(
+            einstellungService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
+        await activationService.SetPluginEnabledAsync("FailKi", false);
+        var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance, activationService);
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
+
+        await sut.FiltereAktivePluginsAsync();
+
+        sut.VerfuegbareKiPlugins.Should().ContainSingle();
+        sut.VerfuegbareKiPlugins.Should().Contain("FakeKi");
+        sut.SelectedKiPluginPrefix.Should().Be("FakeKi");
+    }
+
     /// <summary>KI-Fehler bleiben im Dialog und verlieren den bisherigen Body nicht.</summary>
     [Fact]
     public async Task KiAusfuellen_ShouldKeepBodyAndShowError_WhenGeneratorFails()

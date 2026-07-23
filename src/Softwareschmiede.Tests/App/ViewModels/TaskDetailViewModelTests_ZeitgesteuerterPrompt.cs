@@ -45,7 +45,8 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, NullLogger<PluginSelectionService>.Instance);
+        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
         _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();

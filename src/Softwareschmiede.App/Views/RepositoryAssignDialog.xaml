@@ -26,6 +26,7 @@
 
         <!-- Plugin-Auswahl -->
         <ComboBox Grid.Row="1"
+                  Visibility="{Binding HasMultipleScmPlugins, Converter={StaticResource BoolToVisibilityConverter}}"
                   ItemsSource="{Binding AvailableScmPlugins}"
                   SelectedItem="{Binding SelectedScmPlugin, Mode=TwoWay}"
                   DisplayMemberPath="PluginName"
@@ -96,6 +97,7 @@
                       SelectedItem="{Binding SelectedWorkingDirectory, Mode=TwoWay}"
                       IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
                       Visibility="{Binding IsWorkingDirectoryManualInput, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                      AutomationProperties.Name="ArbeitsverzeichnisComboBox"
                       Background="{DynamicResource BackgroundBrush}"
                       Padding="8,6" />
 

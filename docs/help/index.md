@@ -25,7 +25,7 @@ Eigenschaften und Präsentation der Softwareschmiede Desktopanwendung.
 ## Systemverwaltung & Konfiguration
 
 - [Einstellungen](einstellungen/index.md) — Bündelt alle systemweiten Konfigurationen: Plugin-Einstellungen, Arbeitsverzeichnis, Benachrichtigungen und Erscheinungsbild.
-- [Plugin-System](plugins/index.md) — SCM- und KI-Plugins werden als separate .NET-Klassenbibliotheken bereitgestellt und per `PluginManager` zur Laufzeit entdeckt.
+- [Plugin-System](plugins/index.md) — SCM- und KI-Plugins werden als separate .NET-Klassenbibliotheken bereitgestellt und per `PluginManager` zur Laufzeit entdeckt. Jedes Plugin kann selektiv aktiviert/deaktiviert werden; deaktivierte Plugins verschwinden aus Auswahllisten. Bei genau einem aktiven Plugin einer Kategorie wird dieses automatisch ohne Auswahl verwendet.
 - [Stabilität & Fehlerbehandlung](stabilitaet/index.md) — Fängt Fehler an allen relevanten Stellen zentral ab und protokolliert sie, statt unkontrolliert abzustürzen: globale Exception-Handler, abgesicherte Fire-and-Forget-Aufrufe, geschützte Prozess-Event-Handler und zuverlässige Freigabe nativer ConPTY-Handles.
 
 ### KI-Plugins (Entwicklungsautomatisierung)

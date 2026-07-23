@@ -12,16 +12,19 @@ public sealed class PluginSelectionService
 {
     private readonly IPluginManager _pluginManager;
     private readonly PluginDefaultSettingsService _defaultSettingsService;
+    private readonly PluginActivationService _pluginActivationService;
     private readonly ILogger<PluginSelectionService> _logger;
 
     /// <inheritdoc cref="PluginSelectionService"/>
     public PluginSelectionService(
         IPluginManager pluginManager,
         PluginDefaultSettingsService defaultSettingsService,
+        PluginActivationService pluginActivationService,
         ILogger<PluginSelectionService> logger)
     {
         _pluginManager = pluginManager;
         _defaultSettingsService = defaultSettingsService;
+        _pluginActivationService = pluginActivationService;
         _logger = logger;
     }
 
@@ -52,16 +55,15 @@ public sealed class PluginSelectionService
         return resolved;
     }
 
-    /// <summary>Gibt alle verfügbaren KI-Plugin-Prefixe zurück.</summary>
-    public Task<IReadOnlyList<string>> GetAvailableKiPluginPrefixesAsync(CancellationToken ct = default)
+    /// <summary>Gibt die Prefixe aller aktiven KI-Plugins zurück.</summary>
+    public async Task<IReadOnlyList<string>> GetAvailableKiPluginPrefixesAsync(CancellationToken ct = default)
     {
-        var plugins = _pluginManager.GetDevelopmentAutomationPlugins();
-        var prefixe = (IReadOnlyList<string>)plugins
+        var plugins = await _pluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync(ct);
+        return plugins
             .Select(p => p.PluginPrefix)
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        return Task.FromResult(prefixe);
     }
 
     /// <summary>Löst das KI-Plugin auf.</summary>

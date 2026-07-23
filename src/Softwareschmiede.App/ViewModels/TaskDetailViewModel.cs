@@ -55,6 +55,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _fehlerMeldung;
     private bool _isCliRunning;
     private string? _selectedKiPluginPrefix;
+    private bool _zeigeKiPluginAuswahl;
     private string? _optionalCliParameters;
     private CancellationTokenSource? _ladenCts;
     private string? _editTitel;
@@ -214,6 +215,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         get => _selectedKiPluginPrefix;
         set => SetProperty(ref _selectedKiPluginPrefix, value);
+    }
+
+    /// <summary>Steuert die Sichtbarkeit des KI-Plugin-Selectors (false bei genau einem aktiven Plugin).</summary>
+    public bool ZeigeKiPluginAuswahl
+    {
+        get => _zeigeKiPluginAuswahl;
+        private set => SetProperty(ref _zeigeKiPluginAuswahl, value);
     }
 
     /// <summary>Optionale Parameter für den CLI-Start.</summary>
@@ -639,6 +647,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             if (VerfuegbareKiPlugins.Count > 0 && _selectedKiPluginPrefix is null)
                 SelectedKiPluginPrefix = VerfuegbareKiPlugins[0];
+
+            ZeigeKiPluginAuswahl = VerfuegbareKiPlugins.Count > 1;
         }
         catch (Exception ex)
         {
@@ -1052,7 +1062,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         var dialogVm = _serviceProvider.GetRequiredService<IssueCreateDialogViewModel>();
         var preferredKiPluginPrefix = await ResolvePreferredKiPluginPrefixAsync(ct);
-        dialogVm.Initialize(
+        await dialogVm.InitializeAsync(
             issueCreateProvider,
             gitPlugin as IIssueTemplateProvider,
             repositoryId,
@@ -1060,7 +1070,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             _aufgabe.AnforderungsBeschreibung,
             preferredKiPluginPrefix,
             () => _aufgabe?.IssueReferenz is not null,
-            async token => (await _aufgabeService.GetDetailAsync(_aufgabeId, token))?.IssueReferenz is not null);
+            async token => (await _aufgabeService.GetDetailAsync(_aufgabeId, token))?.IssueReferenz is not null,
+            ct);
 
         var createdIssue = await _dialogService.ShowIssueCreateDialogAsync(dialogVm, ct);
         if (createdIssue is null)
@@ -1438,6 +1449,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     private async Task<string?> ResolvePluginViaDialogAsync(Aufgabe aufgabe, CancellationToken ct)
     {
+        if (VerfuegbareKiPlugins.Count == 1)
+        {
+            var einzigesPluginPrefix = VerfuegbareKiPlugins[0];
+            await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, einzigesPluginPrefix, ct);
+            return einzigesPluginPrefix;
+        }
+
         var dialogResult = await _dialogService.ShowPluginSelectionDialogAsync(
             VerfuegbareKiPlugins,
             _selectedKiPluginPrefix,
