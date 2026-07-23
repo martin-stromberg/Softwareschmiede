@@ -97,10 +97,11 @@
 
 ### Regel: Aktivierungsstatus wird sofort persistiert
 
-**Beschreibung:** Wenn der Benutzer in den Einstellungen den Status wechselt und speichert, wird dieser Status sofort in die `AppEinstellung`-Tabelle geschrieben und bleibt nach Neustart erhalten.
+**Beschreibung:** Wenn der Benutzer in den Einstellungen den Status über die CheckBox „Plugin aktiviert" im rechten Bereich wechselt und speichert, wird dieser Status sofort in die `AppEinstellung`-Tabelle geschrieben und bleibt nach Neustart erhalten.
 
 **Bedingungen:**
-- Benutzer ändert Checkbox-Status in Plugin-Liste
+- Benutzer wählt ein Plugin in der Liste aus
+- Benutzer ändert den Status via CheckBox „Plugin aktiviert" im rechten Bereich
 - Speichern-Button wird geklickt
 - Validierung erfolgreich (mindestens ein Plugin aktiv)
 
@@ -110,7 +111,7 @@
 - Beim nächsten Öffnen der Einstellungen ist der Status noch aktiv
 - Nach Neustart der Anwendung ist der Status nach Reload noch aktiv
 
-**Umsetzung:** `SettingsViewModel.SpeichernAsync()` — iteriert über geänderte Einträge und ruft `SetPluginEnabledAsync()` auf
+**Umsetzung:** `SettingsViewModel.SpeichernAsync()` — iteriert über alle Einträge in `SourceCodeManagementPlugins` und `DevelopmentAutomationPlugins`, deren `IsEnabled`-Status sich geändert hat, und ruft `SetPluginEnabledAsync()` auf
 
 ## Kompatibilität und Migration
 

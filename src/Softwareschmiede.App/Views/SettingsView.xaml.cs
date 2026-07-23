@@ -48,23 +48,6 @@ public sealed partial class SettingsView : UserControl
         }
     }
 
-    /// <summary>
-    /// Selektiert den ListBoxItem-Container bereits in der Tunneling-Phase, bevor die darin
-    /// enthaltene CheckBox das MouseLeftButtonDown-Ereignis für ihre eigene Umschalt-Logik als
-    /// behandelt markiert. Ohne dies erreicht der Klick niemals die bubbling-basierte
-    /// Selektionslogik von <see cref="ListBoxItem"/>, sodass ein Klick direkt auf die CheckBox
-    /// (z. B. per AutomationProperties.Name in E2E-Tests oder beim manuellen Anklicken) den
-    /// Eintrag toggelt, aber nicht auswählt und somit auch nicht <see cref="OnPluginSelectionChanged"/>
-    /// auslöst.
-    /// </summary>
-    /// <param name="sender">Der <see cref="ListBoxItem"/>-Container, an dem der Handler registriert ist.</param>
-    /// <param name="e">Die Ereignisargumente des Mausklicks.</param>
-    private void OnPluginActivationItemPreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        if (sender is ListBoxItem { IsSelected: false } item)
-            item.IsSelected = true;
-    }
-
     private void OnPasswordBoxLoaded(object sender, RoutedEventArgs e)
         => PluginSettingEntryEditHelper.OnPasswordBoxLoaded(sender, e);
 

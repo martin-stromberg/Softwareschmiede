@@ -66,8 +66,10 @@ public sealed class E2E_PluginAktivierung : WpfTestBase
         NavigateToSettings(mainWindow);
         OpenPluginsTab(mainWindow);
 
-        var scmCheckbox = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin"), Short);
-        scmCheckbox.AsCheckBox().IsChecked = false;
+        var scmEintrag = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
+        scmEintrag.Click();
+        var scmAktiviertCheckbox = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
+        scmAktiviertCheckbox.AsCheckBox().IsChecked = false;
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
@@ -107,7 +109,9 @@ public sealed class E2E_PluginAktivierung : WpfTestBase
         NavigateToSettings(mainWindow);
         OpenPluginsTab(mainWindow);
 
-        var claudeCheckboxReloaded = WaitForElement(mainWindow, cf => cf.ByName("Softwareschmiede.ClaudeCli"), Short);
+        var claudeEintragReloaded = WaitForElement(mainWindow, cf => cf.ByName("Softwareschmiede.ClaudeCli.Eintrag"), Short);
+        claudeEintragReloaded.Click();
+        var claudeCheckboxReloaded = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
         Assert.False(claudeCheckboxReloaded.AsCheckBox().IsChecked);
 
         // Zurück zur Aufgabe: bei genau einem aktiven KI-Plugin entfällt Selector und Auswahl-Dialog
@@ -140,7 +144,9 @@ public sealed class E2E_PluginAktivierung : WpfTestBase
 
     private static void DeaktivierePlugin(AutomationElement mainWindow, string pluginPrefix)
     {
-        var checkbox = WaitForElement(mainWindow, cf => cf.ByName(pluginPrefix), Short);
+        var eintrag = WaitForElement(mainWindow, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short);
+        eintrag.Click();
+        var checkbox = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
         checkbox.AsCheckBox().IsChecked = false;
     }
 }

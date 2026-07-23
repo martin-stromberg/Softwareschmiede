@@ -247,7 +247,9 @@ Das neue **Plugins-Register** in **Einstellungen → Plugins** bietet eine zentr
 
 **Aktivierung/Deaktivierung von Plugins:**
 
-- Linke Spalte zeigt zwei gruppierte Listen (Quellcodeverwaltung und KI) mit Aktivierungs-CheckBoxen je Plugin
+- Linke Spalte zeigt zwei gruppierte Auswahllisten (Quellcodeverwaltung und KI) mit Plugin-Namen
+- Nach Auswahl eines Plugins wird der Plugin-Name als Kopfzeile im rechten Einstellungsbereich angezeigt
+- Im rechten Bereich kann das ausgewählte Plugin über die CheckBox „Plugin aktiviert" aktiviert oder deaktiviert werden
 - Deaktivierte Plugins werden automatisch aus allen Plugin-Auswahlflächen gefiltert (Projekt-/Aufgabenbearbeitung, Aufgabenstart)
 - Neue Plugins sind standardmäßig aktiviert (fehlender Aktivierungsstatus = aktiviert)
 - **Validierungsregel:** Mindestens ein Plugin je Kategorie muss aktiv bleiben; das Deaktivieren des letzten aktiven Plugins einer Kategorie wird verhindert

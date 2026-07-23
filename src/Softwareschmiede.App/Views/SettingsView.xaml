@@ -83,6 +83,40 @@
                 </DataTemplate>
             </local:PluginSettingFieldTemplateSelector.CommandLineParametersTemplate>
         </local:PluginSettingFieldTemplateSelector>
+
+        <Style x:Key="PluginActivationListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -283,23 +317,17 @@
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,8,0,4" />
                             <ListBox ItemsSource="{Binding SourceCodeManagementPlugins}"
+                                     Background="{DynamicResource SurfaceBrush}"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
                                      Margin="0,0,0,16"
+                                     ItemContainerStyle="{StaticResource PluginActivationListBoxItemStyle}"
                                      SelectionChanged="OnPluginSelectionChanged">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnPluginActivationItemPreviewMouseLeftButtonDown" />
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
-                                            <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}"
-                                                      AutomationProperties.Name="{Binding PluginPrefix}"
-                                                      VerticalAlignment="Center" />
                                             <TextBlock Text="{Binding PluginName}"
                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
-                                                       Foreground="{DynamicResource PrimaryTextBrush}"
                                                        Margin="6,0,0,0"
                                                        VerticalAlignment="Center" />
                                         </StackPanel>
@@ -313,22 +341,16 @@
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        Margin="0,0,0,4" />
                             <ListBox ItemsSource="{Binding DevelopmentAutomationPlugins}"
+                                     Background="{DynamicResource SurfaceBrush}"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
+                                     ItemContainerStyle="{StaticResource PluginActivationListBoxItemStyle}"
                                      SelectionChanged="OnPluginSelectionChanged">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnPluginActivationItemPreviewMouseLeftButtonDown" />
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal">
-                                            <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}"
-                                                      AutomationProperties.Name="{Binding PluginPrefix}"
-                                                      VerticalAlignment="Center" />
                                             <TextBlock Text="{Binding PluginName}"
                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
-                                                       Foreground="{DynamicResource PrimaryTextBrush}"
                                                        Margin="6,0,0,0"
                                                        VerticalAlignment="Center" />
                                         </StackPanel>
@@ -340,37 +362,49 @@
 
                     <!-- Rechte Spalte: Einstellungen des im Aktivierungsregister ausgewählten Plugins -->
                     <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding SelectedPluginSettings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,0,0,8">
-                                        <TextBlock Text="{Binding GroupName}"
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   Margin="0,10,0,5" />
-                                        <ItemsControl ItemsSource="{Binding Entries}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Margin="0,4,0,4">
-                                                        <TextBlock Text="{Binding Field.Label}"
-                                                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                                                   FontSize="12"
-                                                                   Margin="0,0,0,2" />
-                                                        <ContentControl Content="{Binding}"
-                                                                        ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
-                                                        <TextBlock Text="{Binding Field.Description}"
-                                                                   FontSize="11"
-                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                                                   Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                                                                   Margin="0,2,0,0" />
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedPlugin.PluginName}"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Visibility="{Binding SelectedPlugin, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                                       Margin="0,0,0,8" />
+                            <CheckBox Content="Plugin aktiviert"
+                                      AutomationProperties.Name="PluginAktiviert"
+                                      IsChecked="{Binding SelectedPlugin.IsEnabled, Mode=TwoWay}"
+                                      Visibility="{Binding SelectedPlugin, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                                      Margin="0,0,0,12" />
+                            <ItemsControl ItemsSource="{Binding SelectedPluginSettings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,0,8">
+                                            <TextBlock Text="{Binding GroupName}"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       Margin="0,10,0,5" />
+                                            <ItemsControl ItemsSource="{Binding Entries}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="0,4,0,4">
+                                                            <TextBlock Text="{Binding Field.Label}"
+                                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                       FontSize="12"
+                                                                       Margin="0,0,0,2" />
+                                                            <ContentControl Content="{Binding}"
+                                                                            ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
+                                                            <TextBlock Text="{Binding Field.Description}"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                       Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                                                                       Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </ScrollViewer>
                 </Grid>
             </TabItem>

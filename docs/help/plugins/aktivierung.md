@@ -22,9 +22,9 @@ Die Plugin-Aktivierung erfolgt zentral im Einstellungsfenster (Menü → Einstel
      - KI-Plugins (Entwicklungsautomatisierung)
    - **Rechte Spalte:** Einstellungsgruppen des ausgewählten Plugins
 
-2. **Aktivierungs-Checkboxen:** Jedes Plugin in den Listen hat eine Checkbox (☑/☐), über die der Status umgeschaltet wird
+2. **Aktivierungsstatus im rechten Bereich:** Der Aktivierungsstatus wird nicht direkt in der Liste umgeschaltet, sondern über eine CheckBox „Plugin aktiviert" im rechten Einstellungsbereich des ausgewählten Plugins konfiguriert.
 
-3. **Plugin-Details:** Wählt der Benutzer ein Plugin aus der Liste, werden dessen Einstellungsgruppen rechts angezeigt
+3. **Plugin-Details:** Wählt der Benutzer ein Plugin aus der Liste, werden dessen Plugin-Namen als Kopfzeile, die Aktivierungs-CheckBox „Plugin aktiviert" und die Einstellungsgruppen rechts angezeigt
 
 ### Persistierung
 
@@ -49,9 +49,10 @@ Wenn nach Filterung nur ein Plugin einer Kategorie aktiv ist:
 
 Versucht der Benutzer, das letzte aktive Plugin einer Kategorie zu deaktivieren:
 
-1. Beim Speichern wird eine Validierungsfehlermeldung angezeigt: „Mindestens ein <Kategorie>-Plugin muss aktiv bleiben."
-2. Die Deaktivierung wird nicht gespeichert
-3. Der Checkbox bleibt aktiviert
+1. Der Benutzer versucht, die CheckBox „Plugin aktiviert" im rechten Bereich zu deaktivieren und klickt „Speichern"
+2. Beim Speichern wird eine Validierungsfehlermeldung angezeigt: „Mindestens ein <Kategorie>-Plugin muss aktiv bleiben."
+3. Die Deaktivierung wird nicht gespeichert
+4. Die CheckBox im rechten Bereich bleibt aktiviert
 
 ## Beispiele
 
@@ -60,8 +61,8 @@ Versucht der Benutzer, das letzte aktive Plugin einer Kategorie zu deaktivieren:
 Ein Benutzer hat GitHub, BitBucket und Codex CLI installiert. Codex wird aber nicht benötigt:
 
 1. Einstellungen → Tab „Plugins" öffnen
-2. In der KI-Plugins-Liste „Codex CLI" finden
-3. Checkbox neben „Codex CLI" deaktivieren (☑ → ☐)
+2. In der KI-Plugins-Liste (linke Spalte) „Codex CLI" anklicken/auswählen
+3. Im rechten Bereich wird die CheckBox „Plugin aktiviert" angezeigt — diese deaktivieren (☑ → ☐)
 4. Button „Speichern" klicken
 5. **Ergebnis:** Beim nächsten Aufgabenstart wird die KI-Plugin-Auswahl nur noch Claude CLI und GitHub Copilot zeigen; Codex CLI verschwindet aus allen Auswahldialogen
 
@@ -70,10 +71,10 @@ Ein Benutzer hat GitHub, BitBucket und Codex CLI installiert. Codex wird aber ni
 Ein Benutzer möchte nur GitHub als SCM-Plugin nutzen; BitBucket und Local Directory sind vorhanden, sollen aber ausgeblendet werden:
 
 1. Einstellungen → Tab „Plugins" öffnen
-2. In der SCM-Plugins-Liste:
-   - BitBucket: deaktivieren (☑ → ☐)
-   - Local Directory: deaktivieren (☑ → ☐)
-   - GitHub: bleibt aktiviert (☑)
+2. In der SCM-Plugins-Liste (linke Spalte) jeweils auswählen und deaktivieren:
+   - BitBucket: anklicken, im rechten Bereich CheckBox „Plugin aktiviert" deaktivieren (☑ → ☐)
+   - Local Directory: anklicken, im rechten Bereich CheckBox „Plugin aktiviert" deaktivieren (☑ → ☐)
+   - GitHub: bleibt aktiviert (kann optional anklicken und CheckBox bleibt aktiviert)
 3. Button „Speichern" klicken
 4. **Ergebnis:** 
    - In der Projektbearbeitung wird kein SCM-Plugin-Selector mehr angezeigt
@@ -85,11 +86,11 @@ Ein Benutzer möchte nur GitHub als SCM-Plugin nutzen; BitBucket und Local Direc
 Ein Benutzer versucht, alle KI-Plugins zu deaktivieren (weil keines konfiguriert ist):
 
 1. Einstellungen → Tab „Plugins" öffnen
-2. KI-Plugins-Liste:
-   - Claude CLI: deaktivieren (☑ → ☐)
-   - GitHub Copilot: deaktivieren (☑ → ☐)
-   - Codex CLI: deaktivieren (☑ → ☐)
-   - KI-Simulator: deaktivieren (☑ → ☐)
+2. In der KI-Plugins-Liste jeweils auswählen und die CheckBox „Plugin aktiviert" im rechten Bereich deaktivieren:
+   - Claude CLI: anklicken, CheckBox deaktivieren (☑ → ☐)
+   - GitHub Copilot: anklicken, CheckBox deaktivieren (☑ → ☐)
+   - Codex CLI: anklicken, CheckBox deaktivieren (☑ → ☐)
+   - KI-Simulator: anklicken, CheckBox deaktivieren (☑ → ☐)
 3. Button „Speichern" klicken
 4. **Ergebnis:** 
    - Fehlermeldung: „Mindestens ein KI-Plugin muss aktiv bleiben."
