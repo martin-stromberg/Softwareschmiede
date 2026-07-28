@@ -768,9 +768,23 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var projekt = await _projektService.CreateAsync("Alert-Konvertierung-Projekt", null);
         await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo");
         var alert = ErstelleAlert(9, "Unsichere Abfrage");
+        var issueBody = string.Join(Environment.NewLine, new[]
+        {
+            "Automatisch aus einem GitHub-Code-Scanning-Alert erstellt.",
+            string.Empty,
+            "Alert-Typ: CodeScanning",
+            "Severity: high",
+            "Status: open",
+            "Tool: CodeQL",
+            "Rule: Rule Name",
+            "Betroffener Ort: src/File.cs:10",
+            "Alert-URL: https://github.com/test/repo/security/code-scanning/9",
+            string.Empty,
+            "Alert-Beschreibung"
+        });
         var plugin = new TestScmPlugin([], [alert])
         {
-            CreatedIssue = new Issue(200, "Code scanning alert: Unsichere Abfrage", "Body", [], null, "https://github.com/test/repo/issues/200")
+            CreatedIssue = new Issue(200, "Code scanning alert: Unsichere Abfrage", issueBody, [], null, "https://github.com/test/repo/issues/200")
         };
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
         _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
@@ -785,6 +799,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         sut.OffeneAnforderungen.Should().BeEmpty();
         var aufgabe = (await _aufgabeService.GetByProjektAsync(projekt.Id)).Single();
         aufgabe.Titel.Should().Be("Unsichere Abfrage");
+        aufgabe.AnforderungsBeschreibung.Should().Be(issueBody);
         aufgabe.IssueReferenz!.IssueNummer.Should().Be(200);
         aufgabe.AlertReferenz!.SourceKey.Should().Be(alert.SourceKey);
     }
