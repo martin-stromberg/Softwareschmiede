@@ -40,7 +40,7 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
                 Label: "Personal Access Token",
                 FieldType: PluginSettingFieldType.Secret,
                 Placeholder: "ghp_...",
-                Description: "GitHub Personal Access Token mit den Berechtigungen repo und read:org. Token erstellen: https://github.com/settings/tokens/new",
+                Description: "GitHub Personal Access Token mit den Berechtigungen repo, read:org und Zugriff auf Code-Scanning-Alerts. Token erstellen: https://github.com/settings/tokens/new",
                 IsRequired: true)
         ])
     ];
@@ -349,6 +349,55 @@ password {token}
     }
 
     /// <inheritdoc/>
+    public override async Task<IEnumerable<ScmAlert>> GetAlertsAsync(string repositoryId, CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return [];
+        }
+
+        _logger.LogInformation("Rufe Code-Scanning-Alerts für Repository {RepositoryId} ab.", normalizedRepositoryId);
+
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            ["api", "--paginate", "--slurp", $"repos/{normalizedRepositoryId}/code-scanning/alerts?state=open&per_page=100"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            if (IsNotFound(result.StdErr))
+            {
+                _logger.LogInformation(
+                    "Code-Scanning-Alerts für Repository {RepositoryId} nicht verfügbar: {StdErr}",
+                    normalizedRepositoryId,
+                    sanitizedError);
+                return [];
+            }
+
+            if (IsAuthenticationFailure(result.StdErr))
+            {
+                _logger.LogWarning(
+                    "Code-Scanning-Alerts für Repository {RepositoryId} konnten wegen fehlender Rechte nicht geladen werden: {StdErr}",
+                    normalizedRepositoryId,
+                    sanitizedError);
+                return [];
+            }
+
+            _logger.LogWarning(
+                "gh api code-scanning/alerts fehlgeschlagen für {RepositoryId}: {StdErr}",
+                normalizedRepositoryId,
+                sanitizedError);
+            return [];
+        }
+
+        return ParseCodeScanningAlerts(result.StdOut, normalizedRepositoryId);
+    }
+
+    /// <inheritdoc/>
     public override Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default)
         => Task.FromResult(!string.IsNullOrWhiteSpace(NormalizeRepositoryId(repositoryId)));
 
@@ -525,6 +574,117 @@ password {token}
     private static bool IsNotFound(string error)
         => error.Contains("404", StringComparison.OrdinalIgnoreCase)
            || error.Contains("not found", StringComparison.OrdinalIgnoreCase);
+
+    private static IEnumerable<ScmAlert> ParseCodeScanningAlerts(string json, string repositoryId)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var alerts = new List<ScmAlert>();
+        if (doc.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return alerts;
+        }
+
+        foreach (var element in EnumerateCodeScanningAlertElements(doc.RootElement))
+        {
+            var number = GetInt32OrDefault(element, "number");
+            if (number <= 0)
+            {
+                continue;
+            }
+
+            var rule = TryGetObject(element, "rule");
+            var tool = TryGetObject(element, "tool");
+            var location = TryGetObject(TryGetObject(element, "most_recent_instance"), "location");
+            var message = TryGetObject(element, "most_recent_instance");
+
+            var ruleId = GetStringOrNull(rule, "id");
+            var ruleName = GetStringOrNull(rule, "name");
+            var description = GetStringOrNull(rule, "description");
+            var messageText = GetStringOrNull(TryGetObject(message, "message"), "text");
+            var title = FirstNonWhiteSpace(ruleName, ruleId, messageText, $"Code scanning alert #{number}")!;
+            var severity = FirstNonWhiteSpace(
+                GetStringOrNull(rule, "security_severity_level"),
+                GetStringOrNull(rule, "severity"));
+
+            alerts.Add(new ScmAlert(
+                AlertNumber: number,
+                SourceKey: $"github:code-scanning:{repositoryId}:{number}",
+                AlertType: ScmAlertType.CodeScanning,
+                Title: title,
+                Description: FirstNonWhiteSpace(messageText, description),
+                AlertUrl: GetStringOrNull(element, "html_url"),
+                Severity: severity,
+                State: GetStringOrNull(element, "state"),
+                ToolName: GetStringOrNull(tool, "name"),
+                RuleId: ruleId,
+                RuleName: ruleName,
+                FilePath: GetStringOrNull(location, "path"),
+                StartLine: GetNullableInt32(location, "start_line")));
+        }
+
+        return alerts;
+    }
+
+    private static IEnumerable<JsonElement> EnumerateCodeScanningAlertElements(JsonElement root)
+    {
+        foreach (var element in root.EnumerateArray())
+        {
+            if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var nestedElement in element.EnumerateArray())
+                {
+                    if (nestedElement.ValueKind == JsonValueKind.Object)
+                    {
+                        yield return nestedElement;
+                    }
+                }
+
+                continue;
+            }
+
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                yield return element;
+            }
+        }
+    }
+
+    private static JsonElement? TryGetObject(JsonElement? element, string propertyName)
+    {
+        if (element is not { ValueKind: JsonValueKind.Object } value
+            || !value.TryGetProperty(propertyName, out var property)
+            || property.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return property;
+    }
+
+    private static string? GetStringOrNull(JsonElement? element, string propertyName)
+    {
+        if (element is not { ValueKind: JsonValueKind.Object } value
+            || !value.TryGetProperty(propertyName, out var property)
+            || property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        return property.GetString();
+    }
+
+    private static int GetInt32OrDefault(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var property) && property.TryGetInt32(out var value) ? value : 0;
+
+    private static int? GetNullableInt32(JsonElement? element, string propertyName)
+        => element is { ValueKind: JsonValueKind.Object } value
+           && value.TryGetProperty(propertyName, out var property)
+           && property.TryGetInt32(out var intValue)
+            ? intValue
+            : null;
+
+    private static string? FirstNonWhiteSpace(params string?[] values)
+        => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private static IEnumerable<Issue> ParseIssues(string json)
     {

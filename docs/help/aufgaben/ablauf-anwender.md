@@ -69,6 +69,18 @@ Wenn der Aufgabe noch kein Issue zugeordnet ist und der Repository-Provider die 
 
 Nach erfolgreicher Anlage wird die Issue-Referenz in der Aufgabe angezeigt; die Anlage eines weiteren Issues ist für diese Aufgabe nicht mehr verfügbar. Wenn der Provider keine Templates unterstützt oder keine Templates findet, kannst du direkt ohne Template fortfahren. Fehler werden im Dialog angezeigt und die bisherigen Eingaben bleiben zur Korrektur erhalten.
 
+### 2b. Aufgabe aus GitHub-Code-Scanning-Alert erstellen
+
+Wenn ein Projekt ein GitHub-Repository verwendet, zeigt die Projektdetailansicht unter **Offene Anforderungen** neben offenen GitHub-Issues auch offene GitHub-Code-Scanning-Alerts an. Alerts sind als **GitHub Code Scanning Alert** gekennzeichnet und zeigen, soweit von GitHub geliefert, Severity, Regel und betroffene Datei.
+
+1. Öffne das Projekt mit dem zugeordneten GitHub-Repository.
+2. Prüfe in **Offene Anforderungen** die Einträge vom Typ **GitHub Code Scanning Alert**.
+3. Wähle den Alert aus und bestätige die Erstellung.
+4. Die Anwendung legt automatisch ein neues GitHub-Issue mit den Alert-Informationen an.
+5. Danach wird daraus eine lokale Aufgabe erstellt und mit dem neu angelegten GitHub-Issue verknüpft.
+
+Nach erfolgreicher Erstellung verschwindet derselbe Alert aus der Liste der offenen Anforderungen. Das ursprüngliche GitHub-Code-Scanning-Alert wird in GitHub nicht automatisch geschlossen oder verändert.
+
 ### 3. Aufgabe starten (Repository einrichten)
 
 Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
@@ -86,6 +98,8 @@ Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 > Die `issue.md`-Datei ist eine lokale Datei und wird nicht committet. Sie dient als Referenzmaterial für die KI und den Entwickler während der Aufgabenbearbeitung.
 >
 > Aufgaben, die aus einem Git-Plugin ohne Issue-Bezug erstellt wurden, können ebenfalls gestartet werden. In diesem Fall wird der Aufgabenbranch ohne Issue-Nummer angelegt.
+>
+> Aufgaben, die aus einem GitHub-Code-Scanning-Alert erstellt wurden, besitzen eine normale GitHub-Issue-Referenz. Der Aufgabenbranch enthält deshalb die Nummer des automatisch angelegten GitHub-Issues.
 
 ### 4. CLI starten
 

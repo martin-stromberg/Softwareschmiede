@@ -25,6 +25,7 @@
 | `RecoveryVersion` | `int` | Concurrency-Token für Recovery |
 | `VorschlagPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
 | `VorschlagAusfuehrenAbUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
+| `AlertReferenz` | `AlertReferenz?` | Optionale Herkunftsreferenz, wenn die Aufgabe aus einem SCM-Alert erstellt wurde |
 
 ### `Protokolleintrag`
 
@@ -46,6 +47,25 @@
 | `IssueNummer` | `int` | Issue-Nummer im Provider |
 | `Titel` | `string` | Titel des Issues |
 | `IssueUrl` | `string?` | Direkt-URL zum Issue |
+
+### `AlertReferenz`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `AufgabeId` | `Guid` | FK -> Aufgabe |
+| `Provider` | `string` | SCM-Provider, z. B. `github` |
+| `RepositoryId` | `string` | Repository-Kennung beim Provider |
+| `AlertType` | `string` | Alert-Art, initial `CodeScanning` |
+| `SourceKey` | `string` | Providerweit stabile Alert-Kennung zur Duplikatvermeidung |
+| `AlertUrl` | `string?` | Direkt-URL zum ursprünglichen Alert |
+| `Titel` | `string` | Alert-Titel zum Zeitpunkt der Konvertierung |
+| `Severity` | `string?` | Von GitHub gelieferte Severity |
+| `State` | `string?` | Von GitHub gelieferter Alert-Status |
+| `RuleId` | `string?` | Code-Scanning-Regelkennung |
+| `ToolName` | `string?` | Name des meldenden Code-Scanning-Tools |
+
+`SourceKey` ist eindeutig indiziert. Dadurch kann derselbe GitHub-Code-Scanning-Alert auch bei parallelen oder wiederholten UI-Aktionen nicht mehrfach als lokale Aufgabe gespeichert werden.
 
 ## Statusübergänge
 
@@ -85,8 +105,15 @@ erDiagram
         Guid AufgabeId
         int IssueNummer
     }
+    AlertReferenz {
+        Guid Id
+        Guid AufgabeId
+        string SourceKey
+        string AlertType
+    }
     Aufgabe ||--o{ Protokolleintrag : "hat"
     Aufgabe ||--o| IssueReferenz : "hat"
+    Aufgabe ||--o| AlertReferenz : "hat"
 ```
 
 ## CLI-Ausgabeprotokoll

@@ -274,14 +274,14 @@
                     </Grid>
                 </Border>
 
-                <!-- Offene Anforderungen (Issues) -->
+                <!-- Offene Anforderungen -->
                 <Border Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="1"
                         CornerRadius="12"
                         Padding="20"
                         Margin="0 10"
-                        Visibility="{Binding KannIssuesLaden, Converter={StaticResource BoolToVisibilityConverter}}">
+                        Visibility="{Binding KannAnforderungenLaden, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -303,8 +303,8 @@
                                    Margin="0,0,0,8" />
 
                         <ListBox Grid.Row="2"
-                                 AutomationProperties.Name="IssueVorschlaege"
-                                 ItemsSource="{Binding IssueVorschlaege}"
+                                 AutomationProperties.Name="OffeneAnforderungen"
+                                 ItemsSource="{Binding OffeneAnforderungen}"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -319,18 +319,23 @@
                                         <StackPanel Grid.Row="0" Orientation="Horizontal">
                                             <TextBlock FontSize="11"
                                                        Foreground="{DynamicResource AccentBrush}"
-                                                       Margin="0,0,6,0">
-                                                <Run Text="#" /><Run Text="{Binding Nummer}" />
-                                            </TextBlock>
+                                                       Margin="0,0,6,0"
+                                                       Text="{Binding NummerText}" />
                                             <TextBlock Text="{Binding Titel}"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
-                                        <TextBlock Grid.Row="1"
-                                                   Text="Offene Anforderung"
-                                                   FontSize="11"
-                                                   Foreground="{DynamicResource AccentBrush}" />
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal">
+                                            <TextBlock Text="{Binding TypText}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource AccentBrush}"
+                                                       Margin="0,0,12,0" />
+                                            <TextBlock Text="{Binding DetailText}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>

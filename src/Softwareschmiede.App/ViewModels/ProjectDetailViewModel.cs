@@ -46,9 +46,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private AufgabenFilterTyp _aufgabenFilter = AufgabenFilterTyp.Alle;
     private bool _isFilterOverlayVisible;
     private bool _isLoadingIssues;
-    private bool _kannIssuesLaden;
+    private bool _kannAnforderungenLaden;
     private bool _disposed;
     private Guid _aktuelleAufgabeId;
+    private readonly HashSet<string> _laufendeAlertKonvertierungen = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -148,7 +149,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die Ansicht im Neuanlage-Modus ist (noch kein persistiertes Projekt).</summary>
     public bool IsNeuanlage => _projektId == Guid.Empty;
 
-    /// <summary>Collection von geladenen Issues aus dem SCM-Plugin.</summary>
+    /// <summary>Collection von geladenen Anforderungen aus dem SCM-Plugin.</summary>
+    public ObservableCollection<ScmRequirement> OffeneAnforderungen { get; } = new();
+
+    /// <summary>Collection von geladenen Issues aus dem SCM-Plugin. Bleibt als kompatible Weiterleitung erhalten.</summary>
     public ObservableCollection<Issue> IssueVorschlaege { get; } = new();
 
     /// <summary>Gibt an, ob Issues gerade geladen werden.</summary>
@@ -158,12 +162,24 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _isLoadingIssues, value);
     }
 
-    /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat.</summary>
-    public bool KannIssuesLaden
+    /// <summary>true wenn das Repository ein SCM-Plugin mit Anforderungssupport hat.</summary>
+    public bool KannAnforderungenLaden
     {
-        get => _kannIssuesLaden;
-        private set => SetProperty(ref _kannIssuesLaden, value);
+        get => _kannAnforderungenLaden;
+        private set
+        {
+            if (SetProperty(ref _kannAnforderungenLaden, value))
+            {
+                OnPropertyChanged(nameof(KannIssuesLaden));
+            }
+        }
     }
+
+    /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat. Kompatible Weiterleitung.</summary>
+    public bool KannIssuesLaden => KannAnforderungenLaden;
+
+    /// <summary>Erstellt eine Aufgabe aus einer offenen SCM-Anforderung.</summary>
+    public AsyncRelayCommand<ScmRequirement> AufgabeAusAnforderungErstellenCommand { get; }
 
     /// <summary>Erstellt eine Aufgabe aus einem Issue-Vorschlag.</summary>
     public AsyncRelayCommand<Issue> AufgabeAusIssueErstellenCommand { get; }
@@ -226,6 +242,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         RepositoryZuweisenCommand = new AsyncRelayCommand(RepositoryZuweisenAsync, () => _projektId != Guid.Empty);
         RepositoryOeffnenCommand = new RelayCommand(RepositoryOeffnen, () => _selectedRepository != null);
         ArbeitsverzeichnisBearbeitenCommand = new AsyncRelayCommand(ArbeitsverzeichnisBearbeitenAsync, () => _selectedRepository != null);
+        AufgabeAusAnforderungErstellenCommand = new AsyncRelayCommand<ScmRequirement>(AufgabeAusAnforderungErstellenAsync);
         AufgabeAusIssueErstellenCommand = new AsyncRelayCommand<Issue>(AufgabeAusIssueErstellenAsync);
     }
 
@@ -253,7 +270,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 SelectedRepository = Projekt.Repositories.FirstOrDefault();
             }
 
-            await LadenIssuesAsync(ct);
+            await LadenOffeneAnforderungenAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -540,7 +557,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task LadenIssuesAsync(CancellationToken ct)
+    private async Task LadenOffeneAnforderungenAsync(CancellationToken ct)
     {
         var repository = _selectedRepository;
         if (repository == null)
@@ -553,6 +570,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
 
         IsLoadingIssues = true;
+        OffeneAnforderungen.Clear();
         IssueVorschlaege.Clear();
 
         try
@@ -561,12 +579,31 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 .Where(a => a.IssueReferenz?.IssueNummer != null)
                 .Select(a => a.IssueReferenz!.IssueNummer!.Value)
                 .ToHashSet();
+            var bereitsKonvertierteAlerts = Aufgaben
+                .Where(a => !string.IsNullOrWhiteSpace(a.AlertReferenz?.SourceKey))
+                .Select(a => a.AlertReferenz!.SourceKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var issues = await gitPlugin.GetIssuesAsync(repository.RepositoryUrl, ct);
             foreach (var issue in issues)
             {
                 if (!bereitsKonvertierteNummern.Contains(issue.Nummer))
+                {
                     IssueVorschlaege.Add(issue);
+                    OffeneAnforderungen.Add(ScmRequirement.FromIssue(issue));
+                }
+            }
+
+            if (gitPlugin is IScmAlertProvider alertProvider)
+            {
+                var alerts = await alertProvider.GetAlertsAsync(repository.RepositoryUrl, ct);
+                foreach (var alert in alerts)
+                {
+                    if (!bereitsKonvertierteAlerts.Contains(alert.SourceKey))
+                    {
+                        OffeneAnforderungen.Add(ScmRequirement.FromAlert(alert));
+                    }
+                }
             }
         }
         catch (OperationCanceledException)
@@ -581,6 +618,20 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         {
             IsLoadingIssues = false;
         }
+    }
+
+    private async Task AufgabeAusAnforderungErstellenAsync(ScmRequirement? anforderung, CancellationToken ct)
+    {
+        if (anforderung == null)
+            return;
+
+        if (anforderung.Kind == ScmRequirementKind.Issue)
+        {
+            await AufgabeAusIssueErstellenAsync(anforderung.Issue, ct);
+            return;
+        }
+
+        await AufgabeAusAlertErstellenAsync(anforderung, ct);
     }
 
     private async Task AufgabeAusIssueErstellenAsync(Issue? issue, CancellationToken ct)
@@ -604,6 +655,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             var zuEntfernen = IssueVorschlaege.FirstOrDefault(i => i.Nummer == issue.Nummer);
             if (zuEntfernen != null)
                 IssueVorschlaege.Remove(zuEntfernen);
+            var anforderung = OffeneAnforderungen.FirstOrDefault(a => a.Kind == ScmRequirementKind.Issue && a.Issue?.Nummer == issue.Nummer);
+            if (anforderung != null)
+                OffeneAnforderungen.Remove(anforderung);
 
             Aufgaben.Add(aufgabe);
             AktualisiereAufgabenAnsichten();
@@ -619,9 +673,121 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async Task AufgabeAusAlertErstellenAsync(ScmRequirement anforderung, CancellationToken ct)
+    {
+        var alert = anforderung.Alert;
+        if (alert == null || _projektId == Guid.Empty || _selectedRepository == null)
+            return;
+
+        if (!_dialogService.BestaetigenDialog(
+                $"Alert '{alert.Title}' als GitHub-Issue und Aufgabe erstellen?",
+                "Alert konvertieren"))
+            return;
+
+        var konvertierungRegistriert = false;
+
+        try
+        {
+            konvertierungRegistriert = _laufendeAlertKonvertierungen.Add(alert.SourceKey);
+            if (!konvertierungRegistriert)
+                return;
+
+            var existing = await _aufgabeService.GetByAlertSourceKeyAsync(alert.SourceKey, ct);
+            if (existing != null)
+            {
+                EntferneOffeneAnforderung(alert.SourceKey);
+                ReplaceOrAddAufgabe(existing);
+                AktualisiereAufgabenAnsichten();
+                return;
+            }
+
+            var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
+                .FirstOrDefault(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+
+            if (gitPlugin is not IIssueCreateProvider issueCreateProvider)
+            {
+                FehlerMeldung = "Das ausgewählte SCM-Plugin kann keine Issues erstellen.";
+                return;
+            }
+
+            if (!await issueCreateProvider.CanCreateIssueAsync(_selectedRepository.RepositoryUrl, ct))
+            {
+                FehlerMeldung = "Für dieses Repository kann kein GitHub-Issue erstellt werden.";
+                return;
+            }
+
+            var request = BuildIssueCreateRequest(alert);
+            var createdIssueResult = await issueCreateProvider.CreateIssueAsync(_selectedRepository.RepositoryUrl, request, ct);
+            if (!createdIssueResult.IsSuccess || createdIssueResult.Issue == null)
+            {
+                FehlerMeldung = createdIssueResult.ErrorMessage ?? "GitHub-Issue konnte nicht erstellt werden.";
+                return;
+            }
+
+            var aufgabe = await _aufgabeService.CreateFromAlertAsync(
+                _projektId,
+                alert,
+                createdIssueResult.Issue,
+                _selectedRepository.Id,
+                _selectedRepository.PluginTyp,
+                _selectedRepository.RepositoryUrl,
+                ct);
+
+            EntferneOffeneAnforderung(alert.SourceKey);
+
+            ReplaceOrAddAufgabe(aufgabe);
+            AktualisiereAufgabenAnsichten();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Alert {SourceKey}.", alert.SourceKey);
+            SetFehler(ex);
+        }
+        finally
+        {
+            if (konvertierungRegistriert)
+                _laufendeAlertKonvertierungen.Remove(alert.SourceKey);
+        }
+    }
+
+    private void EntferneOffeneAnforderung(string sourceKey)
+    {
+        var zuEntfernen = OffeneAnforderungen.FirstOrDefault(a => string.Equals(a.SourceKey, sourceKey, StringComparison.OrdinalIgnoreCase));
+        if (zuEntfernen != null)
+            OffeneAnforderungen.Remove(zuEntfernen);
+    }
+
+    private static IssueCreateRequest BuildIssueCreateRequest(ScmAlert alert)
+    {
+        var title = $"Code scanning alert: {alert.Title}";
+        var location = alert.FilePath is null
+            ? "-"
+            : alert.StartLine is null ? alert.FilePath : $"{alert.FilePath}:{alert.StartLine}";
+        var body = string.Join(Environment.NewLine, new[]
+        {
+            "Automatisch aus einem GitHub-Code-Scanning-Alert erstellt.",
+            string.Empty,
+            $"Alert-Typ: {alert.AlertType}",
+            $"Severity: {alert.Severity ?? "-"}",
+            $"Status: {alert.State ?? "-"}",
+            $"Tool: {alert.ToolName ?? "-"}",
+            $"Rule: {alert.RuleName ?? alert.RuleId ?? "-"}",
+            $"Betroffener Ort: {location}",
+            $"Alert-URL: {alert.AlertUrl ?? "-"}",
+            string.Empty,
+            alert.Description ?? "-"
+        });
+
+        return new IssueCreateRequest(title, body);
+    }
+
     private void AktualisiereKannIssuesLaden()
     {
-        KannIssuesLaden = _selectedRepository != null
+        KannAnforderungenLaden = _selectedRepository != null
             && _pluginManager.GetSourceCodeManagementPlugins()
                 .Any(p => string.Equals(p.PluginPrefix, _selectedRepository.PluginTyp, StringComparison.OrdinalIgnoreCase));
     }

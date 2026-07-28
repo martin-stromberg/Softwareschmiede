@@ -34,6 +34,18 @@ SCM-Operationen auf einem lokalen Repository-Klon.
 
 ---
 
+## `IScmAlertProvider`
+
+Optionale Erweiterung für SCM-Plugins, die Sicherheits- oder Qualitätsalerts als eigene Anforderungsart liefern können.
+
+| Methode | Parameter | Rückgabe | Beschreibung |
+|---------|-----------|---------|--------------|
+| `GetAlertsAsync` | `repositoryId`, `ct` | `Task<IEnumerable<ScmAlert>>` | Liefert offene Alerts für ein Repository. Plugins ohne Alert-Unterstützung geben eine leere Liste zurück. |
+
+GitHub implementiert diese Erweiterung initial für Code-Scanning-Alerts. Bitbucket/Jira und andere Provider sind dadurch nicht verpflichtet, Alerts bereitzustellen.
+
+---
+
 ## `IKiPlugin` : `IPlugin`
 
 KI-Entwicklungsautomatisierung.
@@ -119,3 +131,45 @@ Factory-Methoden:
 | `Success` | Verzeichnisstruktur wurde erfolgreich geladen. Eine leere Liste bedeutet ein gültiges leeres Repository oder keine Unterverzeichnisse. |
 | `Failed` | Abruf ist technisch fehlgeschlagen, z. B. wegen Berechtigungen, Netzwerk oder API-Fehlern. |
 | `NotSupported` | Das Plugin oder die aktuelle Konfiguration unterstützt den Abruf nicht. |
+
+### `ScmRequirement`
+
+Gemeinsamer UI- und Workflow-Typ für offene Anforderungen aus einem SCM-Plugin.
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Kind` | `ScmRequirementKind` | `Issue` oder `Alert` |
+| `Issue` | `Issue?` | Gefüllt bei normalen SCM-Issues |
+| `Alert` | `ScmAlert?` | Gefüllt bei SCM-Alerts |
+
+### `ScmAlert`
+
+Providerunabhängiges Value Object für Sicherheits- und Qualitätsalerts.
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `SourceKey` | `string` | Stabile, providerweit eindeutige Kennung, z. B. für GitHub-Code-Scanning-Alerts |
+| `AlertType` | `ScmAlertType` | Alert-Art, initial `CodeScanning` |
+| `Title` | `string` | Anzeigename des Alerts |
+| `Description` | `string?` | Beschreibung oder Nachricht aus dem Provider |
+| `AlertUrl` | `string?` | Direkt-URL zum Alert |
+| `Severity` | `string?` | Severity des Alerts |
+| `State` | `string?` | Providerstatus |
+| `ToolName` | `string?` | Meldendes Tool |
+| `RuleId` | `string?` | Regelkennung |
+| `RuleName` | `string?` | Regelname |
+| `FilePath` | `string?` | Betroffene Datei |
+| `StartLine` | `int?` | Betroffene Startzeile |
+
+### `ScmRequirementKind`
+
+| Wert | Bedeutung |
+|------|-----------|
+| `Issue` | Normales SCM-Issue |
+| `Alert` | SCM-Alert, z. B. GitHub Code Scanning |
+
+### `ScmAlertType`
+
+| Wert | Bedeutung |
+|------|-----------|
+| `CodeScanning` | GitHub-Code-Scanning-Alert |

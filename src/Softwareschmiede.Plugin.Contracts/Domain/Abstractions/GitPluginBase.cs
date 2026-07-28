@@ -5,7 +5,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Domain.Abstractions;
 
 /// <summary>Gemeinsame Basis für Git-Plugins. Öffentlich zugänglich für externe Plugin-Assemblies.</summary>
-public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider, IIssueTemplateProvider
+public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider, IIssueTemplateProvider, IScmAlertProvider
 {
     private readonly ICliRunner _cliRunner;
 
@@ -22,6 +22,9 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
     public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
     public virtual IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
     public abstract Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
+    public virtual Task<IEnumerable<ScmAlert>> GetAlertsAsync(string repositoryId, CancellationToken ct = default)
+        => Task.FromResult(Enumerable.Empty<ScmAlert>());
+
     public virtual Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default)
         => Task.FromResult(false);
 

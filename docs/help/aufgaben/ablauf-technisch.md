@@ -390,6 +390,30 @@ Providerumfang:
 - Nicht unterstützte Template-Fähigkeiten bei Jira/Bitbucket verhindern den No-Template-Pfad nicht.
 - Provider ohne `IIssueCreateProvider`, etwa LocalDirectory, bieten die Aktion nicht an.
 
+### 7.1a. GitHub-Code-Scanning-Alert in Aufgabe konvertieren
+
+Beteiligte Komponenten:
+- `ProjectDetailViewModel.LadenOffeneAnforderungenAsync` — lädt Issues und Alerts für die Projektdetailansicht.
+- `IScmAlertProvider.GetAlertsAsync` — optionale Alert-Quelle des SCM-Plugins.
+- `GitHubPlugin.GetAlertsAsync` — liest GitHub-Code-Scanning-Alerts über `gh api --paginate --slurp`.
+- `ProjectDetailViewModel.AufgabeAusAnforderungErstellenCommand` — unterscheidet `ScmRequirementKind.Issue` und `ScmRequirementKind.Alert`.
+- `IIssueCreateProvider.CreateIssueAsync` — legt aus dem Alert ein neues GitHub-Issue an.
+- `AufgabeService.CreateFromAlertAsync` — speichert Aufgabe, `IssueReferenz` und `AlertReferenz`.
+
+Ablauf:
+1. Beim Laden der Projektdetailansicht werden normale Issues über `GetIssuesAsync` geladen und in `ScmRequirementKind.Issue` gemappt.
+2. Unterstützt das gewählte SCM-Plugin `IScmAlertProvider`, werden zusätzlich Alerts über `GetAlertsAsync` geladen und in `ScmRequirementKind.Alert` gemappt.
+3. Bereits lokal verarbeitete Issues werden über `IssueReferenz.IssueNummer` gefiltert; bereits konvertierte Alerts über `AlertReferenz.SourceKey`.
+4. Der Anwender wählt einen Alert aus und bestätigt die Erstellung.
+5. Das ViewModel prüft, ob die Issue-Anlage verfügbar ist und ob der Alert inzwischen noch nicht konvertiert wurde.
+6. Aus den Alert-Daten wird ein `IssueCreateRequest` gebaut. Der Titel folgt `Code scanning alert: <Rule/Alert-Titel>`, der Body enthält Alert-Typ, Severity, Tool, Rule, betroffenen Ort, Alert-URL und Beschreibung.
+7. `CreateIssueAsync` erstellt zuerst das externe GitHub-Issue. Schlägt dieser Schritt fehl, wird keine lokale Aufgabe erstellt.
+8. Nach erfolgreicher Issue-Anlage speichert `CreateFromAlertAsync` die lokale Aufgabe mit `IssueReferenz` auf das neue Issue und `AlertReferenz` auf den ursprünglichen Alert.
+9. `AlertReferenz.SourceKey` ist eindeutig; parallele oder wiederholte Konvertierungsversuche erzeugen keine zweite lokale Aufgabe.
+10. Bei Erfolg wird die neue Aufgabe in die Aufgabenliste übernommen und der Alert aus **Offene Anforderungen** entfernt.
+
+Das ursprüngliche Code-Scanning-Alert bleibt in GitHub unverändert. Dependabot- und Secret-Scanning-Alerts werden in diesem Ablauf nicht geladen.
+
 ### 7.2. Pull Request erstellen und Issue automatisch schliessen
 
 Beteiligte Komponenten:

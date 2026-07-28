@@ -33,7 +33,7 @@ Plugin-Einstellungen werden in der **Einstellungsseite** verwaltet:
 
 | Feld | Beschreibung |
 |------|--------------|
-| Token | GitHub Personal Access Token (PAT) mit `repo`-Scope |
+| Token | GitHub Personal Access Token (PAT) mit `repo`-Scope. Für private Organisationen kann zusätzlich `read:org` erforderlich sein. Zum Lesen von Code-Scanning-Alerts muss der Token Zugriff auf Code-Scanning-Alerts des Repositories haben. |
 
 **BitbucketPlugin**
 

@@ -129,6 +129,22 @@ Die neue Aufgabe wird in der Aufgaben-Kachel angezeigt und kann bearbeitet werde
 
 > **Hinweis:** Die Aufgabe wird mit dem Status „Neu" erstellt und gehört automatisch zum aktuellen Projekt.
 
+## Aufgabe aus offener Anforderung erstellen
+
+### Voraussetzungen
+- Sie haben ein Projekt mit zugeordnetem Repository geöffnet.
+- Das Repository-Plugin liefert offene Anforderungen, z. B. GitHub-Issues oder GitHub-Code-Scanning-Alerts.
+
+### Schritte
+
+1. Prüfen Sie in der Projektdetailansicht die Liste **Offene Anforderungen**.
+2. Normale GitHub-Issues erscheinen mit Issue-Nummer.
+3. GitHub-Code-Scanning-Alerts erscheinen als **GitHub Code Scanning Alert** und zeigen zusätzliche Alert-Informationen wie Severity, Regel oder Datei, soweit vorhanden.
+4. Wählen Sie eine offene Anforderung aus und erstellen Sie daraus eine Aufgabe.
+
+### Ergebnis
+Bei einem normalen Issue wird die lokale Aufgabe mit der bestehenden Issue-Referenz erstellt. Bei einem GitHub-Code-Scanning-Alert erstellt die Anwendung zuerst automatisch ein neues GitHub-Issue aus den Alert-Daten und danach die lokale Aufgabe. Der Alert wird lokal als konvertiert gespeichert und danach nicht erneut angeboten.
+
 ## Aufgabenliste filtern
 
 ### Voraussetzungen
