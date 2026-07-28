@@ -80,6 +80,9 @@ public sealed class Aufgabe
     /// <summary>Verknüpfte Issue-Referenz aus dem Git-Provider.</summary>
     public IssueReferenz? IssueReferenz { get; set; }
 
+    /// <summary>Verknüpfte Alert-Referenz aus dem SCM-Provider.</summary>
+    public AlertReferenz? AlertReferenz { get; set; }
+
     /// <summary>Protokolleinträge des KI-Prozesses für diese Aufgabe.</summary>
     public List<Protokolleintrag> Protokolleintraege { get; set; } = [];
 

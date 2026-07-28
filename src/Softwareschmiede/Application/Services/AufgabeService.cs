@@ -35,6 +35,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
         return await _db.Aufgaben
             .AsNoTracking()
             .Include(a => a.IssueReferenz)
+            .Include(a => a.AlertReferenz)
             .Where(a => a.ProjektId == projektId && a.Status != AufgabeStatus.Archiviert)
             .OrderByDescending(a => a.ErstellungsDatum)
             .ToListAsync(ct);
@@ -83,11 +84,24 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .AsNoTracking()
             .Include(a => a.Projekt)
             .Include(a => a.IssueReferenz)
+            .Include(a => a.AlertReferenz)
             .Include(a => a.GitRepository)
                 .ThenInclude(r => r!.StartKonfiguration)
             .Include(a => a.Protokolleintraege)
                 .ThenInclude(p => p.TestErgebnisse)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
+    }
+
+    /// <summary>Gibt eine bereits aus einem Alert erzeugte Aufgabe anhand des Alert-SourceKeys zurück.</summary>
+    public async Task<Aufgabe?> GetByAlertSourceKeyAsync(string sourceKey, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
+
+        return await _db.Aufgaben
+            .AsNoTracking()
+            .Include(a => a.IssueReferenz)
+            .Include(a => a.AlertReferenz)
+            .FirstOrDefaultAsync(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == sourceKey, ct);
     }
 
     /// <summary>Gibt die ID des zuletzt generierten Diff-Ergebnisses einer Aufgabe zurück.</summary>
@@ -201,6 +215,87 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} mit ID {AufgabeId} erstellt.", issue.Nummer, aufgabe.Id);
+        return aufgabe;
+    }
+
+    /// <summary>Erstellt eine neue Aufgabe aus einem Alert und verknüpft sie mit dem bereits erstellten externen Issue.</summary>
+    public async Task<Aufgabe> CreateFromAlertAsync(
+        Guid projektId,
+        ScmAlert alert,
+        Issue createdIssue,
+        Guid? gitRepositoryId = null,
+        string provider = "",
+        string repositoryId = "",
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(alert);
+        ArgumentNullException.ThrowIfNull(createdIssue);
+
+        _logger.LogInformation("Aufgabe aus Alert {SourceKey} für Projekt {ProjektId} erstellen.", alert.SourceKey, projektId);
+
+        var existing = await _db.Aufgaben
+            .AsNoTracking()
+            .Include(a => a.IssueReferenz)
+            .Include(a => a.AlertReferenz)
+            .FirstOrDefaultAsync(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == alert.SourceKey, ct);
+        if (existing != null)
+        {
+            _logger.LogInformation("Alert {SourceKey} ist bereits als Aufgabe {AufgabeId} konvertiert.", alert.SourceKey, existing.Id);
+            return existing;
+        }
+
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            GitRepositoryId = gitRepositoryId,
+            Titel = alert.Title,
+            AnforderungsBeschreibung = alert.Description,
+            Status = AufgabeStatus.Neu,
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+
+        aufgabe.IssueReferenz = CreateIssueReferenz(aufgabe.Id, createdIssue);
+        aufgabe.AlertReferenz = new AlertReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            Provider = provider,
+            RepositoryId = repositoryId,
+            AlertType = alert.AlertType.ToString(),
+            SourceKey = alert.SourceKey,
+            AlertUrl = alert.AlertUrl,
+            Titel = alert.Title,
+            Severity = alert.Severity,
+            State = alert.State,
+            RuleId = alert.RuleId,
+            ToolName = alert.ToolName
+        };
+
+        _db.Aufgaben.Add(aufgabe);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            _db.ChangeTracker.Clear();
+            var concurrentlyCreated = await _db.Aufgaben
+                .AsNoTracking()
+                .Include(a => a.IssueReferenz)
+                .Include(a => a.AlertReferenz)
+                .FirstOrDefaultAsync(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == alert.SourceKey, ct);
+            if (concurrentlyCreated != null)
+            {
+                _logger.LogWarning(ex, "Alert {SourceKey} wurde parallel konvertiert.", alert.SourceKey);
+                return concurrentlyCreated;
+            }
+
+            throw;
+        }
+
+        _logger.LogInformation("Aufgabe aus Alert {SourceKey} mit ID {AufgabeId} erstellt.", alert.SourceKey, aufgabe.Id);
         return aufgabe;
     }
 

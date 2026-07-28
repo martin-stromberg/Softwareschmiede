@@ -34,6 +34,7 @@ Das Standard-SCM-Plugin und das Standard-KI-Plugin werden in den App-Einstellung
 ## Beispiele
 
 - Für GitHub-Repositories wird `GitHubPlugin` als SCM gewählt; der GitHub-Token wird unter `Softwareschmiede.GitHub.Token` gespeichert.
+- Das GitHub-Plugin kann offene Code-Scanning-Alerts lesen und sie in der Projektdetailansicht als offene Anforderungen anzeigen. Beim Erstellen einer Aufgabe aus einem Alert legt die Anwendung automatisch ein GitHub-Issue an und speichert die Alert-Herkunft lokal.
 - Für KI-Läufe mit Claude wird `ClaudeCliPlugin` gewählt; der Anthropic API Key wird optional als `ANTHROPIC_API_KEY`-Umgebungsvariable übergeben.
 - Für KI-Läufe mit Codex wird `CodexPlugin` gewählt; optional kann ein absoluter Pfad zur `codex`-Executable unter `Softwareschmiede.Codex.ExecutablePath` gespeichert werden. Zusätzliche Codex-Argumente werden unter `Softwareschmiede.Codex.CommandLineParameters` gespeichert und nur verwendet, wenn sie vom Anwender gesetzt wurden. Automatische Defaults werden für diesen Wert nicht übernommen.
 

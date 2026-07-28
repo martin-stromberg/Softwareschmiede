@@ -70,6 +70,30 @@
 
 ---
 
+## Aufgabe aus GitHub-Code-Scanning-Alert
+
+**Beschreibung:** Ein GitHub-Code-Scanning-Alert kann aus der Projektdetailansicht in eine lokale Aufgabe überführt werden. Dabei entsteht zuerst ein neues GitHub-Issue, danach die lokale Aufgabe mit Issue- und Alert-Herkunft.
+
+**Bedingungen:**
+- Das Projekt besitzt ein GitHub-Repository.
+- Das GitHub-Plugin liefert offene Code-Scanning-Alerts.
+- Das GitHub-Plugin unterstützt die Issue-Anlage für das Repository.
+- Für die `AlertReferenz.SourceKey` existiert noch keine lokale Aufgabe.
+
+**Verhalten:**
+- Code-Scanning-Alerts werden unter **Offene Anforderungen** gemeinsam mit normalen Issues angezeigt, aber als Alert gekennzeichnet.
+- Beim Auswählen eines Alerts wird ein GitHub-Issue mit deterministischem Titel `Code scanning alert: <Rule/Alert-Titel>` und einem Body aus Alert-Typ, Severity, Tool, Rule, Ort, URL und Beschreibung erstellt.
+- Erst nach erfolgreicher externer Issue-Anlage wird lokal eine Aufgabe erstellt.
+- Die lokale Aufgabe erhält eine `IssueReferenz` auf das neu erzeugte GitHub-Issue und eine `AlertReferenz` auf den ursprünglichen Alert.
+- Derselbe Alert wird über `AlertReferenz.SourceKey` lokal als konvertiert erkannt und nicht erneut angeboten.
+- Das ursprüngliche GitHub-Code-Scanning-Alert wird nicht geschlossen und nicht anderweitig verändert.
+- Dependabot- und Secret-Scanning-Alerts sind in dieser Ausbaustufe nicht angebunden.
+- Bitbucket/Jira und andere SCM-Plugins müssen keine Alerts liefern.
+
+**Umsetzung:** `ProjectDetailViewModel`, `AufgabeService.CreateFromAlertAsync`, `AlertReferenz`, `IScmAlertProvider`, `GitHubPlugin.GetAlertsAsync` und `IIssueCreateProvider.CreateIssueAsync`.
+
+---
+
 ## Automatische Issue-Schliessung bei Pull Requests
 
 **Beschreibung:** Wenn eine Aufgabe aus einem GitHub-Issue erstellt wurde, bleibt die Issue-Referenz an der Aufgabe erhalten und wird beim Erstellen eines Pull Requests automatisch in den Pull-Request-Body uebernommen.

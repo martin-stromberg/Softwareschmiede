@@ -76,6 +76,67 @@ public sealed class AufgabeServiceTests : IDisposable
         result.IssueReferenz.Milestone.Should().Be("v1.0");
     }
 
+    /// <summary>CreateFromAlertAsync erstellt Aufgabe, IssueReferenz und AlertReferenz.</summary>
+    [Fact]
+    public async Task CreateFromAlertAsync_ShouldCreateAufgabeWithIssueAndAlertReference()
+    {
+        var alert = new ScmAlert(
+            7,
+            "github:code-scanning:owner/repo:7",
+            ScmAlertType.CodeScanning,
+            "SQL injection",
+            "Benutzereingabe wird unsicher verwendet.",
+            "https://github.com/owner/repo/security/code-scanning/7",
+            "high",
+            "open",
+            "CodeQL",
+            "cs/sql-injection",
+            "SQL injection",
+            "src/Login.cs",
+            42);
+        var issue = new Issue(123, "Code scanning alert: SQL injection", "Body", [], null, "https://github.com/owner/repo/issues/123");
+
+        var result = await _sut.CreateFromAlertAsync(_projektId, alert, issue, provider: "Softwareschmiede.GitHub", repositoryId: "owner/repo");
+
+        result.Titel.Should().Be("SQL injection");
+        result.IssueReferenz.Should().NotBeNull();
+        result.IssueReferenz!.IssueNummer.Should().Be(123);
+        result.AlertReferenz.Should().NotBeNull();
+        result.AlertReferenz!.SourceKey.Should().Be("github:code-scanning:owner/repo:7");
+        result.AlertReferenz.RuleId.Should().Be("cs/sql-injection");
+    }
+
+    /// <summary>CreateFromAlertAsync erzeugt bei gleicher SourceKey keine zweite Aufgabe.</summary>
+    [Fact]
+    public async Task CreateFromAlertAsync_ShouldReturnExistingTask_WhenSourceKeyAlreadyExists()
+    {
+        var alert = new ScmAlert(7, "github:code-scanning:owner/repo:7", ScmAlertType.CodeScanning, "Alert", "Body", null, "medium", "open", "CodeQL", "rule", "Rule", null, null);
+        var firstIssue = new Issue(123, "Issue 1", "Body", [], null, "https://github.com/owner/repo/issues/123");
+        var secondIssue = new Issue(124, "Issue 2", "Body", [], null, "https://github.com/owner/repo/issues/124");
+
+        var first = await _sut.CreateFromAlertAsync(_projektId, alert, firstIssue);
+        var second = await _sut.CreateFromAlertAsync(_projektId, alert, secondIssue);
+
+        second.Id.Should().Be(first.Id);
+        var aufgaben = await _sut.GetByProjektAsync(_projektId);
+        aufgaben.Count(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == alert.SourceKey).Should().Be(1);
+    }
+
+    /// <summary>DeleteAsync entfernt die AlertReferenz kaskadierend mit der Aufgabe.</summary>
+    [Fact]
+    public async Task DeleteAsync_ShouldCascadeDeleteAlertReferenz_WhenTaskHasAlertReference()
+    {
+        var alert = new ScmAlert(7, "github:code-scanning:owner/repo:7", ScmAlertType.CodeScanning, "Alert", "Body", null, "medium", "open", "CodeQL", "rule", "Rule", null, null);
+        var issue = new Issue(123, "Issue", "Body", [], null, "https://github.com/owner/repo/issues/123");
+        var aufgabe = await _sut.CreateFromAlertAsync(_projektId, alert, issue);
+
+        await _sut.DeleteAsync(aufgabe.Id);
+        _db.ChangeTracker.Clear();
+
+        _db.Aufgaben.Any(a => a.Id == aufgabe.Id).Should().BeFalse();
+        _db.AlertReferenzen.Any(a => a.SourceKey == alert.SourceKey).Should().BeFalse();
+    }
+
     /// <summary>TryAssignIssueReferenzIfNoneAsync speichert eine IssueReferenz, wenn noch keine existiert.</summary>
     [Fact]
     public async Task TryAssignIssueReferenzIfNoneAsync_ShouldPersistIssueReference_WhenNoneExists()

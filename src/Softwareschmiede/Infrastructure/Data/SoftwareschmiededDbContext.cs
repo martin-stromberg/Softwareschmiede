@@ -24,6 +24,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Issue-Referenzen.</summary>
     public DbSet<IssueReferenz> IssueReferenzen => Set<IssueReferenz>();
 
+    /// <summary>Alert-Referenzen.</summary>
+    public DbSet<AlertReferenz> AlertReferenzen => Set<AlertReferenz>();
+
     /// <summary>Protokolleinträge.</summary>
     public DbSet<Protokolleintrag> Protokolleintraege => Set<Protokolleintrag>();
 
@@ -141,6 +144,10 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(i => i.Aufgabe)
                 .HasForeignKey<IssueReferenz>(i => i.AufgabeId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(a => a.AlertReferenz)
+                .WithOne(i => i.Aufgabe)
+                .HasForeignKey<AlertReferenz>(i => i.AufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
             e.HasMany(a => a.Protokolleintraege)
                 .WithOne(p => p.Aufgabe)
                 .HasForeignKey(p => p.AufgabeId)
@@ -155,6 +162,19 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<IssueReferenz>(e =>
         {
             e.HasKey(i => i.Id);
+        });
+
+        // AlertReferenz
+        modelBuilder.Entity<AlertReferenz>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.Property(i => i.Provider).IsRequired().HasMaxLength(200);
+            e.Property(i => i.RepositoryId).IsRequired().HasMaxLength(500);
+            e.Property(i => i.AlertType).IsRequired().HasMaxLength(100);
+            e.Property(i => i.SourceKey).IsRequired().HasMaxLength(700);
+            e.Property(i => i.Titel).IsRequired();
+            e.HasIndex(i => i.AufgabeId).IsUnique();
+            e.HasIndex(i => i.SourceKey).IsUnique();
         });
 
         // Protokolleintrag

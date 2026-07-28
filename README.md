@@ -66,6 +66,7 @@ Die wichtigsten Features:
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
 - **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen und anschließend der Aufgabe zuordnen
+- **GitHub-Code-Scanning-Alerts als Anforderungen** – offene GitHub-Code-Scanning-Alerts erscheinen neben Issues in den offenen Anforderungen und können automatisch in eine Aufgabe mit neu angelegtem GitHub-Issue überführt werden
 - **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
@@ -89,7 +90,7 @@ Die wichtigsten UI-Abläufe sind in der [Anwendungsdokumentation](docs/help/inde
 |---------------|---------|---------|
 | **Windows** | 10 (Build 17763+) / 11 | Pflicht – Windows Credential Store, WPF und Pseudo Console API (ConPTY) werden benötigt |
 | **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) – WPF-Projekt (`net10.0-windows10.0.17763.0`) erfordert Windows-SDK und Zielversion mindestens Build 17763 |
-| **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen |
+| **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen, Issue-Erstellung und Code-Scanning-Alert-Abruf |
 | **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
 | **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
 | **Claude CLI** (`claude`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
@@ -149,7 +150,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 1. **GitHub-Token einrichten** – Credential Manager öffnen und Token speichern (siehe [Konfiguration](#-konfiguration--plugin-setup))
 2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
 3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt erstellen und ein SCM-Plugin wählen
-4. **Aufgabe anlegen** – Issue aus dem Repository wählen oder freie Anforderung erfassen
+4. **Aufgabe anlegen** – Issue oder GitHub-Code-Scanning-Alert aus dem Repository wählen oder freie Anforderung erfassen
 5. **KI-Plugin wählen (Pflicht)** – Copilot, Claude CLI oder Codex CLI auswählen (explizit oder via Standardplugin/Fallback)
 6. **KI-Lauf starten** – Prompt eingeben und den Prozess starten
 
@@ -160,7 +161,8 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 ### Typischer Ablauf in der Anwendung
 
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
-2. **Aufgabe anlegen** (frei oder aus GitHub-Issue).
+2. **Aufgabe anlegen** (frei, aus GitHub-Issue oder aus einem GitHub-Code-Scanning-Alert).
+   Beim Auswählen eines Alerts erstellt Softwareschmiede automatisch ein GitHub-Issue und speichert die Alert-Herkunft lokal, damit derselbe Alert nicht erneut angeboten wird.
 3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen und das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen).
 4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt). Die eingebettete CLI-Konsole zeigt laufende Ausgabe mit vertikaler Scrollbar, Mausrad/Page-/Line-Scroll, 1000-Zeilen-Scrollback und Auto-Follow, solange Sie am Ende der Ausgabe bleiben.
@@ -189,7 +191,7 @@ VS Code wird über `code.cmd`/`code` im `PATH` oder typische Windows-Installatio
 
 ### Plugin-Architektur (kurz)
 
-- **Contracts:** `src/Softwareschmiede.Plugin.Contracts` definiert `IPlugin`, `IGitPlugin`, `IKiPlugin`, `PluginType`
+- **Contracts:** `src/Softwareschmiede.Plugin.Contracts` definiert `IPlugin`, `IGitPlugin`, `IKiPlugin`, optionale Alert-Verträge wie `IScmAlertProvider`, `PluginType`
 - **Plugin-Projekte:** liegen als eigenständige Klassenbibliotheken unter `plugins/`
 - **Host-Referenzen:** `src/Softwareschmiede/Softwareschmiede.csproj` referenziert Plugin-Projekte mit `ReferenceOutputAssembly="false"`
 - **Build/Publish-Kopie:** MSBuild-Targets kopieren Plugin-Artefakte nach `$(OutDir)plugins` bzw. `$(PublishDir)plugins`
@@ -207,7 +209,7 @@ Softwareschmiede speichert API-Tokens **ausschließlich im Windows Credential St
 3. Felder ausfüllen:
    - **Internetadresse oder Netzwerkadresse:** `Softwareschmiede.GitHub.Token`
    - **Benutzername:** *(beliebig, z. B. `github`)*
-   - **Kennwort:** Dein GitHub Personal Access Token (PAT) mit den Scopes `repo`, `read:org`
+   - **Kennwort:** Dein GitHub Personal Access Token (PAT) mit den Scopes `repo`, `read:org` und Zugriff auf Code-Scanning-Alerts des Repositorys
 
 **Option B – Kommandozeile (`cmdkey`):**
 
@@ -384,7 +386,7 @@ Softwareschmiede/                            # Solution Root
 │   │   ├── Themes/                          # DarkTheme.xaml, LightTheme.xaml
 │   │   ├── Converters/                      # AppConverters, KiAusfuehrungsStatusConverter (WPF-Wertkonverter)
 │   ├── Softwareschmiede.IntegrationTests/   # Integrations-Tests
-│   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, PluginType
+│   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, IScmAlertProvider, PluginType
 │   └── Softwareschmiede.Tests/              # Unit-Tests (xUnit, FluentAssertions, Moq)
 ├── plugins/                                 # Plugin-Projekte (separate Klassenbibliotheken)
 │   ├── Softwareschmiede.Plugin.GitHub/      # Git-Provider Plugin
@@ -463,9 +465,12 @@ public interface IPlugin
 
 public interface IGitPlugin : IPlugin { /* Git operations */ }
 public interface IKiPlugin : IPlugin { /* AI operations */ }
+public interface IScmAlertProvider { /* optional SCM alerts, e.g. GitHub Code Scanning */ }
 ```
 
 `IPluginManager` lädt Plugin-DLLs aus `plugins/` dynamisch und ordnet sie über `PluginType` den Kategorien zu.
+
+GitHub-Code-Scanning-Alerts werden über einen optionalen SCM-Alert-Vertrag gelesen und fachlich von normalen Issues getrennt. In der Projektdetailansicht werden beide Quellen als offene Anforderungen angezeigt. Erst beim Auswählen eines Alerts wird ein GitHub-Issue erzeugt; die lokale Aufgabe referenziert dieses Issue und speichert zusätzlich eine `AlertReferenz` mit stabiler `SourceKey`, damit bereits konvertierte Alerts gefiltert bleiben. Nicht-GitHub-Plugins können den Alert-Vertrag ignorieren.
 
 ### Discovery- und Build-Flow
 
@@ -538,6 +543,7 @@ Feature-spezifische Testartefakte:
 - Service-Tests (Branch-Commit-Baum & Commit-Preview): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
 - Service-Tests (dateispezifische Diff-Auflösung): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
+- Service-/ViewModel-/Plugin-Tests (GitHub-Code-Scanning-Alerts): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`, `src/Softwareschmiede.Tests/App/ViewModels/ProjectDetailViewModelTests.cs`, `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubPluginTests.cs`
 - Service-Tests (Issue 58 Pluginauswahl/Persistenz): `src/Softwareschmiede.Tests/Application/Services/PluginSelectionServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
 - Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`

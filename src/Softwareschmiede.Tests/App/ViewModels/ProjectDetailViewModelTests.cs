@@ -566,6 +566,22 @@ public sealed class ProjectDetailViewModelTests : IDisposable
     private static Issue ErstelleIssue(int nummer = 1, string titel = "Issue-Titel")
         => new(nummer, titel, "Body", [], null, "https://github.com/test/repo/issues/" + nummer);
 
+    private static ScmAlert ErstelleAlert(int nummer = 7, string titel = "CodeQL Alert")
+        => new(
+            nummer,
+            $"github:code-scanning:test/repo:{nummer}",
+            ScmAlertType.CodeScanning,
+            titel,
+            "Alert-Beschreibung",
+            $"https://github.com/test/repo/security/code-scanning/{nummer}",
+            "high",
+            "open",
+            "CodeQL",
+            "rule/id",
+            "Rule Name",
+            "src/File.cs",
+            12);
+
     private Mock<IGitPlugin> SetupGitPlugin(IEnumerable<Issue>? issues = null)
     {
         var gitPluginMock = new Mock<IGitPlugin>();
@@ -717,5 +733,167 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         sut.IssueVorschlaege.Should().HaveCount(vorschlaegVorher);
         var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
         aufgaben.Should().BeEmpty();
+    }
+
+    /// <summary>LadenOffeneAnforderungenAsync lädt Issues und Alerts gemeinsam und filtert bereits konvertierte Alerts.</summary>
+    [Fact]
+    public async Task LadenOffeneAnforderungenAsync_LoadsIssuesAndAlertsAndFiltersConvertedAlerts()
+    {
+        var projekt = await _projektService.CreateAsync("Alert-Laden-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo");
+        var convertedAlert = ErstelleAlert(7);
+        await _aufgabeService.CreateFromAlertAsync(
+            projekt.Id,
+            convertedAlert,
+            ErstelleIssue(77, "Created issue"));
+        var plugin = new TestScmPlugin([ErstelleIssue(1)], [convertedAlert, ErstelleAlert(8, "Neuer Alert")]);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IssueVorschlaege.Should().ContainSingle(i => i.Nummer == 1);
+        sut.OffeneAnforderungen.Should().HaveCount(2);
+        sut.OffeneAnforderungen.Any(a => a.Kind == ScmRequirementKind.Issue && a.Issue != null && a.Issue.Nummer == 1).Should().BeTrue();
+        sut.OffeneAnforderungen.Any(a => a.Kind == ScmRequirementKind.Alert && a.Alert != null && a.Alert.AlertNumber == 8).Should().BeTrue();
+        sut.OffeneAnforderungen.Should().NotContain(a => a.SourceKey == convertedAlert.SourceKey);
+    }
+
+    /// <summary>AufgabeAusAnforderungErstellenCommand erstellt bei Alerts erst ein GitHub-Issue und danach die lokale Aufgabe.</summary>
+    [Fact]
+    public async Task AufgabeAusAnforderungErstellenAsync_ShouldCreateExternalIssueBeforeLocalTask_WhenRequirementIsAlert()
+    {
+        var projekt = await _projektService.CreateAsync("Alert-Konvertierung-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo");
+        var alert = ErstelleAlert(9, "Unsichere Abfrage");
+        var plugin = new TestScmPlugin([], [alert])
+        {
+            CreatedIssue = new Issue(200, "Code scanning alert: Unsichere Abfrage", "Body", [], null, "https://github.com/test/repo/issues/200")
+        };
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await sut.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(sut.OffeneAnforderungen.Single());
+
+        plugin.CreateIssueCalls.Should().Be(1);
+        sut.OffeneAnforderungen.Should().BeEmpty();
+        var aufgabe = (await _aufgabeService.GetByProjektAsync(projekt.Id)).Single();
+        aufgabe.Titel.Should().Be("Unsichere Abfrage");
+        aufgabe.IssueReferenz!.IssueNummer.Should().Be(200);
+        aufgabe.AlertReferenz!.SourceKey.Should().Be(alert.SourceKey);
+    }
+
+    /// <summary>AufgabeAusAnforderungErstellenCommand erzeugt kein zweites externes Issue für bereits konvertierte Alerts.</summary>
+    [Fact]
+    public async Task AufgabeAusAnforderungErstellenAsync_ShouldNotCreateExternalIssue_WhenAlertSourceKeyAlreadyExists()
+    {
+        var projekt = await _projektService.CreateAsync("Alert-Duplikat-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo");
+        var alert = ErstelleAlert(9, "Unsichere Abfrage");
+        await _aufgabeService.CreateFromAlertAsync(
+            projekt.Id,
+            alert,
+            new Issue(200, "Code scanning alert: Unsichere Abfrage", "Body", [], null, "https://github.com/test/repo/issues/200"));
+        var plugin = new TestScmPlugin([], [alert]);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await sut.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(ScmRequirement.FromAlert(alert));
+
+        plugin.CreateIssueCalls.Should().Be(0);
+        sut.Aufgaben.Count(a => a.AlertReferenz?.SourceKey == alert.SourceKey).Should().Be(1);
+        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        aufgaben.Count(a => a.AlertReferenz?.SourceKey == alert.SourceKey).Should().Be(1);
+    }
+
+    /// <summary>AufgabeAusAnforderungErstellenCommand erstellt bei fehlgeschlagener Issue-Anlage keine lokale Aufgabe.</summary>
+    [Fact]
+    public async Task AufgabeAusAnforderungErstellenAsync_ShouldNotCreateLocalTask_WhenExternalIssueCreationFails()
+    {
+        var projekt = await _projektService.CreateAsync("Alert-Fehler-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo");
+        var alert = ErstelleAlert(9);
+        var plugin = new TestScmPlugin([], [alert])
+        {
+            CreateIssueResult = IssueCreateResult.Failed("permission denied")
+        };
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await sut.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(sut.OffeneAnforderungen.Single());
+
+        plugin.CreateIssueCalls.Should().Be(1);
+        sut.FehlerMeldung.Should().Contain("permission denied");
+        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        aufgaben.Should().BeEmpty();
+    }
+
+    /// <summary>AufgabeAusAnforderungErstellenCommand erzeugt bei Benutzerabbruch weder GitHub-Issue noch lokale Aufgabe.</summary>
+    [Fact]
+    public async Task AufgabeAusAnforderungErstellenAsync_ShouldDoNothing_WhenUserCancelsAlertConversion()
+    {
+        var projekt = await _projektService.CreateAsync("Alert-Abbruch-Projekt", null);
+        await _projektService.AddRepositoryAsync(projekt.Id, "SourceCodeManagement", "https://github.com/test/repo", "test/repo");
+        var plugin = new TestScmPlugin([], [ErstelleAlert(9)]);
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin]);
+        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await sut.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(sut.OffeneAnforderungen.Single());
+
+        plugin.CreateIssueCalls.Should().Be(0);
+        var aufgaben = await _aufgabeService.GetByProjektAsync(projekt.Id);
+        aufgaben.Should().BeEmpty();
+    }
+
+    private sealed class TestScmPlugin(
+        IEnumerable<Issue> issues,
+        IEnumerable<ScmAlert> alerts) : IGitPlugin, IScmAlertProvider, IIssueCreateProvider
+    {
+        public int CreateIssueCalls { get; private set; }
+        public Issue? CreatedIssue { get; init; }
+        public IssueCreateResult? CreateIssueResult { get; init; }
+        public string PluginName => "Test SCM";
+        public string PluginPrefix => "SourceCodeManagement";
+        public PluginType PluginType => PluginType.SourceCodeManagement;
+        public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
+        public Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default) => Task.FromResult(issues);
+        public Task<IEnumerable<ScmAlert>> GetAlertsAsync(string repositoryId, CancellationToken ct = default) => Task.FromResult(alerts);
+        public Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<IssueCreateResult> CreateIssueAsync(string repositoryId, IssueCreateRequest request, CancellationToken ct = default)
+        {
+            CreateIssueCalls++;
+            return Task.FromResult(CreateIssueResult ?? IssueCreateResult.Success(CreatedIssue ?? new Issue(999, request.Title, request.Body, [], null, "https://github.com/test/repo/issues/999")));
+        }
+
+        public Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default) => Task.CompletedTask;
+        public Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default) => Task.CompletedTask;
+        public Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default) => Task.CompletedTask;
+        public Task PullAsync(string localPath, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task CommitAsync(string localPath, string message, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ResetAsync(string localPath, string resetType, string? targetRef, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+        public Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default) => Task.FromResult(Enumerable.Empty<string>());
+        public Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default) => Task.FromResult("main");
+        public Task CheckoutRemoteBranchAsync(string localPath, string branchName, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<IEnumerable<AvailableRepository>> GetAvailableRepositoriesAsync(CancellationToken ct = default) => Task.FromResult(Enumerable.Empty<AvailableRepository>());
     }
 }

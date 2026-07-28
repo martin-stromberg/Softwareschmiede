@@ -91,6 +91,149 @@ public sealed class GitHubPluginTests
         result.Should().BeEmpty();
     }
 
+    /// <summary>GetAlertsAsync lädt GitHub-Code-Scanning-Alerts und mappt die relevanten Felder.</summary>
+    [Fact]
+    public async Task GetAlertsAsync_ShouldReturnMappedCodeScanningAlerts_WhenCliSucceeds()
+    {
+        const string json = """
+            [
+              {
+                "number": 7,
+                "state": "open",
+                "html_url": "https://github.com/owner/repo/security/code-scanning/7",
+                "rule": {
+                  "id": "cs/sql-injection",
+                  "name": "SQL injection",
+                  "description": "User input reaches SQL query.",
+                  "security_severity_level": "high",
+                  "severity": "warning"
+                },
+                "tool": { "name": "CodeQL" },
+                "most_recent_instance": {
+                  "location": { "path": "src/Login.cs", "start_line": 42 },
+                  "message": { "text": "Unsanitized input" }
+                }
+              }
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "api", "--paginate", "--slurp", "repos/owner/repo/code-scanning/alerts?state=open&per_page=100")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, json, string.Empty));
+
+        var result = (await _sut.GetAlertsAsync("https://github.com/owner/repo.git")).ToList();
+
+        result.Should().ContainSingle();
+        result[0].SourceKey.Should().Be("github:code-scanning:owner/repo:7");
+        result[0].Title.Should().Be("SQL injection");
+        result[0].Description.Should().Be("Unsanitized input");
+        result[0].Severity.Should().Be("high");
+        result[0].ToolName.Should().Be("CodeQL");
+        result[0].FilePath.Should().Be("src/Login.cs");
+        result[0].StartLine.Should().Be(42);
+    }
+
+    /// <summary>GetAlertsAsync verarbeitet paginierte gh-api-Antworten aus mehreren Seiten.</summary>
+    [Fact]
+    public async Task GetAlertsAsync_ShouldReturnAlertsFromAllPaginatedPages()
+    {
+        const string json = """
+            [
+              [
+                {
+                  "number": 1,
+                  "state": "open",
+                  "rule": { "id": "rule/one", "name": "Rule one" },
+                  "tool": { "name": "CodeQL" }
+                }
+              ],
+              [
+                {
+                  "number": 2,
+                  "state": "open",
+                  "rule": { "id": "rule/two", "name": "Rule two" },
+                  "tool": { "name": "CodeQL" }
+                }
+              ]
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "api", "--paginate", "--slurp", "repos/owner/repo/code-scanning/alerts?state=open&per_page=100")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, json, string.Empty));
+
+        var result = (await _sut.GetAlertsAsync("owner/repo")).ToList();
+
+        result.Select(a => a.AlertNumber).Should().Equal(1, 2);
+        result.Select(a => a.SourceKey).Should().Equal(
+            "github:code-scanning:owner/repo:1",
+            "github:code-scanning:owner/repo:2");
+    }
+
+    /// <summary>GetAlertsAsync behandelt fehlendes Code Scanning als leere Liste.</summary>
+    [Fact]
+    public async Task GetAlertsAsync_ShouldReturnEmpty_WhenCodeScanningIsNotAvailable()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => a.Contains("api")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "HTTP 404: Not Found"));
+
+        var result = await _sut.GetAlertsAsync("owner/repo");
+
+        result.Should().BeEmpty();
+    }
+
+    /// <summary>GetAlertsAsync gibt bei fehlenden Rechten eine leere Liste zurück und maskiert Tokens in Logs.</summary>
+    [Fact]
+    public async Task GetAlertsAsync_ShouldReturnEmpty_WhenPermissionsAreMissing()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("secret-token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => a.Contains("api")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "HTTP 403: token secret-token insufficient scopes"));
+
+        var result = await _sut.GetAlertsAsync("owner/repo");
+
+        result.Should().BeEmpty();
+    }
+
+    /// <summary>GetAlertsAsync propagiert Cancellation statt daraus eine leere Liste zu machen.</summary>
+    [Fact]
+    public async Task GetAlertsAsync_ShouldPropagateCancellation_WhenCliIsCancelled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => a.Contains("api")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                cts.Token))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+
+        var act = () => _sut.GetAlertsAsync("owner/repo", cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
     /// <summary>CreateIssueAsync ruft gh issue create auf und mappt die URL auf eine Issue-Referenz.</summary>
     [Fact]
     public async Task CreateIssueAsync_ShouldReturnIssue_WhenCliSucceeds()
