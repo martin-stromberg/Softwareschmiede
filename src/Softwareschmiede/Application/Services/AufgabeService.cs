@@ -250,7 +250,9 @@ public sealed class AufgabeService : IAktiveAufgabenService
             ProjektId = projektId,
             GitRepositoryId = gitRepositoryId,
             Titel = alert.Title,
-            AnforderungsBeschreibung = alert.Description,
+            AnforderungsBeschreibung = string.IsNullOrWhiteSpace(createdIssue.Body)
+                ? alert.Description
+                : createdIssue.Body,
             Status = AufgabeStatus.Neu,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };

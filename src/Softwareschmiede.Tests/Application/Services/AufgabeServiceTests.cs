@@ -94,11 +94,26 @@ public sealed class AufgabeServiceTests : IDisposable
             "SQL injection",
             "src/Login.cs",
             42);
-        var issue = new Issue(123, "Code scanning alert: SQL injection", "Body", [], null, "https://github.com/owner/repo/issues/123");
+        var issueBody = string.Join(Environment.NewLine, new[]
+        {
+            "Automatisch aus einem GitHub-Code-Scanning-Alert erstellt.",
+            string.Empty,
+            "Alert-Typ: CodeScanning",
+            "Severity: high",
+            "Status: open",
+            "Tool: CodeQL",
+            "Rule: SQL injection",
+            "Betroffener Ort: src/Login.cs:42",
+            "Alert-URL: https://github.com/owner/repo/security/code-scanning/7",
+            string.Empty,
+            "Benutzereingabe wird unsicher verwendet."
+        });
+        var issue = new Issue(123, "Code scanning alert: SQL injection", issueBody, [], null, "https://github.com/owner/repo/issues/123");
 
         var result = await _sut.CreateFromAlertAsync(_projektId, alert, issue, provider: "Softwareschmiede.GitHub", repositoryId: "owner/repo");
 
         result.Titel.Should().Be("SQL injection");
+        result.AnforderungsBeschreibung.Should().Be(issueBody);
         result.IssueReferenz.Should().NotBeNull();
         result.IssueReferenz!.IssueNummer.Should().Be(123);
         result.AlertReferenz.Should().NotBeNull();
