@@ -59,7 +59,7 @@ public sealed class DevinPluginTests
 
         var psi = await _sut.StartCliAsync("/repo/path");
 
-        psi.FileName.Should().Be("devin");
+        Path.GetFileNameWithoutExtension(psi.FileName).Should().Be("devin");
         psi.WorkingDirectory.Should().Be("/repo/path");
         psi.Arguments.Should().BeEmpty();
         psi.UseShellExecute.Should().BeFalse();
@@ -76,6 +76,19 @@ public sealed class DevinPluginTests
         var psi = await _sut.StartCliAsync("/repo");
 
         psi.FileName.Should().Be(@"C:\tools\devin.exe");
+    }
+
+    /// <summary>GetCliHelpTextAsync calls the configured executable with --help.</summary>
+    [Fact]
+    public async Task GetCliHelpTextAsync_ShouldReturnHelpText_WhenConfiguredExecutableSupportsHelp()
+    {
+        _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.ExecutablePath"))
+            .Returns("dotnet");
+
+        var helpText = await _sut.GetCliHelpTextAsync();
+
+        helpText.Should().NotBeNullOrWhiteSpace();
+        helpText.Should().Contain("--help");
     }
 
     /// <summary>StartCliAsync trims quotes from configured executable path.</summary>
