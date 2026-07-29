@@ -12,6 +12,8 @@ public sealed class DevinPlugin : CliKiPluginBase
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 
+    private static readonly Lazy<string> _devinExecutablePath = new(FindDevinExecutable);
+
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<DevinPlugin> _logger;
 
@@ -101,5 +103,28 @@ public sealed class DevinPlugin : CliKiPluginBase
     }
 
     private string GetDevinCommand()
-        => ResolveExecutablePath(_credentialStore, PluginPrefix, "devin");
+        => ResolveExecutablePath(_credentialStore, PluginPrefix, _devinExecutablePath.Value);
+
+    private static string FindDevinExecutable()
+    {
+        var pathVar = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var dir in pathVar.Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrWhiteSpace(dir))
+            {
+                continue;
+            }
+
+            foreach (var ext in new[] { ".exe", ".cmd", ".bat", string.Empty })
+            {
+                var candidate = Path.Combine(dir.Trim(), $"devin{ext}");
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return OperatingSystem.IsWindows() ? "devin.exe" : "devin";
+    }
 }
