@@ -109,6 +109,52 @@ public sealed class PullRequestMonitoringServiceTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>ApprovalOnly wird bei unveraendert offenem PR nach dem Warteintervall nicht erneut ausgefuehrt.</summary>
+    [Fact]
+    public async Task RunOnceAsync_ShouldNotApproveAgain_WhenApprovalOnlyAlreadySucceeded()
+    {
+        using var db = TestDbContextFactory.Create();
+        var (_, aufgabe) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var plugin = CreatePluginMock();
+        plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
+        plugin.Setup(p => p.GetPullRequestWorkflowRunsAsync("owner/repo", 42, "head", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new PullRequestWorkflowRunInfo("1", "Build", null, "head", "feature/pr", WorkflowRunStatus.Completed, WorkflowRunConclusion.Success, null, null, false)
+            ]);
+        plugin.Setup(p => p.CompletePullRequestAsync(
+                "owner/repo",
+                42,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.ApprovalOnly),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.Approved("approved"));
+        using var provider = BuildProvider(
+            db,
+            plugin.Object,
+            new Dictionary<string, string>
+            {
+                ["Softwareschmiede.GitHub.AutoCompletePullRequests"] = "true",
+                ["Softwareschmiede.GitHub.PullRequestCompletionStrategy"] = "ApprovalOnly"
+            });
+        var sut = provider.GetRequiredService<PullRequestMonitoringService>();
+
+        await sut.RunOnceAsync();
+        _timeProvider.Advance(TimeSpan.FromMinutes(5));
+        await sut.RunOnceAsync();
+
+        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
+        Assert.Equal(PullRequestStatus.Open, saved.Status);
+        Assert.Contains("genehmigt", saved.LastError);
+        plugin.Verify(p => p.CompletePullRequestAsync(
+            "owner/repo",
+            42,
+            It.IsAny<PullRequestCompletionOptions>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     /// <summary>AutoMerge ohne tatsaechlichen Merge bleibt nicht-terminal und weiter faellig.</summary>
     [Fact]
     public async Task RunOnceAsync_ShouldKeepAutoMergeOpen_WhenCompletionDidNotMergePullRequest()
@@ -147,6 +193,52 @@ public sealed class PullRequestMonitoringServiceTests
         Assert.Null(saved.MergeCommitSha);
         Assert.Contains("Auto-Merge", saved.LastError);
         Assert.True(saved.NextCheckUtc > _timeProvider.GetUtcNow());
+    }
+
+    /// <summary>AutoMerge wird nach bereits aktiviertem Wartestatus bei unveraendert offenem PR nicht erneut getriggert.</summary>
+    [Fact]
+    public async Task RunOnceAsync_ShouldNotEnableAutoMergeAgain_WhenWaitingForMerge()
+    {
+        using var db = TestDbContextFactory.Create();
+        var (_, aufgabe) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.PreMergeRunning, _timeProvider.GetUtcNow());
+        var plugin = CreatePluginMock();
+        plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
+        plugin.Setup(p => p.GetPullRequestWorkflowRunsAsync("owner/repo", 42, "head", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new PullRequestWorkflowRunInfo("1", "Build", null, "head", "feature/pr", WorkflowRunStatus.Completed, WorkflowRunConclusion.Success, null, null, false)
+            ]);
+        plugin.Setup(p => p.CompletePullRequestAsync(
+                "owner/repo",
+                42,
+                It.Is<PullRequestCompletionOptions>(o => o.Strategy == PullRequestCompletionStrategy.AutoMerge),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestCompletionResult.WaitingForMerge("auto merge enabled"));
+        using var provider = BuildProvider(
+            db,
+            plugin.Object,
+            new Dictionary<string, string>
+            {
+                ["Softwareschmiede.GitHub.AutoCompletePullRequests"] = "true",
+                ["Softwareschmiede.GitHub.PullRequestCompletionStrategy"] = "AutoMerge"
+            });
+        var sut = provider.GetRequiredService<PullRequestMonitoringService>();
+
+        await sut.RunOnceAsync();
+        _timeProvider.Advance(TimeSpan.FromMinutes(5));
+        await sut.RunOnceAsync();
+
+        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        Assert.Equal(PullRequestMonitoringPhase.Approved, saved.MonitoringPhase);
+        Assert.Equal(PullRequestStatus.Open, saved.Status);
+        Assert.Contains("Auto-Merge", saved.LastError);
+        plugin.Verify(p => p.CompletePullRequestAsync(
+            "owner/repo",
+            42,
+            It.IsAny<PullRequestCompletionOptions>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Geskippte Pre-Merge-Runs gelten als neutral erfolgreicher Abschluss.</summary>

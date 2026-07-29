@@ -1,7 +1,7 @@
 # Offene Aufgaben
 
 Erstellt am: 2026-07-29
-Abbruchgrund: Maximale Iterationsanzahl erreicht
+Abbruchgrund: Offene Punkte verbleiben nach erneutem Fortsetzungslauf
 
 Die folgenden Aufgaben konnten im automatisierten Zyklus nicht abgeschlossen werden
 und muessen manuell oder in einem erneuten Lauf bearbeitet werden.
@@ -18,9 +18,9 @@ und muessen manuell oder in einem erneuten Lauf bearbeitet werden.
 
 ## Code-Review-Befunde
 
-- [ ] Idempotenzproblem bei nicht gemergten Erfolgsresultaten beheben: Nach `ApprovalOnly` oder `AutoMerge` mit offenem PR darf das Monitoring bei unveraendert erfolgreichem Pre-Merge-Zustand nicht in jedem Poll erneut `CompletePullRequestAsync` ausfuehren und neue Protokolleintraege schreiben.
-- [ ] Zwei-Durchlauf-Monitoring-Test fuer `ApprovalOnly` ergaenzen, der sicherstellt, dass nach persistierter Phase `Approved` kein erneuter Abschlussversuch erfolgt, solange der PR offen und bereits genehmigt ist.
-- [ ] Zwei-Durchlauf-Monitoring-Test fuer `AutoMerge` ergaenzen, der sicherstellt, dass nach `WaitingForMerge` nur weiter gepollt und nicht erneut `gh pr merge --auto` ausgefuehrt wird.
+- [x] Idempotenzproblem bei nicht gemergten Erfolgsresultaten beheben: Nach `ApprovalOnly` oder `AutoMerge` mit offenem PR darf das Monitoring bei unveraendert erfolgreichem Pre-Merge-Zustand nicht in jedem Poll erneut `CompletePullRequestAsync` ausfuehren und neue Protokolleintraege schreiben.
+- [x] Zwei-Durchlauf-Monitoring-Test fuer `ApprovalOnly` ergaenzen, der sicherstellt, dass nach persistierter Phase `Approved` kein erneuter Abschlussversuch erfolgt, solange der PR offen und bereits genehmigt ist.
+- [x] Zwei-Durchlauf-Monitoring-Test fuer `AutoMerge` ergaenzen, der sicherstellt, dass nach `WaitingForMerge` nur weiter gepollt und nicht erneut `gh pr merge --auto` ausgefuehrt wird.
 
 ## Fehlgeschlagene Tests
 

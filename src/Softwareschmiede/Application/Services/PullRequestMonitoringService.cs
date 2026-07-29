@@ -87,11 +87,23 @@ public sealed class PullRequestMonitoringService : BackgroundService
                 status.MergeCommitSha ?? pullRequest.MergeCommitSha,
                 ct);
 
+            var previousPhase = pullRequest.MonitoringPhase;
+            var previousUncertainty = pullRequest.LastError;
             var (phase, uncertainty) = DeterminePhase(status, workflowRuns);
             await references.UpdateFromProviderAsync(pullRequest, status, workflowRuns, phase, ct);
             if (uncertainty is not null)
             {
                 await references.SetProviderUncertaintyAsync(pullRequest, phase, uncertainty, ct);
+            }
+
+            if (ShouldKeepWaitingAfterSuccessfulNonMergeCompletion(previousPhase, phase, status))
+            {
+                await references.SetProviderUncertaintyAsync(
+                    pullRequest,
+                    previousPhase,
+                    previousUncertainty ?? "Pull Request bleibt offen und wird weiter ueberwacht.",
+                    ct);
+                return;
             }
 
             if (phase == PullRequestMonitoringPhase.PreMergeSucceeded && IsAutoCompleteEnabled(services, plugin))
@@ -226,6 +238,14 @@ public sealed class PullRequestMonitoringService : BackgroundService
 
     private static bool IsSuccessfulConclusion(WorkflowRunConclusion conclusion)
         => conclusion is WorkflowRunConclusion.Success or WorkflowRunConclusion.Skipped;
+
+    private static bool ShouldKeepWaitingAfterSuccessfulNonMergeCompletion(
+        PullRequestMonitoringPhase previousPhase,
+        PullRequestMonitoringPhase currentPhase,
+        PullRequestStatusInfo status)
+        => previousPhase == PullRequestMonitoringPhase.Approved
+           && currentPhase == PullRequestMonitoringPhase.PreMergeSucceeded
+           && status.Status == PullRequestStatus.Open;
 
     private static IGitPlugin ResolveProviderPlugin(IServiceProvider services, PullRequestProvider provider)
     {

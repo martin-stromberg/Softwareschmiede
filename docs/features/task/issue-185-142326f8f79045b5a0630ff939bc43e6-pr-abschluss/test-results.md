@@ -8,11 +8,12 @@ Datum: 2026-07-29
 
 | Kommando | Ergebnis |
 |----------|----------|
-| `dotnet build Softwareschmiede.slnx` | Erfolgreich, 0 Warnungen, 0 Fehler |
-| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~PullRequestMonitoringServiceTests|FullyQualifiedName~PullRequestReferenzServiceTests|FullyQualifiedName~GitHubPluginTests" --no-build` | Erfolgreich, 61 bestanden |
-| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter PullRequest --no-build` | Erfolgreich, 35 bestanden |
-| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~GitOrchestrationServiceTests|FullyQualifiedName~TaskDetailViewModelTests|FullyQualifiedName~GitHubPluginTests|FullyQualifiedName~GitPluginBaseTests|FullyQualifiedName~TaskDetailViewTests|FullyQualifiedName~PullRequestMonitoringServiceTests|FullyQualifiedName~PullRequestReferenzServiceTests" --no-build` | Erfolgreich, 208 bestanden |
-| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build` | Timeout nach ca. 184 Sekunden, kein vollstaendiges Ergebnis |
+| `dotnet build Softwareschmiede.slnx` | Erfolgreich, 0 Fehler, bestehende Warnungen |
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~PullRequestMonitoringServiceTests|FullyQualifiedName~PullRequestReferenzServiceTests|FullyQualifiedName~GitHubPluginTests" --no-build` | Erfolgreich, 63 bestanden |
+| `dotnet test Softwareschmiede.slnx --no-build` | Nach ca. 298 Sekunden ohne verwertbare Ausgabe mit Exitcode 1 beendet |
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build` | Nach ca. 296 Sekunden ohne verwertbare Ausgabe mit Exitcode 1 beendet |
+| `dotnet test src\Softwareschmiede.IntegrationTests\Softwareschmiede.IntegrationTests.csproj --no-build` | Erfolgreich, 69 bestanden |
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build --blame-hang-timeout 60s --blame-hang-dump-type none` | Timeout nach ca. 184 Sekunden, keine verwertbare Ausgabe |
 
 ## Fehlgeschlagene Tests
 
@@ -21,10 +22,10 @@ Keine.
 ## Erfolgreiche relevante Tests
 
 - Build der Solution erfolgreich.
-- Fokussierte PR-/Monitoring-/GitHub-Tests: 61 bestanden.
-- Breiter `PullRequest`-Filter: 35 bestanden.
-- Breiter angrenzender Filter fuer Git-Orchestrierung, Task-Detail-UI, GitHub-Plugin, Git-Plugin-Basis und PR-Services: 208 bestanden.
+- Fokussierte PR-/Monitoring-/GitHub-Tests: 63 bestanden.
+- Integrationstestprojekt vollstaendig: 69 bestanden.
 
-## Timeouts
+## Offene Testnachweise
 
-- Der vollstaendige Testlauf fuer `src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj` wurde nach ca. 184 Sekunden beendet. Bis zum Timeout lag kein abschliessendes Testergebnis vor.
+- Der vollstaendige Lauf des Unit-/E2E-Testprojekts `src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj` schliesst weiterhin nicht innerhalb von mehreren Minuten ab und liefert dabei keine verwertbare Ausgabe.
+- Der vollstaendige Solution-Testlauf ist dadurch weiterhin nicht erfolgreich nachgewiesen.
