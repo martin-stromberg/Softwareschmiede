@@ -1,10 +1,13 @@
+using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.App.Views;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -353,6 +356,23 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedPluginSettings[0].Entries[0].Value.Should().BeEmpty();
     }
 
+    /// <summary>Der Hilfebutton verwendet das aktuell ausgewählte CLI-Plugin und nicht das gespeicherte Default-KI-Plugin.</summary>
+    [Fact]
+    public async Task HilfeButtonResolver_VerwendetAusgewaehltesCliPlugin_StattDefaultKiPlugin()
+    {
+        var defaultPlugin = new TestCliPlugin("Codex CLI", "Softwareschmiede.Codex");
+        var selectedPlugin = new TestCliPlugin("Devin CLI", "Softwareschmiede.Devin");
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([defaultPlugin, selectedPlugin]);
+        await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Codex CLI");
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.PluginSelectedCommand.Execute(sut.DevelopmentAutomationPlugins.Single(entry => entry.Plugin == selectedPlugin));
+
+        SettingsView.ResolveCliPluginForHelp(sut).Should().BeSameAs(selectedPlugin);
+    }
+
     /// <summary>SpeichernAsync zeigt Fehlermeldung wenn Pflichtfeld leer ist und speichert nicht.</summary>
     [Fact]
     public async Task SpeichernAsync_ValidierungFehlgeschlagen_ZeigtFehlerMeldung()
@@ -520,4 +540,25 @@ internal sealed class InMemoryCredentialStoreForSettings : ICredentialStore
     public void SetCredential(string key, string value) => _store[key] = value;
     /// <summary>DeleteCredential.</summary>
     public void DeleteCredential(string key) => _store.Remove(key);
+}
+
+internal sealed class TestCliPlugin : CliKiPluginBase
+{
+    public TestCliPlugin(string pluginName, string pluginPrefix)
+    {
+        PluginName = pluginName;
+        PluginPrefix = pluginPrefix;
+        ProviderDateiPraefix = pluginPrefix;
+    }
+
+    public override string ProviderDateiPraefix { get; }
+    public override string PluginName { get; }
+    public override string PluginPrefix { get; }
+    public override PluginType PluginType => PluginType.DevelopmentAutomation;
+    public override IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
+    public override bool SupportsSessionContinuation() => false;
+    public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
+
+    protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
+        => new("test") { WorkingDirectory = localRepoPath };
 }

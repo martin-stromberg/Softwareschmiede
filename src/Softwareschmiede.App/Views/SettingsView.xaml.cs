@@ -60,8 +60,8 @@ public sealed partial class SettingsView : UserControl
     private async void OnHilfeButtonClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not SettingsViewModel vm) return;
-        var plugin = vm.KiPlugins.FirstOrDefault(p => p.PluginName == vm.DefaultKiPlugin);
-        if (plugin is not CliKiPluginBase cliPlugin) return;
+        var cliPlugin = ResolveCliPluginForHelp(vm);
+        if (cliPlugin is null) return;
         var element = sender as FrameworkElement;
         if (element is not null) element.IsEnabled = false;
         try
@@ -81,5 +81,12 @@ public sealed partial class SettingsView : UserControl
         {
             if (element is not null) element.IsEnabled = true;
         }
+    }
+
+    internal static CliKiPluginBase? ResolveCliPluginForHelp(SettingsViewModel vm)
+    {
+        var plugin = vm.SelectedPlugin?.Plugin as IKiPlugin
+            ?? vm.KiPlugins.FirstOrDefault(p => p.PluginName == vm.DefaultKiPlugin);
+        return plugin as CliKiPluginBase;
     }
 }
