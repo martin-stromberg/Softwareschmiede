@@ -57,6 +57,18 @@ public sealed class CliKiPluginCommandLineParametersIntegrationTests
         psi.Arguments.Should().Contain("--model gpt-4o");
     }
 
+    /// <summary>DevinPlugin uebergibt CommandLineParameters aus dem Store an ProcessStartInfo.</summary>
+    [Fact]
+    public async Task DevinPlugin_ShouldAppendCommandLineParameters_FromCredentialStore()
+    {
+        _credentialStore.SetCredential("Softwareschmiede.Devin.CommandLineParameters", "--permission-mode plan");
+        var sut = new DevinPlugin(_credentialStore, NullLogger<DevinPlugin>.Instance);
+
+        var psi = await sut.StartCliAsync("/repo/path");
+
+        psi.Arguments.Should().Contain("--permission-mode plan");
+    }
+
     /// <summary>Leere CommandLineParameters ändern die Arguments nicht.</summary>
     [Fact]
     public async Task CodexPlugin_ShouldNotModifyArguments_WhenCommandLineParametersAreEmpty()

@@ -60,7 +60,7 @@ Die wichtigsten Features:
 
 - **Projekt- und Aufgabenverwaltung** – Dashboard, Statusmodell und chronologisches Aufgabenprotokoll
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
-- **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI und Codex CLI mit Echtzeit-Streaming der Ausgabe
+- **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
 - **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM- und KI-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
 - **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
@@ -95,6 +95,7 @@ Die wichtigsten UI-Abläufe sind in der [Anwendungsdokumentation](docs/help/inde
 | **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
 | **Claude CLI** (`claude`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
 | **Codex CLI** (`codex`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.Codex` (`codex --version`) |
+| **Devin CLI** (`devin`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.Devin` (`devin --version`); Anmeldung erfolgt über die CLI |
 | **Visual Studio Code** (`code`) | aktuell | Optional – nur für den aktivierbaren IDE-Fallback, wenn im Aufgaben-Arbeitsverzeichnis keine `.sln`-Datei gefunden wird |
 | **GitHub Copilot** | aktives Abo | Optional – nur für Copilot-basierte KI-Läufe |
 | **Anthropic API Key** | vorhanden | Optional – nur für Claude-CLI-Läufe (Credential `Softwareschmiede.ClaudeCli.Token`) |
@@ -115,6 +116,10 @@ copilot --version
 
 # Claude-CLI prüfen
 claude --version
+
+# Devin-CLI prüfen und anmelden
+devin --version
+devin auth login
 ```
 
 ---
@@ -151,7 +156,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
 3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt erstellen und ein SCM-Plugin wählen
 4. **Aufgabe anlegen** – Issue oder GitHub-Code-Scanning-Alert aus dem Repository wählen oder freie Anforderung erfassen
-5. **KI-Plugin wählen (Pflicht)** – Copilot, Claude CLI oder Codex CLI auswählen (explizit oder via Standardplugin/Fallback)
+5. **KI-Plugin wählen (Pflicht)** – Copilot, Claude CLI, Codex CLI oder Devin CLI auswählen (explizit oder via Standardplugin/Fallback)
 6. **KI-Lauf starten** – Prompt eingeben und den Prozess starten
 
 ---
@@ -196,7 +201,9 @@ VS Code wird über `code.cmd`/`code` im `PATH` oder typische Windows-Installatio
 - **Host-Referenzen:** `src/Softwareschmiede/Softwareschmiede.csproj` referenziert Plugin-Projekte mit `ReferenceOutputAssembly="false"`
 - **Build/Publish-Kopie:** MSBuild-Targets kopieren Plugin-Artefakte nach `$(OutDir)plugins` bzw. `$(PublishDir)plugins`
 - **Discovery zur Laufzeit:** `PluginManager` lädt alle `*.dll` aus `AppContext.BaseDirectory/plugins` und registriert sie nach `PluginType`
-- **Aktuelle KI-Plugins:** `Softwareschmiede.Plugin.GitHubCopilot` und `Softwareschmiede.Plugin.ClaudeCli`
+- **Aktuelle KI-Plugins:** `Softwareschmiede.Plugin.GitHubCopilot`, `Softwareschmiede.Plugin.ClaudeCli`, `Softwareschmiede.Plugin.Codex` und `Softwareschmiede.Plugin.Devin`
+
+Die CLI-Plugins starten ihre jeweilige interaktive CLI im Aufgaben-Arbeitsverzeichnis. Laufende Ausgabe und Benutzereingaben werden über die bestehende ConPTY-Terminaloberfläche verarbeitet; beim Devin-Plugin erfolgt die Anmeldung innerhalb der Devin CLI (`devin auth login`).
 
 ### GitHub-Token im Windows Credential Store speichern
 
@@ -231,6 +238,10 @@ cmdkey /delete:Softwareschmiede.GitHub.Token
 | `Softwareschmiede.ClaudeCli.Token` | Anthropic API Key für Claude CLI (`ANTHROPIC_API_KEY`) |
 | `Softwareschmiede.Codex.ExecutablePath` | Optionaler absoluter Pfad zur Codex-CLI |
 | `Softwareschmiede.Codex.CommandLineParameters` | Anwenderdefinierte zusätzliche Codex-CLI-Argumente; keine automatische Default-Übernahme |
+| `Softwareschmiede.Devin.ExecutablePath` | Optionaler absoluter Pfad zur Devin CLI (`devin`); ohne Angabe wird die CLI über `PATH` aufgelöst |
+| `Softwareschmiede.Devin.CommandLineParameters` | Anwenderdefinierte zusätzliche Devin-CLI-Argumente; kein Token/API-Key und keine automatische Default-Übernahme |
+
+Für Devin wird kein Token und kein API-Key in Softwareschmiede gespeichert oder an den Prozess übergeben. Die Authentifizierung erfolgt ausschließlich über `devin auth login` beziehungsweise die weiteren Auth-Befehle der Devin CLI.
 
 ### Weitere Plugin-Konfiguration
 
@@ -267,7 +278,7 @@ Das neue **Plugins-Register** in **Einstellungen → Plugins** bietet eine zentr
 
 - Im oberen Bereich des **Plugins-Registers** können Standard-Plugins pro Kategorie (SCM und KI) gewählt werden:
   - **Standard SCM-Plugin:** z. B. GitHub oder Local Directory
-  - **Standard KI-Plugin:** z. B. GitHub Copilot, Claude CLI oder Codex CLI
+  - **Standard KI-Plugin:** z. B. GitHub Copilot, Claude CLI, Codex CLI oder Devin CLI
 - Die Auswahl wird persistent in den App-Einstellungen (`DefaultScmPluginKey`, `DefaultKiPluginKey`) gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt
 - Nach Plugin-Auswahl (durch Klick auf einen Eintrag in den Aktivierungslisten) können plugin-spezifische Einstellungen in der rechten Spalte konfiguriert werden:
   - Die verfügbaren Felder werden vom Plugin via `GetSettingGroups()` definiert
@@ -394,7 +405,8 @@ Softwareschmiede/                            # Solution Root
 │   ├── Softwareschmiede.Plugin.LocalDirectory/ # Lokales SCM-Plugin (WorkspaceMode)
 │   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
 │   ├── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
-│   └── Softwareschmiede.Plugin.Codex/       # KI-Plugin (Codex CLI)
+│   ├── Softwareschmiede.Plugin.Codex/       # KI-Plugin (Codex CLI)
+│   └── Softwareschmiede.Plugin.Devin/       # KI-Plugin (Devin CLI)
 ├── docs/                                    # Fachliche/technische Dokumentation
 │   ├── help/                                 # Anwendungsdokumentation je Bereich (siehe Kapitel „Dokumentation")
 │   ├── features/                             # Planungsartefakte je Anforderung (branchbezogen, nicht dauerhaft)
@@ -434,8 +446,8 @@ flowchart TB
     subgraph Infrastructure["Infrastructure Layer"]
         INL1["EF Core / SQLite"]
         INL2["PluginManager laedt Plugin-DLLs aus dem plugins-Ordner"]
-        INL3["GitHubPlugin / BitBucketPlugin / LocalDirectoryPlugin / GitHubCopilotPlugin / ClaudeCliPlugin"]
-        INL4["CLI-Runner fuer gh, copilot und claude"]
+        INL3["GitHubPlugin / BitBucketPlugin / LocalDirectoryPlugin / GitHubCopilotPlugin / ClaudeCliPlugin / CodexPlugin / DevinPlugin"]
+        INL4["CLI-Runner fuer gh, copilot, claude, codex und devin"]
         INL5["Windows Credential Store"]
     end
 
@@ -579,7 +591,7 @@ Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
 - Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
 - Log-Dateien werden unter `{Programmverzeichnis}/logs` abgelegt (Serilog File-Sink).
 
-Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügbar sein (`copilot` oder `claude`; für Claude-Läufe zusätzlich `ANTHROPIC_API_KEY` als Credential).
+Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügbar sein (`copilot`, `claude`, `codex` oder `devin`). Für Claude-Läufe ist zusätzlich `ANTHROPIC_API_KEY` als Credential erforderlich; Devin verwendet keinen Token/API-Key, sondern die Anmeldung über `devin auth login`.
 
 **Automatisierte Release-Pipeline:**
 
@@ -602,7 +614,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | [Anwendungsdokumentation (Index)](docs/help/index.md) | Einstiegspunkt zur fachlichen und technischen Dokumentation je Anwendungsbereich |
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
-| [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket-Plugin |
+| [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |
 | [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering und Clipboard-Paste |
 | [Dateiexplorer](docs/help/dateiexplorer/index.md) | Arbeitsbaum- und Diff-Ansicht in der Aufgabendetailansicht |
