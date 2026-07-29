@@ -115,6 +115,47 @@
 
 ---
 
+## Pull-Request-Persistenz und Monitoring
+
+**Beschreibung:** Pull Requests, die aus einer Aufgabe heraus erstellt werden, bleiben an dieser Aufgabe gespeichert und werden im PR-Bereich angezeigt.
+
+**Bedingungen:**
+- Die Pull-Request-Erstellung liefert Provider, Repository, PR-Nummer und URL.
+- Der Provider unterstuetzt Status- und Workflow-Abfragen; initial ist das GitHub.
+
+**Verhalten:**
+- Nach erfolgreicher Erstellung wird eine `PullRequestReferenz` mit Aufgabe, Provider, Repository, Nummer, Branches, URL und Head-SHA gespeichert.
+- Mehrere Pull Requests koennen derselben Aufgabe zugeordnet sein.
+- Workflow-Runs werden ueber Provider-Run-ID upserted und bleiben der lokalen PR-Referenz zugeordnet.
+- Der PR-Bereich zeigt PR-Status, Merge-Status, Monitoring-Phase, letzte Pruefung, Workflow-Runs und sichtbare Fehler- oder Blockierungsgruende.
+- Ein fehlgeschlagener oder nicht berechtigter Statusabruf beendet die Aufgabe nicht; der Fehler wird am Pull Request sichtbar gespeichert.
+
+**Umsetzung:** `PullRequestReferenzService`, `PullRequestMonitoringService`, `TaskDetailViewModel` und `TaskDetailView`.
+
+---
+
+## Automatischer PR-Abschluss
+
+**Beschreibung:** GitHub-Pull-Requests koennen nach erfolgreichen zugeordneten Pre-Merge-Actions automatisch abgeschlossen werden, wenn die GitHub-Plugin-Einstellung aktiviert ist.
+
+**Bedingungen:**
+- `AutoCompletePullRequests` ist im GitHub-Plugin aktiviert.
+- Die relevanten Pre-Merge-Workflow-Runs sind abgeschlossen und nicht fehlgeschlagen.
+- Der Pull Request ist noch nicht gemergt.
+
+**Verhalten:**
+- Standardmaessig ist der automatische Abschluss deaktiviert.
+- Erfolgreiche und uebersprungene Workflow-Runs gelten als unkritisch; fehlgeschlagene Runs blockieren den Abschluss.
+- `Merge` fuehrt einen direkten Merge mit der konfigurierten Merge-Methode aus.
+- `AutoMerge` aktiviert GitHub Auto-Merge; ein Abschluss gilt erst dann als gemergt, wenn eine anschliessende Statusabfrage `Merged` meldet.
+- `ApprovalOnly` genehmigt den Pull Request, laesst ihn aber offen und fuehrt nicht automatisch einen Merge aus.
+- Falls Branch Protection, fehlende Berechtigungen oder Self-Approval-Regeln den Abschluss verhindern, wird der Pull Request als blockiert beziehungsweise mit sichtbarem Fehler gespeichert.
+- Nach einem echten Merge werden zuordenbare Post-Merge-Workflow-Runs weiter ueberwacht.
+
+**Umsetzung:** `PullRequestMonitoringService`, `IGitPlugin.CompletePullRequestAsync` und `GitHubPlugin`.
+
+---
+
 ## Sichtbarer Aufgabenkontext
 
 **Beschreibung:** Die Aufgabendetailansicht zeigt den Kontext der aktuell geöffneten Aufgabe und der laufenden CLI-Ausführung.

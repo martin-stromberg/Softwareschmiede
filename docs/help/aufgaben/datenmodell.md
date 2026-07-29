@@ -26,6 +26,7 @@
 | `VorschlagPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
 | `VorschlagAusfuehrenAbUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
 | `AlertReferenz` | `AlertReferenz?` | Optionale Herkunftsreferenz, wenn die Aufgabe aus einem SCM-Alert erstellt wurde |
+| `PullRequests` | `ICollection<PullRequestReferenz>` | Persistierte Pull Requests, die aus der Aufgabe heraus erstellt wurden |
 
 ### `Protokolleintrag`
 
@@ -66,6 +67,48 @@
 | `ToolName` | `string?` | Name des meldenden Code-Scanning-Tools |
 
 `SourceKey` ist eindeutig indiziert. Dadurch kann derselbe GitHub-Code-Scanning-Alert auch bei parallelen oder wiederholten UI-Aktionen nicht mehrfach als lokale Aufgabe gespeichert werden.
+
+### `PullRequestReferenz`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `AufgabeId` | `Guid` | FK -> Aufgabe |
+| `Provider` | `PullRequestProvider` | Provider des Pull Requests, initial `GitHub` |
+| `RepositoryId` | `string` | Repository-Identifier beim Provider, z. B. `owner/repo` |
+| `PullRequestNumber` | `int` | Pull-Request-Nummer beim Provider |
+| `ProviderPullRequestId` | `string?` | Optionale eindeutige Provider-ID |
+| `Url` | `string` | Direkt-URL zum Pull Request |
+| `Titel` | `string` | Pull-Request-Titel |
+| `SourceBranch` | `string` | Quellbranch |
+| `TargetBranch` | `string` | Zielbranch |
+| `HeadSha` | `string?` | Head-SHA des Pull Requests |
+| `MergeCommitSha` | `string?` | Merge-Commit-SHA, sofern bekannt |
+| `Status` | `PullRequestStatus` | Providerstatus des Pull Requests |
+| `MergeStatus` | `PullRequestMergeStatus` | Mergebarkeit beziehungsweise Merge-Status |
+| `MonitoringPhase` | `PullRequestMonitoringPhase` | Lokale Monitoring-Phase |
+| `LastCheckedUtc` | `DateTimeOffset?` | Zeitpunkt der letzten Statusprüfung |
+| `NextCheckUtc` | `DateTimeOffset?` | Zeitpunkt der nächsten Statusprüfung |
+| `LastError` | `string?` | Sichtbarer Fehler oder Blockierungsgrund |
+| `CreatedUtc` | `DateTimeOffset` | Erstellungszeitpunkt des lokalen Referenzeintrags |
+
+### `PullRequestWorkflowRun`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `PullRequestReferenzId` | `Guid` | FK -> PullRequestReferenz |
+| `ProviderRunId` | `string` | Run-ID beim Provider |
+| `Name` | `string` | Workflow- oder Check-Name |
+| `Url` | `string?` | Direkt-URL zum Workflow-Run |
+| `HeadSha` | `string?` | Head-SHA des Workflow-Runs |
+| `BranchName` | `string?` | Branch des Workflow-Runs |
+| `Status` | `WorkflowRunStatus` | Laufstatus |
+| `Conclusion` | `WorkflowRunConclusion` | Abschlussbewertung |
+| `StartedAtUtc` | `DateTimeOffset?` | Startzeitpunkt, sofern bekannt |
+| `CompletedAtUtc` | `DateTimeOffset?` | Abschlusszeitpunkt, sofern bekannt |
+| `IsPostMerge` | `bool` | Kennzeichnet Runs, die nach einem Merge beobachtet werden |
+| `UpdatedUtc` | `DateTimeOffset` | Letzter lokaler Aktualisierungszeitpunkt |
 
 ## Statusübergänge
 
@@ -111,9 +154,26 @@ erDiagram
         string SourceKey
         string AlertType
     }
+    PullRequestReferenz {
+        Guid Id
+        Guid AufgabeId
+        string RepositoryId
+        int PullRequestNumber
+        string Status
+        string MonitoringPhase
+    }
+    PullRequestWorkflowRun {
+        Guid Id
+        Guid PullRequestReferenzId
+        string ProviderRunId
+        string Status
+        string Conclusion
+    }
     Aufgabe ||--o{ Protokolleintrag : "hat"
     Aufgabe ||--o| IssueReferenz : "hat"
     Aufgabe ||--o| AlertReferenz : "hat"
+    Aufgabe ||--o{ PullRequestReferenz : "hat"
+    PullRequestReferenz ||--o{ PullRequestWorkflowRun : "hat"
 ```
 
 ## CLI-Ausgabeprotokoll

@@ -439,6 +439,30 @@ Ablauf:
 
 Bei GitHub schliesst die `Closes #<IssueNummer>`-Direktive das verknuepfte Issue automatisch, sobald der Pull Request gemergt wird. Andere SCM-Provider erhalten dieselbe Information als normalen Pull-Request-Text, falls sie keine GitHub-kompatible Schliesslogik auswerten.
 
+### 7.3. Pull Request speichern und ueberwachen
+
+Beteiligte Komponenten:
+- `GitOrchestrationService.PullRequestErstellenAsync` — speichert erfolgreiche PR-Ergebnisse ueber den PR-Referenzservice
+- `PullRequestReferenzService` — laedt, speichert und aktualisiert PR-Referenzen und Workflow-Runs
+- `PullRequestMonitoringService` — fuehrt Statusabfragen, Workflow-Upserts und optionale Abschlussversuche aus
+- `IGitPlugin.GetPullRequestStatusAsync` — providerabhaengige PR-Statusabfrage
+- `IGitPlugin.GetPullRequestWorkflowRunsAsync` — providerabhaengige Workflow-/Action-Abfrage
+- `IGitPlugin.CompletePullRequestAsync` — providerabhaengiger Abschluss, Auto-Merge oder Approval
+- `TaskDetailViewModel` und `TaskDetailView` — PR-Ansicht in der Aufgabendetailansicht
+
+Ablauf:
+1. Nach erfolgreichem Provider-Aufruf liefert `CreatePullRequestAsync` PR-Nummer, URL, Branch, Provider, Repository-ID und, soweit verfuegbar, Head-SHA.
+2. `PullRequestReferenzService` legt oder aktualisiert eine `PullRequestReferenz` fuer Aufgabe, Provider, Repository und PR-Nummer.
+3. Die PR-Ansicht laedt die gespeicherten Referenzen inklusive `PullRequestWorkflowRun`-Eintraegen und zeigt PR-, Merge- und Monitoring-Status.
+4. `PullRequestMonitoringService` ermittelt faellige PRs anhand von `MonitoringPhase` und `NextCheckUtc`.
+5. Fuer GitHub werden Statusdaten mit `gh pr view` und Workflow-Runs mit `gh run list` abgefragt. Wenn eine Head-SHA bekannt ist, wird sie zur Zuordnung verwendet.
+6. Workflow-Runs werden ueber `ProviderRunId` upserted. `Success` und `Skipped` gelten als unkritische Abschluesse; fehlgeschlagene Conclusions fuehren in eine Fehler- oder Blockierungsphase.
+7. Bei erfolgreichen Pre-Merge-Runs und aktivierter GitHub-Einstellung `AutoCompletePullRequests` versucht der Monitor die konfigurierte Abschlussstrategie.
+8. `Merge` fuehrt einen direkten `gh pr merge` mit konfigurierter Merge-Methode aus. `AutoMerge` nutzt `gh pr merge --auto`; ein Merge gilt erst nach anschliessender Statusabfrage als tatsaechlich abgeschlossen. `ApprovalOnly` fuehrt `gh pr review --approve` aus und laesst den PR offen.
+9. Optionaler Protected-Branch-Bypass wird nur ausgefuehrt, wenn `AllowProtectedBranchBypass` aktiviert ist und der Providerpfad dies unterstuetzt.
+10. Nach einem echten Merge werden zuordenbare Post-Merge-Runs weiter abgefragt und mit `IsPostMerge = true` gespeichert.
+11. GitHub-API-/CLI-Fehler, Branch-Protection-Blockaden und Berechtigungsprobleme werden in `LastError` sowie einer passenden Monitoring-Phase sichtbar gespeichert und im Aufgabenprotokoll protokolliert.
+
 ### 8. Aufgabe löschen (`LoeschenAsync`)
 
 Ausgelöst durch den „Löschen"-Button im Ribbon.

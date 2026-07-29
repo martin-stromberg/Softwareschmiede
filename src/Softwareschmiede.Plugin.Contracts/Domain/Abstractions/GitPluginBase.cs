@@ -38,6 +38,24 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
     public abstract Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default);
     public abstract Task PullAsync(string localPath, CancellationToken ct = default);
     public abstract Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default);
+    public virtual Task<PullRequestStatusInfo> GetPullRequestStatusAsync(string repositoryId, int pullRequestNumber, CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(GetPullRequestStatusAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
+
+    public virtual Task<IReadOnlyList<PullRequestWorkflowRunInfo>> GetPullRequestWorkflowRunsAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        string? headSha = null,
+        string? mergeCommitSha = null,
+        CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(GetPullRequestWorkflowRunsAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
+
+    public virtual Task<PullRequestCompletionResult> CompletePullRequestAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        PullRequestCompletionOptions options,
+        CancellationToken ct = default)
+        => Task.FromResult(PullRequestCompletionResult.Failed($"'{nameof(CompletePullRequestAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt."));
+
     public abstract Task<bool> CheckHealthAsync(CancellationToken ct = default);
     public abstract Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default);
     public abstract Task<string> GetDefaultBranchAsync(string repositoryUrl, CancellationToken ct = default);

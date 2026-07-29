@@ -27,6 +27,12 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Alert-Referenzen.</summary>
     public DbSet<AlertReferenz> AlertReferenzen => Set<AlertReferenz>();
 
+    /// <summary>Pull-Request-Referenzen.</summary>
+    public DbSet<PullRequestReferenz> PullRequestReferenzen => Set<PullRequestReferenz>();
+
+    /// <summary>Pull-Request-Workflow-Runs.</summary>
+    public DbSet<PullRequestWorkflowRun> PullRequestWorkflowRuns => Set<PullRequestWorkflowRun>();
+
     /// <summary>Protokolleinträge.</summary>
     public DbSet<Protokolleintrag> Protokolleintraege => Set<Protokolleintrag>();
 
@@ -148,6 +154,10 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(i => i.Aufgabe)
                 .HasForeignKey<AlertReferenz>(i => i.AufgabeId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(a => a.PullRequests)
+                .WithOne(p => p.Aufgabe)
+                .HasForeignKey(p => p.AufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
             e.HasMany(a => a.Protokolleintraege)
                 .WithOne(p => p.Aufgabe)
                 .HasForeignKey(p => p.AufgabeId)
@@ -175,6 +185,65 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(i => i.Titel).IsRequired();
             e.HasIndex(i => i.AufgabeId).IsUnique();
             e.HasIndex(i => i.SourceKey).IsUnique();
+        });
+
+        // PullRequestReferenz
+        modelBuilder.Entity<PullRequestReferenz>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Provider).HasConversion<string>();
+            e.Property(p => p.RepositoryId).IsRequired().HasMaxLength(500);
+            e.Property(p => p.ProviderPullRequestId).HasMaxLength(200);
+            e.Property(p => p.Url).IsRequired().HasMaxLength(1000);
+            e.Property(p => p.Titel).IsRequired().HasMaxLength(500);
+            e.Property(p => p.SourceBranch).IsRequired().HasMaxLength(300);
+            e.Property(p => p.TargetBranch).IsRequired().HasMaxLength(300);
+            e.Property(p => p.HeadSha).HasMaxLength(100);
+            e.Property(p => p.MergeCommitSha).HasMaxLength(100);
+            e.Property(p => p.Status).HasConversion<string>();
+            e.Property(p => p.MergeStatus).HasConversion<string>();
+            e.Property(p => p.MonitoringPhase).HasConversion<string>();
+            e.Property(p => p.CreatedUtc).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(p => p.LastCheckedUtc).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(p => p.NextCheckUtc).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.HasIndex(p => p.AufgabeId);
+            e.HasIndex(p => new { p.Provider, p.RepositoryId, p.PullRequestNumber }).IsUnique();
+            e.HasIndex(p => new { p.MonitoringPhase, p.LastCheckedUtc });
+            e.HasMany(p => p.WorkflowRuns)
+                .WithOne(w => w.PullRequestReferenz)
+                .HasForeignKey(w => w.PullRequestReferenzId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // PullRequestWorkflowRun
+        modelBuilder.Entity<PullRequestWorkflowRun>(e =>
+        {
+            e.HasKey(w => w.Id);
+            e.Property(w => w.ProviderRunId).IsRequired().HasMaxLength(200);
+            e.Property(w => w.Name).IsRequired().HasMaxLength(300);
+            e.Property(w => w.Url).HasMaxLength(1000);
+            e.Property(w => w.HeadSha).HasMaxLength(100);
+            e.Property(w => w.BranchName).HasMaxLength(300);
+            e.Property(w => w.Status).HasConversion<string>();
+            e.Property(w => w.Conclusion).HasConversion<string>();
+            e.Property(w => w.StartedAtUtc).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(w => w.CompletedAtUtc).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(w => w.UpdatedUtc).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.HasIndex(w => w.PullRequestReferenzId);
+            e.HasIndex(w => w.ProviderRunId);
+            e.HasIndex(w => new { w.PullRequestReferenzId, w.ProviderRunId }).IsUnique();
         });
 
         // Protokolleintrag

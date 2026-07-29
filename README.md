@@ -67,7 +67,8 @@ Die wichtigsten Features:
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
 - **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen und anschließend der Aufgabe zuordnen
 - **GitHub-Code-Scanning-Alerts als Anforderungen** – offene GitHub-Code-Scanning-Alerts erscheinen neben Issues in den offenen Anforderungen und können automatisch in eine Aufgabe mit neu angelegtem GitHub-Issue überführt werden
-- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung
+- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung, persistenter PR-Referenz und GitHub-Actions-Status
+- **PR-Monitoring & automatischer GitHub-Abschluss** – neuer PR-Bereich in Aufgaben mit PR-, Merge-/Monitoring- und Workflow-Run-Status; optionaler automatischer Abschluss nach erfolgreichen Actions
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
 - **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
@@ -172,7 +173,9 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt). Die eingebettete CLI-Konsole zeigt laufende Ausgabe mit vertikaler Scrollbar, Mausrad/Page-/Line-Scroll, 1000-Zeilen-Scrollback und Auto-Follow, solange Sie am Ende der Ausgabe bleiben.
 6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
-7. **Commits durchführen**, Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst. Alternativ Aufgabe abbrechen.
+7. **Commits durchführen**, Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst.
+8. **Pull Request beobachten**. Erstellte GitHub-PRs werden dauerhaft an der Aufgabe gespeichert und im Bereich `PR` mit Status, Merge-/Monitoring-Phase, letzter Prüfung und zugehörigen GitHub-Actions-/Workflow-Runs angezeigt. Je nach GitHub-Plugin-Einstellung kann Softwareschmiede nach erfolgreichen Pre-Merge-Actions einen Abschlussversuch ausführen und anschließend zuordenbare Post-Merge-Actions weiter überwachen. Blockaden durch Berechtigungen, Branch Protection oder GitHub-Fehler werden im PR-Bereich sichtbar.
+9. **Alternativ Aufgabe abbrechen**, wenn der Entwicklungsprozess nicht fortgesetzt werden soll.
 
 ### `start.ps1` für Visual-Studio-Debug (freier HTTP-Port)
 
@@ -253,6 +256,21 @@ Für das Claude-CLI-Plugin kann der API-Key alternativ per `cmdkey` gesetzt werd
 ```powershell
 cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANTHROPIC_API_KEY>
 ```
+
+### GitHub-Plugin: Pull-Request-Abschluss
+
+Das GitHub-Plugin kann Pull Requests, die aus einer Aufgabe heraus erstellt wurden, über `gh` weiter überwachen. Der PR-Bereich einer Aufgabe zeigt die gespeicherten PR-Referenzen, den aktuellen PR- und Merge-Status, die Monitoring-Phase sowie die zugeordneten GitHub-Actions-/Workflow-Runs.
+
+Der automatische Abschluss ist standardmäßig deaktiviert und wird über die Plugin-Einstellungen aktiviert:
+
+| Einstellung | Bedeutung | Default |
+|-------------|-----------|---------|
+| `AutoCompletePullRequests` | Aktiviert automatische Abschlussversuche nach erfolgreichen Pre-Merge-Actions | `false` |
+| `PullRequestCompletionStrategy` | Abschlussweg: `Merge`, `AutoMerge` oder `ApprovalOnly` | `Merge` |
+| `PullRequestMergeMethod` | Merge-Methode für `gh pr merge`: Merge-Commit, Squash oder Rebase | `Squash` |
+| `AllowProtectedBranchBypass` | Erlaubt einen explizit konfigurierten Bypass-Versuch für geschützte Branches, sofern die GitHub-Rechte ausreichen | `false` |
+
+Softwareschmiede führt keinen stillen Schutzregel-Bypass aus. Wenn GitHub Self-Approval, Branch Protection, fehlende Rechte oder andere API-/CLI-Probleme meldet, wird der PR als blockiert oder fehlgeschlagen gespeichert und mit Fehlermeldung in der Aufgabe angezeigt.
 
 ### Plugins-Register — Aktivierung und Standardplugins
 
@@ -434,10 +452,11 @@ flowchart TB
         APL3["ProtokollService"]
         APL4["KiAusfuehrungsService"]
         APL5["GitOrchestrationService"]
+        APL6["PullRequestReferenzService / PullRequestMonitoringService"]
     end
 
     subgraph Domain["Domain Layer (Kern - keine aeußeren Abhaengigkeiten)"]
-        DOL1["Entitaeten: Projekt, Aufgabe, Protokolleintrag"]
+        DOL1["Entitaeten: Projekt, Aufgabe, Protokolleintrag, PullRequestReferenz"]
         DOL2["IPlugin + PluginType"]
         DOL3["IGitPlugin / IKiPlugin"]
         DOL4["Value Objects, Enums, Domaenenregeln"]
@@ -475,7 +494,7 @@ public interface IPlugin
     PluginType PluginType { get; } // SourceCodeManagement | DevelopmentAutomation
 }
 
-public interface IGitPlugin : IPlugin { /* Git operations */ }
+public interface IGitPlugin : IPlugin { /* Git operations, PR status, workflow runs, PR completion */ }
 public interface IKiPlugin : IPlugin { /* AI operations */ }
 public interface IScmAlertProvider { /* optional SCM alerts, e.g. GitHub Code Scanning */ }
 ```
@@ -483,6 +502,8 @@ public interface IScmAlertProvider { /* optional SCM alerts, e.g. GitHub Code Sc
 `IPluginManager` lädt Plugin-DLLs aus `plugins/` dynamisch und ordnet sie über `PluginType` den Kategorien zu.
 
 GitHub-Code-Scanning-Alerts werden über einen optionalen SCM-Alert-Vertrag gelesen und fachlich von normalen Issues getrennt. In der Projektdetailansicht werden beide Quellen als offene Anforderungen angezeigt. Erst beim Auswählen eines Alerts wird ein GitHub-Issue erzeugt; die lokale Aufgabe referenziert dieses Issue und speichert zusätzlich eine `AlertReferenz` mit stabiler `SourceKey`, damit bereits konvertierte Alerts gefiltert bleiben. Nicht-GitHub-Plugins können den Alert-Vertrag ignorieren.
+
+Pull Requests werden providerneutral als `PullRequestReferenz` mit untergeordneten `PullRequestWorkflowRun`-Einträgen gespeichert. `IGitPlugin` enthält dafür optionale Methoden für PR-Status, Workflow-Run-Abfrage und Abschlussversuche (`GetPullRequestStatusAsync`, `GetPullRequestWorkflowRunsAsync`, `CompletePullRequestAsync`). Nicht unterstützende Git-Plugins liefern über die Default-Implementierung ein nachvollziehbares Not-Supported-Ergebnis; das GitHub-Plugin implementiert die Funktionen über `gh pr view`, `gh run list`, `gh pr merge` und `gh pr review`.
 
 ### Discovery- und Build-Flow
 
@@ -498,6 +519,14 @@ GitHub-Code-Scanning-Alerts werden über einen optionalen SCM-Alert-Vertrag gele
 - Commit-Knoten werden in `AufgabeDetail` über den `CommitTreePresenter` zustandsbasiert expandiert (lazy Laden, Fehlerzustand, Retry).
 - Commit-Dateiknoten tragen `WorkspaceFileNode.CommitSha`; damit wird die Vorschau commit-spezifisch über `LoadCommitPreviewAsync` geladen.
 - Für reguläre Workspace-Dateien bleibt die bestehende Vorschaukette (`LoadPreviewAsync` und dateispezifische Diff-Auflösung) unverändert aktiv.
+
+### Architekturbezug: Pull-Request-Monitoring
+
+- `GitOrchestrationService` persistiert nach erfolgreicher PR-Erstellung die vom Git-Plugin gelieferten PR-Metadaten über `PullRequestReferenzService`.
+- `PullRequestReferenzService` lädt PRs einer Aufgabe inklusive Workflow-Runs und upsertet Status-, Merge-, Monitoring- und Fehlerzustände.
+- `PullRequestMonitoringService` fragt fällige PRs im Hintergrund beim passenden Git-Plugin ab, aktualisiert Workflow-Runs und führt konfigurierte Abschlussversuche erst nach erfolgreichen Pre-Merge-Actions aus.
+- Nach einem bestätigten oder gemergten Abschluss beobachtet das Monitoring zuordenbare Post-Merge-Runs weiter; unsichere Zuordnungen oder fehlende GitHub-Rechte werden als sichtbarer Fehler- oder Blockadezustand gespeichert.
+- Der Aufgabenbereich `PR` wird im `TaskDetailViewModel` über einen eigenen Ladepfad befüllt und zeigt mehrere PRs pro Aufgabe gleichwertig an.
 
 ### Architekturbezug: Aktive Aufgaben im Menü (Issue 81)
 
@@ -556,6 +585,7 @@ Feature-spezifische Testartefakte:
 - Service-Tests (dateispezifische Diff-Auflösung): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
 - Service-/ViewModel-/Plugin-Tests (GitHub-Code-Scanning-Alerts): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`, `src/Softwareschmiede.Tests/App/ViewModels/ProjectDetailViewModelTests.cs`, `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubPluginTests.cs`
+- Service-/Plugin-Tests (PR-Persistenz, Monitoring, GitHub-PR-Abschluss): `src/Softwareschmiede.Tests/Application/Services/PullRequestReferenzServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PullRequestMonitoringServiceTests.cs`, `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubPluginTests.cs`
 - Service-Tests (Issue 58 Pluginauswahl/Persistenz): `src/Softwareschmiede.Tests/Application/Services/PluginSelectionServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
 - Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
 - Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`

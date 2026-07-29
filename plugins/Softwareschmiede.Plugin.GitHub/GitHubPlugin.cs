@@ -42,6 +42,35 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
                 Placeholder: "ghp_...",
                 Description: "GitHub Personal Access Token mit den Berechtigungen repo, read:org und Zugriff auf Code-Scanning-Alerts. Token erstellen: https://github.com/settings/tokens/new",
                 IsRequired: true)
+        ]),
+        new PluginSettingGroup("Pull Requests",
+        [
+            new PluginSettingField(
+                Key: "AutoCompletePullRequests",
+                Label: "Automatischer PR-Abschluss",
+                FieldType: PluginSettingFieldType.Boolean,
+                Description: "Pull Requests nach erfolgreichen zugeordneten Actions automatisch abschliessen.",
+                DefaultValue: "false"),
+            new PluginSettingField(
+                Key: "PullRequestCompletionStrategy",
+                Label: "Abschlussstrategie",
+                FieldType: PluginSettingFieldType.Enum,
+                Description: "Strategie fuer den automatischen PR-Abschluss.",
+                EnumOptions: Enum.GetNames<PullRequestCompletionStrategy>(),
+                DefaultValue: PullRequestCompletionStrategy.Merge.ToString()),
+            new PluginSettingField(
+                Key: "PullRequestMergeMethod",
+                Label: "Merge-Methode",
+                FieldType: PluginSettingFieldType.Enum,
+                Description: "Merge-Methode fuer direkte PR-Merges.",
+                EnumOptions: Enum.GetNames<PullRequestMergeMethod>(),
+                DefaultValue: PullRequestMergeMethod.Squash.ToString()),
+            new PluginSettingField(
+                Key: "AllowProtectedBranchBypass",
+                Label: "Protected-Branch-Bypass erlauben",
+                FieldType: PluginSettingFieldType.Boolean,
+                Description: "Erlaubt Abschlussversuche mit administrativem Bypass, falls GitHub und Token das unterstuetzen.",
+                DefaultValue: "false")
         ])
     ];
 
@@ -844,11 +873,319 @@ password {token}
         var lastSlashIndex = prUrl.LastIndexOf('/');
         if (lastSlashIndex > 0 && int.TryParse(prUrl[(lastSlashIndex + 1)..], out var prNumber))
         {
-            return new PullRequest(prNumber, title, prUrl, branchName);
+            try
+            {
+                var status = await GetPullRequestStatusAsync(repositoryId, prNumber, ct);
+                return new PullRequest(
+                    status.Nummer,
+                    status.Titel,
+                    status.Url,
+                    status.SourceBranch,
+                    status.Provider,
+                    status.RepositoryId,
+                    status.ProviderPullRequestId,
+                    status.TargetBranch,
+                    status.HeadSha);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Pull-Request-Metadaten konnten nach Erstellung nicht nachgeladen werden.");
+                return new PullRequest(prNumber, title, prUrl, branchName, PullRequestProvider.GitHub, repositoryId);
+            }
         }
 
         // Fallback: if we can't parse, throw error
         throw new InvalidOperationException($"PR created but could not parse response: {result.StdOut}");
+    }
+
+    /// <inheritdoc/>
+    public override async Task<PullRequestStatusInfo> GetPullRequestStatusAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId)
+            ?? throw new InvalidOperationException("Repository-ID fehlt.");
+
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            [
+                "pr", "view", pullRequestNumber.ToString(),
+                "--repo", normalizedRepositoryId,
+                "--json", "id,number,title,url,state,headRefName,baseRefName,headRefOid,mergeCommit,mergeStateStatus"
+            ],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            throw new InvalidOperationException($"gh pr view fehlgeschlagen: {sanitizedError}");
+        }
+
+        return ParsePullRequestStatus(result.StdOut, normalizedRepositoryId);
+    }
+
+    /// <inheritdoc/>
+    public override async Task<IReadOnlyList<PullRequestWorkflowRunInfo>> GetPullRequestWorkflowRunsAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        string? headSha = null,
+        string? mergeCommitSha = null,
+        CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId)
+            ?? throw new InvalidOperationException("Repository-ID fehlt.");
+
+        var runs = new List<PullRequestWorkflowRunInfo>();
+        if (!string.IsNullOrWhiteSpace(headSha))
+        {
+            var result = await RunWorkflowListAsync(normalizedRepositoryId, headSha, ct);
+            runs.AddRange(ParseWorkflowRuns(result.StdOut, headSha, null));
+        }
+
+        if (!string.IsNullOrWhiteSpace(mergeCommitSha)
+            && !string.Equals(mergeCommitSha, headSha, StringComparison.OrdinalIgnoreCase))
+        {
+            var result = await RunWorkflowListAsync(normalizedRepositoryId, mergeCommitSha, ct);
+            runs.AddRange(ParseWorkflowRuns(result.StdOut, null, mergeCommitSha));
+        }
+
+        if (runs.Count == 0 && string.IsNullOrWhiteSpace(headSha) && string.IsNullOrWhiteSpace(mergeCommitSha))
+        {
+            var result = await RunWorkflowListAsync(normalizedRepositoryId, null, ct);
+            runs.AddRange(ParseWorkflowRuns(result.StdOut, headSha, mergeCommitSha));
+        }
+
+        return runs
+            .GroupBy(r => r.ProviderRunId, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public override async Task<PullRequestCompletionResult> CompletePullRequestAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        PullRequestCompletionOptions options,
+        CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return PullRequestCompletionResult.Failed("Repository-ID fehlt.");
+        }
+
+        var args = new List<string>();
+        if (options.Strategy == PullRequestCompletionStrategy.ApprovalOnly)
+        {
+            args.AddRange(["pr", "review", pullRequestNumber.ToString(), "--repo", normalizedRepositoryId, "--approve"]);
+        }
+        else
+        {
+            args.AddRange(["pr", "merge", pullRequestNumber.ToString(), "--repo", normalizedRepositoryId]);
+            args.Add(options.MergeMethod switch
+            {
+                PullRequestMergeMethod.Merge => "--merge",
+                PullRequestMergeMethod.Rebase => "--rebase",
+                _ => "--squash"
+            });
+
+            if (options.Strategy == PullRequestCompletionStrategy.AutoMerge)
+            {
+                args.Add("--auto");
+            }
+
+            if (options.AllowProtectedBranchBypass)
+            {
+                args.Add("--admin");
+            }
+        }
+
+        var result = await _cliRunner.RunAsync("gh", args.ToArray(), null, GetGhEnvironment(), ct);
+        if (!result.IsSuccess)
+        {
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            return IsAuthenticationFailure(result.StdErr) || IsBranchProtectionFailure(result.StdErr)
+                ? PullRequestCompletionResult.BlockedResult(sanitizedError)
+                : PullRequestCompletionResult.Failed(sanitizedError);
+        }
+
+        if (options.Strategy == PullRequestCompletionStrategy.ApprovalOnly)
+        {
+            return PullRequestCompletionResult.Approved(result.StdOut.Trim());
+        }
+
+        var status = await GetPullRequestStatusAsync(normalizedRepositoryId, pullRequestNumber, ct);
+        if (status.Status != PullRequestStatus.Merged)
+        {
+            return PullRequestCompletionResult.WaitingForMerge(result.StdOut.Trim());
+        }
+
+        return PullRequestCompletionResult.Completed(status.MergeCommitSha, result.StdOut.Trim());
+    }
+
+    private async Task<CliResult> RunWorkflowListAsync(string repositoryId, string? commitSha, CancellationToken ct)
+    {
+        var args = new List<string>
+        {
+            "run", "list",
+            "--repo", repositoryId,
+            "--json", "databaseId,name,status,conclusion,url,headSha,headBranch,createdAt,updatedAt",
+            "--limit", "100"
+        };
+
+        if (!string.IsNullOrWhiteSpace(commitSha))
+        {
+            args.AddRange(["--commit", commitSha]);
+        }
+
+        var result = await _cliRunner.RunAsync("gh", args.ToArray(), null, GetGhEnvironment(), ct);
+        if (!result.IsSuccess)
+        {
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            throw new InvalidOperationException($"gh run list fehlgeschlagen: {sanitizedError}");
+        }
+
+        return result;
+    }
+
+    private static PullRequestStatusInfo ParsePullRequestStatus(string json, string repositoryId)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        var state = GetStringOrNull(root, "state");
+        var mergeStateStatus = GetStringOrNull(root, "mergeStateStatus");
+        var mergeCommitSha = root.TryGetProperty("mergeCommit", out var mergeCommit)
+                             && mergeCommit.ValueKind == JsonValueKind.Object
+            ? GetStringOrNull(mergeCommit, "oid")
+            : null;
+
+        var status = string.Equals(state, "MERGED", StringComparison.OrdinalIgnoreCase)
+                     || (string.Equals(state, "CLOSED", StringComparison.OrdinalIgnoreCase)
+                         && !string.IsNullOrWhiteSpace(mergeCommitSha))
+            ? PullRequestStatus.Merged
+            : string.Equals(state, "OPEN", StringComparison.OrdinalIgnoreCase)
+                ? PullRequestStatus.Open
+                : string.Equals(state, "CLOSED", StringComparison.OrdinalIgnoreCase)
+                    ? PullRequestStatus.Closed
+                    : PullRequestStatus.Unknown;
+
+        return new PullRequestStatusInfo(
+            PullRequestProvider.GitHub,
+            repositoryId,
+            GetInt32OrDefault(root, "number"),
+            GetStringOrNull(root, "id"),
+            GetStringOrNull(root, "url") ?? string.Empty,
+            GetStringOrNull(root, "title") ?? string.Empty,
+            GetStringOrNull(root, "headRefName") ?? string.Empty,
+            GetStringOrNull(root, "baseRefName") ?? string.Empty,
+            GetStringOrNull(root, "headRefOid"),
+            mergeCommitSha,
+            status,
+            MapMergeStatus(mergeStateStatus, status),
+            DateTimeOffset.UtcNow);
+    }
+
+    private static IReadOnlyList<PullRequestWorkflowRunInfo> ParseWorkflowRuns(
+        string json,
+        string? headSha,
+        string? mergeCommitSha)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var runs = new List<PullRequestWorkflowRunInfo>();
+        foreach (var element in doc.RootElement.EnumerateArray())
+        {
+            var runHeadSha = GetStringOrNull(element, "headSha");
+            var isPreMerge = !string.IsNullOrWhiteSpace(headSha)
+                             && string.Equals(runHeadSha, headSha, StringComparison.OrdinalIgnoreCase);
+            var isPostMerge = !string.IsNullOrWhiteSpace(mergeCommitSha)
+                              && string.Equals(runHeadSha, mergeCommitSha, StringComparison.OrdinalIgnoreCase);
+
+            if (!isPreMerge && !isPostMerge)
+            {
+                continue;
+            }
+
+            var providerRunId = element.TryGetProperty("databaseId", out var databaseId)
+                ? databaseId.ValueKind == JsonValueKind.Number
+                    ? databaseId.GetInt64().ToString()
+                    : databaseId.GetString() ?? string.Empty
+                : string.Empty;
+
+            runs.Add(new PullRequestWorkflowRunInfo(
+                providerRunId,
+                GetStringOrNull(element, "name") ?? "Workflow",
+                GetStringOrNull(element, "url"),
+                runHeadSha,
+                GetStringOrNull(element, "headBranch"),
+                MapWorkflowRunStatus(GetStringOrNull(element, "status")),
+                MapWorkflowRunConclusion(GetStringOrNull(element, "conclusion")),
+                TryGetDateTimeOffset(element, "createdAt"),
+                TryGetDateTimeOffset(element, "updatedAt"),
+                isPostMerge));
+        }
+
+        return runs;
+    }
+
+    private static PullRequestMergeStatus MapMergeStatus(string? mergeStateStatus, PullRequestStatus status)
+    {
+        if (status == PullRequestStatus.Merged)
+        {
+            return PullRequestMergeStatus.Merged;
+        }
+
+        return mergeStateStatus?.ToUpperInvariant() switch
+        {
+            "CLEAN" or "HAS_HOOKS" or "UNSTABLE" => PullRequestMergeStatus.Mergeable,
+            "DIRTY" => PullRequestMergeStatus.Conflicting,
+            "BLOCKED" or "DRAFT" or "BEHIND" => PullRequestMergeStatus.Blocked,
+            _ => PullRequestMergeStatus.Unknown
+        };
+    }
+
+    private static WorkflowRunStatus MapWorkflowRunStatus(string? status)
+        => status?.ToLowerInvariant() switch
+        {
+            "queued" or "waiting" or "requested" or "pending" => WorkflowRunStatus.Queued,
+            "in_progress" => WorkflowRunStatus.InProgress,
+            "completed" => WorkflowRunStatus.Completed,
+            _ => WorkflowRunStatus.Unknown
+        };
+
+    private static WorkflowRunConclusion MapWorkflowRunConclusion(string? conclusion)
+        => conclusion?.ToLowerInvariant() switch
+        {
+            "success" => WorkflowRunConclusion.Success,
+            "failure" => WorkflowRunConclusion.Failure,
+            "cancelled" => WorkflowRunConclusion.Cancelled,
+            "skipped" => WorkflowRunConclusion.Skipped,
+            "timed_out" => WorkflowRunConclusion.TimedOut,
+            "action_required" => WorkflowRunConclusion.ActionRequired,
+            _ => WorkflowRunConclusion.Unknown
+        };
+
+    private static DateTimeOffset? TryGetDateTimeOffset(JsonElement element, string propertyName)
+    {
+        var value = GetStringOrNull(element, propertyName);
+        return DateTimeOffset.TryParse(value, out var parsed) ? parsed : null;
+    }
+
+    private static bool IsBranchProtectionFailure(string error)
+    {
+        var normalizedError = error.ToLowerInvariant();
+        return normalizedError.Contains("protected branch", StringComparison.Ordinal)
+               || normalizedError.Contains("required status check", StringComparison.Ordinal)
+               || normalizedError.Contains("review required", StringComparison.Ordinal)
+               || normalizedError.Contains("bypass", StringComparison.Ordinal)
+               || normalizedError.Contains("cannot approve your own pull request", StringComparison.Ordinal);
     }
 
     /// <inheritdoc/>

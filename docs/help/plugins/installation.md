@@ -35,6 +35,10 @@ Plugin-Einstellungen werden in der **Einstellungsseite** verwaltet:
 | Feld | Beschreibung |
 |------|--------------|
 | Token | GitHub Personal Access Token (PAT) mit `repo`-Scope. Für private Organisationen kann zusätzlich `read:org` erforderlich sein. Zum Lesen von Code-Scanning-Alerts muss der Token Zugriff auf Code-Scanning-Alerts des Repositories haben. |
+| Automatischer PR-Abschluss | Aktiviert den automatischen Abschluss gespeicherter Pull Requests nach erfolgreichen zugeordneten Actions. Standard: deaktiviert. |
+| Abschlussstrategie | Strategie fuer den automatischen Abschluss: `Merge`, `AutoMerge` oder `ApprovalOnly`. Standard: `Merge`. |
+| Merge-Methode | Merge-Methode fuer direkte Merges: `Merge`, `Squash` oder `Rebase`. Standard: `Squash`. |
+| Protected-Branch-Bypass erlauben | Erlaubt Abschlussversuche mit administrativem Bypass (`gh pr merge --admin`), sofern GitHub und Token dies unterstuetzen. Standard: deaktiviert. |
 
 **BitbucketPlugin**
 

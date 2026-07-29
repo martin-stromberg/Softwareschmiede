@@ -27,7 +27,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         Info,
         Cli,
         Diff,
-        Dateibrowser
+        Dateibrowser,
+        PullRequests
     }
 
     private readonly AufgabeService _aufgabeService;
@@ -119,6 +120,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowCliPanel));
             OnPropertyChanged(nameof(ShowDiffPanel));
             OnPropertyChanged(nameof(ShowFileExplorerPanel));
+            OnPropertyChanged(nameof(ShowPullRequestPanel));
             OnPropertyChanged(nameof(SolutionsVorhanden));
             OnPropertyChanged(nameof(KannIdeOeffnen));
             OnPropertyChanged(nameof(KannSpeichern));
@@ -129,6 +131,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowIssueGroup));
             OnPropertyChanged(nameof(CurrentIssueReferenz));
             OnPropertyChanged(nameof(ShowInfoPanel));
+            OnPropertyChanged(nameof(IsPullRequestViewSelected));
             WaehleStandardAnsicht();
             DetailTitelAenderungAction?.Invoke(value?.Titel);
 
@@ -235,6 +238,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <value>Die geladenen Protokolleinträge der Aufgabe.</value>
     public ObservableCollection<Protokolleintrag> Protokolleintraege { get; } = new();
 
+    /// <summary>Pull Requests der Aufgabe.</summary>
+    public ObservableCollection<PullRequestReferenz> PullRequests { get; } = new();
+
     /// <summary>Verfügbare KI-Plugin-Prefixe.</summary>
     /// <value>Die Liste der verfügbaren KI-Plugin-Prefixe.</value>
     public ObservableCollection<string> VerfuegbareKiPlugins { get; } = new();
@@ -335,6 +341,18 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Gibt an, ob die Dateiexplorer-Ansicht ausgewählt ist.</summary>
     public bool IsFileExplorerViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Dateibrowser;
+
+    /// <summary>Gibt an, ob die Pull-Request-Ansicht ausgewählt ist.</summary>
+    public bool IsPullRequestViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.PullRequests;
+
+    /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
+    public bool ShowPullRequestPanel => _aufgabe is not null;
+
+    /// <summary>Gibt an, ob keine Pull Requests gespeichert sind.</summary>
+    public bool HasNoPullRequests => PullRequests.Count == 0;
+
+    /// <summary>Gibt an, ob Pull Requests gespeichert sind.</summary>
+    public bool HasPullRequests => PullRequests.Count > 0;
 
     /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
     public string? EditTitel
@@ -458,6 +476,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wechselt zur Dateiexplorer-Ansicht.</summary>
     public ICommand DateiViewCommand { get; }
 
+    /// <summary>Wechselt zur Pull-Request-Ansicht.</summary>
+    public ICommand PullRequestViewCommand { get; }
+
     /// <summary>Navigiert zurück zur vorherigen Ansicht.</summary>
     public ICommand ZurueckCommand { get; }
 
@@ -557,6 +578,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         CliViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Cli), () => ShowCliPanel);
         DiffViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Diff), () => ShowDiffPanel);
         DateiViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Dateibrowser), () => ShowFileExplorerPanel);
+        PullRequestViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.PullRequests), () => ShowPullRequestPanel);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
         IssueAnlegenCommand = new AsyncRelayCommand(IssueAnlegenAsync, () => CanCreateIssue);
@@ -608,6 +630,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             foreach (var eintrag in protokolleintraege)
                 Protokolleintraege.Add(eintrag);
 
+            await LadePullRequestsAsync(ct);
+
             await LadeVerfuegbarePluginsAsync(ct);
             await LadePromptVorlagenAsync(ct);
             await AktualisierePullRequestCapabilityAsync(ct);
@@ -654,6 +678,29 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogWarning(ex, "KI-Plugin-Liste konnte nicht geladen werden.");
         }
+    }
+
+    private async Task LadePullRequestsAsync(CancellationToken ct)
+    {
+        PullRequests.Clear();
+
+        var pullRequestService = _serviceProvider.GetService<PullRequestReferenzService>();
+        if (pullRequestService is null || _aufgabeId == Guid.Empty)
+        {
+            OnPropertyChanged(nameof(HasNoPullRequests));
+            OnPropertyChanged(nameof(HasPullRequests));
+            return;
+        }
+
+        var pullRequests = await pullRequestService.GetByAufgabeAsync(_aufgabeId, ct);
+        foreach (var pullRequest in pullRequests)
+        {
+            PullRequests.Add(pullRequest);
+        }
+
+        OnPropertyChanged(nameof(HasNoPullRequests));
+        OnPropertyChanged(nameof(HasPullRequests));
+        OnPropertyChanged(nameof(ShowPullRequestPanel));
     }
 
     private async Task LadePromptVorlagenAsync(CancellationToken ct)
@@ -1193,6 +1240,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ansicht = DetailAnsicht.Info;
         if (ansicht == DetailAnsicht.Dateibrowser && !ShowFileExplorerPanel)
             ansicht = DetailAnsicht.Info;
+        if (ansicht == DetailAnsicht.PullRequests && !ShowPullRequestPanel)
+            ansicht = DetailAnsicht.Info;
 
         if (_ausgewaehlteAnsicht == ansicht)
             return;
@@ -1203,6 +1252,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsCliViewSelected));
         OnPropertyChanged(nameof(IsDiffViewSelected));
         OnPropertyChanged(nameof(IsFileExplorerViewSelected));
+        OnPropertyChanged(nameof(IsPullRequestViewSelected));
         OnPropertyChanged(nameof(ShowInfoPanel));
     }
 

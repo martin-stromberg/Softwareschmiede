@@ -16,6 +16,7 @@ public sealed class GitOrchestrationService
     private readonly PluginSelectionService _pluginSelectionService;
     private readonly ILogger<GitOrchestrationService> _logger;
     private readonly IGitWorkspaceBrowserService? _gitWorkspaceBrowserService;
+    private readonly PullRequestReferenzService? _pullRequestReferenzService;
 
     /// <inheritdoc cref="GitOrchestrationService"/>
     public GitOrchestrationService(
@@ -25,7 +26,8 @@ public sealed class GitOrchestrationService
         IGitPlugin gitPlugin,
         PluginSelectionService pluginSelectionService,
         ILogger<GitOrchestrationService> logger,
-        IGitWorkspaceBrowserService? gitWorkspaceBrowserService = null)
+        IGitWorkspaceBrowserService? gitWorkspaceBrowserService = null,
+        PullRequestReferenzService? pullRequestReferenzService = null)
     {
         _aufgabeService = aufgabeService;
         _projektService = projektService;
@@ -34,6 +36,7 @@ public sealed class GitOrchestrationService
         _pluginSelectionService = pluginSelectionService;
         _logger = logger;
         _gitWorkspaceBrowserService = gitWorkspaceBrowserService;
+        _pullRequestReferenzService = pullRequestReferenzService;
     }
 
     /// <summary>Ruft Issues aus einem Repository ab.</summary>
@@ -204,6 +207,11 @@ public sealed class GitOrchestrationService
 
         await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
         var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, prTitle, prBody, ct);
+
+        if (_pullRequestReferenzService is not null)
+        {
+            await _pullRequestReferenzService.SaveCreatedAsync(aufgabeId, repositoryId, pullRequest, ct);
+        }
 
         var issueLogSuffix = issueNummer is > 0
             ? $" (Issue #{issueNummer.Value}, Auto-Close aktiv)"
