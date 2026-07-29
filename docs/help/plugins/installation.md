@@ -10,6 +10,7 @@
 | `ClaudeCliPlugin` | Claude Code CLI (`claude`) installiert; optionaler Anthropic API Key |
 | `GitHubCopilotPlugin` | GitHub Copilot CLI (`copilot`) installiert und eingeloggt |
 | `CodexPlugin` | Codex CLI (`codex`) installiert und eingeloggt |
+| `DevinPlugin` | Devin CLI (`devin`) installiert und mit `devin auth login` eingeloggt |
 | `KiSimulatorPlugin` | Keine — nur für Tests |
 
 ## Plugin-Verzeichnis
@@ -63,6 +64,21 @@ Für detaillierte Anleitung siehe [BitBucket-Plugin — Installation & Konfigura
 |------|--------------|
 | ExecutablePath | Optionaler absoluter Pfad zur `codex`-Executable. Leer bedeutet: `codex` wird über `PATH` aufgelöst. |
 | CommandLineParameters | Optionale zusätzliche Argumente für die Codex CLI. Der Wert wird ausschließlich aus der Anwenderkonfiguration übernommen; automatische Defaults werden für Codex nicht eingetragen. Ein leer gespeicherter Wert bedeutet bewusst: keine zusätzlichen Parameter. |
+
+**DevinPlugin**
+
+| Feld | Beschreibung |
+|------|--------------|
+| ExecutablePath | Optionaler absoluter Pfad zur `devin`-Executable. Leer bedeutet: `devin` wird ueber `PATH` aufgeloest. |
+| CommandLineParameters | Optionale zusaetzliche Argumente fuer die Devin CLI, z. B. `--continue`, `--resume <SESSION_ID>`, `--print`, `--prompt-file <FILE>`, `--model <MODEL>` oder `--permission-mode <MODE>`. |
+
+Devin-Zugangsdaten werden nicht in der Softwareschmiede konfiguriert. Die Anmeldung bleibt vollstaendig bei der Devin CLI:
+
+```powershell
+devin auth login
+```
+
+Details siehe [Devin-Plugin](devin-plugin/index.md).
 
 ## Standard-Plugin festlegen
 

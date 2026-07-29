@@ -23,6 +23,7 @@ Jedes Plugin implementiert `IPlugin` und gehört einem von zwei Typen an:
 | `ClaudeCliPlugin` | KI | Claude Code CLI – nutzt `claude` CLI mit Stream-JSON-Output |
 | `GitHubCopilotPlugin` | KI | GitHub Copilot CLI – nutzt `copilot` CLI |
 | `CodexPlugin` | KI | Codex CLI – nutzt `codex` CLI aus der Anwendung heraus |
+| `DevinPlugin` | KI | Devin CLI – nutzt `devin` als lokalen interaktiven Coding-Agent ueber die eingebettete Terminaloberflaeche |
 | `KiSimulatorPlugin` | KI | Simulierter KI-Agent für Entwicklung und Tests |
 
 ### Einstellungen
@@ -37,6 +38,7 @@ Das Standard-SCM-Plugin und das Standard-KI-Plugin werden in den App-Einstellung
 - Das GitHub-Plugin kann offene Code-Scanning-Alerts lesen und sie in der Projektdetailansicht als offene Anforderungen anzeigen. Beim Erstellen einer Aufgabe aus einem Alert legt die Anwendung automatisch ein GitHub-Issue an und speichert die Alert-Herkunft lokal.
 - Für KI-Läufe mit Claude wird `ClaudeCliPlugin` gewählt; der Anthropic API Key wird optional als `ANTHROPIC_API_KEY`-Umgebungsvariable übergeben.
 - Für KI-Läufe mit Codex wird `CodexPlugin` gewählt; optional kann ein absoluter Pfad zur `codex`-Executable unter `Softwareschmiede.Codex.ExecutablePath` gespeichert werden. Zusätzliche Codex-Argumente werden unter `Softwareschmiede.Codex.CommandLineParameters` gespeichert und nur verwendet, wenn sie vom Anwender gesetzt wurden. Automatische Defaults werden für diesen Wert nicht übernommen.
+- Für KI-Läufe mit Devin wird `DevinPlugin` gewählt; die Anmeldung erfolgt vorher in der Devin CLI mit `devin auth login`. Optional kann ein absoluter Pfad zur `devin`-Executable unter `Softwareschmiede.Devin.ExecutablePath` gespeichert werden. Das Plugin bietet keine Token- oder API-Key-Konfiguration an.
 
 ### Aktivierung und Deaktivierung
 
