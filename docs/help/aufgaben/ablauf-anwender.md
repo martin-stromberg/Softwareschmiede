@@ -65,9 +65,10 @@ Wenn der Aufgabe noch kein Issue zugeordnet ist und der Repository-Provider die 
 2. Prüfe oder bearbeite den vorausgefüllten **Titel** und die **Beschreibung**. Die Anforderungsbeschreibung der Aufgabe wird als Ausgangstext übernommen; ein leerer Text ist zulässig.
 3. Falls Templates verfügbar sind, wähle ein **Template** aus. Die Beschreibung enthält danach den Template-Inhalt, eine Trennlinie und `Originalanforderung:` mit der ursprünglichen Anforderungsbeschreibung. Der zusammengesetzte Text kann vollständig geändert werden.
 4. Optional: Wähle einen angebotenen KI-Provider und klicke auf **Ausfüllen**, um das ausgewählte Template anhand der Originalanforderung ausfüllen zu lassen. Prüfe und bearbeite das Ergebnis vor dem Absenden.
-5. Klicke auf **Anlegen**. Mit **Abbrechen** wird der Dialog ohne Provider- oder Speichervorgang geschlossen.
+5. Optional: Aktiviere **Aufgabenbeschreibung nach Issue-Anlage aktualisieren**, wenn die Aufgabenbeschreibung nach erfolgreicher Issue-Erstellung durch den Issue-Text ersetzt werden soll.
+6. Klicke auf **Anlegen**. Mit **Abbrechen** wird der Dialog ohne Provider- oder Speichervorgang geschlossen.
 
-Nach erfolgreicher Anlage wird die Issue-Referenz in der Aufgabe angezeigt; die Anlage eines weiteren Issues ist für diese Aufgabe nicht mehr verfügbar. Wenn der Provider keine Templates unterstützt oder keine Templates findet, kannst du direkt ohne Template fortfahren. Fehler werden im Dialog angezeigt und die bisherigen Eingaben bleiben zur Korrektur erhalten.
+Nach erfolgreicher Anlage wird die Issue-Referenz in der Aufgabe angezeigt; die Anlage eines weiteren Issues ist für diese Aufgabe nicht mehr verfügbar. Die Aufgabenbeschreibung wird nur geändert, wenn die Option aktiviert war und die Issue-Anlage erfolgreich abgeschlossen wurde. Wenn der Provider keine Templates unterstützt oder keine Templates findet, kannst du direkt ohne Template fortfahren. Fehler werden im Dialog angezeigt und die bisherigen Eingaben bleiben zur Korrektur erhalten.
 
 ### 2b. Aufgabe aus GitHub-Code-Scanning-Alert erstellen
 

@@ -32,7 +32,35 @@ public sealed class IssueCreateDialogViewModelTests
 
         sut.Title.Should().Be("Aufgabe");
         sut.Body.Should().Be("Beschreibung");
+        sut.UpdateTaskDescriptionAfterCreate.Should().BeFalse();
         sut.CanSubmit.Should().BeTrue();
+    }
+
+    /// <summary>Die Option zur Aufgabenbeschreibung ist setzbar und meldet PropertyChanged.</summary>
+    [Fact]
+    public void UpdateTaskDescriptionAfterCreate_ShouldBeSettableAndRaisePropertyChanged()
+    {
+        var sut = CreateSut();
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Beschreibung", null);
+
+        using var monitor = sut.Monitor();
+        sut.UpdateTaskDescriptionAfterCreate = true;
+
+        sut.UpdateTaskDescriptionAfterCreate.Should().BeTrue();
+        monitor.Should().RaisePropertyChangeFor(x => x.UpdateTaskDescriptionAfterCreate);
+    }
+
+    /// <summary>Initialize setzt die Option pro Dialoglauf auf den konservativen Standard zurück.</summary>
+    [Fact]
+    public void Initialize_ShouldResetUpdateTaskDescriptionAfterCreate()
+    {
+        var sut = CreateSut();
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Beschreibung", null);
+        sut.UpdateTaskDescriptionAfterCreate = true;
+
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Andere Aufgabe", "Andere Beschreibung", null);
+
+        sut.UpdateTaskDescriptionAfterCreate.Should().BeFalse();
     }
 
     /// <summary>Whitespace-Beschreibung wird als leerer Body behandelt.</summary>
@@ -108,12 +136,14 @@ public sealed class IssueCreateDialogViewModelTests
     {
         var sut = CreateSut();
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
+        sut.UpdateTaskDescriptionAfterCreate = true;
         bool? closed = null;
         sut.CloseRequested += (_, result) => closed = result;
 
         await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
 
         _issueProvider.Request.Should().Be(new IssueCreateRequest("Aufgabe", "Original"));
+        sut.UpdateTaskDescriptionAfterCreate.Should().BeTrue();
         sut.CreatedIssue.Should().NotBeNull();
         closed.Should().BeTrue();
     }

@@ -65,7 +65,7 @@ Die wichtigsten Features:
 - **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
-- **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen und anschließend der Aufgabe zuordnen
+- **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen, anschließend der Aufgabe zuordnen und optional die Aufgabenbeschreibung aktualisieren
 - **GitHub-Code-Scanning-Alerts als Anforderungen** – offene GitHub-Code-Scanning-Alerts erscheinen neben Issues in den offenen Anforderungen und können automatisch in eine Aufgabe mit neu angelegtem GitHub-Issue überführt werden
 - **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung, persistenter PR-Referenz und GitHub-Actions-Status
 - **PR-Monitoring & automatischer GitHub-Abschluss** – neuer PR-Bereich in Aufgaben mit PR-, Merge-/Monitoring- und Workflow-Run-Status; optionaler automatischer Abschluss nach erfolgreichen Actions
@@ -169,7 +169,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
 2. **Aufgabe anlegen** (frei, aus GitHub-Issue oder aus einem GitHub-Code-Scanning-Alert).
    Beim Auswählen eines Alerts erstellt Softwareschmiede automatisch ein GitHub-Issue und speichert die Alert-Herkunft lokal, damit derselbe Alert nicht erneut angeboten wird.
-3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen und das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen).
+3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen, das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen und bei Bedarf die Aufgabenbeschreibung aktualisieren).
 4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt). Die eingebettete CLI-Konsole zeigt laufende Ausgabe mit vertikaler Scrollbar, Mausrad/Page-/Line-Scroll, 1000-Zeilen-Scrollback und Auto-Follow, solange Sie am Ende der Ausgabe bleiben.
 6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.

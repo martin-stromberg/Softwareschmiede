@@ -70,7 +70,7 @@ public sealed class WpfDialogService : IDialogService
     }
 
     /// <inheritdoc/>
-    public Task<Issue?> ShowIssueCreateDialogAsync(
+    public Task<IssueCreateDialogResult?> ShowIssueCreateDialogAsync(
         IssueCreateDialogViewModel viewModel,
         CancellationToken ct = default)
     {
@@ -81,7 +81,12 @@ public sealed class WpfDialogService : IDialogService
                 Owner = System.Windows.Application.Current.MainWindow
             };
             var result = dialog.ShowDialog();
-            return result == true ? viewModel.CreatedIssue : null;
+            return result == true && viewModel.CreatedIssue is not null
+                ? new IssueCreateDialogResult(
+                    viewModel.CreatedIssue,
+                    viewModel.UpdateTaskDescriptionAfterCreate,
+                    viewModel.Body)
+                : null;
         }).Task;
     }
 

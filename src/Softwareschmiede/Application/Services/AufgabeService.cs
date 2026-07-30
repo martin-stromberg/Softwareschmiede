@@ -377,6 +377,19 @@ public sealed class AufgabeService : IAktiveAufgabenService
     /// Gibt false zurück, wenn die Aufgabe bereits eine Referenz besitzt oder parallel eine Referenz gesetzt wurde.
     /// </summary>
     public async Task<bool> TryAssignIssueReferenzIfNoneAsync(Guid id, Issue issue, CancellationToken ct = default)
+        => await TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(id, issue, false, null, ct);
+
+    /// <summary>
+    /// Weist einer Aufgabe eine IssueReferenz nur dann zu, wenn noch keine Referenz existiert,
+    /// und aktualisiert optional die Aufgabenbeschreibung im selben Speichervorgang.
+    /// Gibt false zurück, wenn die Aufgabe bereits eine Referenz besitzt oder parallel eine Referenz gesetzt wurde.
+    /// </summary>
+    public async Task<bool> TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(
+        Guid id,
+        Issue issue,
+        bool updateAnforderungsBeschreibung,
+        string? anforderungsBeschreibung,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(issue);
 
@@ -393,6 +406,14 @@ public sealed class AufgabeService : IAktiveAufgabenService
         if (await _db.IssueReferenzen.AsNoTracking().AnyAsync(i => i.AufgabeId == id, ct))
         {
             return false;
+        }
+
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        if (updateAnforderungsBeschreibung)
+        {
+            aufgabe.AnforderungsBeschreibung = anforderungsBeschreibung;
         }
 
         _db.IssueReferenzen.Add(CreateIssueReferenz(id, issue));

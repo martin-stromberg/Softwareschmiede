@@ -168,6 +168,65 @@ public sealed class AufgabeServiceTests : IDisposable
         reloaded.IssueReferenz.IssueUrl.Should().Be("https://example.test/23");
     }
 
+    /// <summary>Kombinierte Issue-Zuweisung speichert Referenz und Beschreibung gemeinsam.</summary>
+    [Fact]
+    public async Task TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync_ShouldPersistReferenceAndDescription_WhenNoneExists()
+    {
+        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung");
+        var issue = new Issue(23, "Neu", "Issue Body", ["feature"], "v1", "https://example.test/23");
+
+        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(
+            aufgabe.Id,
+            issue,
+            true,
+            "Neue Beschreibung");
+
+        assigned.Should().BeTrue();
+        var reloaded = await _sut.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz!.IssueNummer.Should().Be(23);
+        reloaded.AnforderungsBeschreibung.Should().Be("Neue Beschreibung");
+    }
+
+    /// <summary>Kombinierte Issue-Zuweisung behält die Beschreibung bei deaktivierter Option unverändert.</summary>
+    [Fact]
+    public async Task TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync_ShouldKeepDescription_WhenUpdateFlagIsFalse()
+    {
+        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung");
+        var issue = new Issue(23, "Neu", "Issue Body", [], null, "https://example.test/23");
+
+        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(
+            aufgabe.Id,
+            issue,
+            false,
+            "Neue Beschreibung");
+
+        assigned.Should().BeTrue();
+        var reloaded = await _sut.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz!.IssueNummer.Should().Be(23);
+        reloaded.AnforderungsBeschreibung.Should().Be("Alte Beschreibung");
+    }
+
+    /// <summary>Kombinierte Issue-Zuweisung überschreibt bei vorhandener Referenz weder Referenz noch Beschreibung.</summary>
+    [Fact]
+    public async Task TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync_ShouldReturnFalseAndKeepDescription_WhenReferenceExists()
+    {
+        var aufgabe = await _sut.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung");
+        var existingIssue = new Issue(99, "Vorhanden", "Body", [], null, "https://example.test/99");
+        var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://example.test/23");
+        await _sut.UpdateIssueReferenzAsync(aufgabe.Id, existingIssue);
+
+        var assigned = await _sut.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(
+            aufgabe.Id,
+            createdIssue,
+            true,
+            "Neue Beschreibung");
+
+        assigned.Should().BeFalse();
+        var reloaded = await _sut.GetDetailAsync(aufgabe.Id);
+        reloaded!.IssueReferenz!.IssueNummer.Should().Be(99);
+        reloaded.AnforderungsBeschreibung.Should().Be("Alte Beschreibung");
+    }
+
     /// <summary>TryAssignIssueReferenzIfNoneAsync überschreibt keine vorhandene IssueReferenz.</summary>
     [Fact]
     public async Task TryAssignIssueReferenzIfNoneAsync_ShouldReturnFalseAndKeepExistingReference_WhenReferenceExists()

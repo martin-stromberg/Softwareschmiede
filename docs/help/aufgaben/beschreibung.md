@@ -106,11 +106,11 @@ Wenn im GitHub-Plugin der automatische PR-Abschluss aktiviert ist, versucht die 
 
 ### Issue aus einer Aufgabe anlegen
 
-Über „Issue anlegen" wird ein neues Issue im Provider des zugeordneten Repositorys vorbereitet. Der Aufgabentitel ist als Titel vorausgefüllt, die Anforderungsbeschreibung als editierbare Beschreibung. Falls der Provider Templates liefert, können diese ausgewählt werden. Der Dialog ergänzt dann den Template-Inhalt, eine Trennlinie und den Abschnitt `Originalanforderung:`; der gesamte Inhalt bleibt bearbeitbar.
+Über „Issue anlegen" wird ein neues Issue im Provider des zugeordneten Repositorys vorbereitet. Der Aufgabentitel ist als Titel vorausgefüllt, die Anforderungsbeschreibung als editierbare Beschreibung. Falls der Provider Templates liefert, können diese ausgewählt werden. Der Dialog ergänzt dann den Template-Inhalt, eine Trennlinie und den Abschnitt `Originalanforderung:`; der gesamte Inhalt bleibt bearbeitbar. Optional kann die Aufgabenbeschreibung nach erfolgreicher Issue-Anlage automatisch mit dem angelegten Issue-Text aktualisiert werden.
 
 Optional kann ein ausgewählter Template-Text mit einem im Dialog gewählten KI-Provider ausgefüllt werden. Die KI-Ausfüllhilfe ist unabhängig von der normalen Issue-Anlage und kann bei fehlendem oder nicht geeignetem KI-Provider nicht verwendet werden.
 
-Beim Absenden wird das Issue zuerst extern erstellt. Erst danach wird die Issue-Referenz an der Aufgabe gespeichert und die Detailansicht aktualisiert. Abbrechen, Providerfehler oder eine fehlgeschlagene lokale Zuordnung erzeugen keine erfolgreiche Zuordnung. Ist bereits ein Issue zugeordnet, wird die Anlageaktion für diese Aufgabe nicht mehr angeboten.
+Beim Absenden wird das Issue zuerst extern erstellt. Erst danach werden die Issue-Referenz und, falls im Dialog aktiviert, die aktualisierte Aufgabenbeschreibung an der Aufgabe gespeichert und die Detailansicht aktualisiert. Abbrechen, Providerfehler oder eine fehlgeschlagene lokale Zuordnung erzeugen keine erfolgreiche Zuordnung. Ist bereits ein Issue zugeordnet, wird die Anlageaktion für diese Aufgabe nicht mehr angeboten.
 
 ### Zeitgesteuerter Prompt-Versand
 
