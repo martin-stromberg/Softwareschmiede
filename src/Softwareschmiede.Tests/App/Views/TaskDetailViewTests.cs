@@ -21,6 +21,10 @@ public sealed class TaskDetailViewTests
         xaml.Should().Contain("GruppenName=\"Pull Request\"");
         xaml.Should().Contain("AutomationName=\"PullRequestErstellen\"");
         xaml.Should().Contain("ButtonCommand=\"{Binding PullRequestErstellenCommand}\"");
+        xaml.Should().Contain("AutomationName=\"PullRequestsAktualisieren\"");
+        xaml.Should().Contain("ButtonCommand=\"{Binding PullRequestsAktualisierenCommand}\"");
+        xaml.Should().Contain("AutomationProperties.Name=\"PullRequestUrlOeffnen\"");
+        xaml.Should().Contain("Command=\"{Binding DataContext.PullRequestUrlOeffnenCommand, ElementName=Root}\"");
     }
 
     /// <summary>Die CLI-Konsole liegt in einem vertikalen ScrollViewer, bleibt aber unter ihrem stabilen Automation-Namen erreichbar.</summary>

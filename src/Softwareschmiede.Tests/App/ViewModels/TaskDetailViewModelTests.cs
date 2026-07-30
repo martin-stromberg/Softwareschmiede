@@ -1469,6 +1469,114 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.PullRequestErstellenCommand.CanExecute(null).Should().BeFalse();
     }
 
+    /// <summary>PullRequestsAktualisierenCommand stoesst einen sofortigen Monitoring-Refresh an und laedt neue Workflow-Runs ohne Aufgabenwechsel.</summary>
+    [Fact]
+    public async Task PullRequestsAktualisierenCommand_ShouldRefreshWorkflowRunsImmediately()
+    {
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = "owner/repo",
+            RepositoryName = "owner/repo",
+            Aktiv = true
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "PR-Aufgabe", "Beschreibung", repository.Id);
+        var pullRequest = new PullRequestReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            Provider = PullRequestProvider.GitHub,
+            RepositoryId = "owner/repo",
+            PullRequestNumber = 233,
+            Url = "https://github.com/owner/repo/pull/233",
+            Titel = "PR",
+            SourceBranch = "feature/pr",
+            TargetBranch = "main",
+            HeadSha = "head",
+            Status = PullRequestStatus.Open,
+            MergeStatus = PullRequestMergeStatus.Unknown,
+            MonitoringPhase = PullRequestMonitoringPhase.Created,
+            CreatedUtc = DateTimeOffset.UtcNow,
+            NextCheckUtc = DateTimeOffset.UtcNow.AddHours(1)
+        };
+        _db.PullRequestReferenzen.Add(pullRequest);
+        await _db.SaveChangesAsync();
+
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupGet(p => p.PluginName).Returns("GitHub");
+        gitPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.GitHub");
+        gitPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
+        gitPluginMock.Setup(p => p.GetSettingGroups()).Returns(
+        [
+            new PluginSettingGroup("Pull Requests",
+            [
+                new PluginSettingField("AutoCompletePullRequests", "Auto", PluginSettingFieldType.Boolean, DefaultValue: "false")
+            ])
+        ]);
+        gitPluginMock.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 233, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequestStatusInfo(
+                PullRequestProvider.GitHub,
+                "owner/repo",
+                233,
+                "PR_kw",
+                "https://github.com/owner/repo/pull/233",
+                "PR",
+                "feature/pr",
+                "main",
+                "head",
+                null,
+                PullRequestStatus.Open,
+                PullRequestMergeStatus.Mergeable,
+                DateTimeOffset.UtcNow));
+        gitPluginMock.Setup(p => p.GetPullRequestWorkflowRunsAsync("owner/repo", 233, "head", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new PullRequestWorkflowRunInfo(
+                    "233",
+                    "Missing Translation for Statement Draft Validation Results",
+                    "https://github.com/owner/repo/actions/runs/233",
+                    "head",
+                    "feature/pr",
+                    WorkflowRunStatus.InProgress,
+                    WorkflowRunConclusion.Unknown,
+                    DateTimeOffset.UtcNow,
+                    null,
+                    false)
+            ]);
+
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var serviceProvider = new ServiceCollection()
+            .AddSingleton(_db)
+            .AddSingleton<TimeProvider>(TimeProvider.System)
+            .AddSingleton<IPluginManager>(pluginManagerMock.Object)
+            .AddSingleton<ICredentialStore>(new Mock<ICredentialStore>().Object)
+            .AddSingleton(sp => new PluginSettingsService(sp.GetRequiredService<ICredentialStore>(), NullLogger<PluginSettingsService>.Instance))
+            .AddScoped(_ => new PullRequestReferenzService(_db, TimeProvider.System, NullLogger<PullRequestReferenzService>.Instance))
+            .AddScoped(_ => new ProtokollService(_db, NullLogger<ProtokollService>.Instance))
+            .AddSingleton<PullRequestMonitoringService>(sp => new PullRequestMonitoringService(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                TimeProvider.System,
+                NullLogger<PullRequestMonitoringService>.Instance))
+            .BuildServiceProvider();
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProvider);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.PullRequests.Single().WorkflowRuns.Should().BeEmpty();
+
+        await ((AsyncRelayCommand)sut.PullRequestsAktualisierenCommand).ExecuteAsync();
+
+        sut.PullRequests.Single().WorkflowRuns.Should().ContainSingle(run =>
+            run.Name == "Missing Translation for Statement Draft Validation Results"
+            && run.Status == WorkflowRunStatus.InProgress);
+        gitPluginMock.Verify(p => p.GetPullRequestWorkflowRunsAsync("owner/repo", 233, "head", null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     /// <summary>CanAssignIssue ist false wenn IsCliRunning == true.</summary>
     [Fact]
     public async Task CanAssignIssue_FalseWhenCliRunning()

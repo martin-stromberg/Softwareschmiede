@@ -62,6 +62,19 @@ public sealed class PullRequestMonitoringService : BackgroundService
         }
     }
 
+    /// <summary>Aktualisiert alle noch laufenden Pull Requests einer Aufgabe sofort, unabhaengig vom naechsten Polling-Zeitpunkt.</summary>
+    public async Task RefreshAufgabeAsync(Guid aufgabeId, CancellationToken ct = default)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var references = scope.ServiceProvider.GetRequiredService<PullRequestReferenzService>();
+        var pullRequests = await references.GetRefreshableByAufgabeAsync(aufgabeId, ct);
+
+        foreach (var pullRequest in pullRequests)
+        {
+            await MonitorAsync(scope.ServiceProvider, pullRequest, references, ct);
+        }
+    }
+
     private async Task MonitorAsync(
         IServiceProvider services,
         PullRequestReferenz pullRequest,

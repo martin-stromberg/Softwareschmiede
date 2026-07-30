@@ -201,13 +201,18 @@
 
                 <!-- Gruppe: Pull Request -->
                 <controls:RibbonGroup GruppenName="Pull Request"
-                                      Visibility="{Binding KannPullRequestErstellen, Converter={StaticResource BoolToVisibilityConverter}}">
+                                      Visibility="{Binding ShowPullRequestPanel, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="↗"
                                                         ButtonText="PR erstellen"
                                                         AutomationName="PullRequestErstellen"
-                                                        ButtonCommand="{Binding PullRequestErstellenCommand}" />
+                                                        ButtonCommand="{Binding PullRequestErstellenCommand}"
+                                                        Visibility="{Binding KannPullRequestErstellen, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="🔄"
+                                                        ButtonText="Aktualisieren"
+                                                        AutomationName="PullRequestsAktualisieren"
+                                                        ButtonCommand="{Binding PullRequestsAktualisierenCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -466,11 +471,21 @@
                                                                FontWeight="SemiBold"
                                                                Foreground="{DynamicResource PrimaryTextBrush}"
                                                                TextWrapping="Wrap" />
-                                                    <TextBlock Text="{Binding Url}"
-                                                               FontSize="12"
-                                                               Foreground="{DynamicResource AccentBrush}"
-                                                               TextWrapping="Wrap"
-                                                               Margin="0,2,0,8" />
+                                                    <Button Command="{Binding DataContext.PullRequestUrlOeffnenCommand, ElementName=Root}"
+                                                            CommandParameter="{Binding Url}"
+                                                            AutomationProperties.Name="PullRequestUrlOeffnen"
+                                                            HorizontalAlignment="Left"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="0"
+                                                            Margin="0,2,0,8"
+                                                            Cursor="Hand">
+                                                        <TextBlock Text="{Binding Url}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   TextDecorations="Underline"
+                                                                   TextWrapping="Wrap" />
+                                                    </Button>
                                                     <UniformGrid Columns="4" Margin="0,0,0,8">
                                                         <TextBlock Text="{Binding PullRequestNumber, StringFormat='PR #{0}'}"
                                                                    Foreground="{DynamicResource SecondaryTextBrush}"

@@ -76,6 +76,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _canCreatePullRequest;
     private bool _canCreateIssue;
     private bool _openVisualStudioCodeWhenNoSolutionFound;
+    private bool _isRefreshingPullRequests;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -354,6 +355,21 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob Pull Requests gespeichert sind.</summary>
     public bool HasPullRequests => PullRequests.Count > 0;
 
+    /// <summary>Gibt an, ob die PR-Daten gerade aktualisiert werden.</summary>
+    public bool IsRefreshingPullRequests
+    {
+        get => _isRefreshingPullRequests;
+        private set
+        {
+            SetProperty(ref _isRefreshingPullRequests, value);
+            OnPropertyChanged(nameof(CanRefreshPullRequests));
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    /// <summary>Gibt an, ob Pull Requests manuell aktualisiert werden koennen.</summary>
+    public bool CanRefreshPullRequests => _aufgabeId != Guid.Empty && !_isRefreshingPullRequests;
+
     /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
     public string? EditTitel
     {
@@ -460,6 +476,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Erstellt einen Pull Request für die Aufgabe.</summary>
     public ICommand PullRequestErstellenCommand { get; }
+
+    /// <summary>Aktualisiert Pull Requests und zugeordnete Workflow-Runs der Aufgabe.</summary>
+    public ICommand PullRequestsAktualisierenCommand { get; }
+
+    /// <summary>Öffnet eine Pull-Request-URL im Standard-Browser.</summary>
+    public ICommand PullRequestUrlOeffnenCommand { get; }
 
     /// <summary>Toggled IsInfoViewVisible zwischen Info-Panel und CLI-Fenster.</summary>
     public ICommand InfoCliToggleCommand { get; }
@@ -573,12 +595,16 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
         LoeschenCommand = new AsyncRelayCommand(LoeschenAsync, () => KannLoeschen);
         PullRequestErstellenCommand = new AsyncRelayCommand(PullRequestErstellenAsync, () => KannPullRequestErstellen && !_isLoading);
+        PullRequestsAktualisierenCommand = new AsyncRelayCommand(PullRequestsAktualisierenAsync, () => CanRefreshPullRequests);
+        PullRequestUrlOeffnenCommand = new RelayCommand<string>(
+            url => OeffnePullRequestUrl(url),
+            url => !string.IsNullOrWhiteSpace(url));
         InfoCliToggleCommand = new RelayCommand(InfoCliToggle);
         InfoViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Info));
         CliViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Cli), () => ShowCliPanel);
         DiffViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Diff), () => ShowDiffPanel);
         DateiViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Dateibrowser), () => ShowFileExplorerPanel);
-        PullRequestViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.PullRequests), () => ShowPullRequestPanel);
+        PullRequestViewCommand = new RelayCommand(PullRequestAnsichtWaehlen, () => ShowPullRequestPanel);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
         IssueAnlegenCommand = new AsyncRelayCommand(IssueAnlegenAsync, () => CanCreateIssue);
@@ -701,6 +727,40 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasNoPullRequests));
         OnPropertyChanged(nameof(HasPullRequests));
         OnPropertyChanged(nameof(ShowPullRequestPanel));
+    }
+
+    private async Task PullRequestsAktualisierenAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty)
+            return;
+
+        IsRefreshingPullRequests = true;
+        FehlerMeldung = null;
+
+        try
+        {
+            var monitoringService = _serviceProvider.GetService<PullRequestMonitoringService>();
+            if (monitoringService is not null)
+            {
+                await monitoringService.RefreshAufgabeAsync(_aufgabeId, ct);
+            }
+
+            await LadePullRequestsAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Pull Requests fuer Aufgabe {AufgabeId} konnten nicht aktualisiert werden.", _aufgabeId);
+            FehlerMeldung = $"Pull Requests konnten nicht aktualisiert werden: {ex.Message}";
+            await LadePullRequestsAsync(CancellationToken.None);
+        }
+        finally
+        {
+            IsRefreshingPullRequests = false;
+        }
     }
 
     private async Task LadePromptVorlagenAsync(CancellationToken ct)
@@ -1026,8 +1086,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void OeffnePullRequestUrl(string url)
+    private void OeffnePullRequestUrl(string? url)
     {
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
         try
         {
             Process.Start(new ProcessStartInfo
@@ -1254,6 +1317,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsFileExplorerViewSelected));
         OnPropertyChanged(nameof(IsPullRequestViewSelected));
         OnPropertyChanged(nameof(ShowInfoPanel));
+    }
+
+    private void PullRequestAnsichtWaehlen()
+    {
+        WaehleAnsicht(DetailAnsicht.PullRequests);
+        PullRequestsAktualisierenCommand.Execute(null);
     }
 
     private async Task AktualisiereAktivenCliNameAusAufgabeAsync(CancellationToken ct)

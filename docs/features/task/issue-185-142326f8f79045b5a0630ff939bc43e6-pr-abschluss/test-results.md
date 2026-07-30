@@ -29,3 +29,17 @@ Keine.
 
 - Der vollstaendige Lauf des Unit-/E2E-Testprojekts `src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj` schliesst weiterhin nicht innerhalb von mehreren Minuten ab und liefert dabei keine verwertbare Ausgabe.
 - Der vollstaendige Solution-Testlauf ist dadurch weiterhin nicht erfolgreich nachgewiesen.
+
+## Nachtest Nutzer-Rueckmeldung vom 2026-07-30
+
+| Kommando | Ergebnis |
+|----------|----------|
+| `dotnet build src\Softwareschmiede.App\Softwareschmiede.App.csproj -p:OutputPath=.tmp-build\app\` | Erfolgreich, 0 Fehler, bestehende XML-Kommentarwarnungen |
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~TaskDetailViewModelTests|FullyQualifiedName~TaskDetailViewTests|FullyQualifiedName~GitHubPluginTests"` | Fehlgeschlagen vor Testausfuehrung, weil die laufende App-Ausgabe durch `Softwareschmiede.App` und Visual Studio gesperrt war |
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~TaskDetailViewModelTests|FullyQualifiedName~TaskDetailViewTests|FullyQualifiedName~GitHubPluginTests" -p:OutputPath=.tmp-build\tests\` | Erfolgreich, 158 bestanden |
+
+### Gepruefte Punkte
+
+- PR-URL ist als klickbares UI-Element verdrahtet.
+- PR-Refresh stoesst sofortiges Monitoring fuer die aktuelle Aufgabe an und laedt Workflow-Runs neu.
+- GitHub-Workflow-Runs bevorzugen `displayTitle` vor `name`, damit Test-Actions mit dem konkreten Statement-Titel angezeigt werden.

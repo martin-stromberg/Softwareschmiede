@@ -220,7 +220,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<PromptZeitVersandService>();
-        services.AddHostedService<PullRequestMonitoringService>();
+        services.AddSingleton<PullRequestMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();

@@ -770,20 +770,57 @@ public sealed class GitHubPluginTests
         var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha, mergeSha);
 
         result.Should().HaveCount(2);
-        result.Should().Contain(r => r.ProviderRunId == "1" && !r.IsPostMerge);
+        result.Should().Contain(r => r.ProviderRunId == "1" && r.Name == "Build" && !r.IsPostMerge);
         result.Should().Contain(r => r.ProviderRunId == "2" && r.IsPostMerge);
         _cliRunnerMock.Verify(c => c.RunAsync(
             "gh",
-            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "run", "list", "--repo", "owner/repo", "--json", "databaseId,name,status,conclusion,url,headSha,headBranch,createdAt,updatedAt", "--limit", "100", "--commit", headSha)),
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "run", "list", "--repo", "owner/repo", "--json", "databaseId,name,displayTitle,status,conclusion,url,headSha,headBranch,createdAt,updatedAt", "--limit", "100", "--commit", headSha)),
             null,
             It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Once);
         _cliRunnerMock.Verify(c => c.RunAsync(
             "gh",
-            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "run", "list", "--repo", "owner/repo", "--json", "databaseId,name,status,conclusion,url,headSha,headBranch,createdAt,updatedAt", "--limit", "100", "--commit", mergeSha)),
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "run", "list", "--repo", "owner/repo", "--json", "databaseId,name,displayTitle,status,conclusion,url,headSha,headBranch,createdAt,updatedAt", "--limit", "100", "--commit", mergeSha)),
             null,
             It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetPullRequestWorkflowRunsAsync bevorzugt den GitHub-Anzeigetitel des Runs vor dem Workflow-Kurznamen.</summary>
+    [Fact]
+    public async Task GetPullRequestWorkflowRunsAsync_ShouldUseDisplayTitleAsRunName()
+    {
+        const string headSha = "head123";
+        const string runsJson = """
+            [
+              {
+                "databaseId": 233,
+                "name": "Tests",
+                "displayTitle": "Missing Translation for Statement Draft Validation Results",
+                "status": "in_progress",
+                "conclusion": null,
+                "url": "https://github.com/owner/repo/actions/runs/233",
+                "headSha": "head123",
+                "headBranch": "feature/pr",
+                "createdAt": "2026-07-30T10:00:00Z",
+                "updatedAt": "2026-07-30T10:01:00Z"
+              }
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, runsJson, string.Empty));
+
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha);
+
+        result.Should().ContainSingle();
+        result[0].Name.Should().Be("Missing Translation for Statement Draft Validation Results");
+        result[0].Status.Should().Be(WorkflowRunStatus.InProgress);
     }
 
     /// <summary>ApprovalOnly liefert ein erfolgreiches, aber nicht gemergtes Abschlussresultat.</summary>

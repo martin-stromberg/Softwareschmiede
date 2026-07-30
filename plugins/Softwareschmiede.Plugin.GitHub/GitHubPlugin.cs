@@ -1032,7 +1032,7 @@ password {token}
         {
             "run", "list",
             "--repo", repositoryId,
-            "--json", "databaseId,name,status,conclusion,url,headSha,headBranch,createdAt,updatedAt",
+            "--json", "databaseId,name,displayTitle,status,conclusion,url,headSha,headBranch,createdAt,updatedAt",
             "--limit", "100"
         };
 
@@ -1121,7 +1121,7 @@ password {token}
 
             runs.Add(new PullRequestWorkflowRunInfo(
                 providerRunId,
-                GetStringOrNull(element, "name") ?? "Workflow",
+                ResolveWorkflowRunDisplayName(element),
                 GetStringOrNull(element, "url"),
                 runHeadSha,
                 GetStringOrNull(element, "headBranch"),
@@ -1133,6 +1133,17 @@ password {token}
         }
 
         return runs;
+    }
+
+    private static string ResolveWorkflowRunDisplayName(JsonElement element)
+    {
+        var displayTitle = GetStringOrNull(element, "displayTitle");
+        if (!string.IsNullOrWhiteSpace(displayTitle))
+        {
+            return displayTitle;
+        }
+
+        return GetStringOrNull(element, "name") ?? "Workflow";
     }
 
     private static PullRequestMergeStatus MapMergeStatus(string? mergeStateStatus, PullRequestStatus status)
