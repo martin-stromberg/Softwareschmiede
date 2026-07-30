@@ -28,6 +28,9 @@ SCM-Operationen auf einem lokalen Repository-Klon.
 | `PushBranchAsync` | `localPath`, `branchName`, `ct` | `Task` | Branch pushen |
 | `PullAsync` | `localPath`, `ct` | `Task` | Änderungen vom Remote holen |
 | `CreatePullRequestAsync` | `repositoryId`, `branchName`, `title`, `body`, `ct` | `Task<PullRequest>` | Pull Request erstellen |
+| `GetPullRequestStatusAsync` | `repositoryId`, `pullRequestNumber`, `ct` | `Task<PullRequestStatusInfo>` | Status, Merge-Status und relevante SHAs eines Pull Requests abrufen. Default: `NotSupported`. |
+| `GetPullRequestWorkflowRunsAsync` | `repositoryId`, `pullRequestNumber`, `headSha?`, `mergeCommitSha?`, `ct` | `Task<IReadOnlyList<PullRequestWorkflowRunInfo>>` | Zugeordnete Workflow-/Action-Runs eines Pull Requests abrufen. |
+| `CompletePullRequestAsync` | `repositoryId`, `pullRequestNumber`, `options`, `ct` | `Task<PullRequestCompletionResult>` | Pull Request nach konfigurierter Strategie abschliessen, Auto-Merge aktivieren oder genehmigen. Default: `NotSupported`. |
 | `ResetAsync` | `localPath`, `resetType`, `targetRef?`, `ct` | `Task` | Git-Reset ausführen |
 | `GetRepositoryStructureAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<IEnumerable<RepositoryDirectoryEntry>>` | Kompatibilitätsmethode für direkte Aufrufer: liefert Verzeichniseinträge oder wirft `NotSupportedException`, wenn das Plugin keinen Strukturabruf unterstützt. |
 | `GetRepositoryStructureLoadResultAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<RepositoryStructureLoadResult>` | Bevorzugte Methode für UI und Services: liefert Verzeichnisstruktur mit expliziter Erfolg-/Fehlersemantik für die Arbeitsverzeichnis-Auswahl. Die Default-Implementierung ruft `GetRepositoryStructureAsync` auf und wandelt Erfolg, `NotSupportedException` und sonstige Fehler in ein Result um. |
@@ -96,6 +99,54 @@ CLI-basierte Plugins können zusätzliche Startargumente über das Feld `Command
 | `Nummer` | `int` | PR-Nummer |
 | `Titel` | `string` | PR-Titel |
 | `Url` | `string` | Direkt-URL zum PR |
+| `BranchName` | `string` | Name des Quell-Branches |
+| `Provider` | `PullRequestProvider` | Provider des Pull Requests, initial `GitHub` |
+| `RepositoryId` | `string?` | Repository-Identifier beim Provider |
+| `ProviderPullRequestId` | `string?` | Optionale eindeutige Provider-ID |
+| `TargetBranch` | `string?` | Name des Ziel-Branches |
+| `HeadSha` | `string?` | Head-SHA des Pull Requests |
+
+### `PullRequestStatusInfo`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Status` | `PullRequestStatus` | Aktueller PR-Status |
+| `MergeStatus` | `PullRequestMergeStatus` | Mergebarkeit beziehungsweise Merge-Status |
+| `HeadSha` | `string?` | Aktuelle Head-SHA |
+| `MergeCommitSha` | `string?` | Merge-Commit-SHA, sofern bekannt |
+| `LastUpdatedUtc` | `DateTimeOffset?` | Providerzeitpunkt der letzten Aktualisierung, sofern bekannt |
+
+### `PullRequestWorkflowRunInfo`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `ProviderRunId` | `string` | Run-ID beim Provider |
+| `Name` | `string` | Workflow- oder Check-Name |
+| `Url` | `string?` | Direkt-URL zum Run |
+| `HeadSha` | `string?` | Head-SHA des Runs |
+| `BranchName` | `string?` | Branch des Runs |
+| `Status` | `WorkflowRunStatus` | Laufstatus |
+| `Conclusion` | `WorkflowRunConclusion` | Abschlussbewertung |
+| `StartedAtUtc` | `DateTimeOffset?` | Startzeitpunkt, sofern bekannt |
+| `CompletedAtUtc` | `DateTimeOffset?` | Abschlusszeitpunkt, sofern bekannt |
+
+### `PullRequestCompletionOptions`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Strategy` | `PullRequestCompletionStrategy` | `Merge`, `AutoMerge` oder `ApprovalOnly` |
+| `MergeMethod` | `PullRequestMergeMethod` | `Merge`, `Squash` oder `Rebase` |
+| `AllowProtectedBranchBypass` | `bool` | Erlaubt administrativen Bypass, wenn Provider und Token dies unterstuetzen |
+
+### `PullRequestCompletionResult`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Success` | `bool` | Abschlussaufruf wurde technisch erfolgreich ausgefuehrt |
+| `PullRequestMerged` | `bool` | Pull Request ist tatsaechlich gemergt |
+| `Blocked` | `bool` | Abschluss wurde durch Rechte, Regeln oder Voraussetzungen blockiert |
+| `Message` | `string?` | Providerausgabe oder sichtbarer Fehler |
+| `MergeCommitSha` | `string?` | Merge-Commit-SHA, sofern nach Abschluss bekannt |
 
 ### `TestResult`
 

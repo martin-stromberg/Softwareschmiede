@@ -50,6 +50,39 @@ public interface IGitPlugin : IPlugin
     /// <param name="ct">Cancellation Token.</param>
     Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default);
 
+    /// <summary>Ruft den aktuellen Status eines Pull Requests ab.</summary>
+    /// <param name="repositoryId">Repository-Identifier (z.B. "owner/repo").</param>
+    /// <param name="pullRequestNumber">Pull-Request-Nummer.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<PullRequestStatusInfo> GetPullRequestStatusAsync(string repositoryId, int pullRequestNumber, CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(GetPullRequestStatusAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
+
+    /// <summary>Ruft zugeordnete Workflow-Runs eines Pull Requests ab.</summary>
+    /// <param name="repositoryId">Repository-Identifier (z.B. "owner/repo").</param>
+    /// <param name="pullRequestNumber">Pull-Request-Nummer.</param>
+    /// <param name="headSha">Optionaler Head-SHA zur genaueren Zuordnung.</param>
+    /// <param name="mergeCommitSha">Optionaler Merge-Commit-SHA fuer Post-Merge-Runs.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<IReadOnlyList<PullRequestWorkflowRunInfo>> GetPullRequestWorkflowRunsAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        string? headSha = null,
+        string? mergeCommitSha = null,
+        CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(GetPullRequestWorkflowRunsAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
+
+    /// <summary>Schliesst einen Pull Request mit der angegebenen Strategie ab.</summary>
+    /// <param name="repositoryId">Repository-Identifier (z.B. "owner/repo").</param>
+    /// <param name="pullRequestNumber">Pull-Request-Nummer.</param>
+    /// <param name="options">Abschlussoptionen.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<PullRequestCompletionResult> CompletePullRequestAsync(
+        string repositoryId,
+        int pullRequestNumber,
+        PullRequestCompletionOptions options,
+        CancellationToken ct = default)
+        => Task.FromResult(PullRequestCompletionResult.Failed($"'{nameof(CompletePullRequestAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt."));
+
     /// <summary>Führt einen Commit durch.</summary>
     /// <param name="localPath">Lokaler Pfad des geklonten Repositories.</param>
     /// <param name="message">Commit-Nachricht.</param>

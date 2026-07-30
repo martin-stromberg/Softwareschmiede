@@ -201,13 +201,18 @@
 
                 <!-- Gruppe: Pull Request -->
                 <controls:RibbonGroup GruppenName="Pull Request"
-                                      Visibility="{Binding KannPullRequestErstellen, Converter={StaticResource BoolToVisibilityConverter}}">
+                                      Visibility="{Binding ShowPullRequestPanel, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="↗"
                                                         ButtonText="PR erstellen"
                                                         AutomationName="PullRequestErstellen"
-                                                        ButtonCommand="{Binding PullRequestErstellenCommand}" />
+                                                        ButtonCommand="{Binding PullRequestErstellenCommand}"
+                                                        Visibility="{Binding KannPullRequestErstellen, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="🔄"
+                                                        ButtonText="Aktualisieren"
+                                                        AutomationName="PullRequestsAktualisieren"
+                                                        ButtonCommand="{Binding PullRequestsAktualisierenCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -268,6 +273,13 @@
                         Padding="12,4"
                         FontSize="12"
                         Visibility="{Binding ShowFileExplorerPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <Button Content="PR"
+                        AutomationProperties.Name="PullRequestViewButton"
+                        Command="{Binding PullRequestViewCommand}"
+                        Padding="12,4"
+                        Margin="6,0,0,0"
+                        FontSize="12"
+                        Visibility="{Binding ShowPullRequestPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
 
             <Grid Grid.Row="1">
@@ -425,6 +437,115 @@
 
                 <views:FileExplorerView DataContext="{Binding FileExplorer}"
                                         Visibility="{Binding DataContext.IsFileExplorerViewSelected, ElementName=Root, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Visibility="{Binding IsPullRequestViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Margin="24">
+                        <Border Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="16">
+                            <StackPanel>
+                                <TextBlock Text="Keine Pull Requests vorhanden"
+                                           AutomationProperties.Name="PullRequestsEmpty"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontStyle="Italic"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,8"
+                                           Visibility="{Binding HasNoPullRequests, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <ItemsControl ItemsSource="{Binding PullRequests}"
+                                              AutomationProperties.Name="PullRequestsList"
+                                              Visibility="{Binding HasPullRequests, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource BorderBrush}"
+                                                    BorderThickness="0,0,0,1"
+                                                    Padding="0,0,0,12"
+                                                    Margin="0,0,0,12">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Titel}"
+                                                               FontSize="15"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               TextWrapping="Wrap" />
+                                                    <Button Command="{Binding DataContext.PullRequestUrlOeffnenCommand, ElementName=Root}"
+                                                            CommandParameter="{Binding Url}"
+                                                            AutomationProperties.Name="PullRequestUrlOeffnen"
+                                                            HorizontalAlignment="Left"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="0"
+                                                            Margin="0,2,0,8"
+                                                            Cursor="Hand">
+                                                        <TextBlock Text="{Binding Url}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   TextDecorations="Underline"
+                                                                   TextWrapping="Wrap" />
+                                                    </Button>
+                                                    <UniformGrid Columns="4" Margin="0,0,0,8">
+                                                        <TextBlock Text="{Binding PullRequestNumber, StringFormat='PR #{0}'}"
+                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                   FontSize="12" />
+                                                        <TextBlock Text="{Binding Status, StringFormat='Status: {0}'}"
+                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                   FontSize="12" />
+                                                        <TextBlock Text="{Binding MergeStatus, StringFormat='Merge: {0}'}"
+                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                   FontSize="12" />
+                                                        <TextBlock Text="{Binding MonitoringPhase, StringFormat='Phase: {0}'}"
+                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                   FontSize="12" />
+                                                    </UniformGrid>
+                                                    <TextBlock Text="{Binding LastError}"
+                                                               Foreground="{DynamicResource ErrorBrush}"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Margin="0,0,0,8"
+                                                               Visibility="{Binding LastError, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                                                    <ItemsControl ItemsSource="{Binding WorkflowRuns}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Margin="0,3">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="2*" />
+                                                                        <ColumnDefinition Width="120" />
+                                                                        <ColumnDefinition Width="120" />
+                                                                        <ColumnDefinition Width="90" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="{Binding Name}"
+                                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                               FontSize="12"
+                                                                               TextWrapping="Wrap" />
+                                                                    <TextBlock Grid.Column="1"
+                                                                               Text="{Binding Status}"
+                                                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                               FontSize="12" />
+                                                                    <TextBlock Grid.Column="2"
+                                                                               Text="{Binding Conclusion}"
+                                                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                               FontSize="12" />
+                                                                    <TextBlock Grid.Column="3"
+                                                                               Text="{Binding IsPostMerge, StringFormat='Post: {0}'}"
+                                                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                               FontSize="12" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
         </Grid>
 

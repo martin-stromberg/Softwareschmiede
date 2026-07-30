@@ -111,15 +111,16 @@ In der CLI-Ansicht (Status **Gestartet** oder höher):
 
 Das CLI-Fenster erscheint eingebettet in die Aufgabenansicht. Die Aufgabe bleibt im Status **Gestartet** oder **Wartend**, während die laufende CLI über den Laufstatus und den Namen in der Fußzeile erkennbar ist. Die KI ist nun interaktiv bedienbar.
 
-### 5. Zwischen Info-, CLI- und Diff-Ansicht wechseln
+### 5. Zwischen Info-, CLI-, Diff- und PR-Ansicht wechseln
 
 In der Aufgabendetailansicht befindet sich oberhalb des Inhalts eine Ansichtsleiste:
 
 - **Info:** Zeigt Aufgabenstammdaten, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Diese Ansicht ist auch bei gestarteten, wartenden und beendeten Aufgaben erreichbar.
 - **CLI:** Zeigt das Terminalfenster des KI-Tools, wenn für die Aufgabe eine CLI-Ausführung verfügbar ist.
 - **Diff:** Zeigt die Änderungen nach Abschluss der Aufgabe, wenn eine Diff-Ansicht verfügbar ist.
+- **PR:** Zeigt die aus der Aufgabe heraus erstellten Pull Requests sowie die zugeordneten GitHub Actions.
 
-Du kannst während einer laufenden CLI-Ausführung zur Info-Ansicht wechseln, ohne den CLI-Prozess zu unterbrechen. Während eine CLI läuft, zeigt die Fußzeile den Namen der aktiven CLI. Nach Stop, Fehler oder Ende wird dieser Name entfernt.
+Du kannst während einer laufenden CLI-Ausführung zur Info- oder PR-Ansicht wechseln, ohne den CLI-Prozess zu unterbrechen. Während eine CLI läuft, zeigt die Fußzeile den Namen der aktiven CLI. Nach Stop, Fehler oder Ende wird dieser Name entfernt.
 
 ### 6. Mit der KI arbeiten
 
@@ -156,6 +157,16 @@ Im Status **Gestartet** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") 
 ### 9. Pull Request erstellen
 
 Wenn die Aufgabe einen Branch hat und ein verknüpftes Git-Repository mit Pull-Request-Unterstützung vorhanden ist, erscheint im Ribbon die Gruppe **Pull Request**. Klicke dort auf **PR erstellen**, um aus dem Aufgabenbranch einen Pull Request zu erstellen. Die Anwendung erstellt die PR-Beschreibung aus den Commits des Aufgabenbranches und pusht den Branch vorher automatisch zum Remote. Bei Aufgaben mit verknüpfter Issue-Nummer ergänzt sie den Pull-Request-Body automatisch um `Closes #<Issue>`. Enthält der Branch keine Commits gegenüber dem Zielbranch, kann GitHub keinen Pull Request erstellen.
+
+Nach erfolgreicher Erstellung speichert die Anwendung die Pull-Request-Referenz an der Aufgabe. Öffne die Ansicht **PR**, um folgende Informationen zu sehen:
+
+- Pull-Request-Nummer, Titel und Direktlink
+- Aktueller PR-Status und Merge-Status
+- Monitoring-Phase und Zeitpunkt der letzten Statusprüfung
+- Zugeordnete GitHub Actions mit Status und Ergebnis
+- Fehler oder Blockierungsgrund, falls GitHub den Statusabruf oder Abschluss nicht erlaubt
+
+Wenn im GitHub-Plugin der automatische PR-Abschluss aktiviert ist, wartet die Anwendung auf erfolgreiche zugeordnete Actions und führt danach die konfigurierte Abschlussstrategie aus. Je nach Einstellung wird der Pull Request direkt gemergt, Auto-Merge aktiviert oder nur genehmigt. Nach einem echten Merge werden zuordenbare Post-Merge-Actions weiter angezeigt.
 
 ### 10. Aufgabe löschen
 

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
@@ -707,10 +708,244 @@ public sealed class GitHubPluginTests
     public void PluginMetadata_ShouldExposeExpectedValues()
     {
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHub");
-        _sut.GetSettingGroups().Should().ContainSingle();
-        _sut.GetSettingGroups().Single().Fields.Should().ContainSingle(f => f.Key == "Token" && f.IsRequired);
+        var settingGroups = _sut.GetSettingGroups();
+        settingGroups.Should().HaveCount(2);
+        settingGroups.Single(g => g.GroupName == "Authentifizierung").Fields.Should()
+            .ContainSingle(f => f.Key == "Token" && f.IsRequired);
+        settingGroups.Single(g => g.GroupName == "Pull Requests").Fields.Select(f => f.Key).Should().Contain(
+            "AutoCompletePullRequests",
+            "PullRequestCompletionStrategy",
+            "PullRequestMergeMethod",
+            "AllowProtectedBranchBypass");
         _sut.GetRepositoryLinkFields().Should().ContainSingle(f => f.Key == "RepositoryUrl" && f.IsRequired);
         _sut.GetRepositoryLinkFields().Should().ContainSingle(f => f.Key == "RepositoryName" && f.IsRequired);
+    }
+
+    /// <summary>GetPullRequestWorkflowRunsAsync fragt bekannte SHAs gezielt per gh run list --commit ab.</summary>
+    [Fact]
+    public async Task GetPullRequestWorkflowRunsAsync_ShouldScopeRunListByCommitSha()
+    {
+        const string headSha = "head123";
+        const string mergeSha = "merge456";
+        const string preMergeJson = """
+            [
+              {
+                "databaseId": 1,
+                "name": "Build",
+                "status": "completed",
+                "conclusion": "success",
+                "url": "https://github.com/owner/repo/actions/runs/1",
+                "headSha": "head123",
+                "headBranch": "feature/pr",
+                "createdAt": "2026-07-29T10:00:00Z",
+                "updatedAt": "2026-07-29T10:05:00Z"
+              }
+            ]
+            """;
+        const string postMergeJson = """
+            [
+              {
+                "databaseId": 2,
+                "name": "Deploy",
+                "status": "in_progress",
+                "conclusion": null,
+                "url": "https://github.com/owner/repo/actions/runs/2",
+                "headSha": "merge456",
+                "headBranch": "main",
+                "createdAt": "2026-07-29T10:06:00Z",
+                "updatedAt": "2026-07-29T10:07:00Z"
+              }
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.SetupSequence(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, preMergeJson, string.Empty))
+            .ReturnsAsync(new CliResult(0, postMergeJson, string.Empty));
+
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha, mergeSha);
+
+        result.Should().HaveCount(2);
+        result.Should().Contain(r => r.ProviderRunId == "1" && r.Name == "Build" && !r.IsPostMerge);
+        result.Should().Contain(r => r.ProviderRunId == "2" && r.IsPostMerge);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "gh",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "run", "list", "--repo", "owner/repo", "--json", "databaseId,name,displayTitle,status,conclusion,url,headSha,headBranch,createdAt,updatedAt", "--limit", "100", "--commit", headSha)),
+            null,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "gh",
+            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "run", "list", "--repo", "owner/repo", "--json", "databaseId,name,displayTitle,status,conclusion,url,headSha,headBranch,createdAt,updatedAt", "--limit", "100", "--commit", mergeSha)),
+            null,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>GetPullRequestWorkflowRunsAsync kombiniert Workflow-Name und GitHub-Anzeigetitel.</summary>
+    [Fact]
+    public async Task GetPullRequestWorkflowRunsAsync_ShouldCombineWorkflowNameAndDisplayTitle()
+    {
+        const string headSha = "head123";
+        const string runsJson = """
+            [
+              {
+                "databaseId": 233,
+                "name": "Tests",
+                "displayTitle": "Missing Translation for Statement Draft Validation Results",
+                "status": "in_progress",
+                "conclusion": null,
+                "url": "https://github.com/owner/repo/actions/runs/233",
+                "headSha": "head123",
+                "headBranch": "feature/pr",
+                "createdAt": "2026-07-30T10:00:00Z",
+                "updatedAt": "2026-07-30T10:01:00Z"
+              }
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, runsJson, string.Empty));
+
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha);
+
+        result.Should().ContainSingle();
+        result[0].Name.Should().Be("Tests: Missing Translation for Statement Draft Validation Results");
+        result[0].Status.Should().Be(WorkflowRunStatus.InProgress);
+    }
+
+    /// <summary>GetPullRequestWorkflowRunsAsync unterscheidet gleichlautende Run-Titel ueber den Workflow-Namen.</summary>
+    [Fact]
+    public async Task GetPullRequestWorkflowRunsAsync_ShouldDistinguishSameDisplayTitleByWorkflowName()
+    {
+        const string mergeSha = "merge123";
+        const string runsJson = """
+            [
+              {
+                "databaseId": 301,
+                "name": "Tests",
+                "displayTitle": "fix: Implement proper translation for validation messages and budget",
+                "status": "completed",
+                "conclusion": "success",
+                "url": "https://github.com/owner/repo/actions/runs/301",
+                "headSha": "merge123",
+                "headBranch": "main",
+                "createdAt": "2026-07-30T10:00:00Z",
+                "updatedAt": "2026-07-30T10:01:00Z"
+              },
+              {
+                "databaseId": 302,
+                "name": "Release",
+                "displayTitle": "fix: Implement proper translation for validation messages and budget",
+                "status": "completed",
+                "conclusion": "success",
+                "url": "https://github.com/owner/repo/actions/runs/302",
+                "headSha": "merge123",
+                "headBranch": "main",
+                "createdAt": "2026-07-30T10:02:00Z",
+                "updatedAt": "2026-07-30T10:03:00Z"
+              }
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, runsJson, string.Empty));
+
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, mergeCommitSha: mergeSha);
+
+        result.Select(r => r.Name).Should().BeEquivalentTo(
+        [
+            "Tests: fix: Implement proper translation for validation messages and budget",
+            "Release: fix: Implement proper translation for validation messages and budget"
+        ]);
+    }
+
+    /// <summary>ApprovalOnly liefert ein erfolgreiches, aber nicht gemergtes Abschlussresultat.</summary>
+    [Fact]
+    public async Task CompletePullRequestAsync_ShouldReturnNonMergedResult_WhenApprovalOnlySucceeds()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pr", "review", "42", "--repo", "owner/repo", "--approve")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "approved", string.Empty));
+
+        var result = await _sut.CompletePullRequestAsync(
+            "owner/repo",
+            42,
+            new PullRequestCompletionOptions(PullRequestCompletionStrategy.ApprovalOnly));
+
+        result.Success.Should().BeTrue();
+        result.PullRequestMerged.Should().BeFalse();
+        result.MergeCommitSha.Should().BeNull();
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "gh",
+            It.Is<IEnumerable<string>>(a => a.Contains("merge")),
+            null,
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>AutoMerge gilt erst nach echtem Merged-Status als gemergter Abschluss.</summary>
+    [Fact]
+    public async Task CompletePullRequestAsync_ShouldReturnNonMergedResult_WhenAutoMergeDoesNotMergeImmediately()
+    {
+        const string openStatusJson = """
+            {
+                "id": "PR_kw",
+                "number": 42,
+                "title": "PR",
+                "url": "https://github.com/owner/repo/pull/42",
+                "state": "OPEN",
+                "headRefName": "feature/pr",
+                "baseRefName": "main",
+                "headRefOid": "head",
+                "mergeCommit": null,
+                "mergeStateStatus": "CLEAN"
+            }
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pr", "merge", "42", "--repo", "owner/repo", "--squash", "--auto")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "Auto-merge enabled", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pr", "view", "42", "--repo", "owner/repo", "--json", "id,number,title,url,state,headRefName,baseRefName,headRefOid,mergeCommit,mergeStateStatus")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, openStatusJson, string.Empty));
+
+        var result = await _sut.CompletePullRequestAsync(
+            "owner/repo",
+            42,
+            new PullRequestCompletionOptions(PullRequestCompletionStrategy.AutoMerge));
+
+        result.Success.Should().BeTrue();
+        result.PullRequestMerged.Should().BeFalse();
+        result.MergeCommitSha.Should().BeNull();
+        result.Message.Should().Be("Auto-merge enabled");
     }
 
     /// <summary><summary>PushBranchAsync_ShouldConfigureRemoteUrlWithToken_BeforePush.</summary>.</summary>

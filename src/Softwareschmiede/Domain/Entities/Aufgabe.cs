@@ -83,6 +83,9 @@ public sealed class Aufgabe
     /// <summary>Verknüpfte Alert-Referenz aus dem SCM-Provider.</summary>
     public AlertReferenz? AlertReferenz { get; set; }
 
+    /// <summary>Verknüpfte Pull Requests aus dem SCM-Provider.</summary>
+    public List<PullRequestReferenz> PullRequests { get; set; } = [];
+
     /// <summary>Protokolleinträge des KI-Prozesses für diese Aufgabe.</summary>
     public List<Protokolleintrag> Protokolleintraege { get; set; } = [];
 

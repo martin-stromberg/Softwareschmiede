@@ -171,6 +171,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ProtokollService>();
         services.AddScoped<RepositoryStartskriptService>();
         services.AddScoped<GitOrchestrationService>();
+        services.AddScoped<PullRequestReferenzService>();
         services.AddScoped<EntwicklungsprozessService>(sp => new EntwicklungsprozessService(
             sp.GetRequiredService<AufgabeService>(),
             sp.GetRequiredService<ProtokollService>(),
@@ -219,6 +220,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<KiAusfuehrungsService>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<PromptZeitVersandService>();
+        services.AddSingleton<PullRequestMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();
