@@ -56,3 +56,15 @@ Keine.
 - Manueller Refresh aktualisiert auch terminal gespeicherte PRs erneut vom Provider.
 - Wenn GitHub inzwischen `Merged` meldet, wird der lokale Status von `Offen` auf `Merged` aktualisiert.
 - Manueller Refresh loest keinen automatischen PR-Abschluss aus, wenn ein PR weiterhin offen ist.
+
+## Nachtest Workflow-Run-Anzeigenamen vom 2026-07-30
+
+| Kommando | Ergebnis |
+|----------|----------|
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~GitHubPluginTests" -p:OutputPath=.tmp-build\tests\` | Erfolgreich, siehe aktueller Lauf |
+| `dotnet build src\Softwareschmiede.App\Softwareschmiede.App.csproj -p:OutputPath=.tmp-build\app\` | Erfolgreich, siehe aktueller Lauf |
+
+### Gepruefte Punkte
+
+- GitHub-Workflow-Runs zeigen bei abweichendem Workflow-Namen und `displayTitle` beide Informationen an.
+- Gleichlautende Merge-Run-Titel werden dadurch als `Tests: ...` und `Release: ...` unterscheidbar.

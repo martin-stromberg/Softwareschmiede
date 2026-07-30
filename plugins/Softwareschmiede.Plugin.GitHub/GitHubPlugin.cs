@@ -1137,13 +1137,17 @@ password {token}
 
     private static string ResolveWorkflowRunDisplayName(JsonElement element)
     {
+        var name = GetStringOrNull(element, "name");
         var displayTitle = GetStringOrNull(element, "displayTitle");
         if (!string.IsNullOrWhiteSpace(displayTitle))
         {
-            return displayTitle;
+            return !string.IsNullOrWhiteSpace(name)
+                   && !string.Equals(name, displayTitle, StringComparison.OrdinalIgnoreCase)
+                ? $"{name}: {displayTitle}"
+                : displayTitle;
         }
 
-        return GetStringOrNull(element, "name") ?? "Workflow";
+        return name ?? "Workflow";
     }
 
     private static PullRequestMergeStatus MapMergeStatus(string? mergeStateStatus, PullRequestStatus status)

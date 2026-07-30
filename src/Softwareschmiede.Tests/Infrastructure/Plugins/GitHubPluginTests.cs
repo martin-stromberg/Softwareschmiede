@@ -786,9 +786,9 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>GetPullRequestWorkflowRunsAsync bevorzugt den GitHub-Anzeigetitel des Runs vor dem Workflow-Kurznamen.</summary>
+    /// <summary>GetPullRequestWorkflowRunsAsync kombiniert Workflow-Name und GitHub-Anzeigetitel.</summary>
     [Fact]
-    public async Task GetPullRequestWorkflowRunsAsync_ShouldUseDisplayTitleAsRunName()
+    public async Task GetPullRequestWorkflowRunsAsync_ShouldCombineWorkflowNameAndDisplayTitle()
     {
         const string headSha = "head123";
         const string runsJson = """
@@ -819,8 +819,59 @@ public sealed class GitHubPluginTests
         var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, headSha);
 
         result.Should().ContainSingle();
-        result[0].Name.Should().Be("Missing Translation for Statement Draft Validation Results");
+        result[0].Name.Should().Be("Tests: Missing Translation for Statement Draft Validation Results");
         result[0].Status.Should().Be(WorkflowRunStatus.InProgress);
+    }
+
+    /// <summary>GetPullRequestWorkflowRunsAsync unterscheidet gleichlautende Run-Titel ueber den Workflow-Namen.</summary>
+    [Fact]
+    public async Task GetPullRequestWorkflowRunsAsync_ShouldDistinguishSameDisplayTitleByWorkflowName()
+    {
+        const string mergeSha = "merge123";
+        const string runsJson = """
+            [
+              {
+                "databaseId": 301,
+                "name": "Tests",
+                "displayTitle": "fix: Implement proper translation for validation messages and budget",
+                "status": "completed",
+                "conclusion": "success",
+                "url": "https://github.com/owner/repo/actions/runs/301",
+                "headSha": "merge123",
+                "headBranch": "main",
+                "createdAt": "2026-07-30T10:00:00Z",
+                "updatedAt": "2026-07-30T10:01:00Z"
+              },
+              {
+                "databaseId": 302,
+                "name": "Release",
+                "displayTitle": "fix: Implement proper translation for validation messages and budget",
+                "status": "completed",
+                "conclusion": "success",
+                "url": "https://github.com/owner/repo/actions/runs/302",
+                "headSha": "merge123",
+                "headBranch": "main",
+                "createdAt": "2026-07-30T10:02:00Z",
+                "updatedAt": "2026-07-30T10:03:00Z"
+              }
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.IsAny<IEnumerable<string>>(),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, runsJson, string.Empty));
+
+        var result = await _sut.GetPullRequestWorkflowRunsAsync("owner/repo", 42, mergeCommitSha: mergeSha);
+
+        result.Select(r => r.Name).Should().BeEquivalentTo(
+        [
+            "Tests: fix: Implement proper translation for validation messages and budget",
+            "Release: fix: Implement proper translation for validation messages and budget"
+        ]);
     }
 
     /// <summary>ApprovalOnly liefert ein erfolgreiches, aber nicht gemergtes Abschlussresultat.</summary>
