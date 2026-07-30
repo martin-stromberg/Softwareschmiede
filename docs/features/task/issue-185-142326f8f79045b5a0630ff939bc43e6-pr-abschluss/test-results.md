@@ -43,3 +43,16 @@ Keine.
 - PR-URL ist als klickbares UI-Element verdrahtet.
 - PR-Refresh stoesst sofortiges Monitoring fuer die aktuelle Aufgabe an und laedt Workflow-Runs neu.
 - GitHub-Workflow-Runs bevorzugen `displayTitle` vor `name`, damit Test-Actions mit dem konkreten Statement-Titel angezeigt werden.
+
+## Nachtest manueller Merge-Refresh vom 2026-07-30
+
+| Kommando | Ergebnis |
+|----------|----------|
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~PullRequestMonitoringServiceTests" -p:OutputPath=.tmp-build\tests\` | Erfolgreich, 11 bestanden |
+| `dotnet build src\Softwareschmiede.App\Softwareschmiede.App.csproj -p:OutputPath=.tmp-build\app\` | Erfolgreich, 0 Fehler, bestehende XML-Kommentarwarnungen |
+
+### Gepruefte Punkte
+
+- Manueller Refresh aktualisiert auch terminal gespeicherte PRs erneut vom Provider.
+- Wenn GitHub inzwischen `Merged` meldet, wird der lokale Status von `Offen` auf `Merged` aktualisiert.
+- Manueller Refresh loest keinen automatischen PR-Abschluss aus, wenn ein PR weiterhin offen ist.

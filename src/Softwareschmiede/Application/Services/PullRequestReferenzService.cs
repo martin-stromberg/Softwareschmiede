@@ -97,15 +97,11 @@ public sealed class PullRequestReferenzService
             .Take(take)
             .ToListAsync(ct);
 
-    /// <summary>Liefert nicht-terminale PRs einer Aufgabe fuer einen expliziten Refresh.</summary>
+    /// <summary>Liefert alle PRs einer Aufgabe fuer einen expliziten Refresh.</summary>
     public async Task<IReadOnlyList<PullRequestReferenz>> GetRefreshableByAufgabeAsync(Guid aufgabeId, CancellationToken ct = default)
         => await _db.PullRequestReferenzen
             .Include(p => p.WorkflowRuns)
-            .Where(p => p.AufgabeId == aufgabeId
-                        && p.MonitoringPhase != PullRequestMonitoringPhase.PostMergeSucceeded
-                        && p.MonitoringPhase != PullRequestMonitoringPhase.PostMergeFailed
-                        && p.MonitoringPhase != PullRequestMonitoringPhase.Completed
-                        && p.MonitoringPhase != PullRequestMonitoringPhase.Failed)
+            .Where(p => p.AufgabeId == aufgabeId)
             .OrderByDescending(p => p.CreatedUtc)
             .ToListAsync(ct);
 

@@ -303,6 +303,67 @@ public sealed class PullRequestMonitoringServiceTests
         Assert.DoesNotContain(due, p => p.Id == pullRequest.Id);
     }
 
+    /// <summary>Ein manueller Refresh aktualisiert auch terminal gespeicherte PRs erneut vom Provider.</summary>
+    [Fact]
+    public async Task RefreshAufgabeAsync_ShouldUpdateCompletedPullRequestStatus_WhenProviderReportsMerged()
+    {
+        using var db = TestDbContextFactory.Create();
+        var (_, aufgabe) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
+        var plugin = CreatePluginMock();
+        plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Status(PullRequestStatus.Merged, PullRequestMergeStatus.Merged, mergeCommitSha: "merge"));
+        plugin.Setup(p => p.GetPullRequestWorkflowRunsAsync("owner/repo", 42, "head", "merge", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new PullRequestWorkflowRunInfo("1", "Post Merge", null, "merge", "main", WorkflowRunStatus.Completed, WorkflowRunConclusion.Success, null, null, true)
+            ]);
+        using var provider = BuildProvider(db, plugin.Object);
+
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id);
+
+        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        Assert.Equal(PullRequestStatus.Merged, saved.Status);
+        Assert.Equal(PullRequestMergeStatus.Merged, saved.MergeStatus);
+        Assert.Equal("merge", saved.MergeCommitSha);
+        Assert.Equal(PullRequestMonitoringPhase.PostMergeSucceeded, saved.MonitoringPhase);
+    }
+
+    /// <summary>Ein manueller Refresh aktualisiert nur den Providerstatus und loest keinen Auto-Abschluss aus.</summary>
+    [Fact]
+    public async Task RefreshAufgabeAsync_ShouldNotCompletePullRequest_WhenOpenPreMergeSucceeded()
+    {
+        using var db = TestDbContextFactory.Create();
+        var (_, aufgabe) = AddAufgabe(db);
+        var pullRequest = AddPullRequest(db, aufgabe.Id, PullRequestMonitoringPhase.Completed, _timeProvider.GetUtcNow().AddMinutes(-1));
+        var plugin = CreatePluginMock();
+        plugin.Setup(p => p.GetPullRequestStatusAsync("owner/repo", 42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Status(PullRequestStatus.Open, PullRequestMergeStatus.Mergeable));
+        plugin.Setup(p => p.GetPullRequestWorkflowRunsAsync("owner/repo", 42, "head", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new PullRequestWorkflowRunInfo("1", "Build", null, "head", "feature/pr", WorkflowRunStatus.Completed, WorkflowRunConclusion.Success, null, null, false)
+            ]);
+        using var provider = BuildProvider(
+            db,
+            plugin.Object,
+            new Dictionary<string, string>
+            {
+                ["Softwareschmiede.GitHub.AutoCompletePullRequests"] = "true"
+            });
+
+        await provider.GetRequiredService<PullRequestMonitoringService>().RefreshAufgabeAsync(aufgabe.Id);
+
+        var saved = db.PullRequestReferenzen.Single(p => p.Id == pullRequest.Id);
+        Assert.Equal(PullRequestStatus.Open, saved.Status);
+        Assert.Equal(PullRequestMonitoringPhase.PreMergeSucceeded, saved.MonitoringPhase);
+        plugin.Verify(p => p.CompletePullRequestAsync(
+            "owner/repo",
+            42,
+            It.IsAny<PullRequestCompletionOptions>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private ServiceProvider BuildProvider(
         SoftwareschmiededDbContext db,
         IGitPlugin gitPlugin,

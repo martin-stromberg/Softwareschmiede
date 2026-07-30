@@ -58,7 +58,7 @@ public sealed class PullRequestMonitoringService : BackgroundService
 
         foreach (var pullRequest in due)
         {
-            await MonitorAsync(scope.ServiceProvider, pullRequest, references, ct);
+            await MonitorAsync(scope.ServiceProvider, pullRequest, references, allowAutoComplete: true, ct);
         }
     }
 
@@ -71,7 +71,7 @@ public sealed class PullRequestMonitoringService : BackgroundService
 
         foreach (var pullRequest in pullRequests)
         {
-            await MonitorAsync(scope.ServiceProvider, pullRequest, references, ct);
+            await MonitorAsync(scope.ServiceProvider, pullRequest, references, allowAutoComplete: false, ct);
         }
     }
 
@@ -79,6 +79,7 @@ public sealed class PullRequestMonitoringService : BackgroundService
         IServiceProvider services,
         PullRequestReferenz pullRequest,
         PullRequestReferenzService references,
+        bool allowAutoComplete,
         CancellationToken ct)
     {
         if (pullRequest.Provider != PullRequestProvider.GitHub)
@@ -119,7 +120,9 @@ public sealed class PullRequestMonitoringService : BackgroundService
                 return;
             }
 
-            if (phase == PullRequestMonitoringPhase.PreMergeSucceeded && IsAutoCompleteEnabled(services, plugin))
+            if (allowAutoComplete
+                && phase == PullRequestMonitoringPhase.PreMergeSucceeded
+                && IsAutoCompleteEnabled(services, plugin))
             {
                 await TryCompleteAsync(services, references, protokoll, plugin, pullRequest, ct);
             }

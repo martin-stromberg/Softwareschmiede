@@ -23,6 +23,7 @@ und muessen manuell oder in einem erneuten Lauf bearbeitet werden.
 - [x] Die Status der einzelnen Actions aktualisieren sich waehrend der Anzeige nicht.
 - [x] Es wird ein Refresh-Button im PR-Bereich benoetigt.
 - [x] Bei CodeQL wird der Action-Name korrekt angezeigt, bei der Test-Action zu PR #233 aber nicht: Statt `Missing Translation for Statement Draft Validation Results` wird nur `Tests` angezeigt.
+- [x] Nach manuellem Merge bleibt der lokale PR-Status trotz Refresh auf `Offen`, wenn die lokale Monitoring-Phase bereits terminal gespeichert war.
 
 ## Code-Review-Befunde
 
