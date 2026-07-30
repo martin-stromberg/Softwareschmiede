@@ -26,8 +26,8 @@ public interface IDialogService
         IssueSelectionDialogViewModel viewModel,
         CancellationToken ct = default);
 
-    /// <summary>Zeigt den Issue-Anlage-Dialog und gibt das angelegte Issue zurück, oder null wenn abgebrochen.</summary>
-    Task<Issue?> ShowIssueCreateDialogAsync(
+    /// <summary>Zeigt den Issue-Anlage-Dialog und gibt das Ergebnis zurück, oder null wenn abgebrochen.</summary>
+    Task<IssueCreateDialogResult?> ShowIssueCreateDialogAsync(
         IssueCreateDialogViewModel viewModel,
         CancellationToken ct = default);
 

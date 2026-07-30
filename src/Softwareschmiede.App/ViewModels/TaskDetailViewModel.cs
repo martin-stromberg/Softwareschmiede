@@ -1183,11 +1183,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             async token => (await _aufgabeService.GetDetailAsync(_aufgabeId, token))?.IssueReferenz is not null,
             ct);
 
-        var createdIssue = await _dialogService.ShowIssueCreateDialogAsync(dialogVm, ct);
-        if (createdIssue is null)
+        var dialogResult = await _dialogService.ShowIssueCreateDialogAsync(dialogVm, ct);
+        if (dialogResult is null)
         {
             return;
         }
+
+        var createdIssue = dialogResult.Issue;
 
         try
         {
@@ -1199,7 +1201,18 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            if (!await _aufgabeService.TryAssignIssueReferenzIfNoneAsync(_aufgabeId, createdIssue, ct))
+            var neueAnforderungsBeschreibung = dialogResult.UpdateTaskDescription
+                ? !string.IsNullOrWhiteSpace(createdIssue.Body)
+                    ? createdIssue.Body
+                    : dialogResult.LocalBody ?? string.Empty
+                : null;
+
+            if (!await _aufgabeService.TryAssignIssueReferenzAndUpdateDescriptionIfNoneAsync(
+                    _aufgabeId,
+                    createdIssue,
+                    dialogResult.UpdateTaskDescription,
+                    neueAnforderungsBeschreibung,
+                    ct))
             {
                 var standNachFehlgeschlagenerZuordnung = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
                 if (standNachFehlgeschlagenerZuordnung is not null)
@@ -1219,8 +1232,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Externes Issue wurde erstellt, lokale Zuordnung für Aufgabe {AufgabeId} ist fehlgeschlagen.", _aufgabeId);
-            FehlerMeldung = $"Issue wurde extern erstellt ({DescribeIssue(createdIssue)}), konnte aber nicht lokal zugeordnet werden: {ex.Message}";
+            _logger.LogError(ex, "Externes Issue wurde erstellt, lokale Zuordnung oder Aufgabenbeschreibung für Aufgabe {AufgabeId} ist fehlgeschlagen.", _aufgabeId);
+            FehlerMeldung = $"Issue wurde extern erstellt ({DescribeIssue(createdIssue)}), die lokale Zuordnung oder Aufgabenbeschreibung konnte aber nicht gespeichert werden: {ex.Message}";
         }
     }
 

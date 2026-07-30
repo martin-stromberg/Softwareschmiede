@@ -120,6 +120,11 @@
 
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right">
+                <CheckBox Content="Aufgabenbeschreibung nach Issue-Anlage aktualisieren"
+                          AutomationProperties.Name="AufgabenbeschreibungNachIssueAnlageAktualisieren"
+                          IsChecked="{Binding UpdateTaskDescriptionAfterCreate, Mode=TwoWay}"
+                          VerticalAlignment="Center"
+                          Margin="0,0,16,0" />
                 <Button Content="Abbrechen"
                         AutomationProperties.Name="IssueAnlageAbbrechen"
                         Command="{Binding AbbrechenCommand}"

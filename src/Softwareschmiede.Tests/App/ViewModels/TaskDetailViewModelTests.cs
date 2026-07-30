@@ -1751,7 +1751,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
         _dialogServiceMock
             .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(createdIssue);
+            .ReturnsAsync(new IssueCreateDialogResult(createdIssue, false, "Lokaler Body"));
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.AufgabeId = aufgabe.Id;
@@ -1761,7 +1761,58 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.CurrentIssueReferenz.Should().NotBeNull();
         sut.CurrentIssueReferenz!.IssueNummer.Should().Be(23);
         sut.CurrentIssueReferenz.IssueUrl.Should().Be("https://github.com/test/repo/issues/23");
+        sut.Aufgabe!.AnforderungsBeschreibung.Should().Be("Beschreibung");
         sut.CanCreateIssue.Should().BeFalse();
+    }
+
+    /// <summary>IssueAnlegenAsync aktualisiert bei aktivierter Dialogoption die Aufgabenbeschreibung aus dem Provider-Issue.</summary>
+    [Fact]
+    public async Task IssueAnlegenAsync_ShouldUpdateTaskDescriptionFromCreatedIssueBody_WhenOptionIsEnabled()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id);
+        var createdIssue = new Issue(23, "Neu", "Provider Body", [], null, "https://github.com/test/repo/issues/23");
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IssueCreateDialogResult(createdIssue, true, "Lokaler Body"));
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+
+        sut.Aufgabe!.AnforderungsBeschreibung.Should().Be("Provider Body");
+        sut.CurrentIssueReferenz!.IssueNummer.Should().Be(23);
+    }
+
+    /// <summary>IssueAnlegenAsync nutzt den lokalen Dialog-Body, wenn der Provider-Issue-Body leer ist.</summary>
+    [Fact]
+    public async Task IssueAnlegenAsync_ShouldUseLocalBodyFallback_WhenCreatedIssueBodyIsEmpty()
+    {
+        var repository = await ErstelleRepositoryAsync("Softwareschmiede.TestGit", "https://github.com/test/repo", "owner/repo");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Anlage", "Alte Beschreibung", repository.Id);
+        var createdIssue = new Issue(23, "Neu", "   ", [], null, "https://github.com/test/repo/issues/23");
+        var gitPluginMock = ErstelleIssueCreateGitPluginMock(canCreateIssue: true);
+        var pluginManagerMock = ErstellePluginManagerMitGitPlugin(gitPluginMock.Object);
+        var dialogVm = new IssueCreateDialogViewModel(pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
+        _dialogServiceMock
+            .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IssueCreateDialogResult(createdIssue, true, "Lokaler Body"));
+        var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
+
+        sut.Aufgabe!.AnforderungsBeschreibung.Should().Be("Lokaler Body");
+        sut.CurrentIssueReferenz!.IssueNummer.Should().Be(23);
     }
 
     /// <summary>Nach extern erstelltem Issue nennt ein lokaler Persistenzfehler die externe URL und speichert keine Referenz.</summary>
@@ -1781,7 +1832,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .Returns<IssueCreateDialogViewModel, CancellationToken>(async (_, token) =>
             {
                 await _aufgabeService.DeleteAsync(aufgabe.Id, token);
-                return createdIssue;
+                return new IssueCreateDialogResult(createdIssue, true, "Lokaler Body");
             });
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
@@ -1789,7 +1840,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.IssueAnlegenCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Contain("konnte aber nicht lokal zugeordnet werden");
+        sut.FehlerMeldung.Should().Contain("die lokale Zuordnung oder Aufgabenbeschreibung konnte aber nicht gespeichert werden");
         sut.FehlerMeldung.Should().Contain("https://github.com/test/repo/issues/23");
         (await _aufgabeService.GetDetailAsync(aufgabe.Id)).Should().BeNull();
     }
@@ -1807,7 +1858,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
         _dialogServiceMock
             .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Issue?)null);
+            .ReturnsAsync((IssueCreateDialogResult?)null);
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
         sut.AufgabeId = aufgabe.Id;
@@ -1830,7 +1881,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var serviceProviderMock = new Mock<IServiceProvider>();
         serviceProviderMock.Setup(sp => sp.GetService(typeof(IssueCreateDialogViewModel))).Returns(dialogVm);
         var dialogStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var dialogRelease = new TaskCompletionSource<Issue?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogRelease = new TaskCompletionSource<IssueCreateDialogResult?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var dialogCalls = 0;
         _dialogServiceMock
             .Setup(d => d.ShowIssueCreateDialogAsync(It.IsAny<IssueCreateDialogViewModel>(), It.IsAny<CancellationToken>()))
@@ -1875,7 +1926,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             .Returns<IssueCreateDialogViewModel, CancellationToken>(async (_, token) =>
             {
                 await _aufgabeService.UpdateIssueReferenzAsync(aufgabe.Id, parallelIssue, token);
-                return createdIssue;
+                return new IssueCreateDialogResult(createdIssue, true, "Neue Beschreibung");
             });
         var sut = CreateSut(pluginManager: pluginManagerMock.Object, serviceProvider: serviceProviderMock.Object);
 
@@ -1885,6 +1936,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var reloaded = await _aufgabeService.GetDetailAsync(aufgabe.Id);
         reloaded!.IssueReferenz!.IssueNummer.Should().Be(99);
+        reloaded.AnforderungsBeschreibung.Should().Be("Beschreibung");
         sut.FehlerMeldung.Should().Contain("extern erstellt");
         sut.FehlerMeldung.Should().Contain("https://github.com/test/repo/issues/23");
     }

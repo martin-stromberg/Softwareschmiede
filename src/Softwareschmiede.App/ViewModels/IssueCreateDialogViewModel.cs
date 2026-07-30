@@ -27,6 +27,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
     private bool _isLoadingTemplates;
     private bool _isSubmitting;
     private bool _isGenerating;
+    private bool _updateTaskDescriptionAfterCreate;
 
     /// <summary>Wird ausgelöst wenn der Dialog geschlossen werden soll. Parameter: true = erfolgreich, false = abgebrochen.</summary>
     public event EventHandler<bool>? CloseRequested;
@@ -39,6 +40,13 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
 
     /// <summary>Das erfolgreich beim Provider angelegte Issue.</summary>
     public Issue? CreatedIssue { get; private set; }
+
+    /// <summary>Gibt an, ob die Aufgabenbeschreibung nach erfolgreicher Issue-Anlage aktualisiert werden soll.</summary>
+    public bool UpdateTaskDescriptionAfterCreate
+    {
+        get => _updateTaskDescriptionAfterCreate;
+        set => SetProperty(ref _updateTaskDescriptionAfterCreate, value);
+    }
 
     /// <summary>Ausgewähltes Template.</summary>
     public IssueTemplate? SelectedTemplate
@@ -199,6 +207,7 @@ public sealed class IssueCreateDialogViewModel : ViewModelBase
         _issueAlreadyAssignedLive = issueAlreadyAssignedLive;
 
         CreatedIssue = null;
+        UpdateTaskDescriptionAfterCreate = false;
         ErrorMessage = null;
         Templates.Clear();
         Title = initialTitle;
