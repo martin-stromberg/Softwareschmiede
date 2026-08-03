@@ -209,7 +209,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         {
             var pluginPrefix = await FindPluginPrefixForRepositoryAsync(repo.Url, ct);
             var projekt = await _projektService.CreateAsync(repo.Name, null, ct);
-            await _projektService.AddRepositoryAsync(projekt.Id, pluginPrefix, repo.Url, repo.Name, ct);
+            await _projektService.AddRepositoryAsync(projekt.Id, pluginPrefix, repo.Url, repo.Name, ct: ct);
             await NeuesProjektHinzufuegen();
         }
         catch (OperationCanceledException)

@@ -21,6 +21,9 @@ public sealed class GitRepository
     /// <summary>Gibt an, ob das Repository aktiv ist.</summary>
     public bool Aktiv { get; set; } = true;
 
+    /// <summary>Konfigurierter Basis-Branch, von dem neue Feature-Branches abgezweigt werden. <c>null</c> bedeutet: Remote-Standard-Branch wird verwendet.</summary>
+    public string? DefaultSourceBranchName { get; set; }
+
     /// <summary>Optionale Startkonfiguration für Repository-Startskripte.</summary>
     public RepositoryStartKonfiguration? StartKonfiguration { get; set; }
 

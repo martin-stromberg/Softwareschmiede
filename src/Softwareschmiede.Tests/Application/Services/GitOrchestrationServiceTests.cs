@@ -409,7 +409,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var expectedPr = new PullRequest(42, "PR Titel", "https://example/pr/42", "feature/pr");
 
         _gitPluginMock
-            .Setup(g => g.CreatePullRequestAsync("test/repo", "feature/pr", "Custom title", "Custom body", It.IsAny<CancellationToken>()))
+            .Setup(g => g.CreatePullRequestAsync("test/repo", "feature/pr", null, "Custom title", "Custom body", It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedPr);
 
         // Act
@@ -421,7 +421,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             g => g.PushBranchAsync(@"C:\repos\task-4", "feature/pr", It.IsAny<CancellationToken>()),
             Times.Once);
         _gitPluginMock.Verify(
-            g => g.CreatePullRequestAsync("test/repo", "feature/pr", "Custom title", "Custom body", It.IsAny<CancellationToken>()),
+            g => g.CreatePullRequestAsync("test/repo", "feature/pr", null, "Custom title", "Custom body", It.IsAny<CancellationToken>()),
             Times.Once);
         var protokoll = await _protokollService.GetByAufgabeAsync(aufgabe.Id);
         protokoll.Should().Contain(e => e.Typ == ProtokollTyp.GitAktion && e.Inhalt.Contains("vor Pull-Request-Erstellung gepusht"));
@@ -480,6 +480,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/commit-body",
                 "feature/commit-body",
+                null,
                 "PR mit Commits",
                 It.Is<string>(body =>
                     body.Contains("## Commits")
@@ -496,6 +497,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/commit-body",
             "feature/commit-body",
+            null,
             "PR mit Commits",
             It.Is<string>(body =>
                 body.Contains("## Commits")
@@ -522,7 +524,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         var expectedPr = new PullRequest(43, "PR Titel", "https://example/pr/43", "feature/no-repo");
 
         _gitPluginMock
-            .Setup(g => g.CreatePullRequestAsync("test/project-repo", "feature/no-repo", "Titel aus Aufgabe", "Body aus Aufgabe", It.IsAny<CancellationToken>()))
+            .Setup(g => g.CreatePullRequestAsync("test/project-repo", "feature/no-repo", null, "Titel aus Aufgabe", "Body aus Aufgabe", It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedPr);
 
         // Act
@@ -534,7 +536,70 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         // Assert
         result.Should().Be(expectedPr);
         _gitPluginMock.Verify(
-            g => g.CreatePullRequestAsync("test/project-repo", "feature/no-repo", "Titel aus Aufgabe", "Body aus Aufgabe", It.IsAny<CancellationToken>()),
+            g => g.CreatePullRequestAsync("test/project-repo", "feature/no-repo", null, "Titel aus Aufgabe", "Body aus Aufgabe", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync übergibt den konfigurierten Basis-Branch (<see cref="GitRepository.DefaultSourceBranchName"/>) als Ziel-Branch an das Plugin.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldCallPluginWithBaseBranch_WhenConfigured()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt mit Basis-Branch", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/basis-branch-repo",
+            "test/basis-branch-repo");
+        var repositoryEntity = await _db.GitRepositories.FindAsync(repository.Id);
+        repositoryEntity!.DefaultSourceBranchName = "staging";
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Basis-Branch", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/basis-branch", @"C:\repos\task-basis-branch");
+        var expectedPr = new PullRequest(90, "PR Titel", "https://example/pr/90", "feature/basis-branch");
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync("test/basis-branch-repo", "feature/basis-branch", "staging", "Titel", "Body", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedPr);
+
+        // Act
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        // Assert
+        result.Should().Be(expectedPr);
+        _gitPluginMock.Verify(
+            g => g.CreatePullRequestAsync("test/basis-branch-repo", "feature/basis-branch", "staging", "Titel", "Body", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>PullRequestErstellenAsync übergibt <c>baseBranch = null</c> an das Plugin, wenn kein Basis-Branch konfiguriert ist (Plugin-Fallback auf Remote-Standard).</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldCallPluginWithoutBaseBranch_WhenNotConfigured()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt ohne Basis-Branch", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/no-basis-branch-repo",
+            "test/no-basis-branch-repo");
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR ohne Basis-Branch", null, repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/no-basis-branch", @"C:\repos\task-no-basis-branch");
+        var expectedPr = new PullRequest(91, "PR Titel", "https://example/pr/91", "feature/no-basis-branch");
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync("test/no-basis-branch-repo", "feature/no-basis-branch", null, "Titel", "Body", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedPr);
+
+        // Act
+        var result = await _sut.PullRequestErstellenAsync(aufgabe.Id, title: "Titel", body: "Body");
+
+        // Assert
+        result.Should().Be(expectedPr);
+        _gitPluginMock.Verify(
+            g => g.CreatePullRequestAsync("test/no-basis-branch-repo", "feature/no-basis-branch", null, "Titel", "Body", It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -565,6 +630,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/issue-repo",
                 "feature/issue",
+                null,
                 "Titel",
                 It.Is<string>(body => body == $"Body{Environment.NewLine}{Environment.NewLine}Closes #123"),
                 It.IsAny<CancellationToken>()))
@@ -575,6 +641,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/issue-repo",
             "feature/issue",
+            null,
             "Titel",
             It.Is<string>(body => body == $"Body{Environment.NewLine}{Environment.NewLine}Closes #123"),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -611,6 +678,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/existing-directive",
                 "feature/no-dup",
+                null,
                 "Titel",
                 existingBody,
                 It.IsAny<CancellationToken>()))
@@ -621,6 +689,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/existing-directive",
             "feature/no-dup",
+            null,
             "Titel",
             existingBody,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -654,6 +723,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/whitespace-body",
                 "feature/whitespace",
+                null,
                 "Titel",
                 "Closes #501",
                 It.IsAny<CancellationToken>()))
@@ -666,6 +736,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/whitespace-body",
             "feature/whitespace",
+            null,
             "Titel",
             "Closes #501",
             It.IsAny<CancellationToken>()), Times.Once);
@@ -701,6 +772,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/other-directive",
                 "feature/other-directive",
+                null,
                 "Titel",
                 expectedBody,
                 It.IsAny<CancellationToken>()))
@@ -713,6 +785,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/other-directive",
             "feature/other-directive",
+            null,
             "Titel",
             expectedBody,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -745,6 +818,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/no-issue-number",
                 "feature/no-issue-number",
+                null,
                 "Titel",
                 "Body",
                 It.IsAny<CancellationToken>()))
@@ -755,6 +829,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/no-issue-number",
             "feature/no-issue-number",
+            null,
             "Titel",
             "Body",
             It.IsAny<CancellationToken>()), Times.Once);
@@ -789,6 +864,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 $"test/non-positive-{Math.Abs(issueNummer)}",
                 $"feature/non-positive-{Math.Abs(issueNummer)}",
+                null,
                 "Titel",
                 "Body",
                 It.IsAny<CancellationToken>()))
@@ -799,6 +875,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             $"test/non-positive-{Math.Abs(issueNummer)}",
             $"feature/non-positive-{Math.Abs(issueNummer)}",
+            null,
             "Titel",
             "Body",
             It.IsAny<CancellationToken>()), Times.Once);
@@ -832,6 +909,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/qualified-directive",
                 "feature/qualified-directive",
+                null,
                 "Titel",
                 existingBody,
                 It.IsAny<CancellationToken>()))
@@ -842,6 +920,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/qualified-directive",
             "feature/qualified-directive",
+            null,
             "Titel",
             existingBody,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -877,6 +956,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/alternative-directive",
                 "feature/alternative-directive",
+                null,
                 "Titel",
                 existingBody,
                 It.IsAny<CancellationToken>()))
@@ -887,6 +967,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/alternative-directive",
             "feature/alternative-directive",
+            null,
             "Titel",
             existingBody,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -919,7 +1000,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*mehrere aktive Repositories*");
         _gitPluginMock.Verify(
-            g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -939,7 +1020,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*kein aktives Repository*");
         _gitPluginMock.Verify(
-            g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            g => g.CreatePullRequestAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -963,6 +1044,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "owner/repo",
                 "feature/ssh-url",
+                null,
                 "Titel",
                 "Body",
                 It.IsAny<CancellationToken>()))
@@ -976,6 +1058,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "owner/repo",
             "feature/ssh-url",
+            null,
             "Titel",
             "Body",
             It.IsAny<CancellationToken>()), Times.Once);
@@ -1084,6 +1167,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
         pluginMock.Setup(plugin => plugin.CreatePullRequestAsync(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
+                It.IsAny<string?>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))

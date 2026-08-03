@@ -1,5 +1,4 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Infrastructure.Services;
@@ -276,33 +275,6 @@ public partial class End2EndTest
         await db.SaveChangesAsync();
     }
 
-    private AutomationElement OpenRepositoryAssignDialog(AutomationElement mainWindow)
-    {
-        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
-        return WaitForWindow("Repository zuweisen", Short);
-    }
-
-    private static AutomationElement WaitForFirstRepositoryItem(AutomationElement dialog)
-    {
-        AutomationElement[] items = [];
-        var deadline = DateTime.UtcNow + Short;
-        while (DateTime.UtcNow < deadline)
-        {
-            var listBox = dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.List));
-            if (listBox is not null)
-            {
-                items = listBox.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
-                if (items.Length > 0)
-                    return items[0];
-            }
-
-            Thread.Sleep(200);
-        }
-
-        throw new TimeoutException("Repository-Liste im Zuweisungsdialog enthielt kein Element innerhalb des Timeouts.");
-    }
-
     private static AutomationElement WaitForWorkingDirectoryComboBox(AutomationElement dialog)
     {
         var deadline = DateTime.UtcNow + Short;
@@ -323,9 +295,9 @@ public partial class End2EndTest
         var deadline = DateTime.UtcNow + Short;
         while (DateTime.UtcNow < deadline)
         {
-            var textBoxes = dialog.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit));
-            if (textBoxes.Length == 1)
-                return textBoxes[0];
+            var textBox = dialog.FindFirstDescendant(cf => cf.ByName("ArbeitsverzeichnisEingabe"));
+            if (textBox is not null)
+                return textBox;
 
             Thread.Sleep(200);
         }

@@ -899,10 +899,10 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         }
 
         public Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default) => Task.CompletedTask;
-        public Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default) => Task.CompletedTask;
+        public Task CreateBranchAsync(string localPath, string branchName, string? sourceBranchName = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default) => Task.CompletedTask;
         public Task PullAsync(string localPath, CancellationToken ct = default) => Task.CompletedTask;
-        public Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string? baseBranch, string title, string body, CancellationToken ct = default) => throw new NotSupportedException();
         public Task CommitAsync(string localPath, string message, CancellationToken ct = default) => Task.CompletedTask;
         public Task ResetAsync(string localPath, string resetType, string? targetRef, CancellationToken ct = default) => Task.CompletedTask;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);

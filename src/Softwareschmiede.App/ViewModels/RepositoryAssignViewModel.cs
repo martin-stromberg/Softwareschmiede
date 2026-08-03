@@ -28,6 +28,12 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     private bool _isWorkingDirectoryManualInput;
     private string? _workingDirectoryInputText;
     private string? _workingDirectoryInputError;
+    private ObservableCollection<string> _availableSourceBranches = new();
+    private string? _defaultSourceBranchName;
+    private bool _isLoadingSourceBranches;
+    private string? _sourceBranchInputError;
+    private CancellationTokenSource? _sourceBranchCts;
+    private bool _isSourceBranchManualInput;
 
     /// <summary>Wird ausgelöst wenn der Dialog geschlossen werden soll. Parameter: true = bestätigt, false = abgebrochen.</summary>
     public event EventHandler<bool>? CloseRequested;
@@ -126,6 +132,48 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _isLoadingDirectoryStructure, value);
     }
 
+    /// <summary>Verfügbare Branches des ausgewählten Repositories, aus dem Plugin geladen.</summary>
+    public ObservableCollection<string> AvailableSourceBranches
+    {
+        get => _availableSourceBranches;
+        private set => SetProperty(ref _availableSourceBranches, value);
+    }
+
+    /// <summary>Vom Benutzer ausgewählter/eingegebener Basis-Branch, von dem neue Feature-Branches abgezweigt werden. <c>null</c>/leer bedeutet Standard-Branch des Repositories.</summary>
+    public string? DefaultSourceBranchName
+    {
+        get => _defaultSourceBranchName;
+        set
+        {
+            if (SetProperty(ref _defaultSourceBranchName, value))
+            {
+                ValidateSourceBranchInput();
+                RelayCommand.Refresh();
+            }
+        }
+    }
+
+    /// <summary>Gibt an, ob die verfügbaren Branches des ausgewählten Repositories gerade geladen werden.</summary>
+    public bool IsLoadingSourceBranches
+    {
+        get => _isLoadingSourceBranches;
+        private set => SetProperty(ref _isLoadingSourceBranches, value);
+    }
+
+    /// <summary>Validierungsfehler der Basis-Branch-Eingabe.</summary>
+    public string? SourceBranchInputError
+    {
+        get => _sourceBranchInputError;
+        private set => SetProperty(ref _sourceBranchInputError, value);
+    }
+
+    /// <summary>Gibt an, ob der Basis-Branch manuell eingegeben wird (keine Vorschlagsliste verfügbar).</summary>
+    public bool IsSourceBranchManualInput
+    {
+        get => _isSourceBranchManualInput;
+        private set => SetProperty(ref _isSourceBranchManualInput, value);
+    }
+
     /// <summary>Bestätigt die Auswahl und schließt den Dialog.</summary>
     public ICommand BestaetigenCommand { get; }
 
@@ -137,6 +185,9 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
 
     /// <summary>Der laufende Directory-Struktur-Lade-Task; nur für Tests.</summary>
     internal Task? CurrentLoadDirectoryStructureTask { get; private set; }
+
+    /// <summary>Der laufende Branch-Lade-Task; nur für Tests.</summary>
+    internal Task? CurrentLoadSourceBranchesTask { get; private set; }
 
     /// <inheritdoc cref="RepositoryAssignViewModel"/>
     public RepositoryAssignViewModel(
@@ -208,6 +259,8 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         _reloadCts?.Dispose();
         _dirStructureCts?.Cancel();
         _dirStructureCts?.Dispose();
+        _sourceBranchCts?.Cancel();
+        _sourceBranchCts?.Dispose();
     }
 
     private async Task ReloadRepositoriesForSelectedPlugin(CancellationToken ct)
@@ -255,6 +308,68 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         _dirStructureCts?.Dispose();
         _dirStructureCts = new CancellationTokenSource();
         CurrentLoadDirectoryStructureTask = LoadDirectoryStructureAsync(_dirStructureCts.Token);
+
+        AvailableSourceBranches.Clear();
+        DefaultSourceBranchName = null;
+        SourceBranchInputError = null;
+        IsSourceBranchManualInput = false;
+        _sourceBranchCts?.Cancel();
+        _sourceBranchCts?.Dispose();
+        _sourceBranchCts = new CancellationTokenSource();
+        CurrentLoadSourceBranchesTask = LoadSourceBranchesAsync(_sourceBranchCts.Token);
+    }
+
+    private async Task LoadSourceBranchesAsync(CancellationToken ct)
+    {
+        if (SelectedScmPlugin == null || SelectedRepository == null)
+        {
+            AvailableSourceBranches.Clear();
+            IsSourceBranchManualInput = false;
+            return;
+        }
+
+        var gitPlugin = SelectedScmPlugin;
+        var repositoryUrl = SelectedRepository.Url;
+
+        IsLoadingSourceBranches = true;
+        try
+        {
+            var branches = await gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
+            ct.ThrowIfCancellationRequested();
+
+            AvailableSourceBranches.Clear();
+            foreach (var branch in branches.OrderBy(b => b, StringComparer.OrdinalIgnoreCase))
+                AvailableSourceBranches.Add(branch);
+            IsSourceBranchManualInput = AvailableSourceBranches.Count == 0;
+
+            var defaultBranch = await gitPlugin.GetDefaultBranchAsync(repositoryUrl, ct);
+            ct.ThrowIfCancellationRequested();
+            DefaultSourceBranchName = defaultBranch;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Abgebrochen durch Repository-/Plugin-Wechsel — kein Fehler
+        }
+        catch (Exception ex)
+        {
+            // Plugin unterstützt Branch-Abfrage nicht (z.B. LocalDirectoryPlugin) oder ein anderer Fehler ist
+            // aufgetreten — Auswahl bleibt als manuelle Eingabe ohne Vorschlagsliste möglich.
+            _logger.LogWarning(ex, "Verfügbare Branches konnten für Repository '{RepositoryUrl}' nicht geladen werden.", repositoryUrl);
+            AvailableSourceBranches.Clear();
+            IsSourceBranchManualInput = true;
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+                IsLoadingSourceBranches = false;
+        }
+    }
+
+    private bool ValidateSourceBranchInput()
+    {
+        var isValid = SourceBranchInputValidator.Validate(DefaultSourceBranchName, AvailableSourceBranches, out var error);
+        SourceBranchInputError = error;
+        return isValid;
     }
 
     private async Task LoadDirectoryStructureAsync(CancellationToken ct)
@@ -305,7 +420,8 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
 
     private bool CanConfirm()
         => _selectedRepository != null
-            && (!IsWorkingDirectoryManualInput || ValidateManualWorkingDirectoryInput());
+            && (!IsWorkingDirectoryManualInput || ValidateManualWorkingDirectoryInput())
+            && ValidateSourceBranchInput();
 
     private void Confirm()
     {
@@ -321,6 +437,14 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
             WorkingDirectoryInputText = normalized;
             SelectedWorkingDirectory = normalized;
         }
+
+        if (!ValidateSourceBranchInput())
+        {
+            RelayCommand.Refresh();
+            return;
+        }
+
+        DefaultSourceBranchName = string.IsNullOrWhiteSpace(DefaultSourceBranchName) ? null : DefaultSourceBranchName.Trim();
 
         CloseRequested?.Invoke(this, true);
     }

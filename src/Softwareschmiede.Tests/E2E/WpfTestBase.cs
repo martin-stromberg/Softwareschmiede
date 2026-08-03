@@ -640,6 +640,41 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
+    /// Öffnet den Repository-Zuweisungs-Dialog über den "Zuweisen"-Button und wartet, bis das
+    /// Dialogfenster erscheint.
+    /// </summary>
+    protected AutomationElement OpenRepositoryAssignDialog(AutomationElement mainWindow)
+    {
+        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
+        zuweisenButton.AsButton().Click();
+        return WaitForWindow("Repository zuweisen", Short);
+    }
+
+    /// <summary>
+    /// Wartet, bis die Repository-Liste im Zuweisungsdialog mindestens ein Element enthält, und
+    /// gibt das erste Listenelement zurück.
+    /// </summary>
+    protected static AutomationElement WaitForFirstRepositoryItem(AutomationElement dialog)
+    {
+        AutomationElement[] items = [];
+        var deadline = DateTime.UtcNow + Short;
+        while (DateTime.UtcNow < deadline)
+        {
+            var listBox = dialog.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.List));
+            if (listBox is not null)
+            {
+                items = listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
+                if (items.Length > 0)
+                    return items[0];
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException("Repository-Liste im Zuweisungsdialog enthielt kein Element innerhalb des Timeouts.");
+    }
+
+    /// <summary>
     /// Startet die Anwendung, konfiguriert das LocalDirectoryPlugin mit einem neu erstellten lokalen
     /// Quellverzeichnis, legt ein Projekt an, öffnet es, weist das Repository zu und erstellt eine
     /// neue Aufgabe. Gibt das Hauptfenster zurück, in dem die Aufgabe im Edit-Panel (Status "Neu")

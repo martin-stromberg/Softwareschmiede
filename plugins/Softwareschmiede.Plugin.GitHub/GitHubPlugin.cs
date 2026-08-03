@@ -827,6 +827,7 @@ password {token}
     public override async Task<PullRequest> CreatePullRequestAsync(
         string repositoryId,
         string branchName,
+        string? baseBranch,
         string title,
         string body,
         CancellationToken ct = default)
@@ -844,6 +845,11 @@ password {token}
             "--title", title,
             "--body", body
         };
+
+        if (!string.IsNullOrEmpty(baseBranch))
+        {
+            args.AddRange(["--base", baseBranch]);
+        }
 
         var result = await _cliRunner.RunAsync(
             "gh",

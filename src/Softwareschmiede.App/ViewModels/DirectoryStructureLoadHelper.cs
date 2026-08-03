@@ -134,3 +134,21 @@ internal static class WorkingDirectoryInputValidator
         return true;
     }
 }
+
+/// <summary>Validiert einen ausgewählten/eingegebenen Basis-Branch gegen die verfügbaren Branches eines Repositories.</summary>
+internal static class SourceBranchInputValidator
+{
+    /// <summary>Prüft, ob <paramref name="branchName"/> in <paramref name="availableBranches"/> enthalten ist.</summary>
+    public static bool Validate(string? branchName, IReadOnlyCollection<string> availableBranches, out string? error)
+    {
+        if (string.IsNullOrWhiteSpace(branchName) || availableBranches.Count == 0)
+        {
+            error = null;
+            return true;
+        }
+
+        var exists = availableBranches.Contains(branchName, StringComparer.OrdinalIgnoreCase);
+        error = exists ? null : $"Branch '{branchName}' existiert nicht im Repository.";
+        return exists;
+    }
+}

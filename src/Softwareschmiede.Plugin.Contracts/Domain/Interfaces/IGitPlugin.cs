@@ -28,8 +28,9 @@ public interface IGitPlugin : IPlugin
     /// <summary>Legt einen neuen Branch im lokalen Klon an.</summary>
     /// <param name="localPath">Lokaler Pfad des geklonten Repositories.</param>
     /// <param name="branchName">Name des neuen Branches.</param>
+    /// <param name="sourceBranchName">Optionaler Basis-Branch, von dem der neue Branch abgezweigt werden soll. Wenn <c>null</c>/leer, wird der aktuelle HEAD verwendet.</param>
     /// <param name="ct">Cancellation Token.</param>
-    Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default);
+    Task CreateBranchAsync(string localPath, string branchName, string? sourceBranchName = null, CancellationToken ct = default);
 
     /// <summary>Pusht den Branch auf den Remote.</summary>
     /// <param name="localPath">Lokaler Pfad des geklonten Repositories.</param>
@@ -45,10 +46,11 @@ public interface IGitPlugin : IPlugin
     /// <summary>Erstellt einen Pull Request.</summary>
     /// <param name="repositoryId">Repository-Identifier (z.B. "owner/repo").</param>
     /// <param name="branchName">Name des Quell-Branches.</param>
+    /// <param name="baseBranch">Optionaler Ziel-Branch. Wenn <c>null</c>/leer, wird der Plugin-Fallback (Remote-Standard-Branch) verwendet.</param>
     /// <param name="title">Titel des Pull Requests.</param>
     /// <param name="body">Beschreibung des Pull Requests.</param>
     /// <param name="ct">Cancellation Token.</param>
-    Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default);
+    Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string? baseBranch, string title, string body, CancellationToken ct = default);
 
     /// <summary>Ruft den aktuellen Status eines Pull Requests ab.</summary>
     /// <param name="repositoryId">Repository-Identifier (z.B. "owner/repo").</param>

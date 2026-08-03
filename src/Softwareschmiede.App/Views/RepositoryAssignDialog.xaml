@@ -4,7 +4,7 @@
         Title="Repository zuweisen"
         Background="{DynamicResource SurfaceBrush}"
         Width="500"
-        Height="430"
+        Height="560"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
     <Grid Margin="24">
@@ -12,6 +12,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -104,6 +105,7 @@
             <TextBox Text="{Binding WorkingDirectoryInputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
                      Visibility="{Binding IsWorkingDirectoryManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
+                     AutomationProperties.Name="ArbeitsverzeichnisEingabe"
                      Background="{DynamicResource BackgroundBrush}"
                      Foreground="{DynamicResource PrimaryTextBrush}"
                      Padding="8,6" />
@@ -124,8 +126,49 @@
                        Margin="0,4,0,0" />
         </StackPanel>
 
+        <!-- Basis-Branch-Auswahl -->
+        <StackPanel Grid.Row="4" Margin="0,12,0,0">
+            <TextBlock Text="Basis-Branch für Feature-Branches"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource PrimaryTextBrush}"
+                       Margin="0,0,0,8" />
+
+            <ComboBox ItemsSource="{Binding AvailableSourceBranches}"
+                      SelectedItem="{Binding DefaultSourceBranchName, Mode=TwoWay}"
+                      IsEnabled="{Binding IsLoadingSourceBranches, Converter={StaticResource InverseBoolConverter}}"
+                      Visibility="{Binding IsSourceBranchManualInput, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                      AutomationProperties.Name="BasisBranchAuswahlComboBox"
+                      Background="{DynamicResource BackgroundBrush}"
+                      Padding="8,6"
+                      Margin="0,0,0,8" />
+
+            <TextBox Text="{Binding DefaultSourceBranchName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     IsEnabled="{Binding IsLoadingSourceBranches, Converter={StaticResource InverseBoolConverter}}"
+                     Visibility="{Binding IsSourceBranchManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
+                     AutomationProperties.Name="BasisBranchEingabe"
+                     Background="{DynamicResource BackgroundBrush}"
+                     Foreground="{DynamicResource PrimaryTextBrush}"
+                     Padding="8,6" />
+
+            <TextBlock Text="{Binding SourceBranchInputError}"
+                       Foreground="{DynamicResource ErrorBrush}"
+                       Margin="0,4,0,0"
+                       TextWrapping="Wrap" />
+
+            <TextBlock Text="Wird geladen…"
+                       Foreground="{DynamicResource SecondaryTextBrush}"
+                       Visibility="{Binding IsLoadingSourceBranches, Converter={StaticResource BoolToVisibilityConverter}}"
+                       Margin="0,4,0,0" />
+
+            <TextBlock Text="Der Branch, von dem neue Feature-Branches für Aufgaben abgezweigt werden. Leer lassen für Standard-Branch des Repositories."
+                       FontSize="11"
+                       Foreground="{DynamicResource SecondaryTextBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0" />
+        </StackPanel>
+
         <!-- Buttons -->
-        <StackPanel Grid.Row="4"
+        <StackPanel Grid.Row="5"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">

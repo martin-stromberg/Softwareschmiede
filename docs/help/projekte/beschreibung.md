@@ -45,6 +45,8 @@ Jedes Repository verweist auf einen Plugin-Typ (z.B. `SourceCodeManagement` oder
 
 Repositories können eine `RepositoryStartKonfiguration` enthalten, die beim Starten einer Aufgabe ein Startskript ausführt (z.B. `npm install`). Das Skript kann auch nachträglich manuell ausgelöst werden.
 
+**Basis-Branch-Konfiguration:** Jedes Repository kann optional einen Basis-Branch konfigurieren, von dem neue Feature-Branches für Aufgaben abgezweigt werden. Dies ermöglicht Workflows mit Staging-Branches, Release-Branches oder anderen nicht-Standard-Entwicklungszweigen. Der konfigurierte Basis-Branch wird beim Aufgabenstart validiert und als Ziel-Branch für Pull Requests verwendet. Wenn kein Basis-Branch konfiguriert ist, wird der Remote-Standard-Branch verwendet (Fallback). Siehe [Basis-Branch-Konfiguration](basis-branch-konfiguration.md) für Details.
+
 ## Beispiele
 
 - Projekt „Backend-API" mit einem GitHub-Repository und mehreren Aufgaben für Features und Bugfixes. Der Projektname und die Beschreibung werden in der Detailansicht angepasst, Repositories über den „Zuweisen"-Button hinzugefügt.

@@ -172,6 +172,86 @@
                     </Grid>
                 </Border>
 
+                <!-- Basis-Branch-Kachel (nur wenn ein Repository zugewiesen ist) -->
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="20"
+                        Margin="0 10"
+                        Visibility="{Binding SelectedRepository, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Text="Basis-Branch"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,12" />
+
+                        <!-- Anzeige-Modus -->
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding IsEditingSourceBranch, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                            <TextBlock Text="Basis-Branch:"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding SelectedRepositorySourceBranchName, TargetNullValue=Standard, FallbackValue=Standard}"
+                                       AutomationProperties.AutomationId="BasisBranchAnzeige"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,12,0" />
+                            <Button Content="Bearbeiten"
+                                    AutomationProperties.Name="BasisBranchBearbeiten"
+                                    Command="{Binding EditSourceBranchCommand}"
+                                    Padding="10,4" />
+                        </StackPanel>
+
+                        <!-- Bearbeitungs-Modus -->
+                        <StackPanel Visibility="{Binding IsEditingSourceBranch, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <ComboBox ItemsSource="{Binding AvailableSourceBranchesForEdit}"
+                                      SelectedItem="{Binding SelectedRepositorySourceBranchName, Mode=TwoWay}"
+                                      Visibility="{Binding IsEditingSourceBranchManualInput, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                                      AutomationProperties.Name="BasisBranchBearbeitenAuswahlComboBox"
+                                      Background="{DynamicResource BackgroundBrush}"
+                                      Padding="8,6"
+                                      Margin="0,0,0,8" />
+
+                            <TextBox Text="{Binding SelectedRepositorySourceBranchName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Visibility="{Binding IsEditingSourceBranchManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
+                                     AutomationProperties.Name="BasisBranchBearbeitenEingabe"
+                                     Background="{DynamicResource BackgroundBrush}"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     Padding="8,6"
+                                     Margin="0,0,0,8" />
+
+                            <TextBlock Text="{Binding SourceBranchInputError}"
+                                       Foreground="{DynamicResource ErrorBrush}"
+                                       Margin="0,0,0,8"
+                                       TextWrapping="Wrap" />
+
+                            <TextBlock Text="Wird geladen…"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       Visibility="{Binding IsLoadingSourceBranchesForEdit, Converter={StaticResource BoolToVisibilityConverter}}"
+                                       Margin="0,0,0,8" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Speichern"
+                                        AutomationProperties.Name="BasisBranchSpeichern"
+                                        Command="{Binding SaveSourceBranchCommand}"
+                                        Background="{DynamicResource AccentBrush}"
+                                        Foreground="White"
+                                        BorderThickness="0"
+                                        Padding="10,4"
+                                        Margin="0,0,8,0" />
+                                <Button Content="Abbrechen"
+                                        AutomationProperties.Name="BasisBranchAbbrechen"
+                                        Command="{Binding CancelSourceBranchEditCommand}"
+                                        Padding="10,4" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- Aufgaben-Kachel (nur wenn Projekt bereits persistiert ist) -->
                 <Border Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderBrush}"

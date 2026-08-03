@@ -181,34 +181,132 @@ Keine.
       - Test: `DefaultSourceBranchName` wird in DB gespeichert und kann gelesen werden
       - Test: Existierende `GitRepository`-Einträge haben `DefaultSourceBranchName = null` (Migration)
 
-12. **E2E-Test: Repository-Zuordnung mit Basis-Branch-Auswahl**
-    - Voraussetzungen: UI-Komponenten für Basis-Branch-Eingabe (siehe Schritt 13)
+12. **RepositoryAssignViewModel um Basis-Branch-Auswahl erweitern**
+    - Voraussetzungen: `GitRepository.DefaultSourceBranchName` existiert, `IGitPlugin` erweitert
+    - Beschreibung:
+      - Neue Eigenschaften hinzufügen:
+        - `DefaultSourceBranchName` (`string?`) — Benutzer-konfigurierter Basis-Branch-Name, gebunden an UI
+        - `AvailableSourceBranches` (`ObservableCollection<string>`) — Liste verfügbarer Branches aus dem Repository
+        - `IsLoadingSourceBranches` (`bool`) — Ladeindikator für Branch-Abfrage
+        - `SourceBranchInputError` (`string?`) — Validierungsfehler bei Branch-Eingabe
+      - Bei Repository-Auswahl: Verfügbare Branches aus `IGitPlugin.GetRemoteBranchesAsync()` laden
+      - Bei Branch-Eingabe: Validierung durchführen (existiert im Remote?)
+      - Default-Branch des Repositories vorschlagen (via `IGitPlugin.GetDefaultBranchAsync()`)
+
+13. **RepositoryAssignDialog.xaml um Basis-Branch-Auswahl-UI erweitern**
+    - Voraussetzungen: RepositoryAssignViewModel erweitert
+    - Beschreibung:
+      - Neue UI-Elemente nach dem Arbeitsverzeichnis-Bereich hinzufügen:
+        - Label: "Basis-Branch für Feature-Branches"
+        - ComboBox oder TextBox + Autocomplete für Branch-Auswahl (`DefaultSourceBranchName` gebunden)
+        - Ladeindikator bei Branch-Abfrage (`IsLoadingSourceBranches`)
+        - Optional: Validierungsfehler-Text unter Branch-Feld (`SourceBranchInputError`)
+        - Hilfstext: "Der Branch, von dem neue Feature-Branches für Aufgaben abgezweigt werden. Leer lassen für Standard-Branch des Repositories."
+      - UI-Logik: ComboBox disabled während `IsLoadingSourceBranches`, Bestätigungsbutton disabled wenn Branch-Validierung fehlschlägt
+
+14. **ProjektService.AddRepositoryAsync() anpassen**
+    - Voraussetzungen: RepositoryAssignViewModel mit DefaultSourceBranchName erweitert
+    - Beschreibung:
+      - Signatur erweitern: `AddRepositoryAsync(..., string? defaultSourceBranchName, ...)`
+      - `GitRepository.DefaultSourceBranchName` beim Erstellen setzen
+      - Rückgabewert: `GitRepository` mit gesetztem `DefaultSourceBranchName`
+
+15. **ProjectDetailViewModel um Basis-Branch-Bearbeitung erweitern**
+    - Voraussetzungen: `GitRepository.DefaultSourceBranchName` persistiert
+    - Beschreibung:
+      - Neue Eigenschaften hinzufügen:
+        - `SelectedRepositorySourceBranchName` (`string?`) — aktuell konfigurierter Basis-Branch des ausgewählten Repositories
+        - `IsEditingSourceBranch` (`bool`) — steuert Edit-Modus
+        - `AvailableSourceBranchesForEdit` (`ObservableCollection<string>`) — Branches des ausgewählten Repositories
+        - `SourceBranchInputError` (`string?`) — Validierungsfehler
+      - Neuer Command: `EditSourceBranchCommand` — öffnet Edit-Modus für Basis-Branch
+      - Neuer Command: `SaveSourceBranchCommand` — speichert geänderten Basis-Branch
+      - Neuer Command: `CancelSourceBranchEditCommand` — bricht Edit-Modus ab
+      - Bei Repository-Auswahl (`SelectedRepository` ändert sich): `SelectedRepositorySourceBranchName` und verfügbare Branches neu laden
+      - Beim Speichern: `ProjektService.UpdateRepositorySourceBranchAsync()` aufrufen
+
+16. **ProjektService.UpdateRepositorySourceBranchAsync() implementieren**
+    - Voraussetzungen: `GitRepository.DefaultSourceBranchName` persistiert
+    - Beschreibung:
+      - Neue Methode: `UpdateRepositorySourceBranchAsync(repositoryId: Guid, defaultSourceBranchName: string?, cancellationToken: CancellationToken): Task<GitRepository>`
+      - Laden des `GitRepository` aus DB
+      - `DefaultSourceBranchName` setzen
+      - Änderung speichern
+      - Optional: Validierung durchführen (Branch existiert im Remote?) — bei Fehler Exception werfen mit aussagekräftiger Meldung
+
+17. **ProjectDetailView um Basis-Branch-Anzeige und -Bearbeitung erweitern**
+    - Voraussetzungen: ProjectDetailViewModel angepasst
+    - Beschreibung:
+      - Bereich nach oder neben Repository-Anzeige hinzufügen:
+        - Label: "Basis-Branch:"
+        - Anzeige des aktuellen `SelectedRepositorySourceBranchName` (oder Fallback-Text "Standard")
+        - Button "Bearbeiten" → `EditSourceBranchCommand`
+        - Edit-Modus (wenn `IsEditingSourceBranch = true`):
+          - ComboBox oder TextBox für `SelectedRepositorySourceBranchName`
+          - Button "Speichern" → `SaveSourceBranchCommand`
+          - Button "Abbrechen" → `CancelSourceBranchEditCommand`
+          - Optional: Validierungsfehler anzeigen (`SourceBranchInputError`)
+      - Ladeindikator: Show while loading branches
+
+18. **RepositoryAssignViewModel-Tests schreiben**
+    - Voraussetzungen: RepositoryAssignViewModel erweitert
+    - Beschreibung:
+      - Test: Branch-Liste wird geladen, wenn Repository ausgewählt wird
+      - Test: Validierung schlägt fehl, wenn Branch nicht existiert
+      - Test: Validierung erfolgreich, wenn Branch existiert
+      - Test: Benutzer kann Basis-Branch auswählen und Dialog wird bestätigt
+      - Test: `DefaultSourceBranchName` wird beim Dialog-Confirm zurückgegeben
+
+19. **ProjectDetailViewModel-Tests für Basis-Branch-Bearbeitung schreiben**
+    - Voraussetzungen: ProjectDetailViewModel um Basis-Branch-Bearbeitung erweitert
+    - Beschreibung:
+      - Test: `SelectedRepositorySourceBranchName` wird geladen, wenn Repository ausgewählt wird
+      - Test: Bearbeitung des Basis-Branches ruft `ProjektService.UpdateRepositorySourceBranchAsync()` auf
+      - Test: Validierungsfehler werden angezeigt
+      - Test: Edit-Modus wird korrekt bei Bestätigung/Abbruch geschlossen
+
+20. **E2E-Test: Repository-Zuordnung mit Basis-Branch-Auswahl**
+    - Voraussetzungen: UI-Komponenten für Basis-Branch-Eingabe (Schritte 12-13)
     - Beschreibung:
       - Test: Benutzer ordnet Repository zu Projekt zu und wählt Basis-Branch
       - Verifikation: `DefaultSourceBranchName` wird in DB gespeichert
+      - Verifikation: Nach Neustart ist Basis-Branch in Projektdetailansicht sichtbar
 
-13. **E2E-Test: Aufgabe starten mit Basis-Branch-Validierung**
+21. **E2E-Test: Basis-Branch-Bearbeitung in Projektdetailansicht**
+    - Voraussetzungen: UI-Komponenten für Basis-Branch-Bearbeitung (Schritte 15-17)
+    - Beschreibung:
+      - Test: Benutzer öffnet existierendes Projekt mit Repository
+      - Test: Benutzer öffnet Edit-Modus für Basis-Branch
+      - Test: Benutzer wählt anderen Basis-Branch und speichert
+      - Verifikation: Neue Auswahl wird in DB gespeichert
+      - Verifikation: Nach Neustart ist neuer Basis-Branch sichtbar
+
+22. **E2E-Test: Aufgabe starten mit Basis-Branch-Validierung**
     - Voraussetzungen: Validierungslogik, Feature-Branch-Erstellung angepasst
     - Beschreibung:
       - Test: Aufgabenstart mit existierendem Basis-Branch erfolgreich
       - Test: Aufgabenstart mit nicht-existierendem Basis-Branch zeigt Fehlermeldung
       - Verifikation: Feature-Branch wird vom Basis-Branch abgezweigt (Git-Verifikation)
 
-14. **E2E-Test: PR-Erstellung mit Basis-Branch als Ziel**
+23. **E2E-Test: PR-Erstellung mit Basis-Branch als Ziel**
     - Voraussetzungen: PR-Erstellung angepasst, E2E-Testinfrastruktur
     - Beschreibung:
       - Test: PR wird mit konfiguriertem Basis-Branch als Ziel erstellt
       - Verifikation: PR im GitHub zeigt korrekten Ziel-Branch
 
-15. **Betroffene bestehende Tests anpassen**
-    - Voraussetzungen: Alle Logik-Änderungen abgeschlossen
+24. **Betroffene bestehende Tests anpassen**
+    - Voraussetzungen: Alle Logik- und UI-Änderungen abgeschlossen
     - Beschreibung:
+      - Prüfe `RepositoryAssignViewModelTests` (neue Tests hinzugefügt), `ProjectDetailViewModelTests` (neue Tests hinzugefügt)
       - Prüfe `EntwicklungsprozessServiceTests` und `GitOrchestrationServiceTests` auf Auswirkungen
       - Anpassungen vornehmen, wenn Signaturen oder Verhalten sich geändert haben
+      - Prüfe bestehende E2E-Tests: Sicherstellen, dass Mock-GitRepository-Objekte `DefaultSourceBranchName = null` haben (Fallback)
 
 ## Tests
 
 ### Neue Tests
+
+#### Backend / Service-Layer-Tests
 
 | Test / Hilfsmethode | Testklasse | Was wird geprüft / bereitgestellt? |
 |--------------------|------------|-------------------------------------|
@@ -219,11 +317,31 @@ Keine.
 | `SetupBranchAsync_ShouldCreateBranchFromHead_WhenNotConfigured` | `EntwicklungsprozessServiceTests` | Feature-Branch wird vom HEAD abgezweigt, wenn kein Basis-Branch konfiguriert |
 | `PullRequestErstellenAsync_ShouldCallPluginWithBaseBranch_WhenConfigured` | `GitOrchestrationServiceTests` | PR-Erstellung übergibt konfigurierten Basis-Branch an Plugin |
 | `PullRequestErstellenAsync_ShouldCallPluginWithoutBaseBranch_WhenNotConfigured` | `GitOrchestrationServiceTests` | PR-Erstellung übergibt `baseBranch = null`, wenn nicht konfiguriert |
-| `DefaultSourceBranchName_ShouldBePersisted` | `EntwicklungsprozessServiceTests` (Integration) | `DefaultSourceBranchName` wird in DB gespeichert und kann gelesen werden |
-| E2E: Repo-Zuordnung mit Basis-Branch-Auswahl | `E2E_RepositoryManagementTests` (TBD) | Benutzer wählt Basis-Branch bei Repository-Zuordnung, wird in DB gespeichert |
-| E2E: Aufgabenstart mit erfolgreicher Validierung | `E2E_TaskStartupTests` (TBD) | Aufgabe startet mit existierendem Basis-Branch, Feature-Branch wird korrekt abgezweigt |
-| E2E: Aufgabenstart mit Validierungsfehler | `E2E_TaskStartupTests` (TBD) | Aufgabenstart zeigt Fehlermeldung, wenn Basis-Branch nicht existiert |
-| E2E: PR-Erstellung mit Basis-Branch | `E2E_PullRequestTests` (TBD) | PR wird mit konfiguriertem Basis-Branch als Ziel erstellt |
+| `DefaultSourceBranchName_ShouldBePersisted` | Integration-Tests | `DefaultSourceBranchName` wird in DB gespeichert und kann gelesen werden |
+
+#### ViewModel-Unit-Tests
+
+| Test / Hilfsmethode | Testklasse | Was wird geprüft / bereitgestellt? |
+|--------------------|------------|-------------------------------------|
+| `RepositoryChanged_ShouldLoadAvailableBranches` | `RepositoryAssignViewModelTests` | Verfügbare Branches werden aus Plugin geladen, wenn Repository ausgewählt wird |
+| `SourceBranchValidation_ShouldFail_WhenBranchDoesNotExist` | `RepositoryAssignViewModelTests` | Validierung schlägt fehl, wenn ausgewählter Branch nicht im Remote existiert |
+| `SourceBranchValidation_ShouldSucceed_WhenBranchExists` | `RepositoryAssignViewModelTests` | Validierung erfolgreich, wenn Branch existiert |
+| `Confirm_ShouldReturnDefaultSourceBranchName` | `RepositoryAssignViewModelTests` | Dialog-Bestätigung gibt `DefaultSourceBranchName` zurück (gebunden an View) |
+| `SelectedRepository_ShouldLoadAndSuggestDefaultBranch` | `RepositoryAssignViewModelTests` | Default-Branch des Repositories wird geladen und vorgeschlagen |
+| `ProjectDetailVM_SelectedRepository_ShouldLoadSourceBranchName` | `ProjectDetailViewModelTests` | `SelectedRepositorySourceBranchName` wird geladen, wenn Repository ausgewählt wird |
+| `ProjectDetailVM_SaveSourceBranch_ShouldCallService` | `ProjectDetailViewModelTests` | Speichern des Basis-Branches ruft `ProjektService.UpdateRepositorySourceBranchAsync()` auf |
+| `ProjectDetailVM_EditSourceBranchMode_ShouldLoadAvailableBranches` | `ProjectDetailViewModelTests` | Verfügbare Branches werden geladen, wenn Edit-Modus geöffnet wird |
+| `ProjectDetailVM_CancelSourceBranchEdit_ShouldDiscardChanges` | `ProjectDetailViewModelTests` | Abbruch verwirft Änderungen am Basis-Branch-Feld |
+
+#### E2E-Tests
+
+| Szenario | Testdatei / Testklasse | Abgedecktes Akzeptanzkriterium |
+|----------|------------------------|-------------------------------|
+| Repository-Zuordnung mit Basis-Branch-Auswahl | `E2E_RepositoryManagementTests` (neu) | Benutzer kann Basis-Branch im Zuordnungs-Dialog auswählen, wird persistent gespeichert |
+| Basis-Branch-Bearbeitung in Projektdetailansicht | `E2E_RepositoryManagementTests` (neu) | Benutzer kann Basis-Branch in Projektdetailansicht nachträglich ändern, wird persistent gespeichert |
+| Aufgabenstart mit Basis-Branch-Validierung (Happy Path) | `E2E_TaskStartupTests` (neu) | Aufgabe startet erfolgreich mit existierendem Basis-Branch, Feature-Branch vom richtigen Basis-Branch abgezweigt |
+| Aufgabenstart mit Basis-Branch-Validierung (Error Case) | `E2E_TaskStartupTests` (neu) | Aufgabenstart schlägt mit Fehlermeldung fehl, wenn Basis-Branch nicht existiert |
+| PR-Erstellung mit konfiguriertem Basis-Branch | `E2E_PullRequestTests` (neu oder erweitert) | PR wird mit korrektem Basis-Branch als Ziel-Branch erstellt (Verifikation via GitHub API) |
 
 ### Betroffene bestehende Tests
 
@@ -232,23 +350,18 @@ Keine.
 | `EntwicklungsprozessServiceTests` (alle) | Möglicherweise anpassen, wenn `SetupBranchAsync()`-Signatur sich ändert (neue optionale Parameter) |
 | `GitOrchestrationServiceTests` (alle) | Möglicherweise anpassen, wenn `PullRequestErstellenAsync()`-Signatur sich ändert |
 | `EntwicklungsprozessServiceTests_WorkingDirectoryValidation` (alle) | Überprüfen, ob Änderungen im Aufgabenstart-Flow diese Tests beeinflussen |
+| `ProjectDetailViewModelTests` (alle) | Überprüfen, ob neue Properties und Commands auf bestehende Tests auswirken |
+| `RepositoryAssignViewModelTests` (alle) | Überprüfen, ob neue Branch-Lade-Logik auf bestehende Tests auswirkt |
 
-### E2E-Tests (Pflicht)
+### Bestehende E2E-Tests, die überprüft werden müssen
 
-| Szenario | Testdatei / Testklasse | Abgedecktes Akzeptanzkriterium |
-|----------|------------------------|-------------------------------|
-| Repository-Zuordnung mit Basis-Branch-Auswahl | `E2E_RepositoryManagementTests` (neu anzulegen) | Benutzer kann Basis-Branch konfigurieren, wird persistent gespeichert |
-| Aufgabenstart mit Basis-Branch-Validierung (Happy Path) | `E2E_TaskStartupTests` (neu anzulegen) | Aufgabe startet erfolgreich mit existierendem Basis-Branch, Feature-Branch vom richtigen Basis-Branch abgezweigt |
-| Aufgabenstart mit Basis-Branch-Validierung (Error Case) | `E2E_TaskStartupTests` (neu anzulegen) | Aufgabenstart schlägt mit Fehlermeldung fehl, wenn Basis-Branch nicht existiert |
-| PR-Erstellung mit konfiguriertem Basis-Branch | `E2E_PullRequestTests` (neu anzulegen oder erweitern) | PR wird mit korrektem Basis-Branch als Ziel-Branch erstellt (Verifikation via GitHub API) |
-
-Welche bestehenden E2E-Tests müssen angepasst werden?
-
-| Test / Testklasse | Grund der Anpassung |
+| Test / Testklasse | Grund der Überprüfung |
 |-------------------|---------------------|
-| Existierende E2E-Tests für Aufgabenstart | Überprüfen, ob neue Validierungslogik Mock-GitRepository-Objekte mit `DefaultSourceBranchName = null` benötigt (sollte transparent sein, da Fallback auf Standard) |
+| Existierende E2E-Tests für Repository-Zuordnung | Überprüfen, ob Dialog-Größe/Layout durch neue Basis-Branch-Auswahl beeinträchtigt wird |
+| Existierende E2E-Tests für Aufgabenstart | Überprüfen, ob neue Validierungslogik auf Mock-GitRepository-Objekte auswirkt (sollte transparent sein mit `DefaultSourceBranchName = null` Fallback) |
+| Existierende E2E-Tests für Projektdetailansicht | Überprüfen, ob neue Basis-Branch-Anzeige/-Bearbeitung Layout-Tests beeinträchtigt |
 
-Keine bekannten Breaking Changes erwartet, da neue Properties optional sind.
+Keine bekannten Breaking Changes erwartet, da neue Properties optional sind (mit `null`-Fallback auf Standard-Branch).
 
 ## Offene Punkte
 

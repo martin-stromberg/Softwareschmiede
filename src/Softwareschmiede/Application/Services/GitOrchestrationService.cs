@@ -204,9 +204,10 @@ public sealed class GitOrchestrationService
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
 
         var prBody = await BuildPullRequestBodyAsync(aufgabe, body, ct);
+        var baseBranch = await ResolveDefaultSourceBranchNameAsync(aufgabe, ct);
 
         await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
-        var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, prTitle, prBody, ct);
+        var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, baseBranch, prTitle, prBody, ct);
 
         if (_pullRequestReferenzService is not null)
         {
@@ -364,6 +365,34 @@ public sealed class GitOrchestrationService
         }
 
         return null;
+    }
+
+    /// <summary>Ermittelt den konfigurierten Basis-Branch (<see cref="GitRepository.DefaultSourceBranchName"/>) aus der Aufgabe oder dem zugehörigen Projekt.</summary>
+    private async Task<string?> ResolveDefaultSourceBranchNameAsync(Aufgabe aufgabe, CancellationToken ct)
+    {
+        if (aufgabe.GitRepository is not null)
+        {
+            return aufgabe.GitRepository.DefaultSourceBranchName;
+        }
+
+        var projekt = await _projektService.GetDetailAsync(aufgabe.ProjektId, ct)
+            ?? throw new InvalidOperationException($"Projekt {aufgabe.ProjektId} nicht gefunden.");
+
+        var aktiveRepositories = projekt.Repositories
+            .Where(repository => repository.Aktiv)
+            .OrderBy(repository => repository.RepositoryName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(repository => repository.Id)
+            .ToList();
+
+        if (aktiveRepositories.Count > 1)
+        {
+            _logger.LogWarning(
+                "Aufgabe {AufgabeId}: Mehrdeutige Basis-Branch-Auflösung ({RepositoryCount} aktive Repositories). Es wird kein Basis-Branch aufgelöst.",
+                aufgabe.Id,
+                aktiveRepositories.Count);
+        }
+
+        return aktiveRepositories.Count == 1 ? aktiveRepositories[0].DefaultSourceBranchName : null;
     }
 
     /// <summary>Extrahiert die Repository-ID (owner/repo) aus einer Repository-URL.</summary>

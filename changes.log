@@ -1,3 +1,18 @@
+## 2026-08-03 — Unterstützung eines Staging-Branch / Basis-Branch-Konfiguration
+
+- Feature: Repositories können einen konfigurierbaren Basis-Branch speichern, von dem neue Feature-Branches für Aufgaben abgezweigt werden, statt automatisch vom Remote-Standard-Branch.
+- Datenmodell: Neue optionale Eigenschaft `GitRepository.DefaultSourceBranchName` speichert den konfigurierten Basis-Branch-Namen persistent in der Datenbank. `null` bedeutet Fallback auf Remote-Standard-Branch.
+- Validierung beim Aufgabenstart: `EntwicklungsprozessService.ProzessStartenAsync()` prüft vor dem Klon, ob der konfigurierte Basis-Branch im Remote-Repository existiert (via `IGitPlugin.GetRemoteBranchesAsync()`). Nicht-Existenz wirft `GitBranchNotFoundException` mit aussagekräftiger Fehlermeldung.
+- Feature-Branch-Erstellung: `EntwicklungsprozessService.SetupBranchAsync()` wird mit optionalem `baseBranchName`-Parameter aufgerufen; verzweigt den neuen Branch vom konfigurierten Basis-Branch statt vom HEAD.
+- PR-Ziel-Branch: `GitOrchestrationService.PullRequestErstellenAsync()` übergibt den konfigurierten Basis-Branch an `IGitPlugin.CreatePullRequestAsync()` als `baseBranch`-Parameter (Fallback auf Remote-Standard, wenn nicht konfiguriert).
+- Plugin-API-Erweiterung: `IGitPlugin.CreateBranchAsync()` erhält neuen optionalen Parameter `sourceBranchName`; `CreatePullRequestAsync()` erhält neuen optionalen Parameter `baseBranch`. Bestehende Plugin-Implementierungen bleiben funktional, die neuen Parameter sind optional.
+- UI-Integration: `RepositoryAssignViewModel` und `RepositoryAssignDialog.xaml` erweitert um Basis-Branch-Auswahl beim Repository-Zuweisen (ComboBox mit Autocomplete, Validierung beim Speichern).
+- UI-Bearbeitung: `ProjectDetailViewModel` und `ProjectDetailView.xaml` erweitert um Edit-Modus für nachträgliche Änderung des Basis-Branches mit `ProjektService.UpdateRepositorySourceBranchAsync()`.
+- Datenbankmigrationen: Neue Migration `AddDefaultSourceBranchNameToGitRepository` fügt Spalte zu `git_repository`-Tabelle hinzu (nullable Varchar).
+- Tests: Neue Unit-Tests für Validierungslogik (`EntwicklungsprozessServiceTests`), Feature-Branch-Erstellung (`SetupBranchAsync()`), PR-Erstellung (`GitOrchestrationServiceTests`). ViewModel-Tests für Branch-Auswahl und Validierung. E2E-Tests für Repository-Zuordnung mit Basis-Branch, Aufgabenstart mit Validierung, PR-Erstellung mit konfig uriertem Basis-Branch.
+- Dokumentation: Neue Dokumentationsdatei `docs/help/projekte/basis-branch-konfiguration.md` beschreibt Feature, technischen Ablauf, Anwendungs-Ablauf und Business Rules.
+- Rückwärtskompatibilität: Bestehende Repositories ohne `DefaultSourceBranchName` verwenden automatisch den Remote-Standard-Branch (Fallback via `IGitPlugin.GetDefaultBranchAsync()`). Keine Breaking Changes für bestehende Workflows.
+
 ## 2026-07-23 — Plugins-Einstellungen UI-Verbesserungen (Nachfolge-Bugfix)
 
 - UI-Korrektur: Kontrast-Fehler in den Plugin-Aktivierungslisten behoben — Plugin-Namen in der linken Spalte sind nun mit korrekter Textfarbe sichtbar. Themed Background und Foreground sowie Selektions-/Hover-Styling hinzugefügt.

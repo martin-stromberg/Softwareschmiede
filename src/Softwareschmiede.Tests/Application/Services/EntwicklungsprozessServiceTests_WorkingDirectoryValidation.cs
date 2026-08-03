@@ -40,7 +40,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
         _gitPluginMock.SetupGet(p => p.PluginPrefix).Returns("Mock.Git");
         _gitPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.SourceCodeManagement);
         _gitPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var pluginManagerMock = new Mock<IPluginManager>();
@@ -158,7 +158,7 @@ public sealed class EntwicklungsprozessServiceTests_WorkingDirectoryValidation :
 
             // Assert
             await act.Should().ThrowAsync<DirectoryNotFoundException>();
-            _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
+            _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never,
                 "die Validierung soll vor der Branch-Erstellung fehlschlagen, nicht erst beim späteren CLI-Start");
         }
         finally

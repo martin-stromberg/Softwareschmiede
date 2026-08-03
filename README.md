@@ -67,7 +67,8 @@ Die wichtigsten Features:
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
 - **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen, anschließend der Aufgabe zuordnen und optional die Aufgabenbeschreibung aktualisieren
 - **GitHub-Code-Scanning-Alerts als Anforderungen** – offene GitHub-Code-Scanning-Alerts erscheinen neben Issues in den offenen Anforderungen und können automatisch in eine Aufgabe mit neu angelegtem GitHub-Issue überführt werden
-- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung, persistenter PR-Referenz und GitHub-Actions-Status
+- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung, persistenter PR-Referenz und GitHub-Actions-Status; konfigurierbarer Basis-Branch pro Repository für Feature-Branch-Erstellung und PR-Ziele
+- **Basis-Branch-Konfiguration** – Repositories können einen konfigurierbaren Basis-Branch speichern, von dem neue Feature-Branches für Aufgaben abgezweigt werden; konfiguriert in Repository-Details, validiert beim Aufgabenstart, als Ziel-Branch für Pull Requests genutzt
 - **PR-Monitoring & automatischer GitHub-Abschluss** – neuer PR-Bereich in Aufgaben mit PR-, Merge-/Monitoring- und Workflow-Run-Status; optionaler automatischer Abschluss nach erfolgreichen Actions
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
@@ -643,6 +644,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 |----------|-------------|
 | [Anwendungsdokumentation (Index)](docs/help/index.md) | Einstiegspunkt zur fachlichen und technischen Dokumentation je Anwendungsbereich |
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
+| [Basis-Branch-Konfiguration](docs/help/projekte/basis-branch-konfiguration.md) | Konfiguration eines Basis-Branches pro Repository für Feature-Branch-Erstellung und Pull-Request-Ziele |
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |

@@ -169,11 +169,11 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     }
 
     /// <inheritdoc/>
-    public override async Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default)
+    public override async Task CreateBranchAsync(string localPath, string branchName, string? sourceBranchName = null, CancellationToken ct = default)
     {
         var workspacePath = ResolveWorkspacePath(localPath);
         await EnsureGitRepositoryAsync(workspacePath, ct);
-        await base.CreateBranchAsync(workspacePath, branchName, ct);
+        await base.CreateBranchAsync(workspacePath, branchName, sourceBranchName, ct);
     }
 
     /// <inheritdoc/>
@@ -208,7 +208,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     }
 
     /// <inheritdoc/>
-    public override Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default)
+    public override Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string? baseBranch, string title, string body, CancellationToken ct = default)
         => throw BuildNotSupported(nameof(CreatePullRequestAsync));
 
     /// <inheritdoc/>
