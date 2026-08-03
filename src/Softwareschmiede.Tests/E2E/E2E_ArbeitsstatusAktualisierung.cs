@@ -28,10 +28,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_ArbeitsstatusAktualisierung : WpfTestBase
+public partial class End2EndTest
 {
     private const string AufgabenTitel = "Neue Aufgabe";
 
@@ -42,12 +39,11 @@ public sealed class E2E_ArbeitsstatusAktualisierung : WpfTestBase
     /// "▶ Läuft" anzeigen. Wird der CLI-Prozess über den Stoppen-Button beendet, wechselt die Kachel
     /// automatisch auf "✓ Bereit".
     /// </summary>
-    [SkippableFact]
-    public void SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E()
+    protected void SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe("ArbeitsstatusAktualisierung-Repo", "ArbeitsstatusAktualisierung-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "ArbeitsstatusAktualisierung-Repo", "ArbeitsstatusAktualisierung-Projekt");
 
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
         var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
@@ -64,6 +60,8 @@ public sealed class E2E_ArbeitsstatusAktualisierung : WpfTestBase
         // Assert: Kachel wechselt automatisch zurück auf "✓ Bereit", nachdem der CLI-Prozess beendet wurde
         // (CliProcessManager entfernt AktiveRunId beim Gestoppt-Event).
         WaitForStatusHelpText(mainWindow, "✓ Bereit", Medium);
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>

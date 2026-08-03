@@ -13,10 +13,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_AutoStartCli : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Aufgabe wird gestartet (Status wechselt zu "Gestartet", CLI läuft). Über "Stoppen"
@@ -26,12 +23,11 @@ public sealed class E2E_AutoStartCli : WpfTestBase
     /// automatisch neu gestartet und eingebettet (Stoppen-Button erscheint wieder ohne manuellen Klick
     /// auf "Starten" oder "Plugin ändern").
     /// </summary>
-    [SkippableFact]
-    public void AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E()
+    protected void AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe("AutoStartCli-Repo", "AutoStartCli-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "AutoStartCli-Repo", "AutoStartCli-Projekt");
 
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
@@ -54,5 +50,7 @@ public sealed class E2E_AutoStartCli : WpfTestBase
 
         // Automatischer CLI-Neustart beim Laden: Stoppen-Button erscheint ohne manuellen Start-Klick
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 }

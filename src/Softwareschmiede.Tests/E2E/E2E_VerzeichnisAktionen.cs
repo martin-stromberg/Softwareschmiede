@@ -17,20 +17,16 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_VerzeichnisAktionen : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Repository klonen (Aufgabe starten), dann nacheinander „Arbeitsverzeichnis öffnen"
     /// und „IDE öffnen" über das Ribbon prüfen - zunächst ohne, dann mit einer und mit mehreren
     /// „*.sln"-Dateien im Arbeitsverzeichnis.
     /// </summary>
-    [SkippableFact]
-    public async Task VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E()
+    protected async Task VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E(Window mainWindow)
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("VerzeichnisAktionen-Repo", "VerzeichnisAktionen-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "VerzeichnisAktionen-Repo", "VerzeichnisAktionen-Projekt");
 
         // Das Ribbon kann bei sichtbarer CLI-Gruppe (Status Gestartet/Wartend) breiter als das Standard-
         // Fenster werden (Dateien- und Werkzeuge-Gruppe kommen neu hinzu). Ein Button einfacher WPF-Buttons
@@ -89,21 +85,9 @@ public sealed class E2E_VerzeichnisAktionen : WpfTestBase
         okButton.AsButton().Click();
 
         await WaitForProzessStartEintragAsync(zweiteSolution);
-    }
 
-    private async Task<string> GetLokalerKlonPfadAsync()
-    {
-        await using var db = OpenTestDbContext();
-        var aufgabe = db.Aufgaben.Single();
-        return aufgabe.LokalerKlonPfad
-            ?? throw new InvalidOperationException("LokalerKlonPfad wurde nach dem Starten der Aufgabe nicht gesetzt.");
-    }
-
-    private void ReloadTaskDetail(AutomationElement mainWindow)
-    {
-        AufgabeDetailZurueck(mainWindow);
-        var items = OffeneAufgabenItems(mainWindow);
-        ErsteOffeneAufgabeOeffnen(items);
-        WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        mainWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
+        NavigateBackFromProjectCardToProjectsList(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 }

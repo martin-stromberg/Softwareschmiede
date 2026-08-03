@@ -28,21 +28,17 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_PluginAktivierung : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Führt Validierung (letztes SCM-Plugin), Persistenz des KI-Aktivierungsstatus und das
     /// Single-Plugin-Verhalten beim Aufgabenstart als drei Phasen derselben Aufgabe aus.
     /// </summary>
-    [SkippableFact]
-    public void PluginAktivierung_ValidierungPersistenzUndSinglePluginVerhalten_E2E()
+    protected void PluginAktivierung_ValidierungPersistenzUndSinglePluginVerhalten_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe("PluginAktivierung-Repo", "PluginAktivierung-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "PluginAktivierung-Repo", "PluginAktivierung-Projekt");
 
         // SetupProjectMitNeuerAufgabe legt die Aufgabe an und öffnet sie direkt im Edit-Panel der
         // TaskDetailView. Für die folgenden Phasen wird zur ProjectDetailView zurückgekehrt, damit
@@ -51,6 +47,8 @@ public sealed class E2E_PluginAktivierung : WpfTestBase
 
         DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(mainWindow);
         DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(mainWindow);
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>
@@ -96,6 +94,7 @@ public sealed class E2E_PluginAktivierung : WpfTestBase
     {
         DeaktivierePlugin(mainWindow, "Softwareschmiede.ClaudeCli");
         DeaktivierePlugin(mainWindow, "Softwareschmiede.Codex");
+        DeaktivierePlugin(mainWindow, "Softwareschmiede.Devin");
         DeaktivierePlugin(mainWindow, "Softwareschmiede.GitHubCopilot");
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
@@ -148,5 +147,13 @@ public sealed class E2E_PluginAktivierung : WpfTestBase
         eintrag.Click();
         var checkbox = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
         checkbox.AsCheckBox().IsChecked = false;
+    }
+
+    private static void AktivierePlugin(AutomationElement mainWindow, string pluginPrefix)
+    {
+        var eintrag = WaitForElement(mainWindow, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short);
+        eintrag.Click();
+        var checkbox = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
+        checkbox.AsCheckBox().IsChecked = true;
     }
 }

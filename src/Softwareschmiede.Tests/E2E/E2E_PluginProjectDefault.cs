@@ -19,27 +19,25 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_PluginProjectDefault : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Führt beide Phasen im selben Projekt aus: Erste Aufgabe speichert den Projekt-Standard über
     /// die Checkbox; zweite, neu angelegte Aufgabe desselben Projekts übernimmt ihn automatisch.
     /// </summary>
-    [SkippableFact]
-    public void PluginProjectDefault_SpeichernUndAutomatischeUebernahmeInFolgeaufgabe_E2E()
+    protected void PluginProjectDefault_SpeichernUndAutomatischeUebernahmeInFolgeaufgabe_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe(
+        SetupProjectMitNeuerAufgabe(mainWindow, 
             "PluginProjectDefault-Repo",
             "PluginProjectDefault-Projekt",
             useInSourceDirectoryMode: false);
 
         PluginDialogMitProjektCheckbox_SpeichertProjektStandardUndStartetCli_E2E(mainWindow);
         ZweiteAufgabeImProjekt_UebernimmtGespeichertenProjektStandardOhneDialog_E2E(mainWindow);
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>

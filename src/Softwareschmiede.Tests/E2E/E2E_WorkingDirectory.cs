@@ -37,10 +37,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_WorkingDirectory : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Führt fünf Arbeitsverzeichnis-Szenarien nacheinander in einem gemeinsamen App-Lifecycle aus:
@@ -50,11 +47,8 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
     /// Jede Phase räumt ihr Projekt bzw. ihre Aufgabe auf, bevor die nächste beginnt (siehe
     /// <see cref="DeleteCurrentProject"/>, <see cref="DeleteCurrentTask"/>).
     /// </summary>
-    [Fact]
-    public async Task RepositoryZuweisung()
+    protected async Task RepositoryZuweisung(Window mainWindow)
     {
-        var mainWindow = LaunchAppAndGetMainWindow();
-
         await RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E(mainWindow);
         await RepositoryZuweisen_MitErfolgreichemStrukturabruf_ZeigtUndSpeichertArbeitsverzeichnis_E2E(mainWindow);
         
@@ -174,10 +168,9 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
     /// Szenario: Repository mit konfiguriertem Arbeitsunterverzeichnis wird gestartet.
     /// Erwartung: CLI startet erfolgreich (Stoppen-Button erscheint), kein Fehlerbanner.
     /// </summary>
-    [SkippableFact]
-    public async Task AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E()
+    protected async Task AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E(Window mainWindow)
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("WorkingDir-Repo", "WorkingDir-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "WorkingDir-Repo", "WorkingDir-Projekt");
 
         await SeedWorkingDirectoryAsync("backend", createSubdirectory: true);
 
@@ -189,6 +182,10 @@ public sealed class E2E_WorkingDirectory : WpfTestBase
 
         var fehlerMeldung = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
         Assert.Null(fehlerMeldung);
+
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>

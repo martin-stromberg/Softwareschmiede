@@ -20,24 +20,22 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_PluginAuswahlUndWechsel : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Führt die Plugin-Auswahl (Abbrechen, dann OK) und den anschließenden Plugin-Wechsel bei
     /// laufender CLI als zwei Phasen an derselben Aufgabe aus.
     /// </summary>
-    [SkippableFact]
-    public void PluginAuswahlAbbrechenOkUndWechsel_E2E()
+    protected void PluginAuswahlAbbrechenOkUndWechsel_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe("PluginDialog-Repo", "PluginDialog-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "PluginDialog-Repo", "PluginDialog-Projekt");
 
         PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(mainWindow);
         PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(mainWindow);
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>
