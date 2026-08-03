@@ -17,10 +17,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_FileExplorer : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Repository klonen (Aufgabe starten), dann auf das "Dateien"-Register wechseln.
@@ -40,10 +37,14 @@ public sealed class E2E_FileExplorer : WpfTestBase
     /// Regressionstest für Issue #157 Nacharbeit: die Ribbon-Gruppen waren an ShowCliPanel/
     /// ShowFileExplorerPanel statt an IsCliViewSelected/IsFileExplorerViewSelected gebunden.
     /// </summary>
-    [SkippableFact]
-    public void DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E()
+    protected void DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E(Window mainWindow)
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("FileExplorer-Repo", "FileExplorer-Projekt");
+        NavigateToSettings(mainWindow);
+        OpenPluginsTab(mainWindow);
+        AktivierePlugin(mainWindow, "Softwareschmiede.GitHubCopilot");
+
+
+        SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-Repo", "FileExplorer-Projekt");
 
         // git init im Quellverzeichnis vorab bestätigen, damit "Starten" im ersten Versuch gelingt.
         ConfirmLocalDirectoryGitInitInSourceDirectory();
@@ -94,6 +95,8 @@ public sealed class E2E_FileExplorer : WpfTestBase
         // Zurück in der CLI-Ansicht: Ribbon-Gruppe "CLI" erscheint wieder, "Dateien" bleibt verborgen.
         WaitForElement(mainWindow, cf => cf.ByName("PluginAendern"), Short);
         WaitUntilGone(mainWindow, cf => cf.ByName("DateiStandard"), Short);
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>
@@ -104,10 +107,9 @@ public sealed class E2E_FileExplorer : WpfTestBase
     /// des Verzeichnisknotens auf der Grenztiefe ("Ebene2") löst LadeKinderAsync/LoadSubtreeAsync aus und
     /// lässt "Deep.cs" im Baum erscheinen.
     /// </summary>
-    [SkippableFact]
-    public async Task DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E()
+    protected async Task DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E(Window mainWindow)
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("FileExplorer-LazyLoad-Repo", "FileExplorer-LazyLoad-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-LazyLoad-Repo", "FileExplorer-LazyLoad-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
@@ -140,6 +142,9 @@ public sealed class E2E_FileExplorer : WpfTestBase
         ebene2.Patterns.ExpandCollapse.Pattern.Expand();
 
         WaitForElement(mainWindow, cf => cf.ByName("Deep.cs"), Short);
+
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>
@@ -153,10 +158,9 @@ public sealed class E2E_FileExplorer : WpfTestBase
     /// Aufklappen "Deep2.cs" (statt weiterhin nur der veraltete Stand "Deep.cs"), bestätigt das einen echten
     /// Neu-Ladevorgang und damit, dass die Bereinigung ChildrenLoaded zurückgesetzt hat.
     /// </summary>
-    [SkippableFact]
-    public async Task DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E()
+    protected async Task DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E(Window mainWindow)
     {
-        var mainWindow = SetupProjectMitNeuerAufgabe("FileExplorer-LazyLoad-Collapse-Repo", "FileExplorer-LazyLoad-Collapse-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-LazyLoad-Collapse-Repo", "FileExplorer-LazyLoad-Collapse-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
@@ -205,6 +209,9 @@ public sealed class E2E_FileExplorer : WpfTestBase
         WaitForElement(mainWindow, cf => cf.ByName("Deep2.cs"), Short);
         var veralteterKnoten = mainWindow.FindFirstDescendant(cf => cf.ByName("Deep.cs"));
         veralteterKnoten.Should().BeNull("die Zuklapp-Bereinigung muss den zwischengespeicherten Stand verwerfen, statt ihn beim erneuten Aufklappen weiterzuverwenden");
+
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     private async Task<string> GetLokalerKlonPfadAsync()

@@ -27,10 +27,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
+public partial class End2EndTest
 {
     private const string TitelA = "Aufgabe-A-Wechseltest";
     private const string TitelB = "Aufgabe-B-Wechseltest";
@@ -41,14 +38,11 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
     /// Prüft: Danach wird tatsächlich Aufgabe B angezeigt — inklusive der zu Aufgabe B gehörenden CLI
     /// (eigene Prozess-ID), nicht mehr die CLI von Aufgabe A.
     /// </summary>
-    [SkippableFact]
-    public void AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E()
+    protected void AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var sourceDirectory = CreateLocalSourceDirectory("Wechsel-Repo");
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
         ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory, useInSourceDirectoryMode: false);
 
         NavigateToProjects(mainWindow);
@@ -104,6 +98,11 @@ public sealed class E2E_TaskWechselUeberMenue : WpfTestBase
         infoToggle = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Medium);
         infoToggle.Click();
         WaitForElement(mainWindow, cf => cf.ByName(TitelA), Short);
+
+        NavigateBackFromTaskToProject(mainWindow);
+        NavigateToProjects(mainWindow);
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>Legt eine neue Aufgabe im aktuell geöffneten Projekt an, benennt sie um, öffnet sie erneut und startet die CLI mit dem KI-Simulator-Plugin.</summary>

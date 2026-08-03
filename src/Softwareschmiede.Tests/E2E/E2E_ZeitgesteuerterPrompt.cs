@@ -12,23 +12,19 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_ZeitgesteuerterPrompt : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Nutzer startet die CLI, trägt eine in der Zukunft liegende Zielzeit ein, wählt eine
     /// Promptvorlage und klickt "Zeitgesteuert senden". Die Statusanzeige "Prompt in Wartestellung"
     /// muss erscheinen, ohne dass ein Fehlerbanner sichtbar wird.
     /// </summary>
-    [SkippableFact]
-    public void ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E()
+    protected void ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(Window mainWindow)
     {
         SkipWennConPtyNichtVerfuegbar();
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe("ZeitgesteuertPrompt-Repo", "ZeitgesteuertPrompt-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "ZeitgesteuertPrompt-Repo", "ZeitgesteuertPrompt-Projekt");
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
@@ -69,5 +65,9 @@ public sealed class E2E_ZeitgesteuerterPrompt : WpfTestBase
 
         var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
         Assert.Null(fehlerBanner);
+
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 }

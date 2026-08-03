@@ -1,3 +1,5 @@
+using FlaUI.Core.AutomationElements;
+
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
@@ -9,10 +11,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Neue Aufgabe erstellen, Titel ausfüllen, speichern (Phase Speichern); anschließend
@@ -22,11 +21,10 @@ public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
     /// Titeländerung wird nicht persistiert, die zuvor angelegte Aufgabe (Status "Neu") bleibt jedoch
     /// weiterhin in der Liste vorhanden.
     /// </summary>
-    [Fact]
-    public void AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E()
+    protected void AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(Window mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects("NeueAufgabe-Test");
-
+        NavigateToProjectsAndCreateProject(mainWindow, "NeueAufgabe-Test");
+        
         // Phase Speichern
         NeueAufgabeAnlegen(mainWindow);
         AufgabeTitelSetzen(mainWindow, "Persistierte Neue Aufgabe");
@@ -50,5 +48,6 @@ public sealed class E2E_CreateNewTaskNavigation : WpfTestBase
         // Die Aufgabenliste enthält beide zuvor angelegten Aufgaben (Status "Neu")
         var items = OffeneAufgabenItems(mainWindow);
         Assert.True(items.Length >= 2, "Aufgabenliste sollte beide angelegten Aufgaben weiterhin enthalten.");
+        DeleteCurrentProject(mainWindow);
     }
 }

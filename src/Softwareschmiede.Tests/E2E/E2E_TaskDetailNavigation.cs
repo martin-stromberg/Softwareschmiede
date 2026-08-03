@@ -11,10 +11,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_TaskDetailNavigation : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Neue Aufgabe anlegen (korrekte Daten prüfen), über "Zurück" zur ProjectDetailView
@@ -23,10 +20,10 @@ public sealed class E2E_TaskDetailNavigation : WpfTestBase
     /// ProjectDetailView zurück; das Öffnen aus der Liste zeigt die TaskDetailView fensterumfassend
     /// (ProjectDetailView nicht mehr sichtbar).
     /// </summary>
-    [Fact]
-    public void TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E()
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    protected void TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(Window mainWindow)
     {
-        var mainWindow = StartAndNavigateToProjects("TaskNav-Test");
+        NavigateToProjectsAndCreateProject(mainWindow, "TaskNav-Test");
 
         // Korrekte Daten
         var editTitelBox = NeueAufgabeAnlegen(mainWindow);

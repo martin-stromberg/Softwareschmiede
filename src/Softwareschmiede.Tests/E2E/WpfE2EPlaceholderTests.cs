@@ -10,10 +10,9 @@ namespace Softwareschmiede.Tests.E2E;
 /// - Windows-Desktop-Session (kein Headless-CI)
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein (dotnet build src/Softwareschmiede.App)
 ///
-/// Konsolidierung (Issue #153): Die ursprünglich acht Einzeltests laufen als Phasen in zwei
-/// gemeinsamen App-Lifecycles - ein Projekt-/Aufgaben-Flow und ein Einstellungen-Flow -, da alle
-/// Tests dieser Klasse denselben einfachen Interaktionsmustern folgen und keine sich gegenseitig
-/// ausschließenden Vorbedingungen haben.
+/// Konsolidierung (Issue #153): Die ursprünglich acht Einzeltests laufen als Phasen in einem
+/// gemeinsamen App-Lifecycle, da alle Tests dieser Klasse denselben einfachen Interaktionsmustern
+/// folgen und keine sich gegenseitig ausschließenden Vorbedingungen haben.
 ///
 /// Ausführung (lokal): dotnet test --filter Category=E2E
 /// CI-Regular-Lauf:    dotnet test --filter "Category!=OsInterface"
@@ -24,16 +23,27 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class WpfE2ETests : WpfTestBase
 {
     /// <summary>
+    /// Führt die einfachen WPF-E2E-Szenarien für Projekt/Aufgabe und Einstellungen in einem App-Lifecycle aus.
+    /// </summary>
+    [Fact]
+    public void WpfBasisSzenarien()
+    {
+        SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");
+
+        var app = LaunchApp();
+        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
+
+        Projekt_ErstellenUndAufgabeAnlegen_ZeigtListeUndStartenButton_E2E(mainWindow);
+        Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E(mainWindow);
+    }
+
+    /// <summary>
     /// Szenario: Projekt anlegen und öffnen (Aufgabenliste sichtbar); neue Aufgabe anlegen (Liste
     /// weiterhin sichtbar, kein Status "Gestartet"); "Starten"-Button sichtbar, Hauptfenster besitzt
     /// ein gültiges Handle.
     /// </summary>
-    [Fact]
-    public void Projekt_ErstellenUndAufgabeAnlegen_ZeigtListeUndStartenButton_E2E()
+    private void Projekt_ErstellenUndAufgabeAnlegen_ZeigtListeUndStartenButton_E2E(Window mainWindow)
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
-
         NavigateToProjects(mainWindow);
         CreateAndOpenProject(mainWindow, "E2E-Startprojekt");
 
@@ -52,6 +62,10 @@ public sealed class WpfE2ETests : WpfTestBase
 
         var windowHandle = mainWindow.FrameworkAutomationElement.NativeWindowHandle;
         Assert.NotEqual(IntPtr.Zero, windowHandle);
+
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
+        NavigateBackToDashboard(mainWindow);
     }
 
     /// <summary>
@@ -59,14 +73,8 @@ public sealed class WpfE2ETests : WpfTestBase
     /// Dark Mode umschalten, speichern und nach Rückkehr Persistenz prüfen; Arbeitsverzeichnis ändern
     /// und speichern; mehrfache Navigation zwischen Dashboard und Einstellungen bleibt stabil.
     /// </summary>
-    [Fact]
-    public void Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E()
+    private void Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E(Window mainWindow)
     {
-        SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");
-
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
-
         // Sauberer Start: kein Recovery-Banner
         WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(10));
 

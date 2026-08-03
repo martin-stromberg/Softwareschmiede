@@ -8,29 +8,45 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_TaskExecutionCommandLineParameters : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Speichert CommandLineParameters für das Codex-Plugin im Credential Store, startet dann eine
     /// Aufgabe mit dem KI Simulator und prüft, dass die Aufgabe trotzdem korrekt startet.
     /// </summary>
-    [SkippableFact]
-    public void AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E()
+    protected void AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E(FlaUI.Core.AutomationElements.Window mainWindow)
     {
-        new WindowsCredentialStore().SetCredential(
-            "Softwareschmiede.Codex.CommandLineParameters", "--test-regression-flag");
-        ConfirmLocalDirectoryGitInitInSourceDirectory();
+        var credentialStore = new WindowsCredentialStore();
+        var backup = credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters");
+        try
+        {
+            credentialStore.SetCredential(
+                "Softwareschmiede.Codex.CommandLineParameters", "--test-regression-flag");
+            ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe(
-            "CmdParamsRegressionRepo",
-            "CmdParams-Regressions-Projekt");
+            SetupProjectMitNeuerAufgabe(
+                mainWindow,
+                "CmdParamsRegressionRepo",
+                "CmdParams-Regressions-Projekt");
 
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+            StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        Assert.NotNull(stoppenButton);
+            var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+            Assert.NotNull(stoppenButton);
+            NavigateBackFromTaskToProject(mainWindow);
+            DeleteCurrentProject(mainWindow);
+        }
+        finally
+        {
+            if (string.IsNullOrWhiteSpace(backup))
+            {
+                credentialStore.DeleteCredential("Softwareschmiede.Codex.CommandLineParameters");
+            }
+            else
+            {
+                credentialStore.SetCredential(
+                    "Softwareschmiede.Codex.CommandLineParameters", backup);
+            }
+        }
     }
 }

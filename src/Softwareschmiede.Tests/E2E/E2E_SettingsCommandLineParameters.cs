@@ -11,10 +11,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Öffnet die KI-Einstellungen für Codex CLI und prüft, dass das CommandLineParameters-
@@ -22,11 +19,8 @@ public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
     /// Einstellungen erhalten geblieben ist; klickt anschließend den Hilfe-Button (?) und prüft, dass
     /// ein Dialog mit einem "Schließen"-Button erscheint, der den Dialog schließt.
     /// </summary>
-    [Fact]
-    public void CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E()
+    protected void CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(Window mainWindow)
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
         var expectedValue = $"--test-{Guid.NewGuid():N}";
 
         OpenKiSettingsWithCodexCli(mainWindow);
@@ -35,7 +29,7 @@ public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
 
         // Wert setzen, speichern, Seite verlassen und erneut betreten - Wert bleibt erhalten
         commandLineParametersBox.AsTextBox().Text = expectedValue;
-        SaveSettings(mainWindow);
+        SaveSettings((AutomationElement)mainWindow);
 
         var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
         dashboardButton.AsButton().Click();
@@ -79,12 +73,5 @@ public sealed class E2E_SettingsCommandLineParameters : WpfTestBase
                 return;
             Thread.Sleep(200);
         }
-    }
-
-    private static void SaveSettings(AutomationElement mainWindow)
-    {
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
     }
 }

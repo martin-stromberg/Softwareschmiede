@@ -14,10 +14,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_AufgabeStarten : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Aufgabe im Status "Neu" mit "Starten" auf "Gestartet" wechseln.
@@ -26,12 +23,11 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
     /// Nach Korrektur der Einstellung gelingt der zweite Versuch: Repository wird geklont,
     /// Status wechselt auf "Gestartet" und die CLI wird gestartet (CLI-Panel mit Stoppen-Button sichtbar).
     /// </summary>
-    [SkippableFact]
-    public void AufgabeStarten_KlontRepositoryUndStartetCli_E2E()
+    protected void AufgabeStarten_KlontRepositoryUndStartetCli_E2E(Window mainWindow)
     {
         new WindowsCredentialStore().DeleteCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory");
 
-        var mainWindow = SetupProjectMitNeuerAufgabe(
+        SetupProjectMitNeuerAufgabe(mainWindow,
             "AufgabeStarten-Repo",
             "AufgabeStarten-Projekt",
             initializeSourceGitRepository: false);
@@ -60,5 +56,8 @@ public sealed class E2E_AufgabeStarten : WpfTestBase
         // Kein Fehler mehr angezeigt (Border ist Collapsed → TextBlock nicht im UIA-Baum)
         var fehlerMeldungNachStart = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
         Assert.Null(fehlerMeldungNachStart);
+
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 }

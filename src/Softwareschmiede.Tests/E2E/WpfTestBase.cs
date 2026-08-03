@@ -349,6 +349,15 @@ public abstract class WpfTestBase : IDisposable
         var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
         button.AsButton().Click();
     }
+    /// <summary>
+    /// Navigiert von einer geöffneten Aufgabendetailansicht zurück zur Projektdetailansicht.
+    /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster mit geöffneter Aufgabe.</param>
+    protected void NavigateBackFromTaskToProject(Window mainWindow)
+    {
+        var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        button.AsButton().Click();
+    }
 
     /// <summary>
     /// Navigiert vom Dashboard zurück zur Projektliste. Wird benötigt, wenn ein Test nach dem Öffnen des Dashboards wieder zur Projektliste zurückkehren muss. 
@@ -451,6 +460,19 @@ public abstract class WpfTestBase : IDisposable
 
         if (projektName is not null)
             CreateAndOpenProject(mainWindow, projektName);
+
+        return mainWindow;
+    }
+    /// <summary>
+    /// Navigiert in einer bereits gestarteten Anwendung zur Projektliste, erstellt ein Projekt und öffnet es.
+    /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    /// <param name="projectName">Der Name des Projekts, das erstellt und geöffnet werden soll.</param>
+    /// <returns>Das Hauptfenster der Anwendung mit geöffneter Projektdetailansicht.</returns>
+    protected AutomationElement NavigateToProjectsAndCreateProject(Window mainWindow, string projectName)
+    {
+        NavigateToProjects(mainWindow);
+        CreateAndOpenProject(mainWindow, projectName);
 
         return mainWindow;
     }
@@ -624,13 +646,12 @@ public abstract class WpfTestBase : IDisposable
     /// bereit zum Starten ist.
     /// </summary>
     protected AutomationElement SetupProjectMitNeuerAufgabe(
+        Window mainWindow,
         string repositoryFolderName,
         string projektName,
         bool useInSourceDirectoryMode = true,
         bool initializeSourceGitRepository = true)
     {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
         return SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, repositoryFolderName, projektName, useInSourceDirectoryMode, initializeSourceGitRepository);
     }
     /// <summary>

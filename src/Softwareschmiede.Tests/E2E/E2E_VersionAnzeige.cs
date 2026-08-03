@@ -9,24 +9,16 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_VersionAnzeige : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: App starten mit aufgeklappter Seitenleiste (Standardzustand).
     /// Prüft: Der Versions-TextBlock (AutomationId "AppVersionText") in der Fußzeile der Seitenleiste
     /// zeigt einen nicht-leeren Versionstext an.
     /// </summary>
-    [Fact]
-    public void AppStarten_ZeigtVersionsTextInFusszeile_E2E()
-    {
-        var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-
+    protected void AppStarten_ZeigtVersionsTextInFusszeile_E2E(FlaUI.Core.AutomationElements.Window mainWindow)
+    {        
         var versionText = WaitForElement(mainWindow, cf => cf.ByAutomationId("AppVersionText"), Short);
-
         Assert.False(string.IsNullOrWhiteSpace(versionText.Name));
     }
 }

@@ -19,28 +19,27 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
-[Trait("Category", "E2E")]
-[OsInterface]
-[Collection("E2E")]
-public sealed class E2E_ConPtyLifecycle : WpfTestBase
+public partial class End2EndTest
 {
     /// <summary>
     /// Führt vier ConPTY-Szenarien nacheinander an derselben laufenden Session aus: Start (Stoppen-Button
     /// erscheint), Fenster-Resize (Session bleibt aktiv), Tastatureingabe (wird ohne Fehler entgegengenommen),
     /// Prozessende über den Stoppen-Button (Session endet, Status bleibt "Gestartet").
     /// </summary>
-    [SkippableFact]
-    public void ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E()
+    protected void ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        var mainWindow = SetupProjectMitNeuerAufgabe("ConPty-Repo", "ConPty-Projekt");
+        SetupProjectMitNeuerAufgabe(mainWindow, "ConPty-Repo", "ConPty-Projekt");
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
         ConPtyStart_ZeigtTerminalPanelMitStoppenButton_E2E(mainWindow);
         ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(mainWindow);
         ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E(mainWindow);
         ConPtyProcessEnd_NachStoppen_IsCliRunningFalse_E2E(mainWindow);
+
+        NavigateBackFromTaskToProject(mainWindow);
+        DeleteCurrentProject(mainWindow);
     }
 
     /// <summary>
