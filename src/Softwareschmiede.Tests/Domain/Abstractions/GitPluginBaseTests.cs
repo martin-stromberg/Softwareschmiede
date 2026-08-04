@@ -67,7 +67,7 @@ public sealed class GitPluginBaseTests
             .ThrowsAsync(new OperationCanceledException(cts.Token));
         var sut = new TestGitPlugin(cli.Object);
 
-        var act = () => sut.CreateBranchAsync("/repo", "feature/x", cts.Token);
+        var act = () => sut.CreateBranchAsync("/repo", "feature/x", ct: cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         cli.VerifyAll();
@@ -272,7 +272,7 @@ public sealed class GitPluginBaseTests
         /// <summary>PullAsync.</summary>
         public override Task PullAsync(string localPath, CancellationToken ct = default) => Task.CompletedTask;
         /// <summary>Task.</summary>
-        public override Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default) => Task.FromResult(new PullRequest(1, "t", "u", "b"));
+        public override Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string? baseBranch, string title, string body, CancellationToken ct = default) => Task.FromResult(new PullRequest(1, "t", "u", "b"));
         /// <summary>Task.</summary>
         public override Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public override Task<IEnumerable<string>> GetRemoteBranchesAsync(string repositoryUrl, CancellationToken ct = default) => Task.FromResult<IEnumerable<string>>([]);

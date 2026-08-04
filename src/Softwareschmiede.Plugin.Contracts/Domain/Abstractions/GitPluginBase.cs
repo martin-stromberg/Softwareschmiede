@@ -37,7 +37,7 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
     public abstract Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default);
     public abstract Task PushBranchAsync(string localPath, string branchName, CancellationToken ct = default);
     public abstract Task PullAsync(string localPath, CancellationToken ct = default);
-    public abstract Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string title, string body, CancellationToken ct = default);
+    public abstract Task<PullRequest> CreatePullRequestAsync(string repositoryId, string branchName, string? baseBranch, string title, string body, CancellationToken ct = default);
     public virtual Task<PullRequestStatusInfo> GetPullRequestStatusAsync(string repositoryId, int pullRequestNumber, CancellationToken ct = default)
         => throw new NotSupportedException($"'{nameof(GetPullRequestStatusAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 
@@ -107,9 +107,13 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
         => Task.FromResult(localPath);
 
     /// <inheritdoc/>
-    public virtual async Task CreateBranchAsync(string localPath, string branchName, CancellationToken ct = default)
+    public virtual async Task CreateBranchAsync(string localPath, string branchName, string? sourceBranchName = null, CancellationToken ct = default)
     {
-        var result = await RunGitAsync(["checkout", "-b", branchName], localPath, ct);
+        var args = string.IsNullOrEmpty(sourceBranchName)
+            ? new List<string> { "checkout", "-b", branchName }
+            : new List<string> { "checkout", "-b", branchName, $"origin/{sourceBranchName}" };
+
+        var result = await RunGitAsync(args, localPath, ct);
         if (!result.IsSuccess)
         {
             throw new InvalidOperationException($"git checkout -b fehlgeschlagen: {result.StdErr}");

@@ -95,7 +95,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                     File.WriteAllText(Path.Combine(path, ".gitignore"), gitignoreContent);
                 return Task.CompletedTask;
             });
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         return uniqueBase;
     }
@@ -104,7 +104,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     {
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
     }
 
@@ -129,7 +129,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
 
         // Assert
         _gitPluginMock.Verify(g => g.CloneRepositoryAsync("https://github.com/test/repo", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
-        _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.Is<string>(b => b.Contains("login-feature")), It.IsAny<CancellationToken>()), Times.Once);
+        _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.Is<string>(b => b.Contains("login-feature")), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
 
         var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         updatedAufgabe!.Status.Should().Be(AufgabeStatus.Gestartet);
@@ -369,7 +369,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Startskript robust starten", null, repository.Id);
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var cliRunnerMock = new Mock<ICliRunner>();
@@ -420,6 +420,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreateBranchAsync(
             It.IsAny<string>(),
             It.Is<string>(branch => branch.StartsWith($"task/issue-321-{aufgabe.Id:N}") && branch.Contains("-issue-branch")),
+            It.IsAny<string?>(),
             It.IsAny<CancellationToken>()), Times.Once);
 
         var updatedAufgabe = await _aufgabeService.GetDetailAsync(aufgabe.Id);
@@ -561,6 +562,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Setup(g => g.CreatePullRequestAsync(
                 "test/repo",
                 "feature/legacy-pr",
+                null,
                 "Legacy Titel",
                 expectedBody,
                 It.IsAny<CancellationToken>()))
@@ -575,6 +577,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
             "test/repo",
             "feature/legacy-pr",
+            null,
             "Legacy Titel",
             expectedBody,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -648,7 +651,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             It.IsAny<string>(),
             "feature/existing-branch",
             It.IsAny<CancellationToken>()), Times.Once);
-        _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
 
         var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         updatedAufgabe!.BranchName.Should().Be("feature/existing-branch");
@@ -664,7 +667,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             .Returns(Task.CompletedTask);
         _gitPluginMock.Setup(g => g.GetDefaultBranchAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("main");
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -676,6 +679,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         _gitPluginMock.Verify(g => g.CreateBranchAsync(
             It.IsAny<string>(),
             It.Is<string>(branch => branch.StartsWith("task/", StringComparison.Ordinal)),
+            It.IsAny<string?>(),
             It.IsAny<CancellationToken>()), Times.Once);
 
         var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
@@ -833,7 +837,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 File.SetAttributes(issueFilePath, FileAttributes.ReadOnly);
                 return Task.CompletedTask;
             });
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var clonePath = Path.Combine(Path.GetTempPath(), "softwareschmiede", aufgabe.Id.ToString());
@@ -1007,7 +1011,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 File.SetAttributes(gitignorePath, FileAttributes.ReadOnly);
                 return Task.CompletedTask;
             });
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -1064,7 +1068,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 File.SetAttributes(gitignorePath, FileAttributes.ReadOnly);
                 return Task.CompletedTask;
             });
-        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act

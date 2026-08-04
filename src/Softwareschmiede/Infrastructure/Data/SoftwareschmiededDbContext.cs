@@ -97,6 +97,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<GitRepository>(e =>
         {
             e.HasKey(r => r.Id);
+            e.Property(r => r.DefaultSourceBranchName)
+                .HasMaxLength(255);
             e.HasOne(r => r.StartKonfiguration)
                 .WithOne(c => c.GitRepository)
                 .HasForeignKey<RepositoryStartKonfiguration>(c => c.GitRepositoryId)

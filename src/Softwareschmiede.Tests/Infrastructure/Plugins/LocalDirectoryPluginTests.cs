@@ -999,7 +999,7 @@ public sealed class LocalDirectoryPluginTests
             new Mock<ICredentialStore>().Object,
             NullLogger<LocalDirectoryPlugin>.Instance);
 
-        await Assert.ThrowsAsync<NotSupportedException>(() => sut.CreatePullRequestAsync("repo", "branch", "title", "body"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => sut.CreatePullRequestAsync("repo", "branch", null, title: "title", body: "body"));
         await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetRemoteBranchesAsync("repo"));
         await Assert.ThrowsAsync<NotSupportedException>(() => sut.GetDefaultBranchAsync("repo"));
         await Assert.ThrowsAsync<NotSupportedException>(() => sut.CheckoutRemoteBranchAsync("/repo", "feature/a"));

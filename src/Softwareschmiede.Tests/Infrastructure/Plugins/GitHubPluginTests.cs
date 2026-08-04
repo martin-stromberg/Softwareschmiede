@@ -634,7 +634,7 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(0, prUrl, string.Empty));
 
         // Act
-        var result = await _sut.CreatePullRequestAsync("owner/repo", "feature/branch", "My PR", "Body");
+        var result = await _sut.CreatePullRequestAsync("owner/repo", "feature/branch", null, title: "My PR", body: "Body");
 
         // Assert
         result.Nummer.Should().Be(42);
@@ -659,7 +659,7 @@ public sealed class GitHubPluginTests
             .ReturnsAsync(new CliResult(1, string.Empty, ghError));
 
         // Act
-        var act = () => _sut.CreatePullRequestAsync("owner/repo", "feature/branch", "My PR", "Body");
+        var act = () => _sut.CreatePullRequestAsync("owner/repo", "feature/branch", null, title: "My PR", body: "Body");
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()

@@ -607,6 +607,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     public override async Task<PullRequest> CreatePullRequestAsync(
         string repositoryId,
         string branchName,
+        string? baseBranch,
         string title,
         string body,
         CancellationToken ct = default)
@@ -625,15 +626,23 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             apiUrl = $"{GetBitbucketApiBaseUrl()}/2.0/repositories/{repositoryId}/pullrequests";
         }
 
-        var repositoryUrl = BuildRepositoryCloneUrl(repositoryId, hostingMode);
-        var defaultBranch = await GetDefaultBranchAsync(repositoryUrl, ct);
+        string targetBranch;
+        if (!string.IsNullOrEmpty(baseBranch))
+        {
+            targetBranch = baseBranch;
+        }
+        else
+        {
+            var repositoryUrl = BuildRepositoryCloneUrl(repositoryId, hostingMode);
+            targetBranch = await GetDefaultBranchAsync(repositoryUrl, ct);
+        }
 
         var payload = JsonSerializer.Serialize(new
         {
             title,
             description = body,
             source = new { branch = new { name = branchName } },
-            destination = new { branch = new { name = defaultBranch } }
+            destination = new { branch = new { name = targetBranch } }
         });
 
         var result = await _cliRunner.RunAsync(

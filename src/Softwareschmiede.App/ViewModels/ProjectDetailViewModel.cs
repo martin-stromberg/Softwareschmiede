@@ -50,6 +50,13 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private Guid _aktuelleAufgabeId;
     private readonly HashSet<string> _laufendeAlertKonvertierungen = new(StringComparer.OrdinalIgnoreCase);
+    private string? _selectedRepositorySourceBranchName;
+    private bool _isEditingSourceBranch;
+    private ObservableCollection<string> _availableSourceBranchesForEdit = new();
+    private string? _sourceBranchInputError;
+    private string? _sourceBranchNameBeforeEdit;
+    private bool _isLoadingSourceBranchesForEdit;
+    private bool _isEditingSourceBranchManualInput;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -124,6 +131,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref _selectedRepository, value))
             {
                 AktualisiereKannIssuesLaden();
+                IsEditingSourceBranch = false;
+                AvailableSourceBranchesForEdit.Clear();
+                IsEditingSourceBranchManualInput = false;
+                SourceBranchInputError = null;
+                SelectedRepositorySourceBranchName = value?.DefaultSourceBranchName;
             }
         }
     }
@@ -178,6 +190,48 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>true wenn das Repository ein SCM-Plugin mit Issue-Support hat. Kompatible Weiterleitung.</summary>
     public bool KannIssuesLaden => KannAnforderungenLaden;
 
+    /// <summary>Aktuell konfigurierter Basis-Branch des ausgewählten Repositories, von dem neue Feature-Branches abgezweigt werden. <c>null</c> bedeutet Standard-Branch.</summary>
+    public string? SelectedRepositorySourceBranchName
+    {
+        get => _selectedRepositorySourceBranchName;
+        set => SetProperty(ref _selectedRepositorySourceBranchName, value);
+    }
+
+    /// <summary>Gibt an, ob der Basis-Branch des ausgewählten Repositories gerade bearbeitet wird.</summary>
+    public bool IsEditingSourceBranch
+    {
+        get => _isEditingSourceBranch;
+        private set => SetProperty(ref _isEditingSourceBranch, value);
+    }
+
+    /// <summary>Verfügbare Branches des ausgewählten Repositories für die Basis-Branch-Bearbeitung.</summary>
+    public ObservableCollection<string> AvailableSourceBranchesForEdit
+    {
+        get => _availableSourceBranchesForEdit;
+        private set => SetProperty(ref _availableSourceBranchesForEdit, value);
+    }
+
+    /// <summary>Validierungsfehler bei der Basis-Branch-Bearbeitung.</summary>
+    public string? SourceBranchInputError
+    {
+        get => _sourceBranchInputError;
+        private set => SetProperty(ref _sourceBranchInputError, value);
+    }
+
+    /// <summary>Gibt an, ob die verfügbaren Branches für die Basis-Branch-Bearbeitung gerade geladen werden.</summary>
+    public bool IsLoadingSourceBranchesForEdit
+    {
+        get => _isLoadingSourceBranchesForEdit;
+        private set => SetProperty(ref _isLoadingSourceBranchesForEdit, value);
+    }
+
+    /// <summary>Gibt an, ob der Basis-Branch im Bearbeitungsmodus manuell eingegeben wird (keine Vorschlagsliste verfügbar).</summary>
+    public bool IsEditingSourceBranchManualInput
+    {
+        get => _isEditingSourceBranchManualInput;
+        private set => SetProperty(ref _isEditingSourceBranchManualInput, value);
+    }
+
     /// <summary>Erstellt eine Aufgabe aus einer offenen SCM-Anforderung.</summary>
     public AsyncRelayCommand<ScmRequirement> AufgabeAusAnforderungErstellenCommand { get; }
 
@@ -214,6 +268,15 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet den Dialog zur nachträglichen Bearbeitung des Arbeitsverzeichnisses des zugewiesenen Repositories.</summary>
     public ICommand ArbeitsverzeichnisBearbeitenCommand { get; }
 
+    /// <summary>Öffnet den Bearbeitungsmodus für den Basis-Branch des ausgewählten Repositories.</summary>
+    public ICommand EditSourceBranchCommand { get; }
+
+    /// <summary>Speichert den geänderten Basis-Branch des ausgewählten Repositories.</summary>
+    public ICommand SaveSourceBranchCommand { get; }
+
+    /// <summary>Bricht die Bearbeitung des Basis-Branches ab und verwirft Änderungen.</summary>
+    public ICommand CancelSourceBranchEditCommand { get; }
+
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
         ProjektService projektService,
@@ -242,6 +305,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         RepositoryZuweisenCommand = new AsyncRelayCommand(RepositoryZuweisenAsync, () => _projektId != Guid.Empty);
         RepositoryOeffnenCommand = new RelayCommand(RepositoryOeffnen, () => _selectedRepository != null);
         ArbeitsverzeichnisBearbeitenCommand = new AsyncRelayCommand(ArbeitsverzeichnisBearbeitenAsync, () => _selectedRepository != null);
+        EditSourceBranchCommand = new AsyncRelayCommand(EditSourceBranchAsync, () => _selectedRepository != null);
+        SaveSourceBranchCommand = new AsyncRelayCommand(SaveSourceBranchAsync, () => _isEditingSourceBranch);
+        CancelSourceBranchEditCommand = new RelayCommand(CancelSourceBranchEdit, () => _isEditingSourceBranch);
         AufgabeAusAnforderungErstellenCommand = new AsyncRelayCommand<ScmRequirement>(AufgabeAusAnforderungErstellenAsync);
         AufgabeAusIssueErstellenCommand = new AsyncRelayCommand<Issue>(AufgabeAusIssueErstellenAsync);
     }
@@ -412,6 +478,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                     scmPlugin.PluginPrefix,
                     repo.Url,
                     repo.Name,
+                    vm.DefaultSourceBranchName,
                     ct);
 
                 await _projektService.SaveRepositoryWorkingDirectoryAsync(gitRepository.Id, vm.SelectedWorkingDirectory, ct);
@@ -492,6 +559,96 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             _logger.LogError(ex, "Fehler beim Bearbeiten des Arbeitsverzeichnisses für Repository {RepositoryId}.", repository.Id);
             SetFehler(ex);
         }
+    }
+
+    private async Task EditSourceBranchAsync(CancellationToken ct)
+    {
+        if (_selectedRepository == null)
+            return;
+
+        var repository = _selectedRepository;
+        _sourceBranchNameBeforeEdit = SelectedRepositorySourceBranchName;
+        SourceBranchInputError = null;
+        IsEditingSourceBranch = true;
+        IsLoadingSourceBranchesForEdit = true;
+
+        try
+        {
+            var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
+                .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+
+            AvailableSourceBranchesForEdit.Clear();
+
+            if (gitPlugin != null)
+            {
+                var branches = await gitPlugin.GetRemoteBranchesAsync(repository.RepositoryUrl, ct);
+                foreach (var branch in branches.OrderBy(b => b, StringComparer.OrdinalIgnoreCase))
+                    AvailableSourceBranchesForEdit.Add(branch);
+            }
+
+            IsEditingSourceBranchManualInput = AvailableSourceBranchesForEdit.Count == 0;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Laden der verfügbaren Branches für Repository {RepositoryId}.", repository.Id);
+            IsEditingSourceBranchManualInput = true;
+        }
+        finally
+        {
+            IsLoadingSourceBranchesForEdit = false;
+        }
+    }
+
+    private async Task SaveSourceBranchAsync(CancellationToken ct)
+    {
+        if (_selectedRepository == null)
+            return;
+
+        if (!ValidateSourceBranchInput())
+            return;
+
+        var repository = _selectedRepository;
+
+        try
+        {
+            var normalized = string.IsNullOrWhiteSpace(SelectedRepositorySourceBranchName)
+                ? null
+                : SelectedRepositorySourceBranchName.Trim();
+
+            var updatedRepository = await _projektService.UpdateRepositorySourceBranchAsync(repository.Id, normalized, ct);
+
+            repository.DefaultSourceBranchName = updatedRepository.DefaultSourceBranchName;
+            SelectedRepositorySourceBranchName = updatedRepository.DefaultSourceBranchName;
+            SourceBranchInputError = null;
+            IsEditingSourceBranch = false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern des Basis-Branches für Repository {RepositoryId}.", repository.Id);
+            SourceBranchInputError = ex.Message;
+        }
+    }
+
+    private void CancelSourceBranchEdit()
+    {
+        SelectedRepositorySourceBranchName = _sourceBranchNameBeforeEdit;
+        SourceBranchInputError = null;
+        IsEditingSourceBranch = false;
+    }
+
+    private bool ValidateSourceBranchInput()
+    {
+        var isValid = SourceBranchInputValidator.Validate(SelectedRepositorySourceBranchName, AvailableSourceBranchesForEdit, out var error);
+        SourceBranchInputError = error;
+        return isValid;
     }
 
     private void OeffneAufgabe(Guid id)

@@ -133,6 +133,7 @@ public sealed class ProjektService
         string pluginTyp,
         string repositoryUrl,
         string repositoryName,
+        string? defaultSourceBranchName = null,
         CancellationToken ct = default)
     {
         var fieldValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -146,7 +147,15 @@ public sealed class ProjektService
             fieldValues[SourceDirectoryFieldKey] = repositoryUrl;
         }
 
-        return await AddRepositoryAsync(projektId, pluginTyp, fieldValues, ct);
+        var repository = await AddRepositoryAsync(projektId, pluginTyp, fieldValues, ct);
+
+        if (!string.IsNullOrWhiteSpace(defaultSourceBranchName))
+        {
+            repository.DefaultSourceBranchName = defaultSourceBranchName.Trim();
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return repository;
     }
 
     /// <summary>Fügt ein Git-Repository über pluginabhängige Eingabefelder zu einem Projekt hinzu.</summary>
@@ -328,6 +337,30 @@ public sealed class ProjektService
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Arbeitsverzeichnis für Repository {RepositoryId} gespeichert: {WorkingDirectory}", repositoryId, normalized ?? ".");
+    }
+
+    /// <summary>
+    /// Aktualisiert den konfigurierten Basis-Branch eines Repositories, von dem neue Feature-Branches
+    /// abgezweigt werden. <c>null</c> oder ein leerer Wert setzen die Konfiguration zurück auf den
+    /// Remote-Standard-Branch (Fallback).
+    /// </summary>
+    /// <param name="repositoryId">ID des Repositories.</param>
+    /// <param name="defaultSourceBranchName">Name des konfigurierten Basis-Branch, oder <c>null</c> für den Remote-Standard-Branch.</param>
+    public async Task<GitRepository> UpdateRepositorySourceBranchAsync(Guid repositoryId, string? defaultSourceBranchName, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Basis-Branch für Repository {RepositoryId} aktualisieren.", repositoryId);
+
+        var repository = await _db.GitRepositories.FirstOrDefaultAsync(r => r.Id == repositoryId, ct)
+            ?? throw new InvalidOperationException($"Repository {repositoryId} nicht gefunden.");
+
+        repository.DefaultSourceBranchName = string.IsNullOrWhiteSpace(defaultSourceBranchName)
+            ? null
+            : defaultSourceBranchName.Trim();
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Basis-Branch für Repository {RepositoryId} aktualisiert: {DefaultSourceBranchName}", repositoryId, repository.DefaultSourceBranchName ?? "(Standard)");
+        return repository;
     }
 
     private static Dictionary<string, string> NormalizeFieldValues(IReadOnlyDictionary<string, string> fieldValues)

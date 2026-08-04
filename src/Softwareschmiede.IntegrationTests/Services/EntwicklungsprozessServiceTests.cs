@@ -83,7 +83,7 @@ public sealed class EntwicklungsprozessServiceTests
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var kiMock = new Mock<IKiPlugin>();
@@ -117,7 +117,7 @@ public sealed class EntwicklungsprozessServiceTests
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
@@ -142,7 +142,7 @@ public sealed class EntwicklungsprozessServiceTests
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var kiMock = new Mock<IKiPlugin>();
@@ -209,7 +209,7 @@ public sealed class EntwicklungsprozessServiceTests
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
@@ -239,7 +239,7 @@ public sealed class EntwicklungsprozessServiceTests
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
@@ -275,7 +275,7 @@ public sealed class EntwicklungsprozessServiceTests
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
@@ -305,7 +305,7 @@ public sealed class EntwicklungsprozessServiceTests
         var gitMock = new Mock<IGitPlugin>();
         gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var resolverMock = new Mock<IArbeitsverzeichnisResolver>();
@@ -325,5 +325,59 @@ public sealed class EntwicklungsprozessServiceTests
             .ToListAsync();
 
         eintraege.Should().Contain(e => e.Contains("Arbeitsverzeichnis-Fallback aktiv"));
+    }
+
+    /// <summary>
+    /// Testet, dass <see cref="GitRepository.DefaultSourceBranchName"/> in der Datenbank gespeichert und über
+    /// einen neuen DbContext wieder eingelesen werden kann (Basis-Branch-Konfiguration, Migration
+    /// AddDefaultSourceBranchNameToGitRepository).
+    /// </summary>
+    [Fact]
+    public async Task DefaultSourceBranchName_ShouldBePersisted()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var projekt = await projektService.CreateAsync("Basis-Branch-Persistenz-Projekt", null);
+        var repository = await projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/persist-basis-branch",
+            "test/persist-basis-branch");
+
+        // Act
+        var repositoryEntity = await db.Context.GitRepositories.FindAsync(repository.Id);
+        repositoryEntity!.DefaultSourceBranchName = "staging";
+        await db.Context.SaveChangesAsync();
+
+        // Assert
+        await using var db2 = db.CreateNewContext();
+        var loaded = await db2.GitRepositories.FindAsync(repository.Id);
+        loaded!.DefaultSourceBranchName.Should().Be("staging");
+    }
+
+    /// <summary>
+    /// Testet, dass bestehende <see cref="GitRepository"/>-Einträge ohne explizite Konfiguration
+    /// <c>DefaultSourceBranchName = null</c> haben (Abwärtskompatibilität nach der Migration).
+    /// </summary>
+    [Fact]
+    public async Task DefaultSourceBranchName_ShouldBeNull_WhenNotConfigured()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
+        var projekt = await projektService.CreateAsync("Basis-Branch-Default-Projekt", null);
+        var repository = await projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/default-basis-branch",
+            "test/default-basis-branch");
+
+        // Act
+        await using var db2 = db.CreateNewContext();
+        var loaded = await db2.GitRepositories.FindAsync(repository.Id);
+
+        // Assert
+        loaded!.DefaultSourceBranchName.Should().BeNull();
     }
 }

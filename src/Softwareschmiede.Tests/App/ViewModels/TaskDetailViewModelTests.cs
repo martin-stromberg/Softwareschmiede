@@ -63,7 +63,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _gitPluginForResolutionMock.Setup(p => p.GetSettingGroups()).Returns([]);
         _gitPluginForResolutionMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        _gitPluginForResolutionMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _gitPluginForResolutionMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Zweites KI-Plugin: Damit VerfuegbareKiPlugins mehr als ein aktives Plugin enthält und das
@@ -90,7 +90,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var gitPluginMock = new Mock<IGitPlugin>();
         gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        gitPluginMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
         arbeitsverzeichnisMock.Setup(r => r.ResolveAsync(It.IsAny<CancellationToken>()))
@@ -1353,6 +1353,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         gitPluginMock.Setup(p => p.CreatePullRequestAsync(
                 "test/repo",
                 "feature/pr-url",
+                null,
                 "PR aus UI",
                 It.Is<string>(body =>
                     body.Contains("## Commits")
@@ -1427,6 +1428,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         gitPluginMock.Verify(p => p.CreatePullRequestAsync(
                 "test/repo",
                 "feature/pr-url",
+                null,
                 "PR aus UI",
                 It.Is<string>(body =>
                     body.Contains("## Commits")
@@ -1437,6 +1439,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         gitPluginMock.Verify(p => p.CreatePullRequestAsync(
                 "https://github.com/test/repo.git",
                 It.IsAny<string>(),
+                It.IsAny<string?>(),
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),

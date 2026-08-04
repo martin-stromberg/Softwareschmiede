@@ -39,6 +39,7 @@
             <TextBox Text="{Binding WorkingDirectoryInputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      IsEnabled="{Binding IsLoadingDirectoryStructure, Converter={StaticResource InverseBoolConverter}}"
                      Visibility="{Binding IsWorkingDirectoryManualInput, Converter={StaticResource BoolToVisibilityConverter}}"
+                     AutomationProperties.Name="ArbeitsverzeichnisEingabe"
                      Background="{DynamicResource BackgroundBrush}"
                      Foreground="{DynamicResource PrimaryTextBrush}"
                      Padding="8,6" />
