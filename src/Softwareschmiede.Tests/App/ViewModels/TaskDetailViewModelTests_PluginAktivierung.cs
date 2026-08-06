@@ -17,6 +17,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
+    private readonly TodoService _todoService;
     private readonly KiAusfuehrungsService _kiService;
     private readonly PromptVorlagenService _promptVorlagenService;
     private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
@@ -29,8 +30,9 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     public TaskDetailViewModelTests_PluginAktivierung()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
+        _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
         _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
@@ -93,6 +95,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             NullLogger<TaskDetailViewModel>.Instance,
             TimeProvider.System,
             fileExplorerViewModel,
+            new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
             ideOeffnenService,
             _einstellungService);

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -14,6 +15,7 @@ public sealed class AufgabeServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly Mock<ILogger<AufgabeService>> _loggerMock;
+    private readonly TodoService _todoService;
     private readonly AufgabeService _sut;
     private readonly Guid _projektId = new Guid("11111111-1111-1111-1111-111111111111");
 
@@ -22,7 +24,8 @@ public sealed class AufgabeServiceTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _loggerMock = new Mock<ILogger<AufgabeService>>();
-        _sut = new AufgabeService(_db, _loggerMock.Object);
+        _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
+        _sut = new AufgabeService(_db, _loggerMock.Object, _todoService);
 
         // Seed a project for FK constraints
         _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
@@ -722,6 +725,65 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Should().ContainSingle();
         result[0].GitRepository.Should().NotBeNull();
         result[0].GitRepository!.PluginTyp.Should().Be("Softwareschmiede.GitHub");
+    }
+
+    /// <summary>CanCompleteTaskAsync gibt false zurück, wenn offene Todos existieren.</summary>
+    [Fact]
+    public async Task CanCompleteTaskAsync_WithOpenTodos_ReturnsFalse()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe mit offenen Todos", null);
+        _db.Todos.Add(new Todo
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            Beschreibung = "Offenes Todo",
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.CanCompleteTaskAsync(aufgabe.Id);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    /// <summary>CanCompleteTaskAsync gibt true zurück, wenn keine Todos existieren.</summary>
+    [Fact]
+    public async Task CanCompleteTaskAsync_WithoutTodos_ReturnsTrue()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe ohne Todos", null);
+
+        // Act
+        var result = await _sut.CanCompleteTaskAsync(aufgabe.Id);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    /// <summary>CanCompleteTaskAsync gibt true zurück, wenn nur erledigte Todos existieren.</summary>
+    [Fact]
+    public async Task CanCompleteTaskAsync_WithOnlyCompletedTodos_ReturnsTrue()
+    {
+        // Arrange
+        var aufgabe = await _sut.CreateAsync(_projektId, "Aufgabe mit erledigten Todos", null);
+        _db.Todos.Add(new Todo
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            Beschreibung = "Erledigtes Todo",
+            ErstellungsDatum = DateTimeOffset.UtcNow,
+            ErledigtAm = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.CanCompleteTaskAsync(aufgabe.Id);
+
+        // Assert
+        result.Should().BeTrue();
     }
 
     private Aufgabe CreateAufgabeDirekt(

@@ -20,6 +20,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
+    private readonly TodoService _todoService;
     private readonly KiAusfuehrungsService _kiService;
     private readonly EntwicklungsprozessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
@@ -37,8 +38,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
     public TaskDetailViewModelTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
+        _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
 
@@ -165,6 +167,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             NullLogger<TaskDetailViewModel>.Instance,
             TimeProvider.System,
             fileExplorerViewModel,
+            new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
             ideOeffnenService,
             _einstellungService);

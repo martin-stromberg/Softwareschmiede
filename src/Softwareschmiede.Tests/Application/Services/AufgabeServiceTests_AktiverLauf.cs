@@ -28,7 +28,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _loggerMock = new Mock<ILogger<AufgabeService>>();
-        _sut = new AufgabeService(_db, _loggerMock.Object);
+        _sut = new AufgabeService(_db, _loggerMock.Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
 
         _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
         {

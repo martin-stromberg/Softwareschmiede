@@ -31,7 +31,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance, _pluginManagerMock.Object);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
     }
 
     /// <summary>Dispose.</summary>

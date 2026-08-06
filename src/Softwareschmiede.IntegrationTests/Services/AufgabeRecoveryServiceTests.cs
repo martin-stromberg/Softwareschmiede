@@ -187,7 +187,7 @@ public sealed class AufgabeRecoveryServiceTests
     {
         var projekt = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
         var projektEntity = await projekt.CreateAsync("Recovery-Parallel", null);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await aufgabeService.CreateAsync(projektEntity.Id, "Festhängende Aufgabe", "test");
         await aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
         return aufgabe;

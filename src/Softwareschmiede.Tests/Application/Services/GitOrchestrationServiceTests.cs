@@ -25,7 +25,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
     public GitOrchestrationServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object);
+        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
         _projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
         _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();

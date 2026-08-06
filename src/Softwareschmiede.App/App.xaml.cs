@@ -165,6 +165,7 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<DirectoryStructureBrowserService>();
 
         // Domain Services
+        services.AddScoped<TodoService>();
         services.AddScoped<AufgabeService>();
         services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
         services.AddScoped<ProjektService>();
@@ -265,6 +266,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<IssueSelectionDialogViewModel>();
         services.AddTransient<IssueCreateDialogViewModel>();
         services.AddTransient<FileExplorerViewModel>();
+        services.AddTransient<TodoListViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

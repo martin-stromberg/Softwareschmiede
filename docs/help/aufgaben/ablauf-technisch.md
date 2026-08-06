@@ -715,6 +715,115 @@ Ablauf:
 5. `IsDashboardVisible` wird neu berechnet (Wert ändert sich zu `false`)
 6. Seitenleisten-Sektion wird ausgeblendet durch Visibility-Binding
 
+## To-Do-Listen-Verwaltung
+
+### Aufgabe laden und To-Dos laden
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.LadenAsync()` — Lädt Aufgabe inklusive `Todos`-Navigation
+- `AufgabeService.GetDetailAsync()` — Ruft `.Include(a => a.Todos)` auf
+- `TodoService` — CRUD-Operationen für To-Dos
+- `TaskDetailViewModel.Todos` — ObservableCollection<TodoViewModel> für Bindung
+
+Ablauf:
+1. `TaskDetailViewModel.LadenAsync()` wird aufgerufen
+2. `AufgabeService.GetDetailAsync(aufgabeId)` wird aufgerufen mit `.Include(a => a.Todos)`
+3. Alle `Todo`-Entitäten der Aufgabe werden mitgeladen
+4. Für jedes `Todo` wird ein neues `TodoViewModel` erstellt
+5. `TaskDetailViewModel.Todos.ReplaceAll(todoViewModels)` befüllt die Collection
+6. `OffeneTodoCount` wird berechnet (Anzahl der To-Dos mit `ErledaltAm == null`)
+
+### Neues To-Do erstellen
+
+Ausgelöst durch Eingabe von Text in das Eingabefeld und Klick auf „Hinzufügen" oder Enter-Taste in `TodoListView`.
+
+Beteiligte Komponenten:
+- `TodoListView.xaml` — TextBox und Button „Hinzufügen"
+- `TaskDetailViewModel.TodoHinzufuegenCommand` — Command zum Erstellen
+- `TodoService.CreateTodoAsync` — Speichert neues To-Do in der Datenbank
+
+Ablauf:
+1. Benutzer gibt Text in TextBox ein
+2. Benutzer klickt Button „Hinzufügen" oder drückt Enter
+3. `TodoHinzufuegenCommand.Execute()` wird aufgerufen
+4. Validierung: Text darf nicht leer sein; sonst Abbruch mit `FehlerMeldung`
+5. `TodoService.CreateTodoAsync(aufgabeId, beschreibung, ct)` wird aufgerufen
+6. Neue `Todo`-Entität wird erstellt mit `Id`, `AufgabeId`, `Beschreibung`, `ErstellungsDatum`
+7. `Todo` wird in `DbContext.Todos` hinzugefügt und in die Datenbank gespeichert
+8. Zurückgegebene `Todo` wird in ein neues `TodoViewModel` konvertiert
+9. `TaskDetailViewModel.Todos.Add(todoViewModel)` wird aufgerufen
+10. `OffeneTodoCount` wird erhöht
+11. Eingabefeld wird geleert und der Focus bleibt zum schnellen Hinzufügen weiterer To-Dos
+12. Ribbon-Badge wird aktualisiert
+
+### To-Do als erledigt markieren (abhaken)
+
+Ausgelöst durch Klick auf die Checkbox neben einem To-Do-Eintrag.
+
+Beteiligte Komponenten:
+- `TodoListView.xaml` — CheckBox mit 2-Way-Binding zu `TodoViewModel.IstErledigt`
+- `TodoViewModel.IstErledigt` — Read-only computed Property (abgeleitet aus `Todo.ErledaltAm != null`)
+- `TaskDetailViewModel.TodoAlsErledeltMarkierenCommand` — Command mit Parameter `TodoViewModel.Id`
+- `TodoService.MarkTodoAsCompletedAsync` — Setzt `ErledaltAm = DateTime.UtcNow` in der Datenbank
+
+Ablauf:
+1. Benutzer klickt Checkbox neben To-Do
+2. Das Checkbox-Binding versucht, `TodoViewModel.IstErledigt` zu setzen (2-Way-Binding)
+3. Da `IstErledigt` read-only ist, wird stattdessen ein Command-Handler ausgelöst:
+   - `TodoAlsErledeltMarkierenCommand` mit `CommandParameter={Binding Id}`
+4. `TodoAlsErledeltMarkierenCommand.Execute(todoId)` wird aufgerufen
+5. `TodoService.MarkTodoAsCompletedAsync(todoId, ct)` wird aufgerufen
+6. Das `Todo` wird geladen, `ErledaltAm` wird auf `DateTime.UtcNow` gesetzt und in der Datenbank gespeichert
+7. In der lokalen `TodoViewModel` wird die `PropertyChanged`-Notification ausgelöst
+8. UI zeigt durchgestrichenen Text und reduzierte Opazität für das erledigte To-Do
+9. `OffeneTodoCount` wird dekrementiert
+10. Ribbon-Badge wird aktualisiert
+
+### To-Do löschen
+
+Ausgelöst durch Klick auf den „Löschen"-Button neben einem To-Do-Eintrag.
+
+Beteiligte Komponenten:
+- `TodoListView.xaml` — Button mit Command `TodoLoeschenCommand`
+- `TaskDetailViewModel.TodoLoeschenCommand` — Command mit Parameter `TodoViewModel.Id`
+- `TodoService.DeleteTodoAsync` — Löscht das To-Do aus der Datenbank
+
+Ablauf:
+1. Benutzer klickt Löschen-Button
+2. `TodoLoeschenCommand.Execute(todoId)` wird aufgerufen
+3. `TodoService.DeleteTodoAsync(todoId, ct)` wird aufgerufen
+4. Das `Todo` wird aus der Datenbank gelöscht
+5. `TaskDetailViewModel.Todos.Remove(todoViewModel)` entfernt das Item aus der Collection
+6. Falls das gelöschte To-Do offen war (nicht erledigt): `OffeneTodoCount` wird dekrementiert
+7. Ribbon-Badge wird aktualisiert
+
+### Aufgabenabschluss mit To-Do-Validierung
+
+Ausgelöst durch Klick auf „Beenden" im Ribbon (nur aktiv wenn Status ∈ {Gestartet, Wartend}).
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.AufgabeAbschliessenCommand` — RelayCommand
+- `TaskDetailViewModel.AufgabeAbschliessenAsync()` — Orchestriert Validierung und Service-Aufruf
+- `AufgabeService.CanCompleteTaskAsync()` — Prüft, ob offene To-Dos vorhanden sind
+- `EntwicklungsprozessService.AbschliessenAsync()` — Setzt Status auf `Beendet`
+
+Ablauf:
+1. Benutzer klickt „Beenden" Button im Ribbon
+2. `AufgabeAbschliessenCommand.Execute()` wird aufgerufen
+3. `AufgabeAbschliessenAsync()` wird ausgeführt
+4. `AufgabeService.CanCompleteTaskAsync(aufgabeId, ct)` wird aufgerufen
+5. Service lädt alle offenen To-Dos (mit `ErledaltAm == null`):
+   - Falls offene To-Dos existieren: Methode gibt `false` zurück
+   - Falls keine offenen To-Dos: Methode gibt `true` zurück
+6. Falls `CanCompleteTaskAsync()` `false` zurückgibt:
+   - `FehlerMeldung` wird gesetzt: „Diese Aufgabe kann nicht beendet werden, solange noch {count} offene To-Do(s) vorhanden sind."
+   - `AufgabeAbschliessenCommand` wird blockiert und die Aufgabe wird nicht beendet
+7. Falls `CanCompleteTaskAsync()` `true` zurückgibt:
+   - `EntwicklungsprozessService.AbschliessenAsync()` wird aufgerufen
+   - Status wird auf `Beendet` gesetzt
+   - Aufgabe wird in der Datenbank aktualisiert
+   - UI zeigt ggf. die Diff-Ansicht
+
 ## Fehlerbehandlung
 
 | Situation | Verhalten |

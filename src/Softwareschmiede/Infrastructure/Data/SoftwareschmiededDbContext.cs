@@ -69,6 +69,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Diff-Cache-Einträge (für TTL-basierte Invalidierung).</summary>
     public DbSet<DiffCache> DiffCaches => Set<DiffCache>();
 
+    /// <summary>To-Do-Elemente von Aufgaben.</summary>
+    public DbSet<Todo> Todos => Set<Todo>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -168,6 +171,24 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(dr => dr.Aufgabe)
                 .HasForeignKey(dr => dr.AufgabeId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(a => a.Todos)
+                .WithOne(t => t.Aufgabe)
+                .HasForeignKey(t => t.AufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Todo
+        modelBuilder.Entity<Todo>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.Beschreibung).IsRequired();
+            // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
+            e.Property(t => t.ErstellungsDatum).HasConversion(
+                v => v.ToUnixTimeMilliseconds(),
+                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(t => t.ErledigtAm).HasConversion(
+                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
         });
 
         // IssueReferenz

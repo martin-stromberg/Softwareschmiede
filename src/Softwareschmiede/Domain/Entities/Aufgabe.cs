@@ -91,4 +91,7 @@ public sealed class Aufgabe
 
     /// <summary>Diff-Ergebnisse für diese Aufgabe (z.B. für verschiedene Dateien oder Vergleiche).</summary>
     public List<DiffResult> DiffResults { get; set; } = [];
+
+    /// <summary>To-Do-Elemente dieser Aufgabe.</summary>
+    public List<Todo> Todos { get; set; } = [];
 }

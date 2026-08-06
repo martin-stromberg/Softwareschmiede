@@ -35,6 +35,8 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         services.AddDbContext<SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(_dbName));
         services.AddScoped<AufgabeService>();
         services.AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance);
+        services.AddScoped<TodoService>();
+        services.AddSingleton<ILogger<TodoService>>(NullLogger<TodoService>.Instance);
         _provider = services.BuildServiceProvider();
 
         using (var scope = _provider.CreateScope())

@@ -54,6 +54,15 @@
                                                         ButtonText="Beenden"
                                                         AutomationName="Beenden"
                                                         ButtonCommand="{Binding AufgabeAbschliessenCommand}" />
+                            <TextBlock Text="{Binding TodoList.OffeneTodoCount, StringFormat='⚠ {0} offen'}"
+                                       AutomationProperties.Name="OffeneTodoCountBadge"
+                                       AutomationProperties.HelpText="{Binding TodoList.OffeneTodoCount}"
+                                       Foreground="{DynamicResource ErrorBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0"
+                                       Visibility="{Binding TodoList.OffeneTodoCount, Converter={StaticResource GreaterThanZeroToVisibilityConverter}}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -280,6 +289,12 @@
                         Margin="6,0,0,0"
                         FontSize="12"
                         Visibility="{Binding ShowPullRequestPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <Button Content="Todos"
+                        AutomationProperties.Name="TodoViewButton"
+                        Command="{Binding TodoList.TodoAnsichtCommand}"
+                        Padding="12,4"
+                        Margin="6,0,0,0"
+                        FontSize="12" />
             </StackPanel>
 
             <Grid Grid.Row="1">
@@ -546,6 +561,9 @@
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
+
+                <views:TodoListView DataContext="{Binding TodoList}"
+                                    Visibility="{Binding DataContext.IsTodoViewSelected, ElementName=Root, Converter={StaticResource BoolToVisibilityConverter}}" />
             </Grid>
         </Grid>
 

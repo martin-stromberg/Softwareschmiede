@@ -28,7 +28,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         // Act
         var created = await service.CreateAsync(projektId, "Test-Aufgabe", "Anforderungsbeschreibung");
@@ -53,7 +53,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await service.CreateAsync(projektId, "Startbare Aufgabe", null);
 
         // Act
@@ -77,7 +77,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await service.CreateAsync(projektId, "Abzuschließende Aufgabe", null);
         await service.StartenAsync(aufgabe.Id, "task/fertig", @"C:\klone\fertig");
 
@@ -107,7 +107,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
         var aufgabe = await aufgabeService.CreateAsync(projektId, "Aufgabe mit Protokoll", null);
@@ -142,7 +142,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
         var aufgabe = await aufgabeService.CreateAsync(projektId, "Zu löschende Aufgabe", null);
@@ -170,7 +170,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await service.CreateAsync(projektId, "Offene Aufgabe", null);
 
         // Act
@@ -192,7 +192,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
 
         var aufgabe = await aufgabeService.CreateAsync(projektId, "Offene Aufgabe", null);
@@ -221,7 +221,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await service.CreateAsync(projektId, "Gestartete Aufgabe", null);
         await service.StartenAsync(aufgabe.Id, "task/test", @"C:\klone\test");
 
@@ -242,7 +242,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var issue = new Issue(
             Nummer: 42,
@@ -273,7 +273,7 @@ public sealed class AufgabeServiceTests
     {
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await service.CreateAsync(projektId, "Issue-Anlage", null);
         var createdIssue = new Issue(23, "Neu", "Body", [], null, "https://example.test/23");
         var parallelIssue = new Issue(99, "Parallel", "Body", [], null, "https://example.test/99");
@@ -283,7 +283,7 @@ public sealed class AufgabeServiceTests
 
         await using (var parallelContext = db.CreateNewContext())
         {
-            var parallelService = new AufgabeService(parallelContext, NullLogger<AufgabeService>.Instance);
+            var parallelService = new AufgabeService(parallelContext, NullLogger<AufgabeService>.Instance, new TodoService(parallelContext, NullLogger<TodoService>.Instance));
             await parallelService.UpdateIssueReferenzAsync(aufgabe.Id, parallelIssue);
         }
 
@@ -307,7 +307,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         await service.CreateAsync(projektId, "Erste Aufgabe", null);
         await Task.Delay(5); // sicherstellen, dass ErstellungsDatum unterschiedlich ist
@@ -333,7 +333,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await service.CreateAsync(projektId, "Aufgabe für Statuswechsel", null);
         await service.StatusSetzenAsync(aufgabe.Id, AufgabeStatus.Gestartet);
 
@@ -359,7 +359,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var jetzt = DateTimeOffset.UtcNow;
 
@@ -413,7 +413,7 @@ public sealed class AufgabeServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektId = await CreateTestProjektAsync(db);
-        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await service.CreateAsync(projektId, "Ursprünglicher Titel", "Alt");
 
         // Act

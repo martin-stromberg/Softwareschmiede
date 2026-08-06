@@ -31,7 +31,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     public GitOrchestrationServiceTests_WorkingDirectoryInSourceDirectory()
     {
         _db = TestDbContextFactory.Create();
-        var aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object);
+        var aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
         var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
         var protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
 

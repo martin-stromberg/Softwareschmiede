@@ -110,6 +110,17 @@
 | `IsPostMerge` | `bool` | Kennzeichnet Runs, die nach einem Merge beobachtet werden |
 | `UpdatedUtc` | `DateTimeOffset` | Letzter lokaler Aktualisierungszeitpunkt |
 
+### `Todo`
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `Id` | `Guid` | Primärschlüssel |
+| `AufgabeId` | `Guid` | FK → Aufgabe |
+| `Beschreibung` | `string` | Beschreibungstext des To-Dos |
+| `ErledaltAm` | `DateTimeOffset?` | Zeitstempel der Fertigstellung; `null` = offen, gesetzt = erledigt |
+| `ErstellungsDatum` | `DateTimeOffset` | Zeitstempel der Erstellung |
+| `Aufgabe` | `Aufgabe` | Navigationseigenschaft zurück zur Aufgabe |
+
 ## Statusübergänge
 
 ```mermaid
@@ -169,10 +180,18 @@ erDiagram
         string Status
         string Conclusion
     }
+    Todo {
+        Guid Id
+        Guid AufgabeId
+        string Beschreibung
+        DateTimeOffset ErledaltAm
+        DateTimeOffset ErstellungsDatum
+    }
     Aufgabe ||--o{ Protokolleintrag : "hat"
     Aufgabe ||--o| IssueReferenz : "hat"
     Aufgabe ||--o| AlertReferenz : "hat"
     Aufgabe ||--o{ PullRequestReferenz : "hat"
+    Aufgabe ||--o{ Todo : "hat"
     PullRequestReferenz ||--o{ PullRequestWorkflowRun : "hat"
 ```
 

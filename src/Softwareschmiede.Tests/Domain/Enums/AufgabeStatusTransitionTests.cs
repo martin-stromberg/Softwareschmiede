@@ -19,7 +19,7 @@ public sealed class AufgabeStatusTransitionTests : IDisposable
     public AufgabeStatusTransitionTests()
     {
         _db = TestDbContextFactory.Create();
-        _sut = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object);
+        _sut = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
 
         _db.Projekte.Add(new Projekt
         {

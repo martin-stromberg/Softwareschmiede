@@ -15,7 +15,7 @@ public sealed class ProtokollServiceTests
     private static async Task<Guid> CreateTestAufgabeAsync(DatabaseFixture db)
     {
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var projekt = await projektService.CreateAsync("Testprojekt Protokoll", null);
         var aufgabe = await aufgabeService.CreateAsync(projekt.Id, "Testaufgabe Protokoll", null);

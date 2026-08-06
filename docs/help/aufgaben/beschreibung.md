@@ -167,6 +167,19 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 7. Bei Erreichen von 16:30 Uhr wird der Prompt automatisch an die CLI versendet; die Status-Anzeige verschwindet.
 8. Falls die CLI zwischenzeitlich beendet wurde, wird der Prompt still verworfen (ohne Fehlermeldung).
 
+### To-Do-Liste für Aufgabengliederung und Fortschrittsverfolgung
+
+Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-Do-Liste:
+
+- **To-Do-Verwaltung:** Benutzer können im Tab „Todos" neue To-Dos erstellen, abhaken und löschen.
+- **Eingabefeld:** Ein Textfeld mit Button „Hinzufügen" ermöglicht die Eingabe neuer To-Do-Texte.
+- **To-Do-Liste:** Ein ItemsControl zeigt alle To-Dos der Aufgabe mit:
+  - **Checkbox:** Abhaken zum Markieren als erledigt — beim Abhaken wird das To-Do sofort in die Datenbank gespeichert und das To-Do erhält durchgestrichenen Text mit reduzierter Opazität.
+  - **Text:** Der To-Do-Beschreibungstext.
+  - **Löschen-Button:** Entfernt das To-Do aus der Liste und der Datenbank.
+- **Validierung beim Aufgabenabschluss:** Die Aufgabe kann **nicht** beendet werden (Status: `Beendet`), solange noch offene To-Dos vorhanden sind. Ein Versuch, die Aufgabe zu beenden, zeigt eine Fehlermeldung wie „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
+- **Ribbon-Badge:** Im Ribbon-Menü wird in der Aufgaben-Gruppe eine Markierung angezeigt, falls offene To-Dos vorhanden sind (z. B. „⚠ 3 offen"). Das Badge wird verborgen wenn alle To-Dos erledigt sind.
+
 ## Einschränkungen
 
 - Für eine Aufgabe kann immer nur ein CLI-Prozess gleichzeitig aktiv sein.

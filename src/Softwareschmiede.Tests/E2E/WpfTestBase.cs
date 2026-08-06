@@ -302,7 +302,7 @@ public abstract class WpfTestBase : IDisposable
                     return element;
 
                 throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetFehlerText(fehlerMeldung)}");
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
             }
 
             Thread.Sleep(200);
@@ -311,12 +311,16 @@ public abstract class WpfTestBase : IDisposable
             $"Element wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
     }
 
-    private static string GetFehlerText(AutomationElement fehlerMeldung)
+    /// <summary>
+    /// Liest den <c>HelpText</c> eines Elements aus; fällt auf <c>Name</c> zurück, wenn <c>HelpText</c>
+    /// leer ist oder von der zugrunde liegenden Automatisierung nicht unterstützt wird.
+    /// </summary>
+    protected static string GetHelpTextOrName(AutomationElement element)
     {
         string? helpText = null;
         try
         {
-            helpText = fehlerMeldung.HelpText;
+            helpText = element.HelpText;
         }
         catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
         {
@@ -325,7 +329,7 @@ public abstract class WpfTestBase : IDisposable
         if (!string.IsNullOrWhiteSpace(helpText))
             return helpText;
 
-        return fehlerMeldung.Name;
+        return element.Name;
     }
 
     /// <summary>
