@@ -1,3 +1,14 @@
+## 2026-08-06 — To-Do-Liste zur Unterstützung der Aufgabengliederung und des Fortschritts
+
+- Feature: Jede Aufgabe erhält eine To-Do-Liste mit neuer „Todos"-Ansicht in der Aufgabendetailansicht. Benutzer können To-Dos anlegen, abhaken und löschen.
+- Datenmodell: Neue Entity `Todo` mit `Id`, `AufgabeId`, `Beschreibung`, `ErledaltAm` (Nullable), `ErstellungsDatum` und Navigationseigenschaft zu `Aufgabe`. Neue Navigation `Aufgabe.Todos` für die 1:n-Beziehung mit Cascade-Delete.
+- Service-Schicht: Neuer `TodoService` mit Methoden `CreateTodoAsync`, `MarkTodoAsCompletedAsync`, `DeleteTodoAsync`, `GetOpenTodosAsync`, `GetAllTodosAsync`, `GetTodoCountAsync`. Erweiterung `AufgabeService.CanCompleteTaskAsync()` blockiert Aufgabenabschluss, wenn offene To-Dos existieren.
+- ViewModel: Neuer `TodoViewModel` mit Properties `Id`, `Beschreibung`, `IstErledigt`, `ErstellungsDatum`. Erweiterung `TaskDetailViewModel` um `Todos`-Collection, `OffeneTodoCount`, `DetailAnsicht.Todos`, Commands `TodoHinzufuegenCommand`, `TodoAlsErledeltMarkierenCommand`, `TodoLoeschenCommand`.
+- UI: Neuer UserControl `TodoListView` mit TextBox für neue To-Dos, Button „Hinzufügen", ItemsControl mit To-Do-Einträgen (Checkbox für Erledigungsstatus, Löschen-Button, durchgestrichene Darstellung erledigter To-Dos). Neuer Tab „Todos" in `TaskDetailView`. Ribbon-Badge zeigt Anzahl offener To-Dos mit visueller Markierung (z. B. „⚠ 3 offen").
+- Validierung: Aufgabenabschluss wird mit Fehlermeldung blockiert, wenn noch offene To-Dos vorhanden sind (z. B. „Diese Aufgabe kann nicht beendet werden, solange noch 3 offene To-Do(s) vorhanden sind.").
+- Datenbankmigrationen: Neue Migration `AddTodoEntity` erstellt `Todos`-Tabelle mit Spalten `Id`, `AufgabeId` (FK), `Beschreibung`, `ErledaltAm`, `ErstellungsDatum`; FK zu `Aufgaben` mit Cascade-Delete.
+- Tests: Unit-Tests für `TodoService`, `AufgabeService.CanCompleteTaskAsync()`, `TodoViewModel`; Integration-Tests für DB-Persistenz und Cascade-Delete; E2E-Tests für UI-Interaktionen (Anlage, Abhaken, Löschen, Validierung beim Abschluss).
+
 ## 2026-08-03 — Unterstützung eines Staging-Branch / Basis-Branch-Konfiguration
 
 - Feature: Repositories können einen konfigurierbaren Basis-Branch speichern, von dem neue Feature-Branches für Aufgaben abgezweigt werden, statt automatisch vom Remote-Standard-Branch.

@@ -20,12 +20,14 @@ public sealed class AufgabeService : IAktiveAufgabenService
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AufgabeService> _logger;
+    private readonly TodoService _todoService;
 
     /// <inheritdoc cref="AufgabeService"/>
-    public AufgabeService(SoftwareschmiededDbContext db, ILogger<AufgabeService> logger)
+    public AufgabeService(SoftwareschmiededDbContext db, ILogger<AufgabeService> logger, TodoService todoService)
     {
         _db = db;
         _logger = logger;
+        _todoService = todoService;
     }
 
     /// <summary>Gibt alle aktiven (nicht archivierten) Aufgaben eines Projekts zurück.</summary>
@@ -89,6 +91,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
                 .ThenInclude(r => r!.StartKonfiguration)
             .Include(a => a.Protokolleintraege)
                 .ThenInclude(p => p.TestErgebnisse)
+            .Include(a => a.Todos)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
@@ -722,6 +725,16 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .ThenBy(a => a.Id)
             .Take(20)
             .ToListAsync(ct);
+    }
+
+    /// <summary>Fehlermeldungsformat für einen blockierten Aufgabenabschluss wegen offener To-Dos (Platzhalter {0}: Anzahl offener To-Dos).</summary>
+    public const string OffeneTodosFehlermeldungFormat = "Diese Aufgabe kann nicht beendet werden, solange noch {0} offene To-Do(s) vorhanden sind.";
+
+    /// <summary>Validiert, ob eine Aufgabe beendet werden kann: gibt false zurück, wenn offene To-Dos existieren.</summary>
+    public async Task<bool> CanCompleteTaskAsync(Guid aufgabeId, CancellationToken ct = default)
+    {
+        var offeneTodoCount = await _todoService.GetTodoCountAsync(aufgabeId, ct);
+        return offeneTodoCount == 0;
     }
 
     private static void ValidateStatusTransition(AufgabeStatus current, AufgabeStatus next)

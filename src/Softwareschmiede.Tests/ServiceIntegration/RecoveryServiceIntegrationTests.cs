@@ -20,7 +20,7 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
     public RecoveryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
 
         var projekt = _projektService.CreateAsync("Recovery-Projekt", null).GetAwaiter().GetResult();

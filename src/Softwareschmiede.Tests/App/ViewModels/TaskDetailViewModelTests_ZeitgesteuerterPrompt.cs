@@ -20,6 +20,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly AufgabeService _aufgabeService;
     private readonly ProtokollService _protokollService;
+    private readonly TodoService _todoService;
     private readonly KiAusfuehrungsService _kiService;
     private readonly EntwicklungsprozessService _entwicklungsprozessService;
     private readonly PluginSelectionService _pluginSelectionService;
@@ -34,8 +35,9 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     public TaskDetailViewModelTests_ZeitgesteuerterPrompt()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
+        _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
@@ -105,6 +107,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             NullLogger<TaskDetailViewModel>.Instance,
             _timeProvider,
             fileExplorerViewModel,
+            new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
             ideOeffnenService,
             einstellungService);

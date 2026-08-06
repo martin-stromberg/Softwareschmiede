@@ -29,7 +29,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public EntwicklungsprozessServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object);
+        _aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
         _protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
         _gitPluginMock = new Mock<IGitPlugin>();
         _kiPluginMock = new Mock<IKiPlugin>();

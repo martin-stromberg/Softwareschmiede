@@ -151,7 +151,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
         await using (var db = OpenTestDbContext())
         {
             var projektService = new ProjektService(db, NullLogger<ProjektService>.Instance);
-            var aufgabeService = new AufgabeService(db, NullLogger<AufgabeService>.Instance);
+            var aufgabeService = new AufgabeService(db, NullLogger<AufgabeService>.Instance, new TodoService(db, NullLogger<TodoService>.Instance));
 
             var projekt = await projektService.CreateAsync(projektName, null);
             await aufgabeService.CreateAsync(projekt.Id, offeneAufgabeTitel, null);

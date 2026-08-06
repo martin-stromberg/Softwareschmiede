@@ -17,7 +17,7 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     /// <summary>Initialisiert die Testdatenbank.</summary>
     public CliUpdateSafetyServiceTests()
     {
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
         {
             Id = _projektId,

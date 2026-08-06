@@ -24,6 +24,7 @@ public static class TaskDetailViewModelTestFactory
             .ReturnsAsync((string?)null);
         var kiService = TestKiAusfuehrungsServiceFactory.Create();
         var protokollService = new ProtokollService(db, NullLogger<ProtokollService>.Instance);
+        var todoService = new TodoService(db, NullLogger<TodoService>.Instance);
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
@@ -47,6 +48,7 @@ public static class TaskDetailViewModelTestFactory
         var serviceProviderMock = new Mock<IServiceProvider>();
 
         var fileExplorerViewModel = CreateStub();
+        var todoListViewModel = new TodoListViewModel(todoService, NullLogger<TodoListViewModel>.Instance);
 
         var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = CreateVerzeichnisAktionenServices();
         var einstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
@@ -66,6 +68,7 @@ public static class TaskDetailViewModelTestFactory
             NullLogger<TaskDetailViewModel>.Instance,
             TimeProvider.System,
             fileExplorerViewModel,
+            todoListViewModel,
             arbeitsverzeichnisOeffnenService,
             ideOeffnenService,
             einstellungService);

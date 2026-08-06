@@ -181,10 +181,34 @@ Im Status **Neu** oder **Gestartet** (nicht **Beendet** oder **Archiviert**), kl
 
 Die Aufgabe ist mit Status **Beendet** abgelegt. Alle Protokolleinträge bleiben erhalten.
 
+### 8a. To-Do-Liste zur Aufgabengliederung verwenden (optional)
+
+Die **Todos-Ansicht** ermöglicht es, Aufgaben in kleinere Arbeitsschritte zu unterteilen und deren Fortschritt zu verfolgen:
+
+1. Öffne die Aufgabendetailansicht und navigiere zum Tab **Todos**.
+2. Gib einen To-Do-Text ein und klicke **Hinzufügen** oder drücke Enter.
+3. Der neue To-Do wird der Liste hinzugefügt.
+
+**To-Do abhaken (erledigt markieren):**
+- Klicke die **Checkbox** neben dem To-Do-Text, um es als erledigt zu markieren.
+- Das erledigte To-Do wird durchgestrichen und grauer dargestellt.
+- Klicke erneut auf die Checkbox, um die Erledigierung zu entfernen.
+
+**To-Do löschen:**
+- Klicke den **Delete-Button** neben dem To-Do, um es zu löschen.
+- Das To-Do wird sofort aus der Liste entfernt.
+
+**Ribbon-Badge (Offene To-Dos-Anzeige):**
+- Im Ribbon-Menü (Gruppe „Aufgabe") wird angezeigt, wie viele To-Dos noch offen sind (z. B. „⚠ 3 offen").
+- Das Badge wird verborgen wenn alle To-Dos erledigt sind.
+
+> **Hinweis:** Die To-Do-Liste dient der Aufgabengliederung. Sie können nur Aufgaben abschließen (Status: `Beendet`), wenn alle To-Dos erledigt sind. Ein Versuch, die Aufgabe zu beenden, zeigt die Fehlermeldung: „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
+
 ## Sonderfälle
 
 - **Rate-Limit (Status Wartend):** Das CLI gibt einen Rate-Limit-Marker aus; Status wechselt auf „Wartend". Ein Prompt-Vorschlag wird gespeichert. Über „Wiederherstellen" (Recovery-Banner auf dem Dashboard) kann die Aufgabe auf „Gestartet" zurückgesetzt und das CLI erneut gestartet werden.
 - **Aufgabe wiederherstellen:** Erscheint auf dem Dashboard das Banner „X Aufgabe(n) benötigen Wiederherstellung", kann durch Klick auf **Wiederherstellen** der Status zurückgesetzt werden. Voraussetzung: kein aktiver CLI-Prozess und Heartbeat älter als 5 Minuten.
+- **Aufgabe mit offenen To-Dos beenden:** Wenn noch To-Dos vorhanden sind, wird das Beenden blockiert. Alle To-Dos müssen erledigt sein, bevor die Aufgabe auf „Beendet" gesetzt werden kann.
 
 ## Barrierefreiheit
 

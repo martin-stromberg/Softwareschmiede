@@ -110,7 +110,7 @@ public sealed class ProjektServiceTests
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var projekt = await projektService.CreateAsync("Zu löschendes Projekt", null);
         await aufgabeService.CreateAsync(projekt.Id, "Aufgabe 1", null);

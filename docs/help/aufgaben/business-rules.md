@@ -257,6 +257,29 @@
 
 ---
 
+## Aufgabenabschluss mit To-Do-Validierung
+
+**Beschreibung:** Eine Aufgabe kann nur beendet (Status: `Beendet`) werden, wenn alle ihre To-Dos erledigt sind.
+
+**Bedingungen:**
+- Aufgabe hat den Status `Gestartet` oder `Wartend` und ist ein Abschluss-Kandidat.
+- `Aufgabe.Todos` enthält eine Liste aller To-Dos.
+
+**Verhalten:**
+- Benutzer klickt „Beenden"-Button im Ribbon → `AufgabeService.CanCompleteTaskAsync()` wird aufgerufen.
+- Methode prüft: Gibt es To-Dos mit `ErledaltAm == null` (offen)?
+  - Falls ja: Methode gibt `false` zurück; Abschluss wird blockiert; `FehlerMeldung` zeigt Anzahl offener To-Dos.
+  - Falls nein: Methode gibt `true` zurück; Abschluss wird erlaubt; `EntwicklungsprozessService.AbschliessenAsync()` wird aufgerufen.
+- Im Ribbon zeigt das Badge (Gruppe „Aufgabe") die Anzahl offener To-Dos (z. B. „⚠ 3 offen"). Badge ist verborgen wenn `OffeneTodoCount == 0`.
+- Erstellte To-Dos bleiben auch nach Aufgabenabschluss gespeichert und sind in der `Todos`-Ansicht einsehbar.
+
+**Umsetzung:**
+- `AufgabeService.CanCompleteTaskAsync(Guid aufgabeId, CancellationToken ct)` — prüft offene To-Dos vor dem Abschluss.
+- `TaskDetailViewModel.AufgabeAbschliessenAsync()` — prüft `CanCompleteTaskAsync()` vor dem Serviceaufruf.
+- `TaskDetailViewModel.OffeneTodoCount` — wird bei jedem To-Do-Wechsel aktualisiert und steuert Ribbon-Badge.
+
+---
+
 ## Zeitgesteuerter Prompt-Versand
 
 **Beschreibung:** Pro Aufgabe kann maximal ein Prompt zeitgesteuert geplant sein. Ein erneut geplanter Prompt ersetzt den vorherigen.

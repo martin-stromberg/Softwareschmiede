@@ -24,7 +24,7 @@ public sealed class EntwicklungsprozessServiceTests
         string aufgabeTitel = "Entwicklungsaufgabe")
     {
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
 
         var projekt = await projektService.CreateAsync("Entwicklungstestprojekt", null);
         var aufgabe = await aufgabeService.CreateAsync(projekt.Id, aufgabeTitel, "Mach etwas Tolles");
@@ -38,7 +38,7 @@ public sealed class EntwicklungsprozessServiceTests
         Mock<IKiPlugin> kiMock,
         IArbeitsverzeichnisResolver? arbeitsverzeichnisResolver = null)
     {
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var protokollService = new ProtokollService(db.Context, NullLogger<ProtokollService>.Instance);
         arbeitsverzeichnisResolver ??= new ArbeitsverzeichnisResolver(
             new ArbeitsverzeichnisSettingsService(db.Context, NullLogger<ArbeitsverzeichnisSettingsService>.Instance),
@@ -109,7 +109,7 @@ public sealed class EntwicklungsprozessServiceTests
     {
         await using var db = await DatabaseFixture.CreateAsync();
         var projektService = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var projekt = await projektService.CreateAsync("Issue-Branch-Projekt", null);
         var issue = new Issue(55, "Issue-basierte Aufgabe", "Beschreibung", ["feature"], null, "https://github.com/test/repo/issues/55");
         var aufgabe = await aufgabeService.CreateFromIssueAsync(projekt.Id, issue);
@@ -172,7 +172,7 @@ public sealed class EntwicklungsprozessServiceTests
         var (_, aufgabeId) = await CreateTestDataAsync(db);
 
         // Aufgabe zuerst starten
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance);
+        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         await aufgabeService.StartenAsync(aufgabeId, "task/test-branch", @"C:\nicht\vorhanden\pfad");
 
         var gitMock = new Mock<IGitPlugin>();

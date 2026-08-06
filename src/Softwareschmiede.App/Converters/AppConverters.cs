@@ -99,6 +99,19 @@ public sealed class NullOrEmptyToVisibilityConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Konvertiert einen Integer-Wert in <see cref="Visibility"/> (Visible wenn größer als 0).</summary>
+[ValueConversion(typeof(int), typeof(Visibility))]
+public sealed class GreaterThanZeroToVisibilityConverter : IValueConverter
+{
+    /// <inheritdoc/>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is int i && i > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <inheritdoc/>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in einen KI-Ausführungsstatus-String.</summary>
 [ValueConversion(typeof(object), typeof(string))]
 public sealed class KiAusfuehrungsStatusConverter : IValueConverter

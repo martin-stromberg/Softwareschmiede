@@ -322,8 +322,15 @@ public sealed class EntwicklungsprozessService
     {
         _logger.LogInformation("Aufgabe {AufgabeId} abschließen.", aufgabeId);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
+        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+
+        if (!await _aufgabeService.CanCompleteTaskAsync(aufgabeId, ct))
+        {
+            var offeneTodoCount = aufgabe.Todos.Count(t => t.IstOffen);
+            throw new InvalidOperationException(
+                string.Format(AufgabeService.OffeneTodosFehlermeldungFormat, offeneTodoCount));
+        }
 
         var vonStatus = aufgabe.Status;
 

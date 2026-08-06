@@ -18,7 +18,7 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
     }
 
     /// <summary>Dispose.</summary>

@@ -1,0 +1,104 @@
+<UserControl x:Class="Softwareschmiede.App.Views.TodoListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root"
+             Background="{DynamicResource BackgroundBrush}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="24">
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="16"
+                    Margin="0,0,0,12">
+                <StackPanel Orientation="Horizontal">
+                    <TextBox Text="{Binding NeuesTodoBeschreibung, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="NeuesTodoBeschreibung"
+                             FontSize="14"
+                             Foreground="{DynamicResource PrimaryTextBrush}"
+                             Background="{DynamicResource BackgroundBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             BorderThickness="1"
+                             Padding="8,6"
+                             Width="400"
+                             HorizontalAlignment="Left">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding TodoHinzufuegenCommand}" />
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Content="Hinzufügen"
+                            AutomationProperties.Name="TodoHinzufuegen"
+                            Command="{Binding TodoHinzufuegenCommand}"
+                            Padding="12,6"
+                            Margin="8,0,0,0" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="16">
+                <ItemsControl ItemsSource="{Binding Todos}"
+                              AutomationProperties.Name="TodosList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{Binding IstErledigt, Mode=OneWay}"
+                                          AutomationProperties.Name="TodoErledigtCheckbox"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,8,0"
+                                          Command="{Binding DataContext.TodoAlsErledigtMarkierenCommand, ElementName=Root}"
+                                          CommandParameter="{Binding Id}">
+                                    <CheckBox.Style>
+                                        <Style TargetType="CheckBox">
+                                            <Style.Triggers>
+                                                <!-- Todos können laut Anforderung nur einmal abgehakt werden (kein Wiederöffnen).
+                                                     Die Checkbox wird nach dem Abhaken deaktiviert, damit UI-Verhalten und
+                                                     Backend-Fähigkeiten übereinstimmen (kein Un-Complete verfügbar). -->
+                                                <DataTrigger Binding="{Binding IstErledigt}" Value="True">
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Beschreibung}"
+                                           FontSize="14"
+                                           VerticalAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource PrimaryTextBrush}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IstErledigt}" Value="True">
+                                                    <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                    <Setter Property="Opacity" Value="0.5" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Button Grid.Column="2"
+                                        Content="🗑"
+                                        AutomationProperties.Name="TodoLoeschen"
+                                        Command="{Binding DataContext.TodoLoeschenCommand, ElementName=Root}"
+                                        CommandParameter="{Binding Id}"
+                                        Padding="8,4"
+                                        Margin="8,0,0,0" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -19,7 +19,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
     }
 

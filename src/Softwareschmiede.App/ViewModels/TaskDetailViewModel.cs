@@ -28,7 +28,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         Cli,
         Diff,
         Dateibrowser,
-        PullRequests
+        PullRequests,
+        Todos
     }
 
     private readonly AufgabeService _aufgabeService;
@@ -43,6 +44,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly IPluginManager _pluginManager;
     private readonly IServiceProvider _serviceProvider;
     private readonly FileExplorerViewModel _fileExplorerViewModel;
+    private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
     private readonly IdeOeffnenService _ideOeffnenService;
     private readonly AppEinstellungService _einstellungService;
@@ -242,6 +244,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Pull Requests der Aufgabe.</summary>
     public ObservableCollection<PullRequestReferenz> PullRequests { get; } = new();
 
+    /// <summary>Komponiertes Presentation Model der To-Do-Liste.</summary>
+    public TodoListViewModel TodoList => _todoListViewModel;
+
     /// <summary>Verfügbare KI-Plugin-Prefixe.</summary>
     /// <value>Die Liste der verfügbaren KI-Plugin-Prefixe.</value>
     public ObservableCollection<string> VerfuegbareKiPlugins { get; } = new();
@@ -345,6 +350,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Gibt an, ob die Pull-Request-Ansicht ausgewählt ist.</summary>
     public bool IsPullRequestViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.PullRequests;
+
+    /// <summary>Gibt an, ob die Todo-Ansicht ausgewählt ist.</summary>
+    public bool IsTodoViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Todos;
 
     /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
     public bool ShowPullRequestPanel => _aufgabe is not null;
@@ -559,6 +567,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         ILogger<TaskDetailViewModel> logger,
         TimeProvider timeProvider,
         FileExplorerViewModel fileExplorerViewModel,
+        TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
         IdeOeffnenService ideOeffnenService,
         AppEinstellungService einstellungService,
@@ -577,6 +586,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _serviceProvider = serviceProvider;
         _logger = logger;
         _fileExplorerViewModel = fileExplorerViewModel;
+        _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
         _ideOeffnenService = ideOeffnenService;
         _einstellungService = einstellungService;
@@ -585,6 +595,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
         _promptZeitVersandService.PromptSent += OnPromptSent;
+        _todoListViewModel.AnsichtAktivierenCallback = () => WaehleAnsicht(DetailAnsicht.Todos);
+        _todoListViewModel.FehlerCallback = meldung => FehlerMeldung = meldung;
 
         LadenCommand = new AsyncRelayCommand(ct => LadenAsync(ct));
         CliStoppenCommand = new AsyncRelayCommand(CliStoppenAsync, () => KannCliStoppen);
@@ -657,6 +669,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 Protokolleintraege.Add(eintrag);
 
             await LadePullRequestsAsync(ct);
+            await _todoListViewModel.LadenAsync(_aufgabeId, ct);
 
             await LadeVerfuegbarePluginsAsync(ct);
             await LadePromptVorlagenAsync(ct);
@@ -953,6 +966,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
+            if (!await _aufgabeService.CanCompleteTaskAsync(_aufgabeId, ct))
+            {
+                FehlerMeldung = string.Format(AufgabeService.OffeneTodosFehlermeldungFormat, _todoListViewModel.OffeneTodoCount);
+                return;
+            }
+
             _promptZeitVersandService.CancelScheduledPrompt(_aufgabeId);
             await _entwicklungsprozessService.AbschliessenAsync(_aufgabeId, ct);
             await LadenAsync(ct);
@@ -1329,6 +1348,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsDiffViewSelected));
         OnPropertyChanged(nameof(IsFileExplorerViewSelected));
         OnPropertyChanged(nameof(IsPullRequestViewSelected));
+        OnPropertyChanged(nameof(IsTodoViewSelected));
         OnPropertyChanged(nameof(ShowInfoPanel));
     }
 
@@ -1808,4 +1828,5 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
         }
     }
+
 }

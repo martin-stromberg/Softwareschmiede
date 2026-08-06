@@ -26,7 +26,7 @@ public sealed class ProjectDetailViewModelTests_Arbeitsverzeichnis : IDisposable
     {
         _db = TestDbContextFactory.Create();
         _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
         _pluginManagerMock = new Mock<IPluginManager>();
