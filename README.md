@@ -59,6 +59,7 @@ Softwareschmiede bündelt den kompletten Workflow der KI-gestützten Softwareent
 Die wichtigsten Features:
 
 - **Projekt- und Aufgabenverwaltung** – Dashboard, Statusmodell und chronologisches Aufgabenprotokoll
+- **To-Do-Listen für Aufgaben** – Strukturierung von Aufgaben mit To-Do-Elementen, Abhak-Status und Blockierung des Aufgabenabschlusses bei offenen To-Dos; Badge zeigt Anzahl offener To-Dos im Ribbon
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
 - **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM- und KI-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
@@ -170,11 +171,14 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
 2. **Aufgabe anlegen** (frei, aus GitHub-Issue oder aus einem GitHub-Code-Scanning-Alert).
    Beim Auswählen eines Alerts erstellt Softwareschmiede automatisch ein GitHub-Issue und speichert die Alert-Herkunft lokal, damit derselbe Alert nicht erneut angeboten wird.
+   **Optional:** To-Do-Liste anlegen und verwalten (Aufgabe gliedern, Fortschritt verfolgen, Abhak-Status ändern).
 3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen, das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen und bei Bedarf die Aufgabenbeschreibung aktualisieren).
 4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt). Die eingebettete CLI-Konsole zeigt laufende Ausgabe mit vertikaler Scrollbar, Mausrad/Page-/Line-Scroll, 1000-Zeilen-Scrollback und Auto-Follow, solange Sie am Ende der Ausgabe bleiben.
 6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
-7. **Commits durchführen**, Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst.
+7. **Commits durchführen**, To-Dos abhaken (falls vorhanden), Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. 
+   **Hinweis:** Aufgaben mit noch offenen To-Dos können nicht abgeschlossen werden — das System blockiert den Abschluss und zeigt die Anzahl offener To-Dos an. 
+   Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst.
 8. **Pull Request beobachten**. Erstellte GitHub-PRs werden dauerhaft an der Aufgabe gespeichert und im Bereich `PR` mit Status, Merge-/Monitoring-Phase, letzter Prüfung und zugehörigen GitHub-Actions-/Workflow-Runs angezeigt. Je nach GitHub-Plugin-Einstellung kann Softwareschmiede nach erfolgreichen Pre-Merge-Actions einen Abschlussversuch ausführen und anschließend zuordenbare Post-Merge-Actions weiter überwachen. Blockaden durch Berechtigungen, Branch Protection oder GitHub-Fehler werden im PR-Bereich sichtbar.
 9. **Alternativ Aufgabe abbrechen**, wenn der Entwicklungsprozess nicht fortgesetzt werden soll.
 
