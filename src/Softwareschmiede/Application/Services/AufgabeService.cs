@@ -78,7 +78,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
-    /// <summary>Gibt eine Aufgabe mit IssueReferenz und Protokolleinträgen zurück.</summary>
+    /// <summary>Gibt eine Aufgabe mit IssueReferenz zurück (ohne Protokolleinträge).</summary>
     public async Task<Aufgabe?> GetDetailAsync(Guid id, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} mit Details abrufen.", id);
@@ -89,8 +89,6 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .Include(a => a.AlertReferenz)
             .Include(a => a.GitRepository)
                 .ThenInclude(r => r!.StartKonfiguration)
-            .Include(a => a.Protokolleintraege)
-                .ThenInclude(p => p.TestErgebnisse)
             .Include(a => a.Todos)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }

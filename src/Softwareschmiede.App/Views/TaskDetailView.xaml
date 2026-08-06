@@ -403,6 +403,7 @@
                                                            VerticalAlignment="Top" />
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding Typ}"
+                                                           AutomationProperties.Name="{Binding Typ, StringFormat={}ProtokollTyp-{0}}"
                                                            FontSize="11"
                                                            Foreground="{DynamicResource AccentBrush}"
                                                            VerticalAlignment="Top" />

@@ -99,10 +99,11 @@ public sealed class AufgabeServiceTests
     }
 
     /// <summary>
-    /// Testet, dass GetDetailAsync Protokolleinträge und TestErgebnisse per Include lädt.
+    /// Testet, dass GetDetailAsync Protokolleinträge NICHT mehr per Include lädt (Issue 193: Protokoll wird
+    /// separat über ProtokollService.GetByAufgabeAsync geladen, um die Detailansicht schnell anzuzeigen).
     /// </summary>
     [Fact]
-    public async Task GetDetailAsync_ShouldIncludeProtokolleintraegeWithTestErgebnisse_WhenDataExists()
+    public async Task GetDetailAsync_ShouldNotIncludeProtokolleintraege_WhenDataExists()
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync();
@@ -123,12 +124,14 @@ public sealed class AufgabeServiceTests
 
         // Act
         var detail = await aufgabeService.GetDetailAsync(aufgabe.Id);
+        var protokolleintraege = await protokollService.GetByAufgabeAsync(aufgabe.Id);
 
         // Assert
         detail.Should().NotBeNull();
-        detail!.Protokolleintraege.Should().HaveCount(2);
+        detail!.Protokolleintraege.Should().BeEmpty();
 
-        var testEintrag = detail.Protokolleintraege.Single(p => p.Typ == ProtokollTyp.TestErgebnis);
+        protokolleintraege.Should().HaveCount(2);
+        var testEintrag = protokolleintraege.Single(p => p.Typ == ProtokollTyp.TestErgebnis);
         testEintrag.TestErgebnisse.Should().HaveCount(1);
         testEintrag.TestErgebnisse[0].TestName.Should().Be("Test1");
     }

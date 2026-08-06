@@ -61,6 +61,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _zeigeKiPluginAuswahl;
     private string? _optionalCliParameters;
     private CancellationTokenSource? _ladenCts;
+    private CancellationTokenSource? _protokollLadenCts;
     private string? _editTitel;
     private string? _editAnforderungsBeschreibung;
     private bool _disposed;
@@ -663,10 +664,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             EditTitel = Aufgabe?.Titel;
             EditAnforderungsBeschreibung = Aufgabe?.AnforderungsBeschreibung;
 
-            var protokolleintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, ct);
-            Protokolleintraege.Clear();
-            foreach (var eintrag in protokolleintraege)
-                Protokolleintraege.Add(eintrag);
+            _protokollLadenCts?.Cancel();
+            _protokollLadenCts?.Dispose();
+            _protokollLadenCts = new CancellationTokenSource();
+            LadeProtokolleAsync(_protokollLadenCts.Token).SafeFireAndForget(_logger, "TaskDetailViewModel.LadeProtokolleAsync");
 
             await LadePullRequestsAsync(ct);
             await _todoListViewModel.LadenAsync(_aufgabeId, ct);
@@ -697,6 +698,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             IsLoading = false;
         }
+    }
+
+    private async Task LadeProtokolleAsync(CancellationToken ct)
+    {
+        Protokolleintraege.Clear();
+        var protokolleintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, ct);
+        foreach (var eintrag in protokolleintraege)
+            Protokolleintraege.Add(eintrag);
     }
 
     private async Task LadeVerfuegbarePluginsAsync(CancellationToken ct)
@@ -1433,6 +1442,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();
         _ladenCts = null;
+        _protokollLadenCts?.Cancel();
+        _protokollLadenCts?.Dispose();
+        _protokollLadenCts = null;
     }
 
     private async Task StartenAsync(CancellationToken ct)
