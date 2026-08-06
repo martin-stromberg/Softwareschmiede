@@ -9,6 +9,8 @@
 [![Release](https://img.shields.io/github/actions/workflow/status/martin-stromberg/Softwareschmiede/release.yml?label=Release)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](#-lizenz)
 
+[![Release & Publish](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml/badge.svg)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml)
+
 ---
 
 ## Inhaltsverzeichnis
