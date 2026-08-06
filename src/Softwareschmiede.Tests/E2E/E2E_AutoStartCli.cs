@@ -21,7 +21,10 @@ public partial class End2EndTest
     /// "Zurück" und erneutes Öffnen der Aufgabe die Ansicht neu geladen.
     /// Prüft: Beim Laden der Aufgabe (Status "Gestartet", kein laufender Prozess) wird die CLI
     /// automatisch neu gestartet und eingebettet (Stoppen-Button erscheint wieder ohne manuellen Klick
-    /// auf "Starten" oder "Plugin ändern").
+    /// auf "Starten" oder "Plugin ändern"). Prüft außerdem (Issue 193): Beim erneuten Öffnen wird die
+    /// Aufgabenbasisinformation (Stoppen-Button) angezeigt, ohne auf das asynchrone Nachladen der
+    /// Protokolleinträge zu warten; die Protokolleinträge (z. B. der GitAktion-Eintrag der
+    /// Repository-Vorbereitung) erscheinen anschließend im Hintergrund in der Protokoll-Liste.
     /// </summary>
     protected void AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E(Window mainWindow)
     {
@@ -32,6 +35,12 @@ public partial class End2EndTest
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+
+        // Protokoll-Nachladen (Issue 193): Der GitAktion-Eintrag aus der Repository-Vorbereitung
+        // wird asynchron im Hintergrund geladen und muss ohne expliziten Reload sichtbar werden.
+        // AutomationProperties.Name des Protokolltyp-TextBlocks ist explizit an Typ gebunden
+        // (TaskDetailView.xaml, "ProtokollTyp-{Typ}"), statt zufällig am impliziten Textinhalt.
+        WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
 
         // CLI manuell stoppen, Status bleibt "Gestartet"
         var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Short);
@@ -48,8 +57,13 @@ public partial class End2EndTest
         Assert.True(items.Length >= 1, "Aufgabenliste sollte die gestartete Aufgabe enthalten.");
         ErsteOffeneAufgabeOeffnen(items);
 
-        // Automatischer CLI-Neustart beim Laden: Stoppen-Button erscheint ohne manuellen Start-Klick
+        // Automatischer CLI-Neustart beim Laden: Stoppen-Button erscheint ohne manuellen Start-Klick.
+        // Erscheint unabhängig vom (fire-and-forget) Protokoll-Nachladen, das erst danach geprüft wird.
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+
+        // Protokoll wird nach dem erneuten Öffnen erneut asynchron nachgeladen und angezeigt.
+        WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
+
         NavigateBackFromTaskToProject(mainWindow);
         DeleteCurrentProject(mainWindow);
     }

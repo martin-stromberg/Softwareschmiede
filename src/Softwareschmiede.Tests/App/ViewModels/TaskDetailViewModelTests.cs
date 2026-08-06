@@ -227,6 +227,84 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.Aufgabe.Should().NotBeNull("der AufgabeId-Setter muss LadenAsync per SafeFireAndForget auslösen");
     }
 
+    // --- Protokoll asynchrones Nachladen (Issue 193) ---
+
+    /// <summary>LadeProtokolleAsync lädt die Protokolleinträge der Aufgabe und befüllt die Protokolleintraege-Collection.</summary>
+    [Fact]
+    public async Task LadeProtokolleAsync_ShouldLoadProtocols_WhenSuccessful()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Testinhalt");
+        var sut = CreateSut();
+        typeof(TaskDetailViewModel).GetField("_aufgabeId", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(sut, aufgabe.Id);
+
+        var method = typeof(TaskDetailViewModel).GetMethod("LadeProtokolleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var task = (Task)method.Invoke(sut, new object[] { CancellationToken.None })!;
+        await task;
+
+        sut.Protokolleintraege.Should().ContainSingle(p => p.Inhalt == "Testinhalt");
+    }
+
+    /// <summary>LadeProtokolleAsync fängt Fehler des ProtokollService nicht selbst ab, sondern lässt sie propagieren, damit SafeFireAndForget (wie bei allen anderen Fire-and-Forget-Aufrufen dieser Klasse) sie protokolliert.</summary>
+    [Fact]
+    public async Task LadeProtokolleAsync_ShouldPropagateException_WhenProtokollServiceFails()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        typeof(TaskDetailViewModel).GetField("_aufgabeId", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(sut, aufgabe.Id);
+
+        await _db.DisposeAsync();
+
+        var method = typeof(TaskDetailViewModel).GetMethod("LadeProtokolleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var task = (Task)method.Invoke(sut, new object[] { CancellationToken.None })!;
+
+        var act = async () => await task;
+        await act.Should().ThrowAsync<ObjectDisposedException>("LadeProtokolleAsync darf Fehler nicht mehr selbst abfangen, sondern muss sie propagieren, damit SafeFireAndForget sie protokollieren kann");
+    }
+
+    /// <summary>LadeProtokolleAsync fängt eine OperationCanceledException nicht selbst ab, sondern lässt sie propagieren, damit SafeFireAndForget den Abbruch behandelt.</summary>
+    [Fact]
+    public async Task LadeProtokolleAsync_ShouldPropagateCancellation_WhenCancellationTokenCancelled()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut();
+        typeof(TaskDetailViewModel).GetField("_aufgabeId", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(sut, aufgabe.Id);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var method = typeof(TaskDetailViewModel).GetMethod("LadeProtokolleAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var task = (Task)method.Invoke(sut, new object[] { cts.Token })!;
+
+        var act = async () => await task;
+        await act.Should().ThrowAsync<OperationCanceledException>("LadeProtokolleAsync darf einen Abbruch nicht mehr selbst abfangen, sondern muss ihn propagieren");
+    }
+
+    /// <summary>LadenAsync setzt Aufgabe, ohne auf das (fire-and-forget) Nachladen der Protokolle zu warten; die Protokolle werden anschließend im Hintergrund nachgeladen.</summary>
+    [Fact]
+    public async Task LadenAsync_ShouldNotWaitForProtocols()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "Eintrag 1");
+        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.KiAntwort, "Eintrag 2");
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.Aufgabe.Should().NotBeNull("Aufgabe muss gesetzt sein, sobald LadenAsync abgeschlossen ist, unabhängig vom Stand des Protokoll-Nachladens");
+        sut.Aufgabe!.Id.Should().Be(aufgabe.Id);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && sut.Protokolleintraege.Count < 2)
+            await Task.Delay(50);
+
+        sut.Protokolleintraege.Should().HaveCount(2, "die Protokolleinträge müssen im Hintergrund nachgeladen werden");
+    }
+
     // --- ShowEditPanel, ShowCliPanel, ShowDiffPanel ---
 
     /// <summary>ShowEditPanel ist true wenn Status=Neu.</summary>

@@ -1,3 +1,12 @@
+## 2026-08-06 — Asynchrones Laden von Aufgabenprotokollen zur Reduktion der Detailansicht-Ladezeit
+
+- Performance-Optimierung: `AufgabeService.GetDetailAsync()` lädt Protokolleinträge (`Protokolleintraege`) und deren Testergebnisse nicht mehr mit der Aufgabe. Aufgabenbasisinformation (Titel, Status, Branch, Beschreibung, Todos, etc.) wird dadurch schnell angezeigt.
+- Asynchrones Nachladen: `TaskDetailViewModel.LadeProtokolleAsync()` lädt Protokolleinträge nach Anzeige der Aufgabe im Hintergrund mittels Fire-and-Forget (`SafeFireAndForget`) — blockiert nicht das UI.
+- Fehlerbehandlung: Fehler beim Protokoll-Laden werden geloggt; `OperationCanceledException` beim Wechsel der Aufgabe wird stillschweigend ignoriert.
+- Seitenneffekt-Handling: `IsLoading` wird nach dem Laden der Aufgabenbasisinformation auf `false` gesetzt, nicht nach dem Protokoll-Laden. Der Anwender kann bereits mit der Aufgabe interagieren, während das Protokoll noch nachgeladen wird.
+- Datenbank-Zugriff: Keine neuen Migrations oder Datenmodell-Änderungen.
+- Tests: `AufgabeServiceTests` und `TaskDetailViewModelTests` angepasst; keine Regressionstests erforderlich (internes Optimierung, Benutzererlebnis ändert sich nicht).
+
 ## 2026-08-06 — To-Do-Liste zur Unterstützung der Aufgabengliederung und des Fortschritts
 
 - Feature: Jede Aufgabe erhält eine To-Do-Liste mit neuer „Todos"-Ansicht in der Aufgabendetailansicht. Benutzer können To-Dos anlegen, abhaken und löschen.

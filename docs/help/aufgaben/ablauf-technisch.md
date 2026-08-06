@@ -36,6 +36,62 @@ Ablauf:
 9. `MainWindowViewModel.Title` bzw. der von `ProjectListViewModel` gemeldete Detailtitel wird auf `Softwareschmiede – {Aufgabentitel}` gesetzt
 10. `ProjectDetailView` wird nicht mehr angezeigt
 
+### Asynchrones Laden der Aufgabenprotokolle (Performance-Optimierung)
+
+Beim Laden der Aufgabendetailansicht werden die Aufgabenbasisinformation schnell angezeigt, während Protokolleinträge asynchron im Hintergrund nachgeladen werden. Diese Optimierung verhindert, dass die UI blockiert wird, wenn eine Aufgabe viele Protokolleinträge hat.
+
+**Änderung gegenüber dem bisherigen Ablauf:**
+
+- **Alt:** `AufgabeService.GetDetailAsync()` lädt alle Beziehungen inkl. `Aufgabe.Protokolleintraege` mit `Include()` synchron. Bei vielen Protokolleinträgen blockiert der DB-Zugriff die UI.
+- **Neu:** `AufgabeService.GetDetailAsync()` lädt **nicht** die Protokolleinträge. `TaskDetailViewModel` lädt diese asynchron nach.
+
+**Beteiligte Komponenten:**
+- `AufgabeService.GetDetailAsync` — Ohne `Include(a => a.Protokolleintraege)` und `ThenInclude(p => p.TestErgebnisse)`
+- `TaskDetailViewModel.LadenAsync` — Orchestriert Lade-Sequenz mit Fire-and-Forget
+- `TaskDetailViewModel.LadeProtokolleAsync` — Private async Methode für Hintergrund-Laden
+- `ProtokollService.GetByAufgabeAsync` — Lädt Protokolleinträge asynchron ab
+- `TaskDetailViewModel.Protokolleintraege` — ObservableCollection wird durch Fire-and-Forget gefüllt
+
+**Ablauf:**
+
+1. `TaskDetailViewModel.LadenAsync(ct)` wird aufgerufen (wie bisher durch AufgabeId-Setter)
+2. `IsLoading = true` wird gesetzt (Lade-Indikator anzeigen)
+3. `Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct)` wird aufgerufen
+   - Schnell: Gibt Aufgabenbasisinformation zurück **ohne** Protokolleinträge
+   - `Aufgabe.Protokolleintraege` ist null oder leer
+4. UI bindet auf `Aufgabe.Titel`, `Aufgabe.Status`, etc. und zeigt Basisinformation sofort an
+5. Fußzeile und Ribbon werden aktualisiert; die Ansicht wird responsive
+6. **Fire-and-Forget für Protokoll:** `_ = LadeProtokolleAsync(_protokollLadenCts.Token)` wird aufgerufen **ohne Await**
+   - Diese Zeile gibt sofort zurück; der Hintergrund-Task läuft unabhängig
+   - `IsLoading` wird nicht beeinflusst durch diesen Task
+7. `LadeProtokolleAsync(ct)` läuft parallel im Hintergrund:
+   - `var protokolleintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, ct)`
+   - Protokolleinträge werden abrufen (kann mehrere Sekunden dauern bei großen Protokollen)
+   - `Protokolleintraege.Clear()` und dann alle Einträge hinzufügen
+   - Fehlerbehandlung:
+     - `OperationCanceledException`: Stillschweigend ignorieren (Aufgabe gewechselt oder View disposed)
+     - Andere Fehler: Mit `_logger.LogError()` protokollieren, nicht an User gezeigt
+8. Nach dem Laden der Basisinformation wird `IsLoading = false` gesetzt (nur dann!)
+   - Der Anwender kann sofort mit der Aufgabe interagieren
+9. Das Protokoll wird still im Hintergrund befüllt; die `ObservableCollection` benachrichtigt das UI-Binding
+10. Im `finally`-Block von `LadenAsync`: `IsLoading = false` wird gesetzt (auch bei Fehler)
+
+**Beobachtetes Verhalten:**
+
+- Bei **kleinen Protokollen** (< 100 Einträge): Das Nachladen ist unmerklich schnell; der Anwender sieht kein Unterschied
+- Bei **großen Protokollen** (> 10.000 Einträge): Die Aufgabenbasisinformation ist **sofort** sichtbar; das Protokoll wird einige Sekunden später angezeigt
+- **UI bleibt responsive:** Während das Protokoll nachgeladen wird, kann der Anwender bereits andere Tabs (Info, CLI, Diff) öffnen, Buttons klicken, etc.
+
+**Abbruch und Cleanup:**
+
+- Wenn der Anwender zur nächsten Aufgabe navigiert (AufgabeId ändert sich):
+  - Neuer `CancellationTokenSource` wird erstellt (`_protokollLadenCts`)
+  - Alter Token wird abgebrochen → `LadeProtokolleAsync` wirft `OperationCanceledException`, das stillschweigend ignoriert wird
+  - Der alte Hintergrund-Task lädt die Protokolle der alten Aufgabe nicht mehr; die Einträge werden nicht in die neue Aufgabe geschrieben
+- Wenn das ViewModel disposed wird (Fenster geschlossen):
+  - `_protokollLadenCts` wird disposed → alle laufenden `await`-Aufrufe werden abgebrochen
+  - Laufende Datenbankabfragen werden durch Timeout abgebrochen (Standard-Verhalten)
+
 ### Navigieren zurück zur Projektdetailansicht
 
 Ausgelöst durch Klick auf „Zurück"-Button im Ribbon der `TaskDetailView`.
