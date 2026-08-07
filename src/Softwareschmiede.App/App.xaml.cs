@@ -29,7 +29,10 @@ public sealed partial class App : System.Windows.Application
     /// <summary>Service Locator für WPF-Code-behind-Klassen (Controls/Views), die von XAML ohne Konstruktor-Injection erzeugt werden.</summary>
     internal static IServiceProvider? Services { get; private set; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Initialisiert die Anwendung und konfiguriert Logging, Dependency Injection und globale Exception-Handler.
+    /// </summary>
+    /// <param name="e">Die Startargumente der Anwendung.</param>
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
