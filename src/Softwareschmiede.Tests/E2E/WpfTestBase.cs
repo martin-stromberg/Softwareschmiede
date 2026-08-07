@@ -259,6 +259,16 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Setzt den Workspace-Modus des LocalDirectoryPlugins für E2E-Tests.</summary>
     protected static void SetLocalDirectoryWorkspaceMode(string workspaceMode)
         => new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.WorkspaceMode", workspaceMode);
+    /// <summary>
+    /// Wechselt die Ansicht innerhalb der Aufgabenansicht, z. B. von "Info" zu "Protokoll" oder "CLI".
+    /// </summary>
+    /// <param name="mainWindow"></param>
+    /// <param name="viewButtonName"></param>
+    protected void WechsleAufgabenansicht(Window mainWindow, string viewButtonName)
+    {
+        var infoButton = WaitForElement(mainWindow, cf => cf.ByName(viewButtonName), Short);
+        infoButton.AsButton().Click();
+    }
 
     /// <summary>
     /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> gefunden wird.
