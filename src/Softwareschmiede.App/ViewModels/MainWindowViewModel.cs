@@ -23,6 +23,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly DarkModeService _darkModeService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IAktiveAufgabenService _aufgabeService;
+    private readonly TodoService _todoService;
     private readonly PromptZeitVersandService _promptZeitVersandService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
@@ -149,6 +150,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         DarkModeService darkModeService,
         IServiceProvider serviceProvider,
         IAktiveAufgabenService aufgabeService,
+        TodoService todoService,
         PromptZeitVersandService promptZeitVersandService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
@@ -162,6 +164,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
         _aufgabeService = aufgabeService;
+        _todoService = todoService;
         _promptZeitVersandService = promptZeitVersandService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
@@ -250,7 +253,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var aufgaben = await _aufgabeService.GetAktiveAufgabenAsync(ct);
-            AktiveAufgabenListe.ReplaceAll(aufgaben.Select(MapAktiveAufgabePanelItem));
+            var offeneTodoCounts = await _todoService.GetOpenTodoCountsAsync(aufgaben.Select(a => a.Id), ct);
+            AktiveAufgabenListe.ReplaceAll(aufgaben.Select(a => MapAktiveAufgabePanelItem(a, offeneTodoCounts)));
         }
         catch (OperationCanceledException)
         {
@@ -284,8 +288,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         viewModel.AufgabeId = aufgabeId;
     }
 
-    private AktiveAufgabePanelItem MapAktiveAufgabePanelItem(Aufgabe aufgabe)
+    private AktiveAufgabePanelItem MapAktiveAufgabePanelItem(
+        Aufgabe aufgabe,
+        IReadOnlyDictionary<Guid, int> offeneTodoCounts)
     {
+        var offeneTodoCount = offeneTodoCounts.GetValueOrDefault(aufgabe.Id);
+        var offeneTodosCommand = new AsyncRelayCommand(
+            ct => OffeneTodosDialogOeffnenAsync(aufgabe.Id, aufgabe.Titel, ct));
+        offeneTodosCommand.OnError = ex =>
+            _logger.LogWarning(ex, "Fehler beim Öffnen des offene To-Dos-Dialogs für Aufgabe {AufgabeId}.", aufgabe.Id);
+
         return new AktiveAufgabePanelItem
         {
             Id = aufgabe.Id,
@@ -299,8 +311,20 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             LaufStatus = aufgabe.LaufStatus,
             LetzterCliStartUtc = aufgabe.LetzterCliStartUtc,
             IsAktiv = GetAktiveAufgabeId() == aufgabe.Id,
-            HasScheduledPrompt = _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id) is not null
+            HasScheduledPrompt = _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id) is not null,
+            OffeneTodoCount = offeneTodoCount,
+            OffeneTodosAnzeigenCommand = offeneTodosCommand
         };
+    }
+
+    private async Task OffeneTodosDialogOeffnenAsync(Guid aufgabeId, string aufgabenTitel, CancellationToken ct)
+    {
+        if (_dialogService is null)
+            return;
+
+        var viewModel = _serviceProvider.GetRequiredService<OpenTodosDialogViewModel>();
+        await viewModel.LoadAsync(aufgabeId, aufgabenTitel, ct);
+        await _dialogService.ShowOpenTodosDialogAsync(viewModel, ct);
     }
 
     private string? ResolvePluginName(PluginType pluginType, string? pluginPrefix)

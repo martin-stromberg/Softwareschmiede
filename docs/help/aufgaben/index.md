@@ -6,7 +6,7 @@ Die Aufgabendetailansicht bietet ein Ribbon-Menü für schnellen Zugriff auf Akt
 
 Erstellte Pull Requests werden persistent an der Aufgabe gespeichert. Die PR-Ansicht zeigt die verknuepften Pull Requests mit Status, Merge-/Monitoring-Phase und zugeordneten GitHub-Actions-/Workflow-Runs. Ein Hintergrundmonitor aktualisiert die gespeicherten GitHub-Statusdaten und kann Pull Requests nach erfolgreichen Pre-Merge-Actions automatisch abschliessen, wenn dies im GitHub-Plugin aktiviert ist.
 
-Die Navigationsmenü-Seitenleiste zeigt bis zu 20 derzeit aktive Aufgaben als Kacheln mit Titel und KI-Ausführungsstatus an, um schnellen Zugriff auf laufende Arbeiten zu ermöglichen. Das Dashboard zeigt die gleiche Aufgabenliste an; die Menüsektion wird automatisch verborgen wenn das Dashboard aktiv ist, um Redundanz zu vermeiden.
+Die Navigationsmenü-Seitenleiste zeigt bis zu 20 derzeit aktive Aufgaben als Kacheln mit Titel, KI-Ausführungsstatus und Anzahl offener Todos an, um schnellen Zugriff auf laufende Arbeiten zu ermöglichen. Das Todo-Label ist anklickbar und öffnet einen rein lesenden Dialog mit den offenen Todos der ausgewählten Aufgabe oder einem Leerzustand bei `0 Todos`. Das Dashboard zeigt die gleiche Aufgabenliste an; die Menüsektion wird automatisch verborgen wenn das Dashboard aktiv ist, um Redundanz zu vermeiden.
 
 ## Inhalt
 

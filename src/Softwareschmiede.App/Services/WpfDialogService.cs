@@ -91,6 +91,23 @@ public sealed class WpfDialogService : IDialogService
     }
 
     /// <inheritdoc/>
+    public Task ShowOpenTodosDialogAsync(
+        OpenTodosDialogViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var dialog = new OpenTodosDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            dialog.ShowDialog();
+        }).Task;
+    }
+
+    /// <inheritdoc/>
     public Task<string?> ShowSolutionSelectionDialogAsync(
         IReadOnlyList<string> solutionPfade,
         CancellationToken ct = default)

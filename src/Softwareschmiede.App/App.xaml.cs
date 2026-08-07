@@ -270,6 +270,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<IssueCreateDialogViewModel>();
         services.AddTransient<FileExplorerViewModel>();
         services.AddTransient<TodoListViewModel>();
+        services.AddTransient<OpenTodosDialogViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

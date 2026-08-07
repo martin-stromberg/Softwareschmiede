@@ -18,6 +18,7 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
 - **Aktive Markierung:** Wenn im Inhaltsbereich eine Aufgabe geöffnet ist, wird genau diese Aufgabe in der Seitenleiste hervorgehoben.
 - **Stabile Sortierung:** Die Aufgaben werden absteigend nach `LetzterCliStartUtc` sortiert. Dieser Zeitstempel wird nur beim echten CLI-Prozessstart aktualisiert, nicht beim Anzeigen einer bereits laufenden Hintergrundaufgabe. Für ältere Aufgaben ohne Wert wird auf `ErstellungsDatum`, danach Titel und ID zurückgefallen.
 - **Navigation:** Ein Navigations-Button (→) auf jeder Kachel ermöglicht den direkten Zugriff auf die Aufgabendetailansicht.
+- **Offene Todos:** Jede Kachel zeigt ein anklickbares Todo-Label mit der Anzahl offener Todos, z. B. `0 Todos`, `1 Todo` oder `3 Todos`. Die Anzahl berücksichtigt nur Todos ohne Erledigungsdatum. Ein Klick öffnet einen modalen read-only Dialog mit den offenen Todos der ausgewählten Aufgabe; bei `0` offenen Todos zeigt der Dialog den Leerzustand „Keine offenen Todos.".
 - **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — keine doppelte Anzeige.
 - **Automatische Statusaktualisierung:** Der Aufgabenstatus wird ohne manuelles Neuladen aktualisiert:
   - **Sofortreaktion auf Prozess-Änderungen:** Wenn eine Aufgabe gestartet oder beendet wird, wird die Seitenleiste sofort aktualisiert.
@@ -179,6 +180,7 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
   - **Löschen-Button:** Entfernt das To-Do aus der Liste und der Datenbank.
 - **Validierung beim Aufgabenabschluss:** Die Aufgabe kann **nicht** beendet werden (Status: `Beendet`), solange noch offene To-Dos vorhanden sind. Ein Versuch, die Aufgabe zu beenden, zeigt eine Fehlermeldung wie „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
 - **Ribbon-Badge:** Im Ribbon-Menü wird in der Aufgaben-Gruppe eine Markierung angezeigt, falls offene To-Dos vorhanden sind (z. B. „⚠ 3 offen"). Das Badge wird verborgen wenn alle To-Dos erledigt sind.
+- **Aktive-Aufgaben-Label:** In der aktiven Aufgabenliste der Seitenleiste und im Dashboard wird die Anzahl offener Todos pro Aufgabe direkt an der Kachel angezeigt. Das Label bleibt auch bei `0 Todos` sichtbar und öffnet einen read-only Dialog mit den offenen Todos oder dem Leerzustand.
 
 ## Einschränkungen
 

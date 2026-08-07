@@ -156,4 +156,54 @@ public sealed class TodoServiceTests : IDisposable
         // Assert
         result.Should().Be(2);
     }
+
+    /// <summary>GetOpenTodoCountsAsync zählt offene Todos für mehrere Aufgaben und ignoriert erledigte Todos.</summary>
+    [Fact]
+    public async Task GetOpenTodoCountsAsync_ShouldReturnCountsForMultipleTasks()
+    {
+        // Arrange
+        var zweiteAufgabeId = Guid.NewGuid();
+        _db.Aufgaben.Add(new Aufgabe
+        {
+            Id = zweiteAufgabeId,
+            ProjektId = _db.Projekte.Single().Id,
+            Titel = "Zweite Testaufgabe",
+            Status = AufgabeStatus.Neu,
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        });
+        _db.SaveChanges();
+
+        await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - offen 1");
+        await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - offen 2");
+        var erledigt = await _sut.CreateTodoAsync(_aufgabeId, "Aufgabe 1 - erledigt");
+        await _sut.MarkTodoAsCompletedAsync(erledigt.Id);
+        await _sut.CreateTodoAsync(zweiteAufgabeId, "Aufgabe 2 - offen");
+
+        // Act
+        var result = await _sut.GetOpenTodoCountsAsync([_aufgabeId, zweiteAufgabeId, _aufgabeId]);
+
+        // Assert
+        result.Should().HaveCount(2);
+        result[_aufgabeId].Should().Be(2);
+        result[zweiteAufgabeId].Should().Be(1);
+    }
+
+    /// <summary>GetOpenTodoCountsAsync gibt keine falschen Einträge für unbekannte oder leere IDs zurück.</summary>
+    [Fact]
+    public async Task GetOpenTodoCountsAsync_ShouldReturnOnlyMatchingCounts()
+    {
+        // Arrange
+        await _sut.CreateTodoAsync(_aufgabeId, "Offen");
+        var unbekannteAufgabeId = Guid.NewGuid();
+
+        // Act
+        var result = await _sut.GetOpenTodoCountsAsync([_aufgabeId, unbekannteAufgabeId]);
+        var emptyResult = await _sut.GetOpenTodoCountsAsync([]);
+
+        // Assert
+        result.Should().ContainSingle();
+        result[_aufgabeId].Should().Be(1);
+        result.Should().NotContainKey(unbekannteAufgabeId);
+        emptyResult.Should().BeEmpty();
+    }
 }

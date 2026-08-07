@@ -36,6 +36,7 @@ public partial class End2EndTest
 
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
+        WechsleAufgabenansicht(mainWindow, "InfoCliToggle");
         // Protokoll-Nachladen (Issue 193): Der GitAktion-Eintrag aus der Repository-Vorbereitung
         // wird asynchron im Hintergrund geladen und muss ohne expliziten Reload sichtbar werden.
         // AutomationProperties.Name des Protokolltyp-TextBlocks ist explizit an Typ gebunden
@@ -43,6 +44,7 @@ public partial class End2EndTest
         WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
 
         // CLI manuell stoppen, Status bleibt "Gestartet"
+        WechsleAufgabenansicht(mainWindow, "CliViewButton");
         var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Short);
         stoppenButton.AsButton().Click();
 
@@ -62,6 +64,7 @@ public partial class End2EndTest
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
         // Protokoll wird nach dem erneuten Öffnen erneut asynchron nachgeladen und angezeigt.
+        WechsleAufgabenansicht(mainWindow, "InfoCliToggle"); 
         WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
 
         NavigateBackFromTaskToProject(mainWindow);

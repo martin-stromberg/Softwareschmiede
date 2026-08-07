@@ -383,6 +383,7 @@
                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                            Margin="0,0,0,8" />
                                 <ListBox ItemsSource="{Binding Protokolleintraege}"
+                                         AutomationProperties.Name="TaskProtocol"
                                          Background="Transparent"
                                          BorderThickness="0"
                                          ScrollViewer.VerticalScrollBarVisibility="Auto"

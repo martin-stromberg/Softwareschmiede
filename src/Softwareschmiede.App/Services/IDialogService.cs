@@ -31,6 +31,11 @@ public interface IDialogService
         IssueCreateDialogViewModel viewModel,
         CancellationToken ct = default);
 
+    /// <summary>Zeigt die offenen To-Dos einer Aufgabe read-only an.</summary>
+    Task ShowOpenTodosDialogAsync(
+        OpenTodosDialogViewModel viewModel,
+        CancellationToken ct = default);
+
     /// <summary>Zeigt den Solution-Auswahl-Dialog und gibt den gewählten Solution-Pfad zurück, oder null wenn abgebrochen.</summary>
     Task<string?> ShowSolutionSelectionDialogAsync(
         IReadOnlyList<string> solutionPfade,

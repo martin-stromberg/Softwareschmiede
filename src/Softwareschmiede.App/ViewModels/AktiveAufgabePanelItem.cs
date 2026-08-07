@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.App.ViewModels;
@@ -39,6 +40,15 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
 
     /// <summary>Gibt an, ob für diese Aufgabe aktuell ein zeitgesteuerter Prompt in der Warteschlange steht.</summary>
     public bool HasScheduledPrompt { get; init; }
+
+    /// <summary>Anzahl offener To-Dos dieser Aufgabe.</summary>
+    public int OffeneTodoCount { get; init; }
+
+    /// <summary>Anzeigetext für die offenen To-Dos.</summary>
+    public string OffeneTodoLabelText => OffeneTodoCount == 1 ? "1 Todo" : $"{OffeneTodoCount} Todos";
+
+    /// <summary>Öffnet den read-only Dialog mit den offenen To-Dos dieser Aufgabe.</summary>
+    public ICommand? OffeneTodosAnzeigenCommand { get; init; }
 
     /// <summary>Gibt an, ob diese Aufgabe aktuell im Inhaltsbereich angezeigt wird.</summary>
     public bool IsAktiv
