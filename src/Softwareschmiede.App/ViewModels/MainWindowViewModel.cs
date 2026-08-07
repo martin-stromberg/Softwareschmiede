@@ -33,6 +33,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IDialogService? _dialogService;
     private readonly IApplicationVersionProvider? _versionProvider;
     private readonly IPluginManager? _pluginManager;
+    private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
     private readonly Action<Action> _dispatcherInvoke;
     private readonly DispatcherTimer _aktualisierungsTimer;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
@@ -159,7 +160,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ICliUpdateSafetyService? cliUpdateSafetyService = null,
         IUpdateProgressDialogService? updateProgressDialogService = null,
         IDialogService? dialogService = null,
-        IApplicationVersionProvider? versionProvider = null)
+        IApplicationVersionProvider? versionProvider = null,
+        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
@@ -173,6 +175,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _updateProgressDialogService = updateProgressDialogService;
         _dialogService = dialogService;
         _versionProvider = versionProvider;
+        _laufdatenChangedNotifier = laufdatenChangedNotifier;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -187,6 +190,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         UpdateStartenCommand = new AsyncRelayCommand(UpdateStartenAsync, () => _updateService is not null && UpdateVerfuegbar && !UpdateCheckLaeuft && !UpdateWirdVorbereitet);
 
         _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
+        if (_laufdatenChangedNotifier is not null)
+        {
+            _laufdatenChangedNotifier.LaufdatenChanged += OnLaufdatenChanged;
+        }
 
         _aktualisierungsTimer = new DispatcherTimer
         {
@@ -354,6 +361,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
     }
 
+    private void OnLaufdatenChanged(Guid aufgabeId)
+    {
+        _dispatcherInvoke(AktiveAufgabenImHintergrundAktualisieren);
+    }
+
     private void OnAktualisierungsTimerTick(object? sender, EventArgs e)
     {
         AktiveAufgabenImHintergrundAktualisieren();
@@ -469,6 +481,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _aktualisierungsTimer.Stop();
         _aktualisierungsTimer.Tick -= OnAktualisierungsTimerTick;
         _runningStatusSource.RunningCountChanged -= OnRunningCountChanged;
+        if (_laufdatenChangedNotifier is not null)
+        {
+            _laufdatenChangedNotifier.LaufdatenChanged -= OnLaufdatenChanged;
+        }
 
         // _refreshGate wird bewusst nicht disposed: Ein noch laufender Fire-and-Forget-Refresh
         // (Timer-Tick oder RunningCountChanged kurz vor dem Schließen) würde in seinem finally-Block

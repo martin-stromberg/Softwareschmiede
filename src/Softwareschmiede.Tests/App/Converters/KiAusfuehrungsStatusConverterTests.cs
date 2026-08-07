@@ -140,6 +140,25 @@ public sealed class KiAusfuehrungsStatusConverterTests
         result.Should().Be("▶ Läuft");
     }
 
+    /// <summary>Convert berücksichtigt beim Sidebar-Panel-Item den persistierten Wartestatus einer aktiven CLI-Ausführung.</summary>
+    [Fact]
+    public void Convert_ShouldReturnWartetString_WhenPanelItemHasActiveRunAndLaufStatusIstWartetAufEingabe()
+    {
+        var item = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Wartende Sidebar-Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AktiveRunId = "run-panel-wartet",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-10),
+            LaufStatus = AufgabeLaufStatus.WartetAufEingabe
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("⏸ Wartet");
+    }
+
     /// <summary>Convert gibt einen leeren String zurück, wenn kein unterstütztes Objekt übergeben wird.</summary>
     [Fact]
     public void Convert_ShouldReturnEmptyString_WhenValueIsNotAufgabe()

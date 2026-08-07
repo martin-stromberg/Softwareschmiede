@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Softwareschmiede.App.Converters;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
@@ -82,7 +83,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         ICliUpdateSafetyService? cliUpdateSafetyService = null,
         IUpdateProgressDialogService? updateProgressDialogService = null,
         IDialogService? dialogService = null,
-        IApplicationVersionProvider? versionProvider = null)
+        IApplicationVersionProvider? versionProvider = null,
+        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var darkModeService = new DarkModeService(scopeFactoryMock.Object, NullLogger<DarkModeService>.Instance);
@@ -101,7 +103,8 @@ public sealed class MainWindowViewModelTests : IDisposable
             cliUpdateSafetyService,
             updateProgressDialogService,
             dialogService,
-            versionProvider);
+            versionProvider,
+            laufdatenChangedNotifier);
     }
 
     private ProjectListViewModel CreateProjectListViewModel(ProjektService projektService)
@@ -562,6 +565,42 @@ public sealed class MainWindowViewModelTests : IDisposable
             "RunningCountChanged muss AktiveAufgabenAktualisierenAsync auslösen");
     }
 
+    /// <summary>LaufdatenChanged aktualisiert eine bereits sichtbare Seitenleisten-Kachel nach persistierten Laufdaten.</summary>
+    [Fact]
+    public async Task LaufdatenChanged_ShouldReloadVisiblePanelItem_WhenRunDataWasPersisted()
+    {
+        // Arrange
+        var notifier = new AufgabeLaufdatenChangedNotifier();
+        var converter = new KiAusfuehrungsStatusConverter();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Laufdaten-Event-Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/laufdaten-event", "/tmp/klon");
+        var sut = CreateSut(laufdatenChangedNotifier: notifier);
+        await sut.AktiveAufgabenAktualisierenAsync();
+        var initialItem = sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id).Subject;
+        initialItem.AktiveRunId.Should().BeNull();
+        converter.Convert(initialItem, typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture)
+            .Should().Be("✓ Bereit");
+
+        // Act
+        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "run-laufdaten-event");
+        notifier.NotifyLaufdatenChanged(aufgabe.Id);
+
+        // Assert
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline
+               && sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id).AktiveRunId is null)
+        {
+            await Task.Delay(50);
+        }
+
+        var refreshedItem = sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id).Subject;
+        refreshedItem.AktiveRunId.Should().Be("run-laufdaten-event");
+        refreshedItem.LastHeartbeatUtc.Should().NotBeNull();
+        refreshedItem.LaufStatus.Should().Be(AufgabeLaufStatus.Laeuft);
+        converter.Convert(refreshedItem, typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture)
+            .Should().Be("▶ Läuft");
+    }
+
     /// <summary>Der automatische Start-Check zeigt den Update-Button bei verfügbarer neuer Version.</summary>
     [Fact]
     public async Task Constructor_ShouldStartUpdateCheckAndExposeAvailableUpdate()
@@ -788,6 +827,50 @@ public sealed class MainWindowViewModelTests : IDisposable
             "nach Dispose() darf RunningCountChanged keine Aktualisierung mehr auslösen");
     }
 
+    /// <summary>Nach Dispose() löst LaufdatenChanged kein Neuladen aus und wirft nicht.</summary>
+    [Fact]
+    public async Task Dispose_ShouldUnsubscribeFromLaufdatenChanged()
+    {
+        // Arrange
+        var aufgabe = new Softwareschmiede.Domain.Entities.Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Projekt = new Softwareschmiede.Domain.Entities.Projekt
+            {
+                Id = _projektId,
+                Name = "Testprojekt",
+                ErstellungsDatum = DateTimeOffset.UtcNow,
+                Status = ProjektStatus.Aktiv
+            },
+            Titel = "Laufdaten nach Dispose",
+            Status = AufgabeStatus.Gestartet,
+            ErstellungsDatum = DateTimeOffset.UtcNow,
+            BranchName = "feature/laufdaten-dispose",
+            LokalerKlonPfad = "/tmp/klon"
+        };
+        var aufgabeService = new ZaehlenderAktiveAufgabenService([aufgabe]);
+        var notifier = new AufgabeLaufdatenChangedNotifier();
+        var sut = CreateSut(aufgabeService, laufdatenChangedNotifier: notifier);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline && aufgabeService.Abrufe == 0)
+            await Task.Delay(25);
+
+        var abrufeVorDispose = aufgabeService.Abrufe;
+        sut.Dispose();
+
+        // Act
+        var act = () => notifier.NotifyLaufdatenChanged(aufgabe.Id);
+
+        // Assert
+        act.Should().NotThrow();
+
+        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        aufgabeService.Abrufe.Should().Be(abrufeVorDispose,
+            "nach Dispose() darf LaufdatenChanged keine Aktualisierung mehr auslösen");
+    }
+
     /// <summary>CurrentVersion wird bei erfolgreichem GetInstalledVersionAsync mit der formatierten Version gefüllt.</summary>
     [Fact]
     public async Task CurrentVersion_ShouldExposeInstalledVersion_WhenProviderReturnsValue()
@@ -866,6 +949,30 @@ public sealed class MainWindowViewModelTests : IDisposable
                 _fortsetzen.Wait(ct);
             }
 
+            return Task.FromResult(_aufgaben);
+        }
+    }
+
+    /// <summary>Test-Datenquelle, die Abrufe zaehlt.</summary>
+    private sealed class ZaehlenderAktiveAufgabenService : IAktiveAufgabenService
+    {
+        private readonly List<Softwareschmiede.Domain.Entities.Aufgabe> _aufgaben;
+        private int _abrufe;
+
+        /// <summary>Initialisiert eine neue zaehlende Test-Datenquelle.</summary>
+        /// <param name="aufgaben">Die zurueckzugebenden Aufgaben.</param>
+        public ZaehlenderAktiveAufgabenService(List<Softwareschmiede.Domain.Entities.Aufgabe> aufgaben)
+        {
+            _aufgaben = aufgaben;
+        }
+
+        /// <summary>Anzahl der Abrufe.</summary>
+        public int Abrufe => Volatile.Read(ref _abrufe);
+
+        /// <inheritdoc />
+        public Task<List<Softwareschmiede.Domain.Entities.Aufgabe>> GetAktiveAufgabenAsync(CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref _abrufe);
             return Task.FromResult(_aufgaben);
         }
     }

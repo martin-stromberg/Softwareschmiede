@@ -12,8 +12,8 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
 
 - **Seitenleisten-Anzeige:** Unterhalb der bestehenden Navigationseinträge (Dashboard, Projekte) wird eine neue Sektion „Aktive Aufgaben" angezeigt. Diese Sektion enthält bis zu 20 aktive Aufgaben als gerahmte Kacheln.
 - **Kachel-Inhalte:** Jede Kachel zeigt den Aufgabentitel, den Projektnamen, das SCM-/SCI-Plugin, das KI-Plugin und den aktuellen KI-Ausführungsstatus:
-  - `▶ Läuft` — `AktiveRunId` ist gesetzt und `LastHeartbeatUtc` ist jünger als 5 Minuten
-  - `⏸ Wartet` — Status ist `Wartend` (Rate-Limit erreicht)
+  - `▶ Läuft` — `AktiveRunId` ist gesetzt, `LastHeartbeatUtc` ist jünger als 5 Minuten und der Laufstatus ist nicht `WartetAufEingabe`
+  - `⏸ Wartet` — die aktive Ausführung wartet auf Eingabe oder die Aufgabe steht im Status `Wartend`
   - `✓ Bereit` — Keine aktive Ausführung erkannt (Fallback)
 - **Aktive Markierung:** Wenn im Inhaltsbereich eine Aufgabe geöffnet ist, wird genau diese Aufgabe in der Seitenleiste hervorgehoben.
 - **Stabile Sortierung:** Die Aufgaben werden absteigend nach `LetzterCliStartUtc` sortiert. Dieser Zeitstempel wird nur beim echten CLI-Prozessstart aktualisiert, nicht beim Anzeigen einer bereits laufenden Hintergrundaufgabe. Für ältere Aufgaben ohne Wert wird auf `ErstellungsDatum`, danach Titel und ID zurückgefallen.
@@ -22,7 +22,8 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
 - **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — keine doppelte Anzeige.
 - **Automatische Statusaktualisierung:** Der Aufgabenstatus wird ohne manuelles Neuladen aktualisiert:
   - **Sofortreaktion auf Prozess-Änderungen:** Wenn eine Aufgabe gestartet oder beendet wird, wird die Seitenleiste sofort aktualisiert.
-  - **Periodische Überprüfung:** Alle 5 Sekunden wird der Status neu abgerufen, um Rate-Limit-Übergänge (▶ Läuft → ⏸ Wartet) und Heartbeat-Ablauf (▶ Läuft → ✓ Bereit nach 5 Minuten ohne Aktivität) zu erkennen.
+  - **Sofortreaktion auf persistierte Laufdaten:** Wenn eine aktive Run-ID, ein Heartbeat oder ein Laufstatus wie `Läuft` oder `WartetAufEingabe` gespeichert wurde, wird die sichtbare Aufgabenliste direkt neu geladen.
+  - **Periodische Überprüfung:** Alle 5 Sekunden wird der Status neu abgerufen, um Heartbeat-Ablauf (▶ Läuft → ✓ Bereit nach 5 Minuten ohne Aktivität) und andere verpasste Änderungen zu erkennen.
   - **Visuelle Übergangsanimation:** Wenn der Status einer Aufgabe sich ändert, wird ein dezenter Opacity-Fade (250 ms) auf dem Status-Text angezeigt, um den Wechsel hervorzuheben.
 
 ### Navigation zwischen Projekt und Aufgabe
