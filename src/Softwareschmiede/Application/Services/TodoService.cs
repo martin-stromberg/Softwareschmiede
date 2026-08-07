@@ -95,4 +95,21 @@ public sealed class TodoService
         => await _db.Todos
             .AsNoTracking()
             .CountAsync(t => t.AufgabeId == aufgabeId && t.ErledigtAm == null, ct);
+
+    /// <summary>Gibt die Anzahl offener To-Dos für mehrere Aufgaben zurück.</summary>
+    public async Task<IReadOnlyDictionary<Guid, int>> GetOpenTodoCountsAsync(
+        IEnumerable<Guid> aufgabeIds,
+        CancellationToken ct = default)
+    {
+        var ids = aufgabeIds.Distinct().ToArray();
+        if (ids.Length == 0)
+            return new Dictionary<Guid, int>();
+
+        return await _db.Todos
+            .AsNoTracking()
+            .Where(t => ids.Contains(t.AufgabeId) && t.ErledigtAm == null)
+            .GroupBy(t => t.AufgabeId)
+            .Select(g => new { AufgabeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.AufgabeId, x => x.Count, ct);
+    }
 }

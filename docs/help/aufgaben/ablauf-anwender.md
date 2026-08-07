@@ -16,6 +16,10 @@ In der linken Navigationsseitenleiste findest du eine Sektion „Aktive Aufgaben
 - `⏸ Wartet` — Die Aufgabe hat ein Rate-Limit erreicht und wartet auf Wiederaufnahme
 - `✓ Bereit` — Keine aktive Ausführung erkannt
 
+Zusätzlich zeigt jede aktive Aufgabe ein anklickbares Todo-Label, z. B. `0 Todos`, `1 Todo` oder `3 Todos`. Die Zahl umfasst nur noch offene Todos der jeweiligen Aufgabe; bereits erledigte Todos werden nicht mitgezählt. Ein Klick auf das Todo-Label öffnet den Dialog **Offene Todos** für genau diese Aufgabe.
+
+Im Dialog siehst du die offenen Todos mit Beschreibung und Erstellungsdatum. Der Dialog ist rein lesend: Du kannst dort keine Todos erstellen, abhaken, bearbeiten oder löschen. Wenn keine offenen Todos vorhanden sind, bleibt das Label trotzdem sichtbar und der Dialog zeigt den Leerzustand `Keine offenen Todos.`.
+
 **Aufgabe öffnen:** Klicke auf den Navigations-Button (→) auf einer Aufgabenkachel, um direkt zur Aufgabendetailansicht zu navigieren. Die Seitenleisten-Sektion wird verborgen wenn du das Dashboard aufrufst — dort siehst du stattdessen die vollständige Liste.
 
 > **Hinweis:** Die Anzeige ist auf 20 Aufgaben begrenzt und wird regelmäßig aktualisiert.

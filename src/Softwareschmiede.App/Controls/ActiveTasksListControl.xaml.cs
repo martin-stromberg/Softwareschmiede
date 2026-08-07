@@ -58,4 +58,9 @@ public sealed partial class ActiveTasksListControl : UserControl
     {
         InitializeComponent();
     }
+
+    private void OffeneTodosButton_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+    }
 }

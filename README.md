@@ -61,7 +61,7 @@ Softwareschmiede bündelt den kompletten Workflow der KI-gestützten Softwareent
 Die wichtigsten Features:
 
 - **Projekt- und Aufgabenverwaltung** – Dashboard, Statusmodell und chronologisches Aufgabenprotokoll
-- **To-Do-Listen für Aufgaben** – Strukturierung von Aufgaben mit To-Do-Elementen, Abhak-Status und Blockierung des Aufgabenabschlusses bei offenen To-Dos; Badge zeigt Anzahl offener To-Dos im Ribbon
+- **To-Do-Listen für Aufgaben** – Strukturierung von Aufgaben mit To-Do-Elementen, Abhak-Status und Blockierung des Aufgabenabschlusses bei offenen To-Dos; Badge zeigt Anzahl offener To-Dos im Ribbon, aktive Aufgaben im Menü zeigen `0/1/n Todos` und öffnen per Klick einen read-only Dialog mit den offenen To-Dos
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
 - **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM- und KI-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
@@ -180,6 +180,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
 7. **Commits durchführen**, To-Dos abhaken (falls vorhanden), Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. 
    **Hinweis:** Aufgaben mit noch offenen To-Dos können nicht abgeschlossen werden — das System blockiert den Abschluss und zeigt die Anzahl offener To-Dos an. 
+   Aktive oder wartende Aufgaben zeigen in Seitenleiste und Dashboard zusätzlich ein anklickbares Todo-Label (`0 Todos`, `1 Todo`, `n Todos`). Der Klick öffnet einen modalen read-only Dialog mit den offenen To-Dos der Aufgabe; bei `0` offenen To-Dos erscheint ein klarer Leerzustand.
    Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst.
 8. **Pull Request beobachten**. Erstellte GitHub-PRs werden dauerhaft an der Aufgabe gespeichert und im Bereich `PR` mit Status, Merge-/Monitoring-Phase, letzter Prüfung und zugehörigen GitHub-Actions-/Workflow-Runs angezeigt. Je nach GitHub-Plugin-Einstellung kann Softwareschmiede nach erfolgreichen Pre-Merge-Actions einen Abschlussversuch ausführen und anschließend zuordenbare Post-Merge-Actions weiter überwachen. Blockaden durch Berechtigungen, Branch Protection oder GitHub-Fehler werden im PR-Bereich sichtbar.
 9. **Alternativ Aufgabe abbrechen**, wenn der Entwicklungsprozess nicht fortgesetzt werden soll.
@@ -542,6 +543,9 @@ Pull Requests werden providerneutral als `PullRequestReferenz` mit untergeordnet
 - `MainWindowViewModel` und `DashboardViewModel` nutzen die Service-Methode um `AktiveAufgaben`-Collections zu befüllen und Navigation zwischen Views zu koordinieren.
 - `NavigateZuAufgabeCommand` nutzt Callbacks zur fensterübergreifenden Navigation zwischen Projekt- und Aufgabendetail (Presentation-Layer Orchestrierung).
 - `IsDashboardVisible` (computed Property) steuert die Sichtbarkeit der Seitenleisten-Sektion über XAML-Binding mit `InvertedBoolToVisibilityConverter`.
+- `TodoService.GetOpenTodoCountsAsync()` liefert offene Todo-Anzahlen per Bulk-Abfrage für die geladenen aktiven Aufgaben; `MainWindowViewModel` mappt sie auf `AktiveAufgabePanelItem.OffeneTodoLabelText` (`0 Todos`, `1 Todo`, `n Todos`).
+- `ActiveTasksListControl` zeigt das Todo-Label in Seitenleiste und Dashboard als eigenen Button an, damit der Klick den Todo-Dialog öffnet und nicht versehentlich zur Aufgabendetailansicht navigiert.
+- `OpenTodosDialogViewModel` und `OpenTodosDialog` laden ausschließlich offene Todos (`ErledigtAm == null`) und zeigen sie in einem modalen read-only Dialog mit Leerzustand bei `0` offenen Todos.
 
 ### Architekturbezug: Automatische CLI-Ausgabeprotokollierung
 
@@ -609,6 +613,10 @@ Feature-spezifische Testartefakte:
   - ViewModel-Tests: `MainWindowViewModelTests` — Properties (`AktiveAufgaben`, `IsDashboardVisible`), `AktiveAufgabenAktualisierenAsync()`, `NavigateZuAufgabeCommand`
   - ViewModel-Tests: `DashboardViewModelTests` — `AktiveAufgabenListe` Befüllung in `LadenAsync()`
   - E2E-Tests: Menü-Anzeige, Navigation zu Aufgabendetail, Sichtbarkeits-Toggle (Dashboard-abhängig), Status-Anzeige
+- Offene Todos im Menü:
+  - Service-Tests: `TodoServiceTests` — Bulk-Zählung offener Todos je Aufgabe, erledigte Todos ignorieren, leere/unbekannte IDs
+  - ViewModel-Tests: `MainWindowViewModelTests` — Todo-Anzahl und Todo-Command in aktiven Aufgabenitems
+  - ViewModel-Tests: `OpenTodosDialogViewModelTests` — read-only Ladevorgang, Aufgabenbezug und Leerzustand
 - Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget, Prozess-Handler-Härtung):
   - Neue Testklasse `AppTests` (`src/Softwareschmiede.Tests/App/AppTests.cs`): `DispatcherUnhandledException_Handler_LogsAndHandlesException()`, `UnhandledException_Handler_Logs()`, `UnobservedTaskException_Handler_LogsAndSetsObserved()`
   - Neue Testklasse `AsyncTaskExtensionsTests` (`src/Softwareschmiede.Tests/Application/Services/AsyncTaskExtensionsTests.cs`): `SafeFireAndForget_LogsErrorOnTaskException()`, `SafeFireAndForget_LogsInfoOnTaskCancellation()`, `SafeFireAndForget_DoesNotLogErrorOrInfo_OnSuccessfulTask()`

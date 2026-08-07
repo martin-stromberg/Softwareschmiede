@@ -16,6 +16,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class MainWindowViewModelTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly TodoService _todoService;
     private readonly AufgabeService _aufgabeService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
@@ -27,7 +28,8 @@ public sealed class MainWindowViewModelTests : IDisposable
     public MainWindowViewModelTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, _todoService);
         _serviceProviderMock = new Mock<IServiceProvider>();
         _dialogServiceMock = new Mock<IDialogService>();
         _runningStatusSourceMock = new Mock<IRunningAutomationStatusSource>();
@@ -61,8 +63,14 @@ public sealed class MainWindowViewModelTests : IDisposable
             .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
             .Returns(() => TaskDetailViewModelTestFactory.Create(_db, _aufgabeService));
         _serviceProviderMock
+            .Setup(sp => sp.GetService(typeof(OpenTodosDialogViewModel)))
+            .Returns(() => new OpenTodosDialogViewModel(_todoService, NullLogger<OpenTodosDialogViewModel>.Instance));
+        _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(IPluginManager)))
             .Returns(_pluginManagerMock.Object);
+        _dialogServiceMock
+            .Setup(d => d.ShowOpenTodosDialogAsync(It.IsAny<OpenTodosDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
     }
 
     /// <summary>Dispose.</summary>
@@ -84,6 +92,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             darkModeService,
             _serviceProviderMock.Object,
             aufgabeService ?? _aufgabeService,
+            _todoService,
             promptZeitVersandService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
@@ -130,6 +139,58 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         // Assert
         sut.AktiveAufgabenListe.Should().ContainSingle(a => a.Id == aufgabe.Id);
+    }
+
+    /// <summary>AktiveAufgabenAktualisierenAsync setzt die offene Todo-Anzahl je Aufgabe.</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldSetOpenTodoCountPerTask()
+    {
+        // Arrange
+        var mitTodos = await _aufgabeService.CreateAsync(_projektId, "Aufgabe mit Todos", null);
+        var ohneTodos = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Todos", null);
+        await _aufgabeService.StartenAsync(mitTodos.Id, "feature/mit-todos", "/tmp/mit-todos");
+        await _aufgabeService.StartenAsync(ohneTodos.Id, "feature/ohne-todos", "/tmp/ohne-todos");
+        await _todoService.CreateTodoAsync(mitTodos.Id, "Offen 1");
+        await _todoService.CreateTodoAsync(mitTodos.Id, "Offen 2");
+        var erledigt = await _todoService.CreateTodoAsync(mitTodos.Id, "Erledigt");
+        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id);
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        sut.AktiveAufgabenListe.Single(a => a.Id == mitTodos.Id).OffeneTodoCount.Should().Be(2);
+        sut.AktiveAufgabenListe.Single(a => a.Id == mitTodos.Id).OffeneTodoLabelText.Should().Be("2 Todos");
+        sut.AktiveAufgabenListe.Single(a => a.Id == ohneTodos.Id).OffeneTodoCount.Should().Be(0);
+        sut.AktiveAufgabenListe.Single(a => a.Id == ohneTodos.Id).OffeneTodoLabelText.Should().Be("0 Todos");
+    }
+
+    /// <summary>OffeneTodosAnzeigenCommand öffnet den Dialog für die Aufgabe des aktiven Listen-Items.</summary>
+    [Fact]
+    public async Task OffeneTodosAnzeigenCommand_ShouldOpenDialogForSelectedTask()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Dialog-Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/dialog", "/tmp/dialog");
+        await _todoService.CreateTodoAsync(aufgabe.Id, "Offenes Todo");
+        OpenTodosDialogViewModel? capturedViewModel = null;
+        _dialogServiceMock
+            .Setup(d => d.ShowOpenTodosDialogAsync(It.IsAny<OpenTodosDialogViewModel>(), It.IsAny<CancellationToken>()))
+            .Callback<OpenTodosDialogViewModel, CancellationToken>((vm, _) => capturedViewModel = vm)
+            .Returns(Task.CompletedTask);
+        var sut = CreateSut(dialogService: _dialogServiceMock.Object);
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Act
+        var command = (AsyncRelayCommand)sut.AktiveAufgabenListe.Single().OffeneTodosAnzeigenCommand!;
+        await command.ExecuteAsync();
+
+        // Assert
+        capturedViewModel.Should().NotBeNull();
+        capturedViewModel!.AufgabeId.Should().Be(aufgabe.Id);
+        capturedViewModel.AufgabenTitel.Should().Be("Dialog-Aufgabe");
+        capturedViewModel.Todos.Should().ContainSingle(t => t.Beschreibung == "Offenes Todo");
     }
 
     /// <summary>IsDashboardVisible ist true, wenn CurrentView ein DashboardViewModel ist.</summary>

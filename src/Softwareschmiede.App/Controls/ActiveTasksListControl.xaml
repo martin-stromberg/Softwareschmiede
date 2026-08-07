@@ -34,6 +34,21 @@
                            AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeStatus:{0}}"
                            AutomationProperties.HelpText="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
                            behaviors:StatusUebergangsAnimation.Status="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}" />
+                <Button Content="{Binding OffeneTodoLabelText}"
+                        Command="{Binding OffeneTodosAnzeigenCommand}"
+                        Click="OffeneTodosButton_Click"
+                        AutomationProperties.Name="{Binding Titel, StringFormat=OffeneTodos:{0}}"
+                        AutomationProperties.HelpText="{Binding OffeneTodoLabelText}"
+                        MinWidth="64"
+                        HorizontalAlignment="Left"
+                        Margin="0,8,0,0"
+                        Padding="8,3"
+                        Cursor="Hand"
+                        Background="{DynamicResource BackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        Foreground="{DynamicResource PrimaryTextBrush}"
+                        FontSize="11" />
             </StackPanel>
         </DataTemplate>
 

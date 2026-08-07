@@ -16,6 +16,7 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly TodoService _todoService;
     private readonly AufgabeService _aufgabeService;
     private readonly KiAusfuehrungsService _kiService;
     private readonly PromptZeitVersandService _promptZeitVersandService;
@@ -27,7 +28,8 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
     public MainWindowViewModelTests_ZeitgesteuerterPrompt()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
+        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, _todoService);
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
         _serviceProviderMock = new Mock<IServiceProvider>();
@@ -68,6 +70,7 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
             darkModeService,
             _serviceProviderMock.Object,
             _aufgabeService,
+            _todoService,
             _promptZeitVersandService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
