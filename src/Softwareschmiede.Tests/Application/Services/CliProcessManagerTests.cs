@@ -20,7 +20,11 @@ public sealed class CliProcessManagerTests : IDisposable
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
-        _sut = new CliProcessManager(_kiService, scopeFactoryMock.Object, NullLogger<CliProcessManager>.Instance);
+        _sut = new CliProcessManager(
+            _kiService,
+            scopeFactoryMock.Object,
+            NullLogger<CliProcessManager>.Instance,
+            new AufgabeLaufdatenChangedNotifier());
     }
 
     /// <summary>Dispose.</summary>
@@ -122,7 +126,8 @@ public sealed class CliProcessManagerTests : IDisposable
         using var manager = new CliProcessManager(
             kiService,
             scopeFactoryMock.Object,
-            NullLogger<CliProcessManager>.Instance);
+            NullLogger<CliProcessManager>.Instance,
+            new AufgabeLaufdatenChangedNotifier());
 
         var method = typeof(CliProcessManager).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(manager, arguments)!;

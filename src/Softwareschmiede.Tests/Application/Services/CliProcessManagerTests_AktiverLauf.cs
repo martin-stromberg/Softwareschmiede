@@ -64,7 +64,11 @@ public sealed class CliProcessManagerTests_AktiverLauf : IDisposable
         var scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
         var kiScopeFactoryMock = new Mock<IServiceScopeFactory>();
         _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, kiScopeFactoryMock.Object);
-        _sut = new CliProcessManager(_kiService, scopeFactory, NullLogger<CliProcessManager>.Instance);
+        _sut = new CliProcessManager(
+            _kiService,
+            scopeFactory,
+            NullLogger<CliProcessManager>.Instance,
+            new AufgabeLaufdatenChangedNotifier());
     }
 
     /// <summary>Dispose.</summary>

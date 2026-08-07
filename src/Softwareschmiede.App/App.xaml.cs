@@ -198,6 +198,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<PluginSelectionService>();
         services.AddScoped<AufgabeRecoveryService>();
         services.AddScoped<PromptVorlagenService>();
+        services.AddSingleton<AufgabeLaufdatenChangedNotifier>();
         services.AddSingleton<PromptVorlagenPlatzhalterService>();
         services.AddScoped<IGitWorkspaceBrowserService, GitWorkspaceBrowserService>();
         services.AddSingleton<ITextDiffService, TextDiffService>();

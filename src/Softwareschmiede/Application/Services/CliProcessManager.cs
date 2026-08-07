@@ -15,6 +15,7 @@ public sealed class CliProcessManager : IDisposable
     private readonly KiAusfuehrungsService _kiService;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CliProcessManager> _logger;
+    private readonly AufgabeLaufdatenChangedNotifier _laufdatenChangedNotifier;
 
     private readonly ConcurrentDictionary<Guid, Timer> _heartbeatTimers = new();
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
@@ -35,11 +36,13 @@ public sealed class CliProcessManager : IDisposable
     public CliProcessManager(
         KiAusfuehrungsService kiService,
         IServiceScopeFactory scopeFactory,
-        ILogger<CliProcessManager> logger)
+        ILogger<CliProcessManager> logger,
+        AufgabeLaufdatenChangedNotifier laufdatenChangedNotifier)
     {
         _kiService = kiService;
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _laufdatenChangedNotifier = laufdatenChangedNotifier;
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
     }
@@ -260,6 +263,7 @@ public sealed class CliProcessManager : IDisposable
             await using var scope = _scopeFactory.CreateAsyncScope();
             var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
             await action(aufgabeService).ConfigureAwait(false);
+            _laufdatenChangedNotifier.NotifyLaufdatenChanged(aufgabeId);
         }
         catch (ObjectDisposedException ex)
         {

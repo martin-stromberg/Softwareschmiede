@@ -634,6 +634,7 @@ Trigger zur Aktualisierung:
 - `MainWindowViewModel.NavigateToProjectList()` ruft `AktiveAufgabenAktualisierenAsync()` auf
 - `MainWindowViewModel.NavigateToSettings()` ruft `AktiveAufgabenAktualisierenAsync()` auf
 - Neu: `IRunningAutomationStatusSource.RunningCountChanged`-Event (bei Prozess-Start/-Stopp)
+- Neu: `AufgabeLaufdatenChangedNotifier.LaufdatenChanged`-Event (nach persistierter Änderung von aktiver Run-ID, Heartbeat oder Laufstatus)
 - Neu: `DispatcherTimer.Tick` (alle 5 Sekunden, Fallback für Heartbeat-Änderungen)
 
 ### Automatische Statusaktualisierung bei Prozess-Änderungen (Event-Pfad)
@@ -663,6 +664,23 @@ Ablauf:
    - Status-String wird neu berechnet (▶ Läuft, ⏸ Wartet, oder ✓ Bereit)
    - Seitenleiste und Dashboard zeigen den aktualisierten Status an (gemeinsame Collection)
 
+### Automatische Statusaktualisierung bei persistierten Laufdaten
+
+Ausgelöst durch `AufgabeLaufdatenChangedNotifier.LaufdatenChanged`, nachdem `CliProcessManager` eine Änderung der Aufgaben-Laufdaten erfolgreich über `AufgabeService` gespeichert hat.
+
+Beteiligte Komponenten:
+- `CliProcessManager` — persistiert Start, Ende und Laufstatuswechsel einer CLI-Ausführung
+- `AufgabeLaufdatenChangedNotifier` — UI-neutraler Singleton-Notifier für geänderte Laufdaten
+- `MainWindowViewModel` — Event-Handler `OnLaufdatenChanged`, Dispatcher-Marshalling und Refresh der aktiven Aufgabenliste
+- `AufgabeService.GetAktiveAufgabenAsync()` — liest die persistierten Laufdaten für die sichtbaren Kacheln neu
+
+Ablauf:
+1. `CliProcessManager` speichert Laufdaten über `AktivenLaufSetzenAsync`, `AktualisiereLaufStatusAsync` oder `AktivenLaufBeendenAsync`.
+2. Erst nach erfolgreicher Persistenz ruft `CliProcessManager` `NotifyLaufdatenChanged(aufgabeId)` auf.
+3. `MainWindowViewModel.OnLaufdatenChanged(aufgabeId)` marshallt über `_dispatcherInvoke` auf den UI-Thread.
+4. `AktiveAufgabenImHintergrundAktualisieren()` lädt die aktive Aufgabenliste neu und verwendet weiter den bestehenden `_refreshGate` gegen überlappende Refreshes.
+5. Die Kachel erhält neue `AktiveRunId`-, `LastHeartbeatUtc`- und `LaufStatus`-Werte; der Converter zeigt dadurch zeitnah `Läuft`, `Wartet` oder `Bereit`.
+
 ### Periodische Statusaktualisierung (Timer-Fallback, alle 5 Sekunden)
 
 Ausgelöst durch `DispatcherTimer.Tick` im `MainWindowViewModel`, die unabhängig vom `RunningCountChanged`-Event läuft.
@@ -678,8 +696,8 @@ Ablauf:
 3. `AktiveAufgabenImHintergrundAktualisieren()` wird per `SafeFireAndForget` aufgerufen
 4. Weitere Schritte wie oben (ab Schritt 7 im Event-Pfad)
 
-**Zweck des Fallback-Timers:** Der Event-Pfad erkennt nur Start/Stopp von Prozessen. Diese Timer-basierte Aktualisierung fängt Statusänderungen ohne Event ab:
-- **Rate-Limit-Übergang:** Status wechselt von `Gestartet` zu `Wartend`, wenn die KI ein Rate-Limit erkennt (kein Event hierfür)
+**Zweck des Fallback-Timers:** Die Event-Pfade aktualisieren Start, Stop und persistierte Laufstatuswechsel zeitnah. Diese Timer-basierte Aktualisierung fängt verbleibende Änderungen ohne Event ab:
+- **Verpasster Statuswechsel:** Falls ein Event nicht verarbeitet wurde, wird der gespeicherte Laufstatus beim nächsten Timerlauf neu gelesen.
 - **Heartbeat-Ablauf:** Status wechselt von `Läuft` zu `Bereit`, wenn `LastHeartbeatUtc` älter als 5 Minuten wird (passiert automatisch, kein Event)
 - **Routinerefresh:** Kontinuierliches Vorrücken von `LastHeartbeatUtc` wird erfasst
 
@@ -739,14 +757,17 @@ Beteiligte Komponenten:
 - Referenz: `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (standardmäßig 5 Minuten)
 
 Konvertierungs-Logik in `Convert()`:
-1. Input-Check: Ist Wert vom Typ `Aufgabe`? Sonst `string.Empty` zurückgeben
-2. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
-   - Output: `"▶ Läuft"`
-3. Wenn `Status == AufgabeStatus.Wartend`:
+1. Input-Check: Ist Wert vom Typ `Aufgabe` oder `AktiveAufgabePanelItem`? Sonst `string.Empty` zurückgeben
+2. Wenn für ein Panel-Item ein geplanter Prompt existiert:
+   - Output: `"⏳ Prompt in Wartestellung"`
+3. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
+   - Bei `LaufStatus == AufgabeLaufStatus.WartetAufEingabe`: Output `"⏸ Wartet"`
+   - Sonst: Output `"▶ Läuft"`
+4. Wenn `Status == AufgabeStatus.Wartend`:
    - Output: `"⏸ Wartet"`
-4. Sonst (Default):
+5. Sonst (Default):
    - Output: `"✓ Bereit"`
-5. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
+6. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
 
 ### Navigation zu Aufgabendetail aus aktiver Aufgabe
 

@@ -538,9 +538,10 @@ Pull Requests werden providerneutral als `PullRequestReferenz` mit untergeordnet
 
 ### Architekturbezug: Aktive Aufgaben im Menü (Issue 81)
 
-- `KiAusfuehrungsStatusConverter` (`IValueConverter`, Presentation-Layer) konvertiert `Aufgabe`-Objekte zu Status-Strings basierend auf Laufzeit-Properties (`AktiveRunId`, `LastHeartbeatUtc`).
+- `KiAusfuehrungsStatusConverter` (`IValueConverter`, Presentation-Layer) konvertiert `Aufgabe`-Objekte und `AktiveAufgabePanelItem`-Eintraege zu Status-Strings. Der Menue-Status wird aus `AktiveRunId`, `LastHeartbeatUtc` und `LaufStatus` abgeleitet und zeigt fuer aktive Aufgaben `Laeuft`, `Wartet` oder `Bereit`.
 - `AufgabeService.GetAktiveAufgabenAsync()` filtert Aufgaben nach Status (`Gestartet`, `Wartend`) und sortiert nach letzter Aktivität (Application-Layer).
 - `MainWindowViewModel` und `DashboardViewModel` nutzen die Service-Methode um `AktiveAufgaben`-Collections zu befüllen und Navigation zwischen Views zu koordinieren.
+- `AufgabeLaufdatenChangedNotifier` meldet erfolgreich persistierte Laufdatenaenderungen aus `CliProcessManager`; `MainWindowViewModel` aktualisiert daraufhin die sichtbare aktive Aufgabenliste zeitnah, damit das Menue nicht bis zum Timer-Fallback auf alten Laufdaten stehen bleibt.
 - `NavigateZuAufgabeCommand` nutzt Callbacks zur fensterübergreifenden Navigation zwischen Projekt- und Aufgabendetail (Presentation-Layer Orchestrierung).
 - `IsDashboardVisible` (computed Property) steuert die Sichtbarkeit der Seitenleisten-Sektion über XAML-Binding mit `InvertedBoolToVisibilityConverter`.
 - `TodoService.GetOpenTodoCountsAsync()` liefert offene Todo-Anzahlen per Bulk-Abfrage für die geladenen aktiven Aufgaben; `MainWindowViewModel` mappt sie auf `AktiveAufgabePanelItem.OffeneTodoLabelText` (`0 Todos`, `1 Todo`, `n Todos`).
