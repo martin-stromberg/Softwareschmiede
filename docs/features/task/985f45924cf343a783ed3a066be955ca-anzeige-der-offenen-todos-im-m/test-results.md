@@ -1,41 +1,32 @@
 # Testergebnis - Anzeige offener Todos im Menue
 
-Status: Feature-relevante Tests bestanden; voller WPF/E2E-Gesamtlauf nicht gruen wegen bekannter, nicht featurebezogener UIAutomation/E2E-Fehler.
+Status: Feature-relevante Tests bestanden; voller WPF/E2E-Gesamtlauf nicht gruen wegen bestehender, nicht featurebezogener UIAutomation/E2E-Fehler.
 
-Iteration: 2
+Iteration: Fortsetzung aus `continue.md` am 2026-08-07
 
-Hinweis zur Bewertung: Die Implementierungsiteration 2 hat keine featurebezogenen Codeaenderungen vorgenommen. Die erneut beobachteten Fehler liegen in zwei bestehenden WPF/UIAutomation-E2E-Sammlern ausserhalb der Todo-Menue-Funktion. Die Todo-Menue-Aenderung betrifft Todo-Count-Service, ActiveTasks-Anzeige, Dialog-Command und den read-only Open-Todos-Dialog; diese Pfade sind durch die fokussierten Tests abgedeckt und bestanden.
+Hinweis zur Bewertung: In dieser Fortsetzung wurden ausschliesslich die beiden offenen Punkte aus `continue.md` erneut geprueft. Es wurden keine Codeaenderungen vorgenommen, weil die reproduzierten Fehler in bestehenden E2E-Sammlern ausserhalb der Todo-Menue-Funktion liegen und kein sinnvoller, eng begrenzter Todo-Menue-Fix erkennbar war. Die Todo-Menue-Aenderung betrifft Todo-Count-Service, ActiveTasks-Anzeige, Dialog-Command und den read-only Open-Todos-Dialog; diese Pfade waren bereits durch fokussierte Tests abgedeckt und bestanden.
 
 ## Ausgefuehrte Kommandos
 
 | Kommando | Ergebnis |
 |----------|----------|
-| `dotnet build Softwareschmiede.slnx --no-restore` | Bestanden: 0 Warnungen, 0 Fehler |
-| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build --filter "FullyQualifiedName~TodoServiceTests|FullyQualifiedName~MainWindowViewModelTests|FullyQualifiedName~OpenTodosDialogViewModelTests"` | Bestanden: 44/44 |
-| `dotnet test src\Softwareschmiede.IntegrationTests\Softwareschmiede.IntegrationTests.csproj --no-build` | Bestanden: 75/75 |
-| `dotnet test Softwareschmiede.slnx --no-build` | Timeout nach 184 Sekunden ohne verwertbare Konsolenausgabe |
-| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build` | Exitcode 1 ohne Konsolenausgabe; TRX-Ergebnis zeigt bekannte WPF/E2E-Fehler |
-| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build --logger "console;verbosity=detailed"` | Exitcode 1 ohne Konsolenausgabe |
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build --filter "FullyQualifiedName=Softwareschmiede.Tests.E2E.End2EndTest.RunGeneralTests" --logger "trx;LogFileName=run-general-continue.trx"` | Fehlgeschlagen nach ca. 25s: `DefaultKiPlugin`/Combobox-Element wurde nicht innerhalb von 20s gefunden |
+| `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --no-build --filter "FullyQualifiedName=Softwareschmiede.Tests.E2E.End2EndTest.RunConPtyTests" --logger "trx;LogFileName=run-conpty-continue.trx"` | Fehlgeschlagen nach ca. 104s: `CliStoppen` im AutoStart-CLI-Szenario wurde nicht innerhalb von 15s gefunden |
 
 ## Bestandene Tests
 
-- Build der gesamten Solution erfolgreich.
-- Feature-relevante Unit-Tests: 44/44 bestanden.
-- Integrationstests: 75/75 bestanden.
-- In der TRX-Datei des vollstaendigen `Softwareschmiede.Tests`-Laufs: 1242/1245 Tests bestanden, 2 fehlgeschlagen.
+- Vorherige Validierung bleibt unveraendert: Build der gesamten Solution erfolgreich, feature-relevante Unit-Tests 44/44 bestanden, Integrationstests 75/75 bestanden.
+- In dieser Fortsetzung wurden die beiden offenen E2E-Sammler gezielt erneut ausgefuehrt; beide blieben nicht gruen.
 
 ## Fehlgeschlagene Tests
 
-- `Softwareschmiede.Tests.E2E.End2EndTest.RunConPtyTests` - `System.TimeoutException: Element wurde nicht innerhalb von 15s gefunden.`
-- `Softwareschmiede.Tests.E2E.End2EndTest.RunGeneralTests` - `System.Runtime.InteropServices.COMException: Ausnahmefehler des Servers. (0x80010105 (RPC_E_SERVERFAULT))`
+- `Softwareschmiede.Tests.E2E.End2EndTest.RunGeneralTests` - aktueller Repro: `System.TimeoutException: Element wurde nicht innerhalb von 20s gefunden.` bei `SelectComboBoxItemByClick` fuer `DefaultKiPlugin` in `E2E_SettingsKiPluginPersistence.cs`.
+- `Softwareschmiede.Tests.E2E.End2EndTest.RunConPtyTests` - aktueller Repro: `System.TimeoutException: Element wurde nicht innerhalb von 15s gefunden.` beim Warten auf `CliStoppen` in `AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E`.
 
-Zusatzlaeufe einzelner Sammler aus vorhandenen TRX-Dateien zeigen dasselbe Fehlerbild:
-
-- `Softwareschmiede.Tests.E2E.End2EndTest.RunGeneralTests` - `System.TimeoutException: Element wurde nicht innerhalb von 20s gefunden.`
-- `Softwareschmiede.Tests.E2E.End2EndTest.RunConPtyTests` - `System.TimeoutException: Element wurde nicht innerhalb von 15s gefunden.`
+Vorherige TRX-Dateien zeigten zusaetzlich fuer `RunGeneralTests` ein wechselndes Fehlerbild beim Schliessen des Hilfe-Dialogs: `RPC_E_SERVERFAULT` bzw. Timeout in `WaitUntilGone`.
 
 ## Bewertung
 
 Keine featurebezogenen Testfehler.
 
-Die beiden fehlgeschlagenen E2E-Sammler betreffen CLI-/allgemeine WPF-UIAutomation-Szenarien und nicht die neue Anzeige offener Todos im Menue, den Todo-Count-Service oder den Open-Todos-Dialog. Da Iteration 2 keine Codeaenderungen am Feature vorgenommen hat und die fokussierten Todo-Tests sowie Integrationstests weiterhin gruen sind, wird das Todo-Menue-Feature aus Testsicht als bestanden bewertet. Der vollstaendige WPF/E2E-Gesamtlauf bleibt wegen bestehender UIAutomation-Flakes nicht gruen.
+Die beiden fehlgeschlagenen E2E-Sammler betreffen bestehende Einstellungen-/CLI-/ConPTY-UIAutomation-Szenarien und nicht die neue Anzeige offener Todos im Menue, den Todo-Count-Service oder den Open-Todos-Dialog. Der erneute Lauf hat wechselnde Fehlerpunkte innerhalb der bestehenden WPF-E2E-Infrastruktur gezeigt. Eine Behebung waere nur ueber breitere E2E-Testinfrastruktur- oder CLI-AutoStart-Arbeiten sinnvoll und damit ausserhalb des Todo-Menue-Feature-Scopes. Die offenen Punkte bleiben daher in `continue.md` dokumentiert.
