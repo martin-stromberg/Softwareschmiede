@@ -1,8 +1,8 @@
 using FluentAssertions;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Threading;
 using Softwareschmiede.App.Views;
+using static Softwareschmiede.Tests.Helpers.WpfUnitTestHelpers;
 
 namespace Softwareschmiede.Tests.App.Views;
 
@@ -71,28 +71,5 @@ public sealed class TaskDetailViewTests
         }
 
         throw new DirectoryNotFoundException("Softwareschmiede.slnx wurde nicht gefunden.");
-    }
-
-    private static void RunOnSta(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception != null)
-            throw exception;
     }
 }

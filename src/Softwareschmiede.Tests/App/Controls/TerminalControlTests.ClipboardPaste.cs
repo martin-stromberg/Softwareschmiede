@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Softwareschmiede.App.Controls;
 using Softwareschmiede.Infrastructure.Terminal;
+using static Softwareschmiede.Tests.Helpers.WpfUnitTestHelpers;
 
 namespace Softwareschmiede.Tests.App.Controls;
 
@@ -261,20 +262,6 @@ public sealed partial class TerminalControlTests
         method.Invoke(control, [args]);
 
         return args;
-    }
-
-    private sealed class TestKeyboardDevice : KeyboardDevice
-    {
-        private readonly HashSet<Key> _downKeys;
-
-        public TestKeyboardDevice(params Key[] downKeys)
-            : base(InputManager.Current)
-        {
-            _downKeys = [.. downKeys];
-        }
-
-        protected override KeyStates GetKeyStatesFromSystem(Key key)
-            => _downKeys.Contains(key) ? KeyStates.Down : KeyStates.None;
     }
 
     private static void InvokeReadClipboardAndInsertAsync(TerminalControl control)

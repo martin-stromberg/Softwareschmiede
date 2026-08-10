@@ -11,6 +11,7 @@ using Moq;
 using Softwareschmiede.App.Controls;
 using Softwareschmiede.Tests.Helpers;
 using Softwareschmiede.Infrastructure.Terminal;
+using static Softwareschmiede.Tests.Helpers.WpfUnitTestHelpers;
 
 namespace Softwareschmiede.Tests.App.Controls;
 
@@ -413,26 +414,6 @@ public sealed partial class TerminalControlTests
     private static PseudoConsoleSession CreateSession(Stream inputStream, Stream outputStream)
     {
         return TestPseudoConsoleSessionFactory.Create(inputStream, outputStream);
-    }
-
-    private static void RunOnSta(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
-                action();
-            }
-            catch (Exception ex) { exception = ex; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception != null)
-            throw exception;
     }
 
     /// <summary>Stream, der beim Lesevorgang sofort 0 Bytes liefert (simuliertes Stream-Ende), ohne die Dispatcher-Pumpe zu benötigen.</summary>

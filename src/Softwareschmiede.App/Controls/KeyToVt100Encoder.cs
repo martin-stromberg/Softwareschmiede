@@ -13,9 +13,19 @@ internal static class KeyToVt100Encoder
     internal static byte[]? Encode(KeyEventArgs e)
     {
         var ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
+        var alt = (e.KeyboardDevice.Modifiers & ModifierKeys.Alt) != 0;
+
+        if (alt)
+            return null;
 
         if (ctrl && e.Key >= Key.A && e.Key <= Key.Z)
             return [unchecked((byte)(e.Key - Key.A + 1))];
+
+        if (ctrl && e.Key == Key.Left)
+            return Encoding.ASCII.GetBytes("\x1b[1;5D");
+
+        if (ctrl && e.Key == Key.Right)
+            return Encoding.ASCII.GetBytes("\x1b[1;5C");
 
         return e.Key switch
         {

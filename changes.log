@@ -1,3 +1,10 @@
+## 2026-08-10 — Alt Gr-Unterstützung für Sonderzeichen und Ctrl+Pfeiltaste-Navigation
+
+- Feature: Die TerminalControl-Komponente unterstützt nun Sonderzeichen, die über Alt Gr auf dem System-Tastaturlayout erreichbar sind (z. B. "@", "{", "}", "|", "~", "`" auf deutschem Tastaturlayout), sowie wortweise Cursor-Navigation mit Ctrl+Links und Ctrl+Rechts.
+- Implementierung in `KeyToVt100Encoder.Encode()`: Alt-Modifier wird erkannt und gibt `null` zurück, um Komposition via `OnTextInput` zu ermöglichen; Ctrl+Left/Right generieren Standard-VT100-Sequenzen (`\x1b[1;5D` für Ctrl+Left, `\x1b[1;5C` für Ctrl+Right) für wortweise Navigation in CLI-Tools.
+- Unit-Tests: `KeyToVt100EncoderTests` prüft Ctrl+Left/Right-Sequenzen und Alt-Handling; kein Test-Overhead für bestehende Tastatureingaben.
+- Keine Datenbankmigrationen, Konfigurationsänderungen oder Breaking Changes erforderlich.
+
 ## 2026-08-06 — Asynchrones Laden von Aufgabenprotokollen zur Reduktion der Detailansicht-Ladezeit
 
 - Performance-Optimierung: `AufgabeService.GetDetailAsync()` lädt Protokolleinträge (`Protokolleintraege`) und deren Testergebnisse nicht mehr mit der Aufgabe. Aufgabenbasisinformation (Titel, Status, Branch, Beschreibung, Todos, etc.) wird dadurch schnell angezeigt.

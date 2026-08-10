@@ -65,7 +65,7 @@ Die wichtigsten Features:
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
 - **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM- und KI-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
-- **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende
+- **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende; unterstützt Alt Gr-Sonderzeichen (z. B. auf deutschem Tastaturlayout: @, {, }, |, ~) und wortweise Cursor-Navigation mit Ctrl+Pfeiltasten
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien)
 - **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen, anschließend der Aufgabe zuordnen und optional die Aufgabenbeschreibung aktualisieren
@@ -663,7 +663,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |
-| [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering und Clipboard-Paste |
+| [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering, Clipboard-Paste, Alt Gr-Sonderzeichen und Ctrl+Pfeiltaste-Navigation |
 | [Dateiexplorer](docs/help/dateiexplorer/index.md) | Arbeitsbaum- und Diff-Ansicht in der Aufgabendetailansicht |
 | [Dateisystem-Integration](docs/help/dateisystem-integration/index.md) | Öffnen des Arbeitsverzeichnisses im OS-Dateiexplorer, von Visual-Studio-Solutions und optional von Visual Studio Code direkt aus dem Ribbon |
 | [Diff-Funktionalität](docs/help/diff/index.md) | Diff-Erzeugung, Persistenz und Viewer-Integration |

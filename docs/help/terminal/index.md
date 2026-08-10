@@ -9,6 +9,7 @@ Das System unterstützt volle Farb-Rendering (3-bit, 8-bit, 24-bit ANSI-Farben),
 - [Beschreibung](beschreibung.md)
 - [Technischer Ablauf](ablauf-technisch.md)
 - [Ablauf für Anwender](ablauf-anwender.md)
+- [Eingabeverarbeitung](eingabeverarbeitung.md) — Alt Gr-Sonderzeichen und Ctrl+Pfeiltaste-Navigation
 - [API](api.md)
 - [Installation & Konfiguration](installation.md)
 - [Architektur](architektur.md)
