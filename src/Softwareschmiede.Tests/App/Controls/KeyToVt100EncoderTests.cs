@@ -6,7 +6,7 @@ namespace Softwareschmiede.Tests.App.Controls;
 
 /// <summary>Unit-Tests für <see cref="KeyToVt100Encoder.EncodeClipboardText"/>: Kodierung von
 /// Zwischenablage-Text zu UTF-8-Bytes mit Newline-Normalisierung für die CLI-Eingabe.</summary>
-public sealed class KeyToVt100EncoderTests
+public sealed partial class KeyToVt100EncoderTests
 {
     /// <summary>Einzeiliger Text wird unverändert als UTF-8-Bytes kodiert.</summary>
     [Fact]

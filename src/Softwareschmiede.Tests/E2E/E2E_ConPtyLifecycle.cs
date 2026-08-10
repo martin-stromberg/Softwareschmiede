@@ -26,6 +26,7 @@ public partial class End2EndTest
     /// erscheint), Fenster-Resize (Session bleibt aktiv), Tastatureingabe (wird ohne Fehler entgegengenommen),
     /// Prozessende über den Stoppen-Button (Session endet, Status bleibt "Gestartet").
     /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster mit dem geöffneten, für ConPTY vorbereiteten Task.</param>
     protected void ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
@@ -90,10 +91,16 @@ public partial class End2EndTest
     }
 
     /// <summary>
-    /// Szenario: Das TerminalControl erhält den Tastaturfokus. Tastatureingaben werden fehlerfrei
-    /// entgegengenommen (kein Fehler-Banner). Die Eingabe landet in
-    /// <c>PseudoConsoleSession.InputStream</c> — verifizierbar durch das Ausbleiben von Fehlern nach
-    /// der Eingabe.
+    /// Szenario: Das TerminalControl erhält den Tastaturfokus. Reguläre Tastatureingaben, über Alt Gr
+    /// erreichbare Sonderzeichen (z. B. "{", "}", "@", "~" auf deutschem Layout) und Strg+Links/Strg+Rechts
+    /// (wortweise Navigation) werden fehlerfrei entgegengenommen (kein Fehler-Banner) und die CLI-Session
+    /// bleibt aktiv. Die Sonderzeichen werden über FlaUI direkt als Unicode-Zeichen eingegeben (wie es auch
+    /// WPF <c>OnTextInput</c> bei Alt Gr-Komposition erhält), unabhängig vom tatsächlich aktiven
+    /// System-Tastaturlayout der Testmaschine (siehe Offener Punkt #1 im Umsetzungsplan). Die Eingaben landen
+    /// in <c>PseudoConsoleSession.InputStream</c> — verifizierbar durch das Ausbleiben von Fehlern und die
+    /// weiterhin laufende Session nach der Eingabe. Eine Prüfung des exakten Zeichen- bzw. Cursor-Ergebnisses
+    /// im Terminal-Puffer ist über FlaUI/UI-Automation nicht möglich, da <c>TerminalControl</c> den Inhalt
+    /// selbst zeichnet und keine Text-Automation-Pattern für den Bufferinhalt bereitstellt.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
     private void ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E(AutomationElement mainWindow)
@@ -103,10 +110,21 @@ public partial class End2EndTest
         mainWindow.Click();
         Keyboard.Type("hello");
 
+        // Alt Gr-Sonderzeichen (deutsches Layout): "{", "}", "@", "~".
+        Keyboard.Type("{}@~");
+
+        // Strg+Links/Strg+Rechts: wortweise Cursor-Navigation als VT100-Sequenz.
+        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.LEFT);
+        Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.RIGHT);
+
         // Kurz warten — bei ConPTY-Fehler würde ein FehlerMeldung-Banner erscheinen
         Thread.Sleep(500);
         var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
         Assert.Null(fehlerBanner);
+
+        // Die CLI-Session muss nach den neuen Tasteneingaben weiterhin aktiv sein (kein Absturz/Abbruch).
+        var stoppenButton = mainWindow.FindFirstDescendant(cf => cf.ByName("CliStoppen"));
+        Assert.NotNull(stoppenButton);
     }
 
     /// <summary>
