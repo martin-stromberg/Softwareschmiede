@@ -14,6 +14,7 @@ public sealed class PseudoConsoleSession : IDisposable
 {
     private const int DefaultCols = 220;
     private const int DefaultRows = 50;
+    private const int InputWriteChunkSize = 4096;
 
     private readonly IPseudoConsoleHandle _pseudoConsole;
     private readonly Process _process;
@@ -26,6 +27,7 @@ public sealed class PseudoConsoleSession : IDisposable
     private readonly ITerminalOutputSink? _outputSink;
     private readonly AnsiSequenceParser _parser = new();
     private readonly CancellationTokenSource _readCts = new();
+    private readonly SemaphoreSlim _inputWriteLock = new(1, 1);
     private readonly Task _readLoopTask;
     private int _disposed;
     private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Laeuft;
@@ -316,9 +318,52 @@ public sealed class PseudoConsoleSession : IDisposable
     public async Task WritePromptAsync(string prompt, CancellationToken ct)
     {
         var bytes = Encoding.UTF8.GetBytes(NormalizeToCarriageReturn(prompt).TrimEnd('\r') + "\r");
-        await InputStream.WriteAsync(bytes, ct);
-        await InputStream.FlushAsync(ct);
-        MarkInputActivity();
+        await WriteInputAsync(bytes, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Schreibt bereits kodierte Eingabebytes serialisiert in den Input-Stream der Sitzung. Große
+    /// Eingaben werden in kontrollierte Chunks geteilt; jeder Chunk wird abgeschlossen, bevor der nächste beginnt.
+    /// Nach erfolgreichem Schreiben wird genau einmal geflusht und Eingabeaktivität markiert.</summary>
+    /// <param name="bytes">Die bereits für die Pseudo Console kodierten Eingabebytes.</param>
+    /// <param name="ct">Abbruch-Token.</param>
+    public async Task WriteInputAsync(ReadOnlyMemory<byte> bytes, CancellationToken ct = default)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            throw new ObjectDisposedException(nameof(PseudoConsoleSession));
+
+        await _inputWriteLock.WaitAsync(ct).ConfigureAwait(false);
+        var totalBytes = bytes.Length;
+        var chunkCount = Math.Max(1, (totalBytes + InputWriteChunkSize - 1) / InputWriteChunkSize);
+        var chunkIndex = -1;
+        try
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+                throw new ObjectDisposedException(nameof(PseudoConsoleSession));
+
+            for (var offset = 0; offset < totalBytes; offset += InputWriteChunkSize)
+            {
+                chunkIndex++;
+                var length = Math.Min(InputWriteChunkSize, totalBytes - offset);
+                await InputStream.WriteAsync(bytes.Slice(offset, length), ct).ConfigureAwait(false);
+            }
+
+            await InputStream.FlushAsync(ct).ConfigureAwait(false);
+            MarkInputActivity();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(
+                ex,
+                "Fehler beim Schreiben in den Terminal-Input-Stream. Bytes={ByteCount}, ChunkIndex={ChunkIndex}, ChunkCount={ChunkCount}",
+                totalBytes,
+                Math.Max(0, chunkIndex),
+                chunkCount);
+            throw;
+        }
+        finally
+        {
+            _inputWriteLock.Release();
+        }
     }
 
     /// <summary>Wandelt alle Zeilenenden (<c>\r\n</c> und alleinstehendes <c>\n</c>) in ein einzelnes <c>\r</c>

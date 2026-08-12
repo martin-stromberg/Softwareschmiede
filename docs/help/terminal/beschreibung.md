@@ -52,7 +52,7 @@ Das Terminal-System wurde mit mehreren Verbesserungen erweitert:
 
 2. **Scrollbare CLI-Ausgabe:** Der Snapshot enthält Scrollback-Zeilen, Scrollback-Anzahl und Gesamtzeilenzahl. `TerminalControl` implementiert zeilenbasiertes Scrollen, sodass lange Ausgaben über vertikale Scrollbar, Mausrad und Page-Scroll erreichbar bleiben. Am Ende des Verlaufs folgt die Anzeige neuer Ausgabe automatisch; eine manuell hochgescrollte Position bleibt stabil.
 
-3. **Clipboard-Paste-Support:** Benutzer können nun mit **Ctrl+V** Text aus der Zwischenablage direkt in die CLI einfügen. Die Text-Eingabe wird zeilenweise normalisiert (alle Newline-Varianten → `\r`) und als UTF-8 kodiert, um mit Windows-Standard-Clipboard-Verhalten kompatibel zu sein.
+3. **Robuster Clipboard-Paste-Support:** Benutzer können mit **Ctrl+V** Text aus der Zwischenablage direkt in die CLI einfügen. Auch lange mehrzeilige Inhalte wie Stacktraces werden vollständig übertragen. Die Zielsession wird beim Paste-Start festgehalten; große Eingaben werden im gemeinsamen `PseudoConsoleSession`-Eingabepfad serialisiert, in geordneten Chunks geschrieben und abschließend geflusht. Die Text-Eingabe wird zeilenweise normalisiert (alle Newline-Varianten → `\r`) und als UTF-8 kodiert, um mit Windows-Standard-Clipboard-Verhalten kompatibel zu sein.
 
 4. **Zeilenvorschub-Normalisierung:** Das Terminal behandelt Unix-Style Line Feeds (`\n`) jetzt identisch wie Windows-Style CRLF (`\r\n`) — beide erzeugen einen Zeilenvorschub **und** setzen die Cursor-Spalte auf 0. Dies verhindert den „Treppeneffekt", der entsteht, wenn Programme nur `\n` senden. Carriage Return (`\r`) allein wird weiterhin korrekt als Spalte-0-Rückkehr in der gleichen Zeile behandelt.
 
