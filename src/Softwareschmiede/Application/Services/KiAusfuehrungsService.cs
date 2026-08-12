@@ -555,8 +555,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         {
             await Task.Delay(300, ct).ConfigureAwait(false);
             var bytes = System.Text.Encoding.UTF8.GetBytes(command + "\r\n");
-            await session.InputStream.WriteAsync(bytes, ct).ConfigureAwait(false);
-            await session.InputStream.FlushAsync(ct).ConfigureAwait(false);
+            await session.WriteInputAsync(bytes, ct).ConfigureAwait(false);
             _logger.LogInformation("Plugin-Befehl an cmd.exe gesendet für Aufgabe {AufgabeId}: {Command}", aufgabeId, command);
         }
         catch (OperationCanceledException)

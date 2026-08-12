@@ -240,10 +240,11 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     {
         if (e.Key == Key.V && (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0)
         {
-            if (Session?.InputStream != null)
+            var session = Session;
+            if (session?.InputStream != null)
             {
                 e.Handled = true;
-                _ = ReadClipboardAndInsertAsync();
+                _ = ReadClipboardAndInsertAsync(session);
             }
 
             return;
@@ -474,26 +475,33 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     /// Input-Stream der aktuellen Session. Fehler beim Zwischenablage-Zugriff, Kodieren oder Schreiben werden
     /// abgefangen und protokolliert, statt das Control zu beeinträchtigen.</summary>
     private async Task ReadClipboardAndInsertAsync()
+        => await ReadClipboardAndInsertAsync(Session!).ConfigureAwait(false);
+
+    /// <summary>Liest den Text aus der Zwischenablage, kodiert ihn für die CLI und schreibt ihn in den
+    /// Input-Stream der beim Paste-Start aktiven Session. Fehler beim Zwischenablage-Zugriff, Kodieren oder
+    /// Schreiben werden abgefangen und protokolliert, statt das Control zu beeinträchtigen.</summary>
+    /// <param name="session">Die beim Paste-Start snapshotete Zielsession.</param>
+    private async Task ReadClipboardAndInsertAsync(PseudoConsoleSession session)
     {
         var text = GetClipboardText();
         if (string.IsNullOrEmpty(text))
             return;
 
         var bytes = KeyToVt100Encoder.EncodeClipboardText(text);
-        await WriteToInputStreamAsync(bytes, "Fehler beim Einfügen aus der Zwischenablage in den Terminal-Input-Stream").ConfigureAwait(false);
+        await WriteToInputStreamAsync(session, bytes, "Fehler beim Einfügen aus der Zwischenablage in den Terminal-Input-Stream").ConfigureAwait(false);
     }
 
     /// <summary>Schreibt Bytes asynchron in den Input-Stream der aktuellen Session und protokolliert Schreibfehler
     /// statt sie zu verschlucken. Wartet mit <c>ConfigureAwait(false)</c>, damit ein synchron blockierender Aufrufer
     /// (z. B. in Tests) nicht durch die Erfassung des UI-SynchronizationContext blockiert.</summary>
+    /// <param name="session">Die Zielsession für den Schreibvorgang.</param>
     /// <param name="bytes">Die zu schreibenden Bytes.</param>
     /// <param name="errorMessage">Die Log-Nachricht bei einem Schreibfehler.</param>
-    private async Task WriteToInputStreamAsync(byte[] bytes, string errorMessage)
+    private async Task WriteToInputStreamAsync(PseudoConsoleSession session, byte[] bytes, string errorMessage)
     {
         try
         {
-            await Session!.InputStream!.WriteAsync(bytes).ConfigureAwait(false);
-            Session.MarkInputActivity();
+            await session.WriteInputAsync(bytes).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

@@ -120,11 +120,11 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(inputStream, new ImmediateEofStream());
             control.Session = session;
 
-            SetClipboardTextWithRetry("Hi\nThere");
-
-            InvokeReadClipboardAndInsertAsync(control);
-
+            var text = "Hi\nThere";
             var expected = KeyToVt100Encoder.EncodeClipboardText("Hi\nThere");
+
+            InvokeReadClipboardAndInsertAsyncWithClipboardRetry(control, text, inputStream, expected);
+
             inputStream.ToArray().Should().Equal(expected);
         });
     }
@@ -202,6 +202,50 @@ public sealed partial class TerminalControlTests
         });
     }
 
+    /// <summary>Ein langer mehrzeiliger Clipboard-Inhalt muss vollständig und mit normalisierten Zeilenumbrüchen
+    /// in der Session ankommen.</summary>
+    [OsInterfaceFact]
+    public void ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            var inputStream = new MemoryStream();
+            using var session = CreateSession(inputStream, new ImmediateEofStream());
+            control.Session = session;
+            var text = CreateStacktraceLikeText(120);
+
+            var expected = KeyToVt100Encoder.EncodeClipboardText(text);
+
+            InvokeReadClipboardAndInsertAsyncWithClipboardRetry(control, text, inputStream, expected);
+
+            inputStream.ToArray().Should().Equal(expected);
+        });
+    }
+
+    /// <summary>Ein laufender Paste schreibt in die beim Start übergebene Session, auch wenn das Control später
+    /// eine andere Session anzeigt.</summary>
+    [OsInterfaceFact]
+    public void ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            var inputStreamA = new MemoryStream();
+            var inputStreamB = new MemoryStream();
+            using var sessionA = CreateSession(inputStreamA, new ImmediateEofStream());
+            using var sessionB = CreateSession(inputStreamB, new ImmediateEofStream());
+            control.Session = sessionA;
+            SetClipboardTextWithRetry("snapshot paste");
+
+            control.Session = sessionB;
+            InvokeReadClipboardAndInsertAsync(control, sessionA);
+
+            inputStreamA.ToArray().Should().Equal(KeyToVt100Encoder.EncodeClipboardText("snapshot paste"));
+            inputStreamB.ToArray().Should().BeEmpty();
+        });
+    }
+
     /// <summary>Enthält die Zwischenablage Text, muss <c>GetClipboardText()</c> diesen unverändert zurückgeben.</summary>
     [OsInterfaceFact]
     public void GetClipboardText_ClipboardContainsText_ReturnsText()
@@ -266,8 +310,41 @@ public sealed partial class TerminalControlTests
 
     private static void InvokeReadClipboardAndInsertAsync(TerminalControl control)
     {
-        var method = typeof(TerminalControl).GetMethod("ReadClipboardAndInsertAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(TerminalControl).GetMethod("ReadClipboardAndInsertAsync", BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null)!;
         var task = (Task)method.Invoke(control, null)!;
+        task.GetAwaiter().GetResult();
+    }
+
+    private static void InvokeReadClipboardAndInsertAsyncWithClipboardRetry(
+        TerminalControl control,
+        string clipboardText,
+        MemoryStream inputStream,
+        byte[] expectedBytes)
+    {
+        const int maxAttempts = 5;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            inputStream.SetLength(0);
+            SetClipboardTextWithRetry(clipboardText);
+            InvokeReadClipboardAndInsertAsync(control);
+
+            if (inputStream.ToArray().SequenceEqual(expectedBytes))
+                return;
+
+            Thread.Sleep(100 * attempt);
+        }
+    }
+
+    private static void InvokeReadClipboardAndInsertAsync(TerminalControl control, PseudoConsoleSession session)
+    {
+        var method = typeof(TerminalControl).GetMethod(
+            "ReadClipboardAndInsertAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            null,
+            [typeof(PseudoConsoleSession)],
+            null)!;
+        var task = (Task)method.Invoke(control, [session])!;
         task.GetAwaiter().GetResult();
     }
 
@@ -275,5 +352,19 @@ public sealed partial class TerminalControlTests
     {
         var method = typeof(TerminalControl).GetMethod("GetClipboardText", BindingFlags.NonPublic | BindingFlags.Instance)!;
         return (string)method.Invoke(control, null)!;
+    }
+
+    private static string CreateStacktraceLikeText(int lineCount)
+    {
+        var builder = new System.Text.StringBuilder();
+        for (var i = 0; i < lineCount; i++)
+        {
+            builder.Append("   at Softwareschmiede.App.Controls.TerminalControl.Generic`1[[System.String]].RenderIntoBatch(RenderBatchBuilder batchBuilder, RenderFragment renderFragment, Exception& renderFragmentException) in C:\\Repos\\Projekt\\Controls\\TerminalControl.cs:line ");
+            builder.Append(200 + i);
+            builder.Append('\n');
+        }
+
+        builder.Append("ÄÖÜ äöü [] <> () {} ` end");
+        return builder.ToString();
     }
 }

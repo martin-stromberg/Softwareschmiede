@@ -2,13 +2,13 @@
 
 # Terminal-Eingabeverarbeitung
 
-Die Terminal-Komponente verarbeitet Tastaturereignisse und konvertiert sie in Standard-VT100-Sequenzen für die Kommunikation mit CLI-Prozessen. Dieses Dokument behandelt die Eingabeverarbeitung speziell für Alt Gr-Sonderzeichen und wortweise Cursor-Navigation.
+Die Terminal-Komponente verarbeitet Tastaturereignisse, Zwischenablage-Inhalte und Standard-VT100-Sequenzen für die Kommunikation mit CLI-Prozessen. Dieses Dokument behandelt die Eingabeverarbeitung speziell für Alt Gr-Sonderzeichen, wortweise Cursor-Navigation und robustes Copy & Paste in Pseudokonsolen-Sitzungen.
 
 ## Beschreibung
 
 ### Zweck
 
-Ermöglichung der Eingabe von Sonderzeichen über Alt Gr (z. B. "@", "{", "}", "|", "~", "`" auf deutschem Tastaturlayout) und wortweise Cursor-Navigation mit Ctrl+Pfeiltasten in CLI-Prozessen.
+Ermöglichung der Eingabe von Sonderzeichen über Alt Gr (z. B. "@", "{", "}", "|", "~", "`" auf deutschem Tastaturlayout), wortweiser Cursor-Navigation mit Ctrl+Pfeiltasten und vollständiger Übertragung langer mehrzeiliger Clipboard-Inhalte in CLI-Prozessen.
 
 ### Funktionsweise
 
@@ -17,7 +17,7 @@ Wenn der Benutzer eine Taste drückt, wird das Ereignis vom Windows Presentation
 1. **Vorverarbeitung:** `OnPreviewKeyDown` prüft, ob die Taste eine Sonderbehandlung benötigt.
 2. **VT100-Kodierung:** `KeyToVt100Encoder.Encode()` konvertiert das Ereignis in eine VT100-Byte-Sequenz oder gibt `null` zurück.
 3. **Text-Eingabe:** Für Tasten, die normale Zeichen erzeugen (inklusive Alt Gr-Sonderzeichen), wird das `TextInput`-Event genutzt, um UTF-8-kodierten Text zu erfassen.
-4. **Ausgabeschreiben:** Kodierte Bytes werden in den Input-Stream der `PseudoConsoleSession` geschrieben, die sie an den laufenden CLI-Prozess weiterleitet.
+4. **Eingabeschreiben:** Kodierte Bytes werden in den Input-Stream der `PseudoConsoleSession` geschrieben, die sie an den laufenden CLI-Prozess weiterleitet.
 
 ### Alt Gr-Sonderzeichen
 
@@ -42,6 +42,14 @@ Mit **Ctrl+Links** und **Ctrl+Rechts** kann der Cursor im CLI um ein ganzes Wort
 - **Ctrl+Right:** `\x1b[1;5C` (CSI-Sequenz für Ctrl+Right)
 
 Diese Sequenzen sind in den meisten POSIX-Shells und modernen CLI-Tools standardisiert und werden automatisch als wortweise Navigation interpretiert.
+
+### Robustes Copy & Paste
+
+Mit **Ctrl+V** fügt das Terminal den aktuellen Text aus der Windows-Zwischenablage in die aktive CLI-Sitzung ein. Der Text wird vor dem asynchronen Schreiben als stabile Momentaufnahme gelesen; gleichzeitig wird die Zielsession festgehalten, damit ein laufender Paste-Vorgang nicht versehentlich in eine inzwischen angezeigte andere Sitzung schreibt.
+
+Mehrzeilige Clipboard-Inhalte werden über `KeyToVt100Encoder.EncodeClipboardText()` normalisiert. Alle Zeilenumbruchsvarianten (`\n`, `\r\n`, `\r`) werden als Carriage Return (`\r`) an die Pseudokonsole weitergegeben. Zeichen wie Backticks, Pfade, Klammern, generische Typnamen, Umlaute und weitere Sonderzeichen bleiben als UTF-8 erhalten.
+
+Lange Eingaben werden über die gemeinsame `PseudoConsoleSession.WriteInputAsync`-Schreiblogik übertragen. Diese serialisiert längere Eingaben pro Session, schreibt große Bytefolgen kontrolliert in Chunks, wartet jeden Chunk ab und führt am Ende einen Flush aus. Dadurch bleiben Reihenfolge und Vollständigkeit erhalten, auch wenn Paste, Promptversand oder Startbefehle zeitlich nah beieinander liegen. Normale kurze Tastatureingaben bleiben auf ihrem direkten Schreibpfad.
 
 ## Technischer Ablauf
 
@@ -127,6 +135,33 @@ Die VT100-Sequenz `\x1b[1;5D]` wird in den Input-Stream geschrieben.
 
 bash oder anderes POSIX-Shell empfängt die Sequenz `\x1b[1;5D` und interpretiert sie als "move cursor left by one word". Der Cursor springt zum Anfang des vorherigen Wortes.
 
+### Ctrl+V-Paste eines langen mehrzeiligen Texts
+
+**Schritt 1: Zielsession festhalten**
+
+Beim Paste-Start übernimmt das `TerminalControl` die aktuell gebundene `PseudoConsoleSession` in eine lokale Variable. Diese Session bleibt das Ziel des Paste-Vorgangs, auch wenn die UI währenddessen zu einer anderen Aufgabe wechselt.
+
+**Schritt 2: Clipboard-Text lesen und kodieren**
+
+```csharp
+var text = Clipboard.GetText();
+byte[] encoded = KeyToVt100Encoder.EncodeClipboardText(text);
+```
+
+Der Encoder erhält den vollständigen Clipboard-Text und normalisiert Zeilenumbrüche auf `\r`.
+
+**Schritt 3: Über gemeinsame Session-Schreiblogik übertragen**
+
+```csharp
+await session.WriteInputAsync(encoded);
+```
+
+`WriteInputAsync` serialisiert den Schreibvorgang pro Session. Bei langen Bytefolgen schreibt die Methode mehrere Chunks nacheinander und wartet jeden `WriteAsync`-Aufruf ab, bevor der nächste Chunk beginnt. Nach erfolgreichem Schreiben wird der Input-Stream geflusht.
+
+**Schritt 4: CLI-Prozess empfängt vollständige Eingabe**
+
+Der CLI-Prozess erhält die zusammenhängende Eingabe mit erhaltener Zeilenstruktur und unveränderten Sonderzeichen. Das gilt für Claude CLI ebenso wie für andere Plugins, die dieselbe `PseudoConsoleSession` nutzen.
+
 ## Diagramm: Tastaturereignis-Verarbeitung
 
 ```mermaid
@@ -137,12 +172,16 @@ flowchart TD
     D --> E["TextInput wird aufgerufen"]
     E --> F["OnTextInput"]
     F --> G["EncodeText UTF-8"]
-    G --> H["InputStream.WriteAsync"]
-    H --> I["ConPTY → CLI-Prozess"]
+    G --> H["Direkter kurzer InputStream-Write"]
+    H --> M["ConPTY → CLI-Prozess"]
     
     C -->|VT100-Taste z.B. Ctrl+Left| J["return Sequenz Bytes"]
     J --> K["e.Handled = true"]
     K --> H
+
+    B -->|Ctrl+V| L["Clipboard lesen und EncodeClipboardText"]
+    L --> I["PseudoConsoleSession.WriteInputAsync"]
+    I --> M
 ```
 
 ## Beteiligte Klassen
@@ -150,11 +189,12 @@ flowchart TD
 | Klasse | Datei | Rolle |
 |--------|-------|-------|
 | `KeyToVt100Encoder` | `src/Softwareschmiede.App/Controls/KeyToVt100Encoder.cs` | Utility-Klasse für VT100-Kodierung aller Tastaturereignisse |
-| `TerminalControl` | `src/Softwareschmiede.App/Controls/TerminalControl.cs` | WPF-UserControl, das Tastaturereignisse an `Encoder` delegiert |
-| `PseudoConsoleSession` | `src/Softwareschmiede/Infrastructure/Terminal/PseudoConsoleSession.cs` | Verwaltet Input/Output-Streams der ConPTY |
+| `TerminalControl` | `src/Softwareschmiede.App/Controls/TerminalControl.cs` | WPF-UserControl, das Tastaturereignisse und Clipboard-Paste an den Encoder delegiert |
+| `PseudoConsoleSession` | `src/Softwareschmiede/Infrastructure/Terminal/PseudoConsoleSession.cs` | Verwaltet Input/Output-Streams der ConPTY und serialisiert längere Input-Writes |
 
 ## Einschränkungen
 
 - **Tastaturlayout-abhängigkeit:** Alt Gr-Unterstützung funktioniert nur auf Tastaturlayouts, die Alt Gr implementieren (deutsch, französisch, spanisch, etc.).
 - **Terminal-abhängige Interpretation:** Die Wortweise-Navigation funktioniert nur in CLI-Tools, die diese VT100-Sequenzen interpretieren.
 - **Keine Unterstützung für Shift+Ctrl+Pfeiltaste:** Diese Kombination wird nicht speziell unterstützt.
+- **Clipboard-Quelle:** Paste nutzt die Windows-Zwischenablage über WPF. Nicht-textuelle Clipboard-Inhalte werden nicht eingefügt.
