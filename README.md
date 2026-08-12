@@ -40,7 +40,7 @@
 
 Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Login** und verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung und KI-Steuerung an einem zentralen Ort.
 
-Die Oberfläche ist eine native **WPF-Desktopanwendung** (`src/Softwareschmiede.App`, .NET 10+). Eine frühere Blazor-Server-Oberfläche wurde vollständig durch die WPF-Anwendung abgelöst und ist nicht mehr Teil des Projekts.
+Die Oberfläche ist eine native **WPF-Desktopanwendung** (`src/Softwareschmiede.App`, .NET 10+). 
 
 ### Geschäftsziele
 
