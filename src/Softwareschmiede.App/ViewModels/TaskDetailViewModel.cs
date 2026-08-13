@@ -1794,6 +1794,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             _arbeitsverzeichnisOeffnenService.Oeffne(effectiveWorkdir);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Öffnen des Arbeitsverzeichnisses {LokalerKlonPfad}.", lokalerKlonPfad);
@@ -1814,6 +1818,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
 
             solutionPfade = _ideOeffnenService.FindeSolutions(effectiveWorkdir);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -1866,6 +1874,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
 
             _ideOeffnenService.OeffneVisualStudioCode(effectiveWorkdir);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
         {
