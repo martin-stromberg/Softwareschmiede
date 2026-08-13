@@ -628,7 +628,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
         SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
-        OeffneArbeitsverzeichnisCommand = new RelayCommand(OeffneArbeitsverzeichnis, () => ShowFileExplorerPanel);
+        OeffneArbeitsverzeichnisCommand = new AsyncRelayCommand(OeffneArbeitsverzeichnisAsync, () => ShowFileExplorerPanel);
         OeffneIdeCommand = new AsyncRelayCommand(OeffneIdeAsync, () => KannIdeOeffnen);
     }
 
@@ -1746,13 +1746,29 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            return _ideOeffnenService.FindeSolutions(aufgabe!.LokalerKlonPfad);
+            var startConfig = aufgabe!.GitRepository?.StartKonfiguration;
+            var arbeitsverzeichnis = WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory(
+                aufgabe.LokalerKlonPfad!,
+                startConfig?.WorkingDirectoryRelativePath);
+
+            return _ideOeffnenService.FindeSolutions(arbeitsverzeichnis);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Suchen nach Solutions im Arbeitsverzeichnis {LokalerKlonPfad}.", aufgabe!.LokalerKlonPfad);
             return [];
         }
+    }
+
+    private Task<string> ErmittleEffektivesArbeitsverzeichnisAsync(string lokalerKlonPfad, CancellationToken ct)
+    {
+        var startConfig = _aufgabe?.GitRepository?.StartKonfiguration;
+
+        return WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(
+            lokalerKlonPfad,
+            startConfig,
+            gitPlugin: null,
+            ct: ct);
     }
 
     private async Task AktualisiereIdeFallbackEinstellungAsync(CancellationToken ct)
@@ -1765,7 +1781,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         CommandManager.InvalidateRequerySuggested();
     }
 
-    private void OeffneArbeitsverzeichnis()
+    private async Task OeffneArbeitsverzeichnisAsync(CancellationToken ct)
     {
         if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
             return;
@@ -1774,7 +1790,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            _arbeitsverzeichnisOeffnenService.Oeffne(lokalerKlonPfad);
+            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
+
+            _arbeitsverzeichnisOeffnenService.Oeffne(effectiveWorkdir);
         }
         catch (Exception ex)
         {
@@ -1787,20 +1805,37 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     {
         FehlerMeldung = null;
 
-        if (_solutionPfade.Count == 0)
+        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
+            return;
+
+        IReadOnlyList<string> solutionPfade;
+        try
         {
-            OeffneVisualStudioCodeFallback();
+            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
+
+            solutionPfade = _ideOeffnenService.FindeSolutions(effectiveWorkdir);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Ermitteln des Arbeitsverzeichnisses für Aufgabe {AufgabeId}.", _aufgabeId);
+            FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
+            return;
+        }
+
+        if (solutionPfade.Count == 0)
+        {
+            await OeffneVisualStudioCodeFallbackAsync(ct);
             return;
         }
 
         string? solutionPfad;
-        if (_solutionPfade.Count == 1)
+        if (solutionPfade.Count == 1)
         {
-            solutionPfad = _solutionPfade[0];
+            solutionPfad = solutionPfade[0];
         }
         else
         {
-            solutionPfad = await _dialogService.ShowSolutionSelectionDialogAsync(_solutionPfade, ct);
+            solutionPfad = await _dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, ct);
             if (solutionPfad is null)
                 return;
         }
@@ -1816,27 +1851,30 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void OeffneVisualStudioCodeFallback()
+    private async Task OeffneVisualStudioCodeFallbackAsync(CancellationToken ct)
     {
         if (!_openVisualStudioCodeWhenNoSolutionFound)
             return;
 
-        var arbeitsverzeichnis = _aufgabe?.LokalerKlonPfad;
-        if (string.IsNullOrWhiteSpace(arbeitsverzeichnis))
+        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
             return;
+
+        FehlerMeldung = null;
 
         try
         {
-            _ideOeffnenService.OeffneVisualStudioCode(arbeitsverzeichnis);
+            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
+
+            _ideOeffnenService.OeffneVisualStudioCode(effectiveWorkdir);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogWarning(ex, "Visual Studio Code wurde für Arbeitsverzeichnis {LokalerKlonPfad} nicht gefunden.", arbeitsverzeichnis);
+            _logger.LogWarning(ex, "Visual Studio Code wurde für Arbeitsverzeichnis {LokalerKlonPfad} nicht gefunden.", lokalerKlonPfad);
             FehlerMeldung = "Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden.";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Öffnen von Visual Studio Code für Arbeitsverzeichnis {LokalerKlonPfad}.", arbeitsverzeichnis);
+            _logger.LogError(ex, "Fehler beim Öffnen von Visual Studio Code für Arbeitsverzeichnis {LokalerKlonPfad}.", lokalerKlonPfad);
             FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
         }
     }

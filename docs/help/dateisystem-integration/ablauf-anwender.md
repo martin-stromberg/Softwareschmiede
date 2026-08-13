@@ -54,12 +54,22 @@ Für die Verwendung dieser Funktionen muss:
 
 > **Hinweis:** Wenn später eine `*.sln`-Datei im Arbeitsverzeichnis vorhanden ist, öffnet die Aktion wieder die Solution. Die Solution hat Vorrang vor VS Code.
 
+## Konfiguriertes Arbeitsunterverzeichnis
+
+Falls beim Repository ein **Arbeitsunterverzeichnis** konfiguriert wurde (z. B. über die Projekt-Einstellungen):
+
+1. **„Arbeitsverzeichnis öffnen"** öffnet das konfigurierte Unterverzeichnis (z. B. `Projekt\src\backend`), nicht den Repository-Root.
+2. **„IDE öffnen"** sucht nach Solutions nur im konfigurierten Unterverzeichnis. Solutions im Repository-Root werden nicht berücksichtigt.
+3. Der **VS-Code-Fallback** startet Visual Studio Code mit dem konfigurierten Unterverzeichnis als Arbeitsverzeichnis.
+
+> **Hinweis:** Wenn die Arbeit in einem Mono-Repo auf ein spezielles Subprojekt beschränkt sein soll, konfiguriert die Projekt-Verwaltung das entsprechende Unterverzeichnis. Anschließend verwenden alle Ribbon-Aktionen automatisch dieses Unterverzeichnis, statt den Gesamtrepository-Pfad.
+
 ## Ergebnis
 
 Nach erfolgreicher Ausführung:
-- **Arbeitsverzeichnis öffnen:** Der System-Dateiexplorer zeigt die Verzeichnisstruktur des Arbeitsverzeichnisses.
-- **IDE öffnen:** Die IDE (z. B. Visual Studio) ist mit der Solution geladen und bereit zur Bearbeitung.
-- **IDE öffnen ohne Solution und mit aktiviertem Fallback:** Visual Studio Code zeigt das Arbeitsverzeichnis an.
+- **Arbeitsverzeichnis öffnen:** Der System-Dateiexplorer zeigt die Verzeichnisstruktur des Arbeitsverzeichnisses (aufgelöstes Unterverzeichnis oder Repository-Root).
+- **IDE öffnen:** Die IDE (z. B. Visual Studio) ist mit der gefundenen Solution geladen und bereit zur Bearbeitung.
+- **IDE öffnen ohne Solution und mit aktiviertem Fallback:** Visual Studio Code zeigt das Arbeitsverzeichnis (aufgelöstes Unterverzeichnis) an.
 
 ## Barrierefreiheit
 
