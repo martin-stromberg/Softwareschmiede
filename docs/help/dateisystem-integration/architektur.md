@@ -10,11 +10,12 @@
 | `ProzessStartAnfrage` | Value Object (Domain.ValueObjects) | Kapselt Prozessstart-Parameter (`DateiName`, `Argumente`, `ShellAusfuehren`) ohne System.Diagnostics-Abhängigkeit. |
 | `SystemProzessStarter` | Klasse (Infrastructure.Services) | Reale Implementierung von `IProzessStarter`; mappt auf `ProcessStartInfo` und ruft `Process.Start()` auf. |
 | `AufzeichnenderProzessStarter` | Klasse (Infrastructure.Services) | Test-Implementierung von `IProzessStarter`; schreibt `ProzessStartAnfrage` in Logdatei statt echte Prozesse zu starten. |
-| `ArbeitsverzeichnisOeffnenService` | Klasse (Application.Services) | Löst Plattformbefehl auf (Windows/Linux/macOS) und delegiert Prozessstart. |
+| `WorkingDirectoryResolver` | Klasse (Application.Services, statisch) | Löst das effektive Arbeitsverzeichnis auf durch Kombination von Repository-Root mit optionalem konfiguriertem `WorkingDirectoryRelativePath`; validiert das Ergebnis. Stellt `ResolveEffectiveWorkingDirectory()` (sync) und `DetermineEffectiveWorkingDirectoryAsync()` (async) zur Verfügung. |
+| `ArbeitsverzeichnisOeffnenService` | Klasse (Application.Services) | Löst Plattformbefehl auf (Windows/Linux/macOS) und delegiert Prozessstart mit aufgelöstem Arbeitsverzeichnis. |
 | `IVisualStudioCodeLocator` | Interface (Application.Services) | Abstraktion zur Auflösung eines startbaren Visual-Studio-Code-Befehls. |
 | `VisualStudioCodeLocator` | Klasse (Infrastructure.Services) | Sucht `code.cmd`/`code` in `PATH` und typischen Windows-Installationspfaden. |
-| `IdeOeffnenService` | Klasse (Application.Services) | Findet `.sln`-Dateien, öffnet sie per Shell-Execute und startet optional VS Code mit dem Arbeitsverzeichnis. |
-| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe. |
+| `IdeOeffnenService` | Klasse (Application.Services) | Findet `.sln`-Dateien im **aufgelösten Arbeitsverzeichnis**, öffnet sie per Shell-Execute und startet optional VS Code mit dem aufgelösten Arbeitsverzeichnis. |
+| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe; nutzt `WorkingDirectoryResolver` zur Auflösung des Arbeitsverzeichnisses vor Weitergabe an Services. |
 | `IDialogService` / `WpfDialogService` | Interface / Klasse (App.Services) | Dialog-Gateway; implementiert `ShowSolutionSelectionDialogAsync()`. |
 | `SolutionSelectionDialog` | WPF-Window (App.Views) | Modales Fenster für Solution-Auswahl bei mehreren Dateien. |
 | `SolutionSelectionDialogViewModel` | Klasse (App.ViewModels) | Presentation Model für Dialog; verwaltet Solution-Liste und Benutzer-Auswahl. |
@@ -31,6 +32,10 @@ Infrastructure-Schicht (Reale / Test-Implementierung):
 └─ AufzeichnenderProzessStarter (implementiert IProzessStarter)
 
 Application-Schicht (Services):
+├─ WorkingDirectoryResolver (statische Utility-Klasse)
+│  ├─ `ResolveEffectiveWorkingDirectory()` (sync, für UI-Caching)
+│  ├─ `DetermineEffectiveWorkingDirectoryAsync()` (async, für Command-Handler)
+│  └─ `ValidateWorkingDirectory()` (Validierung und Fehlerbehandlung)
 ├─ ArbeitsverzeichnisOeffnenService
 │  └─ Abhängigkeit: IProzessStarter
 ├─ IdeOeffnenService
@@ -40,6 +45,7 @@ Application-Schicht (Services):
 
 App-Schicht (UI/ViewModels):
 ├─ TaskDetailViewModel
+│  ├─ WorkingDirectoryResolver (zur Auflösung des Arbeitsverzeichnisses)
 │  ├─ ArbeitsverzeichnisOeffnenService
 │  ├─ IdeOeffnenService
 │  ├─ AppEinstellungService
@@ -64,24 +70,29 @@ Benutzer klickt Button
   ↓
 TaskDetailViewModel.OeffneArbeitsverzeichnisCommand
   ↓
-OeffneArbeitsverzeichnis() Methode
+OeffneArbeitsverzeichnisAsync() Methode (async)
   ↓
-ArbeitsverzeichnisOeffnenService.Oeffne(LokalerKlonPfad)
+WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()
+  ├─ Kombiniert LokalerKlonPfad + WorkingDirectoryRelativePath
+  ├─ Validiert das Ergebnis (existiert, ist erreichbar)
+  └─ Rückgabe: aufgelöstes Arbeitsverzeichnis (z. B. C:\repo\src\backend)
   ↓
-Plattformbefehl auflösen (Explorer/xdg-open/open)
+ArbeitsverzeichnisOeffnenService.Oeffne(effectiveWorkdir)
+  ↓
+Plattformbefehl auflösen (Explorer/xdg-open/open mit aufgelöstem Pfad)
   ↓
 ProzessStartAnfrage erstellen
   ↓
 IProzessStarter.Starten(anfrage)
   ├─→ SystemProzessStarter (Production)
   │   ↓
-  │   Process.Start()
+  │   Process.Start() mit aufgelöstem Pfad
   │   ↓
-  │   OS-Dateiexplorer
+  │   OS-Dateiexplorer öffnet aufgelöstes Verzeichnis
   │
   └─→ AufzeichnenderProzessStarter (Test)
       ↓
-      Logdatei schreiben (prozess-starts.log)
+      Logdatei schreiben (prozess-starts.log mit aufgelöstem Pfad)
 ```
 
 ### IDE öffnen
@@ -91,10 +102,13 @@ Benutzer klickt Button
   ↓
 TaskDetailViewModel.OeffneIdeAsync()
   ↓
-_solutionPfade lesen (beim Aufgabe-Laden gecacht)
+WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()
+  └─ Rückgabe: aufgelöstes Arbeitsverzeichnis (z. B. C:\repo\src\backend)
   ↓
-Verzweigung nach Anzahl der Solutions:
-  ├─→ Keine: Bei deaktiviertem Fallback kein Klick; bei aktiviertem Fallback VS Code starten
+_solutionPfade lesen (beim Aufgabe-Laden im aufgelösten Verzeichnis gecacht)
+  ↓
+Verzweigung nach Anzahl der Solutions im aufgelösten Verzeichnis:
+  ├─→ Keine: Bei deaktiviertem Fallback kein Klick; bei aktiviertem Fallback VS Code mit aufgelöstem Pfad starten
   ├─→ Eine: Direkt zu Prozessstart
   └─→ Mehrere: Dialog anzeigen
        ↓
@@ -118,7 +132,7 @@ IProzessStarter.Starten(anfrage)
   ├─→ SystemProzessStarter: Process.Start() mit Shell-Execute
   └─→ AufzeichnenderProzessStarter: Logdatei schreiben
   ↓
-IDE (z. B. Visual Studio) öffnet Solution
+IDE (z. B. Visual Studio) öffnet Solution aus aufgelöstem Verzeichnis
 ```
 
 ### IDE öffnen ohne Solution mit VS Code
@@ -126,7 +140,9 @@ IDE (z. B. Visual Studio) öffnet Solution
 ```
 TaskDetailViewModel lädt Aufgabe
   ↓
-IdeOeffnenService.FindeSolutions() liefert leere Liste
+WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory() — aufgelöst
+  ↓
+IdeOeffnenService.FindeSolutions(effectiveWorkdir) liefert leere Liste
   ↓
 AppEinstellungService liest ide.vscode.openWhenNoSolutionFound
   ↓
@@ -134,13 +150,16 @@ KannIdeOeffnen = Arbeitsverzeichnis vorhanden und Einstellung true
   ↓
 Benutzer klickt IDE öffnen
   ↓
-IdeOeffnenService.OeffneVisualStudioCode(LokalerKlonPfad)
+IdeOeffnenService.OeffneVisualStudioCode(effectiveWorkdir)
+  — übergeben: aufgelöstes Arbeitsverzeichnis (z. B. C:\repo\src\backend)
   ↓
 IVisualStudioCodeLocator.Locate()
   ├─→ Kein Treffer: FehlerMeldung
-  └─→ Treffer: ProzessStartAnfrage für code "<Arbeitsverzeichnis>"
+  └─→ Treffer: ProzessStartAnfrage für code "<aufgelöstes Arbeitsverzeichnis>"
       ↓
       IProzessStarter.Starten(anfrage)
+      ↓
+      VS Code öffnet mit aufgelöstem Verzeichnis als Working Directory
 ```
 
 ## Diagramm

@@ -106,7 +106,9 @@ public abstract class WpfTestBase : IDisposable
             File.Delete(pfad);
     }
 
-    private string ResolveProzessStartLogPfad()
+    /// <summary>Löst den Pfad der Prozessstart-Logdatei für die Testdatenbank dieser Instanz auf.</summary>
+    /// <returns>Der Pfad zur Prozessstart-Logdatei.</returns>
+    protected string ResolveProzessStartLogPfad()
         => AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
 
     /// <summary>
@@ -117,8 +119,14 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags.</param>
     /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>
+    /// <param name="sinceContent">
+    /// Bereits zuvor gelesener Loginhalt der Logdatei. Ist er nicht leer, wird nur der seit diesem Inhalt
+    /// neu hinzugekommene Teil der Logdatei durchsucht - notwendig, wenn ein zuvor bereits aufgezeichneter
+    /// Prozessstart denselben Teilstring enthält (z. B. denselben aufgelösten Arbeitsverzeichnis-Pfad) und
+    /// deshalb allein kein Beweis für einen NEUEN Prozessstart wäre.
+    /// </param>
     /// <exception cref="TimeoutException">Wird geworfen, wenn kein passender Eintrag innerhalb von <paramref name="timeout"/> erscheint.</exception>
-    protected async Task WaitForProzessStartEintragAsync(string substring, TimeSpan? timeout = null)
+    protected async Task WaitForProzessStartEintragAsync(string substring, TimeSpan? timeout = null, string sinceContent = "")
     {
         var effectiveTimeout = timeout ?? Short;
         var pfad = ResolveProzessStartLogPfad();
@@ -131,7 +139,8 @@ public abstract class WpfTestBase : IDisposable
                 try
                 {
                     var inhalt = await File.ReadAllTextAsync(pfad);
-                    if (inhalt.Contains(substring, StringComparison.Ordinal))
+                    if (inhalt.Length > sinceContent.Length
+                        && inhalt[sinceContent.Length..].Contains(substring, StringComparison.Ordinal))
                         return;
                 }
                 catch (IOException)

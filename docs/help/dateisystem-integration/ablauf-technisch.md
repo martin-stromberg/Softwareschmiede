@@ -11,19 +11,26 @@ Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen übe
 ### 1. Arbeitsverzeichnis öffnen
 
 1. Benutzer klickt Button im Ribbon → `TaskDetailViewModel.OeffneArbeitsverzeichnisCommand.Execute()` wird aufgerufen.
-2. `TaskDetailViewModel.OeffneArbeitsverzeichnis()` ruft `ArbeitsverzeichnisOeffnenService.Oeffne(_aufgabe.LokalerKlonPfad)` auf.
-3. `ArbeitsverzeichnisOeffnenService` ermittelt den plattformabhängigen Befehl:
-   - Windows: `explorer.exe` + Verzeichnispfad (als Argument mit Anführungszeichen)
-   - Linux: `xdg-open` + Verzeichnispfad
-   - macOS: `open` + Verzeichnispfad
-4. Service erstellt `ProzessStartAnfrage(DateiName="explorer.exe", Argumente="\"C:\\...\"", ShellAusfuehren=false)`.
-5. Service ruft `IProzessStarter.Starten(anfrage)` auf.
-6. `SystemProzessStarter` mappt die Anfrage auf `ProcessStartInfo` und ruft `Process.Start()` auf.
-7. Der Prozess wird gestartet; Fehler werden geloggt und in `FehlerMeldung` angezeigt.
+2. `TaskDetailViewModel.OeffneArbeitsverzeichnisAsync()` wird aufgerufen (async void Command-Handler).
+3. ViewModel ermittelt das effektive Arbeitsverzeichnis:
+   - Liest `Aufgabe.GitRepository.StartKonfiguration` (optional).
+   - Ruft `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(LokalerKlonPfad, startConfig, gitPlugin: null, CancellationToken)` auf.
+   - `WorkingDirectoryResolver` kombiniert den Repository-Root mit dem optionalen `WorkingDirectoryRelativePath` und validiert das Ergebnis.
+   - Rückgabe: effektives Arbeitsverzeichnis (z. B. `C:\repos\project\src\backend` falls `WorkingDirectoryRelativePath="src/backend"`).
+4. ViewModel ruft `ArbeitsverzeichnisOeffnenService.Oeffne(effectiveWorkdir)` mit dem aufgelösten Pfad auf.
+5. `ArbeitsverzeichnisOeffnenService` ermittelt den plattformabhängigen Befehl:
+   - Windows: `explorer.exe` + aufgelöster Verzeichnispfad (als Argument mit Anführungszeichen)
+   - Linux: `xdg-open` + aufgelöster Verzeichnispfad
+   - macOS: `open` + aufgelöster Verzeichnispfad
+6. Service erstellt `ProzessStartAnfrage(DateiName="explorer.exe", Argumente="\"C:\\...\\backend\"", ShellAusfuehren=false)`.
+7. Service ruft `IProzessStarter.Starten(anfrage)` auf.
+8. `SystemProzessStarter` mappt die Anfrage auf `ProcessStartInfo` und ruft `Process.Start()` auf.
+9. Der Prozess wird gestartet; Fehler werden geloggt und in `FehlerMeldung` angezeigt (z. B. bei nicht-existentem oder nicht-erreichbarem Verzeichnis).
 
 Beteiligte Komponenten:
 - `TaskDetailView.xaml` — Ribbon-Button
-- `TaskDetailViewModel` — Command-Handler
+- `TaskDetailViewModel` — Command-Handler, Auflösung des Arbeitsverzeichnisses
+- `WorkingDirectoryResolver` — Auflösung des effektiven Arbeitsverzeichnisses mit Validierung
 - `ArbeitsverzeichnisOeffnenService` — Plattformauflösung und Service-Logik
 - `IProzessStarter` (Gateway) — Abstraktionsschicht
 - `SystemProzessStarter` — Reale Implementierung
@@ -34,29 +41,36 @@ Beteiligte Komponenten:
 Beim Laden einer Aufgabe (Property `Aufgabe` wird gesetzt):
 
 1. `TaskDetailViewModel.Aufgabe` Setter wird aufgerufen.
-2. Setter ruft `IdeOeffnenService.FindeSolutions(value?.LokalerKlonPfad)` auf.
-3. `IdeOeffnenService.FindeSolutions()`:
+2. Setter ermittelt das effektive Arbeitsverzeichnis (analog zu Schritt 1):
+   - Ruft `WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory(LokalerKlonPfad, startConfig?.WorkingDirectoryRelativePath)` auf (synchrone Variante für UI-Caching).
+   - Rückgabe: aufgelöstes Arbeitsverzeichnis.
+3. Setter ruft `IdeOeffnenService.FindeSolutions(effectiveWorkdir)` mit dem **aufgelösten** Verzeichnis auf.
+4. `IdeOeffnenService.FindeSolutions()`:
    - Prüft, ob der Pfad nicht null/leer und das Verzeichnis existiert.
-   - Ruft `Directory.EnumerateFiles(arbeitsverzeichnis, "*.sln", SearchOption.TopDirectoryOnly)` auf.
+   - Ruft `Directory.EnumerateFiles(effectiveWorkdir, "*.sln", SearchOption.TopDirectoryOnly)` auf (sucht **im aufgelösten Verzeichnis**, nicht im Root).
    - Sortiert die Ergebnisse alphabetisch (OrdinalIgnoreCase).
    - Gibt die Liste als `IReadOnlyList<string>` zurück (leer, wenn keine Solutions gefunden).
-4. Feld `_solutionPfade` speichert das Ergebnis.
-5. Property `SolutionsVorhanden` / Binding `SolutionFileExists` wird geändert.
-6. `TaskDetailViewModel` lädt `ide.vscode.openWhenNoSolutionFound` über `AppEinstellungService`.
-7. `KannIdeOeffnen` wird neu bewertet: `true` bei vorhandener Solution oder bei vorhandenem Arbeitsverzeichnis und aktiviertem VS-Code-Fallback.
+5. Feld `_solutionPfade` speichert das Ergebnis.
+6. Property `SolutionsVorhanden` / Binding `SolutionFileExists` wird geändert.
+7. `TaskDetailViewModel` lädt `ide.vscode.openWhenNoSolutionFound` über `AppEinstellungService`.
+8. `KannIdeOeffnen` wird neu bewertet: `true` bei vorhandener Solution im aufgelösten Verzeichnis oder bei vorhandenem Arbeitsverzeichnis und aktiviertem VS-Code-Fallback.
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.Aufgabe` Setter — Trigger für Solution-Suche
-- `IdeOeffnenService.FindeSolutions()` — Dateisuche und Sortierung
+- `WorkingDirectoryResolver` — Auflösung des effektiven Arbeitsverzeichnisses
+- `IdeOeffnenService.FindeSolutions()` — Dateisuche im aufgelösten Verzeichnis und Sortierung
 - `_solutionPfade` Feld — Gecachte Ergebnisse
 
 ### 3. IDE öffnen (Dialog bei mehreren Solutions)
 
-1. Benutzer klickt Button → `TaskDetailViewModel.OeffneIdeCommand.Execute()` wird aufgerufen → `OeffneIdeAsync()` wird aufgerufen.
-2. Prüfung der gecachten `_solutionPfade`:
+1. Benutzer klickt Button → `TaskDetailViewModel.OeffneIdeCommand.Execute()` wird aufgerufen → `OeffneIdeAsync()` wird aufgerufen (async).
+2. ViewModel ermittelt das effektive Arbeitsverzeichnis (async):
+   - Ruft `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()` auf.
+   - Setzt `effectiveWorkdir`.
+3. Prüfung der gecachten `_solutionPfade`:
    - **Genau eine Solution:** Sprung zu Schritt 4 (direkt öffnen).
    - **Mehrere Solutions:** Weiterfahrt mit Schritt 3a.
-   - **Keine Solution:** Wenn der VS-Code-Fallback deaktiviert ist, ist der Button deaktiviert. Wenn er aktiviert ist, wird das Arbeitsverzeichnis in VS Code geöffnet.
+   - **Keine Solution:** Wenn der VS-Code-Fallback deaktiviert ist, ist der Button deaktiviert. Wenn er aktiviert ist, wird das aufgelöste Arbeitsverzeichnis in VS Code geöffnet (Fallback-Pfad).
 3a. **Dialog anzeigen:**
    - `TaskDetailViewModel` ruft `_dialogService.ShowSolutionSelectionDialogAsync(_solutionPfade, ct)` auf.
    - `WpfDialogService.ShowSolutionSelectionDialogAsync()`:
@@ -81,10 +95,10 @@ Beteiligte Komponenten:
 
 1. Bei `0` gefundenen Solutions prüft `TaskDetailViewModel`, ob `_openVisualStudioCodeWhenNoSolutionFound` gesetzt ist.
 2. Ist die Einstellung deaktiviert, endet der Ablauf ohne Prozessstart.
-3. Ist die Einstellung aktiviert, ruft `TaskDetailViewModel` `IdeOeffnenService.OeffneVisualStudioCode(Aufgabe.LokalerKlonPfad)` auf.
-4. `IdeOeffnenService` validiert das Arbeitsverzeichnis und fragt `IVisualStudioCodeLocator.Locate()` ab.
+3. Ist die Einstellung aktiviert, ruft `TaskDetailViewModel` `IdeOeffnenService.OeffneVisualStudioCode(effectiveWorkdir)` mit dem **aufgelösten Arbeitsverzeichnis** auf.
+4. `IdeOeffnenService` validiert das aufgelöste Arbeitsverzeichnis und fragt `IVisualStudioCodeLocator.Locate()` ab.
 5. `VisualStudioCodeLocator` sucht zuerst `code.cmd` und `code` in `PATH`, danach typische Windows-Pfade unter `%LOCALAPPDATA%`, `%ProgramFiles%` und `%ProgramFiles(x86)%`.
-6. Bei Treffer erstellt der Service `ProzessStartAnfrage(DateiName=<code-Pfad>, Argumente="\"<Arbeitsverzeichnis>\"", ShellAusfuehren=false)`.
+6. Bei Treffer erstellt der Service `ProzessStartAnfrage(DateiName=<code-Pfad>, Argumente="\"<aufgelöster Arbeitsverzeichnis>\"", ShellAusfuehren=false)` — **mit dem aufgelösten Pfad als Arbeitsverzeichnis**, nicht dem Repository-Root.
 7. Wenn kein VS Code gefunden wird, setzt das ViewModel die Meldung: „Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden."
 
 ### 4. IDE öffnen (Prozessstart)
@@ -139,12 +153,22 @@ flowchart TD
 
 ## Fehlerbehandlung
 
+### Arbeitsverzeichnis-Auflösung (Fehler)
+
+Wenn `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()` eine Ausnahme wirft (z. B. das konfigurierte Unterverzeichnis existiert nicht oder ist nicht erreichbar):
+
+1. Ausnahme wird geloggt mit Details (konfig. Pfad, Grund: `DirectoryNotFoundException`, `UnauthorizedAccessException`, etc.).
+2. `TaskDetailViewModel` fängt die Ausnahme ab (in `OeffneArbeitsverzeichnisAsync()`, `OeffneIdeAsync()`, `OeffneVisualStudioCodeFallbackAsync()`).
+3. Fehlermeldung wird in Property `FehlerMeldung` gespeichert (z. B. „Arbeitsverzeichnis konnte nicht geöffnet werden: Verzeichnis nicht gefunden").
+4. UI zeigt Fehler-Banner an.
+5. Buttons bleiben inaktiv, solange das konfigurierte Arbeitsverzeichnis nicht erreichbar ist.
+
 ### Prozessstart-Fehler
 
 Wenn `SystemProzessStarter.Starten()` eine Ausnahme wirft (z. B. Befehl nicht gefunden, keine Berechtigung):
 
-1. Ausnahme wird geloggt mit vollständigen Details (`DateiName`, `Argumente`, `ShellAusfuehren`).
-2. `TaskDetailViewModel` fängt die Ausnahme (in `OeffneArbeitsverzeichnis()` oder `OeffneIdeAsync()`) ab.
+1. Ausnahme wird geloggt mit vollständigen Details (`DateiName`, `Argumente`, `ShellAusfuehren`, aufgelöster Pfad).
+2. `TaskDetailViewModel` fängt die Ausnahme (in `OeffneArbeitsverzeichnisAsync()` oder `OeffneIdeAsync()`) ab.
 3. Fehlermeldung wird in Property `FehlerMeldung` gespeichert.
 4. UI zeigt Fehler-Banner an.
 5. Benutzer kann den Fehler einblenden (durch Fehlerbanner-Klick oder Bestätigung).

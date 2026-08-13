@@ -54,9 +54,24 @@ Gefundene `*.sln`-Dateien haben immer Vorrang vor dem VS-Code-Fallback.
 3. Im Ribbon auf „IDE öffnen" klicken.
 4. Visual Studio Code öffnet das Arbeitsverzeichnis, sofern `code`/`code.cmd` über `PATH` oder eine typische Windows-Installation gefunden wird.
 
+## Arbeitsverzeichnis-Auflösung
+
+Beide Aktionen berücksichtigen das konfigurierte Arbeitsunterverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`) des Repositories:
+
+- **Mit konfiguriertem Unterverzeichnis (z. B. `src/backend`):** 
+  - „Arbeitsverzeichnis öffnen" zeigt das Unterverzeichnis an (z. B. `C:\path\repo\src\backend`), nicht den Repository-Root.
+  - „IDE öffnen" durchsucht das Unterverzeichnis nach Solutions (nicht den Root).
+  - Falls Solutions im Unterverzeichnis existieren, werden diese gefunden und geöffnet; Solutions im Root werden ignoriert.
+  - Das Unterverzeichnis wird auch als Arbeitsverzeichnis an Visual Studio Code übergeben (Fallback).
+
+- **Ohne konfiguriertes Unterverzeichnis (oder `.` = Root):**
+  - Beide Aktionen verwenden den Repository-Root — das Verhalten ist identisch mit Repositories ohne Unterverzeichnis-Konfiguration.
+
+Diese Funktionalität unterstützt Mono-Repos mit mehreren, räumlich getrennten Subprojekten: Ist das Arbeitsverzeichnis auf `backend/` konfiguriert, werden nur Solutions im `backend/`-Ordner berücksichtigt, und das Öffnen des Dateiexplorers zeigt ausschließlich diesen Ordner.
+
 ## Einschränkungen
 
 - Die Anwendung prüft nicht, ob die IDE (z. B. Visual Studio) auf dem System installiert ist. Ist sie nicht vorhanden oder kein Betriebssystem-Handler für `.sln`-Dateien registriert, wird eine Fehlermeldung angezeigt.
 - Der VS-Code-Fallback ist opt-in und standardmäßig deaktiviert. Ist er aktiviert, aber Visual Studio Code nicht auffindbar, zeigt die Aufgabendetailansicht einen Hinweis.
-- Solutions werden nur auf der obersten Verzeichnisebene erkannt (keine rekursive Suche in Unterverzeichnissen).
-- Das Arbeitsverzeichnis muss auf der Festplatte vorhanden sein. Ist der konfigurierte Pfad gelöscht oder nicht erreichbar, sind die Buttons inaktiv.
+- Solutions werden nur auf der obersten Verzeichnisebene des (aufgelösten) Arbeitsverzeichnisses erkannt (keine rekursive Suche in Unterverzeichnissen).
+- Das Arbeitsverzeichnis muss auf der Festplatte vorhanden sein. Ist der konfigurierte Pfad gelöscht oder nicht erreichbar, werden die Buttons inaktiv und eine Fehlermeldung angezeigt.

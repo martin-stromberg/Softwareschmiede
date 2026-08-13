@@ -1,3 +1,13 @@
+## 2026-08-13 — Zuverlässige Anwendung des konfigurierten Arbeitsverzeichnisses bei Ribbon-Aktionen
+
+- Feature: Das konfigurierte Arbeitsunterverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`) wird jetzt konsistent auf alle Ribbon-Aktionen angewendet: „Arbeitsverzeichnis öffnen", „IDE öffnen" und „Visual Studio Code öffnen" (Fallback).
+- Implementierung: `TaskDetailViewModel.OeffneArbeitsverzeichnisAsync()`, `OeffneIdeAsync()` und `OeffneVisualStudioCodeFallbackAsync()` nutzen nun `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()`, um das aufgelöste Arbeitsverzeichnis zu ermitteln und weiterzuleiten.
+- Verhaltensänderung: „IDE öffnen" durchsucht das aufgelöste Arbeitsverzeichnis nach Solutions (nicht den Repository-Root); falls konfiguriert, wird das Unterverzeichnis geöffnet (z. B. `backend/` statt Repository-Root).
+- UI-Verbesserung: Alle Methodensignaturen wurden auf `async`-basiert (statt `async void` allein) mit Fehlerbehandlung umgestellt; aussagekräftige Fehlermeldungen beim Öffnen fehlerhafter oder nicht-existenter Arbeitsverzeichnisse.
+- Unit-Tests: Neue Tests in `TaskDetailViewModelTests_Arbeitsverzeichnis`, `TaskDetailViewModelTests_VisualStudioCode` sowie in `TaskDetailViewModelTests` (für `OeffneIdeAsync`) prüfen Auflösung mit/ohne Konfiguration und Fehlerbehandlung.
+- E2E-Tests: Zwei neue Szenarien in `E2E_VerzeichnisAktionen.cs`: (1) Ribbon-Aktionen ohne Arbeitsverzeichnis-Konfiguration, (2) mit konfiguriertem Unterverzeichnis — prüfen Öffnung des korrekten Pfads im OS-Explorer und VS-Code-Start mit aufgelöstem Arbeitsverzeichnis.
+- Seitenneffekt-Handling: Wenn keine `RepositoryStartKonfiguration` konfiguriert ist, wird der Repository-Root (`LokalerKlonPfad`) verwendet — Rückwärtskompatibilität gewährleistet.
+
 ## 2026-08-10 — Alt Gr-Unterstützung für Sonderzeichen und Ctrl+Pfeiltaste-Navigation
 
 - Feature: Die TerminalControl-Komponente unterstützt nun Sonderzeichen, die über Alt Gr auf dem System-Tastaturlayout erreichbar sind (z. B. "@", "{", "}", "|", "~", "`" auf deutschem Tastaturlayout), sowie wortweise Cursor-Navigation mit Ctrl+Links und Ctrl+Rechts.
