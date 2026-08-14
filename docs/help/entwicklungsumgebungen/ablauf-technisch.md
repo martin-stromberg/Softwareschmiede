@@ -10,10 +10,11 @@ Der technische Ablauf beschreibt die Ausführungsschritte, wenn der Benutzer ein
 
 ### 1. IDE-Öffnen auslösen
 
-Ein Aufrufer (z. B. Ribbon-Button, Kontextmenü) ruft `IdeOeffnenService.OpenRepositoryInIdeAsync(repositoryPath)` mit einem Repository-Pfad auf.
+Der Ribbon-Button „IDE öffnen" der Aufgabendetailansicht ruft `TaskDetailViewModel.OeffneIdeAsync()` auf, das direkt `PluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct)` mit dem über `WorkingDirectoryResolver` aufgelösten Arbeitsverzeichnis aufruft (siehe [Dateisystem-Integration](../dateisystem-integration/ablauf-technisch.md) für die vollständige, um den Solution-Auswahl-Dialog erweiterte Ablaufbeschreibung). Alternative Aufrufer ohne UI-Dialog-Bedarf (z. B. künftige Automatisierung) können stattdessen den generischen Helper `IdeOeffnenService.OpenRepositoryInIdeAsync(repositoryPath)` verwenden, der dieselbe Plugin-Auflösung nutzt, aber bei mehreren gefundenen Visual-Studio-Solutions immer nur die erste öffnet statt einen Auswahl-Dialog anzuzeigen.
 
 Beteiligte Komponenten:
-- `IdeOeffnenService.OpenRepositoryInIdeAsync()` — Koordiniert die IDE-Plugin-Auflösung und Ausführung
+- `TaskDetailViewModel.OeffneIdeAsync()` — Produktionscode-Aufrufer des Ribbon-Buttons; behandelt zusätzlich den Solution-Auswahl-Dialog bei mehreren Visual-Studio-Solutions
+- `IdeOeffnenService.OpenRepositoryInIdeAsync()` — Generischer Helper ohne Dialog-Sonderbehandlung; koordiniert Plugin-Auflösung und Ausführung
 
 ### 2. Aktivierte IDE-Plugins laden
 

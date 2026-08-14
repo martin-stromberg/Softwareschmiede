@@ -14,18 +14,21 @@ public sealed class PluginSelectionService
     private readonly PluginDefaultSettingsService _defaultSettingsService;
     private readonly PluginActivationService _pluginActivationService;
     private readonly ILogger<PluginSelectionService> _logger;
+    private readonly AppEinstellungService? _appEinstellungService;
 
     /// <inheritdoc cref="PluginSelectionService"/>
     public PluginSelectionService(
         IPluginManager pluginManager,
         PluginDefaultSettingsService defaultSettingsService,
         PluginActivationService pluginActivationService,
-        ILogger<PluginSelectionService> logger)
+        ILogger<PluginSelectionService> logger,
+        AppEinstellungService? appEinstellungService = null)
     {
         _pluginManager = pluginManager;
         _defaultSettingsService = defaultSettingsService;
         _pluginActivationService = pluginActivationService;
         _logger = logger;
+        _appEinstellungService = appEinstellungService;
     }
 
     /// <summary>Liest den gespeicherten PluginPrefix für den Plugin-Typ.</summary>
@@ -109,6 +112,57 @@ public sealed class PluginSelectionService
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Löst das IDE-Plugin für das angegebene Repository auf: aktivierte Plugins werden in der
+    /// konfigurierten Reihenfolge (<c>plugins.ide.order</c>) nach Kompatibilität geprüft. Das erste
+    /// Plugin mit <see cref="IdePluginCompatibility.Explicit"/> gewinnt; andernfalls wird das erste
+    /// Plugin mit <see cref="IdePluginCompatibility.Fallback"/> verwendet. Ist kein Plugin aktiv oder
+    /// kompatibel, wird <see cref="IPluginManager.GetDefaultIdePlugin"/> zurückgegeben.
+    /// </summary>
+    public async Task<IIdePlugin> ResolveIdePluginAsync(string repositoryPath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+
+        var enabledPlugins = await _pluginActivationService.GetEnabledIdePluginsAsync(ct);
+        if (enabledPlugins.Count == 0)
+        {
+            return _pluginManager.GetDefaultIdePlugin();
+        }
+
+        var orderSetting = _appEinstellungService is null
+            ? null
+            : await _appEinstellungService.GetSettingAsync(AppEinstellungService.IdePluginOrderKey, ct);
+        var orderedPlugins = ApplyIdePluginOrder(enabledPlugins, orderSetting);
+
+        IIdePlugin? fallbackPlugin = null;
+        foreach (var plugin in orderedPlugins)
+        {
+            var compatibility = await plugin.CheckCompatibilityAsync(repositoryPath, ct);
+            if (compatibility == IdePluginCompatibility.Explicit)
+            {
+                return plugin;
+            }
+
+            if (compatibility == IdePluginCompatibility.Fallback && fallbackPlugin is null)
+            {
+                fallbackPlugin = plugin;
+            }
+        }
+
+        return fallbackPlugin ?? _pluginManager.GetDefaultIdePlugin();
+    }
+
+    /// <summary>Sortiert die übergebenen IDE-Plugins nach der in <paramref name="orderSetting"/> definierten, komma-getrennten Prefix-Reihenfolge. Fehlt die Einstellung, bleibt die Entdeckungsreihenfolge erhalten.</summary>
+    private static IReadOnlyList<IIdePlugin> ApplyIdePluginOrder(IReadOnlyList<IIdePlugin> plugins, string? orderSetting)
+    {
+        var discoveryOrder = plugins.Select(p => p.PluginPrefix).ToList();
+        var orderedPrefixes = IdePluginOrderResolver.Apply(discoveryOrder, orderSetting);
+
+        return orderedPrefixes
+            .Select(prefix => plugins.First(p => string.Equals(p.PluginPrefix, prefix, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
     }
 
     private async Task<TPlugin> ResolvePluginAsync<TPlugin>(

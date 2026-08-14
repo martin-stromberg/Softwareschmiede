@@ -6,6 +6,8 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.PluginImpl;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
@@ -98,9 +100,17 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
 
+        var visualStudioPlugin = new VisualStudioIdePlugin((prozessStarterMock ?? new Mock<IProzessStarter>()).Object);
+        var visualStudioCodePlugin = new VisualStudioCodeIdePlugin(
+            (prozessStarterMock ?? new Mock<IProzessStarter>()).Object,
+            visualStudioCodeLocator ?? new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
+        pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns([visualStudioPlugin, visualStudioCodePlugin]);
+        pluginManagerMock.Setup(p => p.GetDefaultIdePlugin()).Returns(visualStudioPlugin);
+
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
-        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
+        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
@@ -114,7 +124,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(prozessStarterMock, visualStudioCodeLocator);
+        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(prozessStarterMock, pluginSelectionService);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -133,8 +143,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            ideOeffnenService,
-            _einstellungService);
+            ideOeffnenService);
     }
 
     /// <summary>Legt ein GitRepository (optional mit RepositoryStartKonfiguration) sowie eine damit verknüpfte Aufgabe an.</summary>

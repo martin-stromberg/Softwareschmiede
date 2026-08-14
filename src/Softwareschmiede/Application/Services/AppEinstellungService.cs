@@ -34,8 +34,8 @@ public sealed class AppEinstellungService
     /// <summary>Schlüssel für das Log-Level.</summary>
     public const string LogLevelKey = "logging.level";
 
-    /// <summary>Schlüssel für den opt-in VS-Code-Fallback, wenn keine Visual-Studio-Solution gefunden wurde.</summary>
-    public const string OpenVisualStudioCodeWhenNoSolutionFoundKey = "ide.vscode.openWhenNoSolutionFound";
+    /// <summary>Schlüssel für die Prioritäts-Reihenfolge der IDE-Plugins (kommagetrennte Liste von Plugin-Prefixen).</summary>
+    public const string IdePluginOrderKey = "plugins.ide.order";
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AppEinstellungService> _logger;

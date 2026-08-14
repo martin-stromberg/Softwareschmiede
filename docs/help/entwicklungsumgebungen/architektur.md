@@ -58,10 +58,10 @@
 ### IDE-Öffnen auslösen
 
 ```
-User klickt "IDE öffnen"
+User klickt "IDE öffnen" (Ribbon-Button der Aufgabendetailansicht)
          │
          ▼
-IdeOeffnenService.OpenRepositoryInIdeAsync()
+TaskDetailViewModel.OeffneIdeAsync()
          │
          ▼
 PluginSelectionService.ResolveIdePluginAsync()
@@ -109,6 +109,8 @@ plugin.OpenRepositoryAsync()
          ▼
     IDE startet
 ```
+
+> **Hinweis:** Findet `VisualStudioIdePlugin` mehrere Solutions, zeigt `TaskDetailViewModel` vor `plugin.OpenRepositoryAsync()` zusätzlich einen Solution-Auswahl-Dialog an (siehe [Dateisystem-Integration](../dateisystem-integration/architektur.md)); dieser Sonderfall ist in der vereinfachten Darstellung oben nicht enthalten.
 
 ### IDE-Plugin-Aktivierung in der UI
 

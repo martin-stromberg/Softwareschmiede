@@ -12,11 +12,7 @@
 
 ### IDE öffnen
 
-Sie können auf verschiedene Wege eine IDE für ein Repository öffnen:
-
-1. **Über das Menü:** Menü → IDE öffnen
-2. **Über Ribbon-Button:** Klicken Sie auf den Button "IDE öffnen" (sofern in Ihrer Installation vorhanden)
-3. **Über Kontextmenü:** Klick mit rechter Maustaste auf ein Repository, dann "IDE öffnen"
+Öffnen Sie eine Aufgabe mit vorhandenem Arbeitsverzeichnis und klicken Sie im Ribbon (Gruppe „Werkzeuge") der Aufgabendetailansicht auf den Button **IDE öffnen**.
 
 Das System führt folgende Schritte durch:
 
@@ -27,7 +23,7 @@ Das Programm prüft automatisch, welche installierten IDEs mit Ihrem Repository 
 - **Visual Studio** wird bevorzugt, wenn das Repository eine Datei namens `*.sln` (Solution) oder `*.slnx` (neu) im Hauptverzeichnis enthält. Dies ist typischerweise der Fall bei C#- oder .NET-Projekten.
 - **Visual Studio Code** wird als Universallösung verwendet, wenn kein anderes spezialisiertes Plugin aktiv ist oder keine Solution-Datei vorhanden ist.
 
-> **Hinweis:** Die Prüfung geschieht vollautomatisch. Sie sehen keinen Dialog — das beste Programm wird direkt gestartet.
+> **Hinweis:** Die Prüfung geschieht vollautomatisch. Findet Visual Studio dabei mehrere Solution-Dateien im Arbeitsverzeichnis, erscheint ein Auswahl-Dialog; in allen anderen Fällen wird das beste Programm direkt gestartet, ohne dass Sie einen Dialog sehen.
 
 ### Schritt 2: IDE startet
 
@@ -45,10 +41,10 @@ Nach wenigen Sekunden haben Sie Ihre gewünschte IDE mit dem Repository geöffne
 Falls Sie eine andere IDE bevorzugen oder einzelne IDEs deaktivieren möchten:
 
 1. Öffnen Sie **Menü → Einstellungen** → Tab **Plugins**
-2. Im Bereich **Integrierte Entwicklungsumgebungen (IDE)** sehen Sie eine Liste aller verfügbaren IDEs
-3. Mit den **Checkboxen** können Sie IDEs aktivieren oder deaktivieren
-4. Mit den **Pfeilen** (Up/Down) können Sie die Reihenfolge der IDEs ändern — die oben stehende IDE wird bevorzugt
-5. Speichern Sie die Einstellungen mit **OK**
+2. Im Bereich **Integrierte Entwicklungsumgebungen (IDE)** (linke Spalte) sehen Sie eine Liste aller verfügbaren IDEs
+3. Wählen Sie ein Plugin in der Liste aus; im Inhaltsbereich rechts erscheint dessen Checkbox **Plugin aktiviert**, mit der Sie es aktivieren oder deaktivieren
+4. Mit den **Pfeilen** (↑/↓) neben jedem Listeneintrag können Sie die Reihenfolge der IDEs ändern — die oben stehende IDE wird bevorzugt
+5. Speichern Sie die Einstellungen mit **Speichern**
 
 > **Wichtig:** Sie müssen mindestens eine IDE aktiviert lassen. Das Programm wird Ihnen nicht erlauben, alle IDEs gleichzeitig zu deaktivieren.
 

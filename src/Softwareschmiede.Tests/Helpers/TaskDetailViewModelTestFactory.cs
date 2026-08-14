@@ -5,6 +5,7 @@ using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Tests.Helpers;
@@ -28,6 +29,7 @@ public static class TaskDetailViewModelTestFactory
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
+        pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns([]);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginActivationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
@@ -50,8 +52,7 @@ public static class TaskDetailViewModelTestFactory
         var fileExplorerViewModel = CreateStub();
         var todoListViewModel = new TodoListViewModel(todoService, NullLogger<TodoListViewModel>.Instance);
 
-        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = CreateVerzeichnisAktionenServices();
-        var einstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = CreateVerzeichnisAktionenServices(pluginSelectionService: pluginSelectionService);
 
         return new TaskDetailViewModel(
             aufgabeService,
@@ -70,8 +71,7 @@ public static class TaskDetailViewModelTestFactory
             fileExplorerViewModel,
             todoListViewModel,
             arbeitsverzeichnisOeffnenService,
-            ideOeffnenService,
-            einstellungService);
+            ideOeffnenService);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
@@ -84,21 +84,19 @@ public static class TaskDetailViewModelTestFactory
 
     /// <summary>Erstellt ArbeitsverzeichnisOeffnenService und IdeOeffnenService, die denselben IProzessStarter-Mock verwenden.</summary>
     /// <param name="prozessStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
-    /// <param name="visualStudioCodeLocator">Der zu verwendende VS-Code-Locator, oder null für nicht verfügbares VS Code.</param>
+    /// <param name="pluginSelectionService">
+    /// Der PluginSelectionService, den IdeOeffnenService.OpenRepositoryInIdeAsync intern verwendet. Muss derselbe
+    /// sein wie der dem TaskDetailViewModel übergebene, damit OeffneIdeAsync() konsistent auflöst; oder null,
+    /// wenn OpenRepositoryInIdeAsync im Test nicht aufgerufen wird.
+    /// </param>
     /// <returns>Ein Tupel aus ArbeitsverzeichnisOeffnenService und IdeOeffnenService.</returns>
     public static (ArbeitsverzeichnisOeffnenService ArbeitsverzeichnisOeffnenService, IdeOeffnenService IdeOeffnenService) CreateVerzeichnisAktionenServices(
         Mock<IProzessStarter>? prozessStarterMock = null,
-        IVisualStudioCodeLocator? visualStudioCodeLocator = null)
+        PluginSelectionService? pluginSelectionService = null)
     {
         prozessStarterMock ??= new Mock<IProzessStarter>();
-        visualStudioCodeLocator ??= new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
         return (
             new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object),
-            new IdeOeffnenService(prozessStarterMock.Object, visualStudioCodeLocator));
-    }
-
-    private sealed class TestVisualStudioCodeLocator(VisualStudioCodeAvailability availability) : IVisualStudioCodeLocator
-    {
-        public VisualStudioCodeAvailability Locate() => availability;
+            new IdeOeffnenService(prozessStarterMock.Object, pluginSelectionService));
     }
 }

@@ -44,15 +44,13 @@ Für die Verwendung dieser Funktionen muss:
 
 ### IDE öffnen (ohne Solution mit Visual Studio Code)
 
-1. Öffnen Sie **Einstellungen** → **Allgemein**.
-2. Aktivieren Sie **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde**.
-3. Klicken Sie **Speichern**.
-4. Öffnen Sie eine Aufgabe mit vorhandenem Arbeitsverzeichnis, aber ohne `*.sln`-Datei.
-5. Klicken Sie **IDE öffnen**.
+1. Öffnen Sie eine Aufgabe mit vorhandenem Arbeitsverzeichnis, aber ohne `*.sln`-Datei.
+2. Klicken Sie **IDE öffnen**.
+   - Es ist keine separate Einstellung nötig: Ist kein IDE-Plugin explizit kompatibel (z. B. keine `.sln`-Datei gefunden), wird automatisch das erste aktive Fallback-Plugin verwendet — standardmäßig Visual Studio Code.
    - Ist Visual Studio Code verfügbar, wird das Arbeitsverzeichnis in VS Code geöffnet.
-   - Ist Visual Studio Code nicht verfügbar, erscheint die Meldung: „Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden."
+   - Ist Visual Studio Code nicht verfügbar, erscheint eine Fehlermeldung.
 
-> **Hinweis:** Wenn später eine `*.sln`-Datei im Arbeitsverzeichnis vorhanden ist, öffnet die Aktion wieder die Solution. Die Solution hat Vorrang vor VS Code.
+> **Hinweis:** Wenn später eine `*.sln`-Datei im Arbeitsverzeichnis vorhanden ist, öffnet die Aktion wieder die Solution. Die Solution hat Vorrang vor dem Fallback-Plugin. Möchten Sie Visual Studio Code als Fallback nicht verwenden, deaktivieren Sie das Plugin unter **Einstellungen → Plugins → Integrierte Entwicklungsumgebungen (IDE)** (mindestens ein IDE-Plugin muss aktiv bleiben).
 
 ## Konfiguriertes Arbeitsunterverzeichnis
 
@@ -60,7 +58,7 @@ Falls beim Repository ein **Arbeitsunterverzeichnis** konfiguriert wurde (z. B. 
 
 1. **„Arbeitsverzeichnis öffnen"** öffnet das konfigurierte Unterverzeichnis (z. B. `Projekt\src\backend`), nicht den Repository-Root.
 2. **„IDE öffnen"** sucht nach Solutions nur im konfigurierten Unterverzeichnis. Solutions im Repository-Root werden nicht berücksichtigt.
-3. Der **VS-Code-Fallback** startet Visual Studio Code mit dem konfigurierten Unterverzeichnis als Arbeitsverzeichnis.
+3. Das **Fallback-Plugin** (standardmäßig Visual Studio Code) startet mit dem konfigurierten Unterverzeichnis als Arbeitsverzeichnis.
 
 > **Hinweis:** Wenn die Arbeit in einem Mono-Repo auf ein spezielles Subprojekt beschränkt sein soll, konfiguriert die Projekt-Verwaltung das entsprechende Unterverzeichnis. Anschließend verwenden alle Ribbon-Aktionen automatisch dieses Unterverzeichnis, statt den Gesamtrepository-Pfad.
 
@@ -69,7 +67,7 @@ Falls beim Repository ein **Arbeitsunterverzeichnis** konfiguriert wurde (z. B. 
 Nach erfolgreicher Ausführung:
 - **Arbeitsverzeichnis öffnen:** Der System-Dateiexplorer zeigt die Verzeichnisstruktur des Arbeitsverzeichnisses (aufgelöstes Unterverzeichnis oder Repository-Root).
 - **IDE öffnen:** Die IDE (z. B. Visual Studio) ist mit der gefundenen Solution geladen und bereit zur Bearbeitung.
-- **IDE öffnen ohne Solution und mit aktiviertem Fallback:** Visual Studio Code zeigt das Arbeitsverzeichnis (aufgelöstes Unterverzeichnis) an.
+- **IDE öffnen ohne Solution:** Das aktive Fallback-Plugin (standardmäßig Visual Studio Code) zeigt das Arbeitsverzeichnis (aufgelöstes Unterverzeichnis) an.
 
 ## Barrierefreiheit
 

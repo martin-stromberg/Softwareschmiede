@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.PluginImpl;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
 
@@ -18,6 +19,7 @@ public sealed class PluginManager : IPluginManager
     private readonly object _sync = new();
     private readonly List<IGitPlugin> _gitPlugins = [];
     private readonly List<IKiPlugin> _kiPlugins = [];
+    private readonly List<IIdePlugin> _idePlugins = [];
     private bool _initialized;
 
     /// <summary>Erstellt eine neue Instanz von <see cref="PluginManager"/>.</summary>
@@ -73,6 +75,21 @@ public sealed class PluginManager : IPluginManager
             ? 0
             : 1;
 
+    /// <inheritdoc/>
+    public IReadOnlyList<IIdePlugin> GetIdePlugins()
+    {
+        EnsureInitialized();
+        return _idePlugins;
+    }
+
+    /// <inheritdoc/>
+    public IIdePlugin GetDefaultIdePlugin()
+    {
+        EnsureInitialized();
+        return _idePlugins.FirstOrDefault()
+               ?? throw new InvalidOperationException("Kein IDE-Plugin verfügbar.");
+    }
+
     private void EnsureInitialized()
     {
         if (_initialized)
@@ -110,6 +127,9 @@ public sealed class PluginManager : IPluginManager
     {
         _gitPlugins.Clear();
         _kiPlugins.Clear();
+        _idePlugins.Clear();
+
+        RegisterBuiltInIdePlugins();
 
         if (!Directory.Exists(_pluginDirectory))
         {
@@ -131,9 +151,20 @@ public sealed class PluginManager : IPluginManager
         }
 
         _logger.LogInformation(
-            "Plugin-Discovery abgeschlossen. SCM={ScmCount}, DevelopmentAutomation={DevCount}",
+            "Plugin-Discovery abgeschlossen. SCM={ScmCount}, DevelopmentAutomation={DevCount}, Ide={IdeCount}",
             _gitPlugins.Count,
-            _kiPlugins.Count);
+            _kiPlugins.Count,
+            _idePlugins.Count);
+    }
+
+    /// <summary>
+    /// Registriert die eingebauten IDE-Plugins (Visual Studio, Visual Studio Code) direkt, ohne sie aus
+    /// einer Plugin-DLL zu laden. Sie sind fester Bestandteil dieser Assembly.
+    /// </summary>
+    private void RegisterBuiltInIdePlugins()
+    {
+        TryCreateAndRegister(typeof(VisualStudioIdePlugin), "<built-in>");
+        TryCreateAndRegister(typeof(VisualStudioCodeIdePlugin), "<built-in>");
     }
 
     private void LoadPluginsFromDll(string dllPath)
@@ -144,7 +175,7 @@ public sealed class PluginManager : IPluginManager
             var pluginTypes = assembly
                 .GetExportedTypes()
                 .Where(t => !t.IsAbstract && !t.IsInterface &&
-                            (typeof(IGitPlugin).IsAssignableFrom(t) || typeof(IKiPlugin).IsAssignableFrom(t)))
+                            (typeof(IGitPlugin).IsAssignableFrom(t) || typeof(IKiPlugin).IsAssignableFrom(t) || typeof(IIdePlugin).IsAssignableFrom(t)))
                 .ToList();
 
             foreach (var pluginType in pluginTypes)
@@ -187,6 +218,11 @@ public sealed class PluginManager : IPluginManager
                 case PluginType.DevelopmentAutomation when instance is IKiPlugin kiPlugin:
                     _kiPlugins.Add(kiPlugin);
                     _logger.LogInformation("Development-Automation-Plugin geladen: {PluginName} ({Type})", kiPlugin.PluginName, pluginType.FullName);
+                    break;
+
+                case PluginType.Ide when instance is IIdePlugin idePlugin:
+                    _idePlugins.Add(idePlugin);
+                    _logger.LogInformation("IDE-Plugin geladen: {PluginName} ({Type})", idePlugin.PluginName, pluginType.FullName);
                     break;
 
                 default:

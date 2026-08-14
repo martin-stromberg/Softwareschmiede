@@ -215,8 +215,6 @@ Die Aktion **IDE öffnen** in der Aufgabendetailansicht nutzt ein erweiterbares 
 - Die Reihenfolge per Up/Down-Buttons anpassen, um die Auswahl-Priorität zu steuern
 - Plugin-spezifische Einstellungen konfigurieren (falls vorhanden)
 
-**Älterer, separater VS-Code-Fallback (Legacy):** Unabhängig vom IDE-Plugin-System existiert weiterhin die ältere, ausdrücklich opt-in Einstellung **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde** unter **Einstellungen → Allgemein**, standardmäßig deaktiviert. Intern gespeichert als boolescher Wert unter `ide.vscode.openWhenNoSolutionFound`, Default `false`.
-
 ---
 
 ## ⚙️ Konfiguration & Plugin-Setup

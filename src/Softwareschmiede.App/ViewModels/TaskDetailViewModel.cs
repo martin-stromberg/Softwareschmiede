@@ -10,6 +10,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.PluginImpl;
 using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App.ViewModels;
@@ -47,7 +48,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
     private readonly IdeOeffnenService _ideOeffnenService;
-    private readonly AppEinstellungService _einstellungService;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -75,10 +75,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _scheduledPromptStatus;
     private string? _scheduledPromptTimeDisplay;
     private bool _showFileExplorerPanel;
-    private IReadOnlyList<string> _solutionPfade = [];
     private bool _canCreatePullRequest;
     private bool _canCreateIssue;
-    private bool _openVisualStudioCodeWhenNoSolutionFound;
     private bool _isRefreshingPullRequests;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
@@ -114,7 +112,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             SetProperty(ref _aufgabe, value);
             _showFileExplorerPanel = !string.IsNullOrEmpty(value?.LokalerKlonPfad) && Directory.Exists(value.LokalerKlonPfad);
-            _solutionPfade = ErmittleSolutionPfade(value);
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
             OnPropertyChanged(nameof(AufgabeBranchName));
@@ -125,7 +122,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowDiffPanel));
             OnPropertyChanged(nameof(ShowFileExplorerPanel));
             OnPropertyChanged(nameof(ShowPullRequestPanel));
-            OnPropertyChanged(nameof(SolutionsVorhanden));
             OnPropertyChanged(nameof(KannIdeOeffnen));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
@@ -410,12 +406,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="Aufgabe"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
     public bool ShowFileExplorerPanel => _showFileExplorerPanel;
 
-    /// <summary>True wenn beim Laden der Aufgabe mindestens eine <c>*.sln</c>-Datei im Arbeitsverzeichnis gefunden wurde. Steuert <see cref="OeffneIdeCommand"/>.CanExecute.</summary>
-    public bool SolutionsVorhanden => _solutionPfade.Count > 0;
-
-    /// <summary>True wenn die IDE-Aktion eine Solution oder den opt-in VS-Code-Fallback öffnen kann.</summary>
-    public bool KannIdeOeffnen => SolutionsVorhanden
-        || (ShowFileExplorerPanel && _openVisualStudioCodeWhenNoSolutionFound);
+    /// <summary>
+    /// True wenn die IDE-Aktion ausgeführt werden kann. Die konkrete IDE wird erst beim Ausführen von
+    /// <see cref="OeffneIdeCommand"/> über <see cref="PluginSelectionService.ResolveIdePluginAsync"/> aufgelöst
+    /// (explizit/fallback-kompatibles Plugin oder Default-Plugin) - da mindestens ein IDE-Plugin systemseitig
+    /// stets aktiv bleiben muss, genügt als Bedingung ein gültiges, vorhandenes Arbeitsverzeichnis.
+    /// </summary>
+    public bool KannIdeOeffnen => ShowFileExplorerPanel;
 
     /// <summary>True wenn die Info-Ansicht angezeigt werden soll.</summary>
     public bool ShowInfoPanel => IsInfoViewSelected;
@@ -571,7 +568,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
         IdeOeffnenService ideOeffnenService,
-        AppEinstellungService einstellungService,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -590,7 +586,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
         _ideOeffnenService = ideOeffnenService;
-        _einstellungService = einstellungService;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -643,7 +638,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
-            await AktualisiereIdeFallbackEinstellungAsync(ct);
             IsCliRunning = _kiService.IsRunning(_aufgabeId);
 
             var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
@@ -1739,27 +1733,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         });
     }
 
-    private IReadOnlyList<string> ErmittleSolutionPfade(Aufgabe? aufgabe)
-    {
-        if (!_showFileExplorerPanel)
-            return [];
-
-        try
-        {
-            var startConfig = aufgabe!.GitRepository?.StartKonfiguration;
-            var arbeitsverzeichnis = WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory(
-                aufgabe.LokalerKlonPfad!,
-                startConfig?.WorkingDirectoryRelativePath);
-
-            return _ideOeffnenService.FindeSolutions(arbeitsverzeichnis);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Suchen nach Solutions im Arbeitsverzeichnis {LokalerKlonPfad}.", aufgabe!.LokalerKlonPfad);
-            return [];
-        }
-    }
-
     private Task<string> ErmittleEffektivesArbeitsverzeichnisAsync(string lokalerKlonPfad, CancellationToken ct)
     {
         var startConfig = _aufgabe?.GitRepository?.StartKonfiguration;
@@ -1769,16 +1742,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             startConfig,
             gitPlugin: null,
             ct: ct);
-    }
-
-    private async Task AktualisiereIdeFallbackEinstellungAsync(CancellationToken ct)
-    {
-        _openVisualStudioCodeWhenNoSolutionFound =
-            await _einstellungService.GetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, ct)
-            ?? false;
-
-        OnPropertyChanged(nameof(KannIdeOeffnen));
-        CommandManager.InvalidateRequerySuggested();
     }
 
     private async Task OeffneArbeitsverzeichnisAsync(CancellationToken ct)
@@ -1805,6 +1768,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// Öffnet das effektive Arbeitsverzeichnis über <see cref="IdeOeffnenService.OpenRepositoryInIdeAsync"/>,
+    /// welche das zuständige IDE-Plugin über den <see cref="PluginSelectionService"/> auflöst. Für
+    /// Repositories mit mehreren gefundenen Solutions (nur relevant bei <see cref="VisualStudioIdePlugin"/>)
+    /// wird der bestehende Auswahl-Dialog als Callback übergeben (UX-Erhalt für Mehr-Solution-Repos).
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
     private async Task OeffneIdeAsync(CancellationToken ct)
     {
         FehlerMeldung = null;
@@ -1812,12 +1782,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
             return;
 
-        IReadOnlyList<string> solutionPfade;
         try
         {
             var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
 
-            solutionPfade = _ideOeffnenService.FindeSolutions(effectiveWorkdir);
+            await _ideOeffnenService.OpenRepositoryInIdeAsync(
+                effectiveWorkdir,
+                (solutionPfade, dialogCt) => _dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, dialogCt),
+                ct);
         }
         catch (OperationCanceledException)
         {
@@ -1825,70 +1797,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Ermitteln des Arbeitsverzeichnisses für Aufgabe {AufgabeId}.", _aufgabeId);
-            FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
-            return;
-        }
-
-        if (solutionPfade.Count == 0)
-        {
-            await OeffneVisualStudioCodeFallbackAsync(ct);
-            return;
-        }
-
-        string? solutionPfad;
-        if (solutionPfade.Count == 1)
-        {
-            solutionPfad = solutionPfade[0];
-        }
-        else
-        {
-            solutionPfad = await _dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, ct);
-            if (solutionPfad is null)
-                return;
-        }
-
-        try
-        {
-            _ideOeffnenService.OeffneSolution(solutionPfad);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Öffnen der Solution {SolutionPfad}.", solutionPfad);
+            _logger.LogError(ex, "Fehler beim Öffnen der IDE für Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
         }
     }
-
-    private async Task OeffneVisualStudioCodeFallbackAsync(CancellationToken ct)
-    {
-        if (!_openVisualStudioCodeWhenNoSolutionFound)
-            return;
-
-        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
-            return;
-
-        FehlerMeldung = null;
-
-        try
-        {
-            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
-
-            _ideOeffnenService.OeffneVisualStudioCode(effectiveWorkdir);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning(ex, "Visual Studio Code wurde für Arbeitsverzeichnis {LokalerKlonPfad} nicht gefunden.", lokalerKlonPfad);
-            FehlerMeldung = "Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden.";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Öffnen von Visual Studio Code für Arbeitsverzeichnis {LokalerKlonPfad}.", lokalerKlonPfad);
-            FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
-        }
-    }
-
 }

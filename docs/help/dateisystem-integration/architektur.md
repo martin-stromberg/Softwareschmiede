@@ -14,8 +14,12 @@
 | `ArbeitsverzeichnisOeffnenService` | Klasse (Application.Services) | Löst Plattformbefehl auf (Windows/Linux/macOS) und delegiert Prozessstart mit aufgelöstem Arbeitsverzeichnis. |
 | `IVisualStudioCodeLocator` | Interface (Application.Services) | Abstraktion zur Auflösung eines startbaren Visual-Studio-Code-Befehls. |
 | `VisualStudioCodeLocator` | Klasse (Infrastructure.Services) | Sucht `code.cmd`/`code` in `PATH` und typischen Windows-Installationspfaden. |
-| `IdeOeffnenService` | Klasse (Application.Services) | Findet `.sln`-Dateien im **aufgelösten Arbeitsverzeichnis**, öffnet sie per Shell-Execute und startet optional VS Code mit dem aufgelösten Arbeitsverzeichnis. |
-| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe; nutzt `WorkingDirectoryResolver` zur Auflösung des Arbeitsverzeichnisses vor Weitergabe an Services. |
+| `IdeOeffnenService` | Klasse (Application.Services) | Findet `.sln`-Dateien im **aufgelösten Arbeitsverzeichnis** (für die Solution-Auswahl bei mehreren Treffern) und öffnet eine gewählte Solution per Shell-Execute. |
+| `PluginSelectionService` | Klasse (Application.Services) | Löst über `ResolveIdePluginAsync(repositoryPath, ct)` das für das Arbeitsverzeichnis zuständige `IIdePlugin` auf: erstes explizit kompatibles Plugin gewinnt, sonst erstes fallback-kompatibles aktives Plugin, sonst `IPluginManager.GetDefaultIdePlugin()`. |
+| `IIdePlugin` | Interface (Domain.Interfaces) | Vertrag für IDE-Plugins: `CheckCompatibilityAsync()` (Explicit/Fallback/Incompatible) und `OpenRepositoryAsync()`. |
+| `VisualStudioIdePlugin` | Klasse (Domain.PluginImpl) | Eingebautes IDE-Plugin für Visual Studio; `Explicit`-kompatibel bei vorhandener `.sln`/`.slnx`-Datei, öffnet die erste gefundene Solution per Shell-Execute. |
+| `VisualStudioCodeIdePlugin` | Klasse (Domain.PluginImpl) | Eingebautes IDE-Plugin für Visual Studio Code; immer `Fallback`-kompatibel, öffnet das Arbeitsverzeichnis über `IVisualStudioCodeLocator`/`code`. |
+| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe; nutzt `WorkingDirectoryResolver` zur Auflösung des Arbeitsverzeichnisses und `PluginSelectionService` zur Auflösung des zu verwendenden IDE-Plugins. |
 | `IDialogService` / `WpfDialogService` | Interface / Klasse (App.Services) | Dialog-Gateway; implementiert `ShowSolutionSelectionDialogAsync()`. |
 | `SolutionSelectionDialog` | WPF-Window (App.Views) | Modales Fenster für Solution-Auswahl bei mehreren Dateien. |
 | `SolutionSelectionDialogViewModel` | Klasse (App.ViewModels) | Presentation Model für Dialog; verwaltet Solution-Liste und Benutzer-Auswahl. |
@@ -41,14 +45,17 @@ Application-Schicht (Services):
 ├─ IdeOeffnenService
 │  ├─ Abhängigkeit: IProzessStarter
 │  └─ Abhängigkeit: IVisualStudioCodeLocator
-└─ (keine DB/Repository-Abhängigkeiten)
+├─ PluginSelectionService
+│  ├─ Abhängigkeit: IPluginManager (liefert u. a. VisualStudioIdePlugin, VisualStudioCodeIdePlugin)
+│  └─ Abhängigkeit: PluginActivationService (aktivierte IDE-Plugins, Reihenfolge über plugins.ide.order)
+└─ (keine direkten DB/Repository-Abhängigkeiten von ArbeitsverzeichnisOeffnenService/IdeOeffnenService)
 
 App-Schicht (UI/ViewModels):
 ├─ TaskDetailViewModel
 │  ├─ WorkingDirectoryResolver (zur Auflösung des Arbeitsverzeichnisses)
 │  ├─ ArbeitsverzeichnisOeffnenService
-│  ├─ IdeOeffnenService
-│  ├─ AppEinstellungService
+│  ├─ IdeOeffnenService (Solution-Suche/-Öffnen für die Dialog-Auswahl bei mehreren Solutions)
+│  ├─ PluginSelectionService (Auflösung des zu verwendenden IDE-Plugins)
 │  └─ IDialogService
 ├─ WpfDialogService (implementiert IDialogService)
 │  └─ Erstellt SolutionSelectionDialog und SolutionSelectionDialogViewModel
@@ -98,69 +105,52 @@ IProzessStarter.Starten(anfrage)
 ### IDE öffnen
 
 ```
-Benutzer klickt Button
+Benutzer klickt Button (aktiv sobald ShowFileExplorerPanel true ist, d. h. ein gültiges Arbeitsverzeichnis existiert)
   ↓
 TaskDetailViewModel.OeffneIdeAsync()
   ↓
 WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()
   └─ Rückgabe: aufgelöstes Arbeitsverzeichnis (z. B. C:\repo\src\backend)
   ↓
-_solutionPfade lesen (beim Aufgabe-Laden im aufgelösten Verzeichnis gecacht)
+PluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct)
+  ├─ Prüft alle aktivierten IDE-Plugins (Reihenfolge aus plugins.ide.order) via CheckCompatibilityAsync()
+  ├─ Erstes Explicit-kompatibles Plugin gewinnt (z. B. VisualStudioIdePlugin bei gefundener .sln/.slnx)
+  ├─ Sonst erstes Fallback-kompatibles aktives Plugin (z. B. VisualStudioCodeIdePlugin, immer Fallback)
+  └─ Sonst IPluginManager.GetDefaultIdePlugin()
   ↓
-Verzweigung nach Anzahl der Solutions im aufgelösten Verzeichnis:
-  ├─→ Keine: Bei deaktiviertem Fallback kein Klick; bei aktiviertem Fallback VS Code mit aufgelöstem Pfad starten
-  ├─→ Eine: Direkt zu Prozessstart
-  └─→ Mehrere: Dialog anzeigen
-       ↓
-       IDialogService.ShowSolutionSelectionDialogAsync()
-         ↓
-         WpfDialogService (UI-Thread)
-           ↓
-           SolutionSelectionDialog (Modal)
-             ↓
-             SolutionSelectionDialogViewModel
-               ↓
-               Benutzer wählt Solution oder bricht ab
-                 ↓
-                 Rückgabe: Pfad oder null
-  ↓
-IdeOeffnenService.OeffneSolution(gewählterPfad)
-  ↓
-ProzessStartAnfrage mit ShellAusfuehren=true
-  ↓
-IProzessStarter.Starten(anfrage)
-  ├─→ SystemProzessStarter: Process.Start() mit Shell-Execute
-  └─→ AufzeichnenderProzessStarter: Logdatei schreiben
-  ↓
-IDE (z. B. Visual Studio) öffnet Solution aus aufgelöstem Verzeichnis
+Ist das aufgelöste Plugin VisualStudioIdePlugin?
+  ├─→ Ja, und IdeOeffnenService.FindeSolutions(effectiveWorkdir) liefert mehrere Treffer:
+  │     ↓
+  │     IDialogService.ShowSolutionSelectionDialogAsync()
+  │       ↓
+  │       WpfDialogService (UI-Thread) → SolutionSelectionDialog (Modal) → SolutionSelectionDialogViewModel
+  │         ↓
+  │         Benutzer wählt Solution oder bricht ab → Rückgabe: Pfad oder null
+  │     ↓
+  │     IdeOeffnenService.OeffneSolution(gewählterPfad)
+  │       ↓
+  │       ProzessStartAnfrage mit ShellAusfuehren=true
+  │       ↓
+  │       IProzessStarter.Starten(anfrage)
+  │       ↓
+  │       Visual Studio öffnet die gewählte Solution
+  │
+  └─→ Sonst (VisualStudioIdePlugin mit ≤1 Solution, oder jedes andere Plugin wie VisualStudioCodeIdePlugin):
+        ↓
+        plugin.OpenRepositoryAsync(effectiveWorkdir, ct)
+          ├─→ VisualStudioIdePlugin: findet die (einzige) Solution selbst und öffnet sie per Shell-Execute
+          └─→ VisualStudioCodeIdePlugin: IVisualStudioCodeLocator.Locate()
+                ├─→ Kein Treffer: wirft InvalidOperationException → FehlerMeldung, kein Prozessstart
+                └─→ Treffer: ProzessStartAnfrage für code "<aufgelöstes Arbeitsverzeichnis>"
+                      ↓
+                      IProzessStarter.Starten(anfrage)
+                        ├─→ SystemProzessStarter: Process.Start()
+                        └─→ AufzeichnenderProzessStarter (Test): Logdatei schreiben
+                      ↓
+                      IDE öffnet aufgelöstes Arbeitsverzeichnis / Solution
 ```
 
-### IDE öffnen ohne Solution mit VS Code
-
-```
-TaskDetailViewModel lädt Aufgabe
-  ↓
-WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory() — aufgelöst
-  ↓
-IdeOeffnenService.FindeSolutions(effectiveWorkdir) liefert leere Liste
-  ↓
-AppEinstellungService liest ide.vscode.openWhenNoSolutionFound
-  ↓
-KannIdeOeffnen = Arbeitsverzeichnis vorhanden und Einstellung true
-  ↓
-Benutzer klickt IDE öffnen
-  ↓
-IdeOeffnenService.OeffneVisualStudioCode(effectiveWorkdir)
-  — übergeben: aufgelöstes Arbeitsverzeichnis (z. B. C:\repo\src\backend)
-  ↓
-IVisualStudioCodeLocator.Locate()
-  ├─→ Kein Treffer: FehlerMeldung
-  └─→ Treffer: ProzessStartAnfrage für code "<aufgelöstes Arbeitsverzeichnis>"
-      ↓
-      IProzessStarter.Starten(anfrage)
-      ↓
-      VS Code öffnet mit aufgelöstem Verzeichnis als Working Directory
-```
+Welche IDE-Plugins aktiv sind und in welcher Reihenfolge sie geprüft werden, konfigurieren Anwender über **Einstellungen → Plugins → Integrierte Entwicklungsumgebungen (IDE)** (`PluginActivationService`, Setting `plugins.ide.order`). Mindestens ein IDE-Plugin bleibt dabei stets aktiv, sodass `ResolveIdePluginAsync` nie ohne Ergebnis zurückkehrt.
 
 ## Diagramm
 
@@ -175,9 +165,16 @@ graph TD
     
     E["ArbeitsverzeichnisOeffnenService"] -->|uses| D
     F["IdeOeffnenService"] -->|uses| D
-    
+    L["VisualStudioIdePlugin"] -->|uses| D
+    M["VisualStudioCodeIdePlugin"] -->|uses| D
+    M -->|uses| N["IVisualStudioCodeLocator"]
+
+    P["PluginSelectionService"] -->|resolves via CheckCompatibilityAsync| L
+    P -->|resolves via CheckCompatibilityAsync| M
+
     G["TaskDetailViewModel"] -->|uses| E
     G -->|uses| F
+    G -->|uses| P
     G -->|uses| H["IDialogService"]
     
     I["WpfDialogService"] -->|implements| H
@@ -199,7 +196,7 @@ graph TD
 
 ### Caching und Performance
 
-- **Solution-Caching:** `_solutionPfade` wird einmalig beim Laden der Aufgabe gefüllt (synchroner `Directory.EnumerateFiles()`-Aufruf auf oberster Ebene).
+- **Keine Solution-Vorab-Suche mehr beim Laden:** `OeffneIdeCommand.CanExecute` hängt nur noch von `ShowFileExplorerPanel` (vorhandenes Arbeitsverzeichnis) ab; die Solution-Suche (`IdeOeffnenService.FindeSolutions()`) und die Plugin-Kompatibilitätsprüfung laufen erst beim Klick auf „IDE öffnen".
 - **Typischerweise schnell:** Für ein durchschnittliches Repository mit 1–5 Solutions dauert `FindeSolutions()` < 10 ms.
 - **Keine rekursive Suche:** Verhindert Performance-Degradation in großen Verzeichnisstrukturen.
 

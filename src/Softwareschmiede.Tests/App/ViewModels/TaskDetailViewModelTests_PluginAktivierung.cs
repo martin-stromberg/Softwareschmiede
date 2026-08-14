@@ -22,7 +22,6 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
     private readonly PromptVorlagenService _promptVorlagenService;
     private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
     private readonly PromptZeitVersandService _promptZeitVersandService;
-    private readonly AppEinstellungService _einstellungService;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Guid _projektId = Guid.NewGuid();
 
@@ -36,7 +35,6 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         _kiService = TestKiAusfuehrungsServiceFactory.Create();
         _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
         _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
-        _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         _dialogServiceMock = new Mock<IDialogService>();
 
         _db.Projekte.Add(new Projekt
@@ -97,8 +95,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            ideOeffnenService,
-            _einstellungService);
+            ideOeffnenService);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe()

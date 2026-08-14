@@ -4,5 +4,6 @@ namespace Softwareschmiede.Domain.Enums;
 public enum PluginType
 {
     SourceCodeManagement,
-    DevelopmentAutomation
+    DevelopmentAutomation,
+    Ide
 }

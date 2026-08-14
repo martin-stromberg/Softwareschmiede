@@ -92,7 +92,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SolutionsVorhanden.Should().BeTrue("die Solution liegt im konfigurierten Arbeitsverzeichnis");
+        sut.KannIdeOeffnen.Should().BeTrue("das konfigurierte Arbeitsverzeichnis existiert");
         sut.OeffneIdeCommand.CanExecute(null).Should().BeTrue();
 
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();

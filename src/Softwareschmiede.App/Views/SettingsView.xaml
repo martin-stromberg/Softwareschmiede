@@ -117,6 +117,35 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Gemeinsames ItemTemplate für die Einstellungsgruppen eines ausgewählten Plugins (SCM/KI- und IDE-Register). -->
+        <DataTemplate x:Key="PluginSettingGroupsItemTemplate">
+            <StackPanel Margin="0,0,0,8">
+                <TextBlock Text="{Binding GroupName}"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           Margin="0,10,0,5" />
+                <ItemsControl ItemsSource="{Binding Entries}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,4,0,4">
+                                <TextBlock Text="{Binding Field.Label}"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="12"
+                                           Margin="0,0,0,2" />
+                                <ContentControl Content="{Binding}"
+                                                ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
+                                <TextBlock Text="{Binding Field.Description}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -244,17 +273,6 @@
                                  Padding="8,6"
                                  BorderBrush="{DynamicResource BorderBrush}" />
                     </StackPanel>
-
-                    <!-- IDE -->
-                    <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
-                        <TextBlock Text="IDE"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}"
-                                   Margin="0,0,0,8" />
-                        <CheckBox Content="Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde"
-                                  AutomationProperties.Name="OpenVisualStudioCodeWhenNoSolutionFound"
-                                  IsChecked="{Binding OpenVisualStudioCodeWhenNoSolutionFound, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
                 </StackPanel>
             </TabItem>
             <TabItem>
@@ -344,6 +362,7 @@
                                      Background="{DynamicResource SurfaceBrush}"
                                      Foreground="{DynamicResource PrimaryTextBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
+                                     Margin="0,0,0,16"
                                      ItemContainerStyle="{StaticResource PluginActivationListBoxItemStyle}"
                                      SelectionChanged="OnPluginSelectionChanged">
                                 <ListBox.ItemTemplate>
@@ -357,53 +376,81 @@
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
+
+                            <!-- Aktivierung und Reihenfolge IDE-Plugins -->
+                            <TextBlock Text="Integrierte Entwicklungsumgebungen (IDE)"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       Margin="0,0,0,4" />
+                            <ListBox ItemsSource="{Binding DevelopmentEnvironmentPlugins}"
+                                     AutomationProperties.Name="IdePluginListe"
+                                     Background="{DynamicResource SurfaceBrush}"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource BorderBrush}"
+                                     HorizontalContentAlignment="Stretch"
+                                     ItemContainerStyle="{StaticResource PluginActivationListBoxItemStyle}"
+                                     SelectionChanged="OnIdePluginSelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding PluginName}"
+                                                       AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.Eintrag}"
+                                                       Margin="6,0,0,0"
+                                                       VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                <Button Content="↑"
+                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.NachOben}"
+                                                        Margin="12,0,0,0"
+                                                        Padding="6,0"
+                                                        Command="{Binding DataContext.IdePluginMoveUpCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
+                                                        CommandParameter="{Binding}" />
+                                                <Button Content="↓"
+                                                        AutomationProperties.Name="{Binding PluginPrefix, StringFormat={}{0}.NachUnten}"
+                                                        Margin="4,0,0,0"
+                                                        Padding="6,0"
+                                                        Command="{Binding DataContext.IdePluginMoveDownCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
+                                                        CommandParameter="{Binding}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </StackPanel>
                     </ScrollViewer>
 
                     <!-- Rechte Spalte: Einstellungen des im Aktivierungsregister ausgewählten Plugins -->
                     <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <TextBlock Text="{Binding SelectedPlugin.PluginName}"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource PrimaryTextBrush}"
-                                       Visibility="{Binding SelectedPlugin, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                                       Margin="0,0,0,8" />
-                            <CheckBox Content="Plugin aktiviert"
-                                      AutomationProperties.Name="PluginAktiviert"
-                                      IsChecked="{Binding SelectedPlugin.IsEnabled, Mode=TwoWay}"
-                                      Visibility="{Binding SelectedPlugin, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                                      Margin="0,0,0,12" />
-                            <ItemsControl ItemsSource="{Binding SelectedPluginSettings}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Margin="0,0,0,8">
-                                            <TextBlock Text="{Binding GroupName}"
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource PrimaryTextBrush}"
-                                                       Margin="0,10,0,5" />
-                                            <ItemsControl ItemsSource="{Binding Entries}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <StackPanel Margin="0,4,0,4">
-                                                            <TextBlock Text="{Binding Field.Label}"
-                                                                       Foreground="{DynamicResource PrimaryTextBrush}"
-                                                                       FontSize="12"
-                                                                       Margin="0,0,0,2" />
-                                                            <ContentControl Content="{Binding}"
-                                                                            ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
-                                                            <TextBlock Text="{Binding Field.Description}"
-                                                                       FontSize="11"
-                                                                       Foreground="{DynamicResource SecondaryTextBrush}"
-                                                                       Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
-                                                                       Margin="0,2,0,0" />
-                                                        </StackPanel>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <StackPanel Visibility="{Binding IsScmKiPluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{Binding SelectedPlugin.PluginName}"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,0,0,8" />
+                                <CheckBox Content="Plugin aktiviert"
+                                          AutomationProperties.Name="PluginAktiviert"
+                                          IsChecked="{Binding SelectedPlugin.IsEnabled, Mode=TwoWay}"
+                                          Margin="0,0,0,12" />
+                                <ItemsControl ItemsSource="{Binding SelectedPluginSettings}"
+                                              ItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}" />
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding IsIdePluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{Binding SelectedIdePlugin.PluginName}"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="0,0,0,8" />
+                                <CheckBox Content="Plugin aktiviert"
+                                          AutomationProperties.Name="IdePluginAktiviert"
+                                          IsChecked="{Binding SelectedIdePlugin.IsEnabled, Mode=TwoWay}"
+                                          Margin="0,0,0,12" />
+                                <ItemsControl ItemsSource="{Binding SelectedIdePluginSettings}"
+                                              ItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}" />
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

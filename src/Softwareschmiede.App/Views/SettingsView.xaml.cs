@@ -48,6 +48,18 @@ public sealed partial class SettingsView : UserControl
         }
     }
 
+    /// <summary>Selektions-Handler für die IDE-Plugins-Aktivierungsliste im Plugins-Register.</summary>
+    /// <param name="sender">Das auslösende Steuerelement.</param>
+    /// <param name="e">Die Ereignisargumente mit dem neu ausgewählten Element.</param>
+    private void OnIdePluginSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is not SettingsViewModel vm || e.AddedItems.Count == 0)
+            return;
+
+        if (e.AddedItems[0] is PluginActivationEntry entry)
+            vm.IdePluginSelectedCommand.Execute(entry);
+    }
+
     private void OnPasswordBoxLoaded(object sender, RoutedEventArgs e)
         => PluginSettingEntryEditHelper.OnPasswordBoxLoaded(sender, e);
 

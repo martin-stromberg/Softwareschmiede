@@ -1,7 +1,6 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FluentAssertions;
-using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -51,9 +50,19 @@ public partial class End2EndTest
         arbeitsverzeichnisButton.AsButton().Click();
         await WaitForProzessStartEintragAsync(lokalerKlonPfad);
 
-        // Phase 2: Ohne "*.sln" ist "IDE öffnen" deaktiviert.
+        // Phase 2: Ohne "*.sln" ist "IDE öffnen" weiterhin aktiv (CanExecute hängt nur noch vom vorhandenen
+        // Arbeitsverzeichnis ab, nicht mehr von gefundenen Solutions) - ein Klick löst über
+        // PluginSelectionService.ResolveIdePluginAsync automatisch den Visual-Studio-Code-Fallback aus, da
+        // Visual Studio Code standardmäßig als aktives IDE-Plugin gilt.
         var ideButtonOhneSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonOhneSln.Properties.IsEnabled.Value.Should().BeFalse("im Arbeitsverzeichnis liegt noch keine .sln-Datei");
+        ideButtonOhneSln.Properties.IsEnabled.Value.Should().BeTrue("das Arbeitsverzeichnis existiert bereits, auch ohne .sln-Datei");
+
+        var protokollVorFallback = await ReadProzessStartLogAsync();
+        ideButtonOhneSln.AsButton().Click();
+        await WaitForProzessStartEintragAsync(Path.GetFullPath(lokalerKlonPfad), sinceContent: protokollVorFallback);
+
+        var dialogBeiFallback = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
+        dialogBeiFallback.Should().BeNull("ohne gefundene Solution öffnet der Visual-Studio-Code-Fallback direkt, ohne Auswahl-Dialog");
 
         // Genau eine "*.sln" anlegen und die Aufgabe neu laden (Ribbon-Button-CanExecute wird beim Laden gecacht).
         var ersteSolution = Path.Combine(lokalerKlonPfad, "Erste.sln");
@@ -96,11 +105,11 @@ public partial class End2EndTest
     /// <summary>
     /// Szenario: Für das Repository ist ein Arbeitsunterverzeichnis (<c>RepositoryStartKonfiguration.WorkingDirectoryRelativePath</c>)
     /// konfiguriert. „Arbeitsverzeichnis öffnen" muss dieses aufgelöste Unterverzeichnis öffnen (nicht den
-    /// Repository-Root), „IDE öffnen" muss - solange keine Solution im Unterverzeichnis liegt und der
-    /// VS-Code-Fallback aktiviert ist - Visual Studio Code direkt mit dem aufgelösten Unterverzeichnis öffnen
-    /// (<c>OeffneVisualStudioCodeFallback</c>), und sobald eine Solution im Unterverzeichnis liegt, muss diese
-    /// gefunden und geöffnet werden (nicht im Root) - der Beweis, dass die Solution-Suche im aufgelösten
-    /// Arbeitsverzeichnis stattfindet.
+    /// Repository-Root), „IDE öffnen" muss - solange keine Solution im Unterverzeichnis liegt - über
+    /// PluginSelectionService.ResolveIdePluginAsync automatisch auf das (standardmäßig aktive)
+    /// Visual-Studio-Code-Plugin direkt mit dem aufgelösten Unterverzeichnis zurückfallen, und sobald eine
+    /// Solution im Unterverzeichnis liegt, muss diese gefunden und geöffnet werden (nicht im Root) - der
+    /// Beweis, dass die Solution-Suche im aufgelösten Arbeitsverzeichnis stattfindet.
     /// </summary>
     protected async Task VerzeichnisAktionen_KonfiguriertesArbeitsverzeichnisWirdAufgeloest_E2E(Window mainWindow)
     {
@@ -125,23 +134,17 @@ public partial class End2EndTest
         arbeitsverzeichnisButton.AsButton().Click();
         await WaitForProzessStartEintragAsync(Path.GetFullPath(unterverzeichnis));
 
-        // Phase 2: Ohne "*.sln" im Unterverzeichnis ist "IDE öffnen" weiterhin deaktiviert.
-        var ideButtonOhneSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonOhneSln.Properties.IsEnabled.Value.Should().BeFalse("im konfigurierten Arbeitsverzeichnis liegt noch keine .sln-Datei");
-
-        // Phase 2b: Mit aktiviertem VS-Code-Fallback (weiterhin ohne "*.sln" im konfigurierten Unterverzeichnis)
-        // öffnet "IDE öffnen" Visual Studio Code direkt mit dem aufgelösten Unterverzeichnis - über den
-        // Fallback-Pfad OeffneVisualStudioCodeFallbackAsync(), nicht über den Solution-Auswahl-Dialog. Da Phase 1
-        // bereits einen Prozessstart mit demselben aufgelösten Pfad aufgezeichnet hat, wird nur der seit
-        // diesem Zeitpunkt neu hinzugekommene Teil der Log-Datei geprüft.
-        await SeedOpenVisualStudioCodeFallbackAsync();
-        ReloadTaskDetail(mainWindow);
-
+        // Phase 2: Ohne "*.sln" im Unterverzeichnis ist "IDE öffnen" weiterhin aktiv (CanExecute hängt nur
+        // vom vorhandenen Arbeitsverzeichnis ab) und fällt über ResolveIdePluginAsync automatisch auf das
+        // standardmäßig aktive Visual-Studio-Code-Plugin zurück, das direkt mit dem aufgelösten
+        // Unterverzeichnis öffnet - ohne Solution-Auswahl-Dialog. Da Phase 1 bereits einen Prozessstart mit
+        // demselben aufgelösten Pfad aufgezeichnet hat, wird nur der seit diesem Zeitpunkt neu hinzugekommene
+        // Teil der Log-Datei geprüft.
         var protokollVorFallback = await ReadProzessStartLogAsync();
 
-        var ideButtonMitFallback = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonMitFallback.Properties.IsEnabled.Value.Should().BeTrue("der VS-Code-Fallback ist aktiviert, auch ohne .sln-Datei im Arbeitsverzeichnis");
-        ideButtonMitFallback.AsButton().Click();
+        var ideButtonOhneSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
+        ideButtonOhneSln.Properties.IsEnabled.Value.Should().BeTrue("das konfigurierte Arbeitsverzeichnis existiert, auch ohne .sln-Datei");
+        ideButtonOhneSln.AsButton().Click();
         await WaitForProzessStartEintragAsync(Path.GetFullPath(unterverzeichnis), sinceContent: protokollVorFallback);
 
         var solutionAuswahlDialogBeiFallback = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
@@ -179,24 +182,6 @@ public partial class End2EndTest
             GitRepositoryId = repository.Id,
             WorkingDirectoryRelativePath = workingDirectoryRelativePath,
             Aktiv = true
-        });
-        await db.SaveChangesAsync();
-    }
-
-    /// <summary>
-    /// Aktiviert direkt in der Test-Datenbank die Einstellung, dass „IDE öffnen" ohne gefundene Solution
-    /// Visual Studio Code als Fallback öffnet (<see cref="AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey"/>).
-    /// </summary>
-    private async Task SeedOpenVisualStudioCodeFallbackAsync()
-    {
-        await using var db = OpenTestDbContext();
-
-        db.Add(new AppEinstellung
-        {
-            Id = Guid.NewGuid(),
-            Schluessel = AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey,
-            Wert = bool.TrueString,
-            AktualisiertAm = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
     }

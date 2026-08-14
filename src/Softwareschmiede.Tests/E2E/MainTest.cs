@@ -21,6 +21,7 @@ public partial class End2EndTest : WpfTestBase
 
         AppStarten_ZeigtVersionsTextInFusszeile_E2E(mainWindow);
         Einstellungen_SpeichernCodexAlsStandardKiPluginUndExecutablePath_PersistiertBeides_E2E(mainWindow);
+        IdePluginSettings_AktivierungValidierungUndReihenfolge_E2E(mainWindow);
         await RepositoryZuweisung(mainWindow);
         Todo_ErstellenAbhakenLoeschenUndAbschlussValidierung_E2E(mainWindow);
         TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
