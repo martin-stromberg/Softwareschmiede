@@ -64,7 +64,7 @@ Die wichtigsten Features:
 - **To-Do-Listen für Aufgaben** – Strukturierung von Aufgaben mit To-Do-Elementen, Abhak-Status und Blockierung des Aufgabenabschlusses bei offenen To-Dos; Badge zeigt Anzahl offener To-Dos im Ribbon, aktive Aufgaben im Menü zeigen `0/1/n Todos` und öffnen per Klick einen read-only Dialog mit den offenen To-Dos
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
-- **Plugin-basierte IDE-Integration** – Automatische Erkennung und Auswahl der passenden Entwicklungsumgebung (Visual Studio bei `.sln`/`.slnx`-Dateien, Visual Studio Code als Fallback); konfigurierbare Aktivierung und Priorisierung in den Einstellungen
+- **Plugin-basierte IDE-Integration** – Automatische Erkennung und Auswahl der passenden Entwicklungsumgebung (Visual Studio bei `.sln`/`.slnx`-Dateien, Visual Studio Code als Fallback); konfigurierbare Aktivierung und Priorisierung in den Einstellungen; Split-Button-Muster für direkte Öffnung oder Auswahl-Dialog bei mehreren Einstiegspunkten
 - **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM-, KI- und IDE-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
 - **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende; unterstützt robuste Clipboard-Pastes langer mehrzeiliger Inhalte, Alt Gr-Sonderzeichen (z. B. auf deutschem Tastaturlayout: @, {, }, |, ~) und wortweise Cursor-Navigation mit Ctrl+Pfeiltasten
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
@@ -194,19 +194,36 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 
 Weiterführende Bedienungshinweise (Arbeitsverzeichnis-Konfiguration für Repository-Startskripte und Ribbon-Aktionen, LocalDirectoryPlugin-Workspace-Modi, KI-Plugin-Auswahl und Standardplugins, Folgeanweisungen mit Kontextsteuerung, Benachrichtigungssystem u. a.) finden Sie in der [Anwendungsdokumentation](docs/help/index.md).
 
-### IDE öffnen mit Plugin-Auswahl
+### IDE öffnen mit Plugin-Auswahl und Split-Button-Muster
 
-Die Aktion **IDE öffnen** in der Aufgabendetailansicht nutzt ein erweiterbares IDE-Plugin-System zur automatischen Auswahl der passenden Entwicklungsumgebung:
+Die Aktion **IDE öffnen** in der Aufgabendetailansicht nutzt ein erweiterbares IDE-Plugin-System zur automatischen Auswahl der passenden Entwicklungsumgebung mit flexiblem Split-Button-Pattern für mehrere Einstiegspunkte:
 
-**IDE-Plugin-Auswahl:**
+**IDE-Plugin-Auswahl (dreistufiger Prozess):**
 1. Das System fragt alle aktivierten IDE-Plugins der Reihe nach ab, ob sie mit dem Repository kompatibel sind
 2. Priorität: Plugins mit expliziter Kompatibilität (z. B. Visual Studio bei `.sln`/`.slnx`-Dateien) werden bevorzugt
 3. Fallback: Ist kein Plugin explizit kompatibel, wird das erste verfügbare Fallback-Plugin verwendet (z. B. Visual Studio Code)
 4. Default: Ist kein Plugin kompatibel, wird das erste registrierte Plugin verwendet
 
+**Split-Button-Muster (UI-Flexibilität bei mehreren Einstiegspunkten):**
+
+Der IDE-öffnen-Button in der Aufgabendetailansicht (Ribbon) wird als Split-Button mit zwei Teilen dargestellt:
+
+- **Haupt-Button:** 
+  - Öffnet immer **direkt** den **ersten (priorisierten) Einstiegspunkt** ohne Dialog
+  - Schnell und unkompliziert für den Standard-Anwendungsfall (1 IDE-Plugin, 1 Einstiegspunkt)
+  - Verhalten identisch mit dem bisherigen Single-Button
+  - Beispiel: Visual Studio öffnet direkt die erste gefundene `.sln`-Datei
+
+- **Dropdown-Button** (nur sichtbar bei ≥2 Einstiegspunkten):
+  - Wird **nur angezeigt**, wenn das aufgelöste IDE-Plugin mehr als einen Einstiegspunkt angeboten hat
+  - Klick zeigt einen **Auswahl-Dialog** mit allen verfügbaren Einstiegspunkten
+  - Benutzer kann gezielt einen spezifischen Einstiegspunkt wählen (z. B. `backend.sln`, `frontend.sln`, `shared.sln`)
+  - Nach Auswahl öffnet das Plugin den gewählten Einstiegspunkt
+  - Abbruch: Dialog wird geschlossen, nichts wird geöffnet
+
 **Integrierte IDE-Plugins:**
-- **Visual Studio IDE-Plugin** — Prüft auf `.sln` oder `.slnx`-Dateien im Arbeitsverzeichnis; meldet explizite Kompatibilität bei Fund, öffnet die Solution über den Betriebssystem-Standardhandler
-- **Visual Studio Code IDE-Plugin** — Meldet sich immer als Fallback zur Verfügung; öffnet das Arbeitsverzeichnis über den `code`-Befehl
+- **Visual Studio IDE-Plugin** — Prüft auf `.sln` oder `.slnx`-Dateien im Arbeitsverzeichnis; meldet explizite Kompatibilität bei Fund, öffnet die Solution(en) über den Betriebssystem-Standardhandler. Bei mehreren Dateien können alle über den Dropdown-Button ausgewählt werden.
+- **Visual Studio Code IDE-Plugin** — Meldet sich immer als Fallback zur Verfügung; öffnet das Arbeitsverzeichnis über den `code`-Befehl (Single-Einstiegspunkt, daher kein Dropdown)
 
 **Arbeitsverzeichnis-Auflösung:** Beide Aktionen — Arbeitsverzeichnis öffnen und IDE öffnen — berücksichtigen das konfigurierte Arbeitsunterverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`). Ist ein Unterverzeichnis konfiguriert (z. B. `src/backend`), wird nur dieses durchsucht und geöffnet, nicht der Repository-Root. Dies ermöglicht zuverlässiges Arbeiten in Mono-Repos, bei denen mehrere räumlich getrennte Subprojekte in verschiedenen Verzeichnissen liegen.
 
@@ -214,6 +231,10 @@ Die Aktion **IDE öffnen** in der Aufgabendetailansicht nutzt ein erweiterbares 
 - Jedes IDE-Plugin unabhängig aktivieren oder deaktivieren (mindestens ein Plugin muss aktiv bleiben)
 - Die Reihenfolge per Up/Down-Buttons anpassen, um die Auswahl-Priorität zu steuern
 - Plugin-spezifische Einstellungen konfigurieren (falls vorhanden)
+
+**ViewModel-Eigenschaften für die Split-Button-Logik:**
+- `KannIdeAuswaehlen` (`bool`, read-only) — Gibt an, ob mehrere Einstiegspunkte verfügbar sind; steuert die Sichtbarkeit des Dropdown-Buttons
+- `VerfuegbareEinstiegspunkte` (`IReadOnlyList<IdeEntryPoint>`, optional) — Gepufferte Liste der zuletzt ermittelten Einstiegspunkte (für Debugging/Logging)
 
 ---
 

@@ -1,3 +1,17 @@
+## 2026-08-17 — Split-Button-Muster für IDE-Öffnen mit Mehrfach-Einstiegspunkt-Unterstützung
+
+- UI-Erweiterung: Neue WPF-Komponente `RibbonSplitButton` ersetzt den einfachen `RibbonLargeButton` für „IDE öffnen". Sie besteht aus einem Haupt-Button (öffnet direkt) und einem Dropdown-Button (zeigt Dialog bei mehreren Einstiegspunkten).
+- Architektur-Refaktorierung: `IdeOeffnenService` wurde vollständig entfernt. Die Logik ist jetzt direkt in `TaskDetailViewModel.OeffneIdeInternAsync()` implementiert und nutzt `PluginSelectionService.ResolveIdePluginAsync()` sowie die neuen Plugin-Methoden `IIdePlugin.FindEntryPointsAsync()` und `IIdePlugin.OpenEntryPointAsync()`.
+- Neue Plugin-Schnittstelle: `IIdePlugin` erweitert um generische Mehreinstiegspunkt-Unterstützung (`FindEntryPointsAsync()` liefert 0..n `IdeEntryPoint`-Kandidaten, `OpenEntryPointAsync()` öffnet einen konkreten Einstiegspunkt). Alte Methoden `CheckCompatibilityAsync()` und `OpenRepositoryAsync()` bleiben für Rückwärtskompatibilität.
+- Neue ViewModel-Properties: `KannIdeAuswaehlen` (Boolean, steuert Dropdown-Sichtbarkeit), wird bei jedem IDE-Öffnen basierend auf Einstiegspunkt-Anzahl aktualisiert.
+- Neue ViewModel-Commands: `OeffneIdeCommand` (Haupt-Button, direkt öffnen), `OeffneIdeAuswahlCommand` (Dropdown-Button, Dialog bei mehreren).
+- Neue Value Object: `IdeEntryPoint` (Record mit `Path` und optionalem `DisplayName`), beschreibt einen konkreten IDE-Einstiegspunkt (z. B. Solution-Datei, Workspace-Datei).
+- Benutzerverhalten: Benutzer können nun bei mehreren verfügbaren Einstiegspunkten (z. B. mehrere `.sln`-Dateien) gezielt wählen, welche Solution/welcher Workspace geöffnet wird. Der Haupt-Button behält das schnelle Öffnen des ersten Einstiegspunkts bei.
+- Fehlerbehandlung: Keine Einstiegspunkte gefunden (0) → `FileNotFoundException`; genau 1 → direkt öffnen; mehrere ohne Callback → ersten öffnen; mehrere mit Callback → Dialog zeigen.
+- Dokumentation: Dateien `docs/help/entwicklungsumgebungen/` und `docs/help/dateisystem-integration/` aktualisiert, um den neuen direkten Aufrufpfad (`TaskDetailViewModel` → `PluginSelectionService` → `IIdePlugin`) und das Split-Button-Muster zu dokumentieren.
+- Unit-Tests: Neue Tests für `RibbonSplitButton`, `OeffneIdeCommand`, `OeffneIdeAuswahlCommand`, `KannIdeAuswaehlen`, `waehleEntryPointAsync`.
+- E2E-Tests: Neue Szenarien für Split-Button-Verhalten: 1 Einstiegspunkt (nur Haupt-Button sichtbar), mehrere Einstiegspunkte (beide Buttons sichtbar), Dialog-Auswahl funktioniert korrekt.
+
 ## 2026-08-13 — IDE-Plugin-System
 
 - Neues erweiterbares Plugin-System für IDE-Integration mit automatischer Kompatibilitätsprüfung

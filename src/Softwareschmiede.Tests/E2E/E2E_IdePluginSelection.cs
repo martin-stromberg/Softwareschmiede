@@ -15,11 +15,13 @@ namespace Softwareschmiede.Tests.E2E;
 /// fällt auf Visual Studio Code zurück, und ein deaktiviertes Visual-Studio-Plugin führt ebenfalls zum
 /// VS-Code-Fallback - jeweils über den vollständigen, unveränderten Produktions-Stack
 /// (<see cref="PluginManager"/> mit eingebauten IDE-Plugins, <see cref="PluginActivationService"/>,
-/// <see cref="PluginSelectionService"/>, <see cref="IdeOeffnenService.OpenRepositoryInIdeAsync"/>).
+/// <see cref="PluginSelectionService.ResolveIdePluginAsync"/>, gefolgt von
+/// <see cref="IIdePlugin.FindEntryPointsAsync"/>/<see cref="IIdePlugin.OpenEntryPointAsync"/> auf dem
+/// aufgelösten Plugin — derselbe Resolve/Find/Open-Ablauf, den auch <c>TaskDetailViewModel</c> direkt nutzt).
 ///
 /// Diese Szenarien werden bewusst zusätzlich zur FlaUI-Abdeckung in <c>E2E_VerzeichnisAktionen</c> (Ribbon-
-/// Button "IDE öffnen", der inzwischen ebenfalls über <see cref="PluginSelectionService.ResolveIdePluginAsync"/>
-/// auflöst) als reine Objektgraph-Tests gehalten, um die Plugin-Auswahl-Logik selbst schnell und ohne
+/// Button "IDE öffnen", der denselben <see cref="PluginSelectionService.ResolveIdePluginAsync"/>-Pfad nutzt)
+/// als reine Objektgraph-Tests gehalten, um die Plugin-Auswahl-Logik selbst schnell und ohne
 /// App-Start/ConPTY-Abhängigkeit isoliert zu verifizieren; sie laufen deshalb in der regulären Testlane
 /// statt unter Category=OsInterface.
 ///
@@ -41,9 +43,9 @@ public sealed class E2E_IdePluginSelection : IDisposable
         var repository = _tempDirectoryFixture.CreateTempDirectory("e2e_ide_selection_mit_sln");
         File.WriteAllText(Path.Combine(repository, "Loesung.sln"), string.Empty);
 
-        var (ideOeffnenService, prozessStarter) = CreateStack();
+        var (pluginSelectionService, prozessStarter) = CreateStack();
 
-        await ideOeffnenService.OpenRepositoryInIdeAsync(repository);
+        await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
         prozessStarter.Aufrufe.Should().ContainSingle();
         prozessStarter.Aufrufe[0].DateiName.Should().Be(Path.Combine(repository, "Loesung.sln"));
@@ -56,9 +58,9 @@ public sealed class E2E_IdePluginSelection : IDisposable
     {
         var repository = _tempDirectoryFixture.CreateTempDirectory("e2e_ide_selection_ohne_sln");
 
-        var (ideOeffnenService, prozessStarter) = CreateStack();
+        var (pluginSelectionService, prozessStarter) = CreateStack();
 
-        await ideOeffnenService.OpenRepositoryInIdeAsync(repository);
+        await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
         prozessStarter.Aufrufe.Should().ContainSingle();
         prozessStarter.Aufrufe[0].DateiName.Should().Be("code.cmd");
@@ -76,23 +78,38 @@ public sealed class E2E_IdePluginSelection : IDisposable
         var repository = _tempDirectoryFixture.CreateTempDirectory("e2e_ide_selection_vs_deaktiviert");
         File.WriteAllText(Path.Combine(repository, "Loesung.sln"), string.Empty);
 
-        var (ideOeffnenService, prozessStarter, pluginActivationService) = CreateStackWithActivationService();
+        var (pluginSelectionService, prozessStarter, pluginActivationService) = CreateStackWithActivationService();
         await pluginActivationService.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false);
 
-        await ideOeffnenService.OpenRepositoryInIdeAsync(repository);
+        await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
         prozessStarter.Aufrufe.Should().ContainSingle();
         prozessStarter.Aufrufe[0].DateiName.Should().Be("code.cmd");
         prozessStarter.Aufrufe[0].ShellAusfuehren.Should().BeFalse();
     }
 
-    private (IdeOeffnenService IdeOeffnenService, RecordingProzessStarter ProzessStarter) CreateStack()
+    /// <summary>
+    /// Bildet den Resolve/Find/Open-Ablauf nach, den auch <c>TaskDetailViewModel.OeffneIdeInternAsync</c>
+    /// nutzt: Plugin über <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auflösen, dessen
+    /// Einstiegspunkte ermitteln und den ersten öffnen. Alle Szenarien dieser Klasse liefern genau einen
+    /// Einstiegspunkt, daher wird hier bewusst keine Mehrfach-Auswahl-Verzweigung nachgebildet.
+    /// </summary>
+    /// <param name="pluginSelectionService">Löst das für das Repository zuständige IDE-Plugin auf.</param>
+    /// <param name="repositoryPath">Pfad des zu öffnenden Repositories.</param>
+    private static async Task OpenRepositoryInIdeAsync(PluginSelectionService pluginSelectionService, string repositoryPath)
     {
-        var (ideOeffnenService, prozessStarter, _) = CreateStackWithActivationService();
-        return (ideOeffnenService, prozessStarter);
+        var plugin = await pluginSelectionService.ResolveIdePluginAsync(repositoryPath);
+        var entryPoints = await plugin.FindEntryPointsAsync(repositoryPath);
+        await plugin.OpenEntryPointAsync(entryPoints[0]);
     }
 
-    private (IdeOeffnenService IdeOeffnenService, RecordingProzessStarter ProzessStarter, PluginActivationService PluginActivationService) CreateStackWithActivationService()
+    private (PluginSelectionService PluginSelectionService, RecordingProzessStarter ProzessStarter) CreateStack()
+    {
+        var (pluginSelectionService, prozessStarter, _) = CreateStackWithActivationService();
+        return (pluginSelectionService, prozessStarter);
+    }
+
+    private (PluginSelectionService PluginSelectionService, RecordingProzessStarter ProzessStarter, PluginActivationService PluginActivationService) CreateStackWithActivationService()
     {
         var db = TestDbContextFactory.Create();
         var prozessStarter = new RecordingProzessStarter();
@@ -119,9 +136,7 @@ public sealed class E2E_IdePluginSelection : IDisposable
             NullLogger<PluginSelectionService>.Instance,
             appEinstellungService);
 
-        var ideOeffnenService = new IdeOeffnenService(prozessStarter, pluginSelectionService);
-
-        return (ideOeffnenService, prozessStarter, pluginActivationService);
+        return (pluginSelectionService, prozessStarter, pluginActivationService);
     }
 
     private sealed class RecordingProzessStarter : IProzessStarter

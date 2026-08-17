@@ -36,12 +36,26 @@ Die aktivierten Plugins werden in der benutzer-konfigurierten Reihenfolge geprü
 2. **Fallback als Sicherheitsnetz:** Wenn kein Plugin explizit kompatibel ist, wird das erste Plugin mit `Fallback` verwendet.
 3. **Default als letztes Mittel:** Falls kein Plugin aktiv oder kompatibel ist, wird das System-Standardplugin verwendet.
 
-### 3. IDE öffnen
+### 3. IDE öffnen (Split-Button-Muster)
 
-Das ausgewählte Plugin öffnet das Repository in der entsprechenden IDE:
+Das ausgewählte Plugin wird mit einem Split-Button-Muster geöffnet, das Flexibilität bei mehreren Einstiegspunkten (z. B. mehrere `.sln`-Dateien) bietet:
 
-- **Visual Studio:** Die erste gefundene `.sln` oder `.slnx`-Datei wird mit dem Betriebssystem-Standardhandler geöffnet (meist direkt in Visual Studio).
-- **Visual Studio Code:** Das Repository-Verzeichnis wird mit dem `code`-Befehlszeilenwerkzeug geöffnet.
+**Haupt-Button (öffnet direkt):**
+- Öffnet automatisch den **ersten Einstiegspunkt** des Plugins, ohne Dialog
+- Verhalten wie der Klassische Einzelklick, schnell und unkompliziert
+- Beispiele:
+  - Visual Studio: die erste gefundene `.sln` oder `.slnx`-Datei
+  - Visual Studio Code: das Repository-Verzeichnis
+
+**Dropdown-Button (nur sichtbar bei mehreren Einstiegspunkten):**
+- Wird **nur angezeigt**, wenn das Plugin mehr als einen Einstiegspunkt gefunden hat
+- Zeigt einen **Auswahl-Dialog** mit allen Einstiegspunkten
+- Benutzer kann eine spezifische Solution, ein Workspace oder ein Verzeichnis wählen
+- Nach der Auswahl öffnet das Plugin den gewählten Einstiegspunkt
+
+**Beispiel: Repository mit mehreren Visual-Studio-Solutions**
+- Haupt-Button: öffnet immer die erste Solution (z. B. `backend.sln`)
+- Dropdown-Button: zeigt Dialog mit `backend.sln`, `frontend.sln`, `shared.sln` zur Auswahl
 
 ## Beispiele
 
@@ -69,8 +83,8 @@ Das ausgewählte Plugin öffnet das Repository in der entsprechenden IDE:
 
 ## Einschränkungen
 
-- **Visual Studio:** Prüft nur den Repository-Root auf `.sln`/`.slnx`-Dateien, nicht untergeordnete Verzeichnisse. Falls die Solution-Datei nicht im Root liegt, wird Visual Studio als inkompatibel erkannt.
-- **Visual Studio Code:** Erfordert, dass die `code`-CLI installiert und im PATH verfügbar ist. Ist dies nicht der Fall, schlägt das Öffnen fehl.
+- **Visual Studio:** Prüft nur den Repository-Root auf `.sln`/`.slnx`-Dateien, nicht untergeordnete Verzeichnisse. Falls die Solution-Datei nicht im Root liegt, wird Visual Studio als inkompatibel erkannt. Der Auswahl-Dialog zeigt alle gefundenen Solutions im Root.
+- **Visual Studio Code:** Erfordert, dass die `code`-CLI installiert und im PATH verfügbar ist. Ist dies nicht der Fall, schlägt das Öffnen fehl. VS Code öffnet immer das gesamte Repository-Verzeichnis (ein Einstiegspunkt).
 - **Mindestens ein aktives Plugin erforderlich:** Der Benutzer muss immer mindestens ein IDE-Plugin aktiviert lassen. Alle Plugins zu deaktivieren ist nicht möglich.
 - **Nur Betriebssystem-Handler:** Die `.sln`-Datei wird mit dem registrierten Standard-Handler des Betriebssystems geöffnet. Dies ist normalerweise Visual Studio, kann aber bei mehreren Installationen oder benutzerdefinierten Assoziationen unterschiedlich sein.
-- **Keine Mehrfachauswahl:** Der Benutzer sieht keine IDE-Auswahl-Dialog, wenn mehrere Plugins aktiv sind. Die beste IDE wird automatisch gewählt.
+- **Auswahl-Dialog nur für mehrere Einstiegspunkte:** Der Auswahl-Dialog (Dropdown-Button) wird nur angezeigt, wenn das aufgelöste Plugin mehr als einen Einstiegspunkt anbietet. Bei Single-Plugin-Szenarien oder einem Einstiegspunkt erfolgt direkt die Öffnung ohne Dialog.

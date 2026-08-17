@@ -1,0 +1,52 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:Softwareschmiede.App.Controls">
+
+    <!-- Gemeinsamer Style für Ribbon-Buttons (RibbonLargeButton, RibbonSplitButton): transparenter Hintergrund,
+         Hover-/Pressed-/Disabled-Zustände über DynamicResource-Brushes. Der CornerRadius wird pro Instanz über
+         die anhängbare Eigenschaft RibbonButtonStyleHelper.CornerRadius parametrisiert, damit derselbe
+         ControlTemplate für Einzel-Buttons (runde Ecken) und die beiden Hälften eines Split-Buttons (nur
+         außen abgerundet) wiederverwendet werden kann. -->
+    <Style x:Key="RibbonButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="local:RibbonButtonStyleHelper.CornerRadius" Value="4" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding local:RibbonButtonStyleHelper.CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource SidebarBackgroundBrush}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Haupt-Button-Hälfte eines RibbonSplitButton: nur links abgerundet, rechts eckig (grenzt an den Dropdown-Button). -->
+    <Style x:Key="RibbonSplitButtonMainStyle" TargetType="Button" BasedOn="{StaticResource RibbonButtonStyle}">
+        <Setter Property="local:RibbonButtonStyleHelper.CornerRadius" Value="4,0,0,4" />
+    </Style>
+
+    <!-- Dropdown-Button-Hälfte eines RibbonSplitButton: nur rechts abgerundet, links eckig (grenzt an den Haupt-Button). -->
+    <Style x:Key="RibbonSplitButtonDropdownStyle" TargetType="Button" BasedOn="{StaticResource RibbonButtonStyle}">
+        <Setter Property="local:RibbonButtonStyleHelper.CornerRadius" Value="0,4,4,0" />
+    </Style>
+
+</ResourceDictionary>

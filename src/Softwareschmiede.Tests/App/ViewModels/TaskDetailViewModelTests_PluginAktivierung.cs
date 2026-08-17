@@ -76,7 +76,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices();
+        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices();
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -94,8 +94,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService,
-            ideOeffnenService);
+            arbeitsverzeichnisOeffnenService);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe()

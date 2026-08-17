@@ -78,14 +78,28 @@ public partial class End2EndTest
         var dialogNachEinerSln = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
         dialogNachEinerSln.Should().BeNull("bei genau einer Solution darf kein Auswahl-Dialog erscheinen");
 
+        var dropdownButtonMitEinerSln = mainWindow.FindFirstDescendant(cf => cf.ByName("IdeOeffnenDropdown"));
+        dropdownButtonMitEinerSln.Should().BeNull("bei genau einem Einstiegspunkt muss der Dropdown-Button des Split-Buttons unsichtbar sein");
+
         // Eine zweite "*.slnx" anlegen und die Aufgabe erneut neu laden.
         var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.slnx");
         File.WriteAllText(zweiteSolution, string.Empty);
         ReloadTaskDetail(mainWindow);
 
-        // Phase 4: Bei mehreren "*.sln"-Dateien erscheint der Auswahl-Dialog; die gewählte Solution wird geöffnet.
-        var ideButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonMitZweiSln.AsButton().Click();
+        // Phase 4: Bei mehreren "*.sln"-Dateien öffnet der Haupt-Button des Split-Buttons weiterhin direkt
+        // den ersten (alphabetisch sortierten) Einstiegspunkt, ohne Auswahl-Dialog; der jetzt sichtbare
+        // Dropdown-Button zeigt bei Klick den Auswahl-Dialog mit allen Einstiegspunkten an.
+        var ideHauptButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
+        var ideDropdownButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnenDropdown"), Short);
+
+        var protokollVorHauptklick = await ReadProzessStartLogAsync();
+        ideHauptButtonMitZweiSln.AsButton().Click();
+        await WaitForProzessStartEintragAsync(ersteSolution, sinceContent: protokollVorHauptklick);
+
+        var dialogNachHauptklick = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
+        dialogNachHauptklick.Should().BeNull("der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
+
+        ideDropdownButtonMitZweiSln.AsButton().Click();
 
         var dialog = WaitForWindow("Solution auswählen", Short);
         var solutionListe = WaitForElement(dialog, cf => cf.ByName("SolutionAuswahl"), Short);

@@ -15,7 +15,7 @@
 | `PluginManager` | Service | Registry für alle Plugins; registriert IDE-Plugins beim Start (`GetIdePlugins()`, `GetDefaultIdePlugin()`) |
 | `AppEinstellungService` | Service | Persistiert Einstellungen in der Datenbank (Aktivierungsstatus und Reihenfolge) |
 | `IdePluginOrderResolver` | Service-Klasse | Hilfsmethode zum Sortieren von Plugins nach `plugins.ide.order` Setting |
-| `IdeOeffnenService` | Service | Public API; delegiert an `PluginSelectionService.ResolveIdePluginAsync()` und generalisiert das Öffnen über `IIdePlugin.FindEntryPointsAsync()`/`OpenEntryPointAsync()` — unabhängig von der konkreten Plugin-Implementierung |
+| `TaskDetailViewModel.OeffneIdeAsync` / `OeffneIdeAuswahlAsync` | Methoden | Public API für Split-Button (Haupt- und Dropdown-Teil); delegieren an `PluginSelectionService.ResolveIdePluginAsync()` und nutzen `IIdePlugin.FindEntryPointsAsync()`/`OpenEntryPointAsync()` direkt — unabhängig von der konkreten Plugin-Implementierung |
 | `IProzessStarter` | Interface | Startet externe Prozesse (Visual Studio/VS Code); wird von beiden Plugin-Klassen verwendet |
 | `IVisualStudioCodeLocator` | Interface | Ermittelt den VS Code Installationspfad; wird von `VisualStudioCodeIdePlugin` verwendet |
 
@@ -56,13 +56,25 @@
 
 ## Datenfluss
 
-### IDE-Öffnen auslösen
+### IDE-Öffnen auslösen (Split-Button)
 
 ```
-User klickt "IDE öffnen" (Ribbon-Button der Aufgabendetailansicht)
-         │
-         ▼
-TaskDetailViewModel.OeffneIdeAsync()
+User klickt "IDE öffnen" Split-Button (Ribbon in Aufgabendetailansicht)
+    │
+    ├─ Haupt-Button:
+    │      │
+    │      ▼
+    │  TaskDetailViewModel.OeffneIdeCommand.OeffneIdeAsync()
+    │      │
+    │      └─ öffnet den ersten Einstiegspunkt direkt (ohne Dialog)
+    │
+    └─ Dropdown-Button (nur sichtbar bei ≥2 Einstiegspunkten):
+           │
+           ▼
+       TaskDetailViewModel.OeffneIdeAuswahlCommand.OeffneIdeAuswahlAsync()
+           │
+           └─ zeigt Dialog bei mehreren Einstiegspunkten
+              (wenn nur 1 gefunden → wird direkt geöffnet)
          │
          ▼
 PluginSelectionService.ResolveIdePluginAsync()
@@ -114,11 +126,18 @@ plugin.FindEntryPointsAsync()
     │
     ├─ 1 → sofort plugin.OpenEntryPointAsync(einzigerEntryPoint)
     │
-    └─ >1 → Auswahl-Callback (falls vorhanden) mit allen
-            IdeEntryPoint-Objekten aufrufen → gewählten
-            Einstiegspunkt via plugin.OpenEntryPointAsync() öffnen;
-            liefert der Callback null, wird nichts geöffnet;
-            ohne Callback wird der erste geöffnet
+    └─ >1 → 
+        ├─ Haupt-Button: OpenEntryPointAsync(ersterEntryPoint) direkt
+        │
+        └─ Dropdown-Button: waehleEntryPointAsync() aufrufen
+                 │
+                 ▼
+            Dialog zeigt alle Einstiegspunkte
+                 │
+                 └─ Benutzer wählt oder bricht ab
+                    → gewählten Einstiegspunkt via
+                      plugin.OpenEntryPointAsync() öffnen
+                      oder nichts tun (Abbruch)
          │
          ▼
     IProzessStarter startet die IDE

@@ -10,11 +10,18 @@ Der technische Ablauf beschreibt die Ausführungsschritte, wenn der Benutzer ein
 
 ### 1. IDE-Öffnen auslösen
 
-Der Ribbon-Button „IDE öffnen" der Aufgabendetailansicht ruft `TaskDetailViewModel.OeffneIdeAsync()` auf, das `IdeOeffnenService.OpenRepositoryInIdeAsync(effectiveWorkdir, waehleEntryPointAsync, ct)` mit dem über `WorkingDirectoryResolver` aufgelösten Arbeitsverzeichnis sowie einem Auswahl-Callback aufruft (siehe [Dateisystem-Integration](../dateisystem-integration/ablauf-technisch.md) für die vollständige, um den Solution-Auswahl-Dialog erweiterte Ablaufbeschreibung). `IdeOeffnenService.OpenRepositoryInIdeAsync()` selbst ist generisch: Der Callback ist optional — Aufrufer ohne UI-Dialog-Bedarf (z. B. künftige Automatisierung) können ihn weglassen; in diesem Fall öffnet der Service bei mehreren gefundenen Einstiegspunkten automatisch den ersten.
+Der Split-Button „IDE öffnen" in der Aufgabendetailansicht (TaskDetailView) besteht aus zwei Teilen:
+1. **Haupt-Button:** Ruft `TaskDetailViewModel.OeffneIdeCommand.OeffneIdeAsync()` auf — öffnet direkt den ersten (priorisierten) Einstiegspunkt
+2. **Dropdown-Button:** Ruft `TaskDetailViewModel.OeffneIdeAuswahlCommand.OeffneIdeAuswahlAsync()` auf — zeigt einen Auswahl-Dialog bei mehreren Einstiegspunkten
+
+Beide verwenden direkt `PluginSelectionService.ResolveIdePluginAsync()` zur Plugin-Auflösung und `IIdePlugin.FindEntryPointsAsync()`/`OpenEntryPointAsync()` zum Öffnen der IDE (siehe [Dateisystem-Integration](../dateisystem-integration/ablauf-technisch.md) für die vollständige Ablaufbeschreibung). Der Dialog wird nur beim Dropdown-Button angezeigt.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.OeffneIdeAsync()` — Produktionscode-Aufrufer des Ribbon-Buttons; übergibt einen Callback, der bei mehreren `IdeEntryPoint`-Kandidaten den bestehenden Solution-Auswahl-Dialog anzeigt
-- `IdeOeffnenService.OpenRepositoryInIdeAsync()` — Generischer Helper; koordiniert Plugin-Auflösung, `FindEntryPointsAsync()`-Aufruf, Verzweigung nach Anzahl der Einstiegspunkte und `OpenEntryPointAsync()`-Ausführung — unabhängig von der konkreten `IIdePlugin`-Implementierung
+- `TaskDetailViewModel.OeffneIdeAsync()` — Wird vom Haupt-Button aufgerufen; öffnet direkt ohne Dialog
+- `TaskDetailViewModel.OeffneIdeAuswahlAsync()` — Wird vom Dropdown-Button aufgerufen; zeigt Dialog bei mehreren Einstiegspunkten
+- `TaskDetailViewModel.waehleEntryPointAsync()` — Callback-Methode für den Dialog-Service
+- `PluginSelectionService.ResolveIdePluginAsync()` — Löst das zuständige IDE-Plugin auf
+- `RibbonSplitButton` — Neue WPF-Komponente für den Split-Button mit Haupt- und Dropdown-Button
 
 ### 2. Aktivierte IDE-Plugins laden
 
@@ -34,14 +41,14 @@ Beteiligte Komponenten:
 
 ### 4. Kompatibilität prüfen (sequenziell)
 
-Für jedes Plugin in der sortierten Reihenfolge:
+Für jedes Plugin in der sortierten Reihenfolge wird `CheckCompatibilityAsync(repositoryPath)` aufgerufen:
 
-**Schritt 4.1:** Plugin führt `CheckCompatibilityAsync(repositoryPath)` aus
+**Schritt 4.1:** Plugin führt Kompatibilitätsprüfung aus
 - `VisualStudioIdePlugin.CheckCompatibilityAsync()`: Sucht nach `.sln`/`.slnx`-Dateien im Repository-Root via `VisualStudioIdePlugin.FindSolutionFiles()`
 - `VisualStudioCodeIdePlugin.CheckCompatibilityAsync()`: Gibt immer `Fallback` zurück
 
 **Schritt 4.2:** Kompatibilitätsergebnis verarbeiten
-- Falls `Explicit`: Dieses Plugin wird sofort ausgewählt und zur IDE-Öffnung verwendet (Schritt 5)
+- Falls `Explicit`: Dieses Plugin wird sofort ausgewählt (Schritt 5)
 - Falls `Fallback`: Plugin wird als Fallback-Kandidat gemerkt, Schleife läuft weiter
 - Falls `Incompatible`: Schleife läuft weiter zur nächsten Plugin
 
@@ -51,12 +58,12 @@ Beteiligte Komponenten:
 
 ### 5. Einstiegspunkte ermitteln und öffnen
 
-Das ausgewählte Plugin wird zunächst mit `plugin.FindEntryPointsAsync(repositoryPath)` nach seinen verfügbaren Einstiegspunkten gefragt; anschließend verzweigt `IdeOeffnenService` generisch nach deren Anzahl:
+Das ausgewählte Plugin wird mit `plugin.FindEntryPointsAsync(repositoryPath)` nach verfügbaren Einstiegspunkten gefragt. Anschließend erfolgt die Verzweigung nach deren Anzahl:
 
 - **0 Einstiegspunkte:** `FileNotFoundException` wird geworfen — es gibt nichts zu öffnen.
-- **Genau 1 Einstiegspunkt:** `plugin.OpenEntryPointAsync(entryPoints[0])` wird direkt aufgerufen, ohne Rückfrage beim Anwender.
-- **Mehr als 1 Einstiegspunkt und Callback übergeben:** Der Callback (`waehleEntryPointAsync`) wird mit allen gefundenen `IdeEntryPoint`-Objekten aufgerufen; liefert er `null` (Abbruch durch den Anwender), wird nichts geöffnet, sonst wird der gewählte Einstiegspunkt via `plugin.OpenEntryPointAsync()` geöffnet.
-- **Mehr als 1 Einstiegspunkt ohne Callback:** Der erste Einstiegspunkt wird automatisch geöffnet.
+- **Genau 1 Einstiegspunkt:** `plugin.OpenEntryPointAsync(entryPoints[0])` wird direkt aufgerufen, ohne Dialog.
+- **Mehr als 1 Einstiegspunkt (Haupt-Button):** Der erste Einstiegspunkt wird direkt via `plugin.OpenEntryPointAsync()` geöffnet (Fallback).
+- **Mehr als 1 Einstiegspunkt (Dropdown-Button):** Der Callback (`waehleEntryPointAsync`) wird mit allen gefundenen `IdeEntryPoint`-Objekten aufgerufen; zeigt den Dialog an und liefert den gewählten Einstiegspunkt oder `null` (Abbruch).
 
 **Falls Visual Studio Plugin:**
 - `VisualStudioIdePlugin.FindEntryPointsAsync()` ermittelt alle `.sln`/`.slnx`-Dateien (via `FindSolutionFiles()`) und liefert je Datei einen `IdeEntryPoint`

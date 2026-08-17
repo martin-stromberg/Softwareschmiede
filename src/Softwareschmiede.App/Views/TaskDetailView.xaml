@@ -177,10 +177,12 @@
                                                         ButtonText="Arbeitsverzeichnis öffnen"
                                                         AutomationName="ArbeitsverzeichnisOeffnen"
                                                         ButtonCommand="{Binding OeffneArbeitsverzeichnisCommand}" />
-                            <controls:RibbonLargeButton ButtonIcon="🛠"
+                            <controls:RibbonSplitButton ButtonIcon="🛠"
                                                         ButtonText="IDE öffnen"
                                                         AutomationName="IdeOeffnen"
-                                                        ButtonCommand="{Binding OeffneIdeCommand}" />
+                                                        ButtonCommand="{Binding OeffneIdeCommand}"
+                                                        DropdownCommand="{Binding OeffneIdeAuswahlCommand}"
+                                                        CanShowDropdown="{Binding KannIdeAuswaehlen}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>

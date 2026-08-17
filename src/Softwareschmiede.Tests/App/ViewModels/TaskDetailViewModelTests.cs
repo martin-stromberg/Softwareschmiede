@@ -161,13 +161,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
-        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(
-            prozessStarterMock,
-            _pluginSelectionService);
+        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(prozessStarterMock);
 
         // Die von OeffneIdeCommand über _pluginSelectionService aufgelösten IDE-Plugins (Visual Studio,
-        // Visual Studio Code) müssen denselben IProzessStarter/IVisualStudioCodeLocator wie ideOeffnenService
-        // verwenden, damit Prozessstart-Verifikationen in Tests greifen.
+        // Visual Studio Code) müssen denselben IProzessStarter/IVisualStudioCodeLocator verwenden wie die
+        // hier verifizierten Prozessstarts, damit die Prozessstart-Verifikationen in Tests greifen.
         var effectiveProzessStarterMock = prozessStarterMock ?? new Mock<IProzessStarter>();
         var effectiveVisualStudioCodeLocator = visualStudioCodeLocator ?? new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
         var visualStudioPlugin = new VisualStudioIdePlugin(effectiveProzessStarterMock.Object);
@@ -191,8 +189,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService,
-            ideOeffnenService);
+            arbeitsverzeichnisOeffnenService);
         vm.ZurueckAction = zurueckAction;
         return vm;
     }
@@ -2313,9 +2310,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Times.Never);
     }
 
-    /// <summary>Bei mehreren gefundenen Solutions zeigt OeffneIdeCommand den Auswahl-Dialog und öffnet die dort gewählte Solution.</summary>
+    /// <summary>
+    /// Bei mehreren gefundenen Solutions öffnet der Haupt-Button (OeffneIdeCommand) des Split-Buttons weiterhin
+    /// direkt den ersten (alphabetisch sortierten) Einstiegspunkt, ohne den Auswahl-Dialog anzuzeigen - die
+    /// gezielte Auswahl übernimmt seit der Split-Button-Einführung der Dropdown-Button (OeffneIdeAuswahlCommand).
+    /// </summary>
     [Fact]
-    public async Task OeffneIdeCommand_MitMehrerenSolutions_ZeigtAuswahlDialog()
+    public async Task OeffneIdeCommand_MitMehrerenSolutions_OeffnetErsteDirektOhneDialog()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var ersteSolution = Path.Combine(arbeitsverzeichnis, "Erste.sln");
@@ -2326,10 +2327,6 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var aufgabe = await ErstelleAufgabe();
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
 
-        _dialogServiceMock
-            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(zweiteSolution);
-
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);
         sut.AufgabeId = aufgabe.Id;
@@ -2338,38 +2335,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(
-            d => d.ShowSolutionSelectionDialogAsync(
-                It.Is<IReadOnlyList<string>>(liste => liste.Contains(ersteSolution) && liste.Contains(zweiteSolution)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+            d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == zweiteSolution && a.ShellAusfuehren)),
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == ersteSolution && a.ShellAusfuehren)),
             Times.Once);
-    }
-
-    /// <summary>Bricht der Nutzer den Auswahl-Dialog bei mehreren Solutions ab (Rückgabe null), wird keine Solution geöffnet.</summary>
-    [Fact]
-    public async Task OeffneIdeCommand_MitMehrerenSolutions_AbbruchOeffnetKeine()
-    {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Erste.sln"), string.Empty);
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Zweite.sln"), string.Empty);
-
-        var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-
-        _dialogServiceMock
-            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
-
-        var prozessStarterMock = new Mock<IProzessStarter>();
-        var sut = CreateSut(prozessStarterMock: prozessStarterMock);
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
-
-        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 
     private async Task<GitRepository> ErstelleRepositoryAsync(string pluginTyp, string repositoryUrl, string repositoryName)

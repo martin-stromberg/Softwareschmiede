@@ -52,7 +52,7 @@ public static class TaskDetailViewModelTestFactory
         var fileExplorerViewModel = CreateStub();
         var todoListViewModel = new TodoListViewModel(todoService, NullLogger<TodoListViewModel>.Instance);
 
-        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = CreateVerzeichnisAktionenServices(pluginSelectionService: pluginSelectionService);
+        var arbeitsverzeichnisOeffnenService = CreateVerzeichnisAktionenServices();
 
         return new TaskDetailViewModel(
             aufgabeService,
@@ -70,8 +70,7 @@ public static class TaskDetailViewModelTestFactory
             TimeProvider.System,
             fileExplorerViewModel,
             todoListViewModel,
-            arbeitsverzeichnisOeffnenService,
-            ideOeffnenService);
+            arbeitsverzeichnisOeffnenService);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
@@ -82,21 +81,13 @@ public static class TaskDetailViewModelTestFactory
             new Mock<ITextDiffService>().Object,
             NullLogger<FileExplorerViewModel>.Instance);
 
-    /// <summary>Erstellt ArbeitsverzeichnisOeffnenService und IdeOeffnenService, die denselben IProzessStarter-Mock verwenden.</summary>
+    /// <summary>Erstellt einen ArbeitsverzeichnisOeffnenService mit dem übergebenen (oder einem neuen) IProzessStarter-Mock.</summary>
     /// <param name="prozessStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
-    /// <param name="pluginSelectionService">
-    /// Der PluginSelectionService, den IdeOeffnenService.OpenRepositoryInIdeAsync intern verwendet. Muss derselbe
-    /// sein wie der dem TaskDetailViewModel übergebene, damit OeffneIdeAsync() konsistent auflöst; oder null,
-    /// wenn OpenRepositoryInIdeAsync im Test nicht aufgerufen wird.
-    /// </param>
-    /// <returns>Ein Tupel aus ArbeitsverzeichnisOeffnenService und IdeOeffnenService.</returns>
-    public static (ArbeitsverzeichnisOeffnenService ArbeitsverzeichnisOeffnenService, IdeOeffnenService IdeOeffnenService) CreateVerzeichnisAktionenServices(
-        Mock<IProzessStarter>? prozessStarterMock = null,
-        PluginSelectionService? pluginSelectionService = null)
+    /// <returns>Ein einsatzbereiter ArbeitsverzeichnisOeffnenService.</returns>
+    public static ArbeitsverzeichnisOeffnenService CreateVerzeichnisAktionenServices(
+        Mock<IProzessStarter>? prozessStarterMock = null)
     {
         prozessStarterMock ??= new Mock<IProzessStarter>();
-        return (
-            new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object),
-            new IdeOeffnenService(prozessStarterMock.Object, pluginSelectionService));
+        return new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
     }
 }

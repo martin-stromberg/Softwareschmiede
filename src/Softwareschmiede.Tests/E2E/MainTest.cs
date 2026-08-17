@@ -45,6 +45,7 @@ public partial class End2EndTest : WpfTestBase
         await AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E(mainWindow);
         await VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E(mainWindow);
         await VerzeichnisAktionen_KonfiguriertesArbeitsverzeichnisWirdAufgeloest_E2E(mainWindow);
+        await IdeAuswahl_KeineEinstiegspunkteUndDropdownAbbruch_E2E(mainWindow);
         AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E(mainWindow);
         AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E(mainWindow);
         PluginProjectDefault_SpeichernUndAutomatischeUebernahmeInFolgeaufgabe_E2E(mainWindow);
