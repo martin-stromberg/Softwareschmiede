@@ -10,11 +10,11 @@ Der technische Ablauf beschreibt die Ausführungsschritte, wenn der Benutzer ein
 
 ### 1. IDE-Öffnen auslösen
 
-Der Ribbon-Button „IDE öffnen" der Aufgabendetailansicht ruft `TaskDetailViewModel.OeffneIdeAsync()` auf, das direkt `PluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct)` mit dem über `WorkingDirectoryResolver` aufgelösten Arbeitsverzeichnis aufruft (siehe [Dateisystem-Integration](../dateisystem-integration/ablauf-technisch.md) für die vollständige, um den Solution-Auswahl-Dialog erweiterte Ablaufbeschreibung). Alternative Aufrufer ohne UI-Dialog-Bedarf (z. B. künftige Automatisierung) können stattdessen den generischen Helper `IdeOeffnenService.OpenRepositoryInIdeAsync(repositoryPath)` verwenden, der dieselbe Plugin-Auflösung nutzt, aber bei mehreren gefundenen Visual-Studio-Solutions immer nur die erste öffnet statt einen Auswahl-Dialog anzuzeigen.
+Der Ribbon-Button „IDE öffnen" der Aufgabendetailansicht ruft `TaskDetailViewModel.OeffneIdeAsync()` auf, das `IdeOeffnenService.OpenRepositoryInIdeAsync(effectiveWorkdir, waehleEntryPointAsync, ct)` mit dem über `WorkingDirectoryResolver` aufgelösten Arbeitsverzeichnis sowie einem Auswahl-Callback aufruft (siehe [Dateisystem-Integration](../dateisystem-integration/ablauf-technisch.md) für die vollständige, um den Solution-Auswahl-Dialog erweiterte Ablaufbeschreibung). `IdeOeffnenService.OpenRepositoryInIdeAsync()` selbst ist generisch: Der Callback ist optional — Aufrufer ohne UI-Dialog-Bedarf (z. B. künftige Automatisierung) können ihn weglassen; in diesem Fall öffnet der Service bei mehreren gefundenen Einstiegspunkten automatisch den ersten.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.OeffneIdeAsync()` — Produktionscode-Aufrufer des Ribbon-Buttons; behandelt zusätzlich den Solution-Auswahl-Dialog bei mehreren Visual-Studio-Solutions
-- `IdeOeffnenService.OpenRepositoryInIdeAsync()` — Generischer Helper ohne Dialog-Sonderbehandlung; koordiniert Plugin-Auflösung und Ausführung
+- `TaskDetailViewModel.OeffneIdeAsync()` — Produktionscode-Aufrufer des Ribbon-Buttons; übergibt einen Callback, der bei mehreren `IdeEntryPoint`-Kandidaten den bestehenden Solution-Auswahl-Dialog anzeigt
+- `IdeOeffnenService.OpenRepositoryInIdeAsync()` — Generischer Helper; koordiniert Plugin-Auflösung, `FindEntryPointsAsync()`-Aufruf, Verzweigung nach Anzahl der Einstiegspunkte und `OpenEntryPointAsync()`-Ausführung — unabhängig von der konkreten `IIdePlugin`-Implementierung
 
 ### 2. Aktivierte IDE-Plugins laden
 
@@ -49,25 +49,34 @@ Beteiligte Komponenten:
 - `IIdePlugin.CheckCompatibilityAsync()` — Plugin-Schnittstelle für Kompatibilitätsprüfung
 - `VisualStudioIdePlugin.FindSolutionFiles()` — Hilfsmethode zur `.sln`/`.slnx`-Suche via `Directory.EnumerateFiles()`
 
-### 5. IDE öffnen
+### 5. Einstiegspunkte ermitteln und öffnen
 
-Das ausgewählte Plugin wird mit `plugin.OpenRepositoryAsync(repositoryPath)` aufgerufen.
+Das ausgewählte Plugin wird zunächst mit `plugin.FindEntryPointsAsync(repositoryPath)` nach seinen verfügbaren Einstiegspunkten gefragt; anschließend verzweigt `IdeOeffnenService` generisch nach deren Anzahl:
+
+- **0 Einstiegspunkte:** `FileNotFoundException` wird geworfen — es gibt nichts zu öffnen.
+- **Genau 1 Einstiegspunkt:** `plugin.OpenEntryPointAsync(entryPoints[0])` wird direkt aufgerufen, ohne Rückfrage beim Anwender.
+- **Mehr als 1 Einstiegspunkt und Callback übergeben:** Der Callback (`waehleEntryPointAsync`) wird mit allen gefundenen `IdeEntryPoint`-Objekten aufgerufen; liefert er `null` (Abbruch durch den Anwender), wird nichts geöffnet, sonst wird der gewählte Einstiegspunkt via `plugin.OpenEntryPointAsync()` geöffnet.
+- **Mehr als 1 Einstiegspunkt ohne Callback:** Der erste Einstiegspunkt wird automatisch geöffnet.
 
 **Falls Visual Studio Plugin:**
-- `VisualStudioIdePlugin.OpenRepositoryAsync()` sucht erste `.sln`/`.slnx`-Datei (via `FindSolutionFiles()`)
-- Ruft `VisualStudioIdePlugin.OpenSolutionFile()` mit dem gefundenen Pfad auf
+- `VisualStudioIdePlugin.FindEntryPointsAsync()` ermittelt alle `.sln`/`.slnx`-Dateien (via `FindSolutionFiles()`) und liefert je Datei einen `IdeEntryPoint`
+- `VisualStudioIdePlugin.OpenEntryPointAsync()` ruft `VisualStudioIdePlugin.OpenSolutionFile()` mit dem Pfad des gewählten Einstiegspunkts auf
 - `IProzessStarter.Starten()` wird mit `ShellAusfuehren: true` aufgerufen (Windows Shell übernimmt das Öffnen)
 
 **Falls Visual Studio Code Plugin:**
-- `VisualStudioCodeIdePlugin.OpenRepositoryAsync()` ruft `VisualStudioCodeIdePlugin.OpenDirectory()` auf
+- `VisualStudioCodeIdePlugin.FindEntryPointsAsync()` liefert immer genau einen `IdeEntryPoint` (das Repository-Root, `DisplayName: "Visual Studio Code"`)
+- `VisualStudioCodeIdePlugin.OpenEntryPointAsync()` ruft `VisualStudioCodeIdePlugin.OpenDirectory()` mit dem Pfad des Einstiegspunkts auf
 - `IVisualStudioCodeLocator.Locate()` prüft, ob `code`-CLI verfügbar ist (via PATH oder Registry)
 - `IProzessStarter.Starten()` wird mit Befehl `code` und gequottem Repo-Pfad aufgerufen
 
 Beteiligte Komponenten:
-- `IIdePlugin.OpenRepositoryAsync()` — Plugin-Schnittstelle für IDE-Öffnen
+- `IIdePlugin.FindEntryPointsAsync()`, `IIdePlugin.OpenEntryPointAsync()` — Plugin-Schnittstelle für die generische Mehreinstiegspunkt-Ermittlung und das Öffnen eines konkreten Einstiegspunkts
+- `IdeEntryPoint` — Value Object (`Path`, optional `DisplayName`), das einen Einstiegspunkt beschreibt
 - `VisualStudioIdePlugin.OpenSolutionFile()`, `VisualStudioCodeIdePlugin.OpenDirectory()` — Hilfsmethoden
 - `IProzessStarter` — Startet externe Prozesse (Visual Studio/VS Code)
 - `IVisualStudioCodeLocator` — Ermittelt VS Code Installationspfad
+
+> **Hinweis:** Die frühere, in `IdeOeffnenService` per Typ-Prüfung (`plugin is VisualStudioIdePlugin`) umgesetzte Sonderbehandlung für mehrere Visual-Studio-Solutions entfällt vollständig. Die Verzweigung nach Anzahl der Einstiegspunkte ist jetzt für alle `IIdePlugin`-Implementierungen einheitlich.
 
 ## Ablauf-Diagramm
 
@@ -91,16 +100,24 @@ flowchart TD
     M -->|Nein| N{Fallback<br/>gefunden?}
     N -->|Ja| O["Fallback verwenden"]
     N -->|Nein| E
-    J --> P["OpenRepositoryAsync<br/>Repository öffnen"]
+    J --> P["FindEntryPointsAsync<br/>Einstiegspunkte ermitteln"]
     O --> P
     E --> P
-    P --> Q{IDE-Typ}
-    Q -->|Visual Studio| R["FindSolutionFiles"]
-    Q -->|VS Code| S["Locate VS Code"]
-    R --> T["OpenSolutionFile"]
-    S --> U["OpenDirectory"]
-    T --> V["IProzessStarter.Starten<br/>mit ShellAusfuehren"]
-    U --> V
+    P --> Q{Anzahl<br/>Einstiegspunkte}
+    Q -->|0| Q0["FileNotFoundException"]
+    Q -->|1| Q1["OpenEntryPointAsync<br/>direkt, ohne Rückfrage"]
+    Q -->|">1, Callback vorhanden"| Q2["Auswahl-Callback aufrufen"]
+    Q -->|">1, kein Callback"| Q3["OpenEntryPointAsync<br/>ersten Einstiegspunkt öffnen"]
+    Q2 --> Q2a{Callback-<br/>Ergebnis}
+    Q2a -->|null / Abbruch| Q2b["Nichts öffnen"]
+    Q2a -->|IdeEntryPoint gewählt| Q4["OpenEntryPointAsync<br/>gewählten Einstiegspunkt öffnen"]
+    Q1 --> R{IDE-Typ}
+    Q3 --> R
+    Q4 --> R
+    R -->|Visual Studio| S["OpenSolutionFile"]
+    R -->|VS Code| T["OpenDirectory"]
+    S --> V["IProzessStarter.Starten<br/>mit ShellAusfuehren"]
+    T --> V
     V --> W[IDE startet]
 ```
 
@@ -113,10 +130,13 @@ flowchart TD
 
 ### Fehler beim IDE-Öffnen
 
+**Generisch (`IdeOeffnenService`):**
+- Falls `plugin.FindEntryPointsAsync()` eine leere Liste liefert: `FileNotFoundException` wird geworfen (keine Kandidaten zum Öffnen vorhanden)
+
 **Visual Studio:**
-- Falls keine `.sln`-Datei gefunden: `FileNotFoundException` wird geworfen (sollte nicht passieren, da `Explicit` nur bei Fund gemeldet wird)
+- Falls keine `.sln`-Datei gefunden: `FindEntryPointsAsync()` liefert eine leere Liste (löst die generische `FileNotFoundException` in `IdeOeffnenService` aus; sollte nicht passieren, da `Explicit` nur bei Fund gemeldet wird)
 - Falls `.sln`-Öffnen fehlschlägt: `IProzessStarter` ist verantwortlich (normalerweise Shell-Fehler)
 
 **Visual Studio Code:**
-- Falls `code`-CLI nicht verfunden: `InvalidOperationException` mit Nachricht "Visual Studio Code wurde nicht gefunden."
+- Falls `code`-CLI nicht verfunden: `InvalidOperationException` mit Nachricht "Visual Studio Code wurde nicht gefunden." (geworfen aus `OpenEntryPointAsync()`)
 - Falls Verzeichnis-Öffnen fehlschlägt: `IProzessStarter` ist verantwortlich

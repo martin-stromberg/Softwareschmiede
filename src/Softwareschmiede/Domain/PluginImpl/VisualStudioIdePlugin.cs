@@ -64,4 +64,26 @@ public sealed class VisualStudioIdePlugin(IProzessStarter prozessStarter) : IIde
     /// <param name="solutionPath">Der Pfad der zu öffnenden <c>*.sln</c>-Datei.</param>
     internal static void OpenSolutionFile(IProzessStarter prozessStarter, string solutionPath)
         => prozessStarter.Starten(new ProzessStartAnfrage(solutionPath, Argumente: null, ShellAusfuehren: true));
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<IdeEntryPoint>> FindEntryPointsAsync(string repositoryPath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+
+        IReadOnlyList<IdeEntryPoint> entryPoints = FindSolutionFiles(repositoryPath)
+            .Select(solutionPfad => new IdeEntryPoint(solutionPfad))
+            .ToList();
+
+        return Task.FromResult(entryPoints);
+    }
+
+    /// <inheritdoc/>
+    public Task OpenEntryPointAsync(IdeEntryPoint entryPoint, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(entryPoint);
+
+        OpenSolutionFile(prozessStarter, entryPoint.Path);
+
+        return Task.CompletedTask;
+    }
 }

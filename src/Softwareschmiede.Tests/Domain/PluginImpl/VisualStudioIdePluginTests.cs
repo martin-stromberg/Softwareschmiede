@@ -120,6 +120,81 @@ public sealed class VisualStudioIdePluginTests : IDisposable
             Times.Once);
     }
 
+    /// <summary>Bei mehreren .sln-/.slnx-Dateien liefert FindEntryPointsAsync alle Einstiegspunkte alphabetisch sortiert.</summary>
+    [Fact]
+    public async Task FindEntryPointsAsync_MitMehrerenSln_LiefertAlleAlphabetischSortiert()
+    {
+        var verzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(verzeichnis, "Zweite.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(verzeichnis, "Erste.sln"), string.Empty);
+        var sut = CreateSut();
+
+        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis);
+
+        entryPoints.Should().HaveCount(2);
+        entryPoints.Select(ep => ep.Path).Should().BeInAscendingOrder(StringComparer.OrdinalIgnoreCase);
+        entryPoints.Select(ep => ep.Path).Should().Contain(Path.Combine(verzeichnis, "Erste.sln"));
+        entryPoints.Select(ep => ep.Path).Should().Contain(Path.Combine(verzeichnis, "Zweite.sln"));
+    }
+
+    /// <summary>Bei genau einer .sln-Datei liefert FindEntryPointsAsync eine Liste mit genau einem Einstiegspunkt.</summary>
+    [Fact]
+    public async Task FindEntryPointsAsync_MitGenauEinerSln_LiefertEinen()
+    {
+        var verzeichnis = CreateTempDirectory();
+        var solutionPfad = Path.Combine(verzeichnis, "Einzige.sln");
+        File.WriteAllText(solutionPfad, string.Empty);
+        var sut = CreateSut();
+
+        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis);
+
+        entryPoints.Should().ContainSingle();
+        entryPoints[0].Path.Should().Be(solutionPfad);
+    }
+
+    /// <summary>Ohne .sln/.slnx-Datei liefert FindEntryPointsAsync eine leere Liste.</summary>
+    [Fact]
+    public async Task FindEntryPointsAsync_OhneSln_LiefertLeereListe()
+    {
+        var verzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(verzeichnis, "readme.txt"), string.Empty);
+        var sut = CreateSut();
+
+        var entryPoints = await sut.FindEntryPointsAsync(verzeichnis);
+
+        entryPoints.Should().BeEmpty();
+    }
+
+    /// <summary>OpenEntryPointAsync startet den übergebenen Einstiegspunkt per Shell-Execute über IProzessStarter.</summary>
+    [Fact]
+    public async Task OpenEntryPointAsync_RuftOpenSolutionFileAuf()
+    {
+        var verzeichnis = CreateTempDirectory();
+        var solutionPfad = Path.Combine(verzeichnis, "Loesung.sln");
+        File.WriteAllText(solutionPfad, string.Empty);
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var sut = new VisualStudioIdePlugin(prozessStarterMock.Object);
+
+        await sut.OpenEntryPointAsync(new IdeEntryPoint(solutionPfad));
+
+        prozessStarterMock.Verify(
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
+                a.DateiName == solutionPfad &&
+                a.ShellAusfuehren == true)),
+            Times.Once);
+    }
+
+    /// <summary>OpenEntryPointAsync wirft eine ArgumentNullException, wenn kein Einstiegspunkt übergeben wird.</summary>
+    [Fact]
+    public async Task OpenEntryPointAsync_MitNull_WirftArgumentNullException()
+    {
+        var sut = CreateSut();
+
+        var aufruf = async () => await sut.OpenEntryPointAsync(null!);
+
+        await aufruf.Should().ThrowAsync<ArgumentNullException>();
+    }
+
     private string CreateTempDirectory() => _tempDirectoryFixture.CreateTempDirectory("visual_studio_ide_plugin_tests");
 
     private static VisualStudioIdePlugin CreateSut() => new(new Mock<IProzessStarter>().Object);

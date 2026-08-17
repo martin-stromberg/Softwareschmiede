@@ -6,15 +6,16 @@
 
 | Komponente | Typ | Rolle |
 |-----------|-----|-------|
-| `IIdePlugin` | Interface | Plugin-Vertrag für IDE-Implementierungen; definiert Kompatibilitätsprüfung und Repository-Öffnen |
-| `VisualStudioIdePlugin` | Plugin-Klasse | Implementierung für Visual Studio; prüft auf `.sln`/`.slnx`-Dateien |
-| `VisualStudioCodeIdePlugin` | Plugin-Klasse | Implementierung für VS Code; dient als universeller Fallback |
+| `IIdePlugin` | Interface | Plugin-Vertrag für IDE-Implementierungen; definiert Kompatibilitätsprüfung, Repository-Öffnen sowie das generische Mehreinstiegspunkt-Paar `FindEntryPointsAsync()`/`OpenEntryPointAsync()` |
+| `IdeEntryPoint` | Value Object (Record) | Immutabler Datenträger für einen konkreten IDE-Einstiegspunkt (`Path`, optional `DisplayName`); liegt in `Softwareschmiede.Plugin.Contracts` |
+| `VisualStudioIdePlugin` | Plugin-Klasse | Implementierung für Visual Studio; prüft auf `.sln`/`.slnx`-Dateien; `FindEntryPointsAsync()` liefert einen `IdeEntryPoint` je gefundener Solution-Datei |
+| `VisualStudioCodeIdePlugin` | Plugin-Klasse | Implementierung für VS Code; dient als universeller Fallback; `FindEntryPointsAsync()` liefert immer genau einen `IdeEntryPoint` (das Repository-Root) |
 | `PluginSelectionService` | Service | Koordiniert die IDE-Plugin-Auflösung basierend auf Aktivierungsstatus, Reihenfolge und Kompatibilität |
 | `PluginActivationService` | Service | Verwaltet den Aktivierungsstatus von Plugins (Abfrage: `GetEnabledIdePluginsAsync()`) |
 | `PluginManager` | Service | Registry für alle Plugins; registriert IDE-Plugins beim Start (`GetIdePlugins()`, `GetDefaultIdePlugin()`) |
 | `AppEinstellungService` | Service | Persistiert Einstellungen in der Datenbank (Aktivierungsstatus und Reihenfolge) |
 | `IdePluginOrderResolver` | Service-Klasse | Hilfsmethode zum Sortieren von Plugins nach `plugins.ide.order` Setting |
-| `IdeOeffnenService` | Service | Public API; delegiert an `PluginSelectionService.ResolveIdePluginAsync()` und `IIdePlugin.OpenRepositoryAsync()` |
+| `IdeOeffnenService` | Service | Public API; delegiert an `PluginSelectionService.ResolveIdePluginAsync()` und generalisiert das Öffnen über `IIdePlugin.FindEntryPointsAsync()`/`OpenEntryPointAsync()` — unabhängig von der konkreten Plugin-Implementierung |
 | `IProzessStarter` | Interface | Startet externe Prozesse (Visual Studio/VS Code); wird von beiden Plugin-Klassen verwendet |
 | `IVisualStudioCodeLocator` | Interface | Ermittelt den VS Code Installationspfad; wird von `VisualStudioCodeIdePlugin` verwendet |
 
@@ -100,17 +101,30 @@ PluginActivationService │ AppEinstellungService
 Ausgewähltes Plugin
     │
     ▼
-plugin.OpenRepositoryAsync()
+plugin.FindEntryPointsAsync()
     │
-    ├─ VisualStudio: FindSolutionFiles() → .sln → IProzessStarter
+    ├─ VisualStudio: FindSolutionFiles() → je .sln/.slnx ein IdeEntryPoint
     │
-    └─ VSCode: IVisualStudioCodeLocator → code-CLI → IProzessStarter
+    └─ VSCode: immer genau ein IdeEntryPoint (Repository-Root)
          │
          ▼
-    IDE startet
+    Anzahl Einstiegspunkte?
+    │
+    ├─ 0 → FileNotFoundException
+    │
+    ├─ 1 → sofort plugin.OpenEntryPointAsync(einzigerEntryPoint)
+    │
+    └─ >1 → Auswahl-Callback (falls vorhanden) mit allen
+            IdeEntryPoint-Objekten aufrufen → gewählten
+            Einstiegspunkt via plugin.OpenEntryPointAsync() öffnen;
+            liefert der Callback null, wird nichts geöffnet;
+            ohne Callback wird der erste geöffnet
+         │
+         ▼
+    IProzessStarter startet die IDE
 ```
 
-> **Hinweis:** Findet `VisualStudioIdePlugin` mehrere Solutions, zeigt `TaskDetailViewModel` vor `plugin.OpenRepositoryAsync()` zusätzlich einen Solution-Auswahl-Dialog an (siehe [Dateisystem-Integration](../dateisystem-integration/architektur.md)); dieser Sonderfall ist in der vereinfachten Darstellung oben nicht enthalten.
+> **Hinweis:** Der frühere Sonderfall, bei dem `IdeOeffnenService` per Typ-Prüfung (`plugin is VisualStudioIdePlugin`) erkannte, ob ein Solution-Auswahl-Dialog nötig ist, wurde entfernt. Stattdessen liefert jedes `IIdePlugin` über `FindEntryPointsAsync()` generisch 0..n `IdeEntryPoint`-Kandidaten; `IdeOeffnenService` verzweigt ausschließlich anhand der Anzahl der gefundenen Einstiegspunkte, unabhängig von der konkreten Plugin-Implementierung. `TaskDetailViewModel` übergibt dafür weiterhin einen Auswahl-Callback, der bei mehreren Kandidaten den bestehenden Solution-Auswahl-Dialog anzeigt (siehe [Dateisystem-Integration](../dateisystem-integration/architektur.md)).
 
 ### IDE-Plugin-Aktivierung in der UI
 
@@ -184,8 +198,8 @@ nutzt neue Reihenfolge
 ### Erweiterbarkeit
 
 Das System ist für neue IDE-Plugins konzipiert:
-1. Implementiere `IIdePlugin` (CheckCompatibilityAsync, OpenRepositoryAsync)
+1. Implementiere `IIdePlugin` vollständig, inklusive der beiden erzwungenen Methoden `CheckCompatibilityAsync`/`OpenRepositoryAsync` sowie `FindEntryPointsAsync`/`OpenEntryPointAsync` (letztere liefern/öffnen die konkreten `IdeEntryPoint`-Kandidaten des Plugins, z. B. mehrere Workspace-Dateien) — der Compiler erzwingt die Implementierung aller vier Methoden
 2. Registriere das Plugin in `PluginManager`
-3. Das neue Plugin wird automatisch in Settings und IDE-Öffnen-Logik berücksichtigt
+3. Das neue Plugin wird automatisch in Settings sowie in der generischen Mehreinstiegspunkt-Logik von `IdeOeffnenService` berücksichtigt, ohne dass dort Sonderfälle für das neue Plugin ergänzt werden müssen
 
 Beispiel für zukünftige Plugins: JetBrains Rider, Neovim, Sublime Text, etc.

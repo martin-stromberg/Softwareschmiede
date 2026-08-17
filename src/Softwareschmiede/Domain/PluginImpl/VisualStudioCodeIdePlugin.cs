@@ -59,4 +59,24 @@ public sealed class VisualStudioCodeIdePlugin(
 
     private static string QuoteArgument(string argument)
         => $"\"{argument.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<IdeEntryPoint>> FindEntryPointsAsync(string repositoryPath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
+
+        IReadOnlyList<IdeEntryPoint> entryPoints = [new IdeEntryPoint(repositoryPath, "Visual Studio Code")];
+
+        return Task.FromResult(entryPoints);
+    }
+
+    /// <inheritdoc/>
+    public Task OpenEntryPointAsync(IdeEntryPoint entryPoint, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(entryPoint);
+
+        OpenDirectory(prozessStarter, visualStudioCodeLocator, entryPoint.Path);
+
+        return Task.CompletedTask;
+    }
 }

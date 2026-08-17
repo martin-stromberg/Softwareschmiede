@@ -1771,7 +1771,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Öffnet das effektive Arbeitsverzeichnis über <see cref="IdeOeffnenService.OpenRepositoryInIdeAsync"/>,
     /// welche das zuständige IDE-Plugin über den <see cref="PluginSelectionService"/> auflöst. Für
-    /// Repositories mit mehreren gefundenen Solutions (nur relevant bei <see cref="VisualStudioIdePlugin"/>)
+    /// Repositories mit mehreren gefundenen Einstiegspunkten (nur relevant bei <see cref="VisualStudioIdePlugin"/>)
     /// wird der bestehende Auswahl-Dialog als Callback übergeben (UX-Erhalt für Mehr-Solution-Repos).
     /// </summary>
     /// <param name="ct">Abbruchtoken.</param>
@@ -1788,7 +1788,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             await _ideOeffnenService.OpenRepositoryInIdeAsync(
                 effectiveWorkdir,
-                (solutionPfade, dialogCt) => _dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, dialogCt),
+                async (entryPoints, dialogCt) =>
+                {
+                    var solutionPfade = entryPoints.Select(entryPoint => entryPoint.Path).ToList();
+                    var gewaehlterPfad = await _dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, dialogCt);
+                    return gewaehlterPfad is null
+                        ? null
+                        : entryPoints.FirstOrDefault(entryPoint => entryPoint.Path == gewaehlterPfad) ?? new IdeEntryPoint(gewaehlterPfad);
+                },
                 ct);
         }
         catch (OperationCanceledException)

@@ -1,5 +1,6 @@
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.PluginImpl;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Application.Services;
 
@@ -32,22 +33,23 @@ public sealed class IdeOeffnenService(
 
     /// <summary>
     /// Löst das für <paramref name="repositoryPath"/> zuständige IDE-Plugin über den
-    /// <see cref="PluginSelectionService"/> auf und öffnet das Repository damit. Wird als
-    /// <see cref="VisualStudioIdePlugin"/> aufgelöst und existieren im Arbeitsverzeichnis mehrere
-    /// Solution-Dateien, wird <paramref name="waehleSolutionAsync"/> aufgerufen, um die konkrete
-    /// Solution auszuwählen (UX-Erhalt für Mehr-Solution-Repos); wird kein Callback übergeben oder
-    /// existiert nur eine Solution, öffnet das aufgelöste Plugin das Repository direkt.
+    /// <see cref="PluginSelectionService"/> auf und ermittelt dessen verfügbare Einstiegspunkte über
+    /// <see cref="IIdePlugin.FindEntryPointsAsync"/>. Existiert genau ein Einstiegspunkt, wird dieser
+    /// direkt geöffnet. Existieren mehrere Einstiegspunkte und ist <paramref name="waehleEntryPointAsync"/>
+    /// gesetzt, wird der Callback aufgerufen, um den zu öffnenden Einstiegspunkt auszuwählen (UX-Erhalt
+    /// für Mehr-Einstiegspunkt-Repos); liefert der Callback <c>null</c>, wird nichts geöffnet. Existieren
+    /// mehrere Einstiegspunkte ohne Callback, wird der erste geöffnet.
     /// </summary>
     /// <param name="repositoryPath">Pfad des zu öffnenden Repositories.</param>
-    /// <param name="waehleSolutionAsync">
-    /// Optionaler Callback zur Auswahl einer Solution-Datei bei mehreren Treffern; erhält die
-    /// gefundenen Solution-Pfade und liefert den gewählten Pfad, oder <c>null</c> bei Abbruch durch
-    /// den Anwender (in diesem Fall wird nichts geöffnet).
+    /// <param name="waehleEntryPointAsync">
+    /// Optionaler Callback zur Auswahl eines Einstiegspunkts bei mehreren Treffern; erhält die
+    /// gefundenen Einstiegspunkte und liefert den gewählten Einstiegspunkt, oder <c>null</c> bei Abbruch
+    /// durch den Anwender (in diesem Fall wird nichts geöffnet).
     /// </param>
     /// <param name="ct">Cancellation Token.</param>
     public async Task OpenRepositoryInIdeAsync(
         string repositoryPath,
-        Func<IReadOnlyList<string>, CancellationToken, Task<string?>>? waehleSolutionAsync = null,
+        Func<IReadOnlyList<IdeEntryPoint>, CancellationToken, Task<IdeEntryPoint?>>? waehleEntryPointAsync = null,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
@@ -57,20 +59,27 @@ public sealed class IdeOeffnenService(
 
         var plugin = await pluginSelectionService.ResolveIdePluginAsync(repositoryPath, ct);
 
-        if (plugin is VisualStudioIdePlugin && waehleSolutionAsync is not null)
-        {
-            var solutionPfade = FindeSolutions(repositoryPath);
-            if (solutionPfade.Count > 1)
-            {
-                var solutionPfad = await waehleSolutionAsync(solutionPfade, ct);
-                if (solutionPfad is null)
-                    return;
+        var entryPoints = await plugin.FindEntryPointsAsync(repositoryPath, ct);
 
-                OeffneSolution(solutionPfad);
-                return;
-            }
+        if (entryPoints.Count == 0)
+            throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {repositoryPath}");
+
+        if (entryPoints.Count == 1)
+        {
+            await plugin.OpenEntryPointAsync(entryPoints[0], ct);
+            return;
         }
 
-        await plugin.OpenRepositoryAsync(repositoryPath, ct);
+        if (waehleEntryPointAsync is not null)
+        {
+            var gewaehlterEntryPoint = await waehleEntryPointAsync(entryPoints, ct);
+            if (gewaehlterEntryPoint is null)
+                return;
+
+            await plugin.OpenEntryPointAsync(gewaehlterEntryPoint, ct);
+            return;
+        }
+
+        await plugin.OpenEntryPointAsync(entryPoints[0], ct);
     }
 }

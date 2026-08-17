@@ -4,7 +4,7 @@
 
 ## Übersicht
 
-Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen über eine abstrakte `IProzessStarter`-Schnittstelle. Prozessstart-Anfragen werden gekapselt, geloggt und entweder direkt ausgeführt (Production) oder aufgezeichnet (Test). „IDE öffnen" löst das zu verwendende IDE-Plugin bei jedem Klick über `PluginSelectionService.ResolveIdePluginAsync()` auf (kein Vorab-Caching mehr beim Laden der Aufgabe); ein modales Dialogfenster ermöglicht die Auswahl, wenn das aufgelöste Visual-Studio-Plugin mehrere Solutions findet. Ist kein Plugin explizit kompatibel, greift automatisch das erste aktive Fallback-Plugin (standardmäßig Visual Studio Code).
+Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen über eine abstrakte `IProzessStarter`-Schnittstelle. Prozessstart-Anfragen werden gekapselt, geloggt und entweder direkt ausgeführt (Production) oder aufgezeichnet (Test). „IDE öffnen" löst das zu verwendende IDE-Plugin bei jedem Klick über `PluginSelectionService.ResolveIdePluginAsync()` auf (kein Vorab-Caching mehr beim Laden der Aufgabe); `IdeOeffnenService.OpenRepositoryInIdeAsync()` fragt das aufgelöste Plugin anschließend generisch über `IIdePlugin.FindEntryPointsAsync()` nach seinen verfügbaren Einstiegspunkten (bei `VisualStudioIdePlugin`: je gefundener `.sln`/`.slnx`-Datei ein Einstiegspunkt; bei `VisualStudioCodeIdePlugin`: immer genau einer, das Repository-Root) — ein modales Dialogfenster ermöglicht die Auswahl, sobald mehr als ein Einstiegspunkt gefunden wird, unabhängig davon, welches Plugin aufgelöst wurde. Ist kein Plugin explizit kompatibel, greift automatisch das erste aktive Fallback-Plugin (standardmäßig Visual Studio Code).
 
 ## Ablauf
 
@@ -48,26 +48,27 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel.Aufgabe` Setter — setzt `ShowFileExplorerPanel`
 - `TaskDetailViewModel.KannIdeOeffnen` — CanExecute für `OeffneIdeCommand`
 
-### 3. IDE öffnen (Plugin-Auflösung und Dialog bei mehreren Solutions)
+### 3. IDE öffnen (Plugin-Auflösung, generische Einstiegspunkt-Ermittlung und Dialog bei mehreren Einstiegspunkten)
 
 1. Benutzer klickt Button → `TaskDetailViewModel.OeffneIdeCommand.Execute()` wird aufgerufen → `OeffneIdeAsync()` wird aufgerufen (async).
 2. ViewModel ermittelt das effektive Arbeitsverzeichnis (async):
    - Ruft `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()` auf.
    - Setzt `effectiveWorkdir`.
-3. ViewModel ruft `_pluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct)` auf:
-   - Ermittelt die aktivierten IDE-Plugins (`PluginActivationService.GetEnabledIdePluginsAsync()`) in der konfigurierten Reihenfolge (`plugins.ide.order`).
-   - Prüft jedes Plugin über `CheckCompatibilityAsync(effectiveWorkdir, ct)`.
-   - Das erste `Explicit`-kompatible Plugin gewinnt sofort (z. B. `VisualStudioIdePlugin` bei gefundener `.sln`/`.slnx`).
-   - Andernfalls gewinnt das erste `Fallback`-kompatible Plugin (z. B. `VisualStudioCodeIdePlugin`, das sich immer als Fallback meldet).
-   - Sind keine Plugins aktiviert oder kompatibel, liefert `IPluginManager.GetDefaultIdePlugin()` das Ergebnis (mindestens ein IDE-Plugin bleibt systemseitig immer aktiv).
-4. Ist das aufgelöste Plugin ein `VisualStudioIdePlugin`:
-   - ViewModel ruft `IdeOeffnenService.FindeSolutions(effectiveWorkdir)` auf, um die Anzahl der Solutions zu bestimmen.
-   - **Mehr als eine Solution:** Weiterfahrt mit Schritt 4a (Dialog).
-   - **Höchstens eine Solution:** Weiterfahrt mit Schritt 5 (`plugin.OpenRepositoryAsync`).
-5. Für jedes andere Plugin (insbesondere `VisualStudioCodeIdePlugin`): direkt weiter mit Schritt 5.
+3. ViewModel ruft `_ideOeffnenService.OpenRepositoryInIdeAsync(effectiveWorkdir, waehleEntryPointAsync, ct)` auf und übergibt dabei einen Auswahl-Callback. `IdeOeffnenService.OpenRepositoryInIdeAsync()`:
+   - Ruft `_pluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct)` auf:
+     - Ermittelt die aktivierten IDE-Plugins (`PluginActivationService.GetEnabledIdePluginsAsync()`) in der konfigurierten Reihenfolge (`plugins.ide.order`).
+     - Prüft jedes Plugin über `CheckCompatibilityAsync(effectiveWorkdir, ct)`.
+     - Das erste `Explicit`-kompatible Plugin gewinnt sofort (z. B. `VisualStudioIdePlugin` bei gefundener `.sln`/`.slnx`).
+     - Andernfalls gewinnt das erste `Fallback`-kompatible Plugin (z. B. `VisualStudioCodeIdePlugin`, das sich immer als Fallback meldet).
+     - Sind keine Plugins aktiviert oder kompatibel, liefert `IPluginManager.GetDefaultIdePlugin()` das Ergebnis (mindestens ein IDE-Plugin bleibt systemseitig immer aktiv).
+   - Ruft anschließend generisch `plugin.FindEntryPointsAsync(effectiveWorkdir, ct)` auf — unabhängig davon, welches Plugin aufgelöst wurde (`VisualStudioIdePlugin` liefert je gefundener `.sln`/`.slnx`-Datei einen `IdeEntryPoint`, `VisualStudioCodeIdePlugin` immer genau einen mit dem Repository-Root).
+   - **0 Einstiegspunkte:** `FileNotFoundException` wird geworfen.
+   - **Genau 1 Einstiegspunkt:** Weiterfahrt mit Schritt 5 (`plugin.OpenEntryPointAsync()` direkt, kein Dialog).
+   - **Mehr als 1 Einstiegspunkt:** Weiterfahrt mit Schritt 4a (Dialog).
 
-4a. **Dialog anzeigen (nur bei `VisualStudioIdePlugin` mit mehreren Solutions):**
-   - `TaskDetailViewModel` ruft `_dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, ct)` auf.
+4a. **Dialog anzeigen (bei mehr als einem gefundenen Einstiegspunkt, unabhängig vom aufgelösten Plugin):**
+   - `IdeOeffnenService` ruft den von `TaskDetailViewModel` übergebenen Callback mit allen gefundenen `IdeEntryPoint`-Objekten auf.
+   - Der Callback bildet die Einstiegspunkte auf ihre Pfade ab und ruft `_dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, ct)` auf.
    - `WpfDialogService.ShowSolutionSelectionDialogAsync()`:
      - Erstellt `SolutionSelectionDialogViewModel` mit der Liste der Pfade.
      - Erstellt Modal-Dialog `SolutionSelectionDialog` mit `Owner = MainWindow`.
@@ -75,33 +76,35 @@ Beteiligte Komponenten:
      - Wartet auf Benutzeraktion:
        - **OK:** Gibt `SelectedSolution`-Pfad zurück.
        - **Abbrechen:** Gibt `null` zurück.
-   - **Wenn `null` (Abbruch):** Ablauf endet hier, kein Prozessstart.
-   - **Wenn Pfad:** `IdeOeffnenService.OeffneSolution(gewählterPfad)` wird aufgerufen (siehe Schritt 6), Ablauf endet danach.
+   - **Wenn `null` (Abbruch):** Der Callback liefert `null` an `IdeOeffnenService`; der Ablauf endet dort, kein Prozessstart.
+   - **Wenn Pfad:** Der Callback bildet den gewählten Pfad zurück auf den passenden `IdeEntryPoint` ab und gibt ihn zurück; `IdeOeffnenService` ruft damit `plugin.OpenEntryPointAsync()` auf (siehe Schritt 6), Ablauf endet danach.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.OeffneIdeAsync()` — Koordination und Verzweigungslogik
+- `TaskDetailViewModel.OeffneIdeAsync()` — Koordination; übergibt den Auswahl-Callback an `IdeOeffnenService`
+- `IdeOeffnenService.OpenRepositoryInIdeAsync()` — generische Plugin-Auflösung, Einstiegspunkt-Ermittlung und Verzweigung nach Anzahl
 - `PluginSelectionService.ResolveIdePluginAsync()` — Plugin-Auflösung
 - `IIdePlugin.CheckCompatibilityAsync()` — Kompatibilitätsprüfung je Plugin
+- `IIdePlugin.FindEntryPointsAsync()` — generische Einstiegspunkt-Ermittlung je Plugin
 - `IDialogService.ShowSolutionSelectionDialogAsync()` — Dialog-Gateway
 - `WpfDialogService` — Dialog-Anzeige und Koordination
 - `SolutionSelectionDialog` — WPF-Fenster (Modal)
 - `SolutionSelectionDialogViewModel` — Presentation Model
 
-### 5. IDE öffnen (direktes Öffnen über das aufgelöste Plugin)
+### 5. IDE öffnen (direktes Öffnen über den ermittelten Einstiegspunkt)
 
-Für `VisualStudioIdePlugin` mit höchstens einer Solution sowie für jedes andere Plugin (z. B. `VisualStudioCodeIdePlugin`) ruft `TaskDetailViewModel` direkt `plugin.OpenRepositoryAsync(effectiveWorkdir, ct)` auf:
+Bei genau einem gefundenen Einstiegspunkt sowie nach einer Dialog-Auswahl ruft `IdeOeffnenService` `plugin.OpenEntryPointAsync(entryPoint, ct)` auf:
 
-- **`VisualStudioIdePlugin.OpenRepositoryAsync()`:** Sucht die (einzige) Solution im Verzeichnis erneut selbst, wirft `FileNotFoundException`, falls keine gefunden wird (kann bei Race Conditions zwischen Kompatibilitätsprüfung und Öffnen auftreten), und öffnet sie andernfalls per Shell-Execute (siehe Schritt 6).
-- **`VisualStudioCodeIdePlugin.OpenRepositoryAsync()`:**
+- **`VisualStudioIdePlugin.OpenEntryPointAsync()`:** Öffnet die Solution-Datei des übergebenen `IdeEntryPoint` per Shell-Execute (siehe Schritt 6).
+- **`VisualStudioCodeIdePlugin.OpenEntryPointAsync()`:**
   1. Fragt `IVisualStudioCodeLocator.Locate()` ab.
   2. `VisualStudioCodeLocator` sucht zuerst `code.cmd` und `code` in `PATH`, danach typische Windows-Pfade unter `%LOCALAPPDATA%`, `%ProgramFiles%` und `%ProgramFiles(x86)%`.
-  3. Bei Treffer erstellt es `ProzessStartAnfrage(DateiName=<code-Pfad>, Argumente="\"<aufgelöstes Arbeitsverzeichnis>\"", ShellAusfuehren=false)` — **mit dem aufgelösten Pfad**, nicht dem Repository-Root.
+  3. Bei Treffer erstellt es `ProzessStartAnfrage(DateiName=<code-Pfad>, Argumente="\"<Pfad des Einstiegspunkts>\"", ShellAusfuehren=false)` — **mit dem aufgelösten Arbeitsverzeichnis-Pfad**, nicht zwingend dem Repository-Root.
   4. Ohne Treffer wirft es `InvalidOperationException("Visual Studio Code wurde nicht gefunden.")`; `OeffneIdeAsync()` fängt das ab und setzt `FehlerMeldung = "IDE konnte nicht geöffnet werden: Visual Studio Code wurde nicht gefunden."`.
 
-### 6. IDE öffnen (Prozessstart einer Solution)
+### 6. IDE öffnen (Prozessstart eines Einstiegspunkts)
 
-1. Sowohl nach Dialog-Auswahl (Schritt 4a) als auch innerhalb von `VisualStudioIdePlugin.OpenRepositoryAsync()` (Schritt 5) wird letztlich `IdeOeffnenService.OeffneSolution(solutionPfad)` bzw. die interne `VisualStudioIdePlugin.OpenSolutionFile()`-Logik aufgerufen.
-2. Beide erstellen `ProzessStartAnfrage(DateiName=solutionPfad, Argumente=null, ShellAusfuehren=true)`.
+1. Innerhalb von `VisualStudioIdePlugin.OpenEntryPointAsync()` (Schritt 5) wird letztlich die interne `VisualStudioIdePlugin.OpenSolutionFile()`-Logik aufgerufen (dieselbe Hilfsmethode, die auch `IdeOeffnenService.OeffneSolution()` für rückwärtskompatible Aufrufer nutzt).
+2. Diese erstellt `ProzessStartAnfrage(DateiName=solutionPfad, Argumente=null, ShellAusfuehren=true)`.
 3. `IProzessStarter.Starten(anfrage)` wird aufgerufen.
 4. `SystemProzessStarter` mappt auf `ProcessStartInfo` mit `UseShellExecute=true` (Shell-Execute).
 5. `Process.Start()` startet den Prozess; das Betriebssystem ruft den registrierten Handler für `.sln` auf (üblicherweise Visual Studio).
@@ -109,7 +112,7 @@ Für `VisualStudioIdePlugin` mit höchstens einer Solution sowie für jedes ande
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.OeffneIdeAsync()` — Koordination
-- `IdeOeffnenService.OeffneSolution()` / `VisualStudioIdePlugin.OpenSolutionFile()` — Solution-Start
+- `VisualStudioIdePlugin.OpenEntryPointAsync()` / `OpenSolutionFile()` — Solution-Start
 - `IProzessStarter` (Gateway)
 - `SystemProzessStarter` — Reale Implementierung
 
@@ -130,15 +133,15 @@ flowchart TD
     J --> K["Fehler? → FehlerMeldung"]
     
     D --> L["PluginSelectionService.ResolveIdePluginAsync"]
-    L --> M{"Aufgelöstes Plugin?"}
-    M -->|VisualStudioIdePlugin| M2{"Anzahl Solutions?"}
-    M -->|"Sonst (z. B. VisualStudioCodeIdePlugin)"| Z["plugin.OpenRepositoryAsync"]
-    M2 -->|"≤ 1"| Z
-    M2 -->|">1"| P["Dialog anzeigen"]
+    L --> L2["plugin.FindEntryPointsAsync"]
+    L2 --> M{"Anzahl<br/>Einstiegspunkte?"}
+    M -->|0| M0["FileNotFoundException"]
+    M -->|1| Z["plugin.OpenEntryPointAsync"]
+    M -->|">1"| P["Dialog anzeigen"]
     P --> Q{"Benutzer bestätigt?"}
     Q -->|Nein| R["Abbruch, kein Prozessstart"]
-    Q -->|Ja| S["IdeOeffnenService.OeffneSolution"]
-    Z -->|VisualStudioIdePlugin| S
+    Q -->|Ja| Z
+    Z -->|VisualStudioIdePlugin| S["OpenSolutionFile"]
     Z -->|VisualStudioCodeIdePlugin| V["VisualStudioCodeLocator.Locate"]
     V --> W{"VS Code gefunden?"}
     W -->|Nein| X["FehlerMeldung"]
@@ -172,19 +175,20 @@ Wenn `SystemProzessStarter.Starten()` eine Ausnahme wirft (z. B. Befehl nicht ge
 
 ### Keine Solution gefunden
 
-Wenn `IdeOeffnenService.FindeSolutions()` eine leere Liste zurückgibt bzw. kein Plugin explizit kompatibel ist:
+Wenn kein Plugin explizit kompatibel ist (kein `VisualStudioIdePlugin` mit gefundener `.sln`/`.slnx`):
 
 1. `OeffneIdeCommand.CanExecute()` bleibt unabhängig davon `true`, solange ein Arbeitsverzeichnis vorhanden ist (`ShowFileExplorerPanel`).
 2. `PluginSelectionService.ResolveIdePluginAsync()` liefert das erste aktive Fallback-Plugin (standardmäßig `VisualStudioCodeIdePlugin`) oder — falls kein Plugin aktiv/kompatibel ist — `IPluginManager.GetDefaultIdePlugin()`.
-3. Beim Klick wird das aufgelöste Plugin über `plugin.OpenRepositoryAsync()` geöffnet; bei `VisualStudioCodeIdePlugin` wird VS Code über `IVisualStudioCodeLocator` gesucht. Ohne Treffer wird eine verständliche Fehlermeldung angezeigt, ohne dass ein Prozess gestartet wird.
+3. Beim Klick liefert `plugin.FindEntryPointsAsync()` für `VisualStudioCodeIdePlugin` immer genau einen Einstiegspunkt (das Repository-Root); dieser wird direkt über `plugin.OpenEntryPointAsync()` geöffnet, wobei VS Code über `IVisualStudioCodeLocator` gesucht wird. Ohne Treffer wird eine verständliche Fehlermeldung angezeigt, ohne dass ein Prozess gestartet wird.
 
 ### Dialog-Abbruch
 
 Wenn Benutzer im `SolutionSelectionDialog` auf „Abbrechen" klickt:
 
 1. `ShowSolutionSelectionDialogAsync()` gibt `null` zurück.
-2. `OeffneIdeAsync()` bricht ab, ruft nicht `OeffneSolution()` auf.
-3. Keine Fehlermeldung; kein Prozess wird gestartet.
+2. Der Auswahl-Callback in `TaskDetailViewModel` gibt daraufhin ebenfalls `null` an `IdeOeffnenService` zurück.
+3. `IdeOeffnenService.OpenRepositoryInIdeAsync()` bricht ab, ruft nicht `plugin.OpenEntryPointAsync()` auf.
+4. Keine Fehlermeldung; kein Prozess wird gestartet.
 
 ## Test-Implementierung
 

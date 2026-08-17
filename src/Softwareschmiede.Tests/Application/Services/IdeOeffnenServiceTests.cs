@@ -149,32 +149,46 @@ public sealed class IdeOeffnenServiceTests : IDisposable
         var aufruf = async () => await service.OpenRepositoryInIdeAsync(repositoryPfad);
 
         await aufruf.Should().ThrowAsync<ArgumentException>();
-        idePluginMock.Verify(p => p.OpenRepositoryAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        idePluginMock.Verify(p => p.FindEntryPointsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>OpenRepositoryInIdeAsync löst das passende IDE-Plugin über PluginSelectionService auf und öffnet damit.</summary>
+    /// <summary>OpenRepositoryInIdeAsync löst das passende IDE-Plugin über PluginSelectionService auf und öffnet dessen einzigen Einstiegspunkt direkt (kein Callback erforderlich).</summary>
     [Fact]
-    public async Task OpenRepositoryInIdeAsync_LoestPluginAufUndOeffnet()
+    public async Task OpenRepositoryInIdeAsync_MitEinemEinstiegspunkt_OeffnetDirekt()
     {
         var repositoryPfad = CreateTempDirectory();
-        var idePluginMock = new Mock<IIdePlugin>();
-        idePluginMock.SetupGet(p => p.PluginName).Returns("Test-IDE");
-        idePluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestIde");
-        idePluginMock.SetupGet(p => p.PluginType).Returns(PluginType.Ide);
-        idePluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
-        idePluginMock.Setup(p => p.CheckCompatibilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(IdePluginCompatibility.Explicit);
+        var entryPoint = new IdeEntryPoint(repositoryPfad);
+        var idePluginMock = CreateIdePluginMock();
+        idePluginMock.Setup(p => p.FindEntryPointsAsync(repositoryPfad, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<IdeEntryPoint>)[entryPoint]);
         var pluginSelectionService = CreatePluginSelectionService([idePluginMock.Object]);
         var service = new IdeOeffnenService(new Mock<IProzessStarter>().Object, pluginSelectionService);
 
         await service.OpenRepositoryInIdeAsync(repositoryPfad);
 
-        idePluginMock.Verify(p => p.OpenRepositoryAsync(repositoryPfad, It.IsAny<CancellationToken>()), Times.Once);
+        idePluginMock.Verify(p => p.OpenEntryPointAsync(entryPoint, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>Bei mehreren gefundenen Solutions und aufgelöstem VisualStudioIdePlugin ruft OpenRepositoryInIdeAsync den übergebenen Auswahl-Callback auf und öffnet die dort gewählte Solution, statt das Plugin direkt zu öffnen.</summary>
+    /// <summary>OpenRepositoryInIdeAsync wirft eine FileNotFoundException, wenn das aufgelöste Plugin keine Einstiegspunkte findet.</summary>
     [Fact]
-    public async Task OpenRepositoryInIdeAsync_MitMehrerenSolutionsUndVisualStudioPlugin_RuftCallbackAufUndOeffnetGewaehlteSolution()
+    public async Task OpenRepositoryInIdeAsync_OhneEinstiegspunkte_WirftFileNotFoundException()
+    {
+        var repositoryPfad = CreateTempDirectory();
+        var idePluginMock = CreateIdePluginMock();
+        idePluginMock.Setup(p => p.FindEntryPointsAsync(repositoryPfad, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<IdeEntryPoint>)[]);
+        var pluginSelectionService = CreatePluginSelectionService([idePluginMock.Object]);
+        var service = new IdeOeffnenService(new Mock<IProzessStarter>().Object, pluginSelectionService);
+
+        var aufruf = async () => await service.OpenRepositoryInIdeAsync(repositoryPfad);
+
+        await aufruf.Should().ThrowAsync<FileNotFoundException>();
+        idePluginMock.Verify(p => p.OpenEntryPointAsync(It.IsAny<IdeEntryPoint>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Bei mehreren gefundenen Einstiegspunkten ruft OpenRepositoryInIdeAsync den übergebenen Auswahl-Callback mit allen Einstiegspunkten auf und öffnet den dort gewählten, statt automatisch den ersten zu öffnen.</summary>
+    [Fact]
+    public async Task OpenRepositoryInIdeAsync_MitMehrerenEinstiegspunktenUndCallback_RuftCallbackAufUndOeffnetGewaehltenEinstiegspunkt()
     {
         var repositoryPfad = CreateTempDirectory();
         File.WriteAllText(Path.Combine(repositoryPfad, "Erste.sln"), string.Empty);
@@ -184,25 +198,26 @@ public sealed class IdeOeffnenServiceTests : IDisposable
         var pluginSelectionService = CreatePluginSelectionService([visualStudioPlugin]);
         var service = new IdeOeffnenService(prozessStarterMock.Object, pluginSelectionService);
         var gewaehlteSolution = Path.Combine(repositoryPfad, "Zweite.sln");
-        IReadOnlyList<string>? demCallbackUebergebeneSolutions = null;
+        IReadOnlyList<IdeEntryPoint>? demCallbackUebergebeneEntryPoints = null;
 
         await service.OpenRepositoryInIdeAsync(
             repositoryPfad,
-            (solutionPfade, _) =>
+            (entryPoints, _) =>
             {
-                demCallbackUebergebeneSolutions = solutionPfade;
-                return Task.FromResult<string?>(gewaehlteSolution);
+                demCallbackUebergebeneEntryPoints = entryPoints;
+                var gewaehlterEntryPoint = entryPoints.First(ep => ep.Path == gewaehlteSolution);
+                return Task.FromResult<IdeEntryPoint?>(gewaehlterEntryPoint);
             });
 
-        demCallbackUebergebeneSolutions.Should().HaveCount(2);
+        demCallbackUebergebeneEntryPoints.Should().HaveCount(2);
         prozessStarterMock.Verify(
             p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == gewaehlteSolution)),
             Times.Once);
     }
 
-    /// <summary>Bricht der Anwender die Solution-Auswahl ab (Callback liefert null), öffnet OpenRepositoryInIdeAsync keine Solution und startet keinen Prozess.</summary>
+    /// <summary>Bricht der Anwender die Einstiegspunkt-Auswahl ab (Callback liefert null), öffnet OpenRepositoryInIdeAsync nichts und startet keinen Prozess.</summary>
     [Fact]
-    public async Task OpenRepositoryInIdeAsync_MitMehrerenSolutionsUndAbgebrochenerAuswahl_OeffnetNichts()
+    public async Task OpenRepositoryInIdeAsync_MitMehrerenEinstiegspunktenUndAbgebrochenerAuswahl_OeffnetNichts()
     {
         var repositoryPfad = CreateTempDirectory();
         File.WriteAllText(Path.Combine(repositoryPfad, "Erste.sln"), string.Empty);
@@ -212,7 +227,7 @@ public sealed class IdeOeffnenServiceTests : IDisposable
         var pluginSelectionService = CreatePluginSelectionService([visualStudioPlugin]);
         var service = new IdeOeffnenService(prozessStarterMock.Object, pluginSelectionService);
 
-        await service.OpenRepositoryInIdeAsync(repositoryPfad, (_, _) => Task.FromResult<string?>(null));
+        await service.OpenRepositoryInIdeAsync(repositoryPfad, (_, _) => Task.FromResult<IdeEntryPoint?>(null));
 
         prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
@@ -235,7 +250,7 @@ public sealed class IdeOeffnenServiceTests : IDisposable
             (_, _) =>
             {
                 callbackAufgerufen = true;
-                return Task.FromResult<string?>(null);
+                return Task.FromResult<IdeEntryPoint?>(null);
             });
 
         callbackAufgerufen.Should().BeFalse();
@@ -249,6 +264,18 @@ public sealed class IdeOeffnenServiceTests : IDisposable
 
     private static IdeOeffnenService CreateService()
         => new(new Mock<IProzessStarter>().Object);
+
+    private static Mock<IIdePlugin> CreateIdePluginMock()
+    {
+        var idePluginMock = new Mock<IIdePlugin>();
+        idePluginMock.SetupGet(p => p.PluginName).Returns("Test-IDE");
+        idePluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestIde");
+        idePluginMock.SetupGet(p => p.PluginType).Returns(PluginType.Ide);
+        idePluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        idePluginMock.Setup(p => p.CheckCompatibilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(IdePluginCompatibility.Explicit);
+        return idePluginMock;
+    }
 
     private static PluginSelectionService CreatePluginSelectionService(IReadOnlyList<IIdePlugin> idePlugins)
     {

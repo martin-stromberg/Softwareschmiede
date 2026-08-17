@@ -1,4 +1,5 @@
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Interfaces;
 
@@ -15,4 +16,15 @@ public interface IIdePlugin : IPlugin
     /// <param name="repositoryPath">Pfad des zu öffnenden Repositories.</param>
     /// <param name="ct">Cancellation Token.</param>
     Task OpenRepositoryAsync(string repositoryPath, CancellationToken ct = default);
+
+    /// <summary>Ermittelt alle verfügbaren Einstiegspunkte für das angegebene Repository.</summary>
+    /// <param name="repositoryPath">Pfad des zu durchsuchenden Repositories.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Die gefundenen Einstiegspunkte; kann leer sein, wenn keine Kandidaten vorhanden sind.</returns>
+    Task<IReadOnlyList<IdeEntryPoint>> FindEntryPointsAsync(string repositoryPath, CancellationToken ct = default);
+
+    /// <summary>Öffnet den übergebenen Einstiegspunkt in der IDE.</summary>
+    /// <param name="entryPoint">Der zu öffnende Einstiegspunkt.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task OpenEntryPointAsync(IdeEntryPoint entryPoint, CancellationToken ct = default);
 }
