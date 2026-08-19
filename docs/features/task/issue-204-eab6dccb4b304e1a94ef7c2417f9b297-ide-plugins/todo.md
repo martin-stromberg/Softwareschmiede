@@ -43,3 +43,18 @@ Branch: `task/issue-204-eab6dccb4b304e1a94ef7c2417f9b297-ide-plugins`
 | [x] | 8b | Tests ausführen (Unteragent) | `test-results.md` (1316 gesamt, 1314 bestanden, 0 fehlgeschlagen, 2 übersprungen — ein Fehlschlag im ersten Lane-2-Lauf durch 2 volle Wiederholungen als Flakiness verifiziert, konsistent mit Iteration 2) |
 | [x] | – | Iteration oder Abschluss entscheiden | Iteration 3 = Maximum erreicht → Abbruch (Step 8a), unabhängig davon dass Befunde weiter gesunken sind (1 < 2) |
 | [x] | 8a | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` (1 geringfügiger verbleibender Befund: doppelter Mock-Aufbau in `TaskDetailViewModelTests_IdeAuswahl.cs`) |
+
+## Neue Anforderung – Dropdown aggregiert über ALLE kompatiblen IDE-Plugins
+
+Anwenderentscheidung zur ursprünglichen „Offenen Frage 1" aus `requirement.md`: Dropdown soll nicht nur Einstiegspunkte des einen priorisierten Plugins zeigen, sondern über alle kompatiblen (Explicit + Fallback) aktivierten IDE-Plugins aggregieren (z. B. Visual Studio + Visual Studio Code gemeinsam wählbar).
+
+| Status | Schritt | Beschreibung | Artefakt |
+|--------|---------|--------------|----------|
+| [x] | 5 | Umsetzungsplanung — Revision (Unteragent) | `plan.md` aktualisiert: neue Designentscheidungen, `PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync`, `TaskDetailViewModel.ErmittleAggregierteIdeEinstiegspunkteAsync`/`FormatiereAnzeigeWert`, Tupel-Callback-Signatur, Testplan; unabhängig per Read verifiziert |
+| [x] | 5a | Offene Punkte prüfen | „Offene Frage 1" jetzt explizit gelöst dokumentiert |
+| [ ] | 5b | Planungscommit | – |
+| [ ] | 6 | Implementierung (Unteragent) | Codeänderungen |
+| [ ] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` |
+| [ ] | 8 | Code-Review (Unteragent) | `review-code.md` |
+| [ ] | 8b | Tests ausführen (Unteragent) | `test-results.md` |
+| [ ] | – | Iteration oder Abschluss entscheiden | – |
