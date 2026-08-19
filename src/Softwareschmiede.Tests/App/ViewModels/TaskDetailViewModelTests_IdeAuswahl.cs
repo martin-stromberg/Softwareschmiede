@@ -4,6 +4,7 @@ using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.PluginImpl;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
@@ -33,7 +34,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(zweiteSolution);
+            .ReturnsAsync("Visual Studio: Zweite.sln");
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -63,7 +64,12 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         sut.OeffneIdeAuswahlCommand.CanExecute(null).Should().BeFalse();
     }
 
-    /// <summary>Bei genau einem gefundenen Einstiegspunkt bleibt KannIdeAuswaehlen false (Dropdown-Button unsichtbar).</summary>
+    /// <summary>
+    /// Bei genau einem gefundenen Einstiegspunkt bleibt KannIdeAuswaehlen false (Dropdown-Button unsichtbar).
+    /// Isoliert über idePlugins-Override auf nur Visual Studio, da CreateSut() standardmäßig zusätzlich
+    /// Visual Studio Code aktiviert, das für jedes Repository einen weiteren Fallback-Eintrag liefert - mit
+    /// der Multi-Plugin-Aggregation würde die Gesamtanzahl sonst auf 2 steigen.
+    /// </summary>
     [Fact]
     public async Task KannIdeAuswaehlen_WhenOneEntryPoint_ReturnsFalse()
     {
@@ -72,7 +78,8 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
 
-        var sut = CreateSut();
+        var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProzessStarter>().Object);
+        var sut = CreateSut(idePlugins: [visualStudioPlugin]);
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
@@ -124,7 +131,11 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 
-    /// <summary>Regressionstest: Bei genau einem Einstiegspunkt bleibt KannIdeAuswaehlen bereits nach LadenAsync false, ohne dass ein Öffnen-Versuch nötig ist.</summary>
+    /// <summary>
+    /// Regressionstest: Bei genau einem Einstiegspunkt bleibt KannIdeAuswaehlen bereits nach LadenAsync false,
+    /// ohne dass ein Öffnen-Versuch nötig ist. Isoliert über idePlugins-Override auf nur Visual Studio (siehe
+    /// Begründung bei KannIdeAuswaehlen_WhenOneEntryPoint_ReturnsFalse).
+    /// </summary>
     [Fact]
     public async Task KannIdeAuswaehlen_NachLadenAsync_WhenOneEntryPoint_ReturnsFalse()
     {
@@ -133,7 +144,8 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
 
-        var sut = CreateSut();
+        var visualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProzessStarter>().Object);
+        var sut = CreateSut(idePlugins: [visualStudioPlugin]);
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
@@ -188,7 +200,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(zweiteSolution);
+            .ReturnsAsync("Visual Studio: Zweite.sln");
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock);
@@ -199,7 +211,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
-                It.Is<IReadOnlyList<string>>(liste => liste.Contains(ersteSolution) && liste.Contains(zweiteSolution)),
+                It.Is<IReadOnlyList<string>>(liste => liste.Contains("Visual Studio: Erste.sln") && liste.Contains("Visual Studio: Zweite.sln")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         prozessStarterMock.Verify(
@@ -239,15 +251,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var arbeitsverzeichnis = CreateTempDirectory();
         var ersterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "erste.sln"), "Erste Solution");
         var zweiterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "zweite.sln"), "Zweite Solution");
-        var idePluginMock = new Mock<IIdePlugin>();
-        idePluginMock.SetupGet(p => p.PluginName).Returns("Test-IDE");
-        idePluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestIde");
-        idePluginMock.SetupGet(p => p.PluginType).Returns(PluginType.Ide);
-        idePluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
-        idePluginMock.Setup(p => p.CheckCompatibilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(IdePluginCompatibility.Explicit);
-        idePluginMock.Setup(p => p.FindEntryPointsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<IdeEntryPoint>)[ersterEntryPoint, zweiterEntryPoint]);
+        var idePluginMock = CreateTestIdePluginMock([ersterEntryPoint, zweiterEntryPoint]);
         idePluginMock.Setup(p => p.OpenEntryPointAsync(It.IsAny<IdeEntryPoint>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -256,7 +260,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock
             .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(zweiterEntryPoint.DisplayName);
+            .ReturnsAsync($"Test-IDE: {zweiterEntryPoint.DisplayName}");
 
         var sut = CreateSut(idePlugins: [idePluginMock.Object]);
         sut.AufgabeId = aufgabe.Id;
@@ -266,7 +270,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         _dialogServiceMock.Verify(
             d => d.ShowSolutionSelectionDialogAsync(
-                It.Is<IReadOnlyList<string>>(liste => liste.Contains("Erste Solution") && liste.Contains("Zweite Solution")),
+                It.Is<IReadOnlyList<string>>(liste => liste.Contains("Test-IDE: Erste Solution") && liste.Contains("Test-IDE: Zweite Solution")),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         idePluginMock.Verify(p => p.OpenEntryPointAsync(zweiterEntryPoint, It.IsAny<CancellationToken>()), Times.Once);
@@ -284,15 +288,7 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         var arbeitsverzeichnis = CreateTempDirectory();
         var ersterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "erste.sln"), "Erste Solution");
         var zweiterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "zweite.sln"), "Zweite Solution");
-        var idePluginMock = new Mock<IIdePlugin>();
-        idePluginMock.SetupGet(p => p.PluginName).Returns("Test-IDE");
-        idePluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestIde");
-        idePluginMock.SetupGet(p => p.PluginType).Returns(PluginType.Ide);
-        idePluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
-        idePluginMock.Setup(p => p.CheckCompatibilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(IdePluginCompatibility.Explicit);
-        idePluginMock.Setup(p => p.FindEntryPointsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<IdeEntryPoint>)[ersterEntryPoint, zweiterEntryPoint]);
+        var idePluginMock = CreateTestIdePluginMock([ersterEntryPoint, zweiterEntryPoint]);
         idePluginMock.Setup(p => p.OpenEntryPointAsync(It.IsAny<IdeEntryPoint>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("IDE-Prozess konnte nicht gestartet werden."));
 
@@ -328,5 +324,199 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
 
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
         prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Bei aktiviertem VS (mit .sln) und VS Code (Fallback) enthält die an ShowSolutionSelectionDialogAsync
+    /// übergebene Liste sowohl den formatierten VS-Eintrag als auch "Visual Studio Code" - die Aggregation
+    /// erfasst also Einstiegspunkte beider kompatiblen Plugins, nicht nur des einen priorisierten.
+    /// </summary>
+    [Fact]
+    public async Task WaehleEntryPointAsync_WithEntryPointsFromTwoPlugins_ShowsBothInDialog()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        _dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+
+        _dialogServiceMock.Verify(
+            d => d.ShowSolutionSelectionDialogAsync(
+                It.Is<IReadOnlyList<string>>(liste => liste.Contains("Visual Studio: MyProject.sln") && liste.Contains("Visual Studio Code")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// Wählt der Anwender den VS-Code-Eintrag aus dem Dialog (obwohl VS als Explicit-Plugin von
+    /// ResolveIdePluginAsync bevorzugt würde), wird OpenEntryPointAsync auf dem VS-Code-Plugin aufgerufen,
+    /// nicht auf VS.
+    /// </summary>
+    [Fact]
+    public async Task WaehleEntryPointAsync_SelectingEntryFromFallbackPlugin_OpensViaThatPlugin_NotViaResolvedPlugin()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        _dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Visual Studio Code");
+
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
+        var sut = CreateSut(prozessStarterMock, locator);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+
+        prozessStarterMock.Verify(
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == "code.cmd" && !a.ShellAusfuehren)),
+            Times.Once);
+        prozessStarterMock.Verify(
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.ShellAusfuehren)),
+            Times.Never);
+    }
+
+    /// <summary>Die an den Dialog übergebene Liste ordnet Einträge kompatibler Explicit-Plugins vor Einträgen von Fallback-Plugins - unabhängig von der Registrierungsreihenfolge der Plugins.</summary>
+    [Fact]
+    public async Task WaehleEntryPointAsync_OrdersExplicitPluginEntriesBeforeFallbackPluginEntries()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var visualStudioCodePlugin = new VisualStudioCodeIdePlugin(
+            prozessStarterMock.Object,
+            new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
+        var visualStudioPlugin = new VisualStudioIdePlugin(prozessStarterMock.Object);
+
+        IReadOnlyList<string>? angezeigteWerte = null;
+        _dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<string>, CancellationToken>((liste, _) => angezeigteWerte = liste)
+            .ReturnsAsync((string?)null);
+
+        // VS Code (Fallback) wird zuerst registriert, VS (Explicit) danach - die Rückgabeliste muss trotzdem Explicit-vor-Fallback ordnen.
+        var sut = CreateSut(prozessStarterMock, idePlugins: [visualStudioCodePlugin, visualStudioPlugin]);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+
+        angezeigteWerte.Should().NotBeNull();
+        var werteListe = angezeigteWerte!.ToList();
+        werteListe.IndexOf("Visual Studio: MyProject.sln").Should().BeLessThan(werteListe.IndexOf("Visual Studio Code"));
+    }
+
+    /// <summary>Für einen VS-Einstiegspunkt (DisplayName == null) liefert die Formatierung "Visual Studio: {Dateiname}".</summary>
+    [Fact]
+    public async Task FormatiereAnzeigeWert_ForVisualStudioEntryPoint_UsesPluginNamePrefixAndFileName()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        IReadOnlyList<string>? angezeigteWerte = null;
+        _dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<string>, CancellationToken>((liste, _) => angezeigteWerte = liste)
+            .ReturnsAsync((string?)null);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+
+        angezeigteWerte.Should().Contain("Visual Studio: MyProject.sln");
+    }
+
+    /// <summary>Für den VS-Code-Einstiegspunkt (DisplayName == PluginName) liefert die Formatierung nur "Visual Studio Code" ohne Doppelung.</summary>
+    [Fact]
+    public async Task FormatiereAnzeigeWert_ForVisualStudioCodeEntryPoint_UsesPluginNameOnly()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "MyProject.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        IReadOnlyList<string>? angezeigteWerte = null;
+        _dialogServiceMock
+            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<string>, CancellationToken>((liste, _) => angezeigteWerte = liste)
+            .ReturnsAsync((string?)null);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeAuswahlCommand).ExecuteAsync();
+
+        angezeigteWerte.Should().Contain("Visual Studio Code");
+        angezeigteWerte!.Should().NotContain(wert => wert.StartsWith("Visual Studio Code:", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Regressionstest für die zentrale Anforderung: VS liefert genau 1 .sln, VS Code liefert genau 1
+    /// Fallback-Eintrag → aggregiert 2 Einstiegspunkte → KannIdeAuswaehlen == true, obwohl kein einzelnes
+    /// Plugin für sich genommen mehrere Einstiegspunkte hat.
+    /// </summary>
+    [Fact]
+    public async Task KannIdeAuswaehlen_WhenEachCompatiblePluginHasExactlyOneEntryPoint_ButMultiplePluginsCompatible_ReturnsTrue()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Einzige.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.KannIdeAuswaehlen.Should().BeTrue(
+            "VS liefert 1 .sln und VS Code liefert 1 Fallback-Eintrag - aggregiert 2 Einstiegspunkte, obwohl kein einzelnes Plugin für sich genommen mehrere Einstiegspunkte hat");
+    }
+
+    /// <summary>
+    /// Erzeugt einen <see cref="Mock{T}"/> von <see cref="IIdePlugin"/> mit den für Einstiegspunkt-Tests
+    /// gemeinsam benötigten Setups (PluginName, PluginPrefix, PluginType, GetSettingGroups,
+    /// CheckCompatibilityAsync als <see cref="IdePluginCompatibility.Explicit"/> und FindEntryPointsAsync mit
+    /// den übergebenen <paramref name="entryPoints"/>). Das jeweils individuelle OpenEntryPointAsync-Setup
+    /// bleibt Sache des einzelnen Testfalls.
+    /// </summary>
+    /// <param name="entryPoints">Die von FindEntryPointsAsync zurückgegebenen Einstiegspunkte.</param>
+    /// <param name="pluginName">Der zurückgegebene PluginName.</param>
+    /// <param name="pluginPrefix">Der zurückgegebene PluginPrefix.</param>
+    /// <returns>Der fertig konfigurierte <see cref="Mock{T}"/> von <see cref="IIdePlugin"/>.</returns>
+    private static Mock<IIdePlugin> CreateTestIdePluginMock(
+        IReadOnlyList<IdeEntryPoint> entryPoints,
+        string pluginName = "Test-IDE",
+        string pluginPrefix = "Softwareschmiede.TestIde")
+    {
+        var idePluginMock = new Mock<IIdePlugin>();
+        idePluginMock.SetupGet(p => p.PluginName).Returns(pluginName);
+        idePluginMock.SetupGet(p => p.PluginPrefix).Returns(pluginPrefix);
+        idePluginMock.SetupGet(p => p.PluginType).Returns(PluginType.Ide);
+        idePluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        idePluginMock.Setup(p => p.CheckCompatibilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(IdePluginCompatibility.Explicit);
+        idePluginMock.Setup(p => p.FindEntryPointsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entryPoints);
+        return idePluginMock;
     }
 }

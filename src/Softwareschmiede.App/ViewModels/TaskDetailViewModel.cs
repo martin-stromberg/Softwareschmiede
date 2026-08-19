@@ -1759,21 +1759,78 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Ermittelt das effektive Arbeitsverzeichnis, löst das zuständige IDE-Plugin über
-    /// <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auf und liefert dessen Einstiegspunkte über
-    /// <see cref="IIdePlugin.FindEntryPointsAsync"/>. Gemeinsam genutzt von <see cref="OeffneIdeInternAsync"/>
+    /// Löst das zuständige IDE-Plugin über <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auf und
+    /// liefert dessen Einstiegspunkte über <see cref="IIdePlugin.FindEntryPointsAsync"/> für das übergebene,
+    /// bereits ermittelte effektive Arbeitsverzeichnis. Gemeinsam genutzt von <see cref="OeffneIdeInternAsync"/>
     /// (öffnet anschließend einen Einstiegspunkt) und <see cref="AktualisiereKannIdeAuswaehlenAsync"/> (ermittelt
     /// nur die Anzahl, ohne zu öffnen).
     /// </summary>
-    /// <param name="lokalerKlonPfad">Der lokale Klon-Pfad der Aufgabe.</param>
+    /// <param name="effectiveWorkdir">Das bereits über <see cref="ErmittleEffektivesArbeitsverzeichnisAsync"/> aufgelöste effektive Arbeitsverzeichnis.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <returns>Das aufgelöste effektive Arbeitsverzeichnis, das aufgelöste IDE-Plugin sowie dessen gefundene Einstiegspunkte.</returns>
-    private async Task<(string EffectiveWorkdir, IIdePlugin Plugin, IReadOnlyList<IdeEntryPoint> EntryPoints)> ErmittleIdeEntryPointsAsync(string lokalerKlonPfad, CancellationToken ct)
+    /// <returns>Das aufgelöste IDE-Plugin sowie dessen gefundene Einstiegspunkte.</returns>
+    private async Task<(IIdePlugin Plugin, IReadOnlyList<IdeEntryPoint> EntryPoints)> ErmittleIdeEntryPointsAsync(string effectiveWorkdir, CancellationToken ct)
     {
-        var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
         var plugin = await _pluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct);
         var entryPoints = await plugin.FindEntryPointsAsync(effectiveWorkdir, ct);
-        return (effectiveWorkdir, plugin, entryPoints);
+        return (plugin, entryPoints);
+    }
+
+    /// <summary>
+    /// Löst für das übergebene, bereits ermittelte effektive Arbeitsverzeichnis über
+    /// <see cref="PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync"/> ALLE aktivierten, zum
+    /// Repository <c>Explicit</c>- oder <c>Fallback</c>-kompatiblen IDE-Plugins auf (statt nur eines einzelnen
+    /// wie <see cref="ErmittleIdeEntryPointsAsync"/>). Ruft anschließend <see cref="IIdePlugin.FindEntryPointsAsync"/>
+    /// auf jedem dieser Plugins auf und aggregiert die Ergebnisse zu einer Liste von
+    /// <c>(Plugin, EntryPoint)</c>-Tupeln (Plugin-Reihenfolge sowie Einstiegspunkt-Reihenfolge je Plugin bleiben
+    /// erhalten). Schlägt die Einstiegspunkt-Ermittlung für ein einzelnes Plugin fehl, wird der Fehler geloggt
+    /// und mit den übrigen Plugins fortgefahren, statt die gesamte Aggregation abzubrechen. Genutzt vom
+    /// Dropdown-Button-Pfad in <see cref="OeffneIdeInternAsync"/> sowie von
+    /// <see cref="AktualisiereKannIdeAuswaehlenAsync"/>.
+    /// </summary>
+    /// <param name="effectiveWorkdir">Das bereits über <see cref="ErmittleEffektivesArbeitsverzeichnisAsync"/> aufgelöste effektive Arbeitsverzeichnis.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die aggregierte Liste der (Plugin, EntryPoint)-Tupel aller kompatiblen Plugins, die erfolgreich Einstiegspunkte geliefert haben.</returns>
+    private async Task<IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>> ErmittleAggregierteIdeEinstiegspunkteAsync(string effectiveWorkdir, CancellationToken ct)
+    {
+        var plugins = await _pluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync(effectiveWorkdir, ct);
+
+        var eintraege = new List<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>();
+        foreach (var plugin in plugins)
+        {
+            try
+            {
+                var entryPoints = await plugin.FindEntryPointsAsync(effectiveWorkdir, ct);
+                eintraege.AddRange(entryPoints.Select(entryPoint => (plugin, entryPoint)));
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Einstiegspunkte für IDE-Plugin {PluginName} konnten nicht ermittelt werden.", plugin.PluginName);
+            }
+        }
+
+        return eintraege;
+    }
+
+    /// <summary>
+    /// Formatiert einen Einstiegspunkt für die Anzeige im Auswahl-Dialog plugin-qualifiziert:
+    /// <c>"{PluginName}: {DisplayName ?? Dateiname}"</c>, außer die ermittelte Bezeichnung ist bereits
+    /// identisch mit dem <see cref="IIdePlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
+    /// dessen einziger Einstiegspunkt bereits <c>DisplayName == PluginName</c> liefert) — dann wird nur der
+    /// Plugin-Name angezeigt, um ein Doppel-Label zu vermeiden.
+    /// </summary>
+    /// <param name="plugin">Das Plugin, dem der Einstiegspunkt zugeordnet ist.</param>
+    /// <param name="entryPoint">Der zu formatierende Einstiegspunkt.</param>
+    /// <returns>Der formatierte Anzeige-String, z. B. „Visual Studio: MyProject.sln" oder „Visual Studio Code".</returns>
+    private static string FormatiereAnzeigeWert(IIdePlugin plugin, IdeEntryPoint entryPoint)
+    {
+        var bezeichnung = entryPoint.DisplayName ?? Path.GetFileName(entryPoint.Path);
+        return string.Equals(bezeichnung, plugin.PluginName, StringComparison.Ordinal)
+            ? plugin.PluginName
+            : $"{plugin.PluginName}: {bezeichnung}";
     }
 
     /// <summary>
@@ -1794,8 +1851,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var (_, _, entryPoints) = await ErmittleIdeEntryPointsAsync(lokalerKlonPfad, ct);
-            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(entryPoints);
+            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
+            var eintraege = await ErmittleAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(eintraege.Count);
         }
         catch (OperationCanceledException)
         {
@@ -1868,7 +1926,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Ein Task, der abgeschlossen ist, sobald die IDE geöffnet wurde (oder der Vorgang abgebrochen bzw. mit Fehleranzeige beendet wurde).</returns>
     private async Task OeffneIdeInternAsync(
-        Func<IReadOnlyList<IdeEntryPoint>, CancellationToken, Task<IdeEntryPoint?>>? waehleEntryPointAsync,
+        Func<IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>, CancellationToken, Task<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)?>>? waehleEntryPointAsync,
         CancellationToken ct)
     {
         FehlerMeldung = null;
@@ -1878,23 +1936,42 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var (effectiveWorkdir, plugin, entryPoints) = await ErmittleIdeEntryPointsAsync(lokalerKlonPfad, ct);
-            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(entryPoints);
+            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
 
-            if (entryPoints.Count == 0)
-                throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {effectiveWorkdir}");
-
-            if (entryPoints.Count == 1 || waehleEntryPointAsync is null)
+            if (waehleEntryPointAsync is null)
             {
+                // Haupt-Button: bestehender Single-Plugin-Pfad bleibt unverändert.
+                var (plugin, entryPoints) = await ErmittleIdeEntryPointsAsync(effectiveWorkdir, ct);
+
+                // Zusätzlich: KannIdeAuswaehlen aus der aggregierten Ermittlung über alle kompatiblen Plugins aktualisieren.
+                var aggregierteEintraege = await ErmittleAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+                KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(aggregierteEintraege.Count);
+
+                if (entryPoints.Count == 0)
+                    throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {effectiveWorkdir}");
+
                 await plugin.OpenEntryPointAsync(entryPoints[0], ct);
                 return;
             }
 
-            var gewaehlterEntryPoint = await waehleEntryPointAsync(entryPoints, ct);
-            if (gewaehlterEntryPoint is null)
+            // Dropdown-Button: ausschließlich die aggregierte Ermittlung über alle kompatiblen Plugins.
+            var eintraege = await ErmittleAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(eintraege.Count);
+
+            if (eintraege.Count == 0)
+                throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {effectiveWorkdir}");
+
+            if (eintraege.Count == 1)
+            {
+                await eintraege[0].Plugin.OpenEntryPointAsync(eintraege[0].EntryPoint, ct);
+                return;
+            }
+
+            var gewaehlt = await waehleEntryPointAsync(eintraege, ct);
+            if (gewaehlt is null)
                 return;
 
-            await plugin.OpenEntryPointAsync(gewaehlterEntryPoint, ct);
+            await gewaehlt.Value.Plugin.OpenEntryPointAsync(gewaehlt.Value.EntryPoint, ct);
         }
         catch (OperationCanceledException)
         {
@@ -1908,29 +1985,31 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Callback für <see cref="OeffneIdeInternAsync"/>: Zeigt die gefundenen Einstiegspunkte (via
-    /// <see cref="IdeEntryPoint.DisplayName"/>, falls vorhanden, sonst <see cref="IdeEntryPoint.Path"/>)
-    /// im Auswahl-Dialog an und liefert den zum gewählten Anzeigewert gehörenden Einstiegspunkt zurück,
-    /// oder <c>null</c> bei Abbruch durch den Anwender.
+    /// Callback für <see cref="OeffneIdeInternAsync"/> (Dropdown-Button): Formatiert die aggregierten
+    /// (Plugin, EntryPoint)-Tupel via <see cref="FormatiereAnzeigeWert"/> plugin-qualifiziert, zeigt sie im
+    /// Auswahl-Dialog an und liefert das zum gewählten Anzeigewert gehörende Tupel über den Listenindex
+    /// zurück (nicht über Stringgleichheit, da mehrere Einträge theoretisch denselben Anzeige-String liefern
+    /// könnten), oder <c>null</c> bei Abbruch durch den Anwender.
     /// </summary>
-    /// <param name="entryPoints">Die zur Auswahl stehenden Einstiegspunkte.</param>
+    /// <param name="eintraege">Die zur Auswahl stehenden (Plugin, EntryPoint)-Tupel aus allen kompatiblen IDE-Plugins.</param>
     /// <param name="ct">Abbruchtoken.</param>
-    /// <returns>Der gewählte Einstiegspunkt, oder <c>null</c> bei Abbruch.</returns>
-    private async Task<IdeEntryPoint?> WaehleEntryPointAsync(IReadOnlyList<IdeEntryPoint> entryPoints, CancellationToken ct)
+    /// <returns>Das gewählte (Plugin, EntryPoint)-Tupel, oder <c>null</c> bei Abbruch.</returns>
+    private async Task<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)?> WaehleEntryPointAsync(IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)> eintraege, CancellationToken ct)
     {
-        var anzeigeWerte = entryPoints.Select(entryPoint => entryPoint.DisplayName ?? entryPoint.Path).ToList();
+        var anzeigeWerte = eintraege.Select(e => FormatiereAnzeigeWert(e.Plugin, e.EntryPoint)).ToList();
         var gewaehlterWert = await _dialogService.ShowSolutionSelectionDialogAsync(anzeigeWerte, ct);
         if (gewaehlterWert is null)
             return null;
 
-        return entryPoints.FirstOrDefault(entryPoint => (entryPoint.DisplayName ?? entryPoint.Path) == gewaehlterWert);
+        var index = anzeigeWerte.IndexOf(gewaehlterWert);
+        return index >= 0 ? eintraege[index] : null;
     }
 
     /// <summary>
     /// Berechnet, ob mehr als ein Einstiegspunkt vorhanden ist und somit der Dropdown-Button des
     /// <see cref="Controls.RibbonSplitButton"/> zur Auswahl angeboten werden soll.
     /// </summary>
-    /// <param name="entryPoints">Die ermittelten Einstiegspunkte.</param>
+    /// <param name="entryPointCount">Die Gesamtanzahl der ermittelten Einstiegspunkte.</param>
     /// <returns><c>true</c>, wenn mehr als ein Einstiegspunkt vorhanden ist, sonst <c>false</c>.</returns>
-    private static bool BerechneKannIdeAuswaehlen(IReadOnlyList<IdeEntryPoint> entryPoints) => entryPoints.Count >= 2;
+    private static bool BerechneKannIdeAuswaehlen(int entryPointCount) => entryPointCount >= 2;
 }

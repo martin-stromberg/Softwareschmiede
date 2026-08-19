@@ -52,9 +52,24 @@ Anwenderentscheidung zur ursprünglichen „Offenen Frage 1" aus `requirement.md
 |--------|---------|--------------|----------|
 | [x] | 5 | Umsetzungsplanung — Revision (Unteragent) | `plan.md` aktualisiert: neue Designentscheidungen, `PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync`, `TaskDetailViewModel.ErmittleAggregierteIdeEinstiegspunkteAsync`/`FormatiereAnzeigeWert`, Tupel-Callback-Signatur, Testplan; unabhängig per Read verifiziert |
 | [x] | 5a | Offene Punkte prüfen | „Offene Frage 1" jetzt explizit gelöst dokumentiert |
-| [ ] | 5b | Planungscommit | – |
-| [ ] | 6 | Implementierung (Unteragent) | Codeänderungen |
-| [ ] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` |
-| [ ] | 8 | Code-Review (Unteragent) | `review-code.md` |
-| [ ] | 8b | Tests ausführen (Unteragent) | `test-results.md` |
-| [ ] | – | Iteration oder Abschluss entscheiden | – |
+| [x] | 5b | Planungscommit | Commit `ace70d0` |
+| [x] | 6 | Implementierung (Unteragent) | Codeänderungen (`ResolveAlleKompatiblenIdePluginsAsync`, `ErmittleAggregierteIdeEinstiegspunkteAsync`, `FormatiereAnzeigeWert`, Tupel-Callback-Signatur, 12 neue/angepasste Tests — unabhängig verifiziert: Build 0 Fehler, 32/32 gezielte Tests grün) |
+| [x] | 7 | Plan-Review (Unteragent) | `review.md` (Status „Vollständig umgesetzt", 0 Abweichungen — unabhängig per Read verifiziert) |
+| [x] | 8 | Code-Review (Unteragent) | `review-code.md` (5 Befunde: 1. `ResolveAlleKompatiblenIdePluginsAsync` dupliziert Setup von `ResolveIdePluginAsync`, 2. Haupt-Button-Zweig ermittelt Arbeitsverzeichnis+Plugin doppelt (Single-Plugin + Aggregiert), 3. Aggregationsschleife ohne Fehler-Isolierung pro Plugin, 4. bekannter Mock-Duplikat-Befund aus `continue.md` weiterhin unbehoben, 5. veralteter Klassen-Doc-Kommentar) |
+| [x] | 8b | Tests ausführen (Unteragent) | `test-results.md` (1328 gesamt, 1325 bestanden, 0 fehlgeschlagen, 2 übersprungen — 1 Fehlschlag `PseudoConsoleSessionTests` isoliert als bekannte, bereits mehrfach in dieser Session bestätigte Flakiness verifiziert) |
+| [x] | – | Iteration oder Abschluss entscheiden | Iteration 1 (Multi-Plugin-Aggregation), 5 Befunde, Iteration 1 < 3 → zurück zu Schritt 6 (Iteration 2) |
+
+## Multi-Plugin-Aggregation – Iteration 2
+
+| Status | Schritt | Beschreibung | Artefakt |
+|--------|---------|--------------|----------|
+| [x] | 6 | Implementierung (Unteragent) | Codeänderungen (alle 5 Befunde behoben — unabhängig per `git diff` je Befund verifiziert; Build 0 Fehler, 32/32 gezielte Tests grün) |
+| [x] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` (unverändert gültig — Befunde betrafen keine Planabweichungen, übersprungen) |
+| [x] | 8 | Code-Review (Unteragent) | `review-code.md` (1 Befund: Haupt-Button-Zweig ermittelt Plugin/Einstiegspunkte technisch redundant doppelt — Empfehlung: `ErmittleIdeEntryPointsAsync`-Aufruf entfernen, `aggregierteEintraege[0]` direkt nutzen) |
+| [x] | 8b | Tests ausführen (Unteragent) | `test-results.md` (1328 gesamt, 1326 bestanden, 0 fehlgeschlagen, 2 übersprungen — unabhängig verifiziert) |
+| [x] | – | Iteration oder Abschluss entscheiden | **Orchestrator-Entscheidung: Befund NICHT umgesetzt (begründet, s. u.), Zyklus als abgeschlossen behandelt statt Iteration 3.** Grund: Die vorgeschlagene Vereinfachung (`aggregierteEintraege[0]` statt `ErmittleIdeEntryPointsAsync`) ist zwar technisch redundanzfrei, würde aber eine unspezifizierte Verhaltensänderung einführen — `ErmittleAggregierteIdeEinstiegspunkteAsync` schluckt seit Iteration 2 (Befund 3) Fehler einzelner Plugins pro Plugin (try/catch+LogWarning, Fortsetzung mit nächstem Plugin), während `ErmittleIdeEntryPointsAsync` Fehler ungefangen an den äußeren catch-Block durchreicht (spezifische `FehlerMeldung`). Bei Übernahme des Befunds würde ein Fehlschlag des primären/priorisierten Plugins (z. B. Visual Studio) nicht mehr als Fehler angezeigt, sondern der Haupt-Button würde **still auf ein anderes Plugin ausweichen** (z. B. Visual Studio Code), da `aggregierteEintraege[0]` dann das nächste erfolgreiche Plugin wäre — ein Verhalten, das weder in `plan.md` noch in der ursprünglichen Anforderung vorgesehen ist und den Haupt-Button-Vertrag „öffnet immer direkt den ersten priorisierten Einstiegspunkt, 0 Einstiegspunkte → Fehler" verletzen würde. Die doppelte Ermittlung selbst ist der in `plan.md` („Seiteneffekte und Risiken" → „Doppelte Ermittlung beim Haupt-Button-Klick") bereits explizit dokumentierte, bewusst akzeptierte Trade-off. Für eine echte Behebung wäre eine explizite Plan-Revision nötig — dokumentiert in `continue.md`. |
+| [x] | 8a | Folgeaufgaben dokumentieren | `continue.md` aktualisiert: altes Item (Mock-Duplikat) als behoben markiert, neues Item (abgelehnter Befund mit Begründung) ergänzt |
+| [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` (6 Dateien aktualisiert — Retry nach Session-Limit-Abbruch des ersten Versuchs, der keine Änderungen hinterließ; unabhängig per `git diff --stat` und Stichprobe verifiziert) |
+| [x] | 9b | README aktualisieren (Unteragent) | `README.md` (Dropdown-Beschreibung auf Multi-Plugin-Aggregation korrigiert; unabhängig per Read verifiziert) |
+| [ ] | – | Feature-Verzeichnis löschen | Übersprungen — `continue.md` enthält weiterhin einen offenen Punkt (abgelehnter Befund, dokumentiert) |
+| [ ] | – | Commit durchführen | – |

@@ -9,7 +9,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für <see cref="PluginSelectionService.ResolveIdePluginAsync"/> (IDE-Plugin-Auflösung).</summary>
+/// <summary>Tests für <see cref="PluginSelectionService.ResolveIdePluginAsync"/> und <see cref="PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync"/> (IDE-Plugin-Auflösung).</summary>
 public sealed class PluginSelectionServiceTests_IdePlugin
 {
     /// <summary>Ein aktives Plugin mit Explicit-Kompatibilität wird zurückgegeben.</summary>
@@ -107,6 +107,93 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
+    }
+
+    /// <summary>Ein Explicit- und ein Fallback-kompatibles Plugin sind beide in der Rückgabeliste enthalten.</summary>
+    [Fact]
+    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnExplicitAndFallbackPlugins_WhenBothCompatible()
+    {
+        var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
+        var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
+        var pluginManager = CreatePluginManager([visualStudio, vsCode]);
+        var (sut, _) = CreateSut(pluginManager.Object);
+
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+
+        resolved.Select(p => p.PluginPrefix).Should().BeEquivalentTo(
+            ["Softwareschmiede.VisualStudio", "Softwareschmiede.VisualStudioCode"]);
+    }
+
+    /// <summary>Bei gemischter Kompatibilität stehen alle Explicit-Plugins vor allen Fallback-Plugins, unabhängig von der Entdeckungsreihenfolge.</summary>
+    [Fact]
+    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldOrderExplicitPluginsBeforeFallbackPlugins()
+    {
+        var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
+        var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
+        var pluginManager = CreatePluginManager([vsCode, visualStudio]);
+        var (sut, _) = CreateSut(pluginManager.Object);
+
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+
+        resolved.Select(p => p.PluginPrefix).Should().ContainInOrder(
+            "Softwareschmiede.VisualStudio", "Softwareschmiede.VisualStudioCode");
+    }
+
+    /// <summary>Innerhalb der Explicit- bzw. Fallback-Gruppe wird die plugins.ide.order-Reihenfolge eingehalten.</summary>
+    [Fact]
+    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldRespectPluginOrder_FromSetting_WithinEachGroup()
+    {
+        var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
+        var rider = CreateIdePlugin("Rider", "Softwareschmiede.Rider", IdePluginCompatibility.Explicit);
+        var pluginManager = CreatePluginManager([visualStudio, rider]);
+        var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
+        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Rider,Softwareschmiede.VisualStudio");
+
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+
+        resolved.Select(p => p.PluginPrefix).Should().ContainInOrder(
+            "Softwareschmiede.Rider", "Softwareschmiede.VisualStudio");
+    }
+
+    /// <summary>Ein Incompatible-Plugin taucht nicht in der Rückgabeliste auf, auch wenn es aktiviert ist.</summary>
+    [Fact]
+    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldExcludeIncompatiblePlugins()
+    {
+        var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
+        var incompatible = CreateIdePlugin("Incompatible IDE", "Softwareschmiede.Incompatible", IdePluginCompatibility.Incompatible);
+        var pluginManager = CreatePluginManager([visualStudio, incompatible]);
+        var (sut, _) = CreateSut(pluginManager.Object);
+
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+
+        resolved.Select(p => p.PluginPrefix).Should().BeEquivalentTo(["Softwareschmiede.VisualStudio"]);
+    }
+
+    /// <summary>Keine aktivierten Plugins → einelementige Liste mit dem Default-Plugin.</summary>
+    [Fact]
+    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginActive()
+    {
+        var defaultPlugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
+        var pluginManager = CreatePluginManager([], defaultPlugin);
+        var (sut, _) = CreateSut(pluginManager.Object);
+
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+
+        resolved.Should().ContainSingle().Which.PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
+    }
+
+    /// <summary>Alle aktivierten Plugins Incompatible → einelementige Liste mit dem Default-Plugin.</summary>
+    [Fact]
+    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginCompatible()
+    {
+        var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Incompatible);
+        var defaultPlugin = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Incompatible);
+        var pluginManager = CreatePluginManager([visualStudio], defaultPlugin);
+        var (sut, _) = CreateSut(pluginManager.Object);
+
+        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt");
+
+        resolved.Should().ContainSingle().Which.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
     }
 
     /// <summary>

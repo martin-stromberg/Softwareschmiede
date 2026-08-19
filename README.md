@@ -214,16 +214,17 @@ Der IDE-öffnen-Button in der Aufgabendetailansicht (Ribbon) wird als Split-Butt
   - Verhalten identisch mit dem bisherigen Single-Button
   - Beispiel: Visual Studio öffnet direkt die erste gefundene `.sln`-Datei
 
-- **Dropdown-Button** (nur sichtbar bei ≥2 Einstiegspunkten):
-  - Wird **nur angezeigt**, wenn das aufgelöste IDE-Plugin mehr als einen Einstiegspunkt angeboten hat
-  - Klick zeigt einen **Auswahl-Dialog** mit allen verfügbaren Einstiegspunkten
-  - Benutzer kann gezielt einen spezifischen Einstiegspunkt wählen (z. B. `backend.sln`, `frontend.sln`, `shared.sln`)
-  - Nach Auswahl öffnet das Plugin den gewählten Einstiegspunkt
+- **Dropdown-Button** (nur sichtbar bei ≥2 aggregierten Einstiegspunkten):
+  - Zeigt **nicht nur** die Einstiegspunkte des einen priorisierten Plugins, sondern aggregiert die Einstiegspunkte **aller aktivierten, kompatiblen IDE-Plugins** (sowohl explizit als auch als Fallback kompatibel). Beispiel: Liegt eine `.sln`-Datei vor, sind sowohl Visual Studio (explizit kompatibel) als auch Visual Studio Code (Fallback) gemeinsam im Dropdown wählbar — nicht nur das eine, für den Haupt-Button priorisierte Plugin.
+  - Die Einträge sind zunächst nach Kompatibilität sortiert (alle Explicit-Plugins vor allen Fallback-Plugins) und innerhalb dessen in der konfigurierten Plugin-Reihenfolge.
+  - Klick zeigt einen **Auswahl-Dialog** mit allen verfügbaren Einstiegspunkten, plugin-qualifiziert beschriftet (z. B. „Visual Studio: MyProject.sln", „Visual Studio Code"), damit bei mehreren Plugins erkennbar bleibt, welcher Eintrag zu welcher IDE gehört
+  - Benutzer kann gezielt einen spezifischen Einstiegspunkt wählen (z. B. `backend.sln`, `frontend.sln`, `shared.sln`, oder plugin-übergreifend „Visual Studio Code")
+  - Nach Auswahl öffnet das jeweils zugehörige Plugin den gewählten Einstiegspunkt
   - Abbruch: Dialog wird geschlossen, nichts wird geöffnet
 
 **Integrierte IDE-Plugins:**
-- **Visual Studio IDE-Plugin** — Prüft auf `.sln` oder `.slnx`-Dateien im Arbeitsverzeichnis; meldet explizite Kompatibilität bei Fund, öffnet die Solution(en) über den Betriebssystem-Standardhandler. Bei mehreren Dateien können alle über den Dropdown-Button ausgewählt werden.
-- **Visual Studio Code IDE-Plugin** — Meldet sich immer als Fallback zur Verfügung; öffnet das Arbeitsverzeichnis über den `code`-Befehl (Single-Einstiegspunkt, daher kein Dropdown)
+- **Visual Studio IDE-Plugin** — Prüft auf `.sln` oder `.slnx`-Dateien im Arbeitsverzeichnis; meldet explizite Kompatibilität bei Fund, öffnet die Solution(en) über den Betriebssystem-Standardhandler. Bei mehreren Dateien tragen alle zur aggregierten Einstiegspunkt-Liste des Dropdown-Buttons bei.
+- **Visual Studio Code IDE-Plugin** — Meldet sich immer als Fallback zur Verfügung; öffnet das Arbeitsverzeichnis über den `code`-Befehl. Liefert selbst stets nur einen einzigen Einstiegspunkt, trägt aber ebenfalls zur aggregierten Gesamtanzahl bei — in Kombination mit einem weiteren kompatiblen Plugin (z. B. Visual Studio bei vorhandener `.sln`) kann bereits dieser eine zusätzliche Einstiegspunkt den Dropdown-Button auslösen (1 VS-Solution + 1 VS-Code-Fallback = 2 aggregierte Einstiegspunkte).
 
 **Arbeitsverzeichnis-Auflösung:** Beide Aktionen — Arbeitsverzeichnis öffnen und IDE öffnen — berücksichtigen das konfigurierte Arbeitsunterverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`). Ist ein Unterverzeichnis konfiguriert (z. B. `src/backend`), wird nur dieses durchsucht und geöffnet, nicht der Repository-Root. Dies ermöglicht zuverlässiges Arbeiten in Mono-Repos, bei denen mehrere räumlich getrennte Subprojekte in verschiedenen Verzeichnissen liegen.
 
@@ -233,7 +234,8 @@ Der IDE-öffnen-Button in der Aufgabendetailansicht (Ribbon) wird als Split-Butt
 - Plugin-spezifische Einstellungen konfigurieren (falls vorhanden)
 
 **ViewModel-Eigenschaften für die Split-Button-Logik:**
-- `KannIdeAuswaehlen` (`bool`, read-only) — Gibt an, ob mehrere Einstiegspunkte verfügbar sind; steuert die Sichtbarkeit des Dropdown-Buttons
+- `KannIdeAuswaehlen` (`bool`, read-only) — Gibt an, ob insgesamt (über alle kompatiblen IDE-Plugins aggregiert) mindestens zwei Einstiegspunkte verfügbar sind; steuert die Sichtbarkeit des Dropdown-Buttons
+- Der Haupt-Button verwendet weiterhin ausschließlich das eine über `PluginSelectionService.ResolveIdePluginAsync` aufgelöste, priorisierte Plugin (unverändertes Verhalten); der Dropdown-Button nutzt zusätzlich `PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync`, um die Einstiegspunkte aller kompatiblen Plugins zu aggregieren
 
 ---
 

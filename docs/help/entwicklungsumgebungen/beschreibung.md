@@ -36,6 +36,8 @@ Die aktivierten Plugins werden in der benutzer-konfigurierten Reihenfolge geprü
 2. **Fallback als Sicherheitsnetz:** Wenn kein Plugin explizit kompatibel ist, wird das erste Plugin mit `Fallback` verwendet.
 3. **Default als letztes Mittel:** Falls kein Plugin aktiv oder kompatibel ist, wird das System-Standardplugin verwendet.
 
+> **Hinweis:** Diese priorisierte Einzelplugin-Auswahl bestimmt das Verhalten des **Haupt-Buttons** (öffnet direkt den ersten Einstiegspunkt genau dieses einen Plugins). Der **Dropdown-Button** des Split-Buttons weicht davon ab: Er zeigt die aggregierten Einstiegspunkte **aller** aktivierten, kompatiblen Plugins zur Auswahl an, nicht nur des hier priorisierten (siehe Abschnitt 3).
+
 ### 3. IDE öffnen (Split-Button-Muster)
 
 Das ausgewählte Plugin wird mit einem Split-Button-Muster geöffnet, das Flexibilität bei mehreren Einstiegspunkten (z. B. mehrere `.sln`-Dateien) bietet:
@@ -47,15 +49,20 @@ Das ausgewählte Plugin wird mit einem Split-Button-Muster geöffnet, das Flexib
   - Visual Studio: die erste gefundene `.sln` oder `.slnx`-Datei
   - Visual Studio Code: das Repository-Verzeichnis
 
-**Dropdown-Button (nur sichtbar bei mehreren Einstiegspunkten):**
-- Wird **nur angezeigt**, wenn das Plugin mehr als einen Einstiegspunkt gefunden hat
-- Zeigt einen **Auswahl-Dialog** mit allen Einstiegspunkten
-- Benutzer kann eine spezifische Solution, ein Workspace oder ein Verzeichnis wählen
-- Nach der Auswahl öffnet das Plugin den gewählten Einstiegspunkt
+**Dropdown-Button (nur sichtbar bei mehreren Einstiegspunkten insgesamt):**
+- Wird **nur angezeigt**, wenn insgesamt mehr als ein Einstiegspunkt gefunden wurde
+- Anders als der Haupt-Button beschränkt sich der Dropdown-Button dabei nicht auf das eine für den Haupt-Button aufgelöste (priorisierte) Plugin: Er aggregiert die Einstiegspunkte **aller aktivierten, kompatiblen IDE-Plugins** (sowohl `Explicit`- als auch `Fallback`-kompatible), nicht nur des einen priorisierten
+- Zeigt einen **Auswahl-Dialog** mit allen aggregierten Einstiegspunkten, **plugin-qualifiziert** beschriftet im Format „{PluginName}: {Einstiegspunkt-Bezeichnung}" (z. B. „Visual Studio: MyProject.sln"), außer die Bezeichnung ist bereits identisch mit dem Plugin-Namen — dann erscheint nur der Plugin-Name (z. B. „Visual Studio Code")
+- Die Liste ist sortiert: zuerst alle Einstiegspunkte der `Explicit`-kompatiblen Plugins, danach alle der `Fallback`-kompatiblen Plugins, jeweils in der konfigurierten Reihenfolge (`plugins.ide.order`)
+- Benutzer kann eine spezifische Solution, ein Workspace oder ein Verzeichnis wählen — auch aus einem anderen Plugin als dem für den Haupt-Button priorisierten
+- Nach der Auswahl öffnet das zum gewählten Eintrag gehörende Plugin den gewählten Einstiegspunkt (nicht zwingend das für den Haupt-Button priorisierte Plugin)
 
 **Beispiel: Repository mit mehreren Visual-Studio-Solutions**
-- Haupt-Button: öffnet immer die erste Solution (z. B. `backend.sln`)
-- Dropdown-Button: zeigt Dialog mit `backend.sln`, `frontend.sln`, `shared.sln` zur Auswahl
+- Haupt-Button: öffnet immer die erste Solution des priorisierten Plugins (z. B. `backend.sln`)
+- Dropdown-Button: zeigt Dialog mit „Visual Studio: backend.sln", „Visual Studio: frontend.sln", „Visual Studio: shared.sln" zur Auswahl
+
+**Beispiel: Repository mit Solution und zusätzlich aktiviertem Fallback-Plugin**
+- Ist z. B. Visual Studio (`Explicit`, da `.sln` gefunden) und Visual Studio Code (`Fallback`) beide aktiviert, zeigt der Dropdown-Dialog alle Solutions von Visual Studio **und** den Eintrag von Visual Studio Code gemeinsam an (z. B. „Visual Studio: backend.sln", „Visual Studio: frontend.sln", „Visual Studio Code") — auch wenn der Haupt-Button weiterhin nur die erste Visual-Studio-Solution öffnet
 
 ## Beispiele
 
@@ -87,4 +94,4 @@ Das ausgewählte Plugin wird mit einem Split-Button-Muster geöffnet, das Flexib
 - **Visual Studio Code:** Erfordert, dass die `code`-CLI installiert und im PATH verfügbar ist. Ist dies nicht der Fall, schlägt das Öffnen fehl. VS Code öffnet immer das gesamte Repository-Verzeichnis (ein Einstiegspunkt).
 - **Mindestens ein aktives Plugin erforderlich:** Der Benutzer muss immer mindestens ein IDE-Plugin aktiviert lassen. Alle Plugins zu deaktivieren ist nicht möglich.
 - **Nur Betriebssystem-Handler:** Die `.sln`-Datei wird mit dem registrierten Standard-Handler des Betriebssystems geöffnet. Dies ist normalerweise Visual Studio, kann aber bei mehreren Installationen oder benutzerdefinierten Assoziationen unterschiedlich sein.
-- **Auswahl-Dialog nur für mehrere Einstiegspunkte:** Der Auswahl-Dialog (Dropdown-Button) wird nur angezeigt, wenn das aufgelöste Plugin mehr als einen Einstiegspunkt anbietet. Bei Single-Plugin-Szenarien oder einem Einstiegspunkt erfolgt direkt die Öffnung ohne Dialog.
+- **Auswahl-Dialog nur für mehrere Einstiegspunkte:** Der Auswahl-Dialog (Dropdown-Button) wird nur angezeigt, wenn die aggregierte Gesamtanzahl der Einstiegspunkte über alle aktivierten, kompatiblen Plugins hinweg mehr als eins beträgt (nicht nur bezogen auf das eine für den Haupt-Button priorisierte Plugin). Ist insgesamt nur ein Einstiegspunkt vorhanden, erfolgt direkt die Öffnung ohne Dialog.
