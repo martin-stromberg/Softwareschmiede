@@ -683,6 +683,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await LadePromptVorlagenAsync(ct);
             await AktualisierePullRequestCapabilityAsync(ct);
             await AktualisiereIssueCreateCapabilityAsync(ct);
+            await AktualisiereKannIdeAuswaehlenAsync(ct);
 
             // Unmittelbar vor dem Auto-Restart nochmals live prüfen, ob der Prozess läuft.
             // Verhindert doppelten CLI-Start, wenn der Prozess nach dem Starten extrem schnell
@@ -1757,6 +1758,56 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ct: ct);
     }
 
+    /// <summary>
+    /// Ermittelt das effektive Arbeitsverzeichnis, löst das zuständige IDE-Plugin über
+    /// <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auf und liefert dessen Einstiegspunkte über
+    /// <see cref="IIdePlugin.FindEntryPointsAsync"/>. Gemeinsam genutzt von <see cref="OeffneIdeInternAsync"/>
+    /// (öffnet anschließend einen Einstiegspunkt) und <see cref="AktualisiereKannIdeAuswaehlenAsync"/> (ermittelt
+    /// nur die Anzahl, ohne zu öffnen).
+    /// </summary>
+    /// <param name="lokalerKlonPfad">Der lokale Klon-Pfad der Aufgabe.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das aufgelöste effektive Arbeitsverzeichnis, das aufgelöste IDE-Plugin sowie dessen gefundene Einstiegspunkte.</returns>
+    private async Task<(string EffectiveWorkdir, IIdePlugin Plugin, IReadOnlyList<IdeEntryPoint> EntryPoints)> ErmittleIdeEntryPointsAsync(string lokalerKlonPfad, CancellationToken ct)
+    {
+        var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
+        var plugin = await _pluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct);
+        var entryPoints = await plugin.FindEntryPointsAsync(effectiveWorkdir, ct);
+        return (effectiveWorkdir, plugin, entryPoints);
+    }
+
+    /// <summary>
+    /// Berechnet <see cref="KannIdeAuswaehlen"/> einmalig am Ende von <see cref="LadenAsync"/>, damit der
+    /// Dropdown-Button des <see cref="Controls.RibbonSplitButton"/> bereits beim ersten Anzeigen der View
+    /// korrekt sichtbar/unsichtbar ist (ohne einen Einstiegspunkt zu öffnen). Ermittlungsfehler, fehlendes
+    /// Plugin oder fehlendes Arbeitsverzeichnis werden hier nicht als <see cref="FehlerMeldung"/> angezeigt,
+    /// sondern führen lediglich zu <c>KannIdeAuswaehlen = false</c>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    private async Task AktualisiereKannIdeAuswaehlenAsync(CancellationToken ct)
+    {
+        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
+        {
+            KannIdeAuswaehlen = false;
+            return;
+        }
+
+        try
+        {
+            var (_, _, entryPoints) = await ErmittleIdeEntryPointsAsync(lokalerKlonPfad, ct);
+            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(entryPoints);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Einstiegspunkte für Aufgabe {AufgabeId} konnten beim Laden nicht ermittelt werden.", _aufgabeId);
+            KannIdeAuswaehlen = false;
+        }
+    }
+
     private async Task OeffneArbeitsverzeichnisAsync(CancellationToken ct)
     {
         if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
@@ -1827,11 +1878,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
-
-            var plugin = await _pluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct);
-            var entryPoints = await plugin.FindEntryPointsAsync(effectiveWorkdir, ct);
-            KannIdeAuswaehlen = entryPoints.Count >= 2;
+            var (effectiveWorkdir, plugin, entryPoints) = await ErmittleIdeEntryPointsAsync(lokalerKlonPfad, ct);
+            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(entryPoints);
 
             if (entryPoints.Count == 0)
                 throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {effectiveWorkdir}");
@@ -1856,7 +1904,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "Fehler beim Öffnen der IDE für Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
-            KannIdeAuswaehlen = false;
         }
     }
 
@@ -1876,7 +1923,14 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         if (gewaehlterWert is null)
             return null;
 
-        return entryPoints.FirstOrDefault(entryPoint => (entryPoint.DisplayName ?? entryPoint.Path) == gewaehlterWert)
-            ?? new IdeEntryPoint(gewaehlterWert);
+        return entryPoints.FirstOrDefault(entryPoint => (entryPoint.DisplayName ?? entryPoint.Path) == gewaehlterWert);
     }
+
+    /// <summary>
+    /// Berechnet, ob mehr als ein Einstiegspunkt vorhanden ist und somit der Dropdown-Button des
+    /// <see cref="Controls.RibbonSplitButton"/> zur Auswahl angeboten werden soll.
+    /// </summary>
+    /// <param name="entryPoints">Die ermittelten Einstiegspunkte.</param>
+    /// <returns><c>true</c>, wenn mehr als ein Einstiegspunkt vorhanden ist, sonst <c>false</c>.</returns>
+    private static bool BerechneKannIdeAuswaehlen(IReadOnlyList<IdeEntryPoint> entryPoints) => entryPoints.Count >= 2;
 }

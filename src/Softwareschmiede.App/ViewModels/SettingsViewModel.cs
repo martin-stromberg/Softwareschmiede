@@ -466,7 +466,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         IdePluginOrder = DevelopmentEnvironmentPlugins.Select(e => e.PluginPrefix).ToList();
         OnPropertyChanged(nameof(DefaultIdePlugin));
 
-        _ = PersistiereIdePluginOrderAsync();
+        PersistiereIdePluginOrderAsync().SafeFireAndForget(_logger, "SettingsViewModel.PersistiereIdePluginOrderAsync");
     }
 
     private async Task PersistiereIdePluginOrderAsync()

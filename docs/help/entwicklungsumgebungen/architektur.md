@@ -6,7 +6,7 @@
 
 | Komponente | Typ | Rolle |
 |-----------|-----|-------|
-| `IIdePlugin` | Interface | Plugin-Vertrag für IDE-Implementierungen; definiert Kompatibilitätsprüfung, Repository-Öffnen sowie das generische Mehreinstiegspunkt-Paar `FindEntryPointsAsync()`/`OpenEntryPointAsync()` |
+| `IIdePlugin` | Interface | Plugin-Vertrag für IDE-Implementierungen; definiert Kompatibilitätsprüfung (`CheckCompatibilityAsync()`) sowie das generische Mehreinstiegspunkt-Paar `FindEntryPointsAsync()`/`OpenEntryPointAsync()` |
 | `IdeEntryPoint` | Value Object (Record) | Immutabler Datenträger für einen konkreten IDE-Einstiegspunkt (`Path`, optional `DisplayName`); liegt in `Softwareschmiede.Plugin.Contracts` |
 | `VisualStudioIdePlugin` | Plugin-Klasse | Implementierung für Visual Studio; prüft auf `.sln`/`.slnx`-Dateien; `FindEntryPointsAsync()` liefert einen `IdeEntryPoint` je gefundener Solution-Datei |
 | `VisualStudioCodeIdePlugin` | Plugin-Klasse | Implementierung für VS Code; dient als universeller Fallback; `FindEntryPointsAsync()` liefert immer genau einen `IdeEntryPoint` (das Repository-Root) |
@@ -143,7 +143,7 @@ plugin.FindEntryPointsAsync()
     IProzessStarter startet die IDE
 ```
 
-> **Hinweis:** Der frühere Sonderfall, bei dem `IdeOeffnenService` per Typ-Prüfung (`plugin is VisualStudioIdePlugin`) erkannte, ob ein Solution-Auswahl-Dialog nötig ist, wurde entfernt. Stattdessen liefert jedes `IIdePlugin` über `FindEntryPointsAsync()` generisch 0..n `IdeEntryPoint`-Kandidaten; `IdeOeffnenService` verzweigt ausschließlich anhand der Anzahl der gefundenen Einstiegspunkte, unabhängig von der konkreten Plugin-Implementierung. `TaskDetailViewModel` übergibt dafür weiterhin einen Auswahl-Callback, der bei mehreren Kandidaten den bestehenden Solution-Auswahl-Dialog anzeigt (siehe [Dateisystem-Integration](../dateisystem-integration/architektur.md)).
+> **Hinweis:** Der frühere Sonderfall, bei dem eine eigene `IdeOeffnenService`-Klasse per Typ-Prüfung (`plugin is VisualStudioIdePlugin`) erkannte, ob ein Solution-Auswahl-Dialog nötig ist, wurde entfernt (die Klasse selbst existiert nicht mehr). Stattdessen liefert jedes `IIdePlugin` über `FindEntryPointsAsync()` generisch 0..n `IdeEntryPoint`-Kandidaten; `TaskDetailViewModel.OeffneIdeInternAsync()` verzweigt ausschließlich anhand der Anzahl der gefundenen Einstiegspunkte (und des aufrufenden Buttons), unabhängig von der konkreten Plugin-Implementierung. Bei mehreren Kandidaten übergibt der Dropdown-Button einen Auswahl-Callback (`WaehleEntryPointAsync`), der den bestehenden Solution-Auswahl-Dialog anzeigt; der Haupt-Button öffnet stattdessen direkt den ersten Kandidaten (siehe [Dateisystem-Integration](../dateisystem-integration/architektur.md)).
 
 ### IDE-Plugin-Aktivierung in der UI
 
@@ -217,8 +217,8 @@ nutzt neue Reihenfolge
 ### Erweiterbarkeit
 
 Das System ist für neue IDE-Plugins konzipiert:
-1. Implementiere `IIdePlugin` vollständig, inklusive der beiden erzwungenen Methoden `CheckCompatibilityAsync`/`OpenRepositoryAsync` sowie `FindEntryPointsAsync`/`OpenEntryPointAsync` (letztere liefern/öffnen die konkreten `IdeEntryPoint`-Kandidaten des Plugins, z. B. mehrere Workspace-Dateien) — der Compiler erzwingt die Implementierung aller vier Methoden
+1. Implementiere `IIdePlugin` vollständig, inklusive der drei erzwungenen Methoden `CheckCompatibilityAsync`, `FindEntryPointsAsync` und `OpenEntryPointAsync` (letztere beiden liefern/öffnen die konkreten `IdeEntryPoint`-Kandidaten des Plugins, z. B. mehrere Workspace-Dateien) — der Compiler erzwingt die Implementierung aller drei Methoden
 2. Registriere das Plugin in `PluginManager`
-3. Das neue Plugin wird automatisch in Settings sowie in der generischen Mehreinstiegspunkt-Logik von `IdeOeffnenService` berücksichtigt, ohne dass dort Sonderfälle für das neue Plugin ergänzt werden müssen
+3. Das neue Plugin wird automatisch in Settings sowie in der generischen Mehreinstiegspunkt-Logik von `TaskDetailViewModel.OeffneIdeInternAsync`/`ErmittleIdeEntryPointsAsync` berücksichtigt, ohne dass dort Sonderfälle für das neue Plugin ergänzt werden müssen
 
 Beispiel für zukünftige Plugins: JetBrains Rider, Neovim, Sublime Text, etc.

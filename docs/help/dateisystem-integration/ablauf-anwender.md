@@ -26,21 +26,29 @@ Für die Verwendung dieser Funktionen muss:
 
 1. Aufgabe öffnen.
 2. Im Ribbon die Gruppe „Werkzeuge" finden.
-3. Button „IDE öffnen" klicken.
+3. Haupt-Teil des Split-Buttons „IDE öffnen" klicken (der Dropdown-Pfeil daneben ist ausgeblendet, da nur ein Einstiegspunkt existiert).
    - Visual Studio (oder die für `.sln`-Dateien registrierte IDE) öffnet sich automatisch mit der Solution.
    - Alle Projekte der Solution werden geladen.
 
 ### IDE öffnen (mit mehreren Solutions)
 
+Der Button „IDE öffnen" ist als Split-Button mit zwei Teilen umgesetzt: einem Haupt-Teil (öffnet direkt) und einem Dropdown-Teil (Pfeil-Symbol daneben, nur sichtbar, wenn mehr als eine Solution gefunden wurde).
+
+**Schnell öffnen (Haupt-Teil):**
 1. Aufgabe öffnen.
-2. Button „IDE öffnen" klicken.
+2. Haupt-Teil des Buttons „IDE öffnen" klicken.
+   - Die erste gefundene Solution öffnet sich sofort in Visual Studio, ohne Rückfrage.
+
+**Gezielt auswählen (Dropdown-Teil):**
+1. Aufgabe öffnen.
+2. Auf den Dropdown-Pfeil neben „IDE öffnen" klicken.
    - Ein Dialog „Solution auswählen" erscheint mit einer Liste aller gefundenen Solutions.
 3. Gewünschte Solution in der Liste auswählen (Pfade sind alphabetisch sortiert).
 4. Button „OK" klicken.
    - Die gewählte Solution öffnet sich in Visual Studio.
 5. Alternativ: Button „Abbrechen" klicken, um den Dialog zu schließen ohne eine Solution zu öffnen.
 
-> **Hinweis:** Der Dialog zeigt die vollständigen Pfade der gefundenen Solutions an.
+> **Hinweis:** Der Dialog zeigt die vollständigen Pfade der gefundenen Solutions an. Er erscheint ausschließlich über den Dropdown-Teil des Split-Buttons — der Haupt-Teil öffnet immer direkt die erste Solution, ohne Rückfrage.
 
 ### IDE öffnen (ohne Solution mit Visual Studio Code)
 
@@ -71,9 +79,9 @@ Nach erfolgreicher Ausführung:
 
 ## Barrierefreiheit
 
-Beide Buttons unterstützen Tastaturnavigation:
-- Mit **Tab** können Sie zu den Buttons navigieren.
-- Mit **Enter** oder **Leerzeichen** können Sie den Button aktivieren.
-- Der Auswahl-Dialog (bei mehreren Solutions) kann vollständig mit Tastatur bedient werden: Pfeiltasten zum Navigieren der Liste, **Enter** zum Bestätigen, **Escape** zum Abbrechen.
+Alle Buttons unterstützen Tastaturnavigation, einschließlich der beiden Teile des Split-Buttons „IDE öffnen":
+- Mit **Tab** können Sie zum Haupt-Teil und (falls sichtbar) zum Dropdown-Teil des Buttons navigieren.
+- Mit **Enter** oder **Leerzeichen** können Sie den jeweiligen Teil aktivieren.
+- Der Auswahl-Dialog (bei mehreren Solutions, nur über den Dropdown-Teil erreichbar) kann vollständig mit Tastatur bedient werden: Pfeiltasten zum Navigieren der Liste, **Enter** zum Bestätigen, **Escape** zum Abbrechen.
 
 Die Buttons zeigen Tooltips, wenn Sie den Mauszeiger über sie halten.

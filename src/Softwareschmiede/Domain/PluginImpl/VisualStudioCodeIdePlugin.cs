@@ -31,16 +31,6 @@ public sealed class VisualStudioCodeIdePlugin(
         return Task.FromResult(IdePluginCompatibility.Fallback);
     }
 
-    /// <inheritdoc/>
-    public Task OpenRepositoryAsync(string repositoryPath, CancellationToken ct = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
-
-        OpenDirectory(prozessStarter, visualStudioCodeLocator, repositoryPath);
-
-        return Task.CompletedTask;
-    }
-
     /// <summary>Öffnet das übergebene Verzeichnis in Visual Studio Code.</summary>
     /// <param name="prozessStarter">Startet den Öffnen-Befehl für das Verzeichnis.</param>
     /// <param name="visualStudioCodeLocator">Ermittelt den startbaren Visual-Studio-Code-Befehl.</param>

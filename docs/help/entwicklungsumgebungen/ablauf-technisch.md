@@ -137,11 +137,11 @@ flowchart TD
 
 ### Fehler beim IDE-Öffnen
 
-**Generisch (`IdeOeffnenService`):**
+**Generisch (`TaskDetailViewModel.OeffneIdeInternAsync`):**
 - Falls `plugin.FindEntryPointsAsync()` eine leere Liste liefert: `FileNotFoundException` wird geworfen (keine Kandidaten zum Öffnen vorhanden)
 
 **Visual Studio:**
-- Falls keine `.sln`-Datei gefunden: `FindEntryPointsAsync()` liefert eine leere Liste (löst die generische `FileNotFoundException` in `IdeOeffnenService` aus; sollte nicht passieren, da `Explicit` nur bei Fund gemeldet wird)
+- Falls keine `.sln`-Datei gefunden: `FindEntryPointsAsync()` liefert eine leere Liste (löst die generische `FileNotFoundException` in `TaskDetailViewModel.OeffneIdeInternAsync()` aus; sollte nicht passieren, da `Explicit` nur bei Fund gemeldet wird)
 - Falls `.sln`-Öffnen fehlschlägt: `IProzessStarter` ist verantwortlich (normalerweise Shell-Fehler)
 
 **Visual Studio Code:**

@@ -100,6 +100,62 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
         sut.KannIdeAuswaehlen.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Regressionstest: KannIdeAuswaehlen wird bereits am Ende von LadenAsync einmalig berechnet, ohne dass
+    /// zuvor OeffneIdeCommand/OeffneIdeAuswahlCommand ausgeführt werden muss - der Dropdown-Button des
+    /// Split-Buttons ist damit beim ersten Anzeigen der View korrekt sichtbar, statt (wie vor dem Fix) immer
+    /// mit KannIdeAuswaehlen == false zu starten. Kein Einstiegspunkt wird dabei geöffnet.
+    /// </summary>
+    [Fact]
+    public async Task KannIdeAuswaehlen_NachLadenAsync_WhenMultipleEntryPoints_ReturnsTrueOhneOeffnen()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Erste.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Zweite.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var sut = CreateSut(prozessStarterMock);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.KannIdeAuswaehlen.Should().BeTrue();
+        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
+    }
+
+    /// <summary>Regressionstest: Bei genau einem Einstiegspunkt bleibt KannIdeAuswaehlen bereits nach LadenAsync false, ohne dass ein Öffnen-Versuch nötig ist.</summary>
+    [Fact]
+    public async Task KannIdeAuswaehlen_NachLadenAsync_WhenOneEntryPoint_ReturnsFalse()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Einzige.sln"), string.Empty);
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.KannIdeAuswaehlen.Should().BeFalse();
+    }
+
+    /// <summary>Regressionstest: Ohne gefundene Einstiegspunkte bleibt KannIdeAuswaehlen bereits nach LadenAsync false, ohne dass dabei eine FehlerMeldung angezeigt wird (das Laden der Aufgabe selbst war erfolgreich).</summary>
+    [Fact]
+    public async Task KannIdeAuswaehlen_NachLadenAsync_WhenNoEntryPoints_ReturnsFalseOhneFehlerMeldung()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var sut = CreateSut(visualStudioCodeLocator: new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.KannIdeAuswaehlen.Should().BeFalse();
+        sut.FehlerMeldung.Should().BeNullOrEmpty("ein Ermittlungsfehler beim Laden darf nicht als FehlerMeldung angezeigt werden");
+    }
+
     /// <summary>Ohne gefundene Einstiegspunkte (kein .sln, Visual Studio Code nicht verfügbar) bleibt KannIdeAuswaehlen false und eine Fehlermeldung wird gesetzt.</summary>
     [Fact]
     public async Task KannIdeAuswaehlen_WhenNoEntryPoints_ReturnsFalse()
@@ -214,6 +270,43 @@ public sealed class TaskDetailViewModelTests_IdeAuswahl : TaskDetailViewModelTes
                 It.IsAny<CancellationToken>()),
             Times.Once);
         idePluginMock.Verify(p => p.OpenEntryPointAsync(zweiterEntryPoint, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Regressionstest: Schlägt OpenEntryPointAsync trotz mehrerer gefundener Einstiegspunkte fehl (z. B. IDE-Prozess
+    /// kann nicht gestartet werden), bleibt KannIdeAuswaehlen weiterhin true - der Dropdown-Button des Split-Buttons
+    /// darf nach einem fehlgeschlagenen Öffnen-Versuch nicht verschwinden, da der Anwender genau jetzt über den
+    /// Dropdown einen anderen Einstiegspunkt probieren könnte.
+    /// </summary>
+    [Fact]
+    public async Task KannIdeAuswaehlen_WhenOpenEntryPointFailsWithMultipleEntryPoints_BleibtTrue()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var ersterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "erste.sln"), "Erste Solution");
+        var zweiterEntryPoint = ErzeugeEntryPointMitDisplayName(Path.Combine(arbeitsverzeichnis, "zweite.sln"), "Zweite Solution");
+        var idePluginMock = new Mock<IIdePlugin>();
+        idePluginMock.SetupGet(p => p.PluginName).Returns("Test-IDE");
+        idePluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestIde");
+        idePluginMock.SetupGet(p => p.PluginType).Returns(PluginType.Ide);
+        idePluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        idePluginMock.Setup(p => p.CheckCompatibilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(IdePluginCompatibility.Explicit);
+        idePluginMock.Setup(p => p.FindEntryPointsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<IdeEntryPoint>)[ersterEntryPoint, zweiterEntryPoint]);
+        idePluginMock.Setup(p => p.OpenEntryPointAsync(It.IsAny<IdeEntryPoint>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("IDE-Prozess konnte nicht gestartet werden."));
+
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+
+        var sut = CreateSut(idePlugins: [idePluginMock.Object]);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty();
+        sut.KannIdeAuswaehlen.Should().BeTrue("die Anzahl der gefundenen Einstiegspunkte hat sich durch den Öffnen-Fehler nicht geändert");
     }
 
     /// <summary>Ohne gefundene Einstiegspunkte zeigt OeffneIdeAuswahlAsync dieselbe Fehlermeldung wie OeffneIdeAsync.</summary>

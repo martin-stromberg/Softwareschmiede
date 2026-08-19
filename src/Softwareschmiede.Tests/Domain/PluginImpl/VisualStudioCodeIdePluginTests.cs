@@ -56,35 +56,6 @@ public sealed class VisualStudioCodeIdePluginTests
         await aufruf.Should().ThrowAsync<ArgumentException>();
     }
 
-    /// <summary>OpenRepositoryAsync ruft IProzessStarter mit dem aufgelösten VS-Code-Befehl und gequotetem Pfad auf.</summary>
-    [Fact]
-    public async Task OpenRepositoryAsync_ShouldCallProzessStarter_WithCodeCommand()
-    {
-        var repositoryPfad = @"C:\repos\meinprojekt";
-        var prozessStarterMock = new Mock<IProzessStarter>();
-        var sut = new VisualStudioCodeIdePlugin(prozessStarterMock.Object, CreateLocator(new VisualStudioCodeAvailability(true, "code.cmd")));
-
-        await sut.OpenRepositoryAsync(repositoryPfad);
-
-        prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == "code.cmd" &&
-                a.Argumente == $"\"{repositoryPfad}\"" &&
-                a.ShellAusfuehren == false)),
-            Times.Once);
-    }
-
-    /// <summary>OpenRepositoryAsync wirft, wenn VS Code nicht auflösbar ist.</summary>
-    [Fact]
-    public async Task OpenRepositoryAsync_ShouldThrow_WhenVsCodeNotAvailable()
-    {
-        var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
-
-        var aufruf = async () => await sut.OpenRepositoryAsync(@"C:\repos\meinprojekt");
-
-        await aufruf.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Visual Studio Code*");
-    }
-
     /// <summary>FindEntryPointsAsync liefert für VS Code immer genau einen Einstiegspunkt: das Repository-Root selbst.</summary>
     [Fact]
     public async Task FindEntryPointsAsync_LiefertImmerGenauEinen()

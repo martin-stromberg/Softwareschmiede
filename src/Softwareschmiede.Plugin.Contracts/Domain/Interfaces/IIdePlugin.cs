@@ -12,11 +12,6 @@ public interface IIdePlugin : IPlugin
     /// <returns>Das Kompatibilitätsergebnis für das Repository.</returns>
     Task<IdePluginCompatibility> CheckCompatibilityAsync(string repositoryPath, CancellationToken ct = default);
 
-    /// <summary>Öffnet das Repository in der IDE.</summary>
-    /// <param name="repositoryPath">Pfad des zu öffnenden Repositories.</param>
-    /// <param name="ct">Cancellation Token.</param>
-    Task OpenRepositoryAsync(string repositoryPath, CancellationToken ct = default);
-
     /// <summary>Ermittelt alle verfügbaren Einstiegspunkte für das angegebene Repository.</summary>
     /// <param name="repositoryPath">Pfad des zu durchsuchenden Repositories.</param>
     /// <param name="ct">Cancellation Token.</param>

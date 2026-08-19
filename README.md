@@ -234,7 +234,6 @@ Der IDE-öffnen-Button in der Aufgabendetailansicht (Ribbon) wird als Split-Butt
 
 **ViewModel-Eigenschaften für die Split-Button-Logik:**
 - `KannIdeAuswaehlen` (`bool`, read-only) — Gibt an, ob mehrere Einstiegspunkte verfügbar sind; steuert die Sichtbarkeit des Dropdown-Buttons
-- `VerfuegbareEinstiegspunkte` (`IReadOnlyList<IdeEntryPoint>`, optional) — Gepufferte Liste der zuletzt ermittelten Einstiegspunkte (für Debugging/Logging)
 
 ---
 

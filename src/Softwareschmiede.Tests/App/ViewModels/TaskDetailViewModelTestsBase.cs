@@ -129,7 +129,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(prozessStarterMock);
+        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
 
         return new TaskDetailViewModel(
             _aufgabeService,

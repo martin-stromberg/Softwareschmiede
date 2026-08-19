@@ -426,31 +426,21 @@
                     <!-- Rechte Spalte: Einstellungen des im Aktivierungsregister ausgewählten Plugins -->
                     <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <StackPanel Visibility="{Binding IsScmKiPluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="{Binding SelectedPlugin.PluginName}"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                           Margin="0,0,0,8" />
-                                <CheckBox Content="Plugin aktiviert"
-                                          AutomationProperties.Name="PluginAktiviert"
-                                          IsChecked="{Binding SelectedPlugin.IsEnabled, Mode=TwoWay}"
-                                          Margin="0,0,0,12" />
-                                <ItemsControl ItemsSource="{Binding SelectedPluginSettings}"
-                                              ItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}" />
-                            </StackPanel>
+                            <controls:PluginDetailPanel
+                                Visibility="{Binding IsScmKiPluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                HeaderText="{Binding SelectedPlugin.PluginName}"
+                                IsEnabledChecked="{Binding SelectedPlugin.IsEnabled, Mode=TwoWay}"
+                                SettingsSource="{Binding SelectedPluginSettings}"
+                                SettingsItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}"
+                                CheckboxAutomationName="PluginAktiviert" />
 
-                            <StackPanel Visibility="{Binding IsIdePluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <TextBlock Text="{Binding SelectedIdePlugin.PluginName}"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                           Margin="0,0,0,8" />
-                                <CheckBox Content="Plugin aktiviert"
-                                          AutomationProperties.Name="IdePluginAktiviert"
-                                          IsChecked="{Binding SelectedIdePlugin.IsEnabled, Mode=TwoWay}"
-                                          Margin="0,0,0,12" />
-                                <ItemsControl ItemsSource="{Binding SelectedIdePluginSettings}"
-                                              ItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}" />
-                            </StackPanel>
+                            <controls:PluginDetailPanel
+                                Visibility="{Binding IsIdePluginContentVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                                HeaderText="{Binding SelectedIdePlugin.PluginName}"
+                                IsEnabledChecked="{Binding SelectedIdePlugin.IsEnabled, Mode=TwoWay}"
+                                SettingsSource="{Binding SelectedIdePluginSettings}"
+                                SettingsItemTemplate="{StaticResource PluginSettingGroupsItemTemplate}"
+                                CheckboxAutomationName="IdePluginAktiviert" />
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

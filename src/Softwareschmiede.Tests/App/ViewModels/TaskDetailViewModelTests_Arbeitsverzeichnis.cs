@@ -74,7 +74,7 @@ public sealed class TaskDetailViewModelTests_Arbeitsverzeichnis : TaskDetailView
         prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 
-    /// <summary>OeffneIdeAsync ruft IdeOeffnenService.FindeSolutions() mit dem über WorkingDirectoryResolver aufgelösten Arbeitsverzeichnis auf und öffnet eine dort gefundene Solution, obwohl im Repository-Root keine .sln-Datei liegt.</summary>
+    /// <summary>OeffneIdeAsync findet über das aufgelöste IDE-Plugin (FindEntryPointsAsync) eine Solution im über WorkingDirectoryResolver aufgelösten Arbeitsverzeichnis und öffnet sie, obwohl im Repository-Root keine .sln-Datei liegt.</summary>
     [Fact]
     public async Task OeffneIdeAsync_FindetSolutionImAufgeloestenArbeitsverzeichnis()
     {

@@ -161,7 +161,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
-        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(prozessStarterMock);
+        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
 
         // Die von OeffneIdeCommand über _pluginSelectionService aufgelösten IDE-Plugins (Visual Studio,
         // Visual Studio Code) müssen denselben IProzessStarter/IVisualStudioCodeLocator verwenden wie die

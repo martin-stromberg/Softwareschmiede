@@ -76,7 +76,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices();
+        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
 
         return new TaskDetailViewModel(
             _aufgabeService,

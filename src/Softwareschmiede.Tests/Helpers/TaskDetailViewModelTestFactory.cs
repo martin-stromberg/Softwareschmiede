@@ -52,7 +52,7 @@ public static class TaskDetailViewModelTestFactory
         var fileExplorerViewModel = CreateStub();
         var todoListViewModel = new TodoListViewModel(todoService, NullLogger<TodoListViewModel>.Instance);
 
-        var arbeitsverzeichnisOeffnenService = CreateVerzeichnisAktionenServices();
+        var arbeitsverzeichnisOeffnenService = CreateArbeitsverzeichnisOeffnenService();
 
         return new TaskDetailViewModel(
             aufgabeService,
@@ -84,7 +84,7 @@ public static class TaskDetailViewModelTestFactory
     /// <summary>Erstellt einen ArbeitsverzeichnisOeffnenService mit dem übergebenen (oder einem neuen) IProzessStarter-Mock.</summary>
     /// <param name="prozessStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
     /// <returns>Ein einsatzbereiter ArbeitsverzeichnisOeffnenService.</returns>
-    public static ArbeitsverzeichnisOeffnenService CreateVerzeichnisAktionenServices(
+    public static ArbeitsverzeichnisOeffnenService CreateArbeitsverzeichnisOeffnenService(
         Mock<IProzessStarter>? prozessStarterMock = null)
     {
         prozessStarterMock ??= new Mock<IProzessStarter>();

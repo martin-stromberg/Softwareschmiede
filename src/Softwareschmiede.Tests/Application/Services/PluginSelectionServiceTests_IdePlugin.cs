@@ -18,8 +18,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([visualStudio]);
-        var appEinstellungService = CreateAppEinstellungService();
-        var sut = CreateSut(pluginManager.Object, appEinstellungService);
+        var (sut, _) = CreateSut(pluginManager.Object);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
@@ -33,7 +32,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
-        var sut = CreateSut(pluginManager.Object, CreateAppEinstellungService());
+        var (sut, _) = CreateSut(pluginManager.Object);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
@@ -47,7 +46,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([vsCode, visualStudio]);
-        var sut = CreateSut(pluginManager.Object, CreateAppEinstellungService());
+        var (sut, _) = CreateSut(pluginManager.Object);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
@@ -61,7 +60,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Incompatible);
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
-        var sut = CreateSut(pluginManager.Object, CreateAppEinstellungService());
+        var (sut, _) = CreateSut(pluginManager.Object);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
@@ -75,9 +74,8 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Fallback);
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
-        var appEinstellungService = CreateAppEinstellungService();
+        var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
         await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode,Softwareschmiede.VisualStudio");
-        var sut = CreateSut(pluginManager.Object, appEinstellungService);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
@@ -90,7 +88,7 @@ public sealed class PluginSelectionServiceTests_IdePlugin
     {
         var defaultPlugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([], defaultPlugin);
-        var sut = CreateSut(pluginManager.Object, CreateAppEinstellungService());
+        var (sut, _) = CreateSut(pluginManager.Object);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
@@ -104,22 +102,27 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Incompatible);
         var defaultPlugin = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Incompatible);
         var pluginManager = CreatePluginManager([visualStudio], defaultPlugin);
-        var sut = CreateSut(pluginManager.Object, CreateAppEinstellungService());
+        var (sut, _) = CreateSut(pluginManager.Object);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt");
 
         resolved.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
     }
 
-    private static PluginSelectionService CreateSut(IPluginManager pluginManager, AppEinstellungService appEinstellungService)
+    /// <summary>
+    /// Erzeugt den SUT und konstruiert dabei <see cref="PluginDefaultSettingsService"/>, <see cref="PluginActivationService"/>
+    /// und <see cref="AppEinstellungService"/> aus demselben <see cref="SoftwareschmiededDbContext"/> — wie in der Produktion,
+    /// wo sich alle drei Dienste innerhalb eines <see cref="PluginSelectionService"/> denselben Scoped DbContext teilen.
+    /// </summary>
+    private static (PluginSelectionService Sut, AppEinstellungService AppEinstellungService) CreateSut(IPluginManager pluginManager)
     {
-        var defaultSettings = new PluginDefaultSettingsService(CreateDb(), NullLogger<PluginDefaultSettingsService>.Instance);
+        var db = CreateDb();
+        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var activationService = new PluginActivationService(appEinstellungService, pluginManager, NullLogger<PluginActivationService>.Instance);
-        return new PluginSelectionService(pluginManager, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
+        var sut = new PluginSelectionService(pluginManager, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
+        return (sut, appEinstellungService);
     }
-
-    private static AppEinstellungService CreateAppEinstellungService()
-        => new(CreateDb(), NullLogger<AppEinstellungService>.Instance);
 
     private static SoftwareschmiededDbContext CreateDb() => TestDbContextFactory.Create();
 

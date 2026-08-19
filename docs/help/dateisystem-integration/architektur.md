@@ -16,11 +16,11 @@
 | `VisualStudioCodeLocator` | Klasse (Infrastructure.Services) | Sucht `code.cmd`/`code` in `PATH` und typischen Windows-Installationspfaden. |
 | `TaskDetailViewModel.OeffneIdeInternAsync` | Methode (App.ViewModels) | Löst über `PluginSelectionService.ResolveIdePluginAsync()` das zuständige `IIdePlugin` auf und ruft `IIdePlugin.FindEntryPointsAsync()` auf um 0..n `IdeEntryPoint`-Kandidaten zu ermitteln; verzweigt nach deren Anzahl (0 → Exception, 1 → direkt öffnen, >1 → Dialog-Callback) und öffnet den gewählten Einstiegspunkt über `plugin.OpenEntryPointAsync()`. |
 | `PluginSelectionService` | Klasse (Application.Services) | Löst über `ResolveIdePluginAsync(repositoryPath, ct)` das für das Arbeitsverzeichnis zuständige `IIdePlugin` auf: erstes explizit kompatibles Plugin gewinnt, sonst erstes fallback-kompatibles aktives Plugin, sonst `IPluginManager.GetDefaultIdePlugin()`. |
-| `IIdePlugin` | Interface (Domain.Interfaces) | Vertrag für IDE-Plugins: `CheckCompatibilityAsync()` (Explicit/Fallback/Incompatible), `OpenRepositoryAsync()` sowie das generische Mehreinstiegspunkt-Paar `FindEntryPointsAsync()`/`OpenEntryPointAsync()`. |
+| `IIdePlugin` | Interface (Domain.Interfaces) | Vertrag für IDE-Plugins: `CheckCompatibilityAsync()` (Explicit/Fallback/Incompatible) sowie das generische Mehreinstiegspunkt-Paar `FindEntryPointsAsync()`/`OpenEntryPointAsync()`. |
 | `IdeEntryPoint` | Value Object (Plugin.Contracts.Domain.ValueObjects) | Immutabler Datenträger für einen konkreten IDE-Einstiegspunkt (`Path`, optional `DisplayName`). |
 | `VisualStudioIdePlugin` | Klasse (Domain.PluginImpl) | Eingebautes IDE-Plugin für Visual Studio; `Explicit`-kompatibel bei vorhandener `.sln`/`.slnx`-Datei; `FindEntryPointsAsync()` liefert je gefundener Solution-Datei einen `IdeEntryPoint`, `OpenEntryPointAsync()` öffnet den gewählten Einstiegspunkt per Shell-Execute. |
 | `VisualStudioCodeIdePlugin` | Klasse (Domain.PluginImpl) | Eingebautes IDE-Plugin für Visual Studio Code; immer `Fallback`-kompatibel; `FindEntryPointsAsync()` liefert immer genau einen `IdeEntryPoint` (das Repository-Root), `OpenEntryPointAsync()` öffnet das Arbeitsverzeichnis über `IVisualStudioCodeLocator`/`code`. |
-| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe; nutzt `WorkingDirectoryResolver` zur Auflösung des Arbeitsverzeichnisses, übergibt `IdeOeffnenService` einen Auswahl-Callback für den Solution-Auswahl-Dialog bei mehreren `IdeEntryPoint`-Kandidaten. |
+| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe; nutzt `WorkingDirectoryResolver` zur Auflösung des Arbeitsverzeichnisses; `OeffneIdeInternAsync()` löst Plugin und Einstiegspunkte über `ErmittleIdeEntryPointsAsync()` auf und übergibt bei mehreren `IdeEntryPoint`-Kandidaten (nur über den Dropdown-Button) einen Auswahl-Callback (`WaehleEntryPointAsync`) für den Solution-Auswahl-Dialog. |
 | `IDialogService` / `WpfDialogService` | Interface / Klasse (App.Services) | Dialog-Gateway; implementiert `ShowSolutionSelectionDialogAsync()`. |
 | `SolutionSelectionDialog` | WPF-Window (App.Views) | Modales Fenster für Solution-Auswahl bei mehreren Dateien. |
 | `SolutionSelectionDialogViewModel` | Klasse (App.ViewModels) | Presentation Model für Dialog; verwaltet Solution-Liste und Benutzer-Auswahl. |
@@ -227,12 +227,13 @@ graph TD
 ### Fehlertoleranz
 
 - **Prozessstart-Fehler:** Vollständig abgefangen und geloggt. Fehler blockiert nicht die Anwendung.
-- **Dateisuche-Fehler:** `VisualStudioIdePlugin.FindEntryPointsAsync()` gibt eine leere Liste bei jedem Fehler zurück (sicherer Fallback); `IdeOeffnenService.OpenRepositoryInIdeAsync()` wirft in diesem Fall eine aussagekräftige `FileNotFoundException`.
+- **Dateisuche-Fehler:** `VisualStudioIdePlugin.FindEntryPointsAsync()` gibt eine leere Liste bei jedem Fehler zurück (sicherer Fallback); `TaskDetailViewModel.OeffneIdeInternAsync()` wirft in diesem Fall eine aussagekräftige `FileNotFoundException`.
 - **Dialog-Abbruch:** Normales Verhalten, keine Fehlerbehandlung erforderlich.
 
 ### Caching und Performance
 
-- **Keine Solution-Vorab-Suche mehr beim Laden:** `OeffneIdeCommand.CanExecute` hängt nur noch von `ShowFileExplorerPanel` (vorhandenes Arbeitsverzeichnis) ab; die Einstiegspunkt-Suche (`plugin.FindEntryPointsAsync()`) und die Plugin-Kompatibilitätsprüfung laufen erst beim Klick auf „IDE öffnen".
+- **`CanExecute` ohne Vorab-Suche:** `OeffneIdeCommand.CanExecute`/`OeffneIdeAuswahlCommand.CanExecute` hängen nur von `ShowFileExplorerPanel` (vorhandenes Arbeitsverzeichnis) ab, nicht von einer Einstiegspunkt-Suche.
+- **Einmalige Vorab-Ermittlung nur für Dropdown-Sichtbarkeit:** Am Ende von `LadenAsync()` ruft `AktualisiereKannIdeAuswaehlenAsync()` einmalig `ErmittleIdeEntryPointsAsync()` auf (Plugin-Kompatibilitätsprüfung + `plugin.FindEntryPointsAsync()`), um `KannIdeAuswaehlen` zu setzen und damit die Sichtbarkeit des Dropdown-Teils des Split-Buttons zu bestimmen — ohne dabei etwas zu öffnen. Die eigentliche Öffnen-Aktion beim Klick führt dieselbe Ermittlung erneut aus (kein Zwischenspeichern der Einstiegspunkte).
 - **Typischerweise schnell:** Für ein durchschnittliches Repository mit 1–5 Solutions dauert `VisualStudioIdePlugin.FindEntryPointsAsync()` < 10 ms.
 - **Keine rekursive Suche:** Verhindert Performance-Degradation in großen Verzeichnisstrukturen.
 

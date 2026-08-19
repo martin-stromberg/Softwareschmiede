@@ -101,25 +101,6 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         result.Should().Be(IdePluginCompatibility.Incompatible);
     }
 
-    /// <summary>Bei mehreren .sln-Dateien wird die alphabetisch erste geöffnet.</summary>
-    [Fact]
-    public async Task OpenRepositoryAsync_ShouldOpenFirstSolution_WhenMultipleExist()
-    {
-        var verzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(verzeichnis, "Zweite.sln"), string.Empty);
-        File.WriteAllText(Path.Combine(verzeichnis, "Erste.sln"), string.Empty);
-        var prozessStarterMock = new Mock<IProzessStarter>();
-        var sut = new VisualStudioIdePlugin(prozessStarterMock.Object);
-
-        await sut.OpenRepositoryAsync(verzeichnis);
-
-        prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == Path.Combine(verzeichnis, "Erste.sln") &&
-                a.ShellAusfuehren == true)),
-            Times.Once);
-    }
-
     /// <summary>Bei mehreren .sln-/.slnx-Dateien liefert FindEntryPointsAsync alle Einstiegspunkte alphabetisch sortiert.</summary>
     [Fact]
     public async Task FindEntryPointsAsync_MitMehrerenSln_LiefertAlleAlphabetischSortiert()

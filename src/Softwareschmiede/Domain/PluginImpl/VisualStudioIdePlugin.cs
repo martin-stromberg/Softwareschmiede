@@ -32,19 +32,6 @@ public sealed class VisualStudioIdePlugin(IProzessStarter prozessStarter) : IIde
         return Task.FromResult(compatibility);
     }
 
-    /// <inheritdoc/>
-    public Task OpenRepositoryAsync(string repositoryPath, CancellationToken ct = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
-
-        var solutionPfad = FindSolutionFiles(repositoryPath).FirstOrDefault()
-            ?? throw new FileNotFoundException($"Keine .sln/.slnx-Datei im Repository gefunden: {repositoryPath}");
-
-        OpenSolutionFile(prozessStarter, solutionPfad);
-
-        return Task.CompletedTask;
-    }
-
     /// <summary>Ermittelt alle <c>*.sln</c>-/<c>*.slnx</c>-Dateien auf oberster Ebene des Verzeichnisses, alphabetisch sortiert.</summary>
     /// <param name="repositoryPath">Der zu durchsuchende Verzeichnispfad.</param>
     /// <returns>Die gefundenen Solution-Pfade, alphabetisch sortiert; leere Liste bei nicht existierendem Verzeichnis.</returns>

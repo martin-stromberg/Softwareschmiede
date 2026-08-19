@@ -1,0 +1,17 @@
+<UserControl x:Class="Softwareschmiede.App.Controls.PluginDetailPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <StackPanel>
+        <TextBlock Text="{Binding HeaderText, ElementName=Root}"
+                   FontWeight="Bold"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   Margin="0,0,0,8" />
+        <CheckBox Content="Plugin aktiviert"
+                  AutomationProperties.Name="{Binding CheckboxAutomationName, ElementName=Root}"
+                  IsChecked="{Binding IsEnabledChecked, ElementName=Root, Mode=TwoWay}"
+                  Margin="0,0,0,12" />
+        <ItemsControl ItemsSource="{Binding SettingsSource, ElementName=Root}"
+                      ItemTemplate="{Binding SettingsItemTemplate, ElementName=Root}" />
+    </StackPanel>
+</UserControl>

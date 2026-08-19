@@ -9,7 +9,7 @@ Das IDE-Öffnen-Feature in der TaskDetailView wird um ein Split-Button-Muster er
 | Komponente / Bereich | Gewählter Ansatz | Begründung |
 |----------------------|-----------------|------------|
 | **Split-Button-Komponente** | Neue dedizierte `RibbonSplitButton.xaml`-Komponente statt Erweiterung von `RibbonLargeButton` | Saubere Trennung der Verantwortlichkeiten; `RibbonLargeButton` bleibt unverändert und kann für andere Zwecke wiederverwendet werden. Split-Button-Logik (Dropdown-Sichtbarkeit, zwei separate Befehle) unterscheidet sich grundlegend vom Single-Button-Verhalten. |
-| **Einstiegspunkte-Ermittlung** | On-demand beim Dropdown-Klick statt bei View-Initialisierung | Schnellere View-Initialisierung, verzögerte Ermittlung nur wenn nötig. Bei TaskDetailView mit bereits geladenen Aufgaben ist der Overhead minimal. |
+| **Einstiegspunkte-Ermittlung** | Hybrid: einmalige Berechnung von `KannIdeAuswaehlen` am Ende von `LadenAsync` (ohne `OpenEntryPointAsync`) **zusätzlich** zur on-demand-Ermittlung bei jedem Haupt-/Dropdown-Button-Klick | Der Dropdown-Button muss bereits beim ersten Anzeigen der View korrekt sichtbar/unsichtbar sein (`TaskDetailViewModel` ist `Transient` registriert, jede neu geöffnete View startet sonst mit `KannIdeAuswaehlen == false`). Die zusätzliche Ermittlung bei jedem Öffnen-Versuch bleibt bestehen, da sich Einstiegspunkte zwischen Laden und Klick ändern können und der eigentliche Öffnen-Vorgang ohnehin eine frische Ermittlung benötigt. Der Overhead der zusätzlichen Ermittlung beim Laden ist bei bereits geladenen Aufgaben minimal. |
 | **Dialog-Anzeige** | Wiederverwendung von `ShowSolutionSelectionDialogAsync` (mit Pfad-Strings) statt neue Methode mit vollständigen `IdeEntryPoint`-Objekten | Minimale Änderungen an bestehenden Interfaces; `IdeEntryPoint.DisplayName` wird zur Anzeige genutzt. Eine neue `ShowIdeSelectionDialogAsync` mit Plugin-Informationen bleibt als optionale zukünftige Erweiterung. |
 | **Fallback-Logik Haupt-Button** | Haupt-Button verwendet weiterhin Fallback-Verhalten via `PluginSelectionService.ResolveIdePluginAsync` (kein expliziter Callback an `OpenRepositoryInIdeAsync`) | Konsistent mit aktuellem Verhalten; kein Breaking Change. Falls primäres Plugin kompatibel ist und Einstiegspunkte hat, wird der erste geöffnet. |
 | **Dialog-Inhalt** | Nur Einstiegspunkte des priorisierten (aufgelösten) IDE-Plugins anzeigen | Vereinfachte UX; mehrere IDE-Plugins werden durch Priorisierung bereits in der Konfiguration handhabbar. |
@@ -53,17 +53,25 @@ Beteiligte Klassen/Komponenten: `RibbonSplitButton`, `TaskDetailViewModel`, `Ide
 
 ### Sichtbarkeitskontrolle des Dropdown-Buttons
 
-1. TaskDetailView wird initialisiert oder Aufgabe wechselt
-2. Property `KannIdeAuswaehlen` wird (ggf. asynchron) berechnet:
-   - Arbeitsverzeichnis wird ermittelt
-   - `IdeOeffnenService.OpenRepositoryInIdeAsync` wird aufgerufen mit leerer Einstiegspunkte-Liste
-   - Falls Fehler: `KannIdeAuswaehlen = false`
-   - Einstiegspunkte-Anzahl wird geprüft
+Hybrides Verhalten: `KannIdeAuswaehlen` wird sowohl einmalig beim Laden der Aufgabe als auch erneut bei jedem Öffnen-Versuch berechnet, damit der Dropdown-Button bereits beim ersten Anzeigen der View korrekt sichtbar/unsichtbar ist und trotzdem bei jedem Öffnen-Versuch den aktuellen Stand widerspiegelt.
+
+**a) Einmalige Berechnung beim Laden (`LadenAsync`):**
+
+1. `LadenAsync` wird beim Initialisieren der View oder beim Wechsel der Aufgabe aufgerufen (Setter von `AufgabeId`)
+2. Am Ende von `LadenAsync` wird `KannIdeAuswaehlen` einmalig berechnet:
+   - Arbeitsverzeichnis wird über `ErmittleEffektivesArbeitsverzeichnisAsync` ermittelt
+   - IDE-Plugin wird über `PluginSelectionService.ResolveIdePluginAsync` aufgelöst
+   - `FindEntryPointsAsync` wird auf dem Plugin aufgerufen — **ohne** anschließenden Aufruf von `OpenEntryPointAsync`
+   - Falls Fehler, kein Plugin oder kein Arbeitsverzeichnis: `KannIdeAuswaehlen = false` (wird **nicht** als `FehlerMeldung` angezeigt, da das Laden der Aufgabe selbst erfolgreich war)
    - **< 2 Einstiegspunkte:** `KannIdeAuswaehlen = false` → Dropdown-Button unsichtbar
    - **≥ 2 Einstiegspunkte:** `KannIdeAuswaehlen = true` → Dropdown-Button sichtbar
 3. Binding in `RibbonSplitButton` reagiert auf Eigenschaftsänderung und passt Sichtbarkeit an
 
-Beteiligte Klassen/Komponenten: `TaskDetailViewModel`, `IdeOeffnenService`, `RibbonSplitButton` (XAML-Binding)
+**b) Erneute Berechnung bei jedem Öffnen-Versuch (Haupt- oder Dropdown-Button-Klick):**
+
+Bei jedem Klick auf Haupt- oder Dropdown-Button wird `KannIdeAuswaehlen` als Nebeneffekt von `OeffneIdeInternAsync` erneut berechnet (siehe Abschnitte „Haupt-Button-Klick" und „Dropdown-Button-Klick"), da hier ohnehin eine frische Ermittlung der Einstiegspunkte für den eigentlichen Öffnen-Vorgang stattfindet. Diese erneute Berechnung ersetzt den beim Laden ermittelten Wert.
+
+Beteiligte Klassen/Komponenten: `TaskDetailViewModel`, `PluginSelectionService`, IDE-Plugin, `RibbonSplitButton` (XAML-Binding)
 
 ## Neue Klassen
 
