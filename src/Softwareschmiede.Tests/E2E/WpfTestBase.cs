@@ -888,12 +888,15 @@ public abstract class WpfTestBase : IDisposable
     /// Klickt den "Speichern"-Button in der <c>TaskDetailView</c> und wartet auf das Wiedererscheinen
     /// von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>).
     /// </summary>
-    protected void AufgabeDetailSpeichern(AutomationElement mainWindow)
+    protected void AufgabeDetailSpeichern(AutomationElement mainWindow, bool navigateBackToProject)
     {
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
         speichernButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+        if (navigateBackToProject)
+        {
+            NavigateBackFromTaskToProject((Window)mainWindow);
+            WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+        }
     }
 
     /// <summary>

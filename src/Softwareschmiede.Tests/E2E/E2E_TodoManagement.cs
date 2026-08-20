@@ -30,7 +30,7 @@ public partial class End2EndTest
 
         NeueAufgabeAnlegen(mainWindow);
         AufgabeTitelSetzen(mainWindow, "Todo-Testaufgabe");
-        AufgabeDetailSpeichern(mainWindow);
+        AufgabeDetailSpeichern(mainWindow, true);
         AufgabeAusListeOeffnen(mainWindow, "Todo-Testaufgabe");
 
         // Todo-Tab öffnen: Todo-Liste ist leer, Badge nicht sichtbar

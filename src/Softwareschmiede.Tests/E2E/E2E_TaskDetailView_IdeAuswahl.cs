@@ -37,6 +37,7 @@ public partial class End2EndTest
         StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
 
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        NavigateBackFromProjectCardToProjectsList(mainWindow);
 
         // Phase 1: Visual-Studio-Code-Plugin deaktivieren (Einstellungen), damit ohne .sln-Datei kein
         // Fallback-Plugin mehr existiert und FindEntryPointsAsync 0 Einstiegspunkte liefert.
@@ -48,7 +49,7 @@ public partial class End2EndTest
         speichernButton.AsButton().Click();
         WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
 
-        NavigateBackToDashboard(mainWindow);
+        NavigateToProjects(mainWindow);
         var offeneAufgaben = OffeneAufgabenItems(mainWindow);
         ErsteOffeneAufgabeOeffnen(offeneAufgaben);
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
