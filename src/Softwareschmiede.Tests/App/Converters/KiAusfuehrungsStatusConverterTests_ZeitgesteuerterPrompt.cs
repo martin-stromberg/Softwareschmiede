@@ -38,6 +38,7 @@ public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
             Id = Guid.NewGuid(),
             Titel = "Laufende Aufgabe mit geplantem Prompt",
             Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
             AktiveRunId = "run-1",
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
             LaufStatus = AufgabeLaufStatus.Laeuft,
@@ -58,6 +59,7 @@ public sealed class KiAusfuehrungsStatusConverterTests_ZeitgesteuerterPrompt
             Id = Guid.NewGuid(),
             Titel = "Aufgabe ohne geplanten Prompt",
             Status = AufgabeStatus.Wartend,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
             HasScheduledPrompt = false
         };
 

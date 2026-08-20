@@ -54,7 +54,7 @@ public partial class End2EndTest : WpfTestBase
         DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E(mainWindow);
         AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(mainWindow);
         ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(mainWindow);
-        AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E(mainWindow);
+        AufgabeOeffnen_NachStoppen_StartetCliNichtAutomatischErstExplizit_E2E(mainWindow);
         AufgabeStarten_KlontRepositoryUndStartetCli_E2E(mainWindow);
         SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E(mainWindow);
         await DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E(mainWindow);

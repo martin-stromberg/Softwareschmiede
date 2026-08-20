@@ -31,7 +31,7 @@ public sealed class AufgabeRecoveryService
 
     /// <summary>
     /// Scannt alle Aufgaben nach Recovery-Kandidaten.
-    /// Kandidaten: Status <see cref="AufgabeStatus.Gestartet"/> oder <see cref="AufgabeStatus.Wartend"/>,
+    /// Kandidaten: aktiver Aufgabenstatus, persistierter Ausfuehrungsstatus Aktiv,
     /// Heartbeat älter als 5 Minuten, kein laufender CLI-Prozess.
     /// </summary>
     public async Task<IEnumerable<Guid>> ScanForRecoveryCandidatesAsync(CancellationToken ct = default)
@@ -41,6 +41,7 @@ public sealed class AufgabeRecoveryService
         var kandidaten = await _db.Aufgaben
             .AsNoTracking()
             .Where(a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status)
+                && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
                 && a.LastHeartbeatUtc != null
                 && a.LastHeartbeatUtc < cutoff)
             .Select(a => a.Id)
@@ -71,7 +72,7 @@ public sealed class AufgabeRecoveryService
             throw new InvalidOperationException("Aufgabe wurde nicht gefunden.");
         }
 
-        if (!IstRecoveryStatus(aufgabe.Status))
+        if (!IstRecoveryStatus(aufgabe.Status, aufgabe.AusfuehrungsStatus))
         {
             LogRejected(correlationId, aufgabeId, "InvalidState");
             throw new InvalidOperationException("Wiederherstellung für aktuellen Status nicht verfügbar.");
@@ -93,11 +94,12 @@ public sealed class AufgabeRecoveryService
         }
 
         _logger.LogInformation(
-            "TaskRecoveryEligibilityChecked CorrelationId={CorrelationId} TaskId={TaskId} IsRunning={IsRunning} CurrentStatus={CurrentStatus}",
+            "TaskRecoveryEligibilityChecked CorrelationId={CorrelationId} TaskId={TaskId} IsRunning={IsRunning} CurrentStatus={CurrentStatus} CurrentAusfuehrungsStatus={CurrentAusfuehrungsStatus}",
             correlationId,
             aufgabeId,
             isRunning,
-            aufgabe.Status);
+            aufgabe.Status,
+            aufgabe.AusfuehrungsStatus);
 
         if (isRunning)
         {
@@ -119,6 +121,7 @@ public sealed class AufgabeRecoveryService
                 rowCount = await _db.Aufgaben
                     .Where(a => a.Id == aufgabeId
                         && a.Status == aufgabe.Status
+                        && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
                         && a.RecoveryVersion == aufgabe.RecoveryVersion)
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(a => a.Status, AufgabeStatus.Gestartet)
@@ -129,6 +132,7 @@ public sealed class AufgabeRecoveryService
                 var tracked = await _db.Aufgaben.FirstOrDefaultAsync(a => a.Id == aufgabeId, ct);
                 if (tracked is null
                     || tracked.Status != aufgabe.Status
+                    || tracked.AusfuehrungsStatus != AufgabeAusfuehrungsStatus.Aktiv
                     || tracked.RecoveryVersion != aufgabe.RecoveryVersion)
                 {
                     rowCount = 0;
@@ -199,6 +203,7 @@ public sealed class AufgabeRecoveryService
             aufgabeId,
             reasonCode);
 
-    internal static bool IstRecoveryStatus(AufgabeStatus status)
-        => status.IstAktivOderWartend();
+    internal static bool IstRecoveryStatus(AufgabeStatus status, AufgabeAusfuehrungsStatus ausfuehrungsStatus)
+        => status.IstAktivOderWartend()
+            && ausfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv;
 }

@@ -257,6 +257,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             {
                 await CancelAndDisposeConPtyResourcesAsync(earlyExitHandle).ConfigureAwait(false);
                 RaiseRunningCountChanged();
+                await PersistAusfuehrungBeendetAsync(aufgabeId).ConfigureAwait(false);
                 CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
                 return handle;
             }
@@ -467,11 +468,50 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 status = CliProcessStatus.Gestoppt;
             }
 
+            await PersistAusfuehrungBeendetAsync(aufgabeId).ConfigureAwait(false);
             CliProcessStatusChanged?.Invoke(aufgabeId, status);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler im Exited-Handler ({LogKontext}) für Aufgabe {AufgabeId}.", logKontext, aufgabeId);
+        }
+    }
+
+    private async Task PersistAusfuehrungBeendetAsync(Guid aufgabeId)
+    {
+        if (_isDisposed)
+        {
+            _logger.LogWarning(
+                "Ausführungsstatus für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
+                aufgabeId);
+            return;
+        }
+
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+
+            if (_isDisposed)
+            {
+                _logger.LogWarning(
+                    "Ausführungsstatus für Aufgabe {AufgabeId} nicht persistiert, da der Dienst bereits beendet wird.",
+                    aufgabeId);
+                return;
+            }
+
+            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+            await aufgabeService.AktivenLaufBeendenAsync(aufgabeId).ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "Ausführungsstatus für Aufgabe {AufgabeId} konnte nicht persistiert werden, da der ServiceProvider bereits disposed wurde.",
+                aufgabeId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Fehler beim Persistieren des beendeten Ausführungsstatus für Aufgabe {AufgabeId}.", aufgabeId);
         }
     }
 

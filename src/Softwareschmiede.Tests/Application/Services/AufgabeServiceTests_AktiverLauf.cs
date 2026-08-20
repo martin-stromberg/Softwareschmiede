@@ -70,6 +70,7 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         geladen.LetzterCliStartUtc!.Value.Should().BeOnOrAfter(vorUpdate.AddSeconds(-1));
         geladen.LetzterCliStartUtc!.Value.Should().BeOnOrBefore(nachUpdate.AddSeconds(1));
         geladen.LaufStatus.Should().Be(AufgabeLaufStatus.Laeuft);
+        geladen.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
     }
 
     /// <summary>AktivenLaufBeendenAsync entfernt eine zuvor gesetzte AktiveRunId und den LaufStatus.</summary>
@@ -87,6 +88,9 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         // Assert
         var geladen = await _sut.GetByIdAsync(aufgabe.Id);
         geladen!.AktiveRunId.Should().BeNull();
+        geladen.LastHeartbeatUtc.Should().BeNull();
+        geladen.LetzterCliStartUtc.Should().BeNull();
+        geladen.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
     }
 
     /// <summary>
@@ -183,5 +187,6 @@ public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
         var nachStopp = await _sut.GetByIdAsync(aufgabe.Id);
         nachStopp!.AktiveRunId.Should().BeNull();
         nachStopp.LaufStatus.Should().BeNull();
+        nachStopp.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
     }
 }

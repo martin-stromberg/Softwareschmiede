@@ -168,6 +168,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
             Titel = titel,
             AnforderungsBeschreibung = anforderungsBeschreibung,
             Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
@@ -195,6 +196,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
             Titel = issue.Titel,
             AnforderungsBeschreibung = issue.Body,
             Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
@@ -255,6 +257,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
                 ? alert.Description
                 : createdIssue.Body,
             Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
@@ -524,9 +527,19 @@ public sealed class AufgabeService : IAktiveAufgabenService
         var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
+        if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        {
+            throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
+        }
+
         aufgabe.Status = AufgabeStatus.Gestartet;
+        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
         aufgabe.BranchName = branchName;
         aufgabe.LokalerKlonPfad = lokalerKlonPfad;
+        aufgabe.AktiveRunId = null;
+        aufgabe.LastHeartbeatUtc = null;
+        aufgabe.LetzterCliStartUtc = null;
+        aufgabe.LaufStatus = null;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} gestartet (Status: Gestartet).", id);
@@ -575,9 +588,14 @@ public sealed class AufgabeService : IAktiveAufgabenService
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         aufgabe.Status = AufgabeStatus.Beendet;
+        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
         aufgabe.AbschlussDatum = DateTimeOffset.UtcNow;
         aufgabe.BranchName = null;
         aufgabe.LokalerKlonPfad = null;
+        aufgabe.AktiveRunId = null;
+        aufgabe.LastHeartbeatUtc = null;
+        aufgabe.LetzterCliStartUtc = null;
+        aufgabe.LaufStatus = null;
 
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Aufgabe {AufgabeId} abgeschlossen (Status: Beendet).", id);
@@ -613,6 +631,26 @@ public sealed class AufgabeService : IAktiveAufgabenService
         _logger.LogInformation("Aufgabe {AufgabeId}: Status auf {Status} gesetzt.", id, status);
     }
 
+    /// <summary>Setzt eine fehlgeschlagene Startvorbereitung vollständig auf den Neuzustand zurück.</summary>
+    public async Task StartZuruecksetzenAsync(Guid id, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Aufgabe {AufgabeId}: Start zurücksetzen.", id);
+
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        aufgabe.Status = AufgabeStatus.Neu;
+        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet;
+        aufgabe.BranchName = null;
+        aufgabe.LokalerKlonPfad = null;
+        aufgabe.AktiveRunId = null;
+        aufgabe.LastHeartbeatUtc = null;
+        aufgabe.LetzterCliStartUtc = null;
+        aufgabe.LaufStatus = null;
+
+        await _db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Aktualisiert LastHeartbeatUtc der Aufgabe.</summary>
     public async Task UpdateHeartbeatAsync(Guid id, CancellationToken ct = default)
     {
@@ -620,6 +658,21 @@ public sealed class AufgabeService : IAktiveAufgabenService
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Setzt den persistenten KI-Ausführungsstatus einer nicht terminalen Aufgabe auf aktiv.</summary>
+    public async Task AusfuehrungAktivSetzenAsync(Guid id, CancellationToken ct = default)
+    {
+        var aufgabe = await _db.Aufgaben.FindAsync([id], ct)
+            ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
+
+        if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        {
+            throw new InvalidOperationException("Für beendete oder archivierte Aufgaben kann keine aktive Ausführung gesetzt werden.");
+        }
+
+        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
         await _db.SaveChangesAsync(ct);
     }
 
@@ -638,6 +691,12 @@ public sealed class AufgabeService : IAktiveAufgabenService
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         var now = DateTimeOffset.UtcNow;
+        if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        {
+            throw new InvalidOperationException("Für beendete oder archivierte Aufgaben kann kein aktiver Lauf gesetzt werden.");
+        }
+
+        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
         aufgabe.AktiveRunId = laufId;
         aufgabe.LastHeartbeatUtc = now;
         aufgabe.LetzterCliStartUtc = now;
@@ -660,9 +719,12 @@ public sealed class AufgabeService : IAktiveAufgabenService
             ?? throw new InvalidOperationException($"Aufgabe {id} nicht gefunden.");
 
         aufgabe.AktiveRunId = null;
+        aufgabe.LastHeartbeatUtc = null;
+        aufgabe.LetzterCliStartUtc = null;
         // LaufStatus gehört nur zu einem aktiven Lauf (siehe AktivenLaufSetzenAsync) — beim Beenden
         // entfernen, damit kein veralteter Substatus eines beendeten Laufs zurückbleibt.
         aufgabe.LaufStatus = null;
+        aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
         await _db.SaveChangesAsync(ct);
     }
 

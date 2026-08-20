@@ -190,6 +190,11 @@ public sealed class AufgabeRecoveryServiceTests
         var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var aufgabe = await aufgabeService.CreateAsync(projektEntity.Id, "Festhängende Aufgabe", "test");
         await aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
+        if (status.IstAktivOderWartend())
+        {
+            await aufgabeService.AusfuehrungAktivSetzenAsync(aufgabe.Id);
+        }
+
         return aufgabe;
     }
 }

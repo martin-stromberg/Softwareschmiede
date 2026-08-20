@@ -69,15 +69,17 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
     /// <summary><summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Gestartet, true)]
-    [InlineData(AufgabeStatus.Wartend, true)]
-    [InlineData(AufgabeStatus.Neu, false)]
-    [InlineData(AufgabeStatus.Archiviert, false)]
-    [InlineData(AufgabeStatus.Beendet, false)]
+    [InlineData(AufgabeStatus.Gestartet, AufgabeAusfuehrungsStatus.Aktiv, true)]
+    [InlineData(AufgabeStatus.Wartend, AufgabeAusfuehrungsStatus.Aktiv, true)]
+    [InlineData(AufgabeStatus.Gestartet, AufgabeAusfuehrungsStatus.Beendet, false)]
+    [InlineData(AufgabeStatus.Gestartet, AufgabeAusfuehrungsStatus.NichtGestartet, false)]
+    [InlineData(AufgabeStatus.Neu, AufgabeAusfuehrungsStatus.Aktiv, false)]
+    [InlineData(AufgabeStatus.Archiviert, AufgabeAusfuehrungsStatus.Aktiv, false)]
+    [InlineData(AufgabeStatus.Beendet, AufgabeAusfuehrungsStatus.Aktiv, false)]
     /// <summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>
-    public void IstRecoveryStatus_ShouldMatchAllowedStates(AufgabeStatus status, bool expected)
+    public void IstRecoveryStatus_ShouldMatchAllowedStates(AufgabeStatus status, AufgabeAusfuehrungsStatus ausfuehrungsStatus, bool expected)
     {
-        AufgabeRecoveryService.IstRecoveryStatus(status).Should().Be(expected);
+        AufgabeRecoveryService.IstRecoveryStatus(status, ausfuehrungsStatus).Should().Be(expected);
     }
 
     /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>.</summary>
@@ -136,6 +138,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ProjektId = _projektId,
             Titel = "Alte InArbeit Aufgabe",
             Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
@@ -147,6 +150,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ProjektId = _projektId,
             Titel = "Alte Wartend Aufgabe",
             Status = AufgabeStatus.Wartend,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-6),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
@@ -158,7 +162,19 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ProjektId = _projektId,
             Titel = "Frische InArbeit Aufgabe",
             Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+
+        var aufgabeBeendeteAusfuehrung = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Beendete Ausfuehrung",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
@@ -169,11 +185,12 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ProjektId = _projektId,
             Titel = "Neue Aufgabe",
             Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
 
-        _db.Aufgaben.AddRange(aufgabeAlt, aufgabeWartend, aufgabeFrisch, aufgabeNeu);
+        _db.Aufgaben.AddRange(aufgabeAlt, aufgabeWartend, aufgabeFrisch, aufgabeBeendeteAusfuehrung, aufgabeNeu);
         await _db.SaveChangesAsync();
 
         var running = new FakeRunningAutomationStatusSource(false);
@@ -186,6 +203,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         kandidaten.Should().Contain(aufgabeAlt.Id);
         kandidaten.Should().Contain(aufgabeWartend.Id);
         kandidaten.Should().NotContain(aufgabeFrisch.Id);
+        kandidaten.Should().NotContain(aufgabeBeendeteAusfuehrung.Id);
         kandidaten.Should().NotContain(aufgabeNeu.Id);
     }
 
@@ -199,6 +217,7 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ProjektId = _projektId,
             Titel = "Laufende Aufgabe",
             Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
             LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
@@ -224,6 +243,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
             ProjektId = _projektId,
             Titel = "Recovery Task",
             Status = status,
+            AusfuehrungsStatus = status.IstAktivOderWartend()
+                ? AufgabeAusfuehrungsStatus.Aktiv
+                : AufgabeAusfuehrungsStatus.NichtGestartet,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
         _db.Aufgaben.Add(aufgabe);

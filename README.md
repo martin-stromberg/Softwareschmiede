@@ -60,7 +60,7 @@ Softwareschmiede bündelt den kompletten Workflow der KI-gestützten Softwareent
 
 Die wichtigsten Features:
 
-- **Projekt- und Aufgabenverwaltung** – Dashboard, Statusmodell und chronologisches Aufgabenprotokoll
+- **Projekt- und Aufgabenverwaltung** – Dashboard, getrenntes Aufgaben-/KI-Ausführungsstatusmodell und chronologisches Aufgabenprotokoll
 - **To-Do-Listen für Aufgaben** – Strukturierung von Aufgaben mit To-Do-Elementen, Abhak-Status und Blockierung des Aufgabenabschlusses bei offenen To-Dos; Badge zeigt Anzahl offener To-Dos im Ribbon, aktive Aufgaben im Menü zeigen `0/1/n Todos` und öffnen per Klick einen read-only Dialog mit den offenen To-Dos
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
@@ -178,7 +178,7 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen, das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen und bei Bedarf die Aufgabenbeschreibung aktualisieren).
 4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
 5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt). Die eingebettete CLI-Konsole zeigt laufende Ausgabe mit vertikaler Scrollbar, Mausrad/Page-/Line-Scroll, 1000-Zeilen-Scrollback und Auto-Follow, solange Sie am Ende der Ausgabe bleiben.
-6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden.
+6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden. Wird die KI-Ausführung gestoppt oder beendet sie sich selbst, bleibt die Aufgabe offen und wird beim erneuten Öffnen nicht automatisch neu gestartet; ein weiterer Lauf erfolgt explizit über **Starten**.
 7. **Commits durchführen**, To-Dos abhaken (falls vorhanden), Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. 
    **Hinweis:** Aufgaben mit noch offenen To-Dos können nicht abgeschlossen werden — das System blockiert den Abschluss und zeigt die Anzahl offener To-Dos an. 
    Aktive oder wartende Aufgaben zeigen in Seitenleiste und Dashboard zusätzlich ein anklickbares Todo-Label (`0 Todos`, `1 Todo`, `n Todos`). Der Klick öffnet einen modalen read-only Dialog mit den offenen To-Dos der Aufgabe; bei `0` offenen To-Dos erscheint ein klarer Leerzustand.
@@ -585,7 +585,7 @@ Pull Requests werden providerneutral als `PullRequestReferenz` mit untergeordnet
 
 ### Architekturbezug: Aktive Aufgaben im Menü (Issue 81)
 
-- `KiAusfuehrungsStatusConverter` (`IValueConverter`, Presentation-Layer) konvertiert `Aufgabe`-Objekte und `AktiveAufgabePanelItem`-Eintraege zu Status-Strings. Der Menue-Status wird aus `AktiveRunId`, `LastHeartbeatUtc` und `LaufStatus` abgeleitet und zeigt fuer aktive Aufgaben `Laeuft`, `Wartet` oder `Bereit`.
+- `KiAusfuehrungsStatusConverter` (`IValueConverter`, Presentation-Layer) konvertiert `Aufgabe`-Objekte und `AktiveAufgabePanelItem`-Eintraege zu Status-Strings. Der Menue-Status wertet zuerst den persistenten `AusfuehrungsStatus` aus und leitet nur fuer aktive Ausfuehrungen aus `AktiveRunId`, `LastHeartbeatUtc` und `LaufStatus` ab, ob `Laeuft`, `Wartet` oder `Bereit` angezeigt wird.
 - `AufgabeService.GetAktiveAufgabenAsync()` filtert Aufgaben nach Status (`Gestartet`, `Wartend`) und sortiert nach letzter Aktivität (Application-Layer).
 - `MainWindowViewModel` und `DashboardViewModel` nutzen die Service-Methode um `AktiveAufgaben`-Collections zu befüllen und Navigation zwischen Views zu koordinieren.
 - `AufgabeLaufdatenChangedNotifier` meldet erfolgreich persistierte Laufdatenaenderungen aus `CliProcessManager`; `MainWindowViewModel` aktualisiert daraufhin die sichtbare aktive Aufgabenliste zeitnah, damit das Menue nicht bis zum Timer-Fallback auf alten Laufdaten stehen bleibt.

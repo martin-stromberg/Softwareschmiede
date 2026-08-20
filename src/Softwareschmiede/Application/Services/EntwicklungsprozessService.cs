@@ -179,6 +179,52 @@ public sealed class EntwicklungsprozessService
         }
     }
 
+    /// <summary>Startet die KI-CLI erneut im bereits vorbereiteten Klon einer Aufgabe.</summary>
+    public async Task CliNeustartenAsync(
+        Guid aufgabeId,
+        string? kiPluginPrefix,
+        string? optionalParameters,
+        CancellationToken ct = default)
+    {
+        if (_options.KiAusfuehrungsService is null)
+        {
+            throw new InvalidOperationException("KiAusfuehrungsService ist nicht konfiguriert.");
+        }
+
+        var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+
+        if (aufgabe.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        {
+            throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
+        }
+
+        if (string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
+        {
+            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        }
+
+        var kiPlugin = await _pluginSelectionService.ResolveDevelopmentAutomationPluginAsync(kiPluginPrefix, ct);
+        await _aufgabeService.UpdateAsync(
+            aufgabeId,
+            aufgabe.Titel,
+            aufgabe.AnforderungsBeschreibung,
+            kiPlugin.PluginPrefix,
+            ct);
+
+        var repository = await ResolveRepositoryAsync(aufgabe, aufgabe.GitRepository?.RepositoryUrl ?? string.Empty, ct);
+        var gitPlugin = await ResolvePluginAsync(repository, null, aufgabeId, ct);
+
+        await _options.KiAusfuehrungsService.StartWithPseudoConsoleAsync(
+            aufgabeId,
+            kiPlugin,
+            aufgabe.LokalerKlonPfad,
+            optionalParameters,
+            ct,
+            repository.StartKonfiguration,
+            gitPlugin);
+    }
+
     /// <summary>Führt einen manuellen Commit durch.</summary>
     /// <param name="aufgabeId">ID der Aufgabe.</param>
     /// <param name="message">Commit-Nachricht.</param>
@@ -400,7 +446,7 @@ public sealed class EntwicklungsprozessService
             DeleteDirectoryForce(aufgabe.LokalerKlonPfad);
         }
 
-        await _aufgabeService.StatusSetzenAsync(aufgabeId, AufgabeStatus.Neu, ct);
+        await _aufgabeService.StartZuruecksetzenAsync(aufgabeId, ct);
     }
 
     private async Task<IGitPlugin> ResolvePluginAsync(

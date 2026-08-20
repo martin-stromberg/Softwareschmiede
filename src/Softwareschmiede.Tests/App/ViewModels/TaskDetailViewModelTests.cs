@@ -198,7 +198,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung");
         if (status != AufgabeStatus.Neu)
+        {
             await _aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
+            if (status.IstAktivOderWartend())
+                await _aufgabeService.AusfuehrungAktivSetzenAsync(aufgabe.Id);
+        }
         return await _aufgabeService.GetByIdAsync(aufgabe.Id) ?? aufgabe;
     }
 
@@ -364,6 +368,24 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.ShowCliPanel.Should().BeTrue();
+    }
+
+    /// <summary>ShowCliPanel bleibt false, wenn der Aufgabenstatus aktiv ist, die KI-Ausführung aber beendet wurde.</summary>
+    [Fact]
+    public async Task ShowCliPanel_IsFalse_WhenAusfuehrungBeendetIst()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await _aufgabeService.AktivenLaufBeendenAsync(aufgabe.Id);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.ShowCliPanel.Should().BeFalse();
+        sut.ShowEditPanel.Should().BeFalse();
+        sut.ShowDiffPanel.Should().BeFalse();
+        sut.StartenCommand.CanExecute(null).Should().BeTrue();
+        sut.AufgabeAbschliessenCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>ShowDiffPanel ist true wenn Status=Beendet.</summary>
@@ -576,6 +598,31 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var aktualisiert = await _aufgabeService.GetByIdAsync(aufgabe.Id);
         aktualisiert!.Titel.Should().Be("Neuer Titel");
         aktualisiert.AnforderungsBeschreibung.Should().Be("Neue Beschreibung");
+    }
+
+    /// <summary>SpeichernCommand aktualisiert die Liste, navigiert aber nicht automatisch zurück.</summary>
+    [Fact]
+    public async Task SpeichernCommand_AktualisiertListe_OhneZurueckZuNavigieren()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var zurueckAufgerufen = false;
+        var listeAktualisiert = false;
+        var sut = CreateSut(() => zurueckAufgerufen = true);
+        sut.AufgabeListeAktualisierenCallback = () =>
+        {
+            listeAktualisiert = true;
+            return Task.CompletedTask;
+        };
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.EditTitel = "Gespeicherter Titel";
+
+        await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
+
+        listeAktualisiert.Should().BeTrue();
+        zurueckAufgerufen.Should().BeFalse();
+        sut.AufgabeId.Should().Be(aufgabe.Id);
+        sut.AufgabeTitel.Should().Be("Gespeicherter Titel");
     }
 
     /// <summary>SpeichernCommand setzt IsLoading während der Ausführung (und danach wieder false).</summary>
@@ -1121,20 +1168,25 @@ public sealed class TaskDetailViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// GetPseudoConsoleSession gibt nach dem Auto-Restart die laufende Session zurück.
+    /// GetPseudoConsoleSession gibt nach explizitem Start die laufende Session zurück.
     /// Das erlaubt <see cref="Softwareschmiede.App.Views.TaskDetailView"/> im Loaded-Handler die Session
     /// auch dann zu holen, wenn PseudoConsoleSessionGestartet schon gefeuert hat.
     /// </summary>
     [Fact]
-    public async Task GetPseudoConsoleSession_ReturnsSession_AfterAutoRestartInLadenAsync()
+    public async Task GetPseudoConsoleSession_ReturnsSession_AfterExplicitStart()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Auto-Restart-Aufgabe", "Beschreibung");
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", Path.GetTempPath());
-        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi");
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
 
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .Setup(d => d.ShowPluginSelectionDialogAsync(
+                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
 
         // Simuliert: Loaded feuert NACH LadenAsync/PseudoConsoleSessionGestartet.
         // Der View ruft GetPseudoConsoleSession() im Loaded-Handler auf und setzt TerminalConsole.Session direkt.
@@ -1288,13 +1340,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
     }
 
-    // --- LadenAsync: Automatischer CLI-Neustart ---
+    // --- LadenAsync: Kein impliziter CLI-Neustart ---
 
-    /// <summary>LadenAsync startet die CLI automatisch, falls Status Gestartet und kein Prozess läuft.</summary>
+    /// <summary>LadenAsync startet keine neue CLI, falls Status Gestartet/Aktiv, aber kein Prozess läuft.</summary>
     [Fact]
-    public async Task TestLoadAsync_AutoRestartsCli_StatusGestartetNoRunningProcess()
+    public async Task TestLoadAsync_StartetCliNichtImplizit_StatusGestartetAktivOhneLaufendenProzess()
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Auto-Restart-Aufgabe", "Beschreibung");
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Kein-Auto-Restart-Aufgabe", "Beschreibung");
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", Path.GetTempPath());
         await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi");
 
@@ -1302,12 +1354,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.IsCliRunning.Should().BeTrue();
+        sut.IsCliRunning.Should().BeFalse();
+        sut.ShowCliPanel.Should().BeTrue("der persistiert aktive Status soll sichtbar bleiben");
+        sut.KannCliNeuStarten.Should().BeTrue("der Nutzer soll explizit neu starten können");
+        _kiPluginMock.Verify(
+            p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
-    /// <summary>LadenAsync startet die CLI nicht erneut, falls sie bereits läuft.</summary>
+    /// <summary>LadenAsync bindet eine bereits laufende CLI wieder an, ohne einen zweiten Prozess zu starten.</summary>
     [Fact]
-    public async Task TestLoadAsync_NoAutoRestart_CliAlreadyRunning()
+    public async Task TestLoadAsync_BindetBereitsLaufendeSessionWiederAn()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
         var sut = CreateSut();
@@ -1323,18 +1380,83 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
         sut.IsCliRunning.Should().BeTrue();
+        _kiPluginMock.Verify(
+            p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
-    /// <summary>LadenAsync startet die CLI nicht, falls Status != Gestartet.</summary>
+    /// <summary>LadenAsync startet die CLI nicht, falls die Ausführung beendet oder nicht gestartet ist.</summary>
     [Fact]
-    public async Task TestLoadAsync_NoAutoRestart_StatusNotGestartet()
+    public async Task TestLoadAsync_StartetCliNichtImplizit_WhenAusfuehrungBeendetOderNichtGestartet()
     {
-        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var neueAufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var beendeteAusfuehrung = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await _aufgabeService.AktivenLaufBeendenAsync(beendeteAusfuehrung.Id);
+
+        var sut = CreateSut();
+        sut.AufgabeId = neueAufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.IsCliRunning.Should().BeFalse();
+
+        sut.AufgabeId = beendeteAusfuehrung.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.IsCliRunning.Should().BeFalse();
+        sut.StartenCommand.CanExecute(null).Should().BeTrue();
+        _kiPluginMock.Verify(
+            p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>Eine beendete Ausführung kann über die explizite Startaktion im vorhandenen Klon neu gestartet werden.</summary>
+    [Fact]
+    public async Task StartenCommand_StartetBeendeteAusfuehrungExplizitNeu()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Expliziter Neustart", "Beschreibung");
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/explizit", arbeitsverzeichnis);
+        await _aufgabeService.UpdateAsync(aufgabe.Id, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, "Softwareschmiede.TestKi");
+        await _aufgabeService.AktivenLaufBeendenAsync(aufgabe.Id);
+
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.IsCliRunning.Should().BeFalse();
+        sut.StartenCommand.CanExecute(null).Should().BeTrue();
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue();
+        _kiPluginMock.Verify(
+            p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>Insgesamt beendete Aufgaben dürfen nicht erneut gestartet werden.</summary>
+    [Fact]
+    public async Task StartenCommand_CanExecuteFalse_WhenGesamtstatusBeendet()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Beendet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.StartenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>Abgeschlossene Aufgaben bleiben auch mit AusfuehrungsStatus=Beendet nicht startbar.</summary>
+    [Fact]
+    public async Task StartenCommand_CanExecuteFalse_WhenAufgabeAbgeschlossenUndAusfuehrungBeendet()
+    {
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Abgeschlossen", "Beschreibung");
+        await _aufgabeService.AbschliessenAsync(aufgabe.Id);
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.AufgabeStatus.Should().Be(AufgabeStatus.Beendet);
+        sut.Aufgabe!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
+        sut.StartenCommand.CanExecute(null).Should().BeFalse();
     }
 
     /// <summary>LadenAsync lädt Promptvorlagen für die Ribbon-Auswahl.</summary>

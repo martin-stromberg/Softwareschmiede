@@ -29,6 +29,9 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     /// <summary>Aktueller Aufgabenstatus.</summary>
     public AufgabeStatus Status { get; init; }
 
+    /// <summary>Persistierter Lebenszyklusstatus der KI-Ausführung.</summary>
+    public AufgabeAusfuehrungsStatus AusfuehrungsStatus { get; init; } = AufgabeAusfuehrungsStatus.NichtGestartet;
+
     /// <summary>Aktive Lauf-ID der KI-Ausführung.</summary>
     public string? AktiveRunId { get; init; }
 

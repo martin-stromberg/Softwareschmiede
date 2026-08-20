@@ -23,6 +23,9 @@ public sealed class Aufgabe
     /// <summary>Aktueller Status der Aufgabe.</summary>
     public AufgabeStatus Status { get; set; }
 
+    /// <summary>Persistierter Status der KI-Ausführung dieser Aufgabe.</summary>
+    public AufgabeAusfuehrungsStatus AusfuehrungsStatus { get; set; } = AufgabeAusfuehrungsStatus.NichtGestartet;
+
     /// <summary>Name des Git-Branches für diese Aufgabe.</summary>
     public string? BranchName { get; set; }
 

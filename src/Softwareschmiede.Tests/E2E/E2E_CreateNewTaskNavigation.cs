@@ -15,11 +15,11 @@ public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Neue Aufgabe erstellen, Titel ausfüllen, speichern (Phase Speichern); anschließend
-    /// eine weitere Aufgabe erstellen, Titel ausfüllen, über "Zurück" abbrechen (Phase Abbrechen).
-    /// Prüft: Die gespeicherte Aufgabe wird mit Status "Neu" persistiert, erscheint in der Liste, und
-    /// die Navigation kehrt zur ProjectDetailView zurück. Die im Abbrechen-Pfad eingegebene
-    /// Titeländerung wird nicht persistiert, die zuvor angelegte Aufgabe (Status "Neu") bleibt jedoch
-    /// weiterhin in der Liste vorhanden.
+    /// explizit zur Projektansicht zurückkehren und eine weitere Aufgabe über "Zurück" abbrechen
+    /// (Phase Abbrechen). Prüft: Die gespeicherte Aufgabe bleibt nach dem Speichern in der
+    /// TaskDetailView geöffnet, wird mit Status "Neu" persistiert und erscheint nach expliziter
+    /// Rücknavigation in der Liste. Die im Abbrechen-Pfad eingegebene Titeländerung wird nicht
+    /// persistiert, die zuvor angelegte Aufgabe (Status "Neu") bleibt jedoch weiterhin vorhanden.
     /// </summary>
     protected void AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(Window mainWindow)
     {
@@ -30,10 +30,15 @@ public partial class End2EndTest
         AufgabeTitelSetzen(mainWindow, "Persistierte Neue Aufgabe");
         AufgabeDetailSpeichern(mainWindow);
 
-        // Navigation kehrt zur ProjectDetailView zurück (ProjektName-Feld wieder sichtbar)
+        // Die TaskDetailView bleibt geöffnet; der Anwender kann direkt starten statt zur Liste zurückzufallen.
+        WaitForElement(mainWindow, cf => cf.ByName("Starten"), Medium);
+        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+
+        // Erst explizite Rücknavigation zeigt wieder die Projektliste.
+        AufgabeDetailZurueck(mainWindow);
         WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
 
-        // Neue Aufgabe erscheint mit aktualisiertem Titel in der Aufgabenliste
+        // Neue Aufgabe erscheint mit aktualisiertem Titel in der Aufgabenliste.
         WaitForElement(mainWindow, cf => cf.ByName("Persistierte Neue Aufgabe"), Short);
 
         // Phase Abbrechen

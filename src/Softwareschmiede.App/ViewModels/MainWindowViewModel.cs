@@ -313,6 +313,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             ScmPluginName = ResolvePluginName(PluginType.SourceCodeManagement, aufgabe.GitRepository?.PluginTyp),
             KiPluginName = ResolvePluginName(PluginType.DevelopmentAutomation, aufgabe.KiPluginPrefix),
             Status = aufgabe.Status,
+            AusfuehrungsStatus = aufgabe.AusfuehrungsStatus,
             AktiveRunId = aufgabe.AktiveRunId,
             LastHeartbeatUtc = aufgabe.LastHeartbeatUtc,
             LaufStatus = aufgabe.LaufStatus,

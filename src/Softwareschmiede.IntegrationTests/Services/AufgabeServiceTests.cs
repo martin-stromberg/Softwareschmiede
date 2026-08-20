@@ -41,6 +41,7 @@ public sealed class AufgabeServiceTests
         loaded!.Titel.Should().Be("Test-Aufgabe");
         loaded.AnforderungsBeschreibung.Should().Be("Anforderungsbeschreibung");
         loaded.Status.Should().Be(AufgabeStatus.Neu);
+        loaded.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.NichtGestartet);
         loaded.ProjektId.Should().Be(projektId);
     }
 
@@ -64,6 +65,7 @@ public sealed class AufgabeServiceTests
         var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
 
         loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        loaded.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
         loaded.BranchName.Should().Be("task/feature-branch");
         loaded.LokalerKlonPfad.Should().Be(@"C:\klone\aufgabe");
     }
@@ -91,6 +93,7 @@ public sealed class AufgabeServiceTests
         var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
 
         loaded!.Status.Should().Be(AufgabeStatus.Beendet);
+        loaded.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
         loaded.AbschlussDatum.Should().NotBeNull();
         // Toleranz von 2 Sekunden, da DateTimeOffset als Unix-Millisekunden gespeichert wird (Präzisionsverlust < 1 ms)
         loaded.AbschlussDatum!.Value.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(2));
@@ -429,5 +432,37 @@ public sealed class AufgabeServiceTests
         loaded!.Titel.Should().Be("Neuer Titel");
         loaded.AnforderungsBeschreibung.Should().Be("Neue Anforderung");
         loaded.KiPluginPrefix.Should().Be("copilot");
+    }
+
+    /// <summary>
+    /// Testet, dass ein beendeter Ausführungsstatus beim Laden der Detaildaten und erneutem Speichern
+    /// der Aufgabe nicht wieder auf aktiv oder nicht gestartet zurückfällt.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_ShouldKeepAusfuehrungsStatus_WhenBeendeteAusfuehrungLoadedAndSaved()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var projektId = await CreateTestProjektAsync(db);
+        var service = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var aufgabe = await service.CreateAsync(projektId, "Persistierte Ausführung", "Alt");
+
+        await service.StartenAsync(aufgabe.Id, "task/persistierte-ausfuehrung", @"C:\klone\persistiert");
+        await service.AktivenLaufSetzenAsync(aufgabe.Id, "lauf-alt");
+        await service.AktivenLaufBeendenAsync(aufgabe.Id);
+
+        // Act
+        var detail = await service.GetDetailAsync(aufgabe.Id);
+        detail!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
+
+        await service.UpdateAsync(detail.Id, "Persistierte Ausführung aktualisiert", detail.AnforderungsBeschreibung, "copilot");
+
+        // Assert
+        await using var db2 = db.CreateNewContext();
+        var loaded = await db2.Aufgaben.FindAsync(aufgabe.Id);
+
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        loaded.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
+        loaded.AktiveRunId.Should().BeNull();
     }
 }
