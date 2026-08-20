@@ -54,6 +54,12 @@ public static class TaskDetailViewModelTestFactory
 
         var arbeitsverzeichnisOeffnenService = CreateArbeitsverzeichnisOeffnenService();
 
+        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+            serviceProviderMock.Object,
+            dialogServiceMock.Object,
+            aufgabeService,
+            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
+
         return new TaskDetailViewModel(
             aufgabeService,
             protokollService,
@@ -70,7 +76,8 @@ public static class TaskDetailViewModelTestFactory
             TimeProvider.System,
             fileExplorerViewModel,
             todoListViewModel,
-            arbeitsverzeichnisOeffnenService);
+            arbeitsverzeichnisOeffnenService,
+            autonomAufgabeStartCoordinator);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>

@@ -23,7 +23,10 @@ public sealed class AufgabeService : IAktiveAufgabenService
     private readonly TodoService _todoService;
 
     /// <inheritdoc cref="AufgabeService"/>
-    public AufgabeService(SoftwareschmiededDbContext db, ILogger<AufgabeService> logger, TodoService todoService)
+    public AufgabeService(
+        SoftwareschmiededDbContext db,
+        ILogger<AufgabeService> logger,
+        TodoService todoService)
     {
         _db = db;
         _logger = logger;

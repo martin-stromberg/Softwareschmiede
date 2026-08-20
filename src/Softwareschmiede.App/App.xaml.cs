@@ -164,11 +164,16 @@ public sealed partial class App : System.Windows.Application
 
         services.AddMemoryCache();
         services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
+        services.Configure<AutonomAufgabenOptions>(context.Configuration.GetSection(AutonomAufgabenOptions.SectionName));
         services.AddSingleton<IOptions<UpdateOptions>>(Options.Create(new UpdateOptions()));
         services.AddSingleton<DirectoryStructureBrowserService>();
 
         // Domain Services
         services.AddScoped<TodoService>();
+        services.AddScoped<AutonomAufgabenInitialisierungsService>();
+        services.AddScoped<UnteragentGovernanceService>();
+        services.AddScoped<SessionManagementService>();
+        services.AddScoped<ProjektleiterAgentService>();
         services.AddScoped<AufgabeService>();
         services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
         services.AddScoped<ProjektService>();
@@ -205,6 +210,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ArbeitsverzeichnisOeffnenService>();
         services.AddSingleton<IVisualStudioCodeLocator, VisualStudioCodeLocator>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
+        services.AddScoped<AutonomAufgabeStartCoordinator>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();
 
@@ -271,6 +277,8 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<FileExplorerViewModel>();
         services.AddTransient<TodoListViewModel>();
         services.AddTransient<OpenTodosDialogViewModel>();
+        services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
+        services.AddTransient<AutonomAufgabeDetailViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

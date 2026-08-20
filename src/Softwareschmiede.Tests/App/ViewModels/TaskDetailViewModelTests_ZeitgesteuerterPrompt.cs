@@ -90,6 +90,12 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+            serviceProviderMock.Object,
+            _dialogServiceMock.Object,
+            _aufgabeService,
+            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -102,12 +108,13 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             _promptZeitVersandService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
-            new Mock<IServiceProvider>().Object,
+            serviceProviderMock.Object,
             NullLogger<TaskDetailViewModel>.Instance,
             _timeProvider,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService);
+            arbeitsverzeichnisOeffnenService,
+            autonomAufgabeStartCoordinator);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe(AufgabeStatus status = AufgabeStatus.Neu)

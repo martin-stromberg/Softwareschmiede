@@ -173,6 +173,12 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _pluginManagerMockFuerPluginSelection.Setup(p => p.GetIdePlugins()).Returns([visualStudioPlugin, visualStudioCodePlugin]);
         _pluginManagerMockFuerPluginSelection.Setup(p => p.GetDefaultIdePlugin()).Returns(visualStudioPlugin);
 
+        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+            serviceProviderObj,
+            _dialogServiceMock.Object,
+            _aufgabeService,
+            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
+
         var vm = new TaskDetailViewModel(
             _aufgabeService,
             _protokollService,
@@ -189,7 +195,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService);
+            arbeitsverzeichnisOeffnenService,
+            autonomAufgabeStartCoordinator);
         vm.ZurueckAction = zurueckAction;
         return vm;
     }
