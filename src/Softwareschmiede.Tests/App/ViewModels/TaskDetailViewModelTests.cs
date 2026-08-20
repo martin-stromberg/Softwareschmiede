@@ -370,9 +370,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ShowCliPanel.Should().BeTrue();
     }
 
-    /// <summary>ShowCliPanel bleibt false, wenn der Aufgabenstatus aktiv ist, die KI-Ausführung aber beendet wurde.</summary>
+    /// <summary>ShowCliPanel bleibt true, wenn der Aufgabenstatus aktiv ist, die KI-Ausführung aber beendet wurde, damit der Nutzer die letzte Ausgabe anschauen und die CLI neu starten kann.</summary>
     [Fact]
-    public async Task ShowCliPanel_IsFalse_WhenAusfuehrungBeendetIst()
+    public async Task ShowCliPanel_IsTrue_WhenAusfuehrungBeendetIst()
     {
         var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
         await _aufgabeService.AktivenLaufBeendenAsync(aufgabe.Id);
@@ -381,7 +381,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.ShowCliPanel.Should().BeFalse();
+        sut.ShowCliPanel.Should().BeTrue();
         sut.ShowEditPanel.Should().BeFalse();
         sut.ShowDiffPanel.Should().BeFalse();
         sut.StartenCommand.CanExecute(null).Should().BeTrue();

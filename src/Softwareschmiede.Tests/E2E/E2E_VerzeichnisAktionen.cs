@@ -69,17 +69,21 @@ public partial class End2EndTest
         File.WriteAllText(ersteSolution, string.Empty);
         ReloadTaskDetail(mainWindow);
 
-        // Phase 3: Bei genau einer "*.sln" öffnet "IDE öffnen" diese direkt, ohne Auswahl-Dialog.
+        // Phase 3: Bei genau einer "*.sln" öffnet der Haupt-Button von "IDE öffnen" diese weiterhin direkt,
+        // ohne Auswahl-Dialog (Visual Studio ist als Explicit-Plugin kompatibel und gewinnt beim Haupt-Button
+        // gegenüber dem Fallback). Der Dropdown-Button ist aber bereits jetzt sichtbar: Zusätzlich zum einen
+        // Visual-Studio-Einstiegspunkt liefert das weiterhin aktive Visual-Studio-Code-Fallback-Plugin einen
+        // weiteren Einstiegspunkt - aggregiert über alle kompatiblen Plugins sind das 2 Einstiegspunkte.
         var ideButtonMitEinerSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
         ideButtonMitEinerSln.Properties.IsEnabled.Value.Should().BeTrue("es existiert jetzt genau eine .sln-Datei");
         ideButtonMitEinerSln.AsButton().Click();
         await WaitForProzessStartEintragAsync(ersteSolution);
 
         var dialogNachEinerSln = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
-        dialogNachEinerSln.Should().BeNull("bei genau einer Solution darf kein Auswahl-Dialog erscheinen");
+        dialogNachEinerSln.Should().BeNull("der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
 
-        var dropdownButtonMitEinerSln = mainWindow.FindFirstDescendant(cf => cf.ByName("IdeOeffnenDropdown"));
-        dropdownButtonMitEinerSln.Should().BeNull("bei genau einem Einstiegspunkt muss der Dropdown-Button des Split-Buttons unsichtbar sein");
+        var dropdownButtonMitEinerSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnenDropdown"), Short);
+        dropdownButtonMitEinerSln.Should().NotBeNull("Visual Studio liefert die eine .sln als Explicit-Einstiegspunkt, zusätzlich liefert das weiterhin aktive Visual-Studio-Code-Fallback-Plugin einen weiteren Einstiegspunkt - aggregiert sind das 2 Einstiegspunkte, der Dropdown-Button muss also sichtbar sein");
 
         // Eine zweite "*.slnx" anlegen und die Aufgabe erneut neu laden.
         var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.slnx");
@@ -87,8 +91,9 @@ public partial class End2EndTest
         ReloadTaskDetail(mainWindow);
 
         // Phase 4: Bei mehreren "*.sln"-Dateien öffnet der Haupt-Button des Split-Buttons weiterhin direkt
-        // den ersten (alphabetisch sortierten) Einstiegspunkt, ohne Auswahl-Dialog; der jetzt sichtbare
-        // Dropdown-Button zeigt bei Klick den Auswahl-Dialog mit allen Einstiegspunkten an.
+        // den ersten (alphabetisch sortierten) Einstiegspunkt, ohne Auswahl-Dialog; der weiterhin sichtbare
+        // Dropdown-Button zeigt bei Klick den Auswahl-Dialog mit allen (jetzt 3, plugin-qualifiziert
+        // formatierten) Einstiegspunkten an.
         var ideHauptButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
         var ideDropdownButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnenDropdown"), Short);
 
@@ -103,7 +108,8 @@ public partial class End2EndTest
 
         var dialog = WaitForWindow("Solution auswählen", Short);
         var solutionListe = WaitForElement(dialog, cf => cf.ByName("SolutionAuswahl"), Short);
-        var zweiterEintrag = WaitForElement(solutionListe, cf => cf.ByName(zweiteSolution), Short);
+        // Die Liste zeigt plugin-qualifizierte Anzeigewerte ("{PluginName}: {Dateiname}"), keine Rohpfade.
+        var zweiterEintrag = WaitForElement(solutionListe, cf => cf.ByName($"Visual Studio: {Path.GetFileName(zweiteSolution)}"), Short);
         zweiterEintrag.Click();
 
         var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);

@@ -1,3 +1,12 @@
+## 2026-08-20 — Korrektur des Arbeitsablaufs: CLI-Panel-Sichtbarkeit auch bei beendeter Ausführung
+
+- Fehler behoben: Das CLI-Panel wurde fälschlicherweise ausgeblendet, wenn `AusfuehrungsStatus == Beendet` gesetzt wurde, obwohl die Aufgabe noch im Status `Gestartet` oder `Wartend` war.
+- Korrektur der Bedingung in `AufgabeAusfuehrungsStatusExtensions.SollCliAnzeigen`: CLI-Panel wird jetzt auch bei `AusfuehrungsStatus == Beendet` angezeigt, nicht nur bei `Aktiv`.
+- Verhaltensänderung: Benutzer können jetzt die letzte CLI-Ausgabe anschauen und die CLI manuell neu starten, nachdem die Ausführung beendet wurde — das Panel verschwindet nicht mehr unerwünscht beim Plugin-Wechsel oder nach natürlichem Prozessende.
+- Unit-Tests hinzugefügt für `SollCliAnzeigen` mit `Beendet`-Status sowie bestehende Tests überprüft und angepasst.
+- E2E-Tests hinzugefügt für CLI-Panel-Sichtbarkeit nach Beendigung und beim Plugin-Wechsel.
+- Dokumentation aktualisiert unter `docs/help/aufgaben/`: Business-Rules um Sichtbarkeitsbedingung ergänzt, CLI-Ansicht-Beschreibung präzisiert.
+
 ## 2026-08-17 — Split-Button-Muster für IDE-Öffnen mit Mehrfach-Einstiegspunkt-Unterstützung
 
 - UI-Erweiterung: Neue WPF-Komponente `RibbonSplitButton` ersetzt den einfachen `RibbonLargeButton` für „IDE öffnen". Sie besteht aus einem Haupt-Button (öffnet direkt) und einem Dropdown-Button (zeigt Dialog bei mehreren Einstiegspunkten).

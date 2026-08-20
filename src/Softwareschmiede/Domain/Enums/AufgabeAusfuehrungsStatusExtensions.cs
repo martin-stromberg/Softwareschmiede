@@ -8,8 +8,11 @@ public static class AufgabeAusfuehrungsStatusExtensions
         => aufgabeStatus is not AufgabeStatus.Beendet and not AufgabeStatus.Archiviert
             && ausfuehrungsStatus is (AufgabeAusfuehrungsStatus.NichtGestartet or AufgabeAusfuehrungsStatus.Beendet);
 
-    /// <summary>Gibt an, ob die CLI-Ansicht fuer die Aufgabe angezeigt werden soll.</summary>
+    /// <summary>Gibt an, ob die CLI-Ansicht fuer die Aufgabe angezeigt werden soll. Dies ist der Fall, wenn die Aufgabe aktiv oder wartend ist und die KI-Ausfuehrung aktiv oder beendet ist.</summary>
+    /// <param name="ausfuehrungsStatus">Der zu pruefende KI-Ausfuehrungsstatus.</param>
+    /// <param name="aufgabeStatus">Der zu pruefende Aufgabenstatus.</param>
+    /// <returns><c>true</c>, wenn die CLI-Ansicht angezeigt werden soll; andernfalls <c>false</c>.</returns>
     public static bool SollCliAnzeigen(this AufgabeAusfuehrungsStatus ausfuehrungsStatus, AufgabeStatus aufgabeStatus)
         => aufgabeStatus.IstAktivOderWartend()
-            && ausfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv;
+            && ausfuehrungsStatus is (AufgabeAusfuehrungsStatus.Aktiv or AufgabeAusfuehrungsStatus.Beendet);
 }

@@ -112,7 +112,7 @@ public partial class End2EndTest
     {
         NeueAufgabeAnlegen(mainWindow);
         AufgabeTitelSetzen(mainWindow, titel);
-        AufgabeDetailSpeichern(mainWindow);
+        AufgabeDetailSpeichern(mainWindow, true);
 
         AufgabeAusListeOeffnen(mainWindow, titel);
 
