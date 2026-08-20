@@ -7,6 +7,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/LightTheme.xaml" />
+                <ResourceDictionary Source="Controls/RibbonButtonStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Converter -->

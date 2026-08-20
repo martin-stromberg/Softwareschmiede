@@ -14,8 +14,13 @@
 | `ArbeitsverzeichnisOeffnenService` | Klasse (Application.Services) | Löst Plattformbefehl auf (Windows/Linux/macOS) und delegiert Prozessstart mit aufgelöstem Arbeitsverzeichnis. |
 | `IVisualStudioCodeLocator` | Interface (Application.Services) | Abstraktion zur Auflösung eines startbaren Visual-Studio-Code-Befehls. |
 | `VisualStudioCodeLocator` | Klasse (Infrastructure.Services) | Sucht `code.cmd`/`code` in `PATH` und typischen Windows-Installationspfaden. |
-| `IdeOeffnenService` | Klasse (Application.Services) | Findet `.sln`-Dateien im **aufgelösten Arbeitsverzeichnis**, öffnet sie per Shell-Execute und startet optional VS Code mit dem aufgelösten Arbeitsverzeichnis. |
-| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe; nutzt `WorkingDirectoryResolver` zur Auflösung des Arbeitsverzeichnisses vor Weitergabe an Services. |
+| `TaskDetailViewModel.OeffneIdeInternAsync` | Methode (App.ViewModels) | Gemeinsame Implementierung für Haupt- und Dropdown-Button. Haupt-Button (`waehleEntryPointAsync is null`): löst über `ErmittleIdeEntryPointsAsync()`/`PluginSelectionService.ResolveIdePluginAsync()` **ein** zuständiges `IIdePlugin` auf und ruft dessen `IIdePlugin.FindEntryPointsAsync()` auf; öffnet bei ≥1 Einstiegspunkt direkt den ersten. Dropdown-Button: löst über `ErmittleAggregierteIdeEinstiegspunkteAsync()`/`PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync()` **alle** kompatiblen `IIdePlugin`s auf, aggregiert deren `FindEntryPointsAsync()`-Ergebnisse zu `(Plugin, EntryPoint)`-Tupeln; verzweigt nach deren Gesamtanzahl (0 → Exception, 1 → direkt öffnen, >1 → Dialog-Callback) und öffnet den gewählten Einstiegspunkt über das zugehörige `plugin.OpenEntryPointAsync()`. |
+| `PluginSelectionService` | Klasse (Application.Services) | Löst über `ResolveIdePluginAsync(repositoryPath, ct)` das eine für das Arbeitsverzeichnis zuständige, priorisierte `IIdePlugin` auf: erstes explizit kompatibles Plugin gewinnt, sonst erstes fallback-kompatibles aktives Plugin, sonst `IPluginManager.GetDefaultIdePlugin()`. Zusätzlich liefert `ResolveAlleKompatiblenIdePluginsAsync(repositoryPath, ct)` **alle** aktivierten, explizit oder fallback-kompatiblen `IIdePlugin`s als sortierte Liste (erst alle Explicit-, dann alle Fallback-kompatiblen, jeweils in konfigurierter `plugins.ide.order`-Reihenfolge) — genutzt vom Dropdown-Button, um Einstiegspunkte über mehrere Plugins hinweg zu aggregieren. Beide Methoden teilen sich die private Hilfsmethode `GetOrderedEnabledIdePluginsAsync()`. |
+| `IIdePlugin` | Interface (Domain.Interfaces) | Vertrag für IDE-Plugins: `CheckCompatibilityAsync()` (Explicit/Fallback/Incompatible) sowie das generische Mehreinstiegspunkt-Paar `FindEntryPointsAsync()`/`OpenEntryPointAsync()`. |
+| `IdeEntryPoint` | Value Object (Plugin.Contracts.Domain.ValueObjects) | Immutabler Datenträger für einen konkreten IDE-Einstiegspunkt (`Path`, optional `DisplayName`). |
+| `VisualStudioIdePlugin` | Klasse (Domain.PluginImpl) | Eingebautes IDE-Plugin für Visual Studio; `Explicit`-kompatibel bei vorhandener `.sln`/`.slnx`-Datei; `FindEntryPointsAsync()` liefert je gefundener Solution-Datei einen `IdeEntryPoint`, `OpenEntryPointAsync()` öffnet den gewählten Einstiegspunkt per Shell-Execute. |
+| `VisualStudioCodeIdePlugin` | Klasse (Domain.PluginImpl) | Eingebautes IDE-Plugin für Visual Studio Code; immer `Fallback`-kompatibel; `FindEntryPointsAsync()` liefert immer genau einen `IdeEntryPoint` (das Repository-Root), `OpenEntryPointAsync()` öffnet das Arbeitsverzeichnis über `IVisualStudioCodeLocator`/`code`. |
+| `TaskDetailViewModel` | Klasse (App.ViewModels) | Stellt Commands bereit und koordiniert Dialog/Service-Aufrufe; nutzt `WorkingDirectoryResolver` zur Auflösung des Arbeitsverzeichnisses; `OeffneIdeInternAsync()` löst für den Haupt-Button Plugin und Einstiegspunkte über `ErmittleIdeEntryPointsAsync()` (Single-Plugin) auf, für den Dropdown-Button über `ErmittleAggregierteIdeEinstiegspunkteAsync()` (Multi-Plugin-Aggregation über alle kompatiblen Plugins) — und übergibt bei mehreren aggregierten `(Plugin, EntryPoint)`-Kandidaten (nur über den Dropdown-Button) einen Auswahl-Callback (`WaehleEntryPointAsync`) für den Solution-Auswahl-Dialog, der die Kandidaten über `FormatiereAnzeigeWert()` plugin-qualifiziert anzeigt. |
 | `IDialogService` / `WpfDialogService` | Interface / Klasse (App.Services) | Dialog-Gateway; implementiert `ShowSolutionSelectionDialogAsync()`. |
 | `SolutionSelectionDialog` | WPF-Window (App.Views) | Modales Fenster für Solution-Auswahl bei mehreren Dateien. |
 | `SolutionSelectionDialogViewModel` | Klasse (App.ViewModels) | Presentation Model für Dialog; verwaltet Solution-Liste und Benutzer-Auswahl. |
@@ -38,22 +43,26 @@ Application-Schicht (Services):
 │  └─ `ValidateWorkingDirectory()` (Validierung und Fehlerbehandlung)
 ├─ ArbeitsverzeichnisOeffnenService
 │  └─ Abhängigkeit: IProzessStarter
-├─ IdeOeffnenService
-│  ├─ Abhängigkeit: IProzessStarter
-│  └─ Abhängigkeit: IVisualStudioCodeLocator
-└─ (keine DB/Repository-Abhängigkeiten)
+├─ PluginSelectionService
+│  ├─ Abhängigkeit: IPluginManager (liefert u. a. VisualStudioIdePlugin, VisualStudioCodeIdePlugin)
+│  ├─ Abhängigkeit: PluginActivationService (aktivierte IDE-Plugins, Reihenfolge über plugins.ide.order)
+│  ├─ ResolveIdePluginAsync() → ein priorisiertes Plugin (Haupt-Button)
+│  └─ ResolveAlleKompatiblenIdePluginsAsync() → alle kompatiblen Plugins (Dropdown-Button)
+└─ (keine direkten DB/Repository-Abhängigkeiten von ArbeitsverzeichnisOeffnenService)
 
 App-Schicht (UI/ViewModels):
 ├─ TaskDetailViewModel
 │  ├─ WorkingDirectoryResolver (zur Auflösung des Arbeitsverzeichnisses)
 │  ├─ ArbeitsverzeichnisOeffnenService
-│  ├─ IdeOeffnenService
-│  ├─ AppEinstellungService
-│  └─ IDialogService
+│  ├─ PluginSelectionService (zur Auflösung des IDE-Plugins)
+│  ├─ IDialogService (zeigt Dialog bei mehreren IdeEntryPoint-Kandidaten)
+│  └─ Commands: OeffneIdeCommand, OeffneIdeAuswahlCommand (Split-Button-Muster)
 ├─ WpfDialogService (implementiert IDialogService)
 │  └─ Erstellt SolutionSelectionDialog und SolutionSelectionDialogViewModel
-└─ SolutionSelectionDialog (XAML)
-   └─ DataContext: SolutionSelectionDialogViewModel
+├─ SolutionSelectionDialog (XAML)
+│  └─ DataContext: SolutionSelectionDialogViewModel
+└─ RibbonSplitButton (neue WPF-Komponente)
+   └─ Bindet OeffneIdeCommand und OeffneIdeAuswahlCommand
 ```
 
 Sicherheitsrichtlinien für `IProzessStarter`:
@@ -95,72 +104,98 @@ IProzessStarter.Starten(anfrage)
       Logdatei schreiben (prozess-starts.log mit aufgelöstem Pfad)
 ```
 
-### IDE öffnen
+### IDE öffnen (Haupt-Button — direkt öffnen)
 
 ```
-Benutzer klickt Button
+Benutzer klickt Haupt-Button des Split-Buttons (aktiv sobald ShowFileExplorerPanel true ist)
   ↓
-TaskDetailViewModel.OeffneIdeAsync()
+TaskDetailViewModel.OeffneIdeCommand.OeffneIdeAsync()
   ↓
 WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()
   └─ Rückgabe: aufgelöstes Arbeitsverzeichnis (z. B. C:\repo\src\backend)
   ↓
-_solutionPfade lesen (beim Aufgabe-Laden im aufgelösten Verzeichnis gecacht)
+PluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct)
+  ├─ Prüft alle aktivierten IDE-Plugins (Reihenfolge aus plugins.ide.order) via CheckCompatibilityAsync()
+  ├─ Erstes Explicit-kompatibles Plugin gewinnt (z. B. VisualStudioIdePlugin bei gefundener .sln/.slnx)
+  ├─ Sonst erstes Fallback-kompatibles aktives Plugin (z. B. VisualStudioCodeIdePlugin, immer Fallback)
+  └─ Sonst IPluginManager.GetDefaultIdePlugin()
   ↓
-Verzweigung nach Anzahl der Solutions im aufgelösten Verzeichnis:
-  ├─→ Keine: Bei deaktiviertem Fallback kein Klick; bei aktiviertem Fallback VS Code mit aufgelöstem Pfad starten
-  ├─→ Eine: Direkt zu Prozessstart
-  └─→ Mehrere: Dialog anzeigen
-       ↓
-       IDialogService.ShowSolutionSelectionDialogAsync()
-         ↓
-         WpfDialogService (UI-Thread)
-           ↓
-           SolutionSelectionDialog (Modal)
-             ↓
-             SolutionSelectionDialogViewModel
-               ↓
-               Benutzer wählt Solution oder bricht ab
-                 ↓
-                 Rückgabe: Pfad oder null
+plugin.FindEntryPointsAsync(effectiveWorkdir, ct)  — generisch für jedes IIdePlugin
+  ├─→ VisualStudioIdePlugin: ein IdeEntryPoint je gefundener .sln/.slnx-Datei
+  └─→ VisualStudioCodeIdePlugin: immer genau ein IdeEntryPoint (Repository-Root)
   ↓
-IdeOeffnenService.OeffneSolution(gewählterPfad)
+Anzahl gefundener Einstiegspunkte?
+  ├─→ 0: FileNotFoundException
+  │
+  ├─→ Genau 1: sofort weiter zu plugin.OpenEntryPointAsync() (kein Dialog)
+  │
+  └─→ Mehr als 1: Fallback — erster Einstiegspunkt wird direkt geöffnet, kein Dialog
   ↓
-ProzessStartAnfrage mit ShellAusfuehren=true
-  ↓
-IProzessStarter.Starten(anfrage)
-  ├─→ SystemProzessStarter: Process.Start() mit Shell-Execute
-  └─→ AufzeichnenderProzessStarter: Logdatei schreiben
-  ↓
-IDE (z. B. Visual Studio) öffnet Solution aus aufgelöstem Verzeichnis
+plugin.OpenEntryPointAsync(entryPoint, ct)
+  ├─→ VisualStudioIdePlugin: öffnet die Solution-Datei des Einstiegspunkts per Shell-Execute
+  └─→ VisualStudioCodeIdePlugin: IVisualStudioCodeLocator.Locate()
+        ├─→ Kein Treffer: wirft InvalidOperationException → FehlerMeldung, kein Prozessstart
+        └─→ Treffer: ProzessStartAnfrage für code "<Pfad des Einstiegspunkts>"
+              ↓
+              IProzessStarter.Starten(anfrage)
+                ├─→ SystemProzessStarter: Process.Start()
+                └─→ AufzeichnenderProzessStarter (Test): Logdatei schreiben
+              ↓
+              IDE öffnet den Einstiegspunkt (Arbeitsverzeichnis / Solution)
 ```
 
-### IDE öffnen ohne Solution mit VS Code
+### IDE öffnen (Dropdown-Button — aggregierte Auswahl über alle kompatiblen Plugins)
 
 ```
-TaskDetailViewModel lädt Aufgabe
+Benutzer klickt Dropdown-Button des Split-Buttons
+(nur sichtbar, wenn die AGGREGIERTE Gesamtanzahl an Einstiegspunkten ≥2 ist)
   ↓
-WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory() — aufgelöst
+TaskDetailViewModel.OeffneIdeAuswahlCommand.OeffneIdeAuswahlAsync()
   ↓
-IdeOeffnenService.FindeSolutions(effectiveWorkdir) liefert leere Liste
+WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()
+  └─ Rückgabe: aufgelöstes Arbeitsverzeichnis
   ↓
-AppEinstellungService liest ide.vscode.openWhenNoSolutionFound
+PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync(effectiveWorkdir, ct)
+  ├─ Prüft ALLE aktivierten IDE-Plugins (Reihenfolge aus plugins.ide.order) via CheckCompatibilityAsync()
+  │  — kein früher Abbruch beim ersten Explicit-Treffer wie bei ResolveIdePluginAsync()
+  └─ Rückgabe: alle Explicit-kompatiblen Plugins, gefolgt von allen Fallback-kompatiblen Plugins
+     (jeweils in konfigurierter Reihenfolge)
   ↓
-KannIdeOeffnen = Arbeitsverzeichnis vorhanden und Einstellung true
+TaskDetailViewModel.ErmittleAggregierteIdeEinstiegspunkteAsync():
+für JEDES zurückgegebene Plugin: plugin.FindEntryPointsAsync(effectiveWorkdir, ct)
+  ├─ Fehler bei einzelnem Plugin → geloggt, übersprungen (Aggregation läuft weiter)
+  └─ Rückgabe: (Plugin, EntryPoint)-Tupel aller Plugins aggregiert, Plugin-/Einstiegspunkt-Reihenfolge erhalten
   ↓
-Benutzer klickt IDE öffnen
+Anzahl aggregierter Einstiegspunkte?
+  ├─→ 0: FileNotFoundException
+  │
+  ├─→ Genau 1: sofort weiter zu plugin.OpenEntryPointAsync() (Dialog nicht nötig)
+  │
+  └─→ Mehr als 1:
+        ↓
+        TaskDetailViewModel.waehleEntryPointAsync(eintraege, ct) — Dialog-Callback
+          ↓
+          eintraege.Select(e => FormatiereAnzeigeWert(e.Plugin, e.EntryPoint))
+          → „{PluginName}: {Bezeichnung}" bzw. nur „{PluginName}" (falls Bezeichnung == PluginName)
+          ↓
+          IDialogService.ShowSolutionSelectionDialogAsync(anzeigeWerte)
+            ↓
+            WpfDialogService (UI-Thread) → SolutionSelectionDialog (Modal) → SolutionSelectionDialogViewModel
+              ↓
+              Benutzer wählt Anzeigewert oder bricht ab → Rückgabe: Anzeigewert oder null
+          ↓
+          Callback bildet Anzeigewert über Listenindex zurück auf (Plugin, EntryPoint)-Tupel ab
+          → Rückgabe: (Plugin, EntryPoint) oder null
+        ↓
+        null? → Ablauf endet, kein Prozessstart (Abbruch durch Benutzer)
+        (Plugin, EntryPoint)? → weiter zu plugin.OpenEntryPointAsync() — Plugin des gewählten Tupels,
+                                 nicht zwingend das für den Haupt-Button priorisierte Plugin
   ↓
-IdeOeffnenService.OeffneVisualStudioCode(effectiveWorkdir)
-  — übergeben: aufgelöstes Arbeitsverzeichnis (z. B. C:\repo\src\backend)
-  ↓
-IVisualStudioCodeLocator.Locate()
-  ├─→ Kein Treffer: FehlerMeldung
-  └─→ Treffer: ProzessStartAnfrage für code "<aufgelöstes Arbeitsverzeichnis>"
-      ↓
-      IProzessStarter.Starten(anfrage)
-      ↓
-      VS Code öffnet mit aufgelöstem Verzeichnis als Working Directory
+plugin.OpenEntryPointAsync(entryPoint, ct)
+  └─ Die zum gewählten Eintrag gehörende IDE öffnet den gewählten Einstiegspunkt
 ```
+
+Welche IDE-Plugins aktiv sind und in welcher Reihenfolge sie geprüft werden, konfigurieren Anwender über **Einstellungen → Plugins → Integrierte Entwicklungsumgebungen (IDE)** (`PluginActivationService`, Setting `plugins.ide.order`). Mindestens ein IDE-Plugin bleibt dabei stets aktiv, sodass weder `ResolveIdePluginAsync` noch `ResolveAlleKompatiblenIdePluginsAsync` je ohne Ergebnis zurückkehren.
 
 ## Diagramm
 
@@ -174,10 +209,17 @@ graph TD
     C -->|implements| D
     
     E["ArbeitsverzeichnisOeffnenService"] -->|uses| D
-    F["IdeOeffnenService"] -->|uses| D
-    
+    L["VisualStudioIdePlugin"] -->|uses| D
+    M["VisualStudioCodeIdePlugin"] -->|uses| D
+    M -->|uses| N["IVisualStudioCodeLocator"]
+
+    P["PluginSelectionService"] -->|resolves via CheckCompatibilityAsync| L
+    P -->|resolves via CheckCompatibilityAsync| M
+
     G["TaskDetailViewModel"] -->|uses| E
-    G -->|uses| F
+    G -->|uses| P
+    G -->|invokes| L
+    G -->|invokes| M
     G -->|uses| H["IDialogService"]
     
     I["WpfDialogService"] -->|implements| H
@@ -186,7 +228,10 @@ graph TD
     
     G -->|invokes| J
     G -->|binds to| E
-    G -->|binds to| F
+    
+    RB["RibbonSplitButton"] -->|binds to OeffneIdeCommand| G
+    RB -->|binds to OeffneIdeAuswahlCommand| G
+    RB -->|binds KannIdeAuswaehlen| G
 ```
 
 ## Skalierung und Zuverlässigkeit
@@ -194,13 +239,14 @@ graph TD
 ### Fehlertoleranz
 
 - **Prozessstart-Fehler:** Vollständig abgefangen und geloggt. Fehler blockiert nicht die Anwendung.
-- **Dateisuche-Fehler:** `IdeOeffnenService.FindeSolutions()` gibt leere Liste bei jedem Fehler zurück (sicherer Fallback).
+- **Dateisuche-Fehler:** `VisualStudioIdePlugin.FindEntryPointsAsync()` gibt eine leere Liste bei jedem Fehler zurück (sicherer Fallback); `TaskDetailViewModel.OeffneIdeInternAsync()` wirft in diesem Fall eine aussagekräftige `FileNotFoundException`.
 - **Dialog-Abbruch:** Normales Verhalten, keine Fehlerbehandlung erforderlich.
 
 ### Caching und Performance
 
-- **Solution-Caching:** `_solutionPfade` wird einmalig beim Laden der Aufgabe gefüllt (synchroner `Directory.EnumerateFiles()`-Aufruf auf oberster Ebene).
-- **Typischerweise schnell:** Für ein durchschnittliches Repository mit 1–5 Solutions dauert `FindeSolutions()` < 10 ms.
+- **`CanExecute` ohne Vorab-Suche:** `OeffneIdeCommand.CanExecute`/`OeffneIdeAuswahlCommand.CanExecute` hängen nur von `ShowFileExplorerPanel` (vorhandenes Arbeitsverzeichnis) ab, nicht von einer Einstiegspunkt-Suche.
+- **Einmalige Vorab-Ermittlung nur für Dropdown-Sichtbarkeit:** Am Ende von `LadenAsync()` ruft `AktualisiereKannIdeAuswaehlenAsync()` einmalig `ErmittleAggregierteIdeEinstiegspunkteAsync()` auf (Kompatibilitätsprüfung + `FindEntryPointsAsync()` **je aktiviertem, kompatiblem Plugin**, nicht nur des einen priorisierten), um `KannIdeAuswaehlen` anhand der aggregierten Gesamtanzahl zu setzen und damit die Sichtbarkeit des Dropdown-Teils des Split-Buttons zu bestimmen — ohne dabei etwas zu öffnen. Die eigentliche Öffnen-Aktion beim Klick führt für den jeweiligen Button dieselbe Ermittlung erneut aus (Haupt-Button: `ErmittleIdeEntryPointsAsync()` für das eine priorisierte Plugin, zusätzlich `ErmittleAggregierteIdeEinstiegspunkteAsync()` zur Aktualisierung von `KannIdeAuswaehlen`; Dropdown-Button: ausschließlich `ErmittleAggregierteIdeEinstiegspunkteAsync()`) — kein Zwischenspeichern der Einstiegspunkte.
+- **Typischerweise schnell:** Für ein durchschnittliches Repository mit 1–5 Solutions dauert `VisualStudioIdePlugin.FindEntryPointsAsync()` < 10 ms.
 - **Keine rekursive Suche:** Verhindert Performance-Degradation in großen Verzeichnisstrukturen.
 
 ### Test-Isolation

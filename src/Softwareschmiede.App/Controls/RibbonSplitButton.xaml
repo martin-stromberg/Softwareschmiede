@@ -1,0 +1,43 @@
+<local:RibbonButtonBase x:Class="Softwareschmiede.App.Controls.RibbonSplitButton"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Softwareschmiede.App.Controls"
+             x:Name="Root">
+    <StackPanel Orientation="Horizontal" Margin="2,0">
+        <Button Command="{Binding ButtonCommand, ElementName=Root}"
+                AutomationProperties.Name="{Binding AutomationName, ElementName=Root}"
+                Width="56"
+                Height="68"
+                Padding="4,6"
+                Cursor="Hand"
+                Style="{StaticResource RibbonSplitButtonMainStyle}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding ButtonIcon, ElementName=Root}"
+                           FontSize="24"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,4" />
+                <TextBlock Text="{Binding ButtonText, ElementName=Root}"
+                           FontSize="10"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           MaxWidth="54" />
+            </StackPanel>
+        </Button>
+        <Button Command="{Binding DropdownCommand, ElementName=Root}"
+                AutomationProperties.Name="{Binding AutomationName, ElementName=Root, StringFormat={}{0}Dropdown}"
+                Width="16"
+                Height="68"
+                Padding="0"
+                Cursor="Hand"
+                Style="{StaticResource RibbonSplitButtonDropdownStyle}"
+                Visibility="{Binding CanShowDropdown, ElementName=Root, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock Text="▼"
+                       FontSize="10"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource PrimaryTextBrush}" />
+        </Button>
+    </StackPanel>
+</local:RibbonButtonBase>

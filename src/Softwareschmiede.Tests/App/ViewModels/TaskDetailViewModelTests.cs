@@ -9,6 +9,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.PluginImpl;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
@@ -31,6 +32,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly Mock<IGitPlugin> _gitPluginForResolutionMock;
+    private readonly Mock<IPluginManager> _pluginManagerMockFuerPluginSelection;
     private readonly Guid _projektId = Guid.NewGuid();
     private readonly TestTempDirectoryFixture _tempDirectoryFixture = new();
 
@@ -82,6 +84,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
         pluginManagerMock.Setup(p => p.GetDefaultDevelopmentAutomationPlugin()).Returns(_kiPluginMock.Object);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginForResolutionMock.Object);
+        // Standard-IDE-Plugins (Visual Studio, Visual Studio Code) mit nicht-verfügbarem VS Code als
+        // Default; CreateSut() konfiguriert diese bei Bedarf pro Test mit spezifischem
+        // IProzessStarter/IVisualStudioCodeLocator um, damit OeffneIdeCommand-Tests Prozessstarts
+        // verifizieren können.
+        var defaultVisualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProzessStarter>().Object);
+        var defaultVisualStudioCodePlugin = new VisualStudioCodeIdePlugin(
+            new Mock<IProzessStarter>().Object,
+            new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
+        pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns([defaultVisualStudioPlugin, defaultVisualStudioCodePlugin]);
+        pluginManagerMock.Setup(p => p.GetDefaultIdePlugin()).Returns(defaultVisualStudioPlugin);
+        _pluginManagerMockFuerPluginSelection = pluginManagerMock;
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
@@ -148,9 +161,17 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
-        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(
-            prozessStarterMock,
-            visualStudioCodeLocator);
+        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
+
+        // Die von OeffneIdeCommand über _pluginSelectionService aufgelösten IDE-Plugins (Visual Studio,
+        // Visual Studio Code) müssen denselben IProzessStarter/IVisualStudioCodeLocator verwenden wie die
+        // hier verifizierten Prozessstarts, damit die Prozessstart-Verifikationen in Tests greifen.
+        var effectiveProzessStarterMock = prozessStarterMock ?? new Mock<IProzessStarter>();
+        var effectiveVisualStudioCodeLocator = visualStudioCodeLocator ?? new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
+        var visualStudioPlugin = new VisualStudioIdePlugin(effectiveProzessStarterMock.Object);
+        var visualStudioCodePlugin = new VisualStudioCodeIdePlugin(effectiveProzessStarterMock.Object, effectiveVisualStudioCodeLocator);
+        _pluginManagerMockFuerPluginSelection.Setup(p => p.GetIdePlugins()).Returns([visualStudioPlugin, visualStudioCodePlugin]);
+        _pluginManagerMockFuerPluginSelection.Setup(p => p.GetDefaultIdePlugin()).Returns(visualStudioPlugin);
 
         var vm = new TaskDetailViewModel(
             _aufgabeService,
@@ -168,9 +189,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService,
-            ideOeffnenService,
-            _einstellungService);
+            arbeitsverzeichnisOeffnenService);
         vm.ZurueckAction = zurueckAction;
         return vm;
     }
@@ -2135,40 +2154,45 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Times.Once);
     }
 
-    // --- SolutionsVorhanden / OeffneIdeCommand ---
+    // --- KannIdeOeffnen / OeffneIdeCommand ---
 
-    /// <summary>SolutionsVorhanden und OeffneIdeCommand.CanExecute folgen dem Ergebnis von IdeOeffnenService.FindeSolutions beim Laden der Aufgabe.</summary>
+    /// <summary>
+    /// KannIdeOeffnen und OeffneIdeCommand.CanExecute folgen ausschließlich ShowFileExplorerPanel: Sobald
+    /// ein gültiges, vorhandenes Arbeitsverzeichnis existiert, kann die IDE-Aktion ausgeführt werden - auch
+    /// ohne vorhandene .sln-Datei, da das konkrete Plugin (Visual Studio oder Fallback) erst beim Ausführen
+    /// über PluginSelectionService.ResolveIdePluginAsync aufgelöst wird und mindestens ein IDE-Plugin
+    /// systemseitig stets aktiv bleiben muss.
+    /// </summary>
     [Fact]
-    public async Task SolutionsVorhanden_WirdBeimLadenGesetzt()
+    public async Task KannIdeOeffnen_FolgtShowFileExplorerPanel()
     {
-        var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-
         var sut = CreateSut();
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SolutionsVorhanden.Should().BeFalse("das Arbeitsverzeichnis enthält noch keine .sln-Datei");
-        sut.KannIdeOeffnen.Should().BeFalse("der VS-Code-Fallback ist standardmäßig deaktiviert");
+        sut.KannIdeOeffnen.Should().BeFalse("ohne LokalerKlonPfad existiert noch kein Arbeitsverzeichnis");
         sut.OeffneIdeCommand.CanExecute(null).Should().BeFalse();
 
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Loesung.sln"), string.Empty);
+        var arbeitsverzeichnis = CreateTempDirectory();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SolutionsVorhanden.Should().BeTrue("es wurde eine .sln-Datei im Arbeitsverzeichnis angelegt");
-        sut.KannIdeOeffnen.Should().BeTrue();
+        sut.KannIdeOeffnen.Should().BeTrue("das Arbeitsverzeichnis existiert jetzt, unabhängig von vorhandenen .sln-Dateien");
         sut.OeffneIdeCommand.CanExecute(null).Should().BeTrue();
     }
 
-    /// <summary>Ohne Solution aktiviert der opt-in VS-Code-Fallback den IDE-Command bei vorhandenem Arbeitsverzeichnis.</summary>
+    /// <summary>
+    /// Ohne gefundene Solution löst OeffneIdeCommand über PluginSelectionService.ResolveIdePluginAsync
+    /// automatisch das (standardmäßig aktive) Visual-Studio-Code-Plugin als Fallback auf und öffnet damit -
+    /// ganz ohne die frühere, separate "VS Code öffnen, wenn keine Solution gefunden wurde"-Einstellung.
+    /// </summary>
     [Fact]
-    public async Task OeffneIdeCommand_OhneSolutionMitVsCodeFallback_IstAktivUndStartetVsCode()
+    public async Task OeffneIdeCommand_OhneSolution_OeffnetVisualStudioCodeAlsFallback()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabe();
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
@@ -2176,7 +2200,6 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SolutionsVorhanden.Should().BeFalse();
         sut.KannIdeOeffnen.Should().BeTrue();
         sut.OeffneIdeCommand.CanExecute(null).Should().BeTrue();
 
@@ -2190,14 +2213,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Times.Once);
     }
 
-    /// <summary>Wenn VS Code nicht gefunden wird, erzeugt der Fallback eine verständliche Fehlermeldung ohne Prozessstart.</summary>
+    /// <summary>Wenn ohne gefundene Solution auch Visual Studio Code nicht gefunden wird, erzeugt OeffneIdeCommand eine verständliche Fehlermeldung ohne Prozessstart.</summary>
     [Fact]
-    public async Task OeffneIdeCommand_OhneSolutionMitVsCodeFallbackOhneVsCode_ZeigtFehler()
+    public async Task OeffneIdeCommand_OhneSolutionOhneVsCode_ZeigtFehler()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabe();
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(
             prozessStarterMock: prozessStarterMock,
@@ -2207,20 +2229,45 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Be("Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden.");
+        sut.FehlerMeldung.Should().Contain("Visual Studio Code");
         prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 
-    /// <summary>Eine gefundene Solution hat Vorrang vor dem aktivierten VS-Code-Fallback.</summary>
+    /// <summary>
+    /// Ist das Visual-Studio-Code-IDE-Plugin deaktiviert, übernimmt dessen Deaktivierung die frühere Funktion
+    /// der entfernten "VS Code öffnen, wenn keine Solution gefunden wurde"-Einstellung: Ohne gefundene Solution
+    /// und ohne aktives Fallback-Plugin greift ResolveIdePluginAsync auf PluginManager.GetDefaultIdePlugin()
+    /// (Visual Studio) zurück, das ohne .sln-Datei eine Fehlermeldung statt eines VS-Code-Starts erzeugt.
+    /// </summary>
     [Fact]
-    public async Task OeffneIdeCommand_MitSolutionUndVsCodeFallback_OeffnetSolution()
+    public async Task OeffneIdeCommand_OhneSolutionUndDeaktiviertemVsCodePlugin_ZeigtFehlerStattVsCodeFallback()
+    {
+        var arbeitsverzeichnis = CreateTempDirectory();
+        var aufgabe = await ErstelleAufgabe();
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
+        var pluginActivationService = new PluginActivationService(_einstellungService, new Mock<IPluginManager>().Object, NullLogger<PluginActivationService>.Instance);
+        await pluginActivationService.SetPluginEnabledAsync("Softwareschmiede.VisualStudioCode", false);
+        var prozessStarterMock = new Mock<IProzessStarter>();
+        var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
+        var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
+
+        sut.FehlerMeldung.Should().NotBeNullOrEmpty("ohne aktives Fallback-Plugin und ohne .sln kann keine IDE geöffnet werden");
+        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
+    }
+
+    /// <summary>Eine gefundene Solution hat Vorrang vor dem aktiven Visual-Studio-Code-Fallback: Das Visual-Studio-Plugin ist bei vorhandener .sln explizit kompatibel und gewinnt gegenüber dem lediglich fallback-kompatiblen Visual-Studio-Code-Plugin.</summary>
+    [Fact]
+    public async Task OeffneIdeCommand_MitSolutionUndAktivemVsCode_OeffnetSolutionStattVsCode()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var solutionPfad = Path.Combine(arbeitsverzeichnis, "Loesung.sln");
         File.WriteAllText(solutionPfad, string.Empty);
         var aufgabe = await ErstelleAufgabe();
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
         var sut = CreateSut(prozessStarterMock: prozessStarterMock, visualStudioCodeLocator: locator);
@@ -2263,9 +2310,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
             Times.Never);
     }
 
-    /// <summary>Bei mehreren gefundenen Solutions zeigt OeffneIdeCommand den Auswahl-Dialog und öffnet die dort gewählte Solution.</summary>
+    /// <summary>
+    /// Bei mehreren gefundenen Solutions öffnet der Haupt-Button (OeffneIdeCommand) des Split-Buttons weiterhin
+    /// direkt den ersten (alphabetisch sortierten) Einstiegspunkt, ohne den Auswahl-Dialog anzuzeigen - die
+    /// gezielte Auswahl übernimmt seit der Split-Button-Einführung der Dropdown-Button (OeffneIdeAuswahlCommand).
+    /// </summary>
     [Fact]
-    public async Task OeffneIdeCommand_MitMehrerenSolutions_ZeigtAuswahlDialog()
+    public async Task OeffneIdeCommand_MitMehrerenSolutions_OeffnetErsteDirektOhneDialog()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var ersteSolution = Path.Combine(arbeitsverzeichnis, "Erste.sln");
@@ -2276,10 +2327,6 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var aufgabe = await ErstelleAufgabe();
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
 
-        _dialogServiceMock
-            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(zweiteSolution);
-
         var prozessStarterMock = new Mock<IProzessStarter>();
         var sut = CreateSut(prozessStarterMock: prozessStarterMock);
         sut.AufgabeId = aufgabe.Id;
@@ -2288,38 +2335,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
         _dialogServiceMock.Verify(
-            d => d.ShowSolutionSelectionDialogAsync(
-                It.Is<IReadOnlyList<string>>(liste => liste.Contains(ersteSolution) && liste.Contains(zweiteSolution)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+            d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == zweiteSolution && a.ShellAusfuehren)),
+            p => p.Starten(It.Is<ProzessStartAnfrage>(a => a.DateiName == ersteSolution && a.ShellAusfuehren)),
             Times.Once);
-    }
-
-    /// <summary>Bricht der Nutzer den Auswahl-Dialog bei mehreren Solutions ab (Rückgabe null), wird keine Solution geöffnet.</summary>
-    [Fact]
-    public async Task OeffneIdeCommand_MitMehrerenSolutions_AbbruchOeffnetKeine()
-    {
-        var arbeitsverzeichnis = CreateTempDirectory();
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Erste.sln"), string.Empty);
-        File.WriteAllText(Path.Combine(arbeitsverzeichnis, "Zweite.sln"), string.Empty);
-
-        var aufgabe = await ErstelleAufgabe();
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-
-        _dialogServiceMock
-            .Setup(d => d.ShowSolutionSelectionDialogAsync(It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
-
-        var prozessStarterMock = new Mock<IProzessStarter>();
-        var sut = CreateSut(prozessStarterMock: prozessStarterMock);
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
-
-        await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
-
-        prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 
     private async Task<GitRepository> ErstelleRepositoryAsync(string pluginTyp, string repositoryUrl, string repositoryName)
@@ -2388,10 +2408,5 @@ public sealed class TaskDetailViewModelTests : IDisposable
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([_kiPluginMock.Object]);
         pluginManagerMock.Setup(p => p.GetDefaultDevelopmentAutomationPlugin()).Returns(_kiPluginMock.Object);
         return pluginManagerMock;
-    }
-    
-    private sealed class TestVisualStudioCodeLocator(VisualStudioCodeAvailability availability) : IVisualStudioCodeLocator
-    {
-        public VisualStudioCodeAvailability Locate() => availability;
     }
 }

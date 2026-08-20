@@ -31,10 +31,10 @@ public sealed partial class SettingsView : UserControl
     /// <param name="e">Die Ereignisargumente mit dem neu ausgewählten Element.</param>
     private void OnPluginSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (DataContext is not SettingsViewModel vm || e.AddedItems.Count == 0)
+        if (!TryGetViewModelAndFirstAddedItem(e, out var vm, out var item))
             return;
 
-        switch (e.AddedItems[0])
+        switch (item)
         {
             case IGitPlugin gitPlugin:
                 vm.ScmPluginSelectedCommand.Execute(gitPlugin);
@@ -46,6 +46,41 @@ public sealed partial class SettingsView : UserControl
                 vm.PluginSelectedCommand.Execute(entry);
                 break;
         }
+    }
+
+    /// <summary>Selektions-Handler für die IDE-Plugins-Aktivierungsliste im Plugins-Register.</summary>
+    /// <param name="sender">Das auslösende Steuerelement.</param>
+    /// <param name="e">Die Ereignisargumente mit dem neu ausgewählten Element.</param>
+    private void OnIdePluginSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!TryGetViewModelAndFirstAddedItem(e, out var vm, out var item))
+            return;
+
+        if (item is PluginActivationEntry entry)
+            vm.IdePluginSelectedCommand.Execute(entry);
+    }
+
+    /// <summary>
+    /// Gemeinsame Guard-Prüfung für die Selektions-Handler der Plugin-Auswahlsteuerelemente: liefert das
+    /// <see cref="SettingsViewModel"/> des <see cref="DataContext"/> sowie das zuerst neu hinzugefügte Element
+    /// der Selektionsänderung, sofern beides vorhanden ist.
+    /// </summary>
+    /// <param name="e">Die Ereignisargumente mit dem neu ausgewählten Element.</param>
+    /// <param name="vm">Das ermittelte ViewModel, oder <c>null</c>, falls die Prüfung fehlschlägt.</param>
+    /// <param name="item">Das zuerst neu hinzugefügte Element, oder <c>null</c>, falls die Prüfung fehlschlägt.</param>
+    /// <returns><c>true</c>, wenn sowohl ViewModel als auch ein neu hinzugefügtes Element vorhanden sind, sonst <c>false</c>.</returns>
+    private bool TryGetViewModelAndFirstAddedItem(SelectionChangedEventArgs e, out SettingsViewModel vm, out object item)
+    {
+        if (DataContext is SettingsViewModel viewModel && e.AddedItems.Count > 0)
+        {
+            vm = viewModel;
+            item = e.AddedItems[0]!;
+            return true;
+        }
+
+        vm = null!;
+        item = null!;
+        return false;
     }
 
     private void OnPasswordBoxLoaded(object sender, RoutedEventArgs e)

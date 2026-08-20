@@ -14,4 +14,10 @@ public interface IPluginManager
 
     /// <summary>Gibt das priorisierte Development-Automation-Plugin zurück.</summary>
     IKiPlugin GetDefaultDevelopmentAutomationPlugin();
+
+    /// <summary>Gibt alle geladenen IDE-Plugins zurück.</summary>
+    IReadOnlyList<IIdePlugin> GetIdePlugins();
+
+    /// <summary>Gibt das erste verfügbare IDE-Plugin zurück.</summary>
+    IIdePlugin GetDefaultIdePlugin();
 }

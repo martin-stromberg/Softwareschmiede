@@ -21,6 +21,7 @@ public partial class End2EndTest : WpfTestBase
 
         AppStarten_ZeigtVersionsTextInFusszeile_E2E(mainWindow);
         Einstellungen_SpeichernCodexAlsStandardKiPluginUndExecutablePath_PersistiertBeides_E2E(mainWindow);
+        IdePluginSettings_AktivierungValidierungUndReihenfolge_E2E(mainWindow);
         await RepositoryZuweisung(mainWindow);
         Todo_ErstellenAbhakenLoeschenUndAbschlussValidierung_E2E(mainWindow);
         TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
@@ -44,6 +45,7 @@ public partial class End2EndTest : WpfTestBase
         await AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E(mainWindow);
         await VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E(mainWindow);
         await VerzeichnisAktionen_KonfiguriertesArbeitsverzeichnisWirdAufgeloest_E2E(mainWindow);
+        await IdeAuswahl_KeineEinstiegspunkteUndDropdownAbbruch_E2E(mainWindow);
         AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E(mainWindow);
         AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E(mainWindow);
         PluginProjectDefault_SpeichernUndAutomatischeUebernahmeInFolgeaufgabe_E2E(mainWindow);

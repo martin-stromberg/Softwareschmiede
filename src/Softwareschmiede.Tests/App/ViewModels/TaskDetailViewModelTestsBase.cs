@@ -6,6 +6,8 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.PluginImpl;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
@@ -91,16 +93,29 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <summary>Erzeugt ein einsatzbereites TaskDetailViewModel für den Test.</summary>
     /// <param name="prozessStarterMock">Optionaler Mock für IProzessStarter zur Prüfung gestarteter Prozesse.</param>
     /// <param name="visualStudioCodeLocator">Optionaler IVisualStudioCodeLocator zur Steuerung der VS-Code-Verfügbarkeit.</param>
+    /// <param name="idePlugins">Optionale Überschreibung der aktiven IDE-Plugins (Standard: Visual Studio + Visual Studio Code).</param>
     /// <returns>Das erzeugte TaskDetailViewModel.</returns>
-    protected TaskDetailViewModel CreateSut(Mock<IProzessStarter>? prozessStarterMock = null, IVisualStudioCodeLocator? visualStudioCodeLocator = null)
+    protected TaskDetailViewModel CreateSut(
+        Mock<IProzessStarter>? prozessStarterMock = null,
+        IVisualStudioCodeLocator? visualStudioCodeLocator = null,
+        IReadOnlyList<IIdePlugin>? idePlugins = null)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
 
+        var visualStudioPlugin = new VisualStudioIdePlugin((prozessStarterMock ?? new Mock<IProzessStarter>()).Object);
+        var visualStudioCodePlugin = new VisualStudioCodeIdePlugin(
+            (prozessStarterMock ?? new Mock<IProzessStarter>()).Object,
+            visualStudioCodeLocator ?? new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable));
+        var effectiveIdePlugins = idePlugins ?? [visualStudioPlugin, visualStudioCodePlugin];
+        pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns(effectiveIdePlugins);
+        pluginManagerMock.Setup(p => p.GetDefaultIdePlugin()).Returns(effectiveIdePlugins[0]);
+
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
-        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
+        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
 
         var gitPluginMock = new Mock<IGitPlugin>();
         var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
@@ -114,7 +129,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             NullLogger<EntwicklungsprozessService>.Instance);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var (arbeitsverzeichnisOeffnenService, ideOeffnenService) = TaskDetailViewModelTestFactory.CreateVerzeichnisAktionenServices(prozessStarterMock, visualStudioCodeLocator);
+        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -132,9 +147,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService,
-            ideOeffnenService,
-            _einstellungService);
+            arbeitsverzeichnisOeffnenService);
     }
 
     /// <summary>Legt ein GitRepository (optional mit RepositoryStartKonfiguration) sowie eine damit verknüpfte Aufgabe an.</summary>
@@ -168,4 +181,11 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         return await _aufgabeService.CreateAsync(_projektId, "Testaufgabe", "Beschreibung", repository.Id);
     }
+
+    /// <summary>Erstellt einen Test-IdeEntryPoint mit gesetztem DisplayName.</summary>
+    /// <param name="path">Der Pfad des Einstiegspunkts.</param>
+    /// <param name="displayName">Die anzuzeigende Bezeichnung des Einstiegspunkts.</param>
+    /// <returns>Der erzeugte IdeEntryPoint.</returns>
+    protected static IdeEntryPoint ErzeugeEntryPointMitDisplayName(string path, string displayName)
+        => new(path, displayName);
 }

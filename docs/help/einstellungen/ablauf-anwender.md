@@ -27,15 +27,17 @@
 
 > **Hinweis:** Änderungen am Arbeitsverzeichnis wirken sich nur auf neue Aufgaben aus. Bereits gestartete Aufgaben behalten ihren ursprünglichen Klonpfad.
 
-### Visual-Studio-Code-Fallback aktivieren
+## Plugins (Registerkarte) — IDE-Plugins
 
-1. Öffnen Sie die Registerkarte **Allgemein**
-2. Aktivieren Sie **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde**
-3. Klicken Sie **Speichern**
-4. Öffnen Sie danach eine Aufgabe ohne `*.sln`-Datei im Arbeitsverzeichnis
-5. **IDE öffnen** startet nun Visual Studio Code mit dem Arbeitsverzeichnis, sofern VS Code gefunden wird
+### IDE-Plugin aktivieren, deaktivieren oder priorisieren
 
-> **Hinweis:** Die Option ist standardmäßig ausgeschaltet. Bestehende Installationen ändern ihr Verhalten erst, wenn Sie diese Einstellung aktivieren.
+1. Öffnen Sie die Registerkarte **Plugins**
+2. Wählen Sie in der Liste **Integrierte Entwicklungsumgebungen (IDE)** ein Plugin aus (z. B. Visual Studio Code)
+3. Aktivieren oder deaktivieren Sie es im Inhaltsbereich rechts über die Checkbox **Plugin aktiviert**
+4. Passen Sie bei Bedarf die Auswahl-Priorität über die Pfeile **↑**/**↓** neben dem Plugin-Eintrag an
+5. Klicken Sie **Speichern**
+
+> **Hinweis:** Mindestens ein IDE-Plugin muss aktiv bleiben. Beim Klick auf **IDE öffnen** in der Aufgabendetailansicht wird automatisch das erste explizit kompatible Plugin verwendet (z. B. Visual Studio bei vorhandener `*.sln`-Datei); ist keines explizit kompatibel, öffnet automatisch das erste aktive Fallback-Plugin (standardmäßig Visual Studio Code) das Arbeitsverzeichnis — eine separate Opt-in-Einstellung dafür ist nicht mehr nötig.
 
 ## Quellcodeverwaltung (Registerkarte)
 

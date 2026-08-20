@@ -10,6 +10,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.PluginImpl;
 using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App.ViewModels;
@@ -46,8 +47,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
-    private readonly IdeOeffnenService _ideOeffnenService;
-    private readonly AppEinstellungService _einstellungService;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -75,11 +74,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private string? _scheduledPromptStatus;
     private string? _scheduledPromptTimeDisplay;
     private bool _showFileExplorerPanel;
-    private IReadOnlyList<string> _solutionPfade = [];
     private bool _canCreatePullRequest;
     private bool _canCreateIssue;
-    private bool _openVisualStudioCodeWhenNoSolutionFound;
     private bool _isRefreshingPullRequests;
+    private bool _kannIdeAuswaehlen;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -114,7 +112,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             SetProperty(ref _aufgabe, value);
             _showFileExplorerPanel = !string.IsNullOrEmpty(value?.LokalerKlonPfad) && Directory.Exists(value.LokalerKlonPfad);
-            _solutionPfade = ErmittleSolutionPfade(value);
             OnPropertyChanged(nameof(AufgabeTitel));
             OnPropertyChanged(nameof(AufgabeStatus));
             OnPropertyChanged(nameof(AufgabeBranchName));
@@ -125,7 +122,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowDiffPanel));
             OnPropertyChanged(nameof(ShowFileExplorerPanel));
             OnPropertyChanged(nameof(ShowPullRequestPanel));
-            OnPropertyChanged(nameof(SolutionsVorhanden));
             OnPropertyChanged(nameof(KannIdeOeffnen));
             OnPropertyChanged(nameof(KannSpeichern));
             OnPropertyChanged(nameof(KannLoeschen));
@@ -410,12 +406,24 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="Aufgabe"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
     public bool ShowFileExplorerPanel => _showFileExplorerPanel;
 
-    /// <summary>True wenn beim Laden der Aufgabe mindestens eine <c>*.sln</c>-Datei im Arbeitsverzeichnis gefunden wurde. Steuert <see cref="OeffneIdeCommand"/>.CanExecute.</summary>
-    public bool SolutionsVorhanden => _solutionPfade.Count > 0;
+    /// <summary>
+    /// True wenn die IDE-Aktion ausgeführt werden kann. Die konkrete IDE wird erst beim Ausführen von
+    /// <see cref="OeffneIdeCommand"/> über <see cref="PluginSelectionService.ResolveIdePluginAsync"/> aufgelöst
+    /// (explizit/fallback-kompatibles Plugin oder Default-Plugin) - da mindestens ein IDE-Plugin systemseitig
+    /// stets aktiv bleiben muss, genügt als Bedingung ein gültiges, vorhandenes Arbeitsverzeichnis.
+    /// </summary>
+    public bool KannIdeOeffnen => ShowFileExplorerPanel;
 
-    /// <summary>True wenn die IDE-Aktion eine Solution oder den opt-in VS-Code-Fallback öffnen kann.</summary>
-    public bool KannIdeOeffnen => SolutionsVorhanden
-        || (ShowFileExplorerPanel && _openVisualStudioCodeWhenNoSolutionFound);
+    /// <summary>
+    /// Gibt an, ob mehrere Einstiegspunkte für die aktuell aufgelöste IDE verfügbar sind. Steuert die
+    /// Sichtbarkeit des Dropdown-Buttons im <see cref="Controls.RibbonSplitButton"/>. Wird bei jedem Aufruf
+    /// von <see cref="OeffneIdeAsync"/> oder <see cref="OeffneIdeAuswahlAsync"/> aktualisiert.
+    /// </summary>
+    public bool KannIdeAuswaehlen
+    {
+        get => _kannIdeAuswaehlen;
+        private set => SetProperty(ref _kannIdeAuswaehlen, value);
+    }
 
     /// <summary>True wenn die Info-Ansicht angezeigt werden soll.</summary>
     public bool ShowInfoPanel => IsInfoViewSelected;
@@ -534,6 +542,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet die Solution des Arbeitsverzeichnisses mit der registrierten IDE.</summary>
     public ICommand OeffneIdeCommand { get; }
 
+    /// <summary>Zeigt die Auswahl der verfügbaren IDE-Einstiegspunkte an und öffnet den gewählten.</summary>
+    public ICommand OeffneIdeAuswahlCommand { get; }
+
     /// <summary>Wird gefeuert, wenn eine neue <see cref="PseudoConsoleSession"/> gestartet wurde. Löst weiterhin
     /// das Binden von <c>TerminalControl.Session</c> in <c>TaskDetailView</c> aus, unabhängig davon, ob die
     /// Leseschleife der Session bereits vor der UI-Bindung läuft (parallele CLI-Ausführungen, Issue-86).</summary>
@@ -570,8 +581,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         FileExplorerViewModel fileExplorerViewModel,
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
-        IdeOeffnenService ideOeffnenService,
-        AppEinstellungService einstellungService,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -589,8 +598,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _fileExplorerViewModel = fileExplorerViewModel;
         _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
-        _ideOeffnenService = ideOeffnenService;
-        _einstellungService = einstellungService;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -630,6 +637,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         SchedulePromptCommand = new AsyncRelayCommand(SchedulePromptAsync, () => KannPromptPlanen);
         OeffneArbeitsverzeichnisCommand = new AsyncRelayCommand(OeffneArbeitsverzeichnisAsync, () => ShowFileExplorerPanel);
         OeffneIdeCommand = new AsyncRelayCommand(OeffneIdeAsync, () => KannIdeOeffnen);
+        OeffneIdeAuswahlCommand = new AsyncRelayCommand(OeffneIdeAuswahlAsync, () => KannIdeOeffnen);
     }
 
     private async Task LadenAsync(CancellationToken ct)
@@ -643,7 +651,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             Aufgabe = await _aufgabeService.GetDetailAsync(_aufgabeId, ct);
-            await AktualisiereIdeFallbackEinstellungAsync(ct);
             IsCliRunning = _kiService.IsRunning(_aufgabeId);
 
             var session = _kiService.GetPseudoConsoleSession(_aufgabeId);
@@ -676,6 +683,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             await LadePromptVorlagenAsync(ct);
             await AktualisierePullRequestCapabilityAsync(ct);
             await AktualisiereIssueCreateCapabilityAsync(ct);
+            await AktualisiereKannIdeAuswaehlenAsync(ct);
 
             // Unmittelbar vor dem Auto-Restart nochmals live prüfen, ob der Prozess läuft.
             // Verhindert doppelten CLI-Start, wenn der Prozess nach dem Starten extrem schnell
@@ -1739,27 +1747,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         });
     }
 
-    private IReadOnlyList<string> ErmittleSolutionPfade(Aufgabe? aufgabe)
-    {
-        if (!_showFileExplorerPanel)
-            return [];
-
-        try
-        {
-            var startConfig = aufgabe!.GitRepository?.StartKonfiguration;
-            var arbeitsverzeichnis = WorkingDirectoryResolver.ResolveEffectiveWorkingDirectory(
-                aufgabe.LokalerKlonPfad!,
-                startConfig?.WorkingDirectoryRelativePath);
-
-            return _ideOeffnenService.FindeSolutions(arbeitsverzeichnis);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Suchen nach Solutions im Arbeitsverzeichnis {LokalerKlonPfad}.", aufgabe!.LokalerKlonPfad);
-            return [];
-        }
-    }
-
     private Task<string> ErmittleEffektivesArbeitsverzeichnisAsync(string lokalerKlonPfad, CancellationToken ct)
     {
         var startConfig = _aufgabe?.GitRepository?.StartKonfiguration;
@@ -1771,14 +1758,112 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ct: ct);
     }
 
-    private async Task AktualisiereIdeFallbackEinstellungAsync(CancellationToken ct)
+    /// <summary>
+    /// Löst das zuständige IDE-Plugin über <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auf und
+    /// liefert dessen Einstiegspunkte über <see cref="IIdePlugin.FindEntryPointsAsync"/> für das übergebene,
+    /// bereits ermittelte effektive Arbeitsverzeichnis. Gemeinsam genutzt von <see cref="OeffneIdeInternAsync"/>
+    /// (öffnet anschließend einen Einstiegspunkt) und <see cref="AktualisiereKannIdeAuswaehlenAsync"/> (ermittelt
+    /// nur die Anzahl, ohne zu öffnen).
+    /// </summary>
+    /// <param name="effectiveWorkdir">Das bereits über <see cref="ErmittleEffektivesArbeitsverzeichnisAsync"/> aufgelöste effektive Arbeitsverzeichnis.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das aufgelöste IDE-Plugin sowie dessen gefundene Einstiegspunkte.</returns>
+    private async Task<(IIdePlugin Plugin, IReadOnlyList<IdeEntryPoint> EntryPoints)> ErmittleIdeEntryPointsAsync(string effectiveWorkdir, CancellationToken ct)
     {
-        _openVisualStudioCodeWhenNoSolutionFound =
-            await _einstellungService.GetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, ct)
-            ?? false;
+        var plugin = await _pluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct);
+        var entryPoints = await plugin.FindEntryPointsAsync(effectiveWorkdir, ct);
+        return (plugin, entryPoints);
+    }
 
-        OnPropertyChanged(nameof(KannIdeOeffnen));
-        CommandManager.InvalidateRequerySuggested();
+    /// <summary>
+    /// Löst für das übergebene, bereits ermittelte effektive Arbeitsverzeichnis über
+    /// <see cref="PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync"/> ALLE aktivierten, zum
+    /// Repository <c>Explicit</c>- oder <c>Fallback</c>-kompatiblen IDE-Plugins auf (statt nur eines einzelnen
+    /// wie <see cref="ErmittleIdeEntryPointsAsync"/>). Ruft anschließend <see cref="IIdePlugin.FindEntryPointsAsync"/>
+    /// auf jedem dieser Plugins auf und aggregiert die Ergebnisse zu einer Liste von
+    /// <c>(Plugin, EntryPoint)</c>-Tupeln (Plugin-Reihenfolge sowie Einstiegspunkt-Reihenfolge je Plugin bleiben
+    /// erhalten). Schlägt die Einstiegspunkt-Ermittlung für ein einzelnes Plugin fehl, wird der Fehler geloggt
+    /// und mit den übrigen Plugins fortgefahren, statt die gesamte Aggregation abzubrechen. Genutzt vom
+    /// Dropdown-Button-Pfad in <see cref="OeffneIdeInternAsync"/> sowie von
+    /// <see cref="AktualisiereKannIdeAuswaehlenAsync"/>.
+    /// </summary>
+    /// <param name="effectiveWorkdir">Das bereits über <see cref="ErmittleEffektivesArbeitsverzeichnisAsync"/> aufgelöste effektive Arbeitsverzeichnis.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die aggregierte Liste der (Plugin, EntryPoint)-Tupel aller kompatiblen Plugins, die erfolgreich Einstiegspunkte geliefert haben.</returns>
+    private async Task<IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>> ErmittleAggregierteIdeEinstiegspunkteAsync(string effectiveWorkdir, CancellationToken ct)
+    {
+        var plugins = await _pluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync(effectiveWorkdir, ct);
+
+        var eintraege = new List<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>();
+        foreach (var plugin in plugins)
+        {
+            try
+            {
+                var entryPoints = await plugin.FindEntryPointsAsync(effectiveWorkdir, ct);
+                eintraege.AddRange(entryPoints.Select(entryPoint => (plugin, entryPoint)));
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Einstiegspunkte für IDE-Plugin {PluginName} konnten nicht ermittelt werden.", plugin.PluginName);
+            }
+        }
+
+        return eintraege;
+    }
+
+    /// <summary>
+    /// Formatiert einen Einstiegspunkt für die Anzeige im Auswahl-Dialog plugin-qualifiziert:
+    /// <c>"{PluginName}: {DisplayName ?? Dateiname}"</c>, außer die ermittelte Bezeichnung ist bereits
+    /// identisch mit dem <see cref="IIdePlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
+    /// dessen einziger Einstiegspunkt bereits <c>DisplayName == PluginName</c> liefert) — dann wird nur der
+    /// Plugin-Name angezeigt, um ein Doppel-Label zu vermeiden.
+    /// </summary>
+    /// <param name="plugin">Das Plugin, dem der Einstiegspunkt zugeordnet ist.</param>
+    /// <param name="entryPoint">Der zu formatierende Einstiegspunkt.</param>
+    /// <returns>Der formatierte Anzeige-String, z. B. „Visual Studio: MyProject.sln" oder „Visual Studio Code".</returns>
+    private static string FormatiereAnzeigeWert(IIdePlugin plugin, IdeEntryPoint entryPoint)
+    {
+        var bezeichnung = entryPoint.DisplayName ?? Path.GetFileName(entryPoint.Path);
+        return string.Equals(bezeichnung, plugin.PluginName, StringComparison.Ordinal)
+            ? plugin.PluginName
+            : $"{plugin.PluginName}: {bezeichnung}";
+    }
+
+    /// <summary>
+    /// Berechnet <see cref="KannIdeAuswaehlen"/> einmalig am Ende von <see cref="LadenAsync"/>, damit der
+    /// Dropdown-Button des <see cref="Controls.RibbonSplitButton"/> bereits beim ersten Anzeigen der View
+    /// korrekt sichtbar/unsichtbar ist (ohne einen Einstiegspunkt zu öffnen). Ermittlungsfehler, fehlendes
+    /// Plugin oder fehlendes Arbeitsverzeichnis werden hier nicht als <see cref="FehlerMeldung"/> angezeigt,
+    /// sondern führen lediglich zu <c>KannIdeAuswaehlen = false</c>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    private async Task AktualisiereKannIdeAuswaehlenAsync(CancellationToken ct)
+    {
+        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
+        {
+            KannIdeAuswaehlen = false;
+            return;
+        }
+
+        try
+        {
+            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
+            var eintraege = await ErmittleAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(eintraege.Count);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Einstiegspunkte für Aufgabe {AufgabeId} konnten beim Laden nicht ermittelt werden.", _aufgabeId);
+            KannIdeAuswaehlen = false;
+        }
     }
 
     private async Task OeffneArbeitsverzeichnisAsync(CancellationToken ct)
@@ -1805,90 +1890,126 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task OeffneIdeAsync(CancellationToken ct)
+    /// <summary>
+    /// Öffnet das effektive Arbeitsverzeichnis in der zuständigen IDE (Haupt-Button des Split-Buttons):
+    /// löst über <see cref="OeffneIdeInternAsync"/> Plugin und Einstiegspunkte auf und öffnet bei mehreren
+    /// gefundenen Einstiegspunkten direkt den ersten (Fallback-Verhalten), ohne Auswahl-Dialog. Die gezielte
+    /// Auswahl übernimmt <see cref="OeffneIdeAuswahlAsync"/> über den Dropdown-Button.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    private Task OeffneIdeAsync(CancellationToken ct) => OeffneIdeInternAsync(null, ct);
+
+    /// <summary>
+    /// Öffnet das effektive Arbeitsverzeichnis in der zuständigen IDE (Dropdown-Button des Split-Buttons):
+    /// löst über <see cref="OeffneIdeInternAsync"/> Plugin und Einstiegspunkte auf und erzwingt bei mehreren
+    /// gefundenen Einstiegspunkten die Auswahl über den <see cref="WaehleEntryPointAsync"/>-Callback, statt
+    /// automatisch den ersten zu öffnen.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    private Task OeffneIdeAuswahlAsync(CancellationToken ct) => OeffneIdeInternAsync(WaehleEntryPointAsync, ct);
+
+    /// <summary>
+    /// Gemeinsame Implementierung für <see cref="OeffneIdeAsync"/> und <see cref="OeffneIdeAuswahlAsync"/>:
+    /// ermittelt das effektive Arbeitsverzeichnis, löst das zuständige IDE-Plugin über
+    /// <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auf und ermittelt dessen Einstiegspunkte
+    /// über <see cref="IIdePlugin.FindEntryPointsAsync"/> — jeweils genau einmal pro Aufruf — und öffnet
+    /// anschließend über <see cref="IIdePlugin.OpenEntryPointAsync"/> direkt auf Basis desselben Ergebnisses,
+    /// mit dem auch <see cref="KannIdeAuswaehlen"/> aktualisiert wird. Existiert genau ein Einstiegspunkt,
+    /// wird dieser direkt geöffnet. Existieren mehrere und ist <paramref name="waehleEntryPointAsync"/>
+    /// gesetzt, wird der Callback zur Auswahl aufgerufen; liefert er <c>null</c> (Abbruch), wird nichts
+    /// geöffnet. Existieren mehrere ohne Callback, wird der erste geöffnet (Fallback).
+    /// </summary>
+    /// <param name="waehleEntryPointAsync">
+    /// Optionaler Callback zur Auswahl eines Einstiegspunkts bei mehreren Treffern, oder <c>null</c> für das
+    /// Fallback-Verhalten des Haupt-Buttons.
+    /// </param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Ein Task, der abgeschlossen ist, sobald die IDE geöffnet wurde (oder der Vorgang abgebrochen bzw. mit Fehleranzeige beendet wurde).</returns>
+    private async Task OeffneIdeInternAsync(
+        Func<IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>, CancellationToken, Task<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)?>>? waehleEntryPointAsync,
+        CancellationToken ct)
     {
         FehlerMeldung = null;
 
         if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
             return;
 
-        IReadOnlyList<string> solutionPfade;
         try
         {
             var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
 
-            solutionPfade = _ideOeffnenService.FindeSolutions(effectiveWorkdir);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Ermitteln des Arbeitsverzeichnisses für Aufgabe {AufgabeId}.", _aufgabeId);
-            FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
-            return;
-        }
+            if (waehleEntryPointAsync is null)
+            {
+                // Haupt-Button: bestehender Single-Plugin-Pfad bleibt unverändert.
+                var (plugin, entryPoints) = await ErmittleIdeEntryPointsAsync(effectiveWorkdir, ct);
 
-        if (solutionPfade.Count == 0)
-        {
-            await OeffneVisualStudioCodeFallbackAsync(ct);
-            return;
-        }
+                // Zusätzlich: KannIdeAuswaehlen aus der aggregierten Ermittlung über alle kompatiblen Plugins aktualisieren.
+                var aggregierteEintraege = await ErmittleAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+                KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(aggregierteEintraege.Count);
 
-        string? solutionPfad;
-        if (solutionPfade.Count == 1)
-        {
-            solutionPfad = solutionPfade[0];
-        }
-        else
-        {
-            solutionPfad = await _dialogService.ShowSolutionSelectionDialogAsync(solutionPfade, ct);
-            if (solutionPfad is null)
+                if (entryPoints.Count == 0)
+                    throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {effectiveWorkdir}");
+
+                await plugin.OpenEntryPointAsync(entryPoints[0], ct);
                 return;
-        }
+            }
 
-        try
-        {
-            _ideOeffnenService.OeffneSolution(solutionPfad);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Öffnen der Solution {SolutionPfad}.", solutionPfad);
-            FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
-        }
-    }
+            // Dropdown-Button: ausschließlich die aggregierte Ermittlung über alle kompatiblen Plugins.
+            var eintraege = await ErmittleAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+            KannIdeAuswaehlen = BerechneKannIdeAuswaehlen(eintraege.Count);
 
-    private async Task OeffneVisualStudioCodeFallbackAsync(CancellationToken ct)
-    {
-        if (!_openVisualStudioCodeWhenNoSolutionFound)
-            return;
+            if (eintraege.Count == 0)
+                throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {effectiveWorkdir}");
 
-        if (_aufgabe?.LokalerKlonPfad is not { } lokalerKlonPfad)
-            return;
+            if (eintraege.Count == 1)
+            {
+                await eintraege[0].Plugin.OpenEntryPointAsync(eintraege[0].EntryPoint, ct);
+                return;
+            }
 
-        FehlerMeldung = null;
+            var gewaehlt = await waehleEntryPointAsync(eintraege, ct);
+            if (gewaehlt is null)
+                return;
 
-        try
-        {
-            var effectiveWorkdir = await ErmittleEffektivesArbeitsverzeichnisAsync(lokalerKlonPfad, ct);
-
-            _ideOeffnenService.OeffneVisualStudioCode(effectiveWorkdir);
+            await gewaehlt.Value.Plugin.OpenEntryPointAsync(gewaehlt.Value.EntryPoint, ct);
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning(ex, "Visual Studio Code wurde für Arbeitsverzeichnis {LokalerKlonPfad} nicht gefunden.", lokalerKlonPfad);
-            FehlerMeldung = "Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden.";
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Öffnen von Visual Studio Code für Arbeitsverzeichnis {LokalerKlonPfad}.", lokalerKlonPfad);
+            _logger.LogError(ex, "Fehler beim Öffnen der IDE für Aufgabe {AufgabeId}.", _aufgabeId);
             FehlerMeldung = $"IDE konnte nicht geöffnet werden: {ex.Message}";
         }
     }
 
+    /// <summary>
+    /// Callback für <see cref="OeffneIdeInternAsync"/> (Dropdown-Button): Formatiert die aggregierten
+    /// (Plugin, EntryPoint)-Tupel via <see cref="FormatiereAnzeigeWert"/> plugin-qualifiziert, zeigt sie im
+    /// Auswahl-Dialog an und liefert das zum gewählten Anzeigewert gehörende Tupel über den Listenindex
+    /// zurück (nicht über Stringgleichheit, da mehrere Einträge theoretisch denselben Anzeige-String liefern
+    /// könnten), oder <c>null</c> bei Abbruch durch den Anwender.
+    /// </summary>
+    /// <param name="eintraege">Die zur Auswahl stehenden (Plugin, EntryPoint)-Tupel aus allen kompatiblen IDE-Plugins.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das gewählte (Plugin, EntryPoint)-Tupel, oder <c>null</c> bei Abbruch.</returns>
+    private async Task<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)?> WaehleEntryPointAsync(IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)> eintraege, CancellationToken ct)
+    {
+        var anzeigeWerte = eintraege.Select(e => FormatiereAnzeigeWert(e.Plugin, e.EntryPoint)).ToList();
+        var gewaehlterWert = await _dialogService.ShowSolutionSelectionDialogAsync(anzeigeWerte, ct);
+        if (gewaehlterWert is null)
+            return null;
+
+        var index = anzeigeWerte.IndexOf(gewaehlterWert);
+        return index >= 0 ? eintraege[index] : null;
+    }
+
+    /// <summary>
+    /// Berechnet, ob mehr als ein Einstiegspunkt vorhanden ist und somit der Dropdown-Button des
+    /// <see cref="Controls.RibbonSplitButton"/> zur Auswahl angeboten werden soll.
+    /// </summary>
+    /// <param name="entryPointCount">Die Gesamtanzahl der ermittelten Einstiegspunkte.</param>
+    /// <returns><c>true</c>, wenn mehr als ein Einstiegspunkt vorhanden ist, sonst <c>false</c>.</returns>
+    private static bool BerechneKannIdeAuswaehlen(int entryPointCount) => entryPointCount >= 2;
 }
