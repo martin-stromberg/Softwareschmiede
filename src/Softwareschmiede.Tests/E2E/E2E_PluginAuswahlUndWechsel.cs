@@ -76,7 +76,10 @@ public partial class End2EndTest
     /// <summary>
     /// Szenario: Über "Plugin ändern" wird im Dialog ein anderes Plugin gewählt, während die CLI
     /// bereits läuft. Prüft: Der laufende CLI-Prozess wird gestoppt und mit dem neuen Plugin neu
-    /// gestartet (CLI-Panel bleibt nach dem Wechsel sichtbar, Status bleibt "Gestartet").
+    /// gestartet (CLI-Panel bleibt während des gesamten Wechsels sichtbar, Status bleibt "Gestartet") -
+    /// Regressionstest für die Korrektur des Arbeitsablaufs: Während des kurzzeitigen Zwischenstands
+    /// (AusfuehrungsStatus wechselt auf "Beendet", bevor der neue Prozess "Aktiv" setzt) darf das
+    /// CLI-Panel (CliViewButton, gebunden an ShowCliPanel) nicht verschwinden.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit bereits laufender CLI (Softwareschmiede.KiSimulator).</param>
     private void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(AutomationElement mainWindow)
@@ -84,6 +87,10 @@ public partial class End2EndTest
         // Kurze Stabilisierungspause nach Schließen des vorherigen Dialogs, damit die UIA-Elemente
         // wieder einen gültigen Klickpunkt liefern (sonst NoClickablePointException möglich).
         Thread.Sleep(500);
+
+        // Vor dem Wechsel: CLI-Panel sichtbar (ShowCliPanel==true, AusfuehrungsStatus==Aktiv)
+        var cliViewButtonVorWechsel = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
+        Assert.NotNull(cliViewButtonVorWechsel);
 
         // Plugin ändern: Dialog mit aktuellem Plugin vorselektiert anzeigen
         var pluginAendernButton = WaitForElement(mainWindow, cf => cf.ByName("PluginAendern"), Short);
@@ -99,6 +106,10 @@ public partial class End2EndTest
         // Nach dem Wechsel: alter Prozess gestoppt, neuer CLI-Prozess läuft (Stoppen-Button weiterhin sichtbar)
         var stoppenButtonNachWechsel = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
         Assert.NotNull(stoppenButtonNachWechsel);
+
+        // CLI-Panel bleibt während des gesamten Wechsels sichtbar (kein Verschwinden im Zwischenstand)
+        var cliViewButtonNachWechsel = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
+        Assert.NotNull(cliViewButtonNachWechsel);
 
         var statusGestartet = WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
         Assert.NotNull(statusGestartet);
