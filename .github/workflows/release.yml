@@ -99,7 +99,7 @@ jobs:
   # Release Notes, Release und ZIP-Upload direkt fuer den gepushten Tag - unabhaengig von Commit-Typen
   # und ohne semantic-release-Versionsberechnung.
   release-manual-tag:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-rc')
     runs-on: windows-latest
 
     steps:
