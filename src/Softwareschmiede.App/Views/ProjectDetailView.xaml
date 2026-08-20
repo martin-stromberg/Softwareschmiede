@@ -40,6 +40,7 @@
                                                         ButtonText="Löschen"
                                                         AutomationName="Löschen"
                                                         ButtonCommand="{Binding LoeschenCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="🔄" ButtonText="Aktualisieren" AutomationName="Aktualisieren" ButtonCommand="{Binding LadenCommand}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
