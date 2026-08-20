@@ -119,6 +119,9 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
             ProjektId = _projektId,
             Titel = "Recovery-Aufgabe",
             Status = status,
+            AusfuehrungsStatus = status.IstAktivOderWartend()
+                ? AufgabeAusfuehrungsStatus.Aktiv
+                : AufgabeAusfuehrungsStatus.NichtGestartet,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
         _db.Aufgaben.Add(aufgabe);

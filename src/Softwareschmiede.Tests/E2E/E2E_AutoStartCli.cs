@@ -3,8 +3,7 @@ using FlaUI.Core.AutomationElements;
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
-/// E2E-Test für den automatischen CLI-Neustart beim Laden einer Aufgabe im Status "Gestartet"
-/// ohne laufenden CLI-Prozess (Feature 72).
+/// E2E-Test dafür, dass nach einem gestoppten CLI-Lauf kein impliziter Neustart beim Laden erfolgt.
 ///
 /// Voraussetzungen:
 /// - Windows-Desktop-Session (kein Headless-CI)
@@ -17,16 +16,14 @@ public partial class End2EndTest
 {
     /// <summary>
     /// Szenario: Aufgabe wird gestartet (Status wechselt zu "Gestartet", CLI läuft). Über "Stoppen"
-    /// wird der CLI-Prozess manuell beendet, ohne den Status zu ändern. Anschließend wird über
+    /// wird der CLI-Prozess manuell beendet, ohne den Gesamtstatus zu ändern. Anschließend wird über
     /// "Zurück" und erneutes Öffnen der Aufgabe die Ansicht neu geladen.
-    /// Prüft: Beim Laden der Aufgabe (Status "Gestartet", kein laufender Prozess) wird die CLI
-    /// automatisch neu gestartet und eingebettet (Stoppen-Button erscheint wieder ohne manuellen Klick
-    /// auf "Starten" oder "Plugin ändern"). Prüft außerdem (Issue 193): Beim erneuten Öffnen wird die
-    /// Aufgabenbasisinformation (Stoppen-Button) angezeigt, ohne auf das asynchrone Nachladen der
-    /// Protokolleinträge zu warten; die Protokolleinträge (z. B. der GitAktion-Eintrag der
-    /// Repository-Vorbereitung) erscheinen anschließend im Hintergrund in der Protokoll-Liste.
+    /// Prüft: Beim Laden der Aufgabe (Gesamtstatus "Gestartet", beendete Ausführung) wird die CLI
+    /// nicht automatisch neu gestartet. Erst ein expliziter Klick auf "Starten" darf wieder einen
+    /// CLI-Prozess einbetten. Prüft außerdem (Issue 193), dass Protokolleinträge im Hintergrund
+    /// nachgeladen werden.
     /// </summary>
-    protected void AufgabeOeffnen_StatusGestartetOhneLaufendenProzess_StartetCliAutomatisch_E2E(Window mainWindow)
+    protected void AufgabeOeffnen_NachStoppen_StartetCliNichtAutomatischErstExplizit_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
@@ -43,7 +40,7 @@ public partial class End2EndTest
         // (TaskDetailView.xaml, "ProtokollTyp-{Typ}"), statt zufällig am impliziten Textinhalt.
         WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
 
-        // CLI manuell stoppen, Status bleibt "Gestartet"
+        // CLI manuell stoppen, Gesamtstatus bleibt "Gestartet"
         WechsleAufgabenansicht(mainWindow, "CliViewButton");
         var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Short);
         stoppenButton.AsButton().Click();
@@ -59,8 +56,11 @@ public partial class End2EndTest
         Assert.True(items.Length >= 1, "Aufgabenliste sollte die gestartete Aufgabe enthalten.");
         ErsteOffeneAufgabeOeffnen(items);
 
-        // Automatischer CLI-Neustart beim Laden: Stoppen-Button erscheint ohne manuellen Start-Klick.
-        // Erscheint unabhängig vom (fire-and-forget) Protokoll-Nachladen, das erst danach geprüft wird.
+        // Kein impliziter CLI-Neustart beim Laden: Stoppen bleibt weg, Starten bleibt explizit verfügbar.
+        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Short);
+        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+
+        startenButton.AsButton().Click();
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
         // Protokoll wird nach dem erneuten Öffnen erneut asynchron nachgeladen und angezeigt.

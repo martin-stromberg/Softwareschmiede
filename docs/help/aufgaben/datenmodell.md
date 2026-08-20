@@ -12,6 +12,7 @@
 | `Titel` | `string` | Aufgabentitel |
 | `AnforderungsBeschreibung` | `string?` | Prompt-Vorlage / Anforderungstext |
 | `Status` | `AufgabeStatus` | Aktueller Status (siehe unten) |
+| `AusfuehrungsStatus` | `AufgabeAusfuehrungsStatus` | Persistenter Lebenszyklus der KI-Ausführung, unabhängig vom Gesamtstatus der Aufgabe |
 | `BranchName` | `string?` | Name des Git-Branches |
 | `LokalerKlonPfad` | `string?` | Lokaler Pfad des geklonten Repositories |
 | `AgentenpaketName` | `string?` | Name des Agentenpakets |
@@ -123,6 +124,16 @@
 
 ## Statusübergänge
 
+`Aufgabe.Status` beschreibt den fachlichen Gesamtstatus der Aufgabe. Die KI-Ausführung besitzt zusätzlich den unabhängigen Status `AufgabeAusfuehrungsStatus`:
+
+| Wert | Bedeutung |
+|------|-----------|
+| `NichtGestartet` | Für die Aufgabe wurde noch keine KI-Ausführung gestartet |
+| `Aktiv` | Eine KI-Ausführung läuft oder ist als wiederherstellbarer Lauf gespeichert |
+| `Beendet` | Die KI-Ausführung wurde gestoppt oder ist natürlich beendet; die Aufgabe selbst kann weiterhin offen sein |
+
+Nur der Gesamtstatus `Beendet` oder `Archiviert` sperrt einen erneuten Start fachlich. Eine Aufgabe mit `AusfuehrungsStatus.Beendet` kann über **Starten** erneut im vorhandenen Arbeitsverzeichnis ausgeführt werden, solange der Gesamtstatus nicht terminal ist.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Neu : Neu angelegt
@@ -145,6 +156,7 @@ erDiagram
         Guid ProjektId
         string Titel
         AufgabeStatus Status
+        AufgabeAusfuehrungsStatus AusfuehrungsStatus
         string BranchName
         string LokalerKlonPfad
     }

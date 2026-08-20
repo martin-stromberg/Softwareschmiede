@@ -4,6 +4,8 @@
 
 Der Entwicklungsprozess wird durch `EntwicklungsprozessService.ProzessStartenAsync` eingeleitet. Das CLI des KI-Tools wird als nativer Prozess gestartet und via Win32 `SetParent` in die WPF-Aufgabendetailansicht eingebettet. `KiAusfuehrungsService` verwaltet den Prozess-Lifecycle als Singleton.
 
+Der fachliche Aufgabenstatus (`Aufgabe.Status`) und der persistente Lebenszyklus der KI-Ausführung (`Aufgabe.AusfuehrungsStatus`) sind getrennt. Ein gestoppter oder natürlich beendeter CLI-Prozess setzt die KI-Ausführung auf `Beendet`, lässt die Aufgabe aber im Gesamtstatus `Gestartet` oder `Wartend`. Erst `EntwicklungsprozessService.AbschliessenAsync` beendet die Aufgabe fachlich und bereinigt den lokalen Klon.
+
 Die Seitenleisten-Anzeige aktiver Aufgaben wird durch `MainWindowViewModel.AktiveAufgabenAktualisierenAsync()` verwaltet, die `AufgabeService.GetAktiveAufgabenAsync()` aufruft und die `AktiveAufgabenListe` ObservableCollection befüllt. Das Dashboard zeigt dieselbe Liste über `DashboardViewModel.AktiveAufgabenListe` an.
 
 ## Ablauf
@@ -110,12 +112,12 @@ Ablauf:
 6. MainWindow wechselt DataTemplate: `ProjectDetailViewModel` → `ProjectDetailView` wird gerendert
 7. `TaskDetailView` wird nicht mehr angezeigt
 
-### 0. Kombinierter Start-Ablauf: Repository klonen + CLI starten (Status: Neu → Gestartet)
+### 0. Kombinierter Start-Ablauf: Repository klonen + CLI starten
 
-Ausgelöst durch den „Starten"-Button im Ribbon der `TaskDetailView` (nur aktiv wenn Status == `Neu`).
+Ausgelöst durch den „Starten"-Button im Ribbon der `TaskDetailView`. Der Command ist aktiv, wenn der Gesamtstatus nicht `Beendet`/`Archiviert` ist, keine CLI läuft und `Aufgabe.AusfuehrungsStatus` `NichtGestartet` oder `Beendet` ist.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.StartenCommand` — RelayCommand mit CanExecute-Bedingung: Status == `Neu` && !IsCliRunning
+- `TaskDetailViewModel.StartenCommand` — RelayCommand mit CanExecute-Bedingung auf Gesamtstatus, Ausführungsstatus und `!IsCliRunning`
 - `TaskDetailViewModel.StartenAsync` — Orchestriert Plugin-Dialog, Klonen und CLI-Start
 - `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` — Wählt das Git-Plugin
 - `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` — Zeigt KI-Plugin-Dialog (falls nicht als Projekt-Standard gespeichert)
@@ -127,19 +129,20 @@ Beteiligte Komponenten:
 Ablauf:
 1. Anwender klickt „Starten" Button im Ribbon
 2. `TaskDetailViewModel.StartenAsync()` wird aufgerufen
-3. Prüfung: `Aufgabe.Status == Neu`, sonst Fehler
+3. Prüfung: Gesamtstatus ist nicht terminal und Ausführungsstatus erlaubt einen Start
 4. `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` ermittelt Git-Plugin
 5. `PluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.KiAutomation)` prüft Projekt-Standard für KI-Plugin
 6. Falls kein Projekt-Standard vorhanden:
    - `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` zeigt Dialog mit verfügbaren KI-Plugins
    - Benutzer wählt Plugin und optional Checkbox „Für dieses Projekt verwenden"
    - Falls Checkbox aktiviert: `PluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync` speichert als Projekt-Standard
-7. `EntwicklungsprozessService.ProzessStartenAsync(aufgabeId, repositoryUrl, basisBranch, gitPlugin)` wird aufgerufen:
+7. Bei `Aufgabe.AusfuehrungsStatus == NichtGestartet` wird `EntwicklungsprozessService.ProzessStartenAsync(aufgabeId, repositoryUrl, basisBranch, gitPlugin)` aufgerufen:
    - Arbeitsverzeichnis wird ermittelt
    - Repository wird geklont in `{workdir}/softwareschmiede/{aufgabeId}`
    - Branch wird erstellt oder checked out; ohne `IssueReferenz` wird ein Branch im Format `task/{aufgabe.Id:N}-{slug}` erzeugt, mit Issue-Nummer im Format `task/issue-{nummer}-{aufgabe.Id:N}-{slug}`
    - Status wird auf `Gestartet` gesetzt (nicht zwischendurch auf andere Status)
-8. `KiAusfuehrungsService.StartCliAsync(aufgabeId, kiPluginPrefix)` startet intern den ConPTY-Pfad über `StartWithPseudoConsoleAsync`:
+8. Bei `Aufgabe.AusfuehrungsStatus == Beendet` wird der vorhandene lokale Klon über `EntwicklungsprozessService.CliNeustartenAsync` weiterverwendet; Repository-Klon und Branch-Erstellung werden nicht erneut ausgeführt.
+9. `KiAusfuehrungsService.StartCliAsync(aufgabeId, kiPluginPrefix)` startet intern den ConPTY-Pfad über `StartWithPseudoConsoleAsync`:
    - KI-Plugin wird geladen
    - `IKiPlugin.StartCliAsync` liefert `ProcessStartInfo`
    - `KiAusfuehrungsService` erzeugt einen `CliOutputProtokollWriter` für die Aufgabe
@@ -148,12 +151,12 @@ Ablauf:
    - Event `CliProcessStatusChanged` → `IsCliRunning = true`
    - `CliProcessManager.OnCliProcessStatusChanged` (ebenfalls auf das Event abonniert) startet den
      30s-Heartbeat-Timer **und** persistiert sofort `Aufgabe.AktiveRunId` (neue Lauf-ID) sowie
-     `Aufgabe.LastHeartbeatUtc` über `AufgabeService.AktivenLaufSetzenAsync` — dadurch zeigt die
+     `Aufgabe.LastHeartbeatUtc` und `Aufgabe.AusfuehrungsStatus = Aktiv` über `AufgabeService.AktivenLaufSetzenAsync` beziehungsweise `AusfuehrungAktivSetzenAsync` — dadurch zeigt die
      Seitenleisten-Kachel (siehe „KI-Ausführungsstatus-Konvertierung") sofort `"▶ Läuft"`, ohne auf den
      ersten periodischen Heartbeat warten zu müssen
-9. Fenster wird eingebettet (siehe Abschnitt „Fenster einbetten")
-10. UI wählt die CLI-Ansicht mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
-11. Bei Fehler (Klone fehlgeschlagen, CLI-Start fehlgeschlagen): Fehler wird angezeigt, Status bleibt `Neu`, Rollback des Klonverzeichnisses falls nötig
+10. Fenster wird eingebettet (siehe Abschnitt „Fenster einbetten")
+11. UI wählt die CLI-Ansicht mit laufendem Prozess; Anwender sieht die KI-Agenten-Ausgabe
+12. Bei Fehler (Klonen oder CLI-Start fehlgeschlagen): Fehler wird angezeigt; beim Erststart bleibt der Status `Neu`, Rollback des Klonverzeichnisses erfolgt falls nötig
 
 ### 0.3. Automatische issue.md-Erstellung und .gitignore-Aktualisierung
 
@@ -227,26 +230,25 @@ Ablauf:
 3. ViewModel berechnet `KannSpeichern` basierend auf nicht-leerem Titel
 4. Anwender klickt „Speichern" → `SpeichernCommand.Execute()`
 5. `AufgabeService.UpdateAsync()` wird aufgerufen
-6. Bei Erfolg: `LadenAsync()` neu laden, Toast anzeigen; bei Fehler: `FehlerMeldung` anzeigen
+6. Bei Erfolg: `LadenAsync()` neu laden, Aufgabenliste per Callback aktualisieren und die aktuelle Aufgabendetailansicht geöffnet lassen; bei Fehler: `FehlerMeldung` anzeigen
 
-### 1. Automatischer CLI-Neustart bei Ansicht-Laden (Status: Gestartet, kein Prozess läuft)
+### 1. Laden und Wiederverbinden der KI-Ausführung
 
-Falls die Aufgabendetailansicht für eine Aufgabe im Status `Gestartet` geöffnet wird und kein aktiver CLI-Prozess läuft (z.B. nach Neustart der Anwendung), wird die CLI automatisch neu gestartet.
+Beim Laden einer Aufgabe wertet die Detailansicht zuerst den persistenten `AusfuehrungsStatus` aus. Eine beendete oder noch nicht gestartete KI-Ausführung wird nicht automatisch gestartet.
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.LadenAsync` — Lädt Aufgabe, prüft Status und Prozess-Zustand
 - `KiAusfuehrungsService.IsRunning(aufgabeId)` — Prüft, ob Prozess läuft
-- `CliAutomatischNeustartenAsync` — Startet CLI neu mit gespeichertem Plugin
+- `AufgabeRecoveryService` — betrachtet nur Aufgaben mit `AusfuehrungsStatus.Aktiv` als Recovery-Kandidaten
 
 Ablauf:
 1. Benutzer navigiert zu Aufgabendetailansicht
 2. `LadenAsync` wird aufgerufen (registriert in AufgabeId-Property-Setter)
 3. Aufgabe wird mit `AufgabeService.GetDetailAsync` geladen
-4. Prüfung: `Aufgabe.Status == Gestartet && !KiAusfuehrungsService.IsRunning(aufgabeId)` ?
-5. Falls wahr: `CliAutomatischNeustartenAsync` wird aufgerufen
-6. Gespeichertes Plugin wird ermittelt (Aufgaben-Plugin oder Projekt-Standard oder Global-Default)
-7. `KiAusfuehrungsService.StartCliAsync` wird aufgerufen
-8. CLI-Fenster wird eingebettet; Benutzer sieht laufenden Prozess
+4. Prüfung: `Aufgabe.AusfuehrungsStatus == Aktiv`
+5. Falls eine Session läuft: Session wird aus `KiAusfuehrungsService.GetPseudoConsoleSession(aufgabeId)` geholt und eingebettet
+6. Falls keine Session läuft: keine implizite neue CLI wird gestartet; Recovery betrachtet nur aktive, wiederherstellbare Laufdaten
+7. Bei `NichtGestartet` oder `Beendet`: `ShowCliPanel` bleibt aus, `StartenCommand` kann abhängig vom Gesamtstatus aktiv sein
 
 ### 2. Plugin-Wechsel bei laufender CLI (Status: Gestartet/Wartend mit aktiver CLI)
 
@@ -760,14 +762,16 @@ Konvertierungs-Logik in `Convert()`:
 1. Input-Check: Ist Wert vom Typ `Aufgabe` oder `AktiveAufgabePanelItem`? Sonst `string.Empty` zurückgeben
 2. Wenn für ein Panel-Item ein geplanter Prompt existiert:
    - Output: `"⏳ Prompt in Wartestellung"`
-3. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
+3. Wenn `AusfuehrungsStatus != Aktiv`:
+   - Output: `"✓ Bereit"`
+4. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
    - Bei `LaufStatus == AufgabeLaufStatus.WartetAufEingabe`: Output `"⏸ Wartet"`
    - Sonst: Output `"▶ Läuft"`
-4. Wenn `Status == AufgabeStatus.Wartend`:
+5. Wenn `Status == AufgabeStatus.Wartend`:
    - Output: `"⏸ Wartet"`
-5. Sonst (Default):
+6. Sonst (Default):
    - Output: `"✓ Bereit"`
-6. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
+7. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
 
 ### Navigation zu Aufgabendetail aus aktiver Aufgabe
 

@@ -55,7 +55,7 @@ Die Titelleiste des Fensters zeigt nach dem Laden den Namen der geöffneten Aufg
 
 > **Hinweis:** Der Titel ist erforderlich, um speichern zu können. Der „Speichern"-Button ist ausgegraut, wenn das Feld leer ist.
 
-Nach dem Speichern können Sie bleiben, um die Aufgabe weiterzubearbeiten, oder mit **Zurück** zur Projektdetailansicht navigieren. Die neue Aufgabe erscheint sofort in der Aufgabenliste.
+Nach dem Speichern bleibt die Aufgabendetailansicht geöffnet. Du kannst die Aufgabe direkt weiterbearbeiten oder mit **Zurück** zur Projektdetailansicht navigieren. Die neue Aufgabe erscheint sofort in der Aufgabenliste.
 
 ### 2. Aufgabe bearbeiten (optional)
 
@@ -86,7 +86,7 @@ Wenn ein Projekt ein GitHub-Repository verwendet, zeigt die Projektdetailansicht
 
 Nach erfolgreicher Erstellung verschwindet derselbe Alert aus der Liste der offenen Anforderungen. Das ursprüngliche GitHub-Code-Scanning-Alert wird in GitHub nicht automatisch geschlossen oder verändert.
 
-### 3. Aufgabe starten (Repository einrichten)
+### 3. Aufgabe starten oder KI-Ausführung erneut starten
 
 Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 
@@ -97,6 +97,8 @@ Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 - Die `.gitignore`-Datei wird automatisch angepasst, um `issue.md` von der Versionskontrolle auszuschließen.
 - Der Status wechselt auf **Gestartet**.
 - Die **CLI-Ansicht** wird angezeigt.
+
+Hat eine Aufgabe bereits einen lokalen Klon und wurde nur die KI-Ausführung beendet, bleibt der Gesamtstatus der Aufgabe **Gestartet** oder **Wartend**. In diesem Fall startet **Starten** die KI-CLI im vorhandenen Arbeitsverzeichnis erneut, ohne das Repository neu zu klonen oder die Aufgabe endgültig abzuschließen.
 
 > **Hinweis:** Das Arbeitsverzeichnis muss in den Einstellungen konfiguriert sein.
 > 
@@ -151,13 +153,15 @@ Statt einen Prompt sofort zu versenden, kannst du ihn auch für eine später Uhr
 >
 > Wenn du einen neuen Prompt zur gleichen oder anderen Uhrzeit planst, wird der vorherige Plan ersetzt.
 
-### 7. CLI beenden
+### 7. KI-Ausführung beenden
 
 Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alternativ kannst du im Ribbon (Gruppe „CLI") auf **Stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).
 
+Das Beenden der KI-Ausführung ist nicht dasselbe wie das Beenden der Aufgabe. Der lokale Klon bleibt erhalten, der Gesamtstatus der Aufgabe bleibt bestehen, und die CLI wird beim späteren Öffnen der Aufgabe nicht automatisch neu gestartet. Ein erneuter Lauf erfolgt nur über **Starten**.
+
 ### 8. Aufgabe abschließen
 
-Im Status **Gestartet** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") auf **Beenden**. Der Status wechselt auf **Beendet**. Die **Diff-Ansicht** wird angezeigt und zeigt die Änderungen im Repository. Die **Info-Ansicht** bleibt weiterhin auswählbar.
+Im Status **Gestartet** oder **Wartend**, klicke im Ribbon (Gruppe „Aufgabe") auf **Beenden**. Erst diese Aktion schließt die Aufgabe endgültig ab: Der Gesamtstatus wechselt auf **Beendet**, das lokale Arbeitsverzeichnis wird bereinigt und die **Diff-Ansicht** zeigt die Änderungen im Repository. Die **Info-Ansicht** bleibt weiterhin auswählbar.
 
 ### 9. Pull Request erstellen
 

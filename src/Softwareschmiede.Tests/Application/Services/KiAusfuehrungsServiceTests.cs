@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Terminal;
@@ -163,6 +164,99 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         completed.Should().Be(fehlerSignal.Task, "der Exited-Handler sollte trotz disposed ScopeFactory ausgelöst werden, ohne die Anwendung zum Absturz zu bringen");
 
         statusEvents.Should().Contain(CliProcessStatus.Fehler);
+    }
+
+    /// <summary>Natürliches Prozessende persistiert den Ausführungsstatus zentral als Beendet.</summary>
+    [OsInterfaceFact]
+    public async Task ProcessExited_ExitCodeZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden()
+    {
+        await using var provider = CreateAufgabeServiceProvider();
+        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>());
+
+        await StartAndWaitForExitAsync(
+            sut,
+            aufgabeId,
+            new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            },
+            CliProcessStatus.Gestoppt);
+
+        var geladen = await WaitForAufgabeStatusAsync(provider, aufgabeId, AufgabeAusfuehrungsStatus.Beendet);
+        geladen.Status.Should().Be(AufgabeStatus.Gestartet);
+        geladen.AktiveRunId.Should().BeNull();
+        geladen.LastHeartbeatUtc.Should().BeNull();
+        geladen.LetzterCliStartUtc.Should().BeNull();
+    }
+
+    /// <summary>Fehlerhaftes Prozessende beendet nur die Ausführung, nicht den Gesamtstatus.</summary>
+    [OsInterfaceFact]
+    public async Task ProcessExited_ExitCodeNonZero_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden()
+    {
+        await using var provider = CreateAufgabeServiceProvider();
+        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>());
+
+        await StartAndWaitForExitAsync(
+            sut,
+            aufgabeId,
+            new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 1",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            },
+            CliProcessStatus.Fehler);
+
+        var geladen = await WaitForAufgabeStatusAsync(provider, aufgabeId, AufgabeAusfuehrungsStatus.Beendet);
+        geladen.Status.Should().Be(AufgabeStatus.Gestartet);
+    }
+
+    /// <summary>Manueller Stop persistiert den Ausführungsstatus zentral als Beendet.</summary>
+    [OsInterfaceFact]
+    public async Task StopCliAsync_PersistiertAusfuehrungBeendetOhneGesamtstatusZuBeenden()
+    {
+        await using var provider = CreateAufgabeServiceProvider();
+        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        using var sut = new KiAusfuehrungsService(
+            NullLogger<KiAusfuehrungsService>.Instance,
+            NullLoggerFactory.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>());
+
+        var gestoppt = new TaskCompletionSource();
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            if (status == CliProcessStatus.Gestoppt)
+                gestoppt.TrySetResult();
+        };
+
+        var pluginMock = CreatePlugin(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = "/c timeout /t 30 /nobreak > nul",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        });
+
+        await sut.StartCliAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        await sut.StopCliAsync(aufgabeId);
+
+        var completed = await Task.WhenAny(gestoppt.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        completed.Should().Be(gestoppt.Task);
+
+        var geladen = await WaitForAufgabeStatusAsync(provider, aufgabeId, AufgabeAusfuehrungsStatus.Beendet);
+        geladen.Status.Should().Be(AufgabeStatus.Gestartet);
     }
 
     /// <summary>
@@ -660,6 +754,90 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 CreateNoWindow = true,
             });
         return pluginMock;
+    }
+
+    private static Mock<IKiPlugin> CreatePlugin(System.Diagnostics.ProcessStartInfo processStartInfo)
+    {
+        var pluginMock = new Mock<IKiPlugin>();
+        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(processStartInfo);
+        return pluginMock;
+    }
+
+    private static ServiceProvider CreateAufgabeServiceProvider()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        return new ServiceCollection()
+            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>(options => options.UseInMemoryDatabase(databaseName))
+            .AddScoped<TodoService>()
+            .AddScoped<AufgabeService>()
+            .AddScoped<ProtokollService>()
+            .AddSingleton<ILogger<TodoService>>(NullLogger<TodoService>.Instance)
+            .AddSingleton<ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance)
+            .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance)
+            .BuildServiceProvider();
+    }
+
+    private static async Task<(Guid AufgabeId, Guid ProjektId)> CreateGestarteteAufgabeMitAktivemLaufAsync(ServiceProvider provider)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
+        var projektId = Guid.NewGuid();
+        db.Projekte.Add(new Projekt
+        {
+            Id = projektId,
+            Name = "Prozessende-Testprojekt",
+            Status = ProjektStatus.Aktiv,
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+        var aufgabe = await aufgabeService.CreateAsync(projektId, "Prozessende-Aufgabe", "Beschreibung");
+        await aufgabeService.StartenAsync(aufgabe.Id, "feature/prozessende", Path.GetTempPath());
+        await aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, "lauf-prozessende");
+
+        return (aufgabe.Id, projektId);
+    }
+
+    private static async Task StartAndWaitForExitAsync(
+        KiAusfuehrungsService sut,
+        Guid aufgabeId,
+        System.Diagnostics.ProcessStartInfo processStartInfo,
+        CliProcessStatus expectedStatus)
+    {
+        var exitSignal = new TaskCompletionSource();
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            if (status == expectedStatus)
+                exitSignal.TrySetResult();
+        };
+
+        await sut.StartCliAsync(aufgabeId, CreatePlugin(processStartInfo).Object, Path.GetTempPath());
+
+        var completed = await Task.WhenAny(exitSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+        completed.Should().Be(exitSignal.Task);
+    }
+
+    private static async Task<Aufgabe> WaitForAufgabeStatusAsync(
+        ServiceProvider provider,
+        Guid aufgabeId,
+        AufgabeAusfuehrungsStatus expectedStatus)
+    {
+        for (var i = 0; i < 50; i++)
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
+            var aufgabe = await db.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabeId);
+            if (aufgabe.AusfuehrungsStatus == expectedStatus)
+                return aufgabe;
+
+            await Task.Delay(100);
+        }
+
+        await using var finalScope = provider.CreateAsyncScope();
+        var finalDb = finalScope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
+        return await finalDb.Aufgaben.AsNoTracking().SingleAsync(a => a.Id == aufgabeId);
     }
 
     private static void KillIfRunning(System.Diagnostics.Process process)

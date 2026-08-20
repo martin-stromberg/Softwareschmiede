@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Infrastructure.Data;
 
@@ -126,6 +127,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
         {
             e.HasKey(a => a.Id);
             e.Property(a => a.Status).HasConversion<string>();
+            e.Property(a => a.AusfuehrungsStatus)
+                .HasConversion<string>()
+                .HasDefaultValue(AufgabeAusfuehrungsStatus.NichtGestartet);
             // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
             e.Property(a => a.ErstellungsDatum).HasConversion(
                 v => v.ToUnixTimeMilliseconds(),

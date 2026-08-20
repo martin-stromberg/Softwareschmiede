@@ -121,8 +121,8 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
     {
         var status = value switch
         {
-            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, false),
-            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.HasScheduledPrompt),
+            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, false),
+            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.HasScheduledPrompt),
             _ => null
         };
 
@@ -134,6 +134,11 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
         if (status.HasScheduledPrompt)
         {
             return "⏳ Prompt in Wartestellung";
+        }
+
+        if (status.AusfuehrungsStatus != AufgabeAusfuehrungsStatus.Aktiv)
+        {
+            return "✓ Bereit";
         }
 
         if (AufgabeLaufAktivitaet.IstAktiv(status.AktiveRunId, status.LastHeartbeatUtc, DateTimeOffset.UtcNow))
@@ -160,6 +165,7 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
 
     private sealed record StatusDaten(
         AufgabeStatus Status,
+        AufgabeAusfuehrungsStatus AusfuehrungsStatus,
         string? AktiveRunId,
         DateTimeOffset? LastHeartbeatUtc,
         AufgabeLaufStatus? LaufStatus,

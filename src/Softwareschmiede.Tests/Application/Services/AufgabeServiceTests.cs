@@ -53,6 +53,7 @@ public sealed class AufgabeServiceTests : IDisposable
         result.Id.Should().NotBeEmpty();
         result.Titel.Should().Be("Test Aufgabe");
         result.Status.Should().Be(AufgabeStatus.Neu);
+        result.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.NichtGestartet);
         result.ProjektId.Should().Be(_projektId);
     }
 
@@ -291,8 +292,22 @@ public sealed class AufgabeServiceTests : IDisposable
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
         result!.Status.Should().Be(AufgabeStatus.Gestartet);
+        result.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
         result.BranchName.Should().Be("feature/test-branch");
         result.LokalerKlonPfad.Should().Be("/tmp/klon");
+    }
+
+    /// <summary>StartenAsync sperrt terminale Gesamtstatus unabhängig vom Ausführungsstatus.</summary>
+    [Fact]
+    public async Task StartenAsync_ShouldThrow_WhenAufgabeBeendetIst()
+    {
+        var aufgabe = await _sut.CreateAsync(_projektId, "Beendete Aufgabe", null);
+        await _sut.AbschliessenAsync(aufgabe.Id);
+
+        var act = () => _sut.StartenAsync(aufgabe.Id, "feature/test", "/tmp/klon");
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
     }
 
     /// <summary>GetLatestDiffResultIdForFileAsync liefert den neuesten dateispezifischen Diff auch bei unterschiedlicher Pfadnotation.</summary>
@@ -359,6 +374,7 @@ public sealed class AufgabeServiceTests : IDisposable
         // Assert
         var result = await _sut.GetByIdAsync(aufgabe.Id);
         result!.Status.Should().Be(AufgabeStatus.Beendet);
+        result.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
         result.AbschlussDatum.Should().NotBeNull();
     }
 
