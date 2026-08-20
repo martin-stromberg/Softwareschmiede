@@ -81,19 +81,30 @@ jobs:
         run: .github/scripts/determine-version.ps1 -Branch staging
         shell: pwsh
 
+      - name: Determine RC number
+        if: steps.version.outputs.changed == 'true'
+        id: rc
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $existing = @(git tag --list "v$version-rc.*")
+          $rcNumber = $existing.Count + 1
+          "rc_number=$rcNumber" | Add-Content -Path $env:GITHUB_OUTPUT
+          "rc_tag=v$version-rc.$rcNumber" | Add-Content -Path $env:GITHUB_OUTPUT
+
       - name: Pack Release Candidate
         if: steps.version.outputs.changed == 'true'
         uses: ./.github/actions/build-and-package
         with:
           release-version: ${{ steps.version.outputs.version }}
-          release-tag: v${{ steps.version.outputs.version }}-rc.${{ github.run_number }}
+          release-tag: ${{ steps.rc.outputs.rc_tag }}
 
       - name: Create GitHub pre-release
         if: steps.version.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "v${{ steps.version.outputs.version }}-rc.${{ github.run_number }}"
+          $tag = "${{ steps.rc.outputs.rc_tag }}"
           gh release create $tag release.zip `
             --target $env:GITHUB_SHA `
             --title $tag `
