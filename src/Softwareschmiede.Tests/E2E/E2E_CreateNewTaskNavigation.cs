@@ -28,7 +28,7 @@ public partial class End2EndTest
         // Phase Speichern
         NeueAufgabeAnlegen(mainWindow);
         AufgabeTitelSetzen(mainWindow, "Persistierte Neue Aufgabe");
-        AufgabeDetailSpeichern(mainWindow);
+        AufgabeDetailSpeichern(mainWindow, false);
 
         // Die TaskDetailView bleibt geöffnet; der Anwender kann direkt starten statt zur Liste zurückzufallen.
         WaitForElement(mainWindow, cf => cf.ByName("Starten"), Medium);

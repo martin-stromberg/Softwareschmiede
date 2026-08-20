@@ -80,7 +80,13 @@ Die WPF-Aufgabendetailansicht (`TaskDetailView`) nutzt eine gemeinsame Ansichtsl
 Zeigt die Stammdaten der Aufgabe, insbesondere Titel, Status, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Bei neuen Aufgaben enthält sie die bearbeitbaren Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Die Info-Ansicht ist unabhängig vom Aufgabenstatus erreichbar, also auch bei gestarteten, wartenden und beendeten Aufgaben. CLI-Ausgaben laufender ConPTY-Sitzungen werden automatisch als Protokolleinträge gespeichert und sind nach erneutem Laden der Aufgabe über das Aufgabenprotokoll nachvollziehbar.
 
 #### CLI-Ansicht
-Zeigt das Terminalfenster des KI-Tools. Das Fenster wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`). Die CLI-Ansicht wird angeboten, wenn für die Aufgabe eine CLI-Ausführung sinnvoll ist, insbesondere bei gestarteten oder wartenden Aufgaben.
+Zeigt das Terminalfenster des KI-Tools. Das Fenster wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`). 
+
+Die CLI-Ansicht wird angeboten, wenn:
+- Die Aufgabe im Status `Gestartet` oder `Wartend` ist UND
+- Der Ausführungsstatus `Aktiv` (CLI läuft) oder `Beendet` (CLI wurde beendet) ist
+
+Das Panel bleibt auch nach Beendigung der Ausführung sichtbar, sodass der Benutzer die letzte CLI-Ausgabe anschauen und die CLI manuell neu starten kann. Beim Plugin-Wechsel wird die neue Session im selben Panel dargestellt.
 
 Während eine CLI läuft, zeigt die Fußzeile den Namen des aktiven KI-Plugins bzw. CLI-Plugins an. Wenn keine CLI läuft oder ein Start/Stop fehlschlägt, wird dieser Wert geleert, damit kein veralteter CLI-Name sichtbar bleibt. Der technische Laufstatus bleibt davon getrennt.
 

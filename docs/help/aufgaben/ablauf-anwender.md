@@ -123,7 +123,7 @@ Das CLI-Fenster erscheint eingebettet in die Aufgabenansicht. Die Aufgabe bleibt
 In der Aufgabendetailansicht befindet sich oberhalb des Inhalts eine Ansichtsleiste:
 
 - **Info:** Zeigt Aufgabenstammdaten, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Diese Ansicht ist auch bei gestarteten, wartenden und beendeten Aufgaben erreichbar.
-- **CLI:** Zeigt das Terminalfenster des KI-Tools, wenn für die Aufgabe eine CLI-Ausführung verfügbar ist.
+- **CLI:** Zeigt das Terminalfenster des KI-Tools. Die Ansicht ist verfügbar, solange die Aufgabe im Status **Gestartet** oder **Wartend** ist und die Ausführung läuft oder beendet wurde. Nach Beendigung der Ausführung kannst du die letzte Ausgabe noch anschauen und die CLI manuell neu starten.
 - **Diff:** Zeigt die Änderungen nach Abschluss der Aufgabe, wenn eine Diff-Ansicht verfügbar ist.
 - **PR:** Zeigt die aus der Aufgabe heraus erstellten Pull Requests sowie die zugeordneten GitHub Actions.
 
@@ -157,7 +157,7 @@ Statt einen Prompt sofort zu versenden, kannst du ihn auch für eine später Uhr
 
 Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alternativ kannst du im Ribbon (Gruppe „CLI") auf **Stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).
 
-Das Beenden der KI-Ausführung ist nicht dasselbe wie das Beenden der Aufgabe. Der lokale Klon bleibt erhalten, der Gesamtstatus der Aufgabe bleibt bestehen, und die CLI wird beim späteren Öffnen der Aufgabe nicht automatisch neu gestartet. Ein erneuter Lauf erfolgt nur über **Starten**.
+Das Beenden der KI-Ausführung ist nicht dasselbe wie das Beenden der Aufgabe. Der lokale Klon bleibt erhalten, der Gesamtstatus der Aufgabe bleibt bestehen. **Die CLI-Ansicht bleibt auch nach Beendigung noch sichtbar**, sodass du die letzte Ausgabe anschauen und die CLI über **Starten** neu starten kannst, ohne die Aufgabe fachlich zu beenden. Ein erneuter Lauf erfolgt nur über **Starten** im Ribbon.
 
 ### 8. Aufgabe abschließen
 

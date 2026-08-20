@@ -356,7 +356,9 @@ public partial class End2EndTest
         {
             await using var db = OpenTestDbContext();
             var repo = db.GitRepositories.FirstOrDefault(r => r.RepositoryName == repositoryName);
-            saved = db.RepositoryStartKonfigurationen.Where(c => c.GitRepositoryId == repo.Id).SingleOrDefault()?.WorkingDirectoryRelativePath;
+            saved = repo is null
+                ? null
+                : db.RepositoryStartKonfigurationen.Where(c => c.GitRepositoryId == repo.Id).SingleOrDefault()?.WorkingDirectoryRelativePath;
             if (string.Equals(saved, expected, StringComparison.Ordinal))
                 return saved;
 

@@ -156,6 +156,25 @@
 
 ---
 
+## CLI-Panel-Sichtbarkeit
+
+**Beschreibung:** Das CLI-Panel wird in der Aufgabendetailansicht angezeigt oder ausgeblendet, abhängig vom Aufgabenstatus und dem persistierten Ausführungsstatus.
+
+**Bedingungen:**
+- `Aufgabe.Status == Gestartet` oder `Wartend` (Aufgabe ist aktiv oder wartet)
+- `Aufgabe.AusfuehrungsStatus == Aktiv` oder `Beendet` (KI-Ausführung läuft oder wurde beendet)
+
+**Verhalten:**
+- CLI-Panel wird sichtbar, wenn beide Bedingungen erfüllt sind.
+- CLI-Panel wird ausgeblendet, wenn `Aufgabe.Status == Neu`, `Beendet` oder `Archiviert` ist (unabhängig vom `AusfuehrungsStatus`).
+- CLI-Panel wird ausgeblendet, wenn `AusfuehrungsStatus == NichtGestartet` ist (unabhängig vom `Status`).
+- Nach Beendigung der CLI-Ausführung (natürlich oder durch Benutzer) bleibt das CLI-Panel sichtbar, solange die Aufgabe noch im Status `Gestartet` oder `Wartend` ist. Der Benutzer kann die letzte Ausgabe anschauen und die CLI manuell neu starten.
+- Bei Plugin-Wechsel wird die laufende CLI beendet (`AusfuehrungsStatus` → `Beendet`); das Panel bleibt sichtbar und wird mit der neuen Session neu befüllt.
+
+**Umsetzung:** `AufgabeAusfuehrungsStatusExtensions.SollCliAnzeigen(AusfuehrungsStatus, AufgabeStatus)` — prüft beide Bedingungen und gibt `true` zurück, wenn die CLI-Ansicht angezeigt werden soll.
+
+---
+
 ## Sichtbarer Aufgabenkontext
 
 **Beschreibung:** Die Aufgabendetailansicht zeigt den Kontext der aktuell geöffneten Aufgabe und der laufenden CLI-Ausführung.
