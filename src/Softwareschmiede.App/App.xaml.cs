@@ -204,7 +204,6 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<ITextDiffService, TextDiffService>();
         services.AddScoped<ArbeitsverzeichnisOeffnenService>();
         services.AddSingleton<IVisualStudioCodeLocator, VisualStudioCodeLocator>();
-        services.AddScoped<IdeOeffnenService>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();

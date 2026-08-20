@@ -64,7 +64,8 @@ Die wichtigsten Features:
 - **To-Do-Listen für Aufgaben** – Strukturierung von Aufgaben mit To-Do-Elementen, Abhak-Status und Blockierung des Aufgabenabschlusses bei offenen To-Dos; Badge zeigt Anzahl offener To-Dos im Ribbon, aktive Aufgaben im Menü zeigen `0/1/n Todos` und öffnen per Klick einen read-only Dialog mit den offenen To-Dos
 - **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
 - **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
-- **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM- und KI-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
+- **Plugin-basierte IDE-Integration** – Automatische Erkennung und Auswahl der passenden Entwicklungsumgebung (Visual Studio bei `.sln`/`.slnx`-Dateien, Visual Studio Code als Fallback); konfigurierbare Aktivierung und Priorisierung in den Einstellungen; Split-Button-Muster für direkte Öffnung oder Auswahl-Dialog bei mehreren Einstiegspunkten
+- **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM-, KI- und IDE-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
 - **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende; unterstützt robuste Clipboard-Pastes langer mehrzeiliger Inhalte, Alt Gr-Sonderzeichen (z. B. auf deutschem Tastaturlayout: @, {, }, |, ~) und wortweise Cursor-Navigation mit Ctrl+Pfeiltasten
 - **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
 - **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien); beide Aktionen berücksichtigen konfigurierte Arbeitsverzeichnis-Unterverzeichnisse (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`) und arbeiten damit in Mono-Repos mit räumlich getrennten Subprojekten zuverlässig
@@ -193,15 +194,48 @@ Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
 
 Weiterführende Bedienungshinweise (Arbeitsverzeichnis-Konfiguration für Repository-Startskripte und Ribbon-Aktionen, LocalDirectoryPlugin-Workspace-Modi, KI-Plugin-Auswahl und Standardplugins, Folgeanweisungen mit Kontextsteuerung, Benachrichtigungssystem u. a.) finden Sie in der [Anwendungsdokumentation](docs/help/index.md).
 
-### IDE öffnen und VS-Code-Fallback
+### IDE öffnen mit Plugin-Auswahl und Split-Button-Muster
 
-Die Aktion **IDE öffnen** in der Aufgabendetailansicht öffnet weiterhin bevorzugt eine gefundene Visual-Studio-Solution (`*.sln`). Bei mehreren Solutions zeigt die Anwendung einen Auswahl-Dialog; bei genau einer Solution wird diese direkt geöffnet.
+Die Aktion **IDE öffnen** in der Aufgabendetailansicht nutzt ein erweiterbares IDE-Plugin-System zur automatischen Auswahl der passenden Entwicklungsumgebung mit flexiblem Split-Button-Pattern für mehrere Einstiegspunkte:
+
+**IDE-Plugin-Auswahl (dreistufiger Prozess):**
+1. Das System fragt alle aktivierten IDE-Plugins der Reihe nach ab, ob sie mit dem Repository kompatibel sind
+2. Priorität: Plugins mit expliziter Kompatibilität (z. B. Visual Studio bei `.sln`/`.slnx`-Dateien) werden bevorzugt
+3. Fallback: Ist kein Plugin explizit kompatibel, wird das erste verfügbare Fallback-Plugin verwendet (z. B. Visual Studio Code)
+4. Default: Ist kein Plugin kompatibel, wird das erste registrierte Plugin verwendet
+
+**Split-Button-Muster (UI-Flexibilität bei mehreren Einstiegspunkten):**
+
+Der IDE-öffnen-Button in der Aufgabendetailansicht (Ribbon) wird als Split-Button mit zwei Teilen dargestellt:
+
+- **Haupt-Button:** 
+  - Öffnet immer **direkt** den **ersten (priorisierten) Einstiegspunkt** ohne Dialog
+  - Schnell und unkompliziert für den Standard-Anwendungsfall (1 IDE-Plugin, 1 Einstiegspunkt)
+  - Verhalten identisch mit dem bisherigen Single-Button
+  - Beispiel: Visual Studio öffnet direkt die erste gefundene `.sln`-Datei
+
+- **Dropdown-Button** (nur sichtbar bei ≥2 aggregierten Einstiegspunkten):
+  - Zeigt **nicht nur** die Einstiegspunkte des einen priorisierten Plugins, sondern aggregiert die Einstiegspunkte **aller aktivierten, kompatiblen IDE-Plugins** (sowohl explizit als auch als Fallback kompatibel). Beispiel: Liegt eine `.sln`-Datei vor, sind sowohl Visual Studio (explizit kompatibel) als auch Visual Studio Code (Fallback) gemeinsam im Dropdown wählbar — nicht nur das eine, für den Haupt-Button priorisierte Plugin.
+  - Die Einträge sind zunächst nach Kompatibilität sortiert (alle Explicit-Plugins vor allen Fallback-Plugins) und innerhalb dessen in der konfigurierten Plugin-Reihenfolge.
+  - Klick zeigt einen **Auswahl-Dialog** mit allen verfügbaren Einstiegspunkten, plugin-qualifiziert beschriftet (z. B. „Visual Studio: MyProject.sln", „Visual Studio Code"), damit bei mehreren Plugins erkennbar bleibt, welcher Eintrag zu welcher IDE gehört
+  - Benutzer kann gezielt einen spezifischen Einstiegspunkt wählen (z. B. `backend.sln`, `frontend.sln`, `shared.sln`, oder plugin-übergreifend „Visual Studio Code")
+  - Nach Auswahl öffnet das jeweils zugehörige Plugin den gewählten Einstiegspunkt
+  - Abbruch: Dialog wird geschlossen, nichts wird geöffnet
+
+**Integrierte IDE-Plugins:**
+- **Visual Studio IDE-Plugin** — Prüft auf `.sln` oder `.slnx`-Dateien im Arbeitsverzeichnis; meldet explizite Kompatibilität bei Fund, öffnet die Solution(en) über den Betriebssystem-Standardhandler. Bei mehreren Dateien tragen alle zur aggregierten Einstiegspunkt-Liste des Dropdown-Buttons bei.
+- **Visual Studio Code IDE-Plugin** — Meldet sich immer als Fallback zur Verfügung; öffnet das Arbeitsverzeichnis über den `code`-Befehl. Liefert selbst stets nur einen einzigen Einstiegspunkt, trägt aber ebenfalls zur aggregierten Gesamtanzahl bei — in Kombination mit einem weiteren kompatiblen Plugin (z. B. Visual Studio bei vorhandener `.sln`) kann bereits dieser eine zusätzliche Einstiegspunkt den Dropdown-Button auslösen (1 VS-Solution + 1 VS-Code-Fallback = 2 aggregierte Einstiegspunkte).
 
 **Arbeitsverzeichnis-Auflösung:** Beide Aktionen — Arbeitsverzeichnis öffnen und IDE öffnen — berücksichtigen das konfigurierte Arbeitsunterverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`). Ist ein Unterverzeichnis konfiguriert (z. B. `src/backend`), wird nur dieses durchsucht und geöffnet, nicht der Repository-Root. Dies ermöglicht zuverlässiges Arbeiten in Mono-Repos, bei denen mehrere räumlich getrennte Subprojekte in verschiedenen Verzeichnissen liegen.
 
-Wenn keine Solution im aufgelösten Arbeitsverzeichnis vorhanden ist, kann Softwareschmiede optional Visual Studio Code mit dem aufgelösten Arbeitsverzeichnis starten. Dieser Fallback ist ausdrücklich opt-in, standardmäßig deaktiviert und wird in **Einstellungen → Allgemein** über **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde** aktiviert. Intern wird die Programmeinstellung unter `ide.vscode.openWhenNoSolutionFound` als boolescher Wert gespeichert, Default `false`.
+**IDE-Plugin-Verwaltung:** Die Aktivierung und Priorisierung von IDE-Plugins erfolgt über **Einstellungen → Plugins → Integrierte Entwicklungsumgebungen (IDE)**. Hier können Benutzer:
+- Jedes IDE-Plugin unabhängig aktivieren oder deaktivieren (mindestens ein Plugin muss aktiv bleiben)
+- Die Reihenfolge per Up/Down-Buttons anpassen, um die Auswahl-Priorität zu steuern
+- Plugin-spezifische Einstellungen konfigurieren (falls vorhanden)
 
-VS Code wird über `code.cmd`/`code` im `PATH` oder typische Windows-Installationspfade erkannt. Ist der Fallback aktiviert, aber VS Code nicht verfügbar, wird kein Prozess gestartet und die Aufgabendetailansicht zeigt einen nachvollziehbaren Hinweis. Sobald eine `.sln` vorhanden ist, hat Visual Studio beziehungsweise der registrierte `.sln`-Handler immer Vorrang vor VS Code.
+**ViewModel-Eigenschaften für die Split-Button-Logik:**
+- `KannIdeAuswaehlen` (`bool`, read-only) — Gibt an, ob insgesamt (über alle kompatiblen IDE-Plugins aggregiert) mindestens zwei Einstiegspunkte verfügbar sind; steuert die Sichtbarkeit des Dropdown-Buttons
+- Der Haupt-Button verwendet weiterhin ausschließlich das eine über `PluginSelectionService.ResolveIdePluginAsync` aufgelöste, priorisierte Plugin (unverändertes Verhalten); der Dropdown-Button nutzt zusätzlich `PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync`, um die Einstiegspunkte aller kompatiblen Plugins zu aggregieren
 
 ---
 
@@ -209,14 +243,17 @@ VS Code wird über `code.cmd`/`code` im `PATH` oder typische Windows-Installatio
 
 ### Plugin-Architektur (kurz)
 
-- **Contracts:** `src/Softwareschmiede.Plugin.Contracts` definiert `IPlugin`, `IGitPlugin`, `IKiPlugin`, optionale Alert-Verträge wie `IScmAlertProvider`, `PluginType`
+- **Contracts:** `src/Softwareschmiede.Plugin.Contracts` definiert `IPlugin`, `IGitPlugin`, `IKiPlugin`, `IIdePlugin`, optionale Alert-Verträge wie `IScmAlertProvider`, `PluginType` und `IdePluginCompatibility`
 - **Plugin-Projekte:** liegen als eigenständige Klassenbibliotheken unter `plugins/`
 - **Host-Referenzen:** `src/Softwareschmiede/Softwareschmiede.csproj` referenziert Plugin-Projekte mit `ReferenceOutputAssembly="false"`
 - **Build/Publish-Kopie:** MSBuild-Targets kopieren Plugin-Artefakte nach `$(OutDir)plugins` bzw. `$(PublishDir)plugins`
 - **Discovery zur Laufzeit:** `PluginManager` lädt alle `*.dll` aus `AppContext.BaseDirectory/plugins` und registriert sie nach `PluginType`
 - **Aktuelle KI-Plugins:** `Softwareschmiede.Plugin.GitHubCopilot`, `Softwareschmiede.Plugin.ClaudeCli`, `Softwareschmiede.Plugin.Codex` und `Softwareschmiede.Plugin.Devin`
+- **Integrierte IDE-Plugins:** `VisualStudioIdePlugin` (prüft auf `.sln`/`.slnx`), `VisualStudioCodeIdePlugin` (Fallback)
 
 Die CLI-Plugins starten ihre jeweilige interaktive CLI im Aufgaben-Arbeitsverzeichnis. Laufende Ausgabe und Benutzereingaben werden über die bestehende ConPTY-Terminaloberfläche verarbeitet; beim Devin-Plugin erfolgt die Anmeldung innerhalb der Devin CLI (`devin auth login`).
+
+IDE-Plugins ermitteln ihre Kompatibilität mit einem Repository und werden nach Aktivierungsstatus und Priorisierung automatisch ausgewählt.
 
 ### GitHub-Token im Windows Credential Store speichern
 
@@ -288,10 +325,10 @@ Das neue **Plugins-Register** in **Einstellungen → Plugins** bietet eine zentr
 
 **Aktivierung/Deaktivierung von Plugins:**
 
-- Linke Spalte zeigt zwei gruppierte Auswahllisten (Quellcodeverwaltung und KI) mit Plugin-Namen
+- Linke Spalte zeigt drei gruppierte Auswahllisten (Quellcodeverwaltung, KI und Integrierte Entwicklungsumgebungen) mit Plugin-Namen
 - Nach Auswahl eines Plugins wird der Plugin-Name als Kopfzeile im rechten Einstellungsbereich angezeigt
 - Im rechten Bereich kann das ausgewählte Plugin über die CheckBox „Plugin aktiviert" aktiviert oder deaktiviert werden
-- Deaktivierte Plugins werden automatisch aus allen Plugin-Auswahlflächen gefiltert (Projekt-/Aufgabenbearbeitung, Aufgabenstart)
+- Deaktivierte Plugins werden automatisch aus allen Plugin-Auswahlflächen gefiltert (Projekt-/Aufgabenbearbeitung, Aufgabenstart, IDE-Öffnen)
 - Neue Plugins sind standardmäßig aktiviert (fehlender Aktivierungsstatus = aktiviert)
 - **Validierungsregel:** Mindestens ein Plugin je Kategorie muss aktiv bleiben; das Deaktivieren des letzten aktiven Plugins einer Kategorie wird verhindert
 
@@ -301,6 +338,7 @@ Das neue **Plugins-Register** in **Einstellungen → Plugins** bietet eine zentr
   - In der **Aufgabendetailansicht** wird die KI-Plugin-Auswahl verborgen
   - Bei der **Aufgabenerstellung** wird der KI-Plugin-Auswahl-Dialog übersprungen
   - In der **Repository-Zuweisung** wird die SCM-Plugin-Auswahl verborgen
+  - Beim **IDE-Öffnen** wird das aktive IDE-Plugin direkt verwendet (ohne Dialog)
 
 **Standard-Plugins und Einstellungen:**
 
@@ -314,6 +352,13 @@ Das neue **Plugins-Register** in **Einstellungen → Plugins** bietet eine zentr
   - Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert
 - Für Git-Aktionen gilt: eine projektspezifische Repository-Auswahl (Aufgabe/Projekt) hat Vorrang; das Standardplugin dient als Fallback
 - Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin
+
+**IDE-Plugins verwalten:**
+
+- Im **Plugins-Register** unter dem Reiter **Integrierte Entwicklungsumgebungen (IDE)** können aktivierte IDE-Plugins und ihre Priorisierung verwaltet werden
+- Aktivierungs-CheckBox für jedes IDE-Plugin (mindestens eines muss aktiv bleiben)
+- Reihenfolge-Verwaltung per Up/Down-Buttons: Die erste aktivierte IDE in der Reihenfolge wird mit hoher Priorität geprüft; danach Fallback-Plugins in Reihenfolge
+- Gespeicherte Konfiguration wird in der AppEinstellung-Tabelle persistiert (`plugins.enabled.<IdePluginPrefix>` für Aktivierung, `plugins.ide.order` für Reihenfolge)
 
 ### Arbeitsverzeichnis für lokale Klone
 
@@ -664,6 +709,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | [Basis-Branch-Konfiguration](docs/help/projekte/basis-branch-konfiguration.md) | Konfiguration eines Basis-Branches pro Repository für Feature-Branch-Erstellung und Pull-Request-Ziele |
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |
+| [Entwicklungsumgebungen](docs/help/entwicklungsumgebungen/index.md) | IDE-Plugin-System mit automatischer Erkennung und Auswahl (Visual Studio, Visual Studio Code) |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |
 | [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering, robuste Clipboard-Paste, Alt Gr-Sonderzeichen und Ctrl+Pfeiltaste-Navigation |
 | [Dateiexplorer](docs/help/dateiexplorer/index.md) | Arbeitsbaum- und Diff-Ansicht in der Aufgabendetailansicht |

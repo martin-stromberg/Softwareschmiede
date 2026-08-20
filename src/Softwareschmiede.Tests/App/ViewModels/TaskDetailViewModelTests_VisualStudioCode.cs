@@ -2,27 +2,30 @@ using FluentAssertions;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
-using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
 
-/// <summary>Unit-Tests für TaskDetailViewModel.OeffneVisualStudioCodeFallbackAsync(): Nutzung des WorkingDirectoryResolver.</summary>
+/// <summary>
+/// Unit-Tests für TaskDetailViewModel.OeffneIdeAsync() bezüglich des automatischen Visual-Studio-Code-Fallbacks
+/// (via PluginSelectionService.ResolveIdePluginAsync, wenn kein Visual-Studio-Plugin explizit kompatibel ist)
+/// und der Nutzung des WorkingDirectoryResolver.
+/// </summary>
 public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewModelTestsBase
 {
     /// <summary>Präfix für über CreateTempDirectory() erzeugte temporäre Verzeichnisse.</summary>
     protected override string TempDirectoryPrefix => "tdvm_vscode_tests";
 
-    /// <summary>Bei konfiguriertem Arbeitsverzeichnis und aktiviertem VS-Code-Fallback wird VS Code mit dem über WorkingDirectoryResolver aufgelösten Pfad gestartet, nicht mit dem Repository-Root.</summary>
+    /// <summary>Bei konfiguriertem Arbeitsverzeichnis wird der (standardmäßig aktive) Visual-Studio-Code-Fallback mit dem über WorkingDirectoryResolver aufgelösten Pfad gestartet, nicht mit dem Repository-Root.</summary>
     [Fact]
-    public async Task OeffneVisualStudioCodeFallback_MitKonfiguriertemArbeitsverzeichnis_RuftServiceMitAufgeloestemPfadAuf()
+    public async Task OeffneIdeAsync_OhneSolutionMitKonfiguriertemArbeitsverzeichnis_RuftVsCodeMitAufgeloestemPfadAuf()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(arbeitsverzeichnis, "backend"));
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -40,14 +43,13 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
             Times.Once);
     }
 
-    /// <summary>Ohne RepositoryStartKonfiguration wird der VS-Code-Fallback weiterhin mit dem Repository-Root (LokalerKlonPfad) gestartet.</summary>
+    /// <summary>Ohne RepositoryStartKonfiguration wird der Visual-Studio-Code-Fallback weiterhin mit dem Repository-Root (LokalerKlonPfad) gestartet.</summary>
     [Fact]
-    public async Task OeffneVisualStudioCodeFallback_OhneKonfiguration_RuftServiceMitRepositoryRootAuf()
+    public async Task OeffneIdeAsync_OhneSolutionOhneKonfiguration_RuftVsCodeMitRepositoryRootAuf()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -66,12 +68,11 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
 
     /// <summary>Ist Visual Studio Code nicht verfügbar, wird eine aussagekräftige FehlerMeldung gesetzt und kein Prozess gestartet.</summary>
     [Fact]
-    public async Task OeffneVisualStudioCodeFallback_OhneVsCode_ZeigtFehlermeldung()
+    public async Task OeffneIdeAsync_OhneSolutionOhneVsCode_ZeigtFehlermeldung()
     {
         var arbeitsverzeichnis = CreateTempDirectory();
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
@@ -81,11 +82,11 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
 
         await ((AsyncRelayCommand)sut.OeffneIdeCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Be("Keine Visual-Studio-Solution gefunden und Visual Studio Code wurde nicht gefunden.");
+        sut.FehlerMeldung.Should().Contain("Visual Studio Code");
         prozessStarterMock.Verify(p => p.Starten(It.IsAny<ProzessStartAnfrage>()), Times.Never);
     }
 
-    /// <summary>Ohne Solutions im aufgelösten (konfigurierten) Arbeitsverzeichnis fällt OeffneIdeAsync auf den VS-Code-Fallback mit dem aufgelösten Verzeichnis zurück, selbst wenn im Repository-Root eine .sln-Datei liegt.</summary>
+    /// <summary>Ohne Solutions im aufgelösten (konfigurierten) Arbeitsverzeichnis fällt OeffneIdeAsync auf Visual Studio Code mit dem aufgelösten Verzeichnis zurück, selbst wenn im Repository-Root eine .sln-Datei liegt.</summary>
     [Fact]
     public async Task OeffneIdeAsync_OhneLoesungenImArbeitsverzeichnis_FaelltZuVsCodeZurueck()
     {
@@ -97,7 +98,6 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
 
         var aufgabe = await ErstelleAufgabeMitRepositoryAsync("backend");
         await _aufgabeService.StartenAsync(aufgabe.Id, "feature/x", arbeitsverzeichnis);
-        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, true);
 
         var prozessStarterMock = new Mock<IProzessStarter>();
         var locator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
@@ -113,10 +113,5 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
                 a.DateiName == "code.cmd"
                 && a.Argumente == $"\"{erwarteterPfad}\"")),
             Times.Once);
-    }
-
-    private sealed class TestVisualStudioCodeLocator(VisualStudioCodeAvailability availability) : IVisualStudioCodeLocator
-    {
-        public VisualStudioCodeAvailability Locate() => availability;
     }
 }

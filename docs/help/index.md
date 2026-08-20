@@ -25,6 +25,7 @@ Eigenschaften und Präsentation der Softwareschmiede Desktopanwendung.
 ## Systemverwaltung & Konfiguration
 
 - [Einstellungen](einstellungen/index.md) — Bündelt alle systemweiten Konfigurationen: Plugin-Einstellungen, Arbeitsverzeichnis, Benachrichtigungen und Erscheinungsbild.
+- [Entwicklungsumgebungen](entwicklungsumgebungen/index.md) — IDE-Plugin-System mit automatischer Erkennung und Auswahl der passenden Entwicklungsumgebung (Visual Studio für `.sln`/`.slnx`-Dateien, Visual Studio Code als Fallback). Split-Button-Muster im Ribbon: Haupt-Button öffnet direkt die erste IDE/den ersten Einstiegspunkt, Dropdown-Button (nur bei mehreren Einstiegspunkten sichtbar) zeigt einen Dialog zur gezielten Auswahl zwischen verfügbaren Solutions oder Workspaces. Benutzer können IDEs aktivieren/deaktivieren und ihre Prioritätsreihenfolge konfigurieren.
 - [Plugin-System](plugins/index.md) — SCM- und KI-Plugins werden als separate .NET-Klassenbibliotheken bereitgestellt und per `PluginManager` zur Laufzeit entdeckt. Jedes Plugin kann selektiv aktiviert/deaktiviert werden; deaktivierte Plugins verschwinden aus Auswahllisten. Bei genau einem aktiven Plugin einer Kategorie wird dieses automatisch ohne Auswahl verwendet.
 - [Stabilität & Fehlerbehandlung](stabilitaet/index.md) — Fängt Fehler an allen relevanten Stellen zentral ab und protokolliert sie, statt unkontrolliert abzustürzen: globale Exception-Handler, abgesicherte Fire-and-Forget-Aufrufe, geschützte Prozess-Event-Handler und zuverlässige Freigabe nativer ConPTY-Handles.
 

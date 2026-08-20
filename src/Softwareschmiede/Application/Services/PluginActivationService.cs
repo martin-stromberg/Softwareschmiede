@@ -59,6 +59,12 @@ public sealed class PluginActivationService
     public async Task<IReadOnlyList<IKiPlugin>> GetEnabledDevelopmentAutomationPluginsAsync(CancellationToken ct = default)
         => await FilterEnabledAsync(_pluginManager.GetDevelopmentAutomationPlugins(), ct);
 
+    /// <summary>Gibt alle aktiven IDE-Plugins zurück.</summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die Liste der aktiven IDE-Plugins.</returns>
+    public async Task<IReadOnlyList<IIdePlugin>> GetEnabledIdePluginsAsync(CancellationToken ct = default)
+        => await FilterEnabledAsync(_pluginManager.GetIdePlugins(), ct);
+
     private async Task<IReadOnlyList<TPlugin>> FilterEnabledAsync<TPlugin>(IReadOnlyList<TPlugin> plugins, CancellationToken ct)
         where TPlugin : IPlugin
     {

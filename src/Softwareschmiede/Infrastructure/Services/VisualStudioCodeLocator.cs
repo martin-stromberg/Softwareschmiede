@@ -1,4 +1,5 @@
-using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Services;
 

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
@@ -33,9 +34,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private bool _isLoading;
     private string? _fehlerMeldung;
     private string? _erfolgsMeldung;
-    private bool _openVisualStudioCodeWhenNoSolutionFound;
     private PluginActivationEntry? _selectedPlugin;
     private IReadOnlyList<PluginSettingGroupEntry> _selectedPluginSettings = [];
+    private bool _isScmKiPluginContentVisible;
+    private bool _isIdePluginContentVisible;
+    private List<string> _idePluginOrder = [];
+    private PluginActivationEntry? _selectedIdePlugin;
+    private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
     public string? Arbeitsverzeichnis
@@ -103,13 +108,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _erfolgsMeldung, value);
     }
 
-    /// <summary>Gibt an, ob ohne gefundene Visual-Studio-Solution optional Visual Studio Code geöffnet wird.</summary>
-    public bool OpenVisualStudioCodeWhenNoSolutionFound
-    {
-        get => _openVisualStudioCodeWhenNoSolutionFound;
-        set => SetProperty(ref _openVisualStudioCodeWhenNoSolutionFound, value);
-    }
-
     /// <summary>SCM-Plugins mit Aktivierungsstatus für das Plugins-Register.</summary>
     public ObservableCollection<PluginActivationEntry> SourceCodeManagementPlugins { get; } = [];
 
@@ -128,6 +126,50 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         get => _selectedPluginSettings;
         private set => SetProperty(ref _selectedPluginSettings, value);
+    }
+
+    /// <summary>Gibt an, ob im Inhaltsbereich die Einstellungen des ausgewählten SCM-/KI-Plugins angezeigt werden (exklusiv zu <see cref="IsIdePluginContentVisible"/>).</summary>
+    public bool IsScmKiPluginContentVisible
+    {
+        get => _isScmKiPluginContentVisible;
+        private set => SetProperty(ref _isScmKiPluginContentVisible, value);
+    }
+
+    /// <summary>Gibt an, ob im Inhaltsbereich die Einstellungen des ausgewählten IDE-Plugins angezeigt werden (exklusiv zu <see cref="IsScmKiPluginContentVisible"/>).</summary>
+    public bool IsIdePluginContentVisible
+    {
+        get => _isIdePluginContentVisible;
+        private set => SetProperty(ref _isIdePluginContentVisible, value);
+    }
+
+    /// <summary>Alle verfügbaren IDE-Plugins.</summary>
+    public IReadOnlyList<IIdePlugin> IdePlugins { get; private set; } = [];
+
+    /// <summary>IDE-Plugins mit Aktivierungsstatus für das Plugins-Register.</summary>
+    public ObservableCollection<PluginActivationEntry> DevelopmentEnvironmentPlugins { get; } = [];
+
+    /// <summary>Aktuell höchstpriorisiertes IDE-Plugin gemäß <see cref="IdePluginOrder"/>.</summary>
+    public string? DefaultIdePlugin => IdePluginOrder.FirstOrDefault();
+
+    /// <summary>Reihenfolge der IDE-Plugin-Prefixe (aus Setting <c>plugins.ide.order</c>).</summary>
+    public List<string> IdePluginOrder
+    {
+        get => _idePluginOrder;
+        private set => SetProperty(ref _idePluginOrder, value);
+    }
+
+    /// <summary>Im IDE-Plugins-Register ausgewählter Eintrag.</summary>
+    public PluginActivationEntry? SelectedIdePlugin
+    {
+        get => _selectedIdePlugin;
+        private set => SetProperty(ref _selectedIdePlugin, value);
+    }
+
+    /// <summary>Einstellungsgruppen des im IDE-Plugins-Register ausgewählten Plugins.</summary>
+    public IReadOnlyList<PluginSettingGroupEntry>? SelectedIdePluginSettings
+    {
+        get => _selectedIdePluginSettings;
+        private set => SetProperty(ref _selectedIdePluginSettings, value);
     }
 
     /// <summary>Editierbare Promptvorlagen.</summary>
@@ -150,6 +192,15 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     /// <summary>Wird ausgelöst wenn der Nutzer im Plugins-Register einen Listeneintrag wählt. Lädt dessen Einstellungsgruppen.</summary>
     public ICommand PluginSelectedCommand { get; }
+
+    /// <summary>Wird ausgelöst wenn der Nutzer im IDE-Plugins-Register einen Listeneintrag wählt. Lädt dessen Einstellungsgruppen.</summary>
+    public ICommand IdePluginSelectedCommand { get; }
+
+    /// <summary>Verschiebt das ausgewählte IDE-Plugin in der Reihenfolge nach oben.</summary>
+    public ICommand IdePluginMoveUpCommand { get; }
+
+    /// <summary>Verschiebt das ausgewählte IDE-Plugin in der Reihenfolge nach unten.</summary>
+    public ICommand IdePluginMoveDownCommand { get; }
 
     /// <summary>Fügt eine neue Promptvorlage hinzu.</summary>
     public ICommand PromptVorlageHinzufuegenCommand { get; }
@@ -190,6 +241,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (entry is not null)
                 LoadSelectedPluginSettings(entry);
         });
+        IdePluginSelectedCommand = new RelayCommand<PluginActivationEntry>(entry =>
+        {
+            if (entry is not null)
+                LoadSelectedIdePluginSettings(entry);
+        });
+        IdePluginMoveUpCommand = new RelayCommand<PluginActivationEntry>(entry => MoveIdePlugin(entry, -1), entry => CanMoveIdePlugin(entry, -1));
+        IdePluginMoveDownCommand = new RelayCommand<PluginActivationEntry>(entry => MoveIdePlugin(entry, 1), entry => CanMoveIdePlugin(entry, 1));
         PromptVorlageHinzufuegenCommand = new RelayCommand(PromptVorlageHinzufuegen);
         PromptVorlageLoeschenCommand = new RelayCommand<PromptVorlageEntry>(PromptVorlageLoeschen, entry => entry is not null);
     }
@@ -207,11 +265,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             _defaultKiPlugin = await _einstellungService.GetSettingAsync(AppEinstellungService.DefaultKiPluginKey, ct);
             OnPropertyChanged(nameof(DefaultKiPlugin));
 
-            _openVisualStudioCodeWhenNoSolutionFound =
-                await _einstellungService.GetBoolSettingAsync(AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey, ct)
-                ?? false;
-            OnPropertyChanged(nameof(OpenVisualStudioCodeWhenNoSolutionFound));
-
             var savedMode = await _einstellungService.GetSettingAsync(AppEinstellungService.DesignModeKey, ct);
             _designMode = savedMode ?? _darkModeService.Current;
             OnPropertyChanged(nameof(DesignMode));
@@ -222,7 +275,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             KiPlugins = _pluginManager.GetDevelopmentAutomationPlugins();
             OnPropertyChanged(nameof(KiPlugins));
 
+            IdePlugins = _pluginManager.GetIdePlugins();
+            OnPropertyChanged(nameof(IdePlugins));
+
             await LadePluginAktivierungAsync(ct);
+            await LadeIdePluginAktivierungAsync(ct);
 
             var savedScmPluginName = await _einstellungService.GetSettingAsync(AppEinstellungService.DefaultScmPluginKey, ct);
             _defaultScmPlugin = ScmPlugins.FirstOrDefault(p => p.PluginName == savedScmPluginName)
@@ -256,7 +313,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (!ValidierePflichtfelder())
                 return;
 
-            foreach (var entry in SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins))
+            foreach (var entry in SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins).Concat(DevelopmentEnvironmentPlugins))
                 await _pluginActivationService.SetPluginEnabledAsync(entry.PluginPrefix, entry.IsEnabled, ct);
 
             SpeicherePluginEinstellungen(_selectedPlugin?.Plugin, _selectedPluginSettings);
@@ -264,10 +321,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _arbeitsverzeichnisService.SaveArbeitsverzeichnisAsync(_arbeitsverzeichnis, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultScmPluginKey, _defaultScmPlugin?.PluginName, ct);
-            await _einstellungService.SetBoolSettingAsync(
-                AppEinstellungService.OpenVisualStudioCodeWhenNoSolutionFoundKey,
-                OpenVisualStudioCodeWhenNoSolutionFound,
-                ct);
             await SpeicherePromptVorlagenAsync(ct);
 
             try
@@ -305,6 +358,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     {
         SelectedPlugin = entry;
         SelectedPluginSettings = LadePluginEinstellungen(entry.Plugin);
+        IsScmKiPluginContentVisible = true;
+        IsIdePluginContentVisible = false;
     }
 
     /// <summary>Sucht den zu <paramref name="plugin"/> gehörenden Aktivierungseintrag über beide Kategorien und lädt dessen Einstellungen.</summary>
@@ -330,6 +385,99 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         {
             var enabled = await _pluginActivationService.IsPluginEnabledAsync(plugin.PluginPrefix, ct);
             DevelopmentAutomationPlugins.Add(new PluginActivationEntry(plugin, enabled));
+        }
+    }
+
+    private void LoadSelectedIdePluginSettings(PluginActivationEntry entry)
+    {
+        SelectedIdePlugin = entry;
+        SelectedIdePluginSettings = LadePluginEinstellungen(entry.Plugin);
+        IsIdePluginContentVisible = true;
+        IsScmKiPluginContentVisible = false;
+    }
+
+    private async Task LadeIdePluginAktivierungAsync(CancellationToken ct)
+    {
+        foreach (var vorhandenerEintrag in DevelopmentEnvironmentPlugins)
+            vorhandenerEintrag.PropertyChanged -= OnIdePluginEntryPropertyChanged;
+        DevelopmentEnvironmentPlugins.Clear();
+
+        var orderSetting = await _einstellungService.GetSettingAsync(AppEinstellungService.IdePluginOrderKey, ct);
+        var order = ParseIdePluginOrder(orderSetting, IdePlugins);
+
+        foreach (var prefix in order)
+        {
+            var plugin = IdePlugins.FirstOrDefault(p => string.Equals(p.PluginPrefix, prefix, StringComparison.OrdinalIgnoreCase));
+            if (plugin is null)
+                continue;
+
+            var enabled = await _pluginActivationService.IsPluginEnabledAsync(plugin.PluginPrefix, ct);
+            var eintrag = new PluginActivationEntry(plugin, enabled);
+            eintrag.PropertyChanged += OnIdePluginEntryPropertyChanged;
+            DevelopmentEnvironmentPlugins.Add(eintrag);
+        }
+
+        IdePluginOrder = DevelopmentEnvironmentPlugins.Select(e => e.PluginPrefix).ToList();
+        OnPropertyChanged(nameof(DefaultIdePlugin));
+    }
+
+    private static List<string> ParseIdePluginOrder(string? orderSetting, IReadOnlyList<IIdePlugin> availablePlugins)
+    {
+        var discoveryOrder = availablePlugins.Select(p => p.PluginPrefix).ToList();
+        return IdePluginOrderResolver.Apply(discoveryOrder, orderSetting);
+    }
+
+    private void OnIdePluginEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!string.Equals(e.PropertyName, nameof(PluginActivationEntry.IsEnabled), StringComparison.Ordinal))
+            return;
+
+        if (sender is not PluginActivationEntry entry)
+            return;
+
+        if (!entry.IsEnabled && DevelopmentEnvironmentPlugins.All(p => !p.IsEnabled))
+        {
+            entry.IsEnabled = true;
+            FehlerMeldung = "Mindestens ein IDE-Plugin muss aktiv bleiben.";
+        }
+    }
+
+    private bool CanMoveIdePlugin(PluginActivationEntry? entry, int richtung)
+    {
+        if (entry is null)
+            return false;
+
+        var index = DevelopmentEnvironmentPlugins.IndexOf(entry);
+        if (index < 0)
+            return false;
+
+        var zielIndex = index + richtung;
+        return zielIndex >= 0 && zielIndex < DevelopmentEnvironmentPlugins.Count;
+    }
+
+    private void MoveIdePlugin(PluginActivationEntry? entry, int richtung)
+    {
+        if (!CanMoveIdePlugin(entry, richtung))
+            return;
+
+        var index = DevelopmentEnvironmentPlugins.IndexOf(entry!);
+        DevelopmentEnvironmentPlugins.Move(index, index + richtung);
+
+        IdePluginOrder = DevelopmentEnvironmentPlugins.Select(e => e.PluginPrefix).ToList();
+        OnPropertyChanged(nameof(DefaultIdePlugin));
+
+        PersistiereIdePluginOrderAsync().SafeFireAndForget(_logger, "SettingsViewModel.PersistiereIdePluginOrderAsync");
+    }
+
+    private async Task PersistiereIdePluginOrderAsync()
+    {
+        try
+        {
+            await _einstellungService.SetSettingAsync(AppEinstellungService.IdePluginOrderKey, string.Join(",", IdePluginOrder));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern der IDE-Plugin-Reihenfolge.");
         }
     }
 
@@ -382,6 +530,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         if (DevelopmentAutomationPlugins.Count > 0 && DevelopmentAutomationPlugins.All(entry => !entry.IsEnabled))
         {
             FehlerMeldung = "Mindestens ein KI-Plugin muss aktiv bleiben.";
+            return false;
+        }
+
+        if (DevelopmentEnvironmentPlugins.Count > 0 && DevelopmentEnvironmentPlugins.All(entry => !entry.IsEnabled))
+        {
+            FehlerMeldung = "Mindestens ein IDE-Plugin muss aktiv bleiben.";
             return false;
         }
 
@@ -501,6 +655,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _darkModeService.ModeChanged -= OnDarkModeChanged;
+
+        foreach (var entry in DevelopmentEnvironmentPlugins)
+            entry.PropertyChanged -= OnIdePluginEntryPropertyChanged;
     }
 }
 

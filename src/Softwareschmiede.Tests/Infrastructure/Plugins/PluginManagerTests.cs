@@ -152,6 +152,50 @@ public sealed class PluginManagerTests : IDisposable
         kiSecond.Should().HaveCount(5);
     }
 
+    /// <summary>GetIdePlugins gibt die eingebauten IDE-Plugins (Visual Studio, Visual Studio Code) zurück.</summary>
+    [Fact]
+    public void GetIdePlugins_ShouldReturnRegisteredPlugins()
+    {
+        var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
+
+        var idePlugins = sut.GetIdePlugins();
+
+        idePlugins.Should().HaveCount(2);
+        idePlugins.Should().Contain(p => p.PluginName == "Visual Studio");
+        idePlugins.Should().Contain(p => p.PluginName == "Visual Studio Code");
+    }
+
+    /// <summary>GetDefaultIdePlugin gibt das erste registrierte IDE-Plugin zurück.</summary>
+    [Fact]
+    public void GetDefaultIdePlugin_ShouldReturnFirstPlugin()
+    {
+        var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
+
+        var result = sut.GetDefaultIdePlugin();
+
+        result.PluginName.Should().Be("Visual Studio");
+    }
+
+    /// <summary>GetDefaultIdePlugin wirft InvalidOperationException, wenn kein IDE-Plugin registriert werden konnte.</summary>
+    [Fact]
+    public void GetDefaultIdePlugin_ShouldThrowInvalidOperationException_WhenNoPluginsRegistered()
+    {
+        // Ohne registrierten IProzessStarter/IVisualStudioCodeLocator kann ActivatorUtilities die
+        // eingebauten IDE-Plugins nicht instanziieren; TryCreateAndRegister fängt die Exception ab
+        // und überspringt die Registrierung, sodass _idePlugins leer bleibt.
+        var services = new ServiceCollection()
+            .AddLogging()
+            .AddSingleton(new Mock<ICliRunner>().Object)
+            .AddSingleton(new Mock<ICredentialStore>().Object)
+            .BuildServiceProvider();
+        var sut = new PluginManager(services, NullLogger<PluginManager>.Instance, Path.Combine(_tempDirectory, "missing"));
+
+        var act = () => sut.GetDefaultIdePlugin();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*IDE-Plugin*");
+    }
+
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
@@ -167,6 +211,8 @@ public sealed class PluginManagerTests : IDisposable
             .AddLogging()
             .AddSingleton(new Mock<ICliRunner>().Object)
             .AddSingleton(new Mock<ICredentialStore>().Object)
+            .AddSingleton(new Mock<IProzessStarter>().Object)
+            .AddSingleton(new Mock<IVisualStudioCodeLocator>().Object)
             .BuildServiceProvider();
         return new PluginManager(services, NullLogger<PluginManager>.Instance, pluginDirectory);
     }

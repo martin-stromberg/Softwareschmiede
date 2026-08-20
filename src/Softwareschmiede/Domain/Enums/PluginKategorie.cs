@@ -7,5 +7,8 @@ public enum PluginKategorie
     Git,
 
     /// <summary>KI-Plugin (z.B. GitHub Copilot).</summary>
-    Ki
+    Ki,
+
+    /// <summary>IDE-Integration Plugin (z.B. Visual Studio, Visual Studio Code).</summary>
+    Ide
 }

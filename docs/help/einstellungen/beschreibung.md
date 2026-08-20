@@ -62,7 +62,7 @@ Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons
 
 ### IDE-Verhalten
 
-Im Tab **Allgemein** kann die Option **Visual Studio Code oeffnen, wenn keine Visual-Studio-Solution gefunden wurde** aktiviert werden. Sie ist standardmäßig deaktiviert. Bei aktivierter Option öffnet die Aktion **IDE öffnen** in der Aufgabendetailansicht das Arbeitsverzeichnis in Visual Studio Code, wenn keine `*.sln`-Datei auf oberster Ebene vorhanden ist. Gefundene Solutions haben weiterhin Vorrang.
+Die Aktion **IDE öffnen** in der Aufgabendetailansicht löst das zu verwendende IDE-Plugin automatisch über das IDE-Plugin-System auf (siehe **Einstellungen → Plugins → Integrierte Entwicklungsumgebungen (IDE)**): Ist ein Plugin explizit kompatibel (z. B. Visual Studio bei vorhandener `*.sln`/`*.slnx`-Datei), wird dieses verwendet; andernfalls greift automatisch das erste aktive Fallback-Plugin (standardmäßig Visual Studio Code, das das Arbeitsverzeichnis direkt öffnet). Eine separate Opt-in-Einstellung dafür ist nicht mehr nötig — das Verhalten wird stattdessen über Aktivierung/Deaktivierung und Reihenfolge der einzelnen IDE-Plugins gesteuert.
 
 ### Benachrichtigungen
 
