@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Entities;
 
@@ -31,6 +33,18 @@ public sealed class UnteragentSpezifikation
 
     /// <summary>Pfad zum Clone für diesen Agenten (clones/repo_feature_X/).</summary>
     public string ClonePfad { get; set; } = string.Empty;
+
+    /// <summary>Convenience-Zugriff auf <see cref="Branch"/> und <see cref="ClonePfad"/> als Value Object. Nicht von EF Core gemappt; die beiden Werte bleiben einzeln als flache Spalten persistiert.</summary>
+    [NotMapped]
+    public GitArbeitsbereich GitArbeitsbereich
+    {
+        get => new(Branch, ClonePfad);
+        set
+        {
+            Branch = value.BranchName;
+            ClonePfad = value.ClonePfad;
+        }
+    }
 
     /// <summary>Erstellungszeitpunkt des Unteragenten.</summary>
     public DateTimeOffset ErzeugungsDatum { get; set; }

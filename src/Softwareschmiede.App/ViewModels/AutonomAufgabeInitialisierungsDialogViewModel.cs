@@ -386,9 +386,10 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModel : ViewModelBas
                 ProjektBranchName: SelectedProjectBranch ?? _aufgabe.BranchName ?? $"autonom-{_aufgabe.Id}",
                 InitialPrompt: InitialPrompt,
                 ArbeitsverzeichnisPfad: Path.Combine(_options.WorkingDirectoryBase, _aufgabe.Id.ToString()),
-                TokenBudget: TokenBudget,
-                TokenBudgetErweitert: AllowTokenExtension ? TokenBudget : null,
-                LaufzeitLimitMinuten: RuntimeLimitMinutes,
+                RessourcenLimits: new RessourcenLimits(
+                    TokenBudget: TokenBudget,
+                    TokenBudgetErweitert: AllowTokenExtension ? TokenBudget : null,
+                    LaufzeitLimitMinuten: RuntimeLimitMinutes),
                 PersistenzModus: SelectedPersistenceMode,
                 SkillAutogeneration: AutoGenerateSkills,
                 PermissionsQuelle: SelectedPermissionsOption);

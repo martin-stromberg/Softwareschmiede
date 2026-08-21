@@ -63,9 +63,7 @@ public sealed class AutonomAufgabenInitialisierungsService
             ProjektBranchName = anfrage.ProjektBranchName,
             InitialPrompt = anfrage.InitialPrompt,
             PermissionsJsonPfad = permissionsPfad,
-            TokenBudget = anfrage.TokenBudget,
-            TokenBudgetErweitert = anfrage.TokenBudgetErweitert,
-            LaufzeitLimitMinuten = anfrage.LaufzeitLimitMinuten,
+            RessourcenLimits = anfrage.RessourcenLimits,
             PersistenzModus = anfrage.PersistenzModus,
             SkillAutogeneration = anfrage.SkillAutogeneration,
             ArbeitsverzeichnisPfad = anfrage.ArbeitsverzeichnisPfad
@@ -165,8 +163,8 @@ public sealed class AutonomAufgabenInitialisierungsService
                 max_subagents = _options.MaxConcurrentUnteragenten,
                 max_clones = _options.MaxClones,
                 max_feature_branches = _options.MaxFeatureBranches,
-                token_budget = anfrage.TokenBudget,
-                net_runtime_minutes = anfrage.LaufzeitLimitMinuten
+                token_budget = anfrage.RessourcenLimits.TokenBudget,
+                net_runtime_minutes = anfrage.RessourcenLimits.LaufzeitLimitMinuten
             },
             persistence = new
             {
@@ -190,7 +188,7 @@ public sealed class AutonomAufgabenInitialisierungsService
             {
                 started_utc = DateTimeOffset.UtcNow,
                 net_minutes_used = 0,
-                net_minutes_limit = anfrage.LaufzeitLimitMinuten,
+                net_minutes_limit = anfrage.RessourcenLimits.LaufzeitLimitMinuten,
                 paused_utc = (DateTimeOffset?)null
             },
             governance = new
@@ -198,7 +196,7 @@ public sealed class AutonomAufgabenInitialisierungsService
                 max_subagents = _options.MaxConcurrentUnteragenten,
                 max_clones = _options.MaxClones,
                 max_feature_branches = _options.MaxFeatureBranches,
-                token_budget = anfrage.TokenBudget
+                token_budget = anfrage.RessourcenLimits.TokenBudget
             },
             clones = new[]
             {
@@ -219,7 +217,7 @@ public sealed class AutonomAufgabenInitialisierungsService
             },
             flags = new
             {
-                allow_token_extension = anfrage.TokenBudgetErweitert.HasValue,
+                allow_token_extension = anfrage.RessourcenLimits.TokenBudgetErweitert.HasValue,
                 skip_conpty_tests = false
             }
         };
@@ -251,12 +249,12 @@ public sealed class AutonomAufgabenInitialisierungsService
             throw new ArgumentException("InitialPrompt darf nicht leer sein und muss mindestens 10 Zeichen enthalten.", nameof(anfrage));
         }
 
-        if (anfrage.TokenBudget <= 0 || anfrage.TokenBudget > 5_000_000)
+        if (anfrage.RessourcenLimits.TokenBudget <= 0 || anfrage.RessourcenLimits.TokenBudget > 5_000_000)
         {
             throw new ArgumentException("TokenBudget muss größer als 0 und maximal 5.000.000 sein.", nameof(anfrage));
         }
 
-        if (anfrage.LaufzeitLimitMinuten < 60 || anfrage.LaufzeitLimitMinuten > 1440)
+        if (anfrage.RessourcenLimits.LaufzeitLimitMinuten < 60 || anfrage.RessourcenLimits.LaufzeitLimitMinuten > 1440)
         {
             throw new ArgumentException("LaufzeitLimitMinuten muss zwischen 60 und 1440 (24h) liegen.", nameof(anfrage));
         }

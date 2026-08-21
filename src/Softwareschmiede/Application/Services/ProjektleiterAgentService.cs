@@ -84,17 +84,17 @@ public sealed class ProjektleiterAgentService
         });
 
         var repoMainPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "clones", "repo_main");
-        var branchErgebnis = await _cliRunner.RunAsync("git", ["branch", unteragent.Branch], repoMainPfad, null, ct);
+        var branchErgebnis = await _cliRunner.RunAsync("git", ["branch", unteragent.GitArbeitsbereich.BranchName], repoMainPfad, null, ct);
         if (!branchErgebnis.IsSuccess)
         {
-            throw new InvalidOperationException($"Branch '{unteragent.Branch}' für Unteragent '{unteragent.ExterneAgentId}' konnte nicht angelegt werden: {branchErgebnis.StdErr}");
+            throw new InvalidOperationException($"Branch '{unteragent.GitArbeitsbereich.BranchName}' für Unteragent '{unteragent.ExterneAgentId}' konnte nicht angelegt werden: {branchErgebnis.StdErr}");
         }
 
         await GitKlonHelper.KloneFallsNichtVorhandenAsync(
             _cliRunner,
             repoMainPfad,
-            unteragent.ClonePfad,
-            unteragent.Branch,
+            unteragent.GitArbeitsbereich.ClonePfad,
+            unteragent.GitArbeitsbereich.BranchName,
             _logger,
             $"Klon für Unteragent '{unteragent.ExterneAgentId}' fehlgeschlagen",
             ct);
@@ -109,7 +109,7 @@ public sealed class ProjektleiterAgentService
             "Unteragent {AgentId} für Autonome Aufgabe {AutonomAufgabeId} erzeugt (Branch: {Branch}).",
             unteragent.ExterneAgentId,
             unteragent.AutonomAufgabeId,
-            unteragent.Branch);
+            unteragent.GitArbeitsbereich.BranchName);
     }
 
     /// <summary>Integriert die Ergebnisse eines abgeschlossenen Unteragenten in plan.md, progress.md und state.json.</summary>
@@ -190,7 +190,7 @@ public sealed class ProjektleiterAgentService
             throw new ArgumentException("Scope darf nicht leer sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.Branch))
+        if (string.IsNullOrWhiteSpace(unteragent.GitArbeitsbereich.BranchName))
         {
             throw new ArgumentException("Branch darf nicht leer sein.", nameof(unteragent));
         }
@@ -200,7 +200,7 @@ public sealed class ProjektleiterAgentService
             throw new ArgumentException("VerzeichnisPfad muss ein absoluter Pfad sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.ClonePfad) || !Path.IsPathRooted(unteragent.ClonePfad))
+        if (string.IsNullOrWhiteSpace(unteragent.GitArbeitsbereich.ClonePfad) || !Path.IsPathRooted(unteragent.GitArbeitsbereich.ClonePfad))
         {
             throw new ArgumentException("ClonePfad muss ein absoluter Pfad sein.", nameof(unteragent));
         }

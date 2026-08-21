@@ -6,46 +6,41 @@
 
 ## Befunde
 
-### ProjektleiterAgentServiceTests_Fehlerfaelle.cs (ProjektleiterAgentServiceTests_Fehlerfaelle)
+### src/Softwareschmiede/Application/Services/ProjektleiterAgentService.cs (ProjektleiterAgentService)
 
-- **Namenskonventionen und Einheitlichkeit** — Fünf Testmethodennamen wurden bei der Umbenennung der `UnteragentSpezifikation`-Properties nicht mitgezogen und referenzieren weiterhin die alten `Agent…`-Propertynamen, obwohl die zugehörigen XML-Doc-Summaries direkt darüber bereits korrekt auf die neuen Namen aktualisiert wurden. Das erzeugt eine inkonsistente Doppelbenennung innerhalb derselben Methode (Summary vs. Methodenname):
-  - Zeile 123: `SteuereUnteragentAsync_WirftBeiLeeremAgentScope` — Summary sagt „wenn Scope leer ist“, getestet wird `unteragent.Scope = string.Empty`.
-  - Zeile 136: `SteuereUnteragentAsync_WirftBeiLeeremAgentBranch` — Summary sagt „wenn Branch leer ist“, getestet wird `unteragent.Branch = string.Empty`.
-  - Zeile 149: `SteuereUnteragentAsync_WirftBeiRelativemAgentDirectory` — Summary sagt „wenn VerzeichnisPfad kein absoluter Pfad ist“, getestet wird `unteragent.VerzeichnisPfad = "tasks/task_001"`.
-  - Zeile 162: `SteuereUnteragentAsync_WirftBeiRelativemAgentClone` — Summary sagt „wenn ClonePfad kein absoluter Pfad ist“, getestet wird `unteragent.ClonePfad = "clones/repo_feature_001"`.
-  - Zeile 175: `SteuereUnteragentAsync_WirftBeiAgentDirectoryAusserhalbArbeitsverzeichnis` — Summary sagt „wenn VerzeichnisPfad außerhalb des Arbeitsverzeichnisses … liegt“, getestet wird `unteragent.VerzeichnisPfad = Path.Combine(...)`.
+- **Inkonsistente Nutzung des neuen `GitArbeitsbereich`-Wrappers innerhalb derselben Methode** — `SteuereUnteragentAsync` liest in Zeile 87 (`_cliRunner.RunAsync("git", ["branch", unteragent.Branch], ...)`), Zeile 90 (Fehlermeldung) und Zeile 112 (Log-Statement) weiterhin `unteragent.Branch` direkt, während Zeile 96–97 für denselben logischen Wert (und im selben Methodenkörper, nur wenige Zeilen später) `unteragent.GitArbeitsbereich.BranchName` / `.ClonePfad` verwendet. `ValidiereUnteragent` (Zeilen 193 und 203) validiert ebenfalls weiterhin über `unteragent.Branch` / `unteragent.ClonePfad` statt über den Wrapper. Das Value Object wurde also nur an einem von fünf Zugriffspunkten auf dieselben Daten in derselben Datei eingesetzt — wirkt wie ein unvollständiger Refactor, nicht wie eine bewusste Design-Entscheidung, und begünstigt Verwirrung/Doppelpflege, falls künftig einmal an nur einer der beiden Zugriffsarten etwas geändert wird.
 
-  Funktional harmlos (reine Bezeichner, kein Kompilierfehler, keine Testlogik betroffen), aber es widerspricht der im selben Umbenennungs-Batch bereits demonstrierten Konvention, Bezeichner konsequent auf die neuen Propertynamen umzustellen, und verwirrt beim Lesen (Methodenname und Summary sprechen von unterschiedlichen Feldnamen).
+  Empfehlung: In dieser Datei einheitlich auf einen Zugriffsstil festlegen — entweder durchgängig `unteragent.GitArbeitsbereich.BranchName`/`.ClonePfad` verwenden (Zeilen 87, 90, 112, 193, 203 anpassen) oder die Umstellung in Zeilen 96–97 zurücknehmen und dort ebenfalls `unteragent.Branch`/`unteragent.ClonePfad` direkt lesen, bis die ganze Datei konsequent migriert wird.
 
-  Empfehlung: Methoden umbenennen zu `SteuereUnteragentAsync_WirftBeiLeeremScope`, `SteuereUnteragentAsync_WirftBeiLeeremBranch`, `SteuereUnteragentAsync_WirftBeiRelativemVerzeichnisPfad`, `SteuereUnteragentAsync_WirftBeiRelativemClonePfad`, `SteuereUnteragentAsync_WirftBeiVerzeichnisPfadAusserhalbArbeitsverzeichnis`.
+### src/Softwareschmiede/Domain/Entities/Aufgabe.cs (Aufgabe)
 
-## Positivbefunde (keine Änderung nötig, zur Nachvollziehbarkeit dokumentiert)
+- **Getter von `GitArbeitsbereich` verschleiert Teilzustände statt sie sichtbar zu machen** — Die Null-Prüfung im Getter (`BranchName is null && LokalerKlonPfad is null ? null : new GitArbeitsbereich(...)`) liefert nur dann `null`, wenn *beide* Felder unbesetzt sind. Ist nur eines der beiden Felder `null` (das andere gesetzt), wird trotzdem ein nicht-`null`-`GitArbeitsbereich` zurückgegeben, bei dem das fehlende Feld still zu `string.Empty` wird — die eigentliche Divergenz (nur Branch oder nur Klonpfad gesetzt) geht dabei verloren. Dieser Teilzustand ist in der Praxis nicht hypothetisch: `GitOrchestrationServiceTests.cs:168-169` setzt genau diesen Zustand (`LokalerKlonPfad` gesetzt, `BranchName = null`) für dieselbe Entität. Der Doc-Kommentar „Null, solange kein Branch/Klon-Pfad gesetzt ist" ist mehrdeutig und deckt dieses Verhalten nicht eindeutig ab. Aktuell wird der Getter in Produktionscode nirgends gelesen (nur der Setter, in `AufgabeService.cs`), das Risiko ist also latent, aber real, sobald ein künftiger Aufrufer `aufgabe.GitArbeitsbereich` liest und `null` als Signal für „kein vollständiger Arbeitsbereich" erwartet.
 
-- **Migration `20260821193422_RenameUnteragentSpezifikationProperties`**: `Up`/`Down` sind exakt spiegelbildlich (sechs `RenameColumn`-Paare, je Richtung invertiert). Der im `Up`-Endzustand erreichte Spaltenstand (`Scope`, `Prompt`, `ExterneAgentId`, `VerzeichnisPfad`, `ClonePfad`, `Branch`) stimmt mit `SoftwareschmiededDbContextModelSnapshot.cs` und dem `Designer.cs`-Zielmodell der neuen Migration überein (Property-Reihenfolge im Snapshot alphabetisch neu sortiert, inhaltlich aber deckungsgleich inkl. `HasMaxLength`/`IsRequired`).
-- **JSON-Stabilität von `state.json`**: `ProjektleiterAgentService.AktualisiereSubagentsInStateJsonAsync` (Zeile 161–168) schreibt die externen JSON-Schlüssel weiterhin unverändert als `"agent_id"`, `"task_id"`, `"scope"` — die Zuordnung erfolgt manuell über `JsonObject`-Indexer (`["agent_id"] = unteragent.ExterneAgentId`) statt über ein automatisch von der C#-Propertybezeichnung abgeleitetes Attribut, sodass die interne Umbenennung den externen Vertrag korrekt nicht verändert. Codebase-weite Suche nach `AgentId`/`AgentScope`/`AgentPrompt`/`AgentDirectory`/`AgentBranch`/`AgentClone` als Member-Zugriff (`.AgentId` etc.) ergab keine verbliebenen Treffer in `src/`.
-- **Namensentscheidung `AgentId` → `ExterneAgentId`**: Konsistent begründet (siehe `continue.md`) und korrekt umgesetzt — die Entity behält ihre eigene `Id` (Guid-PK) unverändert, `ExterneAgentId` (string) wird ausschließlich für die vom CLI-Tool vergebene externe Kennung verwendet und nirgends als DB-Lookup-Schlüssel benutzt (Lookups laufen weiterhin über `Id`, z. B. `FirstOrDefaultAsync(u => u.Id == unteragent.Id)` in `ProjektleiterAgentService.IntegriereErgebnisseAsync`).
-- **`UnteragentAbbruchException.AgentId`**: Eigenständige, von der Entity unabhängige Property einer anderen Klasse (`Domain/Exceptions/UnteragentAbbruchException.cs`) — korrekt nicht mit umbenannt. Die beiden Aufrufstellen in `UnteragentGovernanceService.ValidiereFehlerBedingungAsync` (Zeile 90 und 95) übergeben den Wert korrekt aus `unteragent.ExterneAgentId`.
-- **Vollständigkeit der Umbenennung**: Alle betroffenen Verwendungsstellen wurden angepasst — Entity (`UnteragentSpezifikation.cs`), DbContext-Konfiguration (`SoftwareschmiededDbContext.cs`), Services (`ProjektleiterAgentService.cs`, `UnteragentGovernanceService.cs`), XAML-Binding (`AutonomAufgabeDetailView.xaml`), Tests (`ProjektleiterAgentServiceTests.cs`, `ProjektleiterAgentServiceTests_Fehlerfaelle.cs`, `UnteragentGovernanceServiceTests.cs`, `E2E_AutonomAufgabenAgentExecution.cs`, `ProjektleiterAgentServiceTestDatenFactory.cs`) sowie Live-Dokumentation (`datenmodell.md`, `business-rules.md`, `ablauf-technisch.md`, `troubleshooting.md`).
-- **Build-Verifikation**: `dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` unabhängig nachgebaut — 0 Fehler, 0 Warnungen; Zeitstempel der erzeugten `Softwareschmiede.Tests.dll` liegt nach dem Zeitstempel der geänderten Quelldatei `UnteragentSpezifikation.cs`, d. h. der Build hat die aktuellen Working-Tree-Änderungen tatsächlich einkompiliert (kein stale/incremental No-Op).
+  Empfehlung: Getter-Bedingung auf `BranchName is null || LokalerKlonPfad is null` ändern, sodass jeder unvollständige Zustand weiterhin `null` liefert und nicht in eine scheinbar gültige VO-Instanz mit leeren Strings umgewandelt wird (analog zur Absicht des Doc-Kommentars).
+
+### Testabdeckung der neuen `[NotMapped]`-Wrapper-Properties
+
+- **Kein einziger Unit-Test prüft Getter/Setter der drei neuen Wrapper-Properties direkt** — Weder `Aufgabe.GitArbeitsbereich` noch `UnteragentSpezifikation.GitArbeitsbereich` noch `AutonomAufgabeKonfiguration.RessourcenLimits` werden in `src/Softwareschmiede.Tests` direkt auf einer Entity-Instanz gelesen oder gesetzt (Suche nach `.GitArbeitsbereich` bzw. `.RessourcenLimits` auf Entity-Objekten liefert keine Treffer). Getestet wird nur `AutonomAufgabeInitialisierungsAnfrage.RessourcenLimits` — das ist aber ein gewöhnliches Record-Property ohne eigene Getter/Setter-Logik, kein Wrapper um flach gemappte Felder. Damit ist die für diesen PR zentrale Eigenschaft — dass Wrapper-Getter/-Setter tatsächlich synchron mit den zugrunde liegenden EF-Feldern bleiben (keine versteckte Divergenz) — durch keinen Test abgesichert; ein Fehler wie der oben beschriebene Getter-Bug in `Aufgabe.cs` wäre durch die bestehende Testsuite nicht aufgefallen.
+
+  Empfehlung: Für jede der drei Entities einen kleinen Roundtrip-Test ergänzen: VO setzen → prüfen, dass die flachen Felder den erwarteten Wert haben; flache Felder setzen → prüfen, dass der VO-Getter den erwarteten Wert (bzw. bei `Aufgabe.GitArbeitsbereich` `null` im Teilzustand) liefert.
 
 ## Geprüfte Dateien
 
-- `src/Softwareschmiede/Domain/Entities/UnteragentSpezifikation.cs`
-- `src/Softwareschmiede/Infrastructure/Data/SoftwareschmiededDbContext.cs`
-- `src/Softwareschmiede/Migrations/20260821193422_RenameUnteragentSpezifikationProperties.cs`
-- `src/Softwareschmiede/Migrations/20260821193422_RenameUnteragentSpezifikationProperties.Designer.cs`
-- `src/Softwareschmiede/Migrations/SoftwareschmiededDbContextModelSnapshot.cs`
+- `src/Softwareschmiede.App/ViewModels/AutonomAufgabeInitialisierungsDialogViewModel.cs`
+- `src/Softwareschmiede.Tests/Application/Services/AutonomAufgabenInitialisierungsServiceTests.cs`
+- `src/Softwareschmiede/Application/Services/AufgabeService.cs`
+- `src/Softwareschmiede/Application/Services/AutonomAufgabenInitialisierungsService.cs`
 - `src/Softwareschmiede/Application/Services/ProjektleiterAgentService.cs`
-- `src/Softwareschmiede/Application/Services/UnteragentGovernanceService.cs`
-- `src/Softwareschmiede/Domain/Exceptions/UnteragentAbbruchException.cs` (gegengeprüft, unverändert — korrekt)
-- `src/Softwareschmiede.App/Views/AutonomAufgabeDetailView.xaml`
-- `src/Softwareschmiede.Tests/Application/Services/ProjektleiterAgentServiceTests.cs`
-- `src/Softwareschmiede.Tests/Application/Services/ProjektleiterAgentServiceTests_Fehlerfaelle.cs`
-- `src/Softwareschmiede.Tests/Application/Services/UnteragentGovernanceServiceTests.cs`
-- `src/Softwareschmiede.Tests/E2E/E2E_AutonomAufgabenAgentExecution.cs`
-- `src/Softwareschmiede.Tests/Helpers/ProjektleiterAgentServiceTestDatenFactory.cs`
-- `docs/help/aufgaben/autonome-aufgaben/datenmodell.md`
-- `docs/help/aufgaben/autonome-aufgaben/business-rules.md`
-- `docs/help/aufgaben/autonome-aufgaben/ablauf-technisch.md`
-- `docs/help/aufgaben/autonome-aufgaben/troubleshooting.md`
-- `docs/features/task/issue-205-47562196e8894189b9b9980fcd48a71c-automatisierte-produktentwickl/continue.md`
+- `src/Softwareschmiede/Domain/Entities/Aufgabe.cs`
+- `src/Softwareschmiede/Domain/Entities/AutonomAufgabeKonfiguration.cs`
+- `src/Softwareschmiede/Domain/Entities/UnteragentSpezifikation.cs`
+- `src/Softwareschmiede/Domain/ValueObjects/AutonomAufgabeInitialisierungsAnfrage.cs`
+- `src/Softwareschmiede/Domain/ValueObjects/GitArbeitsbereich.cs` (neu)
+- `src/Softwareschmiede/Domain/ValueObjects/RessourcenLimits.cs` (neu)
+
+## Ergänzende Prüfpunkte (aus Auftrag)
+
+- **`[NotMapped]`-Wrapper Getter/Setter korrekt?** Für `AutonomAufgabeKonfiguration.RessourcenLimits` und `UnteragentSpezifikation.GitArbeitsbereich` ja, vollständig korrekt (Setter schreibt beide Felder, Getter liest beide Felder, keine Divergenz möglich). Für `Aufgabe.GitArbeitsbereich` liegt der oben beschriebene Getter-Befund vor (Teilzustand wird verschluckt statt als `null` propagiert); Setter ist korrekt.
+- **Keine Migration/Model-Snapshot-Änderung ausgelöst?** Bestätigt — `git status` zeigt keinerlei Änderungen unter `src/Softwareschmiede/Migrations/`, und `SoftwareschmiededDbContext.cs` konfiguriert weiterhin ausschließlich die flachen Spalten (`Branch`, `ClonePfad`, `TokenBudget` etc.), nicht die neuen `[NotMapped]`-Properties. Reiner `[NotMapped]`-Ansatz wie erwartet ohne Schemaauswirkung.
+- **Ausschluss von `AutonomAufgabeKonfiguration` beim `GitArbeitsbereich`-VO nachvollziehbar?** Ja — `AutonomAufgabeKonfiguration.ArbeitsverzeichnisPfad` bleibt ein eigenständiges, nicht in ein `GitArbeitsbereich` verpacktes String-Feld; die Entity hat keinen `Branch`/`ClonePfad`-Feldpaar, sondern nur das Wurzel-Arbeitsverzeichnis, das fachlich klar kein Klon-Pfad ist. Kein Befund.
+- **Reduktion von `AutonomAufgabeInitialisierungsAnfrage` von 9 auf 7 Parameter korrekt, bricht nichts?** Ja — es gibt im gesamten Repository nur einen einzigen Produktionscode-Aufrufer des Konstruktors (`AutonomAufgabeInitialisierungsDialogViewModel.cs:385`), der korrekt auf `RessourcenLimits: new RessourcenLimits(...)` umgestellt wurde. Alle Testaufrufer (`AutonomAufgabenInitialisierungsServiceTests.cs`) wurden ebenfalls konsistent angepasst, inklusive der beiden `with`-Ausdrücke, die jetzt korrekt verschachtelt über `basisAnfrage.RessourcenLimits with { ... }` einzelne Werte überschreiben. Kein Befund.

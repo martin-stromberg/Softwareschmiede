@@ -92,9 +92,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         ProjektBranchName: "feature/autonom-test",
         InitialPrompt: "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.",
         ArbeitsverzeichnisPfad: arbeitsverzeichnispPfad,
-        TokenBudget: 500000,
-        TokenBudgetErweitert: null,
-        LaufzeitLimitMinuten: 480,
+        RessourcenLimits: new RessourcenLimits(TokenBudget: 500000, TokenBudgetErweitert: null, LaufzeitLimitMinuten: 480),
         PersistenzModus: PersistenzModus.Standard,
         SkillAutogeneration: false);
 
@@ -179,7 +177,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         root.TryGetProperty("allowed_actions", out var allowedActions).Should().BeTrue();
         allowedActions.GetArrayLength().Should().BeGreaterThan(0);
         root.TryGetProperty("limits", out var limits).Should().BeTrue();
-        limits.GetProperty("token_budget").GetInt32().Should().Be(anfrage.TokenBudget);
+        limits.GetProperty("token_budget").GetInt32().Should().Be(anfrage.RessourcenLimits.TokenBudget);
     }
 
     /// <summary>InitialisiereAsync lehnt ein ungültiges TokenBudget mit ArgumentException ab.</summary>
@@ -187,7 +185,8 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
     public async Task InitialisiereAsync_WirftArgumentException_BeiUngueltigemTokenBudget()
     {
         var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
-        var anfrage = ErstelleAnfrage(_testRoot) with { TokenBudget = 0 };
+        var basisAnfrage = ErstelleAnfrage(_testRoot);
+        var anfrage = basisAnfrage with { RessourcenLimits = basisAnfrage.RessourcenLimits with { TokenBudget = 0 } };
 
         var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
 
@@ -232,7 +231,8 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
     public async Task InitialisiereAsync_WirftArgumentException_BeiUngueltigemLaufzeitLimit()
     {
         var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
-        var anfrage = ErstelleAnfrage(_testRoot) with { LaufzeitLimitMinuten = 5 };
+        var basisAnfrage = ErstelleAnfrage(_testRoot);
+        var anfrage = basisAnfrage with { RessourcenLimits = basisAnfrage.RessourcenLimits with { LaufzeitLimitMinuten = 5 } };
 
         var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
 
