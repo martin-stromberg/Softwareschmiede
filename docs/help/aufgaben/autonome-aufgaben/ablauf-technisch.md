@@ -254,13 +254,13 @@ Agent ruft (intern): ProjektleiterAgentService.SteuereUnteragentAsync()
    {
        Id = Guid.NewGuid(),
        AutonomAufgabeId = konfiguration.Id,
-       AgentId = $"subagent-{counter}",
+       ExterneAgentId = $"subagent-{counter}",
        TaskId = $"task-{counter}",
-       AgentScope = "feature-{bereich}", // z.B. "feature-backend"
-       AgentPrompt = taskPrompt,
-       AgentDirectory = $"tasks/task_{counter}",
-       AgentBranch = branchName,
-       AgentClone = $"clones/repo_feature_{counter}",
+       Scope = "feature-{bereich}", // z.B. "feature-backend"
+       Prompt = taskPrompt,
+       VerzeichnisPfad = $"tasks/task_{counter}",
+       Branch = branchName,
+       ClonePfad = $"clones/repo_feature_{counter}",
        ErzeugungsDatum = DateTimeOffset.UtcNow,
        Status = UnteragentStatus.Erzeugt
    };
@@ -281,8 +281,8 @@ Agent ruft (intern): ProjektleiterAgentService.SteuereUnteragentAsync()
    ```csharp
    var subagentRequest = new AgentStartRequest
    {
-       Prompt = unteragent.AgentPrompt,
-       WorkingDirectory = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, unteragent.AgentDirectory),
+       Prompt = unteragent.Prompt,
+       WorkingDirectory = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, unteragent.VerzeichnisPfad),
        SkillRegistry = skills,
        Limits = new AgentLimits { TokenBudget = /* portion */ }
    };
@@ -364,9 +364,9 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
 
 2. **plan.md aktualisieren**
    ```
-   Anhängen: "## Teilaufgabe {N} — {AgentScope}"
+   Anhängen: "## Teilaufgabe {N} — {Scope}"
    - Status: Abgeschlossen
-   - Branch: {AgentBranch}
+   - Branch: {Branch}
    - Commits: {anzahl}
    - Zusammenfassung: {task_report.md}
    ```
@@ -374,7 +374,7 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
 3. **progress.md aktualisieren**
    ```
    Anhängen:
-   - Meilenstein: "{AgentScope} abgeschlossen"
+   - Meilenstein: "{Scope} abgeschlossen"
    - Datum: {now}
    - Token verbraucht: {unteragent-token}
    - Nächste Schritte: ...

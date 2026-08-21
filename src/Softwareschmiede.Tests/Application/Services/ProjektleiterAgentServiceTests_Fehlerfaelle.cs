@@ -92,7 +92,7 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
     {
         var konfiguration = await ErstelleKonfigurationAsync();
         var unteragent = ErstelleUnteragent(konfiguration.Id);
-        Directory.CreateDirectory(unteragent.AgentDirectory);
+        Directory.CreateDirectory(unteragent.VerzeichnisPfad);
 
         var akt = () => _sut.IntegriereErgebnisseAsync(konfiguration, unteragent);
 
@@ -118,65 +118,65 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
         await akt.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn AgentScope leer ist.</summary>
+    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn Scope leer ist.</summary>
     [Fact]
-    public async Task SteuereUnteragentAsync_WirftBeiLeeremAgentScope()
+    public async Task SteuereUnteragentAsync_WirftBeiLeeremScope()
     {
         var konfiguration = await ErstelleKonfigurationAsync();
         var unteragent = ErstelleUnteragent(konfiguration.Id);
-        unteragent.AgentScope = string.Empty;
+        unteragent.Scope = string.Empty;
 
         var akt = () => _sut.SteuereUnteragentAsync(unteragent);
 
         await akt.Should().ThrowAsync<ArgumentException>();
     }
 
-    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn AgentBranch leer ist.</summary>
+    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn Branch leer ist.</summary>
     [Fact]
-    public async Task SteuereUnteragentAsync_WirftBeiLeeremAgentBranch()
+    public async Task SteuereUnteragentAsync_WirftBeiLeeremBranch()
     {
         var konfiguration = await ErstelleKonfigurationAsync();
         var unteragent = ErstelleUnteragent(konfiguration.Id);
-        unteragent.AgentBranch = string.Empty;
+        unteragent.Branch = string.Empty;
 
         var akt = () => _sut.SteuereUnteragentAsync(unteragent);
 
         await akt.Should().ThrowAsync<ArgumentException>();
     }
 
-    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn AgentDirectory kein absoluter Pfad ist.</summary>
+    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn VerzeichnisPfad kein absoluter Pfad ist.</summary>
     [Fact]
-    public async Task SteuereUnteragentAsync_WirftBeiRelativemAgentDirectory()
+    public async Task SteuereUnteragentAsync_WirftBeiRelativemVerzeichnisPfad()
     {
         var konfiguration = await ErstelleKonfigurationAsync();
         var unteragent = ErstelleUnteragent(konfiguration.Id);
-        unteragent.AgentDirectory = "tasks/task_001";
+        unteragent.VerzeichnisPfad = "tasks/task_001";
 
         var akt = () => _sut.SteuereUnteragentAsync(unteragent);
 
         await akt.Should().ThrowAsync<ArgumentException>();
     }
 
-    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn AgentClone kein absoluter Pfad ist.</summary>
+    /// <summary>SteuereUnteragentAsync wirft eine ArgumentException, wenn ClonePfad kein absoluter Pfad ist.</summary>
     [Fact]
-    public async Task SteuereUnteragentAsync_WirftBeiRelativemAgentClone()
+    public async Task SteuereUnteragentAsync_WirftBeiRelativemClonePfad()
     {
         var konfiguration = await ErstelleKonfigurationAsync();
         var unteragent = ErstelleUnteragent(konfiguration.Id);
-        unteragent.AgentClone = "clones/repo_feature_001";
+        unteragent.ClonePfad = "clones/repo_feature_001";
 
         var akt = () => _sut.SteuereUnteragentAsync(unteragent);
 
         await akt.Should().ThrowAsync<ArgumentException>();
     }
 
-    /// <summary>SteuereUnteragentAsync wirft eine InvalidOperationException, wenn AgentDirectory außerhalb des Arbeitsverzeichnisses der Autonomen Aufgabe liegt (Governance-Grenze).</summary>
+    /// <summary>SteuereUnteragentAsync wirft eine InvalidOperationException, wenn VerzeichnisPfad außerhalb des Arbeitsverzeichnisses der Autonomen Aufgabe liegt (Governance-Grenze).</summary>
     [Fact]
-    public async Task SteuereUnteragentAsync_WirftBeiAgentDirectoryAusserhalbArbeitsverzeichnis()
+    public async Task SteuereUnteragentAsync_WirftBeiVerzeichnisPfadAusserhalbArbeitsverzeichnis()
     {
         var konfiguration = await ErstelleKonfigurationAsync();
         var unteragent = ErstelleUnteragent(konfiguration.Id);
-        unteragent.AgentDirectory = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "AusserhalbDesArbeitsbereichs", Guid.NewGuid().ToString("N"));
+        unteragent.VerzeichnisPfad = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "AusserhalbDesArbeitsbereichs", Guid.NewGuid().ToString("N"));
 
         var akt = () => _sut.SteuereUnteragentAsync(unteragent);
 
@@ -189,7 +189,7 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
     {
         var konfiguration = await ErstelleKonfigurationAsync();
         var unteragent = ErstelleUnteragent(konfiguration.Id, "003");
-        Directory.CreateDirectory(unteragent.AgentDirectory);
+        Directory.CreateDirectory(unteragent.VerzeichnisPfad);
         _db.UnteragentSpezifikationen.Add(unteragent);
         await _db.SaveChangesAsync();
 

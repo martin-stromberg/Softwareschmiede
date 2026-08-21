@@ -58,21 +58,21 @@ Metadaten eines von einem Projektleiter-Agenten erzeugten Unteragenten.
 |-------------|-----|--------------|
 | `Id` | Guid | Eindeutige Unteragenten-ID |
 | `AutonomAufgabeId` | Guid | Foreign Key zu `AutonomAufgabeKonfiguration` (1:N) |
-| `AgentId` | string | Agent-Identifier (z.B. "subagent-001") |
+| `ExterneAgentId` | string | Externe Agent-Kennung, z.B. vom CLI-Tool vergeben (z.B. "subagent-001"), nicht identisch mit `Id` |
 | `TaskId` | string | Task-Identifier (z.B. "task-001") |
-| `AgentScope` | string | Geltungsbereich (z.B. "feature-backend", "feature-frontend") |
-| `AgentPrompt` | string | Task-Prompt für den Agenten |
-| `AgentDirectory` | string | Relativer Pfad zum Agent-Arbeitsbereich (z.B. "tasks/task_001") |
-| `AgentBranch` | string | Git-Branch für diesen Agenten (z.B. "feature-unteragent-001") |
-| `AgentClone` | string | Relativer Pfad zum Clone (z.B. "clones/repo_feature_001") |
+| `Scope` | string | Geltungsbereich (z.B. "feature-backend", "feature-frontend") |
+| `Prompt` | string | Task-Prompt für den Agenten |
+| `VerzeichnisPfad` | string | Relativer Pfad zum Agent-Arbeitsbereich (z.B. "tasks/task_001") |
+| `Branch` | string | Git-Branch für diesen Agenten (z.B. "feature-unteragent-001") |
+| `ClonePfad` | string | Relativer Pfad zum Clone (z.B. "clones/repo_feature_001") |
 | `ErzeugungsDatum` | DateTimeOffset | Zeitstempel der Erzeugung |
 | `AbschlussDatum` | DateTimeOffset? | Abschlusszeitpunkt (null wenn noch aktiv) |
 | `Status` | UnteragentStatus | `Erzeugt`, `Ausgeführt`, `Abgeschlossen`, `Fehler` |
 | `AutonomAufgabe` | AutonomAufgabeKonfiguration | Navigation (inverse 1:N) |
 
 **Constraints:**
-- `AgentScope`: Nicht null, eindeutig pro `AutonomAufgabeId`
-- `AgentBranch`: Gültiger Git-Branch-Name
+- `Scope`: Nicht null, eindeutig pro `AutonomAufgabeId`
+- `Branch`: Gültiger Git-Branch-Name
 - `Status`: Enum-Wert, keine null
 
 ### `SkillDefinition` (neu)
@@ -110,8 +110,8 @@ Versionierte Skill-Definition für Projektleiter oder Unteragenten.
 │     SessionPauseUtc                     └─ etc.
 │     AktiveUnteragenten                  │
 │                                         ├──── 1:N ────► UnteragentSpezifikation (neu)
-│                                         │               └─ AgentScope
-│                                         │               └─ AgentPrompt
+│                                         │               └─ Scope
+│                                         │               └─ Prompt
 │                                         │               └─ Status
 │                                         │               └─ ErzeugungsDatum
 │                                         │
@@ -238,13 +238,13 @@ erDiagram
     UNTERAGENT {
         guid Id
         guid AutonomAufgabeId FK
-        string AgentId
+        string ExterneAgentId
         string TaskId
-        string AgentScope
-        string AgentPrompt
-        string AgentDirectory
-        string AgentBranch
-        string AgentClone
+        string Scope
+        string Prompt
+        string VerzeichnisPfad
+        string Branch
+        string ClonePfad
         datetime ErzeugungsDatum
         datetime "AbschlussDatum?"
         UnteragentStatus Status

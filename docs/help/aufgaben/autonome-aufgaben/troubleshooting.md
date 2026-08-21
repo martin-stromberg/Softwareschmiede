@@ -146,7 +146,7 @@
 - Unteragent versucht, Skill zu modifizieren oder PR zu erstellen
 
 **Lösung:**
-1. Überprüfe `UnteragentSpezifikation.AgentScope` im Arbeitsverzeichnis (`state.json`)
+1. Überprüfe `UnteragentSpezifikation.Scope` im Arbeitsverzeichnis (`state.json`)
 2. Falls Scope zu eng: Initialisiere Aufgabe neu mit besserer Taskverteilung
 3. Falls Unteragent-Prompt falsch: Benutzer/Entwickler muss Prompt präzisieren
 4. Für Debug: Setze Logging-Level auf `Debug` in `appsettings.json`:

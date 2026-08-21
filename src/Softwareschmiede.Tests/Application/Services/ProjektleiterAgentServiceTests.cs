@@ -101,13 +101,13 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
 
         await _sut.SteuereUnteragentAsync(unteragent);
 
-        Directory.Exists(unteragent.AgentDirectory).Should().BeTrue();
-        Directory.Exists(unteragent.AgentClone).Should().BeTrue();
+        Directory.Exists(unteragent.VerzeichnisPfad).Should().BeTrue();
+        Directory.Exists(unteragent.ClonePfad).Should().BeTrue();
         unteragent.Status.Should().Be(UnteragentStatus.Erzeugt);
 
         var persistiert = await _db.UnteragentSpezifikationen.FindAsync(unteragent.Id);
         persistiert.Should().NotBeNull();
-        persistiert!.AgentBranch.Should().Be("feature-unteragent-001");
+        persistiert!.Branch.Should().Be("feature-unteragent-001");
     }
 
     /// <summary>IntegriereErgebnisseAsync aktualisiert plan.md und progress.md mit den Ergebnissen des Unteragenten.</summary>
@@ -120,8 +120,8 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
         unteragent.ErzeugungsDatum = DateTimeOffset.UtcNow;
         unteragent.Status = UnteragentStatus.Erzeugt;
 
-        Directory.CreateDirectory(unteragent.AgentDirectory);
-        await File.WriteAllTextAsync(Path.Combine(unteragent.AgentDirectory, "task_report.md"), "Backend-Feature erfolgreich implementiert.");
+        Directory.CreateDirectory(unteragent.VerzeichnisPfad);
+        await File.WriteAllTextAsync(Path.Combine(unteragent.VerzeichnisPfad, "task_report.md"), "Backend-Feature erfolgreich implementiert.");
 
         _db.UnteragentSpezifikationen.Add(unteragent);
         await _db.SaveChangesAsync();

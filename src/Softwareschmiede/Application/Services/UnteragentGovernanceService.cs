@@ -21,7 +21,7 @@ public sealed class UnteragentGovernanceService
     /// <inheritdoc cref="UnteragentGovernanceService"/>
     public UnteragentGovernanceService(ILogger<UnteragentGovernanceService> logger) => _logger = logger;
 
-    /// <summary>Validiert, dass ein Unteragent nur in seinem eigenen Bereich (<see cref="UnteragentSpezifikation.AgentDirectory"/>) arbeitet und keine grundsätzlich verbotene Aktion ausführt.</summary>
+    /// <summary>Validiert, dass ein Unteragent nur in seinem eigenen Bereich (<see cref="UnteragentSpezifikation.VerzeichnisPfad"/>) arbeitet und keine grundsätzlich verbotene Aktion ausführt.</summary>
     /// <param name="unteragent">Der Unteragent, dessen Arbeitsbereich als erlaubter Basispfad dient.</param>
     /// <param name="aktion">Die auszuführende Aktion.</param>
     /// <param name="zielPfad">Der zu prüfende Zielpfad.</param>
@@ -30,7 +30,7 @@ public sealed class UnteragentGovernanceService
     {
         ArgumentNullException.ThrowIfNull(unteragent);
 
-        return VerifiziereBerechtigung(unteragent.AgentDirectory, aktion, zielPfad, unteragent.AgentId);
+        return VerifiziereBerechtigung(unteragent.VerzeichnisPfad, aktion, zielPfad, unteragent.ExterneAgentId);
     }
 
     /// <summary>Validiert, dass ein Zielpfad innerhalb eines vorgegebenen Basispfads liegt und keine grundsätzlich verbotene Aktion vorliegt. Dient Aufrufern, die noch keine persistierte <see cref="UnteragentSpezifikation"/> besitzen (z. B. Prüfung des Arbeitsverzeichnisses vor dessen Erzeugung).</summary>
@@ -72,7 +72,7 @@ public sealed class UnteragentGovernanceService
     {
         ArgumentNullException.ThrowIfNull(unteragent);
 
-        var statePfad = Path.Combine(unteragent.AgentDirectory, "task_state.json");
+        var statePfad = Path.Combine(unteragent.VerzeichnisPfad, "task_state.json");
         if (!File.Exists(statePfad))
         {
             return;
@@ -87,12 +87,12 @@ public sealed class UnteragentGovernanceService
 
         if (state.TokenLimit > 0 && state.TokensUsed > state.TokenLimit)
         {
-            throw new UnteragentAbbruchException(unteragent.AgentId, $"Tokenlimit überschritten ({state.TokensUsed}/{state.TokenLimit}).");
+            throw new UnteragentAbbruchException(unteragent.ExterneAgentId, $"Tokenlimit überschritten ({state.TokensUsed}/{state.TokenLimit}).");
         }
 
         if (state.RuntimeLimitMinutes > 0 && DateTimeOffset.UtcNow - state.StartedUtc > TimeSpan.FromMinutes(state.RuntimeLimitMinutes))
         {
-            throw new UnteragentAbbruchException(unteragent.AgentId, $"Laufzeitlimit von {state.RuntimeLimitMinutes} Minuten überschritten.");
+            throw new UnteragentAbbruchException(unteragent.ExterneAgentId, $"Laufzeitlimit von {state.RuntimeLimitMinutes} Minuten überschritten.");
         }
     }
 

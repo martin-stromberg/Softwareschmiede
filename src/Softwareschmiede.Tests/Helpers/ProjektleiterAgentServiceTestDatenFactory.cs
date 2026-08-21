@@ -49,7 +49,7 @@ internal static class ProjektleiterAgentServiceTestDatenFactory
     }
 
     /// <summary>Erstellt eine (nicht persistierte) UnteragentSpezifikation für Tests.</summary>
-    /// <param name="testRoot">Das Arbeitsverzeichnis, unter dem AgentDirectory/AgentClone abgeleitet werden.</param>
+    /// <param name="testRoot">Das Arbeitsverzeichnis, unter dem VerzeichnisPfad/ClonePfad abgeleitet werden.</param>
     /// <param name="autonomAufgabeId">Die Id der zugehörigen AutonomAufgabeKonfiguration.</param>
     /// <param name="suffix">Suffix zur Bildung eindeutiger Agent-/Task-/Branch-/Klon-Bezeichner.</param>
     /// <returns>Eine neue UnteragentSpezifikation.</returns>
@@ -57,12 +57,12 @@ internal static class ProjektleiterAgentServiceTestDatenFactory
     {
         Id = Guid.NewGuid(),
         AutonomAufgabeId = autonomAufgabeId,
-        AgentId = $"agent-{suffix}",
+        ExterneAgentId = $"agent-{suffix}",
         TaskId = $"task_{suffix}",
-        AgentScope = "feature-backend",
-        AgentPrompt = "Implementiere das Backend.",
-        AgentDirectory = Path.Combine(testRoot, "tasks", $"task_{suffix}"),
-        AgentBranch = $"feature-unteragent-{suffix}",
-        AgentClone = Path.Combine(testRoot, "clones", $"repo_feature_{suffix}")
+        Scope = "feature-backend",
+        Prompt = "Implementiere das Backend.",
+        VerzeichnisPfad = Path.Combine(testRoot, "tasks", $"task_{suffix}"),
+        Branch = $"feature-unteragent-{suffix}",
+        ClonePfad = Path.Combine(testRoot, "clones", $"repo_feature_{suffix}")
     };
 }

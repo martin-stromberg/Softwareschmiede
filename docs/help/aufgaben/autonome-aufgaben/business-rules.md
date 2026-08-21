@@ -94,8 +94,8 @@
 **Beschreibung:** Jeder Unteragent arbeitet nur in seinem eigenen Scope (`tasks/task_XXX/`).
 
 **Bedingungen:**
-- Unteragent.AgentDirectory = `tasks/task_{N}`
-- Unteragent.AgentScope eindeutig pro AutonomAufgabeId
+- Unteragent.VerzeichnisPfad = `tasks/task_{N}`
+- Unteragent.Scope eindeutig pro AutonomAufgabeId
 
 **Verhalten:**
 - Unteragent kann nur in `tasks/task_{N}/` Dateien erstellen/ändern
@@ -231,7 +231,7 @@
 **Beschreibung:** Jeder Unteragent erhält einen eindeutigen Git-Branch.
 
 **Bedingungen:**
-- AgentBranch = `feature-unteragent-{counter}` eindeutig pro AutonomAufgabeId
+- Branch = `feature-unteragent-{counter}` eindeutig pro AutonomAufgabeId
 
 **Verhalten:**
 - Counter wird inkrementiert für jeden neuen Unteragent
@@ -246,7 +246,7 @@
 **Beschreibung:** Jeder Unteragent hat sein eigenes Arbeitsverzeichnis.
 
 **Bedingungen:**
-- AgentDirectory = `tasks/task_{counter}` eindeutig pro AutonomAufgabeId
+- VerzeichnisPfad = `tasks/task_{counter}` eindeutig pro AutonomAufgabeId
 
 **Verhalten:**
 - Unteragent-Ergebnisse sind räumlich isoliert

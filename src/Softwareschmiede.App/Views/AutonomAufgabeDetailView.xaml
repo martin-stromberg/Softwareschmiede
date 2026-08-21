@@ -110,8 +110,8 @@
                           AutoGenerateColumns="False"
                           IsReadOnly="True">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Agent-ID" Binding="{Binding AgentId}" />
-                        <DataGridTextColumn Header="Scope" Binding="{Binding AgentScope}" />
+                        <DataGridTextColumn Header="Agent-ID" Binding="{Binding ExterneAgentId}" />
+                        <DataGridTextColumn Header="Scope" Binding="{Binding Scope}" />
                         <DataGridTextColumn Header="Status" Binding="{Binding Status}" />
                         <DataGridTextColumn Header="Erzeugt" Binding="{Binding ErzeugungsDatum}" />
                         <DataGridTextColumn Header="Abgeschlossen" Binding="{Binding AbschlussDatum}" />

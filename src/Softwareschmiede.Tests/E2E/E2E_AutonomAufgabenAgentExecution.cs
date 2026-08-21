@@ -94,13 +94,13 @@ public partial class End2EndTest
         {
             Id = Guid.NewGuid(),
             AutonomAufgabeId = autonomAufgabeId,
-            AgentId = "agent-e2e-001",
+            ExterneAgentId = "agent-e2e-001",
             TaskId = "task_001",
-            AgentScope = "feature-backend",
-            AgentPrompt = "Implementiere das Backend-Feature.",
-            AgentDirectory = unteragentDirectory,
-            AgentBranch = "feature-unteragent-001",
-            AgentClone = unteragentClone
+            Scope = "feature-backend",
+            Prompt = "Implementiere das Backend-Feature.",
+            VerzeichnisPfad = unteragentDirectory,
+            Branch = "feature-unteragent-001",
+            ClonePfad = unteragentClone
         };
 
         await using (var db = OpenTestDbContext())
@@ -116,7 +116,7 @@ public partial class End2EndTest
         {
             var persistiert = await db.UnteragentSpezifikationen.FirstAsync(u => u.Id == unteragent.Id);
             Assert.Equal(UnteragentStatus.Erzeugt, persistiert.Status);
-            Assert.Equal("feature-unteragent-001", persistiert.AgentBranch);
+            Assert.Equal("feature-unteragent-001", persistiert.Branch);
         }
 
         // Phase 3: Session-Pause bei Budget-Limit (Projektleiter-Agent-intern, kein UI-Auslöser).

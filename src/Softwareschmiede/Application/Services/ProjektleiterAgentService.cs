@@ -70,33 +70,33 @@ public sealed class ProjektleiterAgentService
         if (!_governanceService.VerifiziereBerechtigung(
                 konfiguration.ArbeitsverzeichnisPfad,
                 UnteragentAktion.ArbeitsverzeichnisErstellen,
-                unteragent.AgentDirectory,
-                unteragent.AgentId))
+                unteragent.VerzeichnisPfad,
+                unteragent.ExterneAgentId))
         {
             throw new InvalidOperationException(
-                $"Unteragent {unteragent.AgentId}: Arbeitsverzeichnis '{unteragent.AgentDirectory}' liegt außerhalb des erlaubten Bereichs '{konfiguration.ArbeitsverzeichnisPfad}'.");
+                $"Unteragent {unteragent.ExterneAgentId}: Arbeitsverzeichnis '{unteragent.VerzeichnisPfad}' liegt außerhalb des erlaubten Bereichs '{konfiguration.ArbeitsverzeichnisPfad}'.");
         }
 
-        await DirectoryAccessGuard.AusfuehrenAsync(unteragent.AgentDirectory, () =>
+        await DirectoryAccessGuard.AusfuehrenAsync(unteragent.VerzeichnisPfad, () =>
         {
-            Directory.CreateDirectory(unteragent.AgentDirectory);
+            Directory.CreateDirectory(unteragent.VerzeichnisPfad);
             return Task.CompletedTask;
         });
 
         var repoMainPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "clones", "repo_main");
-        var branchErgebnis = await _cliRunner.RunAsync("git", ["branch", unteragent.AgentBranch], repoMainPfad, null, ct);
+        var branchErgebnis = await _cliRunner.RunAsync("git", ["branch", unteragent.Branch], repoMainPfad, null, ct);
         if (!branchErgebnis.IsSuccess)
         {
-            throw new InvalidOperationException($"Branch '{unteragent.AgentBranch}' für Unteragent '{unteragent.AgentId}' konnte nicht angelegt werden: {branchErgebnis.StdErr}");
+            throw new InvalidOperationException($"Branch '{unteragent.Branch}' für Unteragent '{unteragent.ExterneAgentId}' konnte nicht angelegt werden: {branchErgebnis.StdErr}");
         }
 
         await GitKlonHelper.KloneFallsNichtVorhandenAsync(
             _cliRunner,
             repoMainPfad,
-            unteragent.AgentClone,
-            unteragent.AgentBranch,
+            unteragent.ClonePfad,
+            unteragent.Branch,
             _logger,
-            $"Klon für Unteragent '{unteragent.AgentId}' fehlgeschlagen",
+            $"Klon für Unteragent '{unteragent.ExterneAgentId}' fehlgeschlagen",
             ct);
 
         unteragent.Status = UnteragentStatus.Erzeugt;
@@ -107,9 +107,9 @@ public sealed class ProjektleiterAgentService
 
         _logger.LogInformation(
             "Unteragent {AgentId} für Autonome Aufgabe {AutonomAufgabeId} erzeugt (Branch: {Branch}).",
-            unteragent.AgentId,
+            unteragent.ExterneAgentId,
             unteragent.AutonomAufgabeId,
-            unteragent.AgentBranch);
+            unteragent.Branch);
     }
 
     /// <summary>Integriert die Ergebnisse eines abgeschlossenen Unteragenten in plan.md, progress.md und state.json.</summary>
@@ -118,16 +118,16 @@ public sealed class ProjektleiterAgentService
         ArgumentNullException.ThrowIfNull(konfiguration);
         ArgumentNullException.ThrowIfNull(unteragent);
 
-        var reportPfad = Path.Combine(unteragent.AgentDirectory, "task_report.md");
+        var reportPfad = Path.Combine(unteragent.VerzeichnisPfad, "task_report.md");
         var report = File.Exists(reportPfad)
             ? await File.ReadAllTextAsync(reportPfad, ct)
             : "(kein task_report.md gefunden)";
 
         var planPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "plan.md");
-        await File.AppendAllTextAsync(planPfad, $"\n## Teilaufgabe {unteragent.TaskId} ({unteragent.AgentScope})\nStatus: Abgeschlossen\n", ct);
+        await File.AppendAllTextAsync(planPfad, $"\n## Teilaufgabe {unteragent.TaskId} ({unteragent.Scope})\nStatus: Abgeschlossen\n", ct);
 
         var progressPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "progress.md");
-        await File.AppendAllTextAsync(progressPfad, $"\n## {DateTimeOffset.UtcNow:O} — Unteragent {unteragent.AgentId} abgeschlossen\n{report}\n", ct);
+        await File.AppendAllTextAsync(progressPfad, $"\n## {DateTimeOffset.UtcNow:O} — Unteragent {unteragent.ExterneAgentId} abgeschlossen\n{report}\n", ct);
 
         await AktualisiereSubagentsInStateJsonAsync(konfiguration.ArbeitsverzeichnisPfad, unteragent, ct);
 
@@ -140,7 +140,7 @@ public sealed class ProjektleiterAgentService
 
         _logger.LogInformation(
             "Ergebnisse von Unteragent {AgentId} integriert (plan.md, progress.md, state.json aktualisiert).",
-            unteragent.AgentId);
+            unteragent.ExterneAgentId);
     }
 
     private async Task AktualisiereSubagentsInStateJsonAsync(string arbeitsverzeichnisPfad, UnteragentSpezifikation unteragent, CancellationToken ct)
@@ -160,9 +160,9 @@ public sealed class ProjektleiterAgentService
 
         subagents.Add(new JsonObject
         {
-            ["agent_id"] = unteragent.AgentId,
+            ["agent_id"] = unteragent.ExterneAgentId,
             ["task_id"] = unteragent.TaskId,
-            ["scope"] = unteragent.AgentScope,
+            ["scope"] = unteragent.Scope,
             ["status"] = "Abgeschlossen",
             ["completed_utc"] = DateTimeOffset.UtcNow.ToString("O")
         });
@@ -185,24 +185,24 @@ public sealed class ProjektleiterAgentService
 
     private static void ValidiereUnteragent(UnteragentSpezifikation unteragent)
     {
-        if (string.IsNullOrWhiteSpace(unteragent.AgentScope))
+        if (string.IsNullOrWhiteSpace(unteragent.Scope))
         {
-            throw new ArgumentException("AgentScope darf nicht leer sein.", nameof(unteragent));
+            throw new ArgumentException("Scope darf nicht leer sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.AgentBranch))
+        if (string.IsNullOrWhiteSpace(unteragent.Branch))
         {
-            throw new ArgumentException("AgentBranch darf nicht leer sein.", nameof(unteragent));
+            throw new ArgumentException("Branch darf nicht leer sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.AgentDirectory) || !Path.IsPathRooted(unteragent.AgentDirectory))
+        if (string.IsNullOrWhiteSpace(unteragent.VerzeichnisPfad) || !Path.IsPathRooted(unteragent.VerzeichnisPfad))
         {
-            throw new ArgumentException("AgentDirectory muss ein absoluter Pfad sein.", nameof(unteragent));
+            throw new ArgumentException("VerzeichnisPfad muss ein absoluter Pfad sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.AgentClone) || !Path.IsPathRooted(unteragent.AgentClone))
+        if (string.IsNullOrWhiteSpace(unteragent.ClonePfad) || !Path.IsPathRooted(unteragent.ClonePfad))
         {
-            throw new ArgumentException("AgentClone muss ein absoluter Pfad sein.", nameof(unteragent));
+            throw new ArgumentException("ClonePfad muss ein absoluter Pfad sein.", nameof(unteragent));
         }
     }
 }

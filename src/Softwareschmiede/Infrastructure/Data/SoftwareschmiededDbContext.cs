@@ -218,13 +218,13 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<UnteragentSpezifikation>(e =>
         {
             e.HasKey(u => u.Id);
-            e.Property(u => u.AgentId).IsRequired().HasMaxLength(255);
+            e.Property(u => u.ExterneAgentId).IsRequired().HasMaxLength(255);
             e.Property(u => u.TaskId).IsRequired().HasMaxLength(255);
-            e.Property(u => u.AgentScope).IsRequired().HasMaxLength(255);
-            e.Property(u => u.AgentPrompt).IsRequired();
-            e.Property(u => u.AgentDirectory).IsRequired().HasMaxLength(512);
-            e.Property(u => u.AgentBranch).IsRequired().HasMaxLength(255);
-            e.Property(u => u.AgentClone).IsRequired().HasMaxLength(512);
+            e.Property(u => u.Scope).IsRequired().HasMaxLength(255);
+            e.Property(u => u.Prompt).IsRequired();
+            e.Property(u => u.VerzeichnisPfad).IsRequired().HasMaxLength(512);
+            e.Property(u => u.Branch).IsRequired().HasMaxLength(255);
+            e.Property(u => u.ClonePfad).IsRequired().HasMaxLength(512);
             e.Property(u => u.Status).IsRequired().HasConversion<string>();
             e.Property(u => u.ErzeugungsDatum).HasConversion(UnixMillisConverter);
             e.Property(u => u.AbschlussDatum).HasConversion(NullableUnixMillisConverter);

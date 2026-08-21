@@ -37,13 +37,13 @@ public sealed class UnteragentGovernanceServiceTests : IDisposable
     {
         Id = Guid.NewGuid(),
         AutonomAufgabeId = Guid.NewGuid(),
-        AgentId = "agent-001",
+        ExterneAgentId = "agent-001",
         TaskId = "task_001",
-        AgentScope = "feature-backend",
-        AgentPrompt = "Implementiere das Backend-Feature.",
-        AgentDirectory = _agentDirectory,
-        AgentBranch = "feature-unteragent-001",
-        AgentClone = Path.Combine(_testRoot, "clones", "repo_feature_001"),
+        Scope = "feature-backend",
+        Prompt = "Implementiere das Backend-Feature.",
+        VerzeichnisPfad = _agentDirectory,
+        Branch = "feature-unteragent-001",
+        ClonePfad = Path.Combine(_testRoot, "clones", "repo_feature_001"),
         ErzeugungsDatum = DateTimeOffset.UtcNow,
         Status = UnteragentStatus.Erzeugt
     };
