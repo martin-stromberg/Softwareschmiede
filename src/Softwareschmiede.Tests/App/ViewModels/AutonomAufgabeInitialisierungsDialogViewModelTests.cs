@@ -27,36 +27,17 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests : IDispos
     {
         _db = TestDbContextFactory.Create();
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "InitDialogVm", Guid.NewGuid().ToString("N"));
-        var quellRepo = _testRoot + "-quelle";
-        Directory.CreateDirectory(quellRepo);
 
-        var cliRunnerMock = new Mock<ICliRunner>();
-        cliRunnerMock
-            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(a => a.Contains("clone")), It.IsAny<string?>(), It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
-            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) => Directory.CreateDirectory(args.Last()))
-            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
-
-        _initialisierungsService = new AutonomAufgabenInitialisierungsService(_db, cliRunnerMock.Object, Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+        var cliRunnerMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateCliRunnerMockMitErfolgreichemGitKlon();
+        _initialisierungsService = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(_db, cliRunnerMock.Object);
 
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
         var promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
         var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
 
-        var projektId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt { Id = projektId, Name = "Testprojekt", ErstellungsDatum = DateTimeOffset.UtcNow, Status = ProjektStatus.Aktiv });
-        _aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = projektId,
-            Titel = "Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            LokalerKlonPfad = quellRepo,
-            BranchName = "main"
-        };
-        _db.Aufgaben.Add(_aufgabe);
+        var projektId = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleProjekt(_db);
+        _aufgabe = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleAufgabeMitLokalemKlon(_db, projektId, _testRoot, "Testaufgabe", "main");
         _db.SaveChanges();
 
         _sut = new AutonomAufgabeInitialisierungsDialogViewModel(

@@ -36,30 +36,7 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
 
         var projektId = Guid.NewGuid();
         _db.Projekte.Add(new Projekt { Id = projektId, Name = "Testprojekt", ErstellungsDatum = DateTimeOffset.UtcNow, Status = ProjektStatus.Aktiv });
-        _aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = projektId,
-            Titel = "Testaufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.AutonomAufgabe,
-            ErstellungsDatum = DateTimeOffset.UtcNow
-        };
-        _db.Aufgaben.Add(_aufgabe);
-
-        _konfiguration = new AutonomAufgabeKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            AufgabeId = _aufgabe.Id,
-            ProjektBranchName = "feature/autonom",
-            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
-            PermissionsJsonPfad = Path.Combine(_testRoot, "permissions.json"),
-            TokenBudget = 500000,
-            LaufzeitLimitMinuten = 480,
-            PersistenzModus = PersistenzModus.Standard,
-            ArbeitsverzeichnisPfad = _testRoot
-        };
-        _db.AutonomAufgabeKonfigurationen.Add(_konfiguration);
+        (_aufgabe, _konfiguration) = ProjektleiterAgentServiceTestDatenFactory.ErstelleAufgabeUndKonfiguration(_db, projektId, _testRoot);
         _db.SaveChanges();
 
         _sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
@@ -209,18 +186,7 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
     {
         // Konfiguration referenziert eine nicht existierende Aufgabe, wodurch ProjektleiterAgentService.StarteAgentAsync
         // eine InvalidOperationException wirft.
-        var verwaisteKonfiguration = new AutonomAufgabeKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            AufgabeId = Guid.NewGuid(),
-            ProjektBranchName = "feature/autonom",
-            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
-            PermissionsJsonPfad = Path.Combine(_testRoot, "permissions.json"),
-            TokenBudget = 500000,
-            LaufzeitLimitMinuten = 480,
-            PersistenzModus = PersistenzModus.Standard,
-            ArbeitsverzeichnisPfad = _testRoot
-        };
+        var verwaisteKonfiguration = ProjektleiterAgentServiceTestDatenFactory.ErstelleKonfigurationFuerNichtExistierendeAufgabe(_testRoot);
         _sut.Initialize(_aufgabe, verwaisteKonfiguration);
 
         await _sut.StarteAgentAsync();

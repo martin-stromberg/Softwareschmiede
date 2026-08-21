@@ -15,6 +15,24 @@ internal static class ProjektleiterAgentServiceTestDatenFactory
     public static async Task<(Aufgabe Aufgabe, AutonomAufgabeKonfiguration Konfiguration)> ErstelleAutonomeAufgabeAsync(
         SoftwareschmiededDbContext db, Guid projektId, string testRoot)
     {
+        var (aufgabe, konfiguration) = ErstelleAufgabeUndKonfiguration(db, projektId, testRoot);
+        await db.SaveChangesAsync();
+
+        await File.WriteAllTextAsync(Path.Combine(testRoot, "plan.md"), "# Plan\n");
+        await File.WriteAllTextAsync(Path.Combine(testRoot, "progress.md"), "# Fortschritt\n");
+        await File.WriteAllTextAsync(Path.Combine(testRoot, "state.json"), "{\"subagents\":[]}");
+
+        return (aufgabe, konfiguration);
+    }
+
+    /// <summary>Erstellt eine Aufgabe samt AutonomAufgabeKonfiguration und fügt beide dem Datenbankkontext hinzu, ohne zu speichern und ohne Dateien im Arbeitsverzeichnis anzulegen.</summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext.</param>
+    /// <param name="projektId">Die Id des Projekts, dem die Aufgabe zugeordnet wird.</param>
+    /// <param name="testRoot">Das Arbeitsverzeichnis, das als ArbeitsverzeichnisPfad/PermissionsJsonPfad-Basis dient.</param>
+    /// <returns>Die neu angelegte Aufgabe und die zugehörige AutonomAufgabeKonfiguration (beide noch nicht gespeichert).</returns>
+    public static (Aufgabe Aufgabe, AutonomAufgabeKonfiguration Konfiguration) ErstelleAufgabeUndKonfiguration(
+        SoftwareschmiededDbContext db, Guid projektId, string testRoot)
+    {
         var aufgabe = new Aufgabe
         {
             Id = Guid.NewGuid(),
@@ -39,14 +57,25 @@ internal static class ProjektleiterAgentServiceTestDatenFactory
             ArbeitsverzeichnisPfad = testRoot
         };
         db.AutonomAufgabeKonfigurationen.Add(konfiguration);
-        await db.SaveChangesAsync();
-
-        await File.WriteAllTextAsync(Path.Combine(testRoot, "plan.md"), "# Plan\n");
-        await File.WriteAllTextAsync(Path.Combine(testRoot, "progress.md"), "# Fortschritt\n");
-        await File.WriteAllTextAsync(Path.Combine(testRoot, "state.json"), "{\"subagents\":[]}");
 
         return (aufgabe, konfiguration);
     }
+
+    /// <summary>Erstellt eine nicht persistierte AutonomAufgabeKonfiguration, die eine nicht existierende Aufgabe referenziert (für Fehlerpfad-Tests).</summary>
+    /// <param name="testRoot">Das Arbeitsverzeichnis, das als ArbeitsverzeichnisPfad/PermissionsJsonPfad-Basis dient.</param>
+    /// <returns>Eine neue, nicht gespeicherte AutonomAufgabeKonfiguration mit zufälliger, nicht existierender AufgabeId.</returns>
+    public static AutonomAufgabeKonfiguration ErstelleKonfigurationFuerNichtExistierendeAufgabe(string testRoot) => new()
+    {
+        Id = Guid.NewGuid(),
+        AufgabeId = Guid.NewGuid(),
+        ProjektBranchName = "feature/autonom",
+        InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
+        PermissionsJsonPfad = Path.Combine(testRoot, "permissions.json"),
+        TokenBudget = 500000,
+        LaufzeitLimitMinuten = 480,
+        PersistenzModus = PersistenzModus.Standard,
+        ArbeitsverzeichnisPfad = testRoot
+    };
 
     /// <summary>Erstellt eine (nicht persistierte) UnteragentSpezifikation für Tests.</summary>
     /// <param name="testRoot">Das Arbeitsverzeichnis, unter dem VerzeichnisPfad/ClonePfad abgeleitet werden.</param>

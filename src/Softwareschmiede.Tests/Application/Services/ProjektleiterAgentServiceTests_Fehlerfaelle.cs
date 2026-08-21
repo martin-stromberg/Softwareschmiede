@@ -57,18 +57,7 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
     [Fact]
     public async Task StarteAgentAsync_WirftBeiNichtExistierenderAufgabe()
     {
-        var konfiguration = new AutonomAufgabeKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            AufgabeId = Guid.NewGuid(),
-            ProjektBranchName = "feature/autonom",
-            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
-            PermissionsJsonPfad = Path.Combine(_testRoot, "permissions.json"),
-            TokenBudget = 500000,
-            LaufzeitLimitMinuten = 480,
-            PersistenzModus = PersistenzModus.Standard,
-            ArbeitsverzeichnisPfad = _testRoot
-        };
+        var konfiguration = ProjektleiterAgentServiceTestDatenFactory.ErstelleKonfigurationFuerNichtExistierendeAufgabe(_testRoot);
 
         var akt = () => _sut.StarteAgentAsync(konfiguration);
 

@@ -46,30 +46,7 @@ public sealed class SessionManagementServiceTests : IDisposable
 
     private async Task<Aufgabe> ErstelleAutonomeAufgabeAsync()
     {
-        var aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Autonome Testaufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.AutonomAufgabe,
-            ErstellungsDatum = DateTimeOffset.UtcNow
-        };
-        _db.Aufgaben.Add(aufgabe);
-
-        var konfiguration = new AutonomAufgabeKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            ProjektBranchName = "feature/autonom",
-            InitialPrompt = "Implementiere die Aufgabe vollständig.",
-            PermissionsJsonPfad = Path.Combine(_testRoot, "permissions.json"),
-            TokenBudget = 500000,
-            LaufzeitLimitMinuten = 480,
-            PersistenzModus = PersistenzModus.Standard,
-            ArbeitsverzeichnisPfad = _testRoot
-        };
-        _db.AutonomAufgabeKonfigurationen.Add(konfiguration);
+        var (aufgabe, _) = ProjektleiterAgentServiceTestDatenFactory.ErstelleAufgabeUndKonfiguration(_db, _projektId, _testRoot);
 
         var state = new { runtime = new { started_utc = DateTimeOffset.UtcNow, paused_utc = (DateTimeOffset?)null } };
         await File.WriteAllTextAsync(Path.Combine(_testRoot, "state.json"), JsonSerializer.Serialize(state));

@@ -20,41 +20,18 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
     private readonly Mock<ICliRunner> _cliRunnerMock;
     private readonly AutonomAufgabenInitialisierungsService _sut;
     private readonly string _testRoot;
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projektId;
 
     /// <summary>AutonomAufgabenInitialisierungsServiceTests.</summary>
     public AutonomAufgabenInitialisierungsServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _cliRunnerMock = new Mock<ICliRunner>();
-
-        // Simuliert einen erfolgreichen "git clone", indem das Zielverzeichnis inklusive Marker-Datei angelegt wird.
-        _cliRunnerMock
-            .Setup(r => r.RunAsync(
-                "git",
-                It.Is<IEnumerable<string>>(args => args.Contains("clone")),
-                It.IsAny<string?>(),
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) =>
-            {
-                var zielPfad = args.Last();
-                Directory.CreateDirectory(zielPfad);
-                File.WriteAllText(Path.Combine(zielPfad, ".git-marker"), "cloned");
-            })
-            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
-
-        _sut = new AutonomAufgabenInitialisierungsService(_db, _cliRunnerMock.Object, Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+        _cliRunnerMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateCliRunnerMockMitErfolgreichemGitKlon();
+        _sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(_db, _cliRunnerMock.Object);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "AutonomAufgabenInit", Guid.NewGuid().ToString("N"));
 
-        _db.Projekte.Add(new Projekt
-        {
-            Id = _projektId,
-            Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
-        });
+        _projektId = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleProjekt(_db);
         _db.SaveChanges();
     }
 
@@ -70,20 +47,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
 
     private Aufgabe ErstelleUndPersistiereAufgabe(string arbeitsverzeichnispPfad)
     {
-        var quellRepo = Path.Combine(arbeitsverzeichnispPfad + "-quelle");
-        Directory.CreateDirectory(quellRepo);
-
-        var aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Autonome Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            LokalerKlonPfad = quellRepo
-        };
-        _db.Aufgaben.Add(aufgabe);
+        var aufgabe = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleAufgabeMitLokalemKlon(_db, _projektId, arbeitsverzeichnispPfad, "Autonome Testaufgabe");
         _db.SaveChanges();
         return aufgabe;
     }
