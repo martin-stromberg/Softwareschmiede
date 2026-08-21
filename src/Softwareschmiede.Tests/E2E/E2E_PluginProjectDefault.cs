@@ -29,7 +29,7 @@ public partial class End2EndTest
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, 
+        SetupProjectMitNeuerAufgabe(mainWindow,
             "PluginProjectDefault-Repo",
             "PluginProjectDefault-Projekt",
             useInSourceDirectoryMode: false);

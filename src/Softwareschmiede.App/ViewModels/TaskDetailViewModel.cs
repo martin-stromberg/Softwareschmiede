@@ -1387,10 +1387,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         var standardAnsicht = ShowCliPanel
             ? DetailAnsicht.Cli
             : AufgabeStatus switch
-        {
-            Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
-            _ => DetailAnsicht.Info
-        };
+            {
+                Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
+                _ => DetailAnsicht.Info
+            };
 
         WaehleAnsicht(standardAnsicht);
     }

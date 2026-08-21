@@ -57,7 +57,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>Ruft man <see cref="PseudoConsoleSession.Dispose"/> auf, muss die Leseschleife abgebrochen und
     /// die Ein-/Ausgabe-Streams geschlossen werden, damit keine verwaisten Leseschleifen zurückbleiben.</summary>
     [Fact]
-    public void SessionDispose_CancelsReadLoop()
+    public async Task SessionDispose_CancelsReadLoop()
     {
         var outputStream = new BlockingUntilCancelledStream();
         var session = CreateSession(outputStream);
@@ -66,7 +66,7 @@ public sealed class PseudoConsoleSessionTests
         session.Dispose();
 
         outputStream.WasDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
-        var finished = readLoopTask.IsCompleted || readLoopTask.Wait(TimeSpan.FromSeconds(5));
+        var finished = readLoopTask.IsCompleted || await WurdeInnerhalbAsync(readLoopTask, TimeSpan.FromSeconds(5));
         finished.Should().BeTrue("die Leseschleife muss nach Dispose() sauber beendet sein");
     }
 
@@ -76,7 +76,7 @@ public sealed class PseudoConsoleSessionTests
     /// deshalb zusätzlich den Output-Stream schließen, damit ein solcher Read sofort mit einem I/O-Fehler
     /// zurückkehrt, statt den vollen Leseschleifen-Timeout ergebnislos ablaufen zu lassen.</summary>
     [Fact]
-    public void Dispose_ClosesOutputStreamImmediately_UnblocksNonCancelableRead()
+    public async Task Dispose_ClosesOutputStreamImmediately_UnblocksNonCancelableRead()
     {
         var outputStream = new NonCancelableBlockingStream();
         var session = CreateSession(outputStream);
@@ -91,8 +91,27 @@ public sealed class PseudoConsoleSessionTests
             "Dispose() darf nicht auf den vollen Leseschleifen-Timeout warten, wenn ein blockierter, nicht " +
             "kooperativ abbrechbarer Read durch das Schließen des Output-Streams sofort unterbrochen werden kann");
         outputStream.WasDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
-        var finished = readLoopTask.IsCompleted || readLoopTask.Wait(TimeSpan.FromSeconds(2));
+        var finished = readLoopTask.IsCompleted || await WurdeInnerhalbAsync(readLoopTask, TimeSpan.FromSeconds(2));
         finished.Should().BeTrue("die Leseschleife muss nach Dispose() sauber beendet sein");
+    }
+
+    /// <summary>Wartet auf <paramref name="task"/> bis <paramref name="timeout"/> und meldet, ob er dabei
+    /// abgeschlossen wurde (Verhalten von Task.Wait(TimeSpan) für Stresstests nachgebildet, ohne bei
+    /// Zeitüberschreitung eine TimeoutException zu werfen).</summary>
+    /// <param name="task">Der zu erwartende Task.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>true, wenn der Task innerhalb von <paramref name="timeout"/> abgeschlossen wurde; sonst false.</returns>
+    private static async Task<bool> WurdeInnerhalbAsync(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            await task.WaitAsync(timeout);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Ruft man <see cref="PseudoConsoleSession.Dispose"/> gleichzeitig von zwei Threads auf (z. B. weil

@@ -45,7 +45,7 @@ public sealed class ArbeitsverzeichnisSettingsService
         {
             // Validiere den Pfad (ohne Nebeneffekte)
             ValidatePathForConfiguration(trimmed!);
-            
+
             // Erstelle das Verzeichnis nur bei explizitem Speichern
             await EnsureDirectoryExistsAsync(normalized);
         }
@@ -134,7 +134,7 @@ public sealed class ArbeitsverzeichnisSettingsService
     public static void ValidatePathForSave(string path)
     {
         ValidatePathForConfiguration(path);
-        
+
         // Versuche das Verzeichnis zu erstellen (Fallback für Legacy-Code)
         try
         {

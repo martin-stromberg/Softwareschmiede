@@ -50,7 +50,7 @@ public partial class End2EndTest
     {
         await RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E(mainWindow);
         await RepositoryZuweisen_MitErfolgreichemStrukturabruf_ZeigtUndSpeichertArbeitsverzeichnis_E2E(mainWindow);
-        
+
         await ArbeitsverzeichnisBearbeiten_MitFehlgeschlagenemStrukturabruf_ZeigtUndBestaetigtVorhandenenWert_E2E(mainWindow);
         await AufgabeStarten_MitFehlendemArbeitsverzeichnis_ZeigtFehler_E2E(mainWindow);
         await AufgabeStarten_MitPathTraversalArbeitsverzeichnis_ZeigtFehler_E2E(mainWindow);
@@ -66,7 +66,7 @@ public partial class End2EndTest
         return sourceDirectory;
     }
 
-    
+
     /// <summary>
     /// Szenario: Repository-Zuweisung mit erfolgreichem Strukturabruf.
     /// Erwartung: Die Auswahlbox zeigt Unterverzeichnisse und die Auswahl wird gespeichert.

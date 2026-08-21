@@ -310,7 +310,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     {
         var result = await _cliRunner.RunAsync(
             "git",
-            [..GetGitHttpAuthArgs(), "pull"],
+            [.. GetGitHttpAuthArgs(), "pull"],
             localPath,
             GetGitEnvironment(),
             ct);
@@ -324,7 +324,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     {
         var result = await _cliRunner.RunAsync(
             "git",
-            [..GetGitHttpAuthArgs(), "push", "--set-upstream", "origin", branchName],
+            [.. GetGitHttpAuthArgs(), "push", "--set-upstream", "origin", branchName],
             localPath,
             GetGitEnvironment(),
             ct);
@@ -347,7 +347,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var result = await _cliRunner.RunAsync(
             "curl",
-            ["-s", ..GetJiraCurlAuthArgs(), "-H", "Accept: application/json", apiUrl],
+            ["-s", .. GetJiraCurlAuthArgs(), "-H", "Accept: application/json", apiUrl],
             null,
             null,
             ct);
@@ -647,7 +647,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var result = await _cliRunner.RunAsync(
             "curl",
-            ["-s", ..GetCurlAuthArgs(), "-H", "Content-Type: application/json", "-d", payload, apiUrl],
+            ["-s", .. GetCurlAuthArgs(), "-H", "Content-Type: application/json", "-d", payload, apiUrl],
             null,
             null,
             ct);
@@ -697,13 +697,13 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             bbApiUrl = $"{GetBitbucketApiBaseUrl()}/2.0/user";
         }
 
-        var bb = await _cliRunner.RunAsync("curl", ["-s", ..GetCurlAuthArgs(), bbApiUrl], null, null, ct);
+        var bb = await _cliRunner.RunAsync("curl", ["-s", .. GetCurlAuthArgs(), bbApiUrl], null, null, ct);
         var bbOk = bb.IsSuccess && !HasBitbucketApiError(bb.StdOut);
 
         if (string.IsNullOrWhiteSpace(jiraUrl))
             return bbOk;
 
-        var jira = await _cliRunner.RunAsync("curl", ["-s", ..GetJiraCurlAuthArgs(), $"{jiraUrl.TrimEnd('/')}/rest/api/3/myself"], null, null, ct);
+        var jira = await _cliRunner.RunAsync("curl", ["-s", .. GetJiraCurlAuthArgs(), $"{jiraUrl.TrimEnd('/')}/rest/api/3/myself"], null, null, ct);
         return bbOk && jira.IsSuccess && !HasBitbucketApiError(jira.StdOut);
     }
 
@@ -739,7 +739,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var result = await _cliRunner.RunAsync(
             "curl",
-            ["-s", ..GetCurlAuthArgs(), apiUrl],
+            ["-s", .. GetCurlAuthArgs(), apiUrl],
             null,
             null,
             ct);
@@ -902,7 +902,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
             var result = await _cliRunner.RunAsync(
                 "curl",
-                ["-s", ..GetCurlAuthArgs(), nextUrl],
+                ["-s", .. GetCurlAuthArgs(), nextUrl],
                 null,
                 null,
                 ct);
@@ -1072,7 +1072,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             ct.ThrowIfCancellationRequested();
 
             var url = BuildSelfHostedBrowseUrl(repositoryId, branch, relativePath, start);
-            var result = await _cliRunner.RunAsync("curl", ["-s", ..GetCurlAuthArgs(), url], null, null, ct);
+            var result = await _cliRunner.RunAsync("curl", ["-s", .. GetCurlAuthArgs(), url], null, null, ct);
 
             if (!result.IsSuccess)
             {

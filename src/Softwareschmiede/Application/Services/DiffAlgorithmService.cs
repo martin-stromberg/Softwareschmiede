@@ -44,7 +44,7 @@ public sealed class DiffAlgorithmService
             var (diffs, _) = ComputeDiff(sourceLines, targetLines);
 
             var blocks = GroupDiffsIntoBlocks(diffs, diffResultId);
-            
+
             var addedLines = diffs.Count(d => d.type == DiffTypeLocal.Added);
             var removedLines = diffs.Count(d => d.type == DiffTypeLocal.Removed);
             var modifiedLines = 0;
@@ -74,7 +74,7 @@ public sealed class DiffAlgorithmService
 
         while (sourceIdx < sourceLines.Length || targetIdx < targetLines.Length)
         {
-            if (sourceIdx < sourceLines.Length && targetIdx < targetLines.Length && 
+            if (sourceIdx < sourceLines.Length && targetIdx < targetLines.Length &&
                 sourceLines[sourceIdx] == targetLines[targetIdx])
             {
                 diffs.Add((DiffTypeLocal.Context, sourceLines[sourceIdx]));

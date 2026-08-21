@@ -34,7 +34,7 @@ internal static class DirectoryStructureLoadHelper
             return WorkingDirectoryLoadResult.ManualInput(result.Message);
         }
 
-        return WorkingDirectoryLoadResult.Selection([".", ..result.Entries.Select(entry => entry.Path)]);
+        return WorkingDirectoryLoadResult.Selection([".", .. result.Entries.Select(entry => entry.Path)]);
     }
 
     /// <summary>

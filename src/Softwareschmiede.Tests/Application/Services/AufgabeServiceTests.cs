@@ -809,16 +809,16 @@ public sealed class AufgabeServiceTests : IDisposable
         DateTimeOffset? lastHeartbeatUtc = null,
         DateTimeOffset? letzterCliStartUtc = null,
         Guid? gitRepositoryId = null) => new()
-    {
-        Id = Guid.NewGuid(),
-        ProjektId = _projektId,
-        GitRepositoryId = gitRepositoryId,
-        Titel = titel,
-        Status = status,
-        ErstellungsDatum = erstellungsDatum ?? DateTimeOffset.UtcNow,
-        LastHeartbeatUtc = lastHeartbeatUtc,
-        LetzterCliStartUtc = letzterCliStartUtc
-    };
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            GitRepositoryId = gitRepositoryId,
+            Titel = titel,
+            Status = status,
+            ErstellungsDatum = erstellungsDatum ?? DateTimeOffset.UtcNow,
+            LastHeartbeatUtc = lastHeartbeatUtc,
+            LetzterCliStartUtc = letzterCliStartUtc
+        };
 
     private static DiffResult CreateDiffResult(Guid aufgabeId, string filePath, DateTimeOffset generatedAt)
     {

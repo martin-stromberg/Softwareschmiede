@@ -24,7 +24,7 @@ public partial class End2EndTest
     protected void AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(Window mainWindow)
     {
         NavigateToProjectsAndCreateProject(mainWindow, "NeueAufgabe-Test");
-        
+
         // Phase Speichern
         NeueAufgabeAnlegen(mainWindow);
         AufgabeTitelSetzen(mainWindow, "Persistierte Neue Aufgabe");
