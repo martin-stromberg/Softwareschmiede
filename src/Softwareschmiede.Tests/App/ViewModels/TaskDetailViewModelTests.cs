@@ -173,11 +173,11 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _pluginManagerMockFuerPluginSelection.Setup(p => p.GetIdePlugins()).Returns([visualStudioPlugin, visualStudioCodePlugin]);
         _pluginManagerMockFuerPluginSelection.Setup(p => p.GetDefaultIdePlugin()).Returns(visualStudioPlugin);
 
-        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartService(
             serviceProviderObj,
             _dialogServiceMock.Object,
             _aufgabeService,
-            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
+            NullLogger<AutonomAufgabeStartService>.Instance);
 
         var vm = new TaskDetailViewModel(
             _aufgabeService,

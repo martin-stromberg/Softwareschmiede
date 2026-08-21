@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -118,16 +117,15 @@ public sealed class SessionManagementService
                "für den aktuellen Stand, bevor du weitermachst.";
     }
 
-    private static async Task AktualisierePausedUtcInStateJsonAsync(string arbeitsverzeichnispPfad, DateTimeOffset? pausedUtc, CancellationToken ct)
+    private async Task AktualisierePausedUtcInStateJsonAsync(string arbeitsverzeichnisPfad, DateTimeOffset? pausedUtc, CancellationToken ct)
     {
-        var stateJsonPfad = Path.Combine(arbeitsverzeichnispPfad, "state.json");
-        if (!File.Exists(stateJsonPfad))
+        var stateJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "state.json");
+        var node = await StateJsonHelper.LeseAsync(stateJsonPfad, _logger, ct);
+        if (node is null)
         {
             return;
         }
 
-        var json = await File.ReadAllTextAsync(stateJsonPfad, ct);
-        var node = JsonNode.Parse(json) as JsonObject ?? new JsonObject();
         if (node["runtime"] is not JsonObject runtime)
         {
             runtime = new JsonObject();
@@ -136,6 +134,6 @@ public sealed class SessionManagementService
 
         runtime["paused_utc"] = pausedUtc?.ToString("O");
 
-        await File.WriteAllTextAsync(stateJsonPfad, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), ct);
+        await StateJsonHelper.SchreibeAsync(stateJsonPfad, node, ct);
     }
 }

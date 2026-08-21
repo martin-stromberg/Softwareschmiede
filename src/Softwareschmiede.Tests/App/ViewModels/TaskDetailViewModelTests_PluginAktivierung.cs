@@ -78,11 +78,11 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
         var serviceProviderMock = new Mock<IServiceProvider>();
-        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartService(
             serviceProviderMock.Object,
             _dialogServiceMock.Object,
             _aufgabeService,
-            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
+            NullLogger<AutonomAufgabeStartService>.Instance);
 
         return new TaskDetailViewModel(
             _aufgabeService,

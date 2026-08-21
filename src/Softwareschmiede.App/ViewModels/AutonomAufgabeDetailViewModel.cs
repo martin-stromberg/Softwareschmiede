@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
@@ -148,15 +149,22 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
 
     /// <summary>Startet den Projektleiter-Agenten für die angezeigte Autonome Aufgabe.</summary>
     public Task StarteAgentAsync(CancellationToken ct = default)
-        => FuehreAgentOperationAsync(
+    {
+        if (!PruefeAufgabeInitialisiert())
+        {
+            return Task.CompletedTask;
+        }
+
+        return FuehreAgentOperationAsync(
             token => _projektleiterAgentService.StarteAgentAsync(Konfiguration, token),
             "Projektleiter-Agent konnte nicht gestartet werden",
             ct);
+    }
 
     /// <summary>Stoppt (pausiert) den Projektleiter-Agenten.</summary>
     public Task StoppeAgentAsync(CancellationToken ct = default)
     {
-        if (_aufgabe is null)
+        if (!PruefeAufgabeInitialisiert())
         {
             return Task.CompletedTask;
         }
@@ -170,7 +178,7 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
     /// <summary>Setzt den Projektleiter-Agenten nach einer Session-Pause fort.</summary>
     public Task ResumeAgentAsync(CancellationToken ct = default)
     {
-        if (_aufgabe is null)
+        if (!PruefeAufgabeInitialisiert())
         {
             return Task.CompletedTask;
         }
@@ -204,5 +212,17 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    [MemberNotNullWhen(true, nameof(_aufgabe))]
+    private bool PruefeAufgabeInitialisiert()
+    {
+        if (_aufgabe is not null)
+        {
+            return true;
+        }
+
+        ErrorMessage = "Aufgabe wurde nicht initialisiert.";
+        return false;
     }
 }

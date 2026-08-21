@@ -47,7 +47,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
-    private readonly AutonomAufgabeStartCoordinator _autonomAufgabeStartCoordinator;
+    private readonly AutonomAufgabeStartService _autonomAufgabeStartCoordinator;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -589,7 +589,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         FileExplorerViewModel fileExplorerViewModel,
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
-        AutonomAufgabeStartCoordinator autonomAufgabeStartCoordinator,
+        AutonomAufgabeStartService autonomAufgabeStartCoordinator,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -1212,7 +1212,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var ergebnis = await _autonomAufgabeStartCoordinator.StarteAsync(_aufgabeId, _aufgabe, ct);
+        var ergebnis = await _autonomAufgabeStartCoordinator.StarteAsync(_aufgabe, ct);
         if (ergebnis is null)
         {
             return;

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -74,25 +73,27 @@ public sealed class ProjektleiterAgentService
                 $"Unteragent {unteragent.AgentId}: Arbeitsverzeichnis '{unteragent.AgentDirectory}' liegt außerhalb des erlaubten Bereichs.");
         }
 
-        Directory.CreateDirectory(unteragent.AgentDirectory);
+        await DirectoryAccessGuard.AusfuehrenAsync(unteragent.AgentDirectory, () =>
+        {
+            Directory.CreateDirectory(unteragent.AgentDirectory);
+            return Task.CompletedTask;
+        });
 
         var repoMainPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "clones", "repo_main");
-        await _cliRunner.RunAsync("git", ["branch", unteragent.AgentBranch], repoMainPfad, null, ct);
-
-        if (!Directory.Exists(unteragent.AgentClone) || !Directory.EnumerateFileSystemEntries(unteragent.AgentClone).Any())
+        var branchErgebnis = await _cliRunner.RunAsync("git", ["branch", unteragent.AgentBranch], repoMainPfad, null, ct);
+        if (!branchErgebnis.IsSuccess)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(unteragent.AgentClone)!);
-            var kloneErgebnis = await _cliRunner.RunAsync(
-                "git",
-                ["clone", "--branch", unteragent.AgentBranch, repoMainPfad, unteragent.AgentClone],
-                null,
-                null,
-                ct);
-            if (!kloneErgebnis.IsSuccess)
-            {
-                throw new InvalidOperationException($"Klon für Unteragent '{unteragent.AgentId}' fehlgeschlagen: {kloneErgebnis.StdErr}");
-            }
+            throw new InvalidOperationException($"Branch '{unteragent.AgentBranch}' für Unteragent '{unteragent.AgentId}' konnte nicht angelegt werden: {branchErgebnis.StdErr}");
         }
+
+        await GitKlonHelper.KloneFallsNichtVorhandenAsync(
+            _cliRunner,
+            repoMainPfad,
+            unteragent.AgentClone,
+            unteragent.AgentBranch,
+            _logger,
+            $"Klon für Unteragent '{unteragent.AgentId}' fehlgeschlagen",
+            ct);
 
         unteragent.Status = UnteragentStatus.Erzeugt;
         unteragent.ErzeugungsDatum = DateTimeOffset.UtcNow;
@@ -138,16 +139,15 @@ public sealed class ProjektleiterAgentService
             unteragent.AgentId);
     }
 
-    private static async Task AktualisiereSubagentsInStateJsonAsync(string arbeitsverzeichnispPfad, UnteragentSpezifikation unteragent, CancellationToken ct)
+    private async Task AktualisiereSubagentsInStateJsonAsync(string arbeitsverzeichnisPfad, UnteragentSpezifikation unteragent, CancellationToken ct)
     {
-        var stateJsonPfad = Path.Combine(arbeitsverzeichnispPfad, "state.json");
-        if (!File.Exists(stateJsonPfad))
+        var stateJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "state.json");
+        var node = await StateJsonHelper.LeseAsync(stateJsonPfad, _logger, ct);
+        if (node is null)
         {
             return;
         }
 
-        var json = await File.ReadAllTextAsync(stateJsonPfad, ct);
-        var node = JsonNode.Parse(json) as JsonObject ?? new JsonObject();
         if (node["subagents"] is not JsonArray subagents)
         {
             subagents = new JsonArray();
@@ -163,7 +163,7 @@ public sealed class ProjektleiterAgentService
             ["completed_utc"] = DateTimeOffset.UtcNow.ToString("O")
         });
 
-        await File.WriteAllTextAsync(stateJsonPfad, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), ct);
+        await StateJsonHelper.SchreibeAsync(stateJsonPfad, node, ct);
     }
 
     private static string BuildDefaultProjektleiterSkill(AutonomAufgabeKonfiguration konfiguration) => $"""

@@ -18,6 +18,14 @@ Eine Autonome Aufgabe durchläuft folgende technische Phasen:
 
 **Aufruf-Chain:**
 ```
+Benutzer: Dialog öffnen
+    ↓
+AutonomAufgabeInitialisierungsDialogViewModel.Initialize(aufgabe)
+    ↓
+AutonomAufgabeInitialisierungsDialogViewModel.LadeAsync()
+    ↓
+LadeProjektBranchesAsync() + LadePromptVorlagenAsync()
+
 Benutzer: Dialog ausfüllen & bestätigen
     ↓
 AutonomAufgabeInitialisierungsDialogViewModel.BestaetigenAsync()
@@ -26,6 +34,35 @@ AufgabeService.ErzeugeAutonomAufgabeAsync(aufgabe, initialPrompt)
     ↓
 AutonomAufgabenInitialisierungsService.InitialisiereAsync(aufgabe, anfrage)
 ```
+
+**Vorgelagert: Laden von Projektbranches und Promptvorlagen (`LadeAsync`)**
+
+`AutonomAufgabeInitialisierungsDialogViewModel.LadeAsync()` wird von der View nach `Initialize(aufgabe)` und vor Anzeige des Dialogs aufgerufen und führt zwei unabhängige Ladeschritte aus:
+
+- `LadeProjektBranchesAsync()`:
+  1. Ermittelt über `ResolveGitPlugin()` das zur `GitRepository.PluginTyp` der Aufgabe passende `IGitPlugin` aus `IPluginManager.GetSourceCodeManagementPlugins()` (Fallback: erstes verfügbares Plugin)
+  2. Ist kein Plugin oder keine `RepositoryUrl` vorhanden: `IsProjectBranchManualInput = true` (Textfeld statt Auswahlliste)
+  3. Sonst: `IGitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct)` liefert die Branch-Liste, die (alphabetisch sortiert) in `AvailableProjectBranches` geschrieben wird; bei leerer Liste oder Exception fällt das ViewModel ebenfalls auf `IsProjectBranchManualInput = true` zurück (Fehler wird geloggt, nicht dem Anwender als harter Fehler angezeigt)
+- `LadePromptVorlagenAsync()`: lädt alle Einträge über `PromptVorlagenService.GetAllAsync(ct)` in die Collection `InitialPromptVorlagen`
+
+**Branch-Neuanlage über den „+"-Button**
+
+Beteiligte Commands/Methoden im ViewModel:
+- `ShowCreateBranchCommand` → `ZeigeBranchAnlegen()`: setzt `IsCreatingBranch = true`, leert `NewBranchName`/`NewBranchError`
+- `CancelCreateBranchCommand` → `AbbrechenBranchAnlegen()`: setzt `IsCreatingBranch = false` und leert Eingabe/Fehler
+- `CreateBranchCommand` (nur aktiv, wenn `NewBranchName` nicht leer ist) → `NeuenBranchAnlegenAsync(ct)`:
+  1. Bricht mit `NewBranchError` ab, falls `_aufgabe.LokalerKlonPfad` leer ist oder kein `IGitPlugin` ermittelbar ist
+  2. Ruft `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, NewBranchName, SelectedProjectBranch, ct)` auf — der aktuell gewählte Projektbranch dient als `sourceBranchName`
+  3. Bei Erfolg: fügt `NewBranchName` zu `AvailableProjectBranches` hinzu (falls noch nicht vorhanden), setzt `SelectedProjectBranch = NewBranchName`, `IsProjectBranchManualInput = false`, schließt die Eingabezeile (`IsCreatingBranch = false`)
+  4. Bei Exception (außer `OperationCanceledException`, die weitergereicht wird): `NewBranchError` wird mit der Fehlermeldung befüllt, der Dialog bleibt offen
+
+**Promptvorlagen-Auswahl**
+
+Die Property `SelectedInitialPromptVorlage` löst beim Setzen `PromptVorlagenPlatzhalterService.Resolve(vorlage.Prompttext, aufgabe)` auf und schreibt das Ergebnis in `InitialPrompt`. Der Anwender kann den übernommenen Text danach frei weiterbearbeiten.
+
+**Hilfe-Button**
+
+Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisierungsDialog.xaml.cs`) öffnet einen `HelpTextDialog` mit einem statischen, im Code-Behind hinterlegten Erklärungstext zum Gesamtablauf einer Autonomen Aufgabe und zu den Formularfeldern des Dialogs. Es ist keine ViewModel-Logik beteiligt.
 
 **Methode: `AutonomAufgabenInitialisierungsService.InitialisiereAsync()`**
 
@@ -122,6 +159,10 @@ AutonomAufgabenInitialisierungsService.InitialisiereAsync(aufgabe, anfrage)
 - `SoftwareschmiededDbContext` (Persistierung)
 - `ICliRunner` (Git-Befehle)
 - `ILogger` (Protokollierung)
+- `AutonomAufgabeInitialisierungsDialogViewModel` (Formular, Branch-/Vorlagen-Laden, Branch-Neuanlage)
+- `IGitPlugin` (`GetRemoteBranchesAsync`, `CreateBranchAsync` — Branch-Auswahl und -Neuanlage)
+- `IPluginManager` (Ermittlung des passenden Git-Plugins)
+- `PromptVorlagenService` / `PromptVorlagenPlatzhalterService` (Promptvorlagen laden und Platzhalter auflösen)
 
 ---
 

@@ -130,15 +130,10 @@ public sealed class WpfDialogService : IDialogService
         AutonomAufgabeInitialisierungsDialogViewModel viewModel,
         CancellationToken ct = default)
     {
-        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-        {
-            var dialog = new AutonomAufgabeInitialisierungsDialog(viewModel)
-            {
-                Owner = System.Windows.Application.Current.MainWindow
-            };
-            var result = dialog.ShowDialog();
-            return result == true ? viewModel.ErstellteKonfiguration : null;
-        }).Task;
+        ct.ThrowIfCancellationRequested();
+        return ShowDialogAsync(
+            () => new AutonomAufgabeInitialisierungsDialog(viewModel),
+            () => viewModel.ErstellteKonfiguration);
     }
 
     /// <inheritdoc/>
@@ -146,13 +141,21 @@ public sealed class WpfDialogService : IDialogService
         AutonomAufgabeDetailViewModel viewModel,
         CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+        return ShowDialogAsync(
+            () => new AutonomAufgabeDetailDialog(viewModel),
+            () => (object?)null);
+    }
+
+    /// <summary>Erzeugt über <paramref name="dialogFactory"/> ein Dialogfenster, zeigt es modal an und liefert das über <paramref name="resultSelector"/> bestimmte Ergebnis.</summary>
+    private static Task<TResult?> ShowDialogAsync<TResult>(Func<Window> dialogFactory, Func<TResult?> resultSelector)
+    {
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            var dialog = new AutonomAufgabeDetailDialog(viewModel)
-            {
-                Owner = System.Windows.Application.Current.MainWindow
-            };
-            dialog.ShowDialog();
+            var dialog = dialogFactory();
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            var result = dialog.ShowDialog();
+            return result == true ? resultSelector() : default;
         }).Task;
     }
 }

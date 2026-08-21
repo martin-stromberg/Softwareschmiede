@@ -210,7 +210,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ArbeitsverzeichnisOeffnenService>();
         services.AddSingleton<IVisualStudioCodeLocator, VisualStudioCodeLocator>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
-        services.AddScoped<AutonomAufgabeStartCoordinator>();
+        services.AddScoped<AutonomAufgabeStartService>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();
 

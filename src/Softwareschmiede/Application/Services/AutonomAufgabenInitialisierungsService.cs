@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
-using Softwareschmiede.Domain.Exceptions;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
@@ -13,9 +12,6 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Orchestriert die Erstellung des Arbeitsverzeichnisses, des Repository-Klons und der Initialisierung von state.json für eine Autonome Aufgabe.</summary>
 public sealed class AutonomAufgabenInitialisierungsService
 {
-    private const int MaxClones = 3;
-    private const int MaxFeatureBranches = 10;
-
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private readonly SoftwareschmiededDbContext _db;
@@ -36,53 +32,6 @@ public sealed class AutonomAufgabenInitialisierungsService
         _logger = logger;
     }
 
-    /// <summary>Baut eine <see cref="AutonomAufgabeInitialisierungsAnfrage"/> mit den Standardwerten aus <see cref="AutonomAufgabenOptions"/> und initialisiert die Autonome Aufgabe.</summary>
-    public Task<AutonomAufgabeKonfiguration> InitialisiereAsync(Aufgabe aufgabe, string initialPrompt, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(aufgabe);
-
-        return InitialisiereAsync(
-            aufgabe,
-            initialPrompt,
-            projektBranchName: null,
-            tokenBudget: _options.DefaultTokenBudget,
-            tokenBudgetErweitert: null,
-            laufzeitLimitMinuten: _options.DefaultRuntimeLimitMinutes,
-            persistenzModus: PersistenzModus.Standard,
-            skillAutogeneration: _options.SkillAutoGenerationEnabled,
-            permissionsQuelle: PermissionsJsonOption.Generate,
-            ct);
-    }
-
-    /// <summary>Baut eine <see cref="AutonomAufgabeInitialisierungsAnfrage"/> aus den übergebenen Werten (Fallback auf <see cref="AutonomAufgabenOptions"/>-Standardwerte für <paramref name="projektBranchName"/>) und initialisiert die Autonome Aufgabe.</summary>
-    public Task<AutonomAufgabeKonfiguration> InitialisiereAsync(
-        Aufgabe aufgabe,
-        string initialPrompt,
-        string? projektBranchName,
-        int tokenBudget,
-        int? tokenBudgetErweitert,
-        int laufzeitLimitMinuten,
-        PersistenzModus persistenzModus,
-        bool skillAutogeneration,
-        PermissionsJsonOption permissionsQuelle,
-        CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(aufgabe);
-
-        var anfrage = new AutonomAufgabeInitialisierungsAnfrage(
-            ProjektBranchName: projektBranchName ?? aufgabe.BranchName ?? $"autonom-{aufgabe.Id}",
-            InitialPrompt: initialPrompt,
-            ArbeitsverzeichnisPfad: Path.Combine(_options.WorkingDirectoryBase, aufgabe.Id.ToString()),
-            TokenBudget: tokenBudget,
-            TokenBudgetErweitert: tokenBudgetErweitert,
-            LaufzeitLimitMinuten: laufzeitLimitMinuten,
-            PersistenzModus: persistenzModus,
-            SkillAutogeneration: skillAutogeneration,
-            PermissionsQuelle: permissionsQuelle);
-
-        return InitialisiereAsync(aufgabe, anfrage, ct);
-    }
-
     /// <summary>Erstellt das Arbeitsverzeichnis, erzeugt den Repository-Klon und initialisiert state.json und permissions.json für eine Autonome Aufgabe.</summary>
     public async Task<AutonomAufgabeKonfiguration> InitialisiereAsync(Aufgabe aufgabe, AutonomAufgabeInitialisierungsAnfrage anfrage, CancellationToken ct = default)
     {
@@ -96,13 +45,16 @@ public sealed class AutonomAufgabenInitialisierungsService
         await KloneHauptRepositoryAsync(aufgabe, repoMainPfad, ct);
 
         var permissionsPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "permissions.json");
-        if (anfrage.PermissionsQuelle == PermissionsJsonOption.Generate || !File.Exists(permissionsPfad))
-        {
-            await File.WriteAllTextAsync(permissionsPfad, BuildPermissionsJson(anfrage), ct);
-        }
-
         var stateJsonPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "state.json");
-        await File.WriteAllTextAsync(stateJsonPfad, BuildStateJson(aufgabe, anfrage), ct);
+        await DirectoryAccessGuard.AusfuehrenAsync(anfrage.ArbeitsverzeichnisPfad, async () =>
+        {
+            if (anfrage.PermissionsQuelle == PermissionsJsonOption.Generate || !File.Exists(permissionsPfad))
+            {
+                await File.WriteAllTextAsync(permissionsPfad, BuildPermissionsJson(anfrage), ct);
+            }
+
+            await File.WriteAllTextAsync(stateJsonPfad, BuildStateJson(aufgabe, anfrage), ct);
+        });
 
         var konfiguration = new AutonomAufgabeKonfiguration
         {
@@ -140,7 +92,7 @@ public sealed class AutonomAufgabenInitialisierungsService
             throw new ArgumentException("ArbeitsverzeichnisPfad muss ein absoluter Pfad sein.", nameof(arbeitsverzeichnisPfad));
         }
 
-        try
+        await DirectoryAccessGuard.AusfuehrenAsync(arbeitsverzeichnisPfad, async () =>
         {
             Directory.CreateDirectory(arbeitsverzeichnisPfad);
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "skills"));
@@ -148,29 +100,25 @@ public sealed class AutonomAufgabenInitialisierungsService
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "clones"));
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "tasks"));
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "logs"));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            throw new DirectoryAccessException(arbeitsverzeichnisPfad, ex);
-        }
 
-        var planPfad = Path.Combine(arbeitsverzeichnisPfad, "plan.md");
-        if (!File.Exists(planPfad))
-        {
-            await File.WriteAllTextAsync(planPfad, "# Plan\n\nNoch keine Teilaufgaben geplant.\n", ct);
-        }
+            var planPfad = Path.Combine(arbeitsverzeichnisPfad, "plan.md");
+            if (!File.Exists(planPfad))
+            {
+                await File.WriteAllTextAsync(planPfad, "# Plan\n\nNoch keine Teilaufgaben geplant.\n", ct);
+            }
 
-        var progressPfad = Path.Combine(arbeitsverzeichnisPfad, "progress.md");
-        if (!File.Exists(progressPfad))
-        {
-            await File.WriteAllTextAsync(progressPfad, "# Fortschritt\n\nNoch kein Fortschritt protokolliert.\n", ct);
-        }
+            var progressPfad = Path.Combine(arbeitsverzeichnisPfad, "progress.md");
+            if (!File.Exists(progressPfad))
+            {
+                await File.WriteAllTextAsync(progressPfad, "# Fortschritt\n\nNoch kein Fortschritt protokolliert.\n", ct);
+            }
 
-        var governancePfad = Path.Combine(arbeitsverzeichnisPfad, "governance.md");
-        if (!File.Exists(governancePfad))
-        {
-            await File.WriteAllTextAsync(governancePfad, BuildGovernanceMarkdown(), ct);
-        }
+            var governancePfad = Path.Combine(arbeitsverzeichnisPfad, "governance.md");
+            if (!File.Exists(governancePfad))
+            {
+                await File.WriteAllTextAsync(governancePfad, BuildGovernanceMarkdown(), ct);
+            }
+        });
     }
 
     private void SetzeAusfuehrungsStatusAutonomAufgabe(Aufgabe aufgabe)
@@ -214,9 +162,9 @@ public sealed class AutonomAufgabenInitialisierungsService
             },
             limits = new
             {
-                max_subagents = _options.MaxConcurrentSubagents,
-                max_clones = MaxClones,
-                max_feature_branches = MaxFeatureBranches,
+                max_subagents = _options.MaxConcurrentUnteragenten,
+                max_clones = _options.MaxClones,
+                max_feature_branches = _options.MaxFeatureBranches,
                 token_budget = anfrage.TokenBudget,
                 net_runtime_minutes = anfrage.LaufzeitLimitMinuten
             },
@@ -247,9 +195,9 @@ public sealed class AutonomAufgabenInitialisierungsService
             },
             governance = new
             {
-                max_subagents = _options.MaxConcurrentSubagents,
-                max_clones = MaxClones,
-                max_feature_branches = MaxFeatureBranches,
+                max_subagents = _options.MaxConcurrentUnteragenten,
+                max_clones = _options.MaxClones,
+                max_feature_branches = _options.MaxFeatureBranches,
                 token_budget = anfrage.TokenBudget
             },
             clones = new[]

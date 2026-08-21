@@ -150,4 +150,63 @@ public sealed class SessionManagementServiceTests : IDisposable
 
         ergebnis.Should().BeTrue();
     }
+
+    /// <summary>PruefeAusfuehrungAsync meldet früh "kein Unterbruch", wenn bereits eine Session-Pause aktiv ist (SessionPauseUtc gesetzt).</summary>
+    [Fact]
+    public async Task PruefeAusfuehrung_GibtTrueZurueck_WennSessionPausiertIst()
+    {
+        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        entity!.SessionPauseUtc = DateTimeOffset.UtcNow;
+        entity.LastHeartbeatUtc = DateTimeOffset.UtcNow.AddHours(-1);
+        await _db.SaveChangesAsync();
+
+        var ergebnis = await _sut.PruefeAusfuehrungAsync(aufgabe, TimeSpan.FromMinutes(5));
+
+        ergebnis.Should().BeTrue();
+    }
+
+    /// <summary>PruefeAusfuehrungAsync meldet früh "kein Unterbruch", wenn noch kein Heartbeat vorliegt (LastHeartbeatUtc null).</summary>
+    [Fact]
+    public async Task PruefeAusfuehrung_GibtTrueZurueck_WennNochKeinHeartbeatVorliegt()
+    {
+        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+
+        var ergebnis = await _sut.PruefeAusfuehrungAsync(aufgabe, TimeSpan.FromMinutes(5));
+
+        ergebnis.Should().BeTrue();
+    }
+
+    /// <summary>PauseAufgabeBeiBudgetLimitAsync wirft eine InvalidOperationException, wenn die Aufgabe nicht (mehr) existiert.</summary>
+    [Fact]
+    public async Task PauseAufgabeBeiBudgetLimit_WirftBeiNichtExistierenderAufgabe()
+    {
+        var nichtPersistierteAufgabe = new Aufgabe { Id = Guid.NewGuid(), ProjektId = _projektId, Titel = "Unbekannt", ErstellungsDatum = DateTimeOffset.UtcNow };
+
+        var akt = () => _sut.PauseAufgabeBeiBudgetLimitAsync(nichtPersistierteAufgabe);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>SetzeFortAsync wirft eine InvalidOperationException, wenn die Aufgabe nicht (mehr) existiert.</summary>
+    [Fact]
+    public async Task SetzeFort_WirftBeiNichtExistierenderAufgabe()
+    {
+        var nichtPersistierteAufgabe = new Aufgabe { Id = Guid.NewGuid(), ProjektId = _projektId, Titel = "Unbekannt", ErstellungsDatum = DateTimeOffset.UtcNow };
+
+        var akt = () => _sut.SetzeFortAsync(nichtPersistierteAufgabe);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>PruefeAusfuehrungAsync wirft eine InvalidOperationException, wenn die Aufgabe nicht (mehr) existiert.</summary>
+    [Fact]
+    public async Task PruefeAusfuehrung_WirftBeiNichtExistierenderAufgabe()
+    {
+        var nichtPersistierteAufgabe = new Aufgabe { Id = Guid.NewGuid(), ProjektId = _projektId, Titel = "Unbekannt", ErstellungsDatum = DateTimeOffset.UtcNow };
+
+        var akt = () => _sut.PruefeAusfuehrungAsync(nichtPersistierteAufgabe, TimeSpan.FromMinutes(5));
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
 }

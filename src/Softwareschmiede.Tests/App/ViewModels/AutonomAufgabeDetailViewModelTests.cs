@@ -109,4 +109,123 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         var gespeichert = await File.ReadAllTextAsync(Path.Combine(_testRoot, "plan.md"));
         gespeichert.Should().Be("# Plan\n\nAktualisierter Inhalt.");
     }
+
+    /// <summary>LaedePlanAsync liefert einen leeren Inhalt, wenn plan.md im Arbeitsverzeichnis nicht existiert.</summary>
+    [Fact]
+    public async Task LaedePlanAsync_LiefertLeerenInhalt_WennDateiFehlt()
+    {
+        await _sut.LaedePlanAsync();
+
+        _sut.PlanContent.Should().Be(string.Empty);
+    }
+
+    /// <summary>LaedeProgressAsync lädt progress.md aus dem Arbeitsverzeichnis.</summary>
+    [Fact]
+    public async Task LaedeProgressAsync_LaedesDateiausArbeitsverzeichnis()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_testRoot, "progress.md"), "# Fortschritt\n\n50% erledigt.");
+
+        await _sut.LaedeProgressAsync();
+
+        _sut.ProgressContent.Should().Contain("50% erledigt.");
+    }
+
+    /// <summary>LaedeGovernanceAsync lädt governance.md aus dem Arbeitsverzeichnis.</summary>
+    [Fact]
+    public async Task LaedeGovernanceAsync_LaedesDateiausArbeitsverzeichnis()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_testRoot, "governance.md"), "# Governance\n\nRegel 1");
+
+        await _sut.LaedeGovernanceAsync();
+
+        _sut.GovernanceContent.Should().Contain("Regel 1");
+    }
+
+    /// <summary>StoppeAgentAsync delegiert an SessionManagementService.PauseAufgabeBeiBudgetLimitAsync und setzt SessionPauseUtc.</summary>
+    [Fact]
+    public async Task StoppeAgentAsync_DelegiertAnSessionManagementService()
+    {
+        await _sut.StoppeAgentAsync();
+
+        _sut.ErrorMessage.Should().BeNull();
+        var aktualisiert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
+        aktualisiert!.SessionPauseUtc.Should().NotBeNull();
+    }
+
+    /// <summary>StoppeAgentAsync tut nichts, wenn keine Aufgabe initialisiert wurde.</summary>
+    [Fact]
+    public async Task StoppeAgentAsync_TutNichts_OhneInitialisierteAufgabe()
+    {
+        var sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
+
+        await sut.StoppeAgentAsync();
+
+        sut.IsBusy.Should().BeFalse();
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>ResumeAgentAsync delegiert an SessionManagementService.SetzeFortAsync und setzt SessionPauseUtc zurück.</summary>
+    [Fact]
+    public async Task ResumeAgentAsync_DelegiertAnSessionManagementService()
+    {
+        await _sut.StoppeAgentAsync();
+
+        await _sut.ResumeAgentAsync();
+
+        _sut.ErrorMessage.Should().BeNull();
+        var aktualisiert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
+        aktualisiert!.SessionPauseUtc.Should().BeNull();
+        aktualisiert.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+    }
+
+    /// <summary>ResumeAgentAsync tut nichts, wenn keine Aufgabe initialisiert wurde.</summary>
+    [Fact]
+    public async Task ResumeAgentAsync_TutNichts_OhneInitialisierteAufgabe()
+    {
+        var sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
+
+        await sut.ResumeAgentAsync();
+
+        sut.IsBusy.Should().BeFalse();
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>StarteAgentAsync tut nichts, wenn keine Aufgabe initialisiert wurde (kein NullReferenceException auf Konfiguration).</summary>
+    [Fact]
+    public async Task StarteAgentAsync_TutNichts_OhneInitialisierteAufgabe()
+    {
+        var sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
+
+        var akt = async () => await sut.StarteAgentAsync();
+
+        await akt.Should().NotThrowAsync();
+        sut.IsBusy.Should().BeFalse();
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>FuehreAgentOperationAsync fängt Exceptions des zugrunde liegenden Service ab, setzt ErrorMessage und setzt IsBusy zurück.</summary>
+    [Fact]
+    public async Task StarteAgentAsync_SetztErrorMessage_WennServiceWirft()
+    {
+        // Konfiguration referenziert eine nicht existierende Aufgabe, wodurch ProjektleiterAgentService.StarteAgentAsync
+        // eine InvalidOperationException wirft.
+        var verwaisteKonfiguration = new AutonomAufgabeKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = Guid.NewGuid(),
+            ProjektBranchName = "feature/autonom",
+            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
+            PermissionsJsonPfad = Path.Combine(_testRoot, "permissions.json"),
+            TokenBudget = 500000,
+            LaufzeitLimitMinuten = 480,
+            PersistenzModus = PersistenzModus.Standard,
+            ArbeitsverzeichnisPfad = _testRoot
+        };
+        _sut.Initialize(_aufgabe, verwaisteKonfiguration);
+
+        await _sut.StarteAgentAsync();
+
+        _sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        _sut.IsBusy.Should().BeFalse();
+    }
 }

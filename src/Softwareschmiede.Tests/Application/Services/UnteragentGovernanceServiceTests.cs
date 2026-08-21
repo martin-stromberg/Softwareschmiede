@@ -150,4 +150,35 @@ public sealed class UnteragentGovernanceServiceTests : IDisposable
 
         await akt.Should().NotThrowAsync();
     }
+
+    /// <summary>ValidiereFehlerBedingungAsync wirft keine Ausnahme, wenn task_state.json (noch) nicht existiert.</summary>
+    [Fact]
+    public async Task ValidiereFehlerBedingungAsync_WirftKeineAusnahme_OhneTaskStateJson()
+    {
+        var unteragent = ErstelleUnteragent();
+
+        var akt = () => _sut.ValidiereFehlerBedingungAsync(unteragent);
+
+        await akt.Should().NotThrowAsync();
+    }
+
+    /// <summary>VerifiziereBerechtigung wirft eine ArgumentNullException, wenn kein Unteragent übergeben wird.</summary>
+    [Fact]
+    public void VerifiziereBerechtigung_WirftBeiNullUnteragent()
+    {
+        var akt = () => _sut.VerifiziereBerechtigung(null!, UnteragentAktion.ArbeitsverzeichnisErstellen, _agentDirectory);
+
+        akt.Should().Throw<ArgumentNullException>();
+    }
+
+    /// <summary>VerifiziereBerechtigung wirft eine ArgumentException, wenn der Zielpfad leer ist.</summary>
+    [Fact]
+    public void VerifiziereBerechtigung_WirftBeiLeeremZielPfad()
+    {
+        var unteragent = ErstelleUnteragent();
+
+        var akt = () => _sut.VerifiziereBerechtigung(unteragent, UnteragentAktion.ArbeitsverzeichnisErstellen, string.Empty);
+
+        akt.Should().Throw<ArgumentException>();
+    }
 }

@@ -12,13 +12,28 @@ Autonome Aufgaben automatisieren den gesamten Entwicklungsprozess durch einen in
 
 Eine Autonome Aufgabe wird über ein Initialisierungsformular konfiguriert:
 
-1. **Projektbranch** — Git-Branch, in dem die gesamte Aufgabe koordiniert wird
-2. **Initialprompt** — Fachliche Anforderung für den Projektleiter-Agenten
-3. **Permissions** — Berechtigungsprofil (automatisch generiert, aus Datei gewählt oder vordefiniert)
-4. **Token-Budget** — Maximale Token für die gesamte Aufgabe (Standard: 500.000)
-5. **Laufzeitbegrenzung** — Maximale Nettozeit in Minuten (Standard: 480 Min / 8 Std)
-6. **Persistenz-Modus** — Verhalten bei Session-Unterbrechungen (Standard, SessionReset)
-7. **Skill-Autogeneration** — Skills automatisch aus Anforderungen generieren?
+1. **Projektbranch** — Git-Branch, in dem die gesamte Aufgabe koordiniert wird. Ist der Aufgabe ein Git-Repository mit passendem Plugin zugeordnet, schlägt der Dialog die Remote-Branches des Repositories in einer Auswahlliste vor; ohne Repository/Plugin fällt das Feld auf eine freie Texteingabe zurück. Über den **„+"-Button** neben der Auswahl kann direkt aus dem Dialog heraus ein neuer Branch angelegt werden (siehe unten).
+2. **Promptvorlage** — Optionale Auswahl einer vorhandenen Prompt-Vorlage, die den Initialprompt automatisch mit aufgelöstem Vorlagentext vorbefüllt (siehe unten)
+3. **Initialprompt** — Fachliche Anforderung für den Projektleiter-Agenten
+4. **Permissions** — Berechtigungsprofil (automatisch generiert, aus Datei gewählt oder vordefiniert)
+5. **Token-Budget** — Maximale Token für die gesamte Aufgabe (Standard: 500.000)
+6. **Laufzeitbegrenzung** — Maximale Nettozeit in Minuten (Standard: 480 Min / 8 Std)
+7. **Persistenz-Modus** — Verhalten bei Session-Unterbrechungen (Standard, SessionReset)
+8. **Skill-Autogeneration** — Skills automatisch aus Anforderungen generieren?
+
+Über den **„Hilfe"-Button** oben im Dialog kann sich der Anwender jederzeit den Ablauf einer Autonomen Aufgabe (Initialisierung, Agent-Start, Unteragenten, Fortschritt/Integration, Session-Pause) sowie eine Kurzerklärung aller Formularfelder in einem Informationsdialog anzeigen lassen.
+
+### Projektbranch-Auswahl und Branch-Neuanlage
+
+Der Dialog ermittelt beim Öffnen über das der Aufgabe zugeordnete Git-Plugin die verfügbaren Remote-Branches des Repositories:
+
+- Ist ein Repository samt passendem Plugin vorhanden und liefert es mindestens einen Branch, wird eine Auswahlliste (Dropdown) angezeigt; vorausgewählt ist der Branch der Aufgabe.
+- Kann keine Branch-Liste ermittelt werden (kein Repository, kein passendes Plugin, oder Fehler beim Laden), wechselt das Feld automatisch auf eine freie Texteingabe.
+- Über den „+"-Button neben dem Auswahlfeld öffnet sich eine Eingabezeile für einen neuen Branchnamen. Nach Bestätigung wird der Branch im lokalen Klon der Aufgabe angelegt (ausgehend vom aktuell gewählten Projektbranch als Basis), der Auswahlliste hinzugefügt und automatisch als Projektbranch übernommen. Ist kein lokaler Klon vorhanden oder schlägt die Anlage fehl, wird eine Fehlermeldung angezeigt, ohne den Dialog zu schließen.
+
+### Promptvorlagen für den Initialprompt
+
+Der Dialog bietet eine Auswahl bestehender Promptvorlagen (aus der allgemeinen Promptvorlagen-Verwaltung der Anwendung) an. Wird eine Vorlage ausgewählt, wird ihr Vorlagentext mit automatisch aufgelösten Platzhaltern (z. B. Aufgaben- oder Projektbezug) in das Initialprompt-Feld übernommen; der Anwender kann den Text danach weiter anpassen.
 
 Nach der Initialisierung:
 - Strukturiertes Arbeitsverzeichnis wird erstellt

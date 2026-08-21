@@ -54,11 +54,11 @@ public static class TaskDetailViewModelTestFactory
 
         var arbeitsverzeichnisOeffnenService = CreateArbeitsverzeichnisOeffnenService();
 
-        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartService(
             serviceProviderMock.Object,
             dialogServiceMock.Object,
             aufgabeService,
-            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
+            NullLogger<AutonomAufgabeStartService>.Instance);
 
         return new TaskDetailViewModel(
             aufgabeService,

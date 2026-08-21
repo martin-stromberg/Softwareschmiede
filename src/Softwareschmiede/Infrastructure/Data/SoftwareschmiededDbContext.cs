@@ -158,6 +158,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.RecoveryVersion)
                 .HasDefaultValue(0)
                 .IsConcurrencyToken();
+            e.Property(a => a.SessionPauseUtc).HasConversion(NullableUnixMillisConverter);
             e.HasOne(a => a.GitRepository)
                 .WithMany()
                 .HasForeignKey(a => a.GitRepositoryId)
@@ -187,7 +188,6 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(t => t.Aufgabe)
                 .HasForeignKey(t => t.AufgabeId)
                 .OnDelete(DeleteBehavior.Cascade);
-            e.Property(a => a.SessionPauseUtc).HasConversion(NullableUnixMillisConverter);
             e.HasOne(a => a.AutonomKonfiguration)
                 .WithOne(k => k.Aufgabe)
                 .HasForeignKey<AutonomAufgabeKonfiguration>(k => k.AufgabeId)
@@ -218,9 +218,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<UnteragentSpezifikation>(e =>
         {
             e.HasKey(u => u.Id);
-            e.Property(u => u.AgentId).IsRequired();
-            e.Property(u => u.TaskId).IsRequired();
-            e.Property(u => u.AgentScope).IsRequired();
+            e.Property(u => u.AgentId).IsRequired().HasMaxLength(255);
+            e.Property(u => u.TaskId).IsRequired().HasMaxLength(255);
+            e.Property(u => u.AgentScope).IsRequired().HasMaxLength(255);
             e.Property(u => u.AgentPrompt).IsRequired();
             e.Property(u => u.AgentDirectory).IsRequired().HasMaxLength(512);
             e.Property(u => u.AgentBranch).IsRequired().HasMaxLength(255);
@@ -235,8 +235,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<SkillDefinition>(e =>
         {
             e.HasKey(s => s.Id);
-            e.Property(s => s.SkillName).IsRequired();
-            e.Property(s => s.SkillVersion).IsRequired();
+            e.Property(s => s.SkillName).IsRequired().HasMaxLength(255);
+            e.Property(s => s.SkillVersion).IsRequired().HasMaxLength(64);
             e.Property(s => s.SkillContent).IsRequired();
             e.Property(s => s.SkillStatus).IsRequired().HasConversion<string>();
             e.Property(s => s.ErstellungsDatum).HasConversion(UnixMillisConverter);

@@ -22,7 +22,11 @@ internal static class GitKlonHelper
             return;
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(zielPfad)!);
+        var zielElternPfad = Path.GetDirectoryName(zielPfad);
+        if (zielElternPfad is not null)
+        {
+            Directory.CreateDirectory(zielElternPfad);
+        }
 
         string[] argumente = branch is null
             ? ["clone", quellPfad, zielPfad]
