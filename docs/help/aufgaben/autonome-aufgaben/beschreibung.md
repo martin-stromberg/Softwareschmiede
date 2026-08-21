@@ -18,7 +18,7 @@ Eine Autonome Aufgabe wird über ein Initialisierungsformular konfiguriert:
 4. **Permissions** — Berechtigungsprofil (automatisch generiert, aus Datei gewählt oder vordefiniert)
 5. **Token-Budget** — Maximale Token für die gesamte Aufgabe (Standard: 500.000)
 6. **Laufzeitbegrenzung** — Maximale Nettozeit in Minuten (Standard: 480 Min / 8 Std)
-7. **Persistenz-Modus** — Verhalten bei Session-Unterbrechungen (Standard, SessionReset)
+7. **Persistenz-Modus** — Verhalten bei Session-Unterbrechungen (Standard, SitzungZuruecksetzen)
 8. **Skill-Autogeneration** — Skills automatisch aus Anforderungen generieren?
 
 Über den **„Hilfe"-Button** oben im Dialog kann sich der Anwender jederzeit den Ablauf einer Autonomen Aufgabe (Initialisierung, Agent-Start, Unteragenten, Fortschritt/Integration, Session-Pause) sowie eine Kurzerklärung aller Formularfelder in einem Informationsdialog anzeigen lassen.

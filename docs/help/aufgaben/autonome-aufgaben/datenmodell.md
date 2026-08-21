@@ -35,7 +35,7 @@ Konfiguration und Persistierung einer Autonomen Aufgabe.
 | `TokenBudget` | int | Token-Budget für die Gesamtaufgabe |
 | `TokenBudgetErweitert` | int? | Optionales erweitertes Budget nach Pause |
 | `LaufzeitLimitMinuten` | int | Nettozeit-Limit in Minuten |
-| `PersistenzModus` | PersistenzModus | `Standard` oder `SessionReset` |
+| `PersistenzModus` | PersistenzModus | `Standard` oder `SitzungZuruecksetzen` |
 | `SkillAutogeneration` | bool | Sollen Skills automatisch generiert werden? |
 | `ArbeitsverzeichnisPfad` | string | Absoluter Pfad zum Arbeitsverzeichnis |
 | `Aufgabe` | Aufgabe | Navigation (inverse 1:1) |
@@ -86,7 +86,7 @@ Versionierte Skill-Definition für Projektleiter oder Unteragenten.
 | `SkillName` | string | Name des Skills (z.B. "projektleiter-v1") |
 | `SkillVersion` | string | Versionsnummer (z.B. "1.0.0", "1.0.1") |
 | `SkillContent` | string | Markdown-Inhalt des Skills |
-| `SkillStatus` | SkillStatus | `Entwurf`, `Review`, `Freigegeben`, `Archiviert` |
+| `SkillStatus` | SkillStatus | `Entwurf`, `Pruefung`, `Freigegeben`, `Archiviert` |
 | `ErstellungsDatum` | DateTimeOffset | Zeitstempel der Erstellung |
 | `FreigabeDatum` | DateTimeOffset? | Freigabezeitpunkt (null wenn nicht freigegeben) |
 | `AutonomAufgabe` | AutonomAufgabeKonfiguration | Navigation (inverse 1:N) |
@@ -163,7 +163,7 @@ public enum AufgabeAusfuehrungsStatus
 public enum PersistenzModus
 {
     Standard = 0,           // Normale Pause/Resume mit Kontext aus state.json
-    SessionReset = 1        // [Zukünftig] Pause setzt Kontext zurück
+    SitzungZuruecksetzen = 1 // [Zukünftig] Pause setzt Kontext zurück
 }
 ```
 
@@ -172,9 +172,9 @@ public enum PersistenzModus
 ```csharp
 public enum PermissionsJsonOption
 {
-    Generate = 0,           // permissions.json automatisch generieren
-    Select = 1,             // Bestehende Datei auswählen
-    Existing = 2            // Vordefiniertes Profil verwenden
+    Generieren = 0,         // permissions.json automatisch generieren
+    Auswaehlen = 1,         // Bestehende Datei auswählen
+    Vordefiniert = 2        // Vordefiniertes Profil verwenden
 }
 ```
 
@@ -196,7 +196,7 @@ public enum UnteragentStatus
 public enum SkillStatus
 {
     Entwurf = 0,            // Skill ist noch in Bearbeitung
-    Review = 1,             // Skill wartet auf Review
+    Pruefung = 1,           // Skill wartet auf Prüfung
     Freigegeben = 2,        // Skill ist freigegeben und kann verwendet werden
     Archiviert = 3          // Skill ist archiviert und wird nicht mehr verwendet
 }

@@ -24,7 +24,7 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModel : ViewModelBas
 
     private string? _selectedProjectBranch;
     private string _initialPrompt = string.Empty;
-    private PermissionsJsonOption _selectedPermissionsOption = PermissionsJsonOption.Generate;
+    private PermissionsJsonOption _selectedPermissionsOption = PermissionsJsonOption.Generieren;
     private int _tokenBudget;
     private bool _allowTokenExtension;
     private int _runtimeLimitMinutes;
@@ -143,7 +143,7 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModel : ViewModelBas
         set => SetProperty(ref _runtimeLimitMinutes, value);
     }
 
-    /// <summary>Ausgewählter Persistenz-Modus (Standard, SessionReset).</summary>
+    /// <summary>Ausgewählter Persistenz-Modus (Standard, SitzungZuruecksetzen).</summary>
     public PersistenzModus SelectedPersistenceMode
     {
         get => _selectedPersistenceMode;

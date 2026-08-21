@@ -21,5 +21,5 @@ public sealed record AutonomAufgabeInitialisierungsAnfrage(
     int LaufzeitLimitMinuten,
     PersistenzModus PersistenzModus,
     bool SkillAutogeneration,
-    PermissionsJsonOption PermissionsQuelle = PermissionsJsonOption.Generate
+    PermissionsJsonOption PermissionsQuelle = PermissionsJsonOption.Generieren
 );

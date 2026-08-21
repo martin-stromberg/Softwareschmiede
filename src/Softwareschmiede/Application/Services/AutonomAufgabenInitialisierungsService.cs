@@ -48,7 +48,7 @@ public sealed class AutonomAufgabenInitialisierungsService
         var stateJsonPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "state.json");
         await DirectoryAccessGuard.AusfuehrenAsync(anfrage.ArbeitsverzeichnisPfad, async () =>
         {
-            if (anfrage.PermissionsQuelle == PermissionsJsonOption.Generate || !File.Exists(permissionsPfad))
+            if (anfrage.PermissionsQuelle == PermissionsJsonOption.Generieren || !File.Exists(permissionsPfad))
             {
                 await File.WriteAllTextAsync(permissionsPfad, BuildPermissionsJson(anfrage), ct);
             }

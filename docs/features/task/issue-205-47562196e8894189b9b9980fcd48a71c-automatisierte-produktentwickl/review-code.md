@@ -2,32 +2,46 @@
 
 ## Ergebnis
 
-**Status:** Befunde vorhanden
+**Status:** Keine Befunde
 
 ## Befunde
 
-### src/Softwareschmiede/Application/Services/ProjektleiterAgentService.cs (ProjektleiterAgentService)
+Keine.
 
-- **Kopplung / Typmissbrauch (Inappropriate Intimacy an der Grenze zu Primitive Obsession)** — In `SteuereUnteragentAsync` (Zeile 70–74) wird eine `UnteragentSpezifikation`-Instanz (`arbeitsbereichsGrenze`) ausschließlich als Trägerobjekt für zwei Felder (`AgentId`, `AgentDirectory`) erzeugt, um sie an `UnteragentGovernanceService.VerifiziereBerechtigung` zu übergeben. `UnteragentSpezifikation` ist eine EF-Entität, die einen echten, persistierten Unteragenten repräsentiert (u. a. mit Navigationseigenschaft `AutonomAufgabe`); hier wird sie zweckentfremdet, um lediglich "erlaubter Basispfad" zu transportieren. Der Aufrufkontext prüft inhaltlich etwas anderes als der von `VerifiziereBerechtigung` dokumentierte Vertrag ("validiert, dass ein Unteragent nur in seinem eigenen Bereich arbeitet") — hier wird stattdessen geprüft, ob das neue Unteragenten-Arbeitsverzeichnis innerhalb des Arbeitsverzeichnisses der Autonomen Aufgabe liegt. Das ist eine andere Governance-Frage (Grenze der Aufgabe vs. Grenze eines bereits etablierten Unteragenten), die über dieselbe Methode und ein zweckentfremdetes Domänenobjekt abgebildet wird.
+## Zusammenfassung der Prüfung
 
-  Empfehlung: Eine dedizierte Überladung bzw. Methode in `UnteragentGovernanceService` ergänzen, die zwei reine Pfad-Strings entgegennimmt (z. B. `VerifiziereArbeitsbereichsGrenze(string erlaubterBasisPfad, string zielPfad, string agentIdFuerLogging)` oder ähnlich), statt eine fachliche Entität für einen rein technischen Pfadvergleich zu instanziieren. Alternativ: bestehende Methode so umbenennen/dokumentieren, dass der allgemeinere Zweck ("Pfad X muss unterhalb Pfad Y liegen") klar wird, und den Parametertyp auf `string erlaubterBasisPfad` statt `UnteragentSpezifikation` ändern.
+Geprüft wurden die aktuellen Working-Tree-Änderungen (Diff gegenüber `HEAD`, noch unstaged/uncommitted) auf dem Branch `task/issue-205-47562196e8894189b9b9980fcd48a71c-automatisierte-produktentwickl`. Sie umfassen zwei unabhängige, rein sprachliche Enum-Umbenennungen (Eindeutschung):
 
-### src/Softwareschmiede.Tests/Application/Services/ProjektleiterAgentServiceTests.cs (ProjektleiterAgentServiceTests)
+1. `PersistenzModus.SessionReset` → `PersistenzModus.SitzungZuruecksetzen`
+2. `SkillStatus.Review` → `SkillStatus.Pruefung`
+3. `PermissionsJsonOption.Generate` → `PermissionsJsonOption.Generieren`
+4. `PermissionsJsonOption.Select` → `PermissionsJsonOption.Auswaehlen`
+5. `PermissionsJsonOption.Existing` → `PermissionsJsonOption.Vordefiniert`
 
-- **Doppelter Code / unvollständige Extraktion** — Die im selben Änderungspaket neu geschaffene `ProjektleiterAgentServiceTestDatenFactory.ErstelleUnteragent(...)` (in `src/Softwareschmiede.Tests/Helpers/ProjektleiterAgentServiceTestDatenFactory.cs`) wurde explizit zur Vermeidung von Testcode-Duplikation extrahiert und bereits in `ProjektleiterAgentServiceTests_Fehlerfaelle.cs` eingesetzt. In `ProjektleiterAgentServiceTests.cs` selbst (die den Namespace `Softwareschmiede.Tests.Helpers` bereits importiert, siehe Zeile 9) wurde die Umstellung jedoch nicht vollzogen: Zeilen 100–111 (`SteuereUnteragentAsync_ErzeugtUnteragentSpezifikation`) sind eine 1:1-Kopie dessen, was `ProjektleiterAgentServiceTestDatenFactory.ErstelleUnteragent(_testRoot, konfiguration.Id)` (Default-Suffix "001") liefert. Zeilen 134–147 (`IntegriereErgebnisseAsync_AktualisieertPlanMdUndProgressMd`) duplizieren dieselbe Konstruktion mit Suffix "002" plus zwei zusätzlichen Property-Zuweisungen (`ErzeugungsDatum`, `Status`), die sich problemlos nach dem Fabrikaufruf ergänzen ließen. Damit bleibt genau die Duplikation bestehen, die Batch 2 laut Aufgabenbeschreibung beheben sollte.
+**Vollständigkeit der Umbenennung:**
+- Alle Enum-Definitionen (`src/Softwareschmiede/Domain/Enums/PersistenzModus.cs`, `PermissionsJsonOption.cs`, `SkillStatus.cs`) sind konsistent umbenannt, inkl. XML-Doc-Kommentare.
+- Alle Verwendungsstellen im Produktivcode sind mit umbenannt: `AutonomAufgabeInitialisierungsDialogViewModel.cs` (Default-Wert `PermissionsJsonOption.Generieren`, XML-Doc-Kommentar zu `PersistenzModus`), `AutonomAufgabenInitialisierungsService.cs` (Vergleich `PermissionsQuelle == PermissionsJsonOption.Generieren`), `AutonomAufgabeInitialisierungsAnfrage.cs` (Default-Parameter).
+- Repo-weite Suche nach den alten Bezeichnern (`SessionReset`, `SkillStatus.Review`, `PermissionsJsonOption.Generate/Select/Existing`) über `src/` (inkl. Tests), `.claude/` und alle `*.xaml`-Dateien ergibt außerhalb der bereits umbenannten Stellen und historischer/Doku-Artefakte (`requirement.md`, `inventory/models.md`, `review-code.1.md`, `review-code.2.md`, `continue.md` — Planungs-/Entscheidungsdokumentation, kein Code) keine verwaisten Referenzen.
+- Tests (`AutonomAufgabeDetailViewModelTests.cs`, `AutonomAufgabenInitialisierungsServiceTests.cs`, `ProjektleiterAgentServiceTests_Fehlerfaelle.cs`, `SessionManagementServiceTests.cs`, `ProjektleiterAgentServiceTestDatenFactory.cs`) referenzieren ausschließlich `PersistenzModus.Standard`, welcher unverändert ist — keine Testreferenz auf einen der umbenannten Enum-Werte gefunden, somit keine verwaisten Testreferenzen.
+- XAML (`AutonomAufgabeInitialisierungsDialog.xaml`): Die ComboBoxen für `PermissionsJsonOption` und `PersistenzModus` befüllen sich dynamisch via `ObjectDataProvider`/`Enum.GetValues` (kein `EnumToStringConverter` mit hartcodierten Werten, keine Anzeige-String-Zuordnung) — dadurch existiert dort keine hartcodierte Stelle, die hätte veralten können.
+- Dokumentation (`docs/help/aufgaben/autonome-aufgaben/beschreibung.md`, `datenmodell.md`) wurde konsistent mit den neuen Bezeichnern aktualisiert; `ablauf-technisch.md`, `business-rules.md`, `architektur.md` enthalten keine Referenzen auf die alten Bezeichner und mussten nicht angepasst werden.
 
-  Empfehlung: Beide Stellen auf `ProjektleiterAgentServiceTestDatenFactory.ErstelleUnteragent(_testRoot, konfiguration.Id, "001"/"002")` umstellen; bei der zweiten Stelle `ErzeugungsDatum`/`Status` anschließend auf dem zurückgegebenen Objekt setzen (Objektinitialisierer entfällt dann, stattdessen Property-Zuweisung nach Fabrikaufruf oder `with`-Ausdruck, falls sinnvoll gekapselt).
+**DB-Persistenz-Risiko (verifiziert):** Repo-weite Suche in `src/Softwareschmiede/Migrations/` nach `"SessionReset"`, `"Review"`, `"Generate"`, `"Select"`, `"Existing"` als String-Literale (z. B. in `HasDefaultValue`/Seed-Daten) ergibt keine Treffer. Beide Enums werden laut Migrations-Snapshot als `int` persistiert (Ordinalwerte unverändert: `PersistenzModus` 0/1, `PermissionsJsonOption` 0/1/2 in gleicher Reihenfolge), `PermissionsJsonOption` wird zusätzlich gar nicht in der DB persistiert. Die Einschätzung der Unteragenten (kein DB-Persistenz-Risiko) ist damit bestätigt.
+
+**Build-Verifikation:** `dotnet build` für `src/Softwareschmiede.App/Softwareschmiede.App.csproj` und `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` (Debug) läuft jeweils mit 0 Warnungen / 0 Fehlern durch — die Umbenennungen sind compile-clean über den gesamten abhängigen Projektgraphen (Domain, App, Tests).
+
+Es wurden keine strukturellen, stilistischen oder funktionalen Qualitätsprobleme im Sinne der Review-Kriterien (God-Klasse/-Methode, Duplikate, Namenskonventionen, Kopplung, Fehlerbehandlung, Testqualität, klassische Code Smells, toter Code) festgestellt — die Änderung ist ein reines, vollständiges Identifier-Renaming ohne Verhaltensänderung.
 
 ## Geprüfte Dateien
 
-- `src/Softwareschmiede/Application/Services/ProjektleiterAgentService.cs`
-- `src/Softwareschmiede/Application/Services/UnteragentGovernanceService.cs` (Kontext, unverändert)
-- `src/Softwareschmiede.App/ViewModels/TaskDetailViewModel.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/TaskDetailViewModelTests.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/TaskDetailViewModelTestsBase.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/TaskDetailViewModelTests_PluginAktivierung.cs`
-- `src/Softwareschmiede.Tests/App/ViewModels/TaskDetailViewModelTests_ZeitgesteuerterPrompt.cs`
-- `src/Softwareschmiede.Tests/Application/Services/ProjektleiterAgentServiceTests.cs`
-- `src/Softwareschmiede.Tests/Application/Services/ProjektleiterAgentServiceTests_Fehlerfaelle.cs`
-- `src/Softwareschmiede.Tests/Helpers/TaskDetailViewModelTestFactory.cs`
-- `src/Softwareschmiede.Tests/Helpers/ProjektleiterAgentServiceTestDatenFactory.cs` (neu)
+- `src/Softwareschmiede/Domain/Enums/PersistenzModus.cs`
+- `src/Softwareschmiede/Domain/Enums/SkillStatus.cs`
+- `src/Softwareschmiede/Domain/Enums/PermissionsJsonOption.cs`
+- `src/Softwareschmiede/Domain/ValueObjects/AutonomAufgabeInitialisierungsAnfrage.cs`
+- `src/Softwareschmiede/Application/Services/AutonomAufgabenInitialisierungsService.cs`
+- `src/Softwareschmiede.App/ViewModels/AutonomAufgabeInitialisierungsDialogViewModel.cs`
+- `src/Softwareschmiede.App/Views/AutonomAufgabeInitialisierungsDialog.xaml` (auf verwaiste Referenzen geprüft, keine Änderung nötig)
+- `docs/help/aufgaben/autonome-aufgaben/beschreibung.md`
+- `docs/help/aufgaben/autonome-aufgaben/datenmodell.md`
+
+Zusätzlich repo-weit auf verwaiste Referenzen geprüft (ohne inhaltliche Änderung, da keine Treffer): `src/Softwareschmiede.Tests/**`, `src/Softwareschmiede/Migrations/**`, `.claude/**`, alle `*.xaml`, `docs/help/aufgaben/autonome-aufgaben/ablauf-technisch.md`, `business-rules.md`, `architektur.md`.
