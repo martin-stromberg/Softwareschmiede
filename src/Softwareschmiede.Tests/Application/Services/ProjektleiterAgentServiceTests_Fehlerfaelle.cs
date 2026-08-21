@@ -46,51 +46,12 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
 
     private async Task<AutonomAufgabeKonfiguration> ErstelleKonfigurationAsync()
     {
-        var aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Autonome Testaufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.AutonomAufgabe,
-            ErstellungsDatum = DateTimeOffset.UtcNow
-        };
-        _db.Aufgaben.Add(aufgabe);
-
-        var konfiguration = new AutonomAufgabeKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            ProjektBranchName = "feature/autonom",
-            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
-            PermissionsJsonPfad = Path.Combine(_testRoot, "permissions.json"),
-            TokenBudget = 500000,
-            LaufzeitLimitMinuten = 480,
-            PersistenzModus = PersistenzModus.Standard,
-            ArbeitsverzeichnisPfad = _testRoot
-        };
-        _db.AutonomAufgabeKonfigurationen.Add(konfiguration);
-        await _db.SaveChangesAsync();
-
-        await File.WriteAllTextAsync(Path.Combine(_testRoot, "plan.md"), "# Plan\n");
-        await File.WriteAllTextAsync(Path.Combine(_testRoot, "progress.md"), "# Fortschritt\n");
-        await File.WriteAllTextAsync(Path.Combine(_testRoot, "state.json"), "{\"subagents\":[]}");
-
+        var (_, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
         return konfiguration;
     }
 
-    private UnteragentSpezifikation ErstelleUnteragent(Guid autonomAufgabeId, string suffix = "001") => new()
-    {
-        Id = Guid.NewGuid(),
-        AutonomAufgabeId = autonomAufgabeId,
-        AgentId = $"agent-{suffix}",
-        TaskId = $"task_{suffix}",
-        AgentScope = "feature-backend",
-        AgentPrompt = "Implementiere das Backend.",
-        AgentDirectory = Path.Combine(_testRoot, "tasks", $"task_{suffix}"),
-        AgentBranch = $"feature-unteragent-{suffix}",
-        AgentClone = Path.Combine(_testRoot, "clones", $"repo_feature_{suffix}")
-    };
+    private UnteragentSpezifikation ErstelleUnteragent(Guid autonomAufgabeId, string suffix = "001")
+        => ProjektleiterAgentServiceTestDatenFactory.ErstelleUnteragent(_testRoot, autonomAufgabeId, suffix);
 
     /// <summary>StarteAgentAsync wirft eine InvalidOperationException, wenn die referenzierte Aufgabe nicht existiert.</summary>
     [Fact]
@@ -207,6 +168,19 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
         var akt = () => _sut.SteuereUnteragentAsync(unteragent);
 
         await akt.Should().ThrowAsync<ArgumentException>();
+    }
+
+    /// <summary>SteuereUnteragentAsync wirft eine InvalidOperationException, wenn AgentDirectory außerhalb des Arbeitsverzeichnisses der Autonomen Aufgabe liegt (Governance-Grenze).</summary>
+    [Fact]
+    public async Task SteuereUnteragentAsync_WirftBeiAgentDirectoryAusserhalbArbeitsverzeichnis()
+    {
+        var konfiguration = await ErstelleKonfigurationAsync();
+        var unteragent = ErstelleUnteragent(konfiguration.Id);
+        unteragent.AgentDirectory = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "AusserhalbDesArbeitsbereichs", Guid.NewGuid().ToString("N"));
+
+        var akt = () => _sut.SteuereUnteragentAsync(unteragent);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
     }
 
     /// <summary>IntegriereErgebnisseAsync trägt einen Fallback-Text in progress.md ein, wenn task_report.md im Unteragenten-Verzeichnis fehlt.</summary>

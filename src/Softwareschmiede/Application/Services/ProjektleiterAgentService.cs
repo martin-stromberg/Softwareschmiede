@@ -67,10 +67,14 @@ public sealed class ProjektleiterAgentService
             .FirstOrDefaultAsync(k => k.Id == unteragent.AutonomAufgabeId, ct)
             ?? throw new InvalidOperationException($"AutonomAufgabeKonfiguration {unteragent.AutonomAufgabeId} nicht gefunden.");
 
-        if (!_governanceService.VerifiziereBerechtigung(unteragent, UnteragentAktion.ArbeitsverzeichnisErstellen, unteragent.AgentDirectory))
+        if (!_governanceService.VerifiziereBerechtigung(
+                konfiguration.ArbeitsverzeichnisPfad,
+                UnteragentAktion.ArbeitsverzeichnisErstellen,
+                unteragent.AgentDirectory,
+                unteragent.AgentId))
         {
             throw new InvalidOperationException(
-                $"Unteragent {unteragent.AgentId}: Arbeitsverzeichnis '{unteragent.AgentDirectory}' liegt außerhalb des erlaubten Bereichs.");
+                $"Unteragent {unteragent.AgentId}: Arbeitsverzeichnis '{unteragent.AgentDirectory}' liegt außerhalb des erlaubten Bereichs '{konfiguration.ArbeitsverzeichnisPfad}'.");
         }
 
         await DirectoryAccessGuard.AusfuehrenAsync(unteragent.AgentDirectory, () =>

@@ -47,7 +47,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
-    private readonly AutonomAufgabeStartService _autonomAufgabeStartCoordinator;
+    private readonly AutonomAufgabeStartService _autonomAufgabeStartService;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -589,7 +589,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         FileExplorerViewModel fileExplorerViewModel,
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
-        AutonomAufgabeStartService autonomAufgabeStartCoordinator,
+        AutonomAufgabeStartService autonomAufgabeStartService,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -607,7 +607,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _fileExplorerViewModel = fileExplorerViewModel;
         _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
-        _autonomAufgabeStartCoordinator = autonomAufgabeStartCoordinator;
+        _autonomAufgabeStartService = autonomAufgabeStartService;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -1212,7 +1212,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var ergebnis = await _autonomAufgabeStartCoordinator.StarteAsync(_aufgabe, ct);
+        var ergebnis = await _autonomAufgabeStartService.StarteAsync(_aufgabe, ct);
         if (ergebnis is null)
         {
             return;
