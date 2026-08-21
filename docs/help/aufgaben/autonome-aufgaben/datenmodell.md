@@ -83,19 +83,19 @@ Versionierte Skill-Definition für Projektleiter oder Unteragenten.
 |-------------|-----|--------------|
 | `Id` | Guid | Eindeutige ID |
 | `AutonomAufgabeId` | Guid | Foreign Key zu `AutonomAufgabeKonfiguration` (1:N) |
-| `SkillName` | string | Name des Skills (z.B. "projektleiter-v1") |
-| `SkillVersion` | string | Versionsnummer (z.B. "1.0.0", "1.0.1") |
-| `SkillContent` | string | Markdown-Inhalt des Skills |
-| `SkillStatus` | SkillStatus | `Entwurf`, `Pruefung`, `Freigegeben`, `Archiviert` |
+| `Name` | string | Name des Skills (z.B. "projektleiter-v1") |
+| `Version` | string | Versionsnummer (z.B. "1.0.0", "1.0.1") |
+| `Content` | string | Markdown-Inhalt des Skills |
+| `Status` | SkillStatus | `Entwurf`, `Pruefung`, `Freigegeben`, `Archiviert` |
 | `ErstellungsDatum` | DateTimeOffset | Zeitstempel der Erstellung |
 | `FreigabeDatum` | DateTimeOffset? | Freigabezeitpunkt (null wenn nicht freigegeben) |
 | `AutonomAufgabe` | AutonomAufgabeKonfiguration | Navigation (inverse 1:N) |
 
 **Constraints:**
-- `SkillName`: Nicht null, eindeutig pro `AutonomAufgabeId`
-- `SkillVersion`: Nicht null
-- `SkillContent`: Nicht null (kann leer sein, aber nicht null)
-- `SkillStatus`: Enum-Wert
+- `Name`: Nicht null, eindeutig pro `AutonomAufgabeId`
+- `Version`: Nicht null
+- `Content`: Nicht null (kann leer sein, aber nicht null)
+- `Status`: Enum-Wert
 
 ## Beziehungen
 
@@ -116,9 +116,9 @@ Versionierte Skill-Definition für Projektleiter oder Unteragenten.
 │                                         │               └─ ErzeugungsDatum
 │                                         │
 │                                         └──── 1:N ────► SkillDefinition (neu)
-│                                                         └─ SkillName
-│                                                         └─ SkillVersion
-│                                                         └─ SkillStatus
+│                                                         └─ Name
+│                                                         └─ Version
+│                                                         └─ Status
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -253,10 +253,10 @@ erDiagram
     SKILL {
         guid Id
         guid AutonomAufgabeId FK
-        string SkillName
-        string SkillVersion
-        string SkillContent
-        SkillStatus SkillStatus
+        string Name
+        string Version
+        string Content
+        SkillStatus Status
         datetime ErstellungsDatum
         datetime "FreigabeDatum?"
     }
@@ -287,4 +287,4 @@ Für Performanz werden folgende Indizes erstellt:
 | `UnteragentSpezifikationen` | `AutonomAufgabeId` | 1:N-Abfragen |
 | `UnteragentSpezifikationen` | `(AutonomAufgabeId, Status)` | Filtern nach Status |
 | `SkillDefinitionen` | `AutonomAufgabeId` | 1:N-Abfragen |
-| `SkillDefinitionen` | `(AutonomAufgabeId, SkillStatus)` | Filtern nach Status |
+| `SkillDefinitionen` | `(AutonomAufgabeId, Status)` | Filtern nach Status |

@@ -4,44 +4,92 @@
 
 **Status:** Keine Befunde
 
-## Befunde
+## Geprüfte Änderungen
 
-Keine.
+Review der gesamten Working-Tree-Änderungen (Diff gegenüber `HEAD`) im Branch
+`task/issue-205-47562196e8894189b9b9980fcd48a71c-automatisierte-produktentwickl`. Umfasst zwei Batches:
 
-## Zusammenfassung der Prüfung
+1. Neue gemeinsame abstrakte Basisklasse `SoftwareschmiedeException`; `DirectoryAccessException` und
+   `UnteragentAbbruchException` erben jetzt davon statt direkt von `Exception`/`InvalidOperationException`.
+2. Umbenennung der `SkillDefinition`-Entity-Properties (`SkillName`→`Name`, `SkillVersion`→`Version`,
+   `SkillContent`→`Content`, `SkillStatus`→`Status`) inkl. neuer EF-Core-Migration
+   `20260821192052_RenameSkillDefinitionProperties` und aktualisiertem Model-Snapshot.
 
-Geprüft wurden die aktuellen Working-Tree-Änderungen (Diff gegenüber `HEAD`, noch unstaged/uncommitted) auf dem Branch `task/issue-205-47562196e8894189b9b9980fcd48a71c-automatisierte-produktentwickl`. Sie umfassen zwei unabhängige, rein sprachliche Enum-Umbenennungen (Eindeutschung):
+### Migration `20260821192052_RenameSkillDefinitionProperties`
 
-1. `PersistenzModus.SessionReset` → `PersistenzModus.SitzungZuruecksetzen`
-2. `SkillStatus.Review` → `SkillStatus.Pruefung`
-3. `PermissionsJsonOption.Generate` → `PermissionsJsonOption.Generieren`
-4. `PermissionsJsonOption.Select` → `PermissionsJsonOption.Auswaehlen`
-5. `PermissionsJsonOption.Existing` → `PermissionsJsonOption.Vordefiniert`
+- `Up()` enthält genau vier `RenameColumn`-Operationen auf Tabelle `SkillDefinitionen`
+  (`SkillVersion`→`Version`, `SkillStatus`→`Status`, `SkillName`→`Name`, `SkillContent`→`Content`), keine
+  doppelten oder fehlenden Operationen.
+- `Down()` spiegelt exakt die inverse Zuordnung derselben vier Spalten (`Version`→`SkillVersion`,
+  `Status`→`SkillStatus`, `Name`→`SkillName`, `Content`→`SkillContent`) — symmetrisch korrekt.
+- Migration ist chronologisch nach der vorherigen `20260821160341_AddAutonomAufgabeMaxLengthConstraints`
+  einsortiert (einzige/letzte Migration in `src/Softwareschmiede/Migrations/`, keine Namens-/Zeitstempelkollision).
+- `RenameSkillDefinitionProperties.Designer.cs` (`BuildTargetModel`) und
+  `SoftwareschmiededDbContextModelSnapshot.cs` stimmen überein: beide enthalten für `SkillDefinition` exakt die
+  vier neuen Property-Namen `Content`/`Name`/`Status`/`Version` mit identischen `HasMaxLength`/`IsRequired`-Constraints
+  wie vor der Umbenennung — reine Namensänderung, keine Constraint-Drift.
+- Frühere Migrationen (`20260820175118_AddAutonomAufgabeModels`, `20260821160341_AddAutonomAufgabeMaxLengthConstraints`)
+  behalten bewusst die alten Spaltennamen (`SkillName`/`SkillVersion`/`SkillContent`/`SkillStatus`) — korrekt, da
+  EF-Core-Migrationen den Historienzustand zum jeweiligen Zeitpunkt abbilden und nicht rückwirkend umbenannt werden.
 
-**Vollständigkeit der Umbenennung:**
-- Alle Enum-Definitionen (`src/Softwareschmiede/Domain/Enums/PersistenzModus.cs`, `PermissionsJsonOption.cs`, `SkillStatus.cs`) sind konsistent umbenannt, inkl. XML-Doc-Kommentare.
-- Alle Verwendungsstellen im Produktivcode sind mit umbenannt: `AutonomAufgabeInitialisierungsDialogViewModel.cs` (Default-Wert `PermissionsJsonOption.Generieren`, XML-Doc-Kommentar zu `PersistenzModus`), `AutonomAufgabenInitialisierungsService.cs` (Vergleich `PermissionsQuelle == PermissionsJsonOption.Generieren`), `AutonomAufgabeInitialisierungsAnfrage.cs` (Default-Parameter).
-- Repo-weite Suche nach den alten Bezeichnern (`SessionReset`, `SkillStatus.Review`, `PermissionsJsonOption.Generate/Select/Existing`) über `src/` (inkl. Tests), `.claude/` und alle `*.xaml`-Dateien ergibt außerhalb der bereits umbenannten Stellen und historischer/Doku-Artefakte (`requirement.md`, `inventory/models.md`, `review-code.1.md`, `review-code.2.md`, `continue.md` — Planungs-/Entscheidungsdokumentation, kein Code) keine verwaisten Referenzen.
-- Tests (`AutonomAufgabeDetailViewModelTests.cs`, `AutonomAufgabenInitialisierungsServiceTests.cs`, `ProjektleiterAgentServiceTests_Fehlerfaelle.cs`, `SessionManagementServiceTests.cs`, `ProjektleiterAgentServiceTestDatenFactory.cs`) referenzieren ausschließlich `PersistenzModus.Standard`, welcher unverändert ist — keine Testreferenz auf einen der umbenannten Enum-Werte gefunden, somit keine verwaisten Testreferenzen.
-- XAML (`AutonomAufgabeInitialisierungsDialog.xaml`): Die ComboBoxen für `PermissionsJsonOption` und `PersistenzModus` befüllen sich dynamisch via `ObjectDataProvider`/`Enum.GetValues` (kein `EnumToStringConverter` mit hartcodierten Werten, keine Anzeige-String-Zuordnung) — dadurch existiert dort keine hartcodierte Stelle, die hätte veralten können.
-- Dokumentation (`docs/help/aufgaben/autonome-aufgaben/beschreibung.md`, `datenmodell.md`) wurde konsistent mit den neuen Bezeichnern aktualisiert; `ablauf-technisch.md`, `business-rules.md`, `architektur.md` enthalten keine Referenzen auf die alten Bezeichner und mussten nicht angepasst werden.
+### Vollständigkeit der `SkillDefinition`-Umbenennung
 
-**DB-Persistenz-Risiko (verifiziert):** Repo-weite Suche in `src/Softwareschmiede/Migrations/` nach `"SessionReset"`, `"Review"`, `"Generate"`, `"Select"`, `"Existing"` als String-Literale (z. B. in `HasDefaultValue`/Seed-Daten) ergibt keine Treffer. Beide Enums werden laut Migrations-Snapshot als `int` persistiert (Ordinalwerte unverändert: `PersistenzModus` 0/1, `PermissionsJsonOption` 0/1/2 in gleicher Reihenfolge), `PermissionsJsonOption` wird zusätzlich gar nicht in der DB persistiert. Die Einschätzung der Unteragenten (kein DB-Persistenz-Risiko) ist damit bestätigt.
+Repository-weite Suche nach den alten Propertynamen (`.SkillName`, `.SkillVersion`, `.SkillContent`, `.SkillStatus`
+als Property-Zugriff, nicht als Enum-Typname `SkillStatus`) ergab außerhalb der (korrekt unangetasteten) historischen
+Migrationsdateien keine verbliebenen Treffer:
 
-**Build-Verifikation:** `dotnet build` für `src/Softwareschmiede.App/Softwareschmiede.App.csproj` und `src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj` (Debug) läuft jeweils mit 0 Warnungen / 0 Fehlern durch — die Umbenennungen sind compile-clean über den gesamten abhängigen Projektgraphen (Domain, App, Tests).
+- `SoftwareschmiededDbContext.cs` (Property-Konfiguration `HasMaxLength`/`HasConversion`) — umbenannt.
+- `AutonomAufgabeDetailView.xaml` (`DisplayMemberPath="SkillName"` → `"Name"`) — umbenannt.
+- Live-Dokumentation `docs/help/aufgaben/autonome-aufgaben/{datenmodell,ablauf-technisch,business-rules}.md`
+  (Tabellen, ER-Diagramm, Mermaid-Entity, Index-Tabelle, Fließtext) — konsistent umbenannt.
+- `src/Softwareschmiede.Tests`, `src/Softwareschmiede.IntegrationTests`, übriger `src/Softwareschmiede`-Code: keine
+  Treffer (Feature "Skills" ist bislang nur über DB-Entity + Detail-Ansicht angebunden, `new SkillDefinition(...)`
+  wird aktuell nirgends im Code instanziiert — nichts zu übersehen).
+- Der Enum-Typ `SkillStatus` (`src/Softwareschmiede/Domain/Enums/SkillStatus.cs`) ist bewusst unverändert geblieben
+  — nur die gleichnamige Property wurde umbenannt, der Enum-Typname selbst war nie Teil der Umbenennung.
+- Historische Planungsdokumente (`requirement.md`, `plan.md`, `inventory/models.md`, `continue.md`-Altbestand) mit
+  altem Propertynamen sind unverändert geblieben; das ist korrekt, da es sich um Verlaufsnotizen zu vergangenen
+  Ständen handelt, nicht um Live-Dokumentation des aktuellen Datenmodells.
 
-Es wurden keine strukturellen, stilistischen oder funktionalen Qualitätsprobleme im Sinne der Review-Kriterien (God-Klasse/-Methode, Duplikate, Namenskonventionen, Kopplung, Fehlerbehandlung, Testqualität, klassische Code Smells, toter Code) festgestellt — die Änderung ist ein reines, vollständiges Identifier-Renaming ohne Verhaltensänderung.
+### Exception-Hierarchie
+
+- `SoftwareschmiedeException` ist eine schlanke abstrakte Basisklasse mit den beiden Standard-Konstruktoren
+  (`message`, `message, innerException`), erbt von `Exception`. `DirectoryAccessException` (`sealed`) und
+  `UnteragentAbbruchException` (`sealed`) erben beide korrekt davon.
+- Repository-weite Suche nach `catch (DirectoryAccessException)` und `catch (UnteragentAbbruchException)`: keine
+  Treffer — beide werden nirgends explizit auf ihre alte Basisklasse hin gefangen, nur generische
+  `catch (Exception)`-Handler (die weiterhin greifen) bzw. `ThrowsAsync<UnteragentAbbruchException>()`/
+  `ThrowsAsync<DirectoryAccessException>()` in Tests (die weiterhin exakt passen).
+- Kritischer Punkt — Wegfall der bisherigen `InvalidOperationException`-Vererbung von `UnteragentAbbruchException`
+  (Einfachvererbung erzwingt die Entscheidung zwischen `SoftwareschmiedeException` und `InvalidOperationException`):
+  verifiziert, dass `UnteragentAbbruchException` ausschließlich in
+  `UnteragentGovernanceService.ValidiereFehlerBedingungAsync` geworfen wird und diese Methode aktuell in keinem
+  produktiven Aufrufpfad eingebunden ist (nur direkt aus `UnteragentGovernanceServiceTests` heraus aufgerufen). Alle
+  vorhandenen `catch (InvalidOperationException)`-Stellen im Repository (`CliRunner.cs`,
+  `TaskDetailView.xaml.cs`, `GitOrchestrationService.cs` — via `catch (Exception ex) when (ex is
+  InvalidOperationException or DirectoryNotFoundException)`, `KiAusfuehrungsServiceTests.cs`,
+  `AufgabeRecoveryServiceTests.cs`) umschließen fachlich unabhängige Fehler (Prozess-Start/-Kill,
+  Arbeitsverzeichnis-Validierung nach Git-Klon, Aufgaben-Recovery) und keinen Aufruf von
+  `ValidiereFehlerBedingungAsync`. Der Wegfall der `InvalidOperationException`-Fangbarkeit ist damit folgenlos,
+  keine verwaisten Catch-Blöcke.
+
+### Build-Verifikation
+
+`dotnet build src/Softwareschmiede/Softwareschmiede.csproj` erfolgreich, 0 Warnungen, 0 Fehler (unabhängig
+gegengeprüft, nicht nur aus Sub-Agent-Bericht übernommen).
 
 ## Geprüfte Dateien
 
-- `src/Softwareschmiede/Domain/Enums/PersistenzModus.cs`
-- `src/Softwareschmiede/Domain/Enums/SkillStatus.cs`
-- `src/Softwareschmiede/Domain/Enums/PermissionsJsonOption.cs`
-- `src/Softwareschmiede/Domain/ValueObjects/AutonomAufgabeInitialisierungsAnfrage.cs`
-- `src/Softwareschmiede/Application/Services/AutonomAufgabenInitialisierungsService.cs`
-- `src/Softwareschmiede.App/ViewModels/AutonomAufgabeInitialisierungsDialogViewModel.cs`
-- `src/Softwareschmiede.App/Views/AutonomAufgabeInitialisierungsDialog.xaml` (auf verwaiste Referenzen geprüft, keine Änderung nötig)
-- `docs/help/aufgaben/autonome-aufgaben/beschreibung.md`
+- `src/Softwareschmiede/Domain/Exceptions/SoftwareschmiedeException.cs` (neu)
+- `src/Softwareschmiede/Domain/Exceptions/DirectoryAccessException.cs`
+- `src/Softwareschmiede/Domain/Exceptions/UnteragentAbbruchException.cs`
+- `src/Softwareschmiede/Domain/Entities/SkillDefinition.cs`
+- `src/Softwareschmiede/Infrastructure/Data/SoftwareschmiededDbContext.cs`
+- `src/Softwareschmiede/Migrations/20260821192052_RenameSkillDefinitionProperties.cs` (neu)
+- `src/Softwareschmiede/Migrations/20260821192052_RenameSkillDefinitionProperties.Designer.cs` (neu)
+- `src/Softwareschmiede/Migrations/SoftwareschmiededDbContextModelSnapshot.cs`
+- `src/Softwareschmiede.App/Views/AutonomAufgabeDetailView.xaml`
+- `docs/help/aufgaben/autonome-aufgaben/ablauf-technisch.md`
+- `docs/help/aufgaben/autonome-aufgaben/business-rules.md`
 - `docs/help/aufgaben/autonome-aufgaben/datenmodell.md`
-
-Zusätzlich repo-weit auf verwaiste Referenzen geprüft (ohne inhaltliche Änderung, da keine Treffer): `src/Softwareschmiede.Tests/**`, `src/Softwareschmiede/Migrations/**`, `.claude/**`, alle `*.xaml`, `docs/help/aufgaben/autonome-aufgaben/ablauf-technisch.md`, `business-rules.md`, `architektur.md`.
+- `docs/features/task/issue-205-47562196e8894189b9b9980fcd48a71c-automatisierte-produktentwickl/continue.md`

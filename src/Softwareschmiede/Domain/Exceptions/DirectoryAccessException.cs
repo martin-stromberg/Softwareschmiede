@@ -1,7 +1,7 @@
 namespace Softwareschmiede.Domain.Exceptions;
 
 /// <summary>Wird ausgelöst, wenn ein Arbeitsverzeichnis nicht erstellt oder darauf nicht zugegriffen werden kann.</summary>
-public sealed class DirectoryAccessException : Exception
+public sealed class DirectoryAccessException : SoftwareschmiedeException
 {
     /// <summary>Erstellt eine neue Instanz der <see cref="DirectoryAccessException"/>.</summary>
     /// <param name="pfad">Pfad des betroffenen Verzeichnisses.</param>

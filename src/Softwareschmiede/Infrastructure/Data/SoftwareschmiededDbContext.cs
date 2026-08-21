@@ -235,10 +235,10 @@ public sealed class SoftwareschmiededDbContext : DbContext
         modelBuilder.Entity<SkillDefinition>(e =>
         {
             e.HasKey(s => s.Id);
-            e.Property(s => s.SkillName).IsRequired().HasMaxLength(255);
-            e.Property(s => s.SkillVersion).IsRequired().HasMaxLength(64);
-            e.Property(s => s.SkillContent).IsRequired();
-            e.Property(s => s.SkillStatus).IsRequired().HasConversion<string>();
+            e.Property(s => s.Name).IsRequired().HasMaxLength(255);
+            e.Property(s => s.Version).IsRequired().HasMaxLength(64);
+            e.Property(s => s.Content).IsRequired();
+            e.Property(s => s.Status).IsRequired().HasConversion<string>();
             e.Property(s => s.ErstellungsDatum).HasConversion(UnixMillisConverter);
             e.Property(s => s.FreigabeDatum).HasConversion(NullableUnixMillisConverter);
             e.HasIndex(s => s.AutonomAufgabeId);

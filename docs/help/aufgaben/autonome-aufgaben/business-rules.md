@@ -124,17 +124,17 @@
 
 ### Regel: Skills sind nach Freigabe unveränderlich
 
-**Beschreibung:** Einmal freigegebene Skills (`SkillStatus == Freigegeben`) können nicht modifiziert werden.
+**Beschreibung:** Einmal freigegebene Skills (`Status == Freigegeben`) können nicht modifiziert werden.
 
 **Bedingungen:**
-- SkillStatus == Freigegeben
+- Status == Freigegeben
 
 **Verhalten:**
 - Änderungen auf freigegebene Skills sind nicht erlaubt
 - Neue Versionen müssen neue SkillDefinition-Einträge sein (versioniert)
 - Alte Versionen können archiviert werden
 
-**Umsetzung:** `SkillDefinition.SkillStatus` wird geprüft; schreibend ist nur Status != Freigegeben erlaubt
+**Umsetzung:** `SkillDefinition.Status` wird geprüft; schreibend ist nur Status != Freigegeben erlaubt
 
 ---
 

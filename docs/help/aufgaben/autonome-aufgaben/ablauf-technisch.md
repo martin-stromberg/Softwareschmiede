@@ -186,7 +186,7 @@ ProjektleiterAgentService.StarteAgenAsync(konfiguration)
 
 2. **Skills vorbereiten**
    - Lade Skill `skills/skill_projektleiter_v1.md` aus Dateisystem
-   - Registriere weitereSkills aus DB (`SkillDefinition` mit `SkillStatus == Freigegeben`)
+   - Registriere weitereSkills aus DB (`SkillDefinition` mit `Status == Freigegeben`)
 
 3. **Agent erzeugen und starten**
    ```csharp

@@ -101,7 +101,7 @@
             <TabItem Header="Skills">
                 <ListBox AutomationProperties.Name="AutonomAufgabeSkillsListe"
                          ItemsSource="{Binding Skills}"
-                         DisplayMemberPath="SkillName" />
+                         DisplayMemberPath="Name" />
             </TabItem>
 
             <TabItem Header="Unteragenten">

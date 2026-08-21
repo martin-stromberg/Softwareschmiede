@@ -12,16 +12,16 @@ public sealed class SkillDefinition
     public Guid AutonomAufgabeId { get; set; }
 
     /// <summary>Name des Skills (z. B. "projektleiter-v1").</summary>
-    public string SkillName { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 
     /// <summary>Versionsnummer des Skills.</summary>
-    public string SkillVersion { get; set; } = string.Empty;
+    public string Version { get; set; } = string.Empty;
 
     /// <summary>Markdown-Inhalt des Skills.</summary>
-    public string SkillContent { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
 
     /// <summary>Lifecycle-Status des Skills.</summary>
-    public SkillStatus SkillStatus { get; set; }
+    public SkillStatus Status { get; set; }
 
     /// <summary>Erstellungszeitpunkt der Skill-Definition.</summary>
     public DateTimeOffset ErstellungsDatum { get; set; }
