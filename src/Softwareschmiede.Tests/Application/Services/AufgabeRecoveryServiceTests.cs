@@ -30,7 +30,6 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
     /// <summary><summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning.</summary>.</summary>
     [Fact]
-    /// <summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning.</summary>
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskIsInArbeitAndNotRunning()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -47,7 +46,6 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
     /// <summary><summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning.</summary>.</summary>
     [Fact]
-    /// <summary>RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning.</summary>
     public async Task RecoverManuellAsync_ShouldSetStatusAndCreateAudit_WhenTaskInWartendAndNotRunning()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Wartend);
@@ -76,7 +74,6 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
     [InlineData(AufgabeStatus.Neu, AufgabeAusfuehrungsStatus.Aktiv, false)]
     [InlineData(AufgabeStatus.Archiviert, AufgabeAusfuehrungsStatus.Aktiv, false)]
     [InlineData(AufgabeStatus.Beendet, AufgabeAusfuehrungsStatus.Aktiv, false)]
-    /// <summary>IstRecoveryStatus_ShouldMatchAllowedStates.</summary>
     public void IstRecoveryStatus_ShouldMatchAllowedStates(AufgabeStatus status, AufgabeAusfuehrungsStatus ausfuehrungsStatus, bool expected)
     {
         AufgabeRecoveryService.IstRecoveryStatus(status, ausfuehrungsStatus).Should().Be(expected);
@@ -84,7 +81,6 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
     /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>.</summary>
     [Fact]
-    /// <summary>RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning.</summary>
     public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsStillRunning()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -99,7 +95,6 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
     /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable.</summary>.</summary>
     [Fact]
-    /// <summary>RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable.</summary>
     public async Task RecoverManuellAsync_ShouldThrow_WhenStatusIsNotRecoverable()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Neu);
@@ -114,7 +109,6 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
     /// <summary><summary>RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails.</summary>.</summary>
     [Fact]
-    /// <summary>RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails.</summary>
     public async Task RecoverManuellAsync_ShouldThrow_WhenRunningCheckFails()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -255,7 +249,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
     private sealed class FakeRunningAutomationStatusSource(bool isRunning) : IRunningAutomationStatusSource
     {
+#pragma warning disable CS0067 // von IRunningAutomationStatusSource gefordert, in diesem Fake ungenutzt
         public event Action<int, int>? RunningCountChanged;
+#pragma warning restore CS0067
         /// <summary>GetRunningCount.</summary>
         public int GetRunningCount() => isRunning ? 1 : 0;
         /// <summary>IsRunning.</summary>
@@ -264,7 +260,9 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
 
     private sealed class ThrowingRunningAutomationStatusSource : IRunningAutomationStatusSource
     {
+#pragma warning disable CS0067 // von IRunningAutomationStatusSource gefordert, in diesem Fake ungenutzt
         public event Action<int, int>? RunningCountChanged;
+#pragma warning restore CS0067
         /// <summary>GetRunningCount.</summary>
         public int GetRunningCount() => 0;
         /// <summary>IsRunning.</summary>

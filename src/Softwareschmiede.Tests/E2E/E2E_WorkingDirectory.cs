@@ -17,8 +17,8 @@ namespace Softwareschmiede.Tests.E2E;
 /// Konsolidierung (Issue #153): <see cref="RepositoryZuweisung"/> führt fünf der sechs Szenarien
 /// (beide Repository-Zuweisungs-Pfade, die Arbeitsverzeichnis-Bearbeitung sowie die beiden
 /// Start-Fehlerfälle) als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle aus. Jede
-/// Phase räumt ihr Projekt bzw. ihre Aufgabe über <see cref="DeleteCurrentProject"/> /
-/// <see cref="DeleteCurrentTask"/> wieder auf, bevor die nächste Phase beginnt - damit bleiben
+/// Phase räumt ihr Projekt bzw. ihre Aufgabe über <see cref="WpfTestBase.DeleteCurrentProject"/> /
+/// <see cref="WpfTestBase.DeleteCurrentTask"/> wieder auf, bevor die nächste Phase beginnt - damit bleiben
 /// DB-Abfragen wie <c>Single()</c>/<c>SingleOrDefault()</c> gültig, obwohl mehrere Projekte/Repositories
 /// nacheinander im selben Prozess angelegt werden. Die Fallback-Zuweisung
 /// (<see cref="RepositoryZuweisen_MitFehlgeschlagenemStrukturabruf_ZeigtTextBoxUndSpeichertManuellenPfad_E2E"/>)
@@ -44,7 +44,7 @@ public partial class End2EndTest
     /// mit erfolgreichem Strukturabruf (Auswahlbox), Arbeitsverzeichnis-Bearbeitung mit fehlgeschlagenem
     /// Strukturabruf, sowie die beiden Start-Fehlerfälle (fehlendes Arbeitsverzeichnis, Path-Traversal).
     /// Jede Phase räumt ihr Projekt bzw. ihre Aufgabe auf, bevor die nächste beginnt (siehe
-    /// <see cref="DeleteCurrentProject"/>, <see cref="DeleteCurrentTask"/>).
+    /// <see cref="WpfTestBase.DeleteCurrentProject"/>, <see cref="WpfTestBase.DeleteCurrentTask"/>).
     /// </summary>
     protected async Task RepositoryZuweisung(Window mainWindow)
     {

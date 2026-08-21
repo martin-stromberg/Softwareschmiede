@@ -704,7 +704,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>PluginMetadata_ShouldExposeExpectedValues.</summary>.</summary>
     [Fact]
-    /// <summary>PluginMetadata_ShouldExposeExpectedValues.</summary>
     public void PluginMetadata_ShouldExposeExpectedValues()
     {
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHub");
@@ -950,7 +949,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>PushBranchAsync_ShouldConfigureRemoteUrlWithToken_BeforePush.</summary>.</summary>
     [Fact]
-    /// <summary>PushBranchAsync_ShouldConfigureRemoteUrlWithToken_BeforePush.</summary>
     public async Task PushBranchAsync_ShouldConfigureRemoteUrlWithToken_BeforePush()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
@@ -1000,7 +998,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>PushBranchAsync_ShouldNotSetRemoteUrl_WhenTokenIsMissing.</summary>.</summary>
     [Fact]
-    /// <summary>PushBranchAsync_ShouldNotSetRemoteUrl_WhenTokenIsMissing.</summary>
     public async Task PushBranchAsync_ShouldNotSetRemoteUrl_WhenTokenIsMissing()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns((string?)null);
@@ -1024,7 +1021,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>.</summary>
     [Fact]
-    /// <summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>
     public async Task PushBranchAsync_ShouldThrow_WhenPushFails()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
@@ -1050,7 +1046,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>PullAsync_ShouldRunGitPull_WithConfiguredCredentials.</summary>.</summary>
     [Fact]
-    /// <summary>PullAsync_ShouldRunGitPull_WithConfiguredCredentials.</summary>
     public async Task PullAsync_ShouldRunGitPull_WithConfiguredCredentials()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
@@ -1081,7 +1076,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>.</summary>
     [Fact]
-    /// <summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>
     public async Task PullAsync_ShouldThrow_WhenGitPullFails()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns((string?)null);
@@ -1100,7 +1094,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>.</summary>
     [Fact]
-    /// <summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>
     public async Task ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1118,7 +1111,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>.</summary>
     [Fact]
-    /// <summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>
     public async Task ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1136,7 +1128,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>.</summary>
     [Fact]
-    /// <summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>
     public async Task GetRemoteBranchesAsync_ShouldParseAndSortBranches()
     {
         const string output = """
@@ -1160,7 +1151,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>.</summary>
     [Fact]
-    /// <summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>
     public async Task GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1178,7 +1168,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>.</summary>
     [Fact]
-    /// <summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>
     public async Task GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1196,7 +1185,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>.</summary>
     [Fact]
-    /// <summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>
     public async Task GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1214,7 +1202,6 @@ public sealed class GitHubPluginTests
 
     /// <summary><summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>.</summary>
     [Fact]
-    /// <summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>
     public async Task CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(

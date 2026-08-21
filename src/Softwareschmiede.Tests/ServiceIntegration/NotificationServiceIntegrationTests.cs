@@ -29,7 +29,6 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
 
     /// <summary><summary>BenachrichtigungsModus_Banner_IstVorhanden.</summary>.</summary>
     [Fact]
-    /// <summary>BenachrichtigungsModus_Banner_IstVorhanden.</summary>
     public void BenachrichtigungsModus_Banner_IstVorhanden()
     {
         Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Banner);
@@ -37,7 +36,6 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
 
     /// <summary><summary>BenachrichtigungsModus_Ton_IstVorhanden.</summary>.</summary>
     [Fact]
-    /// <summary>BenachrichtigungsModus_Ton_IstVorhanden.</summary>
     public void BenachrichtigungsModus_Ton_IstVorhanden()
     {
         Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Ton);
@@ -45,7 +43,6 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
 
     /// <summary><summary>BenachrichtigungsModus_Deaktiviert_IstVorhanden.</summary>.</summary>
     [Fact]
-    /// <summary>BenachrichtigungsModus_Deaktiviert_IstVorhanden.</summary>
     public void BenachrichtigungsModus_Deaktiviert_IstVorhanden()
     {
         Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Deaktiviert);
@@ -53,7 +50,6 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
 
     /// <summary><summary>BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen.</summary>.</summary>
     [Fact]
-    /// <summary>BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen.</summary>
     public async Task BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen()
     {
         var benutzerId = "test-user";
@@ -68,7 +64,6 @@ public sealed class NotificationServiceIntegrationTests : IDisposable
 
     /// <summary><summary>BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus.</summary>.</summary>
     [Fact]
-    /// <summary>BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus.</summary>
     public async Task BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus()
     {
         var benutzerId = "audit-user";

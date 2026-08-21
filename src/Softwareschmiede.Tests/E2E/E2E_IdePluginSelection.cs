@@ -26,7 +26,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// statt unter Category=OsInterface.
 ///
 /// Statt eines echten Prozessstarts wird <see cref="IProzessStarter"/> durch einen aufzeichnenden
-/// Test-Double ersetzt (analog zu <see cref="Infrastructure.Services.AufzeichnenderProzessStarter"/>,
+/// Test-Double ersetzt (analog zu <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/>,
 /// der auch für echte FlaUI-E2E-Tests im Testmodus verwendet wird).
 /// </summary>
 public sealed class E2E_IdePluginSelection : IDisposable

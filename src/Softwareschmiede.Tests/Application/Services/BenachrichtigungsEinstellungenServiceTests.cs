@@ -20,7 +20,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>SaveAsync_ShouldPersistModesPerUser.</summary>.</summary>
     [Fact]
-    /// <summary>SaveAsync_ShouldPersistModesPerUser.</summary>
     public async Task SaveAsync_ShouldPersistModesPerUser()
     {
         await using var db = CreateDb();
@@ -37,7 +36,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>GetAsync_ShouldReturnDefaults_WhenNoSettingsExist.</summary>.</summary>
     [Fact]
-    /// <summary>GetAsync_ShouldReturnDefaults_WhenNoSettingsExist.</summary>
     public async Task GetAsync_ShouldReturnDefaults_WhenNoSettingsExist()
     {
         await using var db = CreateDb();
@@ -51,7 +49,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>SaveAsync_ShouldUpsertExistingUserSettings.</summary>.</summary>
     [Fact]
-    /// <summary>SaveAsync_ShouldUpsertExistingUserSettings.</summary>
     public async Task SaveAsync_ShouldUpsertExistingUserSettings()
     {
         await using var db = CreateDb();
@@ -68,7 +65,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>UploadAudioAsync_ShouldRejectOversizedFiles.</summary>.</summary>
     [Fact]
-    /// <summary>UploadAudioAsync_ShouldRejectOversizedFiles.</summary>
     public async Task UploadAudioAsync_ShouldRejectOversizedFiles()
     {
         await using var db = CreateDb();
@@ -83,7 +79,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>UploadAudioAsync_ShouldRejectEmptyPayload.</summary>.</summary>
     [Fact]
-    /// <summary>UploadAudioAsync_ShouldRejectEmptyPayload.</summary>
     public async Task UploadAudioAsync_ShouldRejectEmptyPayload()
     {
         await using var db = CreateDb();
@@ -97,7 +92,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>UploadAudioAsync_ShouldRejectInvalidExtension.</summary>.</summary>
     [Fact]
-    /// <summary>UploadAudioAsync_ShouldRejectInvalidExtension.</summary>
     public async Task UploadAudioAsync_ShouldRejectInvalidExtension()
     {
         await using var db = CreateDb();
@@ -111,7 +105,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>UploadAudioAsync_ShouldRejectInvalidMimeType.</summary>.</summary>
     [Fact]
-    /// <summary>UploadAudioAsync_ShouldRejectInvalidMimeType.</summary>
     public async Task UploadAudioAsync_ShouldRejectInvalidMimeType()
     {
         await using var db = CreateDb();
@@ -125,7 +118,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension.</summary>.</summary>
     [Fact]
-    /// <summary>UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension.</summary>
     public async Task UploadAudioAsync_ShouldRejectWhenSignatureDoesNotMatchExtension()
     {
         await using var db = CreateDb();
@@ -140,7 +132,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>UploadAudioAsync_ShouldStoreAndResolveAudioPayload.</summary>.</summary>
     [Fact]
-    /// <summary>UploadAudioAsync_ShouldStoreAndResolveAudioPayload.</summary>
     public async Task UploadAudioAsync_ShouldStoreAndResolveAudioPayload()
     {
         await using var db = CreateDb();
@@ -157,7 +148,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing.</summary>.</summary>
     [Fact]
-    /// <summary>UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing.</summary>
     public async Task UploadAudioAsync_ShouldSanitizeFilenameAndInferMimeType_WhenMimeIsMissing()
     {
         await using var db = CreateDb();
@@ -178,7 +168,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists.</summary>.</summary>
     [Fact]
-    /// <summary>RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists.</summary>
     public async Task RemoveAudioAsync_ShouldDoNothing_WhenNoAudioExists()
     {
         await using var db = CreateDb();
@@ -191,7 +180,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>RemoveAudioAsync_ShouldDeleteStoredAudio.</summary>.</summary>
     [Fact]
-    /// <summary>RemoveAudioAsync_ShouldDeleteStoredAudio.</summary>
     public async Task RemoveAudioAsync_ShouldDeleteStoredAudio()
     {
         await using var db = CreateDb();
@@ -209,7 +197,6 @@ public sealed class BenachrichtigungsEinstellungenServiceTests
 
     /// <summary><summary>GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty.</summary>.</summary>
     [Fact]
-    /// <summary>GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty.</summary>
     public async Task GetAudioPayloadAsync_ShouldReturnNull_WhenStoredAudioContentIsEmpty()
     {
         await using var db = CreateDb();

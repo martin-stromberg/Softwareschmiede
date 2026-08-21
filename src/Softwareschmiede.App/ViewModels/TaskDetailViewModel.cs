@@ -1867,7 +1867,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Formatiert einen Einstiegspunkt für die Anzeige im Auswahl-Dialog plugin-qualifiziert:
     /// <c>"{PluginName}: {DisplayName ?? Dateiname}"</c>, außer die ermittelte Bezeichnung ist bereits
-    /// identisch mit dem <see cref="IIdePlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
+    /// identisch mit dem <see cref="IPlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
     /// dessen einziger Einstiegspunkt bereits <c>DisplayName == PluginName</c> liefert) — dann wird nur der
     /// Plugin-Name angezeigt, um ein Doppel-Label zu vermeiden.
     /// </summary>

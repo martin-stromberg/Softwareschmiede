@@ -71,7 +71,7 @@ public sealed class PseudoConsoleSessionTests
     }
 
     /// <summary>Blockiert der native Read bereits (z. B. weil ein isAsync:false-FileStream einen laufenden
-    /// ReadFile-Syscall wrappt), unterbricht <see cref="CancellationTokenSource.Cancel"/> ihn nicht, da das
+    /// ReadFile-Syscall wrappt), unterbricht <see cref="CancellationTokenSource.Cancel()"/> ihn nicht, da das
     /// Token nur zwischen zwei Lesevorgängen ausgewertet wird. <see cref="PseudoConsoleSession.Dispose"/> muss
     /// deshalb zusätzlich den Output-Stream schließen, damit ein solcher Read sofort mit einem I/O-Fehler
     /// zurückkehrt, statt den vollen Leseschleifen-Timeout ergebnislos ablaufen zu lassen.</summary>
@@ -298,7 +298,7 @@ public sealed class PseudoConsoleSessionTests
     }
 
     /// <summary>Stream, dessen Lesevorgang erst zurückkehrt, wenn das übergebene CancellationToken abgebrochen
-    /// wird (simuliert einen Prozess, der aktuell keine Ausgabe produziert). Erfasst, ob <see cref="Dispose(bool)"/>
+    /// wird (simuliert einen Prozess, der aktuell keine Ausgabe produziert). Erfasst, ob <see cref="Stream.Dispose(bool)"/>
     /// aufgerufen wurde.</summary>
     private sealed class BlockingUntilCancelledStream : Stream
     {
@@ -329,7 +329,7 @@ public sealed class PseudoConsoleSessionTests
         }
     }
 
-    /// <summary>Stream, der zählt, wie oft <see cref="Dispose(bool)"/> aufgerufen wurde — dient zum Nachweis,
+    /// <summary>Stream, der zählt, wie oft <see cref="Stream.Dispose(bool)"/> aufgerufen wurde — dient zum Nachweis,
     /// dass <see cref="PseudoConsoleSession.Dispose"/> bei gleichzeitigem Aufruf aus mehreren Threads seinen
     /// Aufräum-Code nicht mehrfach ausführt.</summary>
     private sealed class DisposeCountingStream : Stream
@@ -365,7 +365,7 @@ public sealed class PseudoConsoleSessionTests
 
     /// <summary>Stream, dessen Lesevorgang das übergebene <see cref="CancellationToken"/> absichtlich ignoriert und
     /// erst zurückkehrt, wenn der Stream selbst disposed wird — simuliert einen bereits blockierten nativen Read
-    /// (isAsync:false-FileStream), der durch <see cref="CancellationTokenSource.Cancel"/> allein nicht unterbrochen
+    /// (isAsync:false-FileStream), der durch <see cref="CancellationTokenSource.Cancel()"/> allein nicht unterbrochen
     /// werden kann, sondern nur durch Schließen des Streams.</summary>
     private sealed class NonCancelableBlockingStream : Stream
     {
@@ -431,7 +431,7 @@ public sealed class PseudoConsoleSessionTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    /// <summary>Stream, dessen Lesevorgang niemals zurückkehrt — auch nicht nach <see cref="Dispose(bool)"/> —
+    /// <summary>Stream, dessen Lesevorgang niemals zurückkehrt — auch nicht nach <see cref="Stream.Dispose(bool)"/> —
     /// um den Worst Case einer Leseschleife zu simulieren, die partout nicht zeitnah beendet werden kann.</summary>
     private sealed class HangingForeverStream : Stream
     {

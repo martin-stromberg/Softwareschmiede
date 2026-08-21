@@ -27,7 +27,6 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary><summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>.</summary>
     [Fact]
-    /// <summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>
     public async Task GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist()
     {
         // Act
@@ -39,7 +38,6 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary><summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>.</summary>
     [Fact]
-    /// <summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>
     public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists()
     {
         // Arrange
@@ -59,7 +57,6 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary><summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>.</summary>
     [Fact]
-    /// <summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>
     public async Task GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit()
     {
         // Arrange
@@ -77,7 +74,6 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary><summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>.</summary>
     [Fact]
-    /// <summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>
     public async Task GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows()
     {
         // Arrange
@@ -93,7 +89,6 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary><summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>.</summary>
     [Fact]
-    /// <summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>
     public async Task GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe()
     {
         // Arrange
@@ -143,7 +138,6 @@ public sealed class DiffServiceTests : IDisposable
 
     /// <summary><summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>.</summary>
     [Fact]
-    /// <summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>
     public async Task DeleteDiffAsync_ShouldDeleteDiff_WhenExisting()
     {
         // Arrange

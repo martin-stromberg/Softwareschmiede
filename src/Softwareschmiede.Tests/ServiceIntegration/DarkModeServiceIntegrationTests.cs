@@ -23,7 +23,6 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
 
     /// <summary><summary>DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt.</summary>.</summary>
     [Fact]
-    /// <summary>DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt.</summary>
     public async Task DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt()
     {
         await _einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, "Dark");
@@ -34,7 +33,6 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
 
     /// <summary><summary>DarkMode_KannAufLightUmgestellt_Werden.</summary>.</summary>
     [Fact]
-    /// <summary>DarkMode_KannAufLightUmgestellt_Werden.</summary>
     public async Task DarkMode_KannAufLightUmgestellt_Werden()
     {
         await _einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, "Dark");
@@ -46,7 +44,6 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
 
     /// <summary><summary>DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung.</summary>.</summary>
     [Fact]
-    /// <summary>DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung.</summary>
     public async Task DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung()
     {
         var geladen = await _einstellungService.GetSettingAsync(AppEinstellungService.DesignModeKey);
@@ -55,7 +52,6 @@ public sealed class DarkModeServiceIntegrationTests : IDisposable
 
     /// <summary><summary>DarkMode_WirdBeimNeustart_Wiederhergestellt.</summary>.</summary>
     [Fact]
-    /// <summary>DarkMode_WirdBeimNeustart_Wiederhergestellt.</summary>
     public async Task DarkMode_WirdBeimNeustart_Wiederhergestellt()
     {
         await _einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, "Dark");

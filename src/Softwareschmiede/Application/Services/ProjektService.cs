@@ -305,6 +305,7 @@ public sealed class ProjektService
     /// </summary>
     /// <param name="repositoryId">ID des Repositories.</param>
     /// <param name="workingDirectoryRelativePath">Relativer Pfad zum Arbeitsverzeichnis, oder <c>null</c>/<c>"."</c> für das Repository-Root.</param>
+    /// <param name="ct">Abbruch-Token.</param>
     public async Task SaveRepositoryWorkingDirectoryAsync(Guid repositoryId, string? workingDirectoryRelativePath, CancellationToken ct = default)
     {
         var normalized = string.IsNullOrWhiteSpace(workingDirectoryRelativePath) || workingDirectoryRelativePath == "."
@@ -346,6 +347,7 @@ public sealed class ProjektService
     /// </summary>
     /// <param name="repositoryId">ID des Repositories.</param>
     /// <param name="defaultSourceBranchName">Name des konfigurierten Basis-Branch, oder <c>null</c> für den Remote-Standard-Branch.</param>
+    /// <param name="ct">Abbruch-Token.</param>
     public async Task<GitRepository> UpdateRepositorySourceBranchAsync(Guid repositoryId, string? defaultSourceBranchName, CancellationToken ct = default)
     {
         _logger.LogInformation("Basis-Branch für Repository {RepositoryId} aktualisieren.", repositoryId);
