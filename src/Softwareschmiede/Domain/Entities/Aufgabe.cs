@@ -74,6 +74,18 @@ public sealed class Aufgabe
     /// <summary>Geplanter Ausführungszeitpunkt für den nächsten Prompt.</summary>
     public DateTimeOffset? VorschlagAusfuehrenAbUtc { get; set; }
 
+    /// <summary>ID des aktuell laufenden Projektleiter-Agenten (nur für Autonome Aufgaben).</summary>
+    public string? ProjektleiterAgentId { get; set; }
+
+    /// <summary>Zeitstempel der letzten Session-Pause wegen Budget-Limit (nur für Autonome Aufgaben).</summary>
+    public DateTimeOffset? SessionPauseUtc { get; set; }
+
+    /// <summary>Anzahl aktuell aktiver Unteragenten (nur für Autonome Aufgaben).</summary>
+    public int? AktiveUnteragenten { get; set; }
+
+    /// <summary>Navigationseigenschaft zur Konfiguration der Autonomen Aufgabe (null für reguläre Aufgaben).</summary>
+    public AutonomAufgabeKonfiguration? AutonomKonfiguration { get; set; }
+
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
 

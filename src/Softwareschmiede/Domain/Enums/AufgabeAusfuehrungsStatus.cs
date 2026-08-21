@@ -10,5 +10,8 @@ public enum AufgabeAusfuehrungsStatus
     Aktiv,
 
     /// <summary>Die KI-Ausfuehrung wurde beendet; ein erneuter Start muss explizit ausgeloest werden.</summary>
-    Beendet
+    Beendet,
+
+    /// <summary>Die Aufgabe ist eine Autonome Aufgabe unter Steuerung eines Projektleiter-Agenten.</summary>
+    AutonomAufgabe
 }

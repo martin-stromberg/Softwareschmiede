@@ -95,7 +95,7 @@ public abstract class WpfTestBase : IDisposable
     }
 
     /// <summary>
-    /// Löscht die Logdatei des <see cref="Infrastructure.Services.AufzeichnenderProzessStarter"/>, falls sie existiert.
+    /// Löscht die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/>, falls sie existiert.
     /// Verhindert, dass Einträge aus vorherigen Testläufen die Substring-Prüfungen von
     /// <see cref="WaitForProzessStartEintragAsync"/> verfälschen.
     /// </summary>
@@ -112,10 +112,10 @@ public abstract class WpfTestBase : IDisposable
         => AufzeichnenderProzessStarter.ResolveLogDateiPfad(_testDbPath);
 
     /// <summary>
-    /// Wartet, bis die Logdatei des <see cref="Infrastructure.Services.AufzeichnenderProzessStarter"/> einen
+    /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/> einen
     /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
     /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>IProzessStarter</c> auf
-    /// <see cref="Infrastructure.Services.AufzeichnenderProzessStarter"/> zeigt.
+    /// <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/> zeigt.
     /// </summary>
     /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags.</param>
     /// <param name="timeout">Maximale Wartezeit. Standard: <see cref="Short"/>.</param>

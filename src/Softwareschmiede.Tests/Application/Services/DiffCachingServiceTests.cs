@@ -25,7 +25,6 @@ public sealed class DiffCachingServiceTests : IDisposable
 
     /// <summary><summary>SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache.</summary>.</summary>
     [Fact]
-    /// <summary>SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache.</summary>
     public async Task SetInCacheAsync_AndGetFromCacheAsync_ShouldReturnResultFromCache()
     {
         // Arrange
@@ -43,7 +42,6 @@ public sealed class DiffCachingServiceTests : IDisposable
 
     /// <summary><summary>GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired.</summary>.</summary>
     [Fact]
-    /// <summary>GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired.</summary>
     public async Task GetFromCacheAsync_ShouldReturnNull_WhenCacheExpired()
     {
         // Arrange
@@ -70,7 +68,6 @@ public sealed class DiffCachingServiceTests : IDisposable
 
     /// <summary><summary>InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache.</summary>.</summary>
     [Fact]
-    /// <summary>InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache.</summary>
     public async Task InvalidateCacheAsync_ShouldMarkPersistentEntryInvalid_AndRemoveMemoryCache()
     {
         // Arrange
@@ -89,7 +86,6 @@ public sealed class DiffCachingServiceTests : IDisposable
 
     /// <summary><summary>CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries.</summary>.</summary>
     [Fact]
-    /// <summary>CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries.</summary>
     public async Task CleanupExpiredCachesAsync_ShouldDeleteOnlyExpiredEntries()
     {
         // Arrange

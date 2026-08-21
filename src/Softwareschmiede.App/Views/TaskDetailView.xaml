@@ -187,6 +187,18 @@
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
+                <!-- Gruppe: Autonome Aufgabe -->
+                <controls:RibbonGroup GruppenName="Autonome Aufgabe">
+                    <controls:RibbonGroup.ItemsContent>
+                        <StackPanel Orientation="Horizontal">
+                            <controls:RibbonLargeButton ButtonIcon="🤖"
+                                                        ButtonText="Autonome Aufgabe starten"
+                                                        AutomationName="AutonomAufgabeInitialisieren"
+                                                        ButtonCommand="{Binding AutonomAufgabeInitialisierenCommand}" />
+                        </StackPanel>
+                    </controls:RibbonGroup.ItemsContent>
+                </controls:RibbonGroup>
+
                 <!-- Gruppe: Issue -->
                 <controls:RibbonGroup GruppenName="Issue"
                                       Visibility="{Binding ShowIssueGroup, Converter={StaticResource BoolToVisibilityConverter}}">

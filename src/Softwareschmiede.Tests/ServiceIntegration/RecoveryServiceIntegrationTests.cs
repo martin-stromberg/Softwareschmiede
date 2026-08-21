@@ -32,7 +32,6 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>.</summary>
     [Fact]
-    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>
     public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -48,7 +47,6 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary><summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>.</summary>
     [Fact]
-    /// <summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>
     public async Task ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -64,7 +62,6 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>.</summary>
     [Fact]
-    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>
     public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Wartend);
@@ -80,7 +77,6 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary><summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>.</summary>
     [Fact]
-    /// <summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>
     public async Task ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -96,7 +92,6 @@ public sealed class RecoveryServiceIntegrationTests : IDisposable
 
     /// <summary><summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>.</summary>
     [Fact]
-    /// <summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>
     public async Task RecoverManuellAsync_Setzt_StatusAufGestartet()
     {
         var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
@@ -146,7 +141,9 @@ internal sealed class E2EFakeRunningStatusSource : IRunningAutomationStatusSourc
     /// <summary>E2EFakeRunningStatusSource.</summary>
     public E2EFakeRunningStatusSource(bool isRunning) => _isRunning = isRunning;
 
+#pragma warning disable CS0067 // von IRunningAutomationStatusSource gefordert, in diesem Fake ungenutzt
     public event Action<int, int>? RunningCountChanged;
+#pragma warning restore CS0067
 
     /// <summary>IsRunning.</summary>
     public bool IsRunning(Guid aufgabeId) => _isRunning;

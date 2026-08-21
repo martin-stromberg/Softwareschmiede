@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 
@@ -7,6 +8,16 @@ namespace Softwareschmiede.Infrastructure.Data;
 /// <summary>Entity Framework Core DbContext für die Softwareschmiede-Anwendung.</summary>
 public sealed class SoftwareschmiededDbContext : DbContext
 {
+    // Gemeinsame Konverter für DateTimeOffset <-> Unix-Millisekunden (long), damit SQLite ORDER BY
+    // funktioniert. Wird von praktisch allen Entities mit Zeitstempel-Properties referenziert.
+    private static readonly ValueConverter<DateTimeOffset, long> UnixMillisConverter = new(
+        v => v.ToUnixTimeMilliseconds(),
+        v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+
+    private static readonly ValueConverter<DateTimeOffset?, long?> NullableUnixMillisConverter = new(
+        v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
+        v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+
     /// <inheritdoc/>
     public SoftwareschmiededDbContext(DbContextOptions<SoftwareschmiededDbContext> options) : base(options) { }
 
@@ -73,6 +84,15 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>To-Do-Elemente von Aufgaben.</summary>
     public DbSet<Todo> Todos => Set<Todo>();
 
+    /// <summary>Konfigurationen von Autonomen Aufgaben.</summary>
+    public DbSet<AutonomAufgabeKonfiguration> AutonomAufgabeKonfigurationen => Set<AutonomAufgabeKonfiguration>();
+
+    /// <summary>Unteragenten-Spezifikationen von Autonomen Aufgaben.</summary>
+    public DbSet<UnteragentSpezifikation> UnteragentSpezifikationen => Set<UnteragentSpezifikation>();
+
+    /// <summary>Skill-Definitionen von Autonomen Aufgaben.</summary>
+    public DbSet<SkillDefinition> SkillDefinitionen => Set<SkillDefinition>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -84,9 +104,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.HasKey(p => p.Id);
             e.Property(p => p.Status).HasConversion<string>();
             // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
-            e.Property(p => p.ErstellungsDatum).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(p => p.ErstellungsDatum).HasConversion(UnixMillisConverter);
             e.HasMany(p => p.Repositories)
                 .WithOne(r => r.Projekt)
                 .HasForeignKey(r => r.ProjektId)
@@ -131,22 +149,12 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .HasConversion<string>()
                 .HasDefaultValue(AufgabeAusfuehrungsStatus.NichtGestartet);
             // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
-            e.Property(a => a.ErstellungsDatum).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
-            e.Property(a => a.AbschlussDatum).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
-            e.Property(a => a.LastHeartbeatUtc).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
-            e.Property(a => a.LetzterCliStartUtc).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(a => a.ErstellungsDatum).HasConversion(UnixMillisConverter);
+            e.Property(a => a.AbschlussDatum).HasConversion(NullableUnixMillisConverter);
+            e.Property(a => a.LastHeartbeatUtc).HasConversion(NullableUnixMillisConverter);
+            e.Property(a => a.LetzterCliStartUtc).HasConversion(NullableUnixMillisConverter);
             e.Property(a => a.LaufStatus).HasConversion<string>();
-            e.Property(a => a.VorschlagAusfuehrenAbUtc).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(a => a.VorschlagAusfuehrenAbUtc).HasConversion(NullableUnixMillisConverter);
             e.Property(a => a.RecoveryVersion)
                 .HasDefaultValue(0)
                 .IsConcurrencyToken();
@@ -179,6 +187,61 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(t => t.Aufgabe)
                 .HasForeignKey(t => t.AufgabeId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.Property(a => a.SessionPauseUtc).HasConversion(NullableUnixMillisConverter);
+            e.HasOne(a => a.AutonomKonfiguration)
+                .WithOne(k => k.Aufgabe)
+                .HasForeignKey<AutonomAufgabeKonfiguration>(k => k.AufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // AutonomAufgabeKonfiguration
+        modelBuilder.Entity<AutonomAufgabeKonfiguration>(e =>
+        {
+            e.HasKey(k => k.Id);
+            e.HasIndex(k => k.AufgabeId).IsUnique();
+            e.Property(k => k.ProjektBranchName).IsRequired().HasMaxLength(255);
+            e.Property(k => k.InitialPrompt).IsRequired();
+            e.Property(k => k.PermissionsJsonPfad).IsRequired().HasMaxLength(512);
+            e.Property(k => k.PersistenzModus).IsRequired().HasConversion<string>();
+            e.Property(k => k.ArbeitsverzeichnisPfad).IsRequired().HasMaxLength(512);
+            e.HasMany(k => k.Unteragenten)
+                .WithOne(u => u.AutonomAufgabe)
+                .HasForeignKey(u => u.AutonomAufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(k => k.Skills)
+                .WithOne(s => s.AutonomAufgabe)
+                .HasForeignKey(s => s.AutonomAufgabeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // UnteragentSpezifikation
+        modelBuilder.Entity<UnteragentSpezifikation>(e =>
+        {
+            e.HasKey(u => u.Id);
+            e.Property(u => u.AgentId).IsRequired();
+            e.Property(u => u.TaskId).IsRequired();
+            e.Property(u => u.AgentScope).IsRequired();
+            e.Property(u => u.AgentPrompt).IsRequired();
+            e.Property(u => u.AgentDirectory).IsRequired().HasMaxLength(512);
+            e.Property(u => u.AgentBranch).IsRequired().HasMaxLength(255);
+            e.Property(u => u.AgentClone).IsRequired().HasMaxLength(512);
+            e.Property(u => u.Status).IsRequired().HasConversion<string>();
+            e.Property(u => u.ErzeugungsDatum).HasConversion(UnixMillisConverter);
+            e.Property(u => u.AbschlussDatum).HasConversion(NullableUnixMillisConverter);
+            e.HasIndex(u => u.AutonomAufgabeId);
+        });
+
+        // SkillDefinition
+        modelBuilder.Entity<SkillDefinition>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.Property(s => s.SkillName).IsRequired();
+            e.Property(s => s.SkillVersion).IsRequired();
+            e.Property(s => s.SkillContent).IsRequired();
+            e.Property(s => s.SkillStatus).IsRequired().HasConversion<string>();
+            e.Property(s => s.ErstellungsDatum).HasConversion(UnixMillisConverter);
+            e.Property(s => s.FreigabeDatum).HasConversion(NullableUnixMillisConverter);
+            e.HasIndex(s => s.AutonomAufgabeId);
         });
 
         // Todo
@@ -187,12 +250,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.HasKey(t => t.Id);
             e.Property(t => t.Beschreibung).IsRequired();
             // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
-            e.Property(t => t.ErstellungsDatum).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
-            e.Property(t => t.ErledigtAm).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(t => t.ErstellungsDatum).HasConversion(UnixMillisConverter);
+            e.Property(t => t.ErledigtAm).HasConversion(NullableUnixMillisConverter);
         });
 
         // IssueReferenz
@@ -230,15 +289,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(p => p.Status).HasConversion<string>();
             e.Property(p => p.MergeStatus).HasConversion<string>();
             e.Property(p => p.MonitoringPhase).HasConversion<string>();
-            e.Property(p => p.CreatedUtc).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
-            e.Property(p => p.LastCheckedUtc).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
-            e.Property(p => p.NextCheckUtc).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(p => p.CreatedUtc).HasConversion(UnixMillisConverter);
+            e.Property(p => p.LastCheckedUtc).HasConversion(NullableUnixMillisConverter);
+            e.Property(p => p.NextCheckUtc).HasConversion(NullableUnixMillisConverter);
             e.HasIndex(p => p.AufgabeId);
             e.HasIndex(p => new { p.Provider, p.RepositoryId, p.PullRequestNumber }).IsUnique();
             e.HasIndex(p => new { p.MonitoringPhase, p.LastCheckedUtc });
@@ -259,15 +312,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(w => w.BranchName).HasMaxLength(300);
             e.Property(w => w.Status).HasConversion<string>();
             e.Property(w => w.Conclusion).HasConversion<string>();
-            e.Property(w => w.StartedAtUtc).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
-            e.Property(w => w.CompletedAtUtc).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
-            e.Property(w => w.UpdatedUtc).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(w => w.StartedAtUtc).HasConversion(NullableUnixMillisConverter);
+            e.Property(w => w.CompletedAtUtc).HasConversion(NullableUnixMillisConverter);
+            e.Property(w => w.UpdatedUtc).HasConversion(UnixMillisConverter);
             e.HasIndex(w => w.PullRequestReferenzId);
             e.HasIndex(w => w.ProviderRunId);
             e.HasIndex(w => new { w.PullRequestReferenzId, w.ProviderRunId }).IsUnique();
@@ -279,9 +326,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.HasKey(p => p.Id);
             e.Property(p => p.Typ).HasConversion<string>();
             // DateTimeOffset als Unix-Millisekunden (long) speichern, damit SQLite ORDER BY funktioniert.
-            e.Property(p => p.Zeitstempel).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(p => p.Zeitstempel).HasConversion(UnixMillisConverter);
             e.HasMany(p => p.TestErgebnisse)
                 .WithOne(t => t.Protokolleintrag)
                 .HasForeignKey(t => t.ProtokollEintragId)
@@ -316,9 +361,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.HasIndex(a => a.Schluessel).IsUnique();
             e.Property(a => a.Wert)
                 .HasMaxLength(2000);
-            e.Property(a => a.AktualisiertAm).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(a => a.AktualisiertAm).HasConversion(UnixMillisConverter);
         });
 
         // PromptVorlage
@@ -330,12 +373,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .HasMaxLength(200);
             e.Property(p => p.Prompttext)
                 .IsRequired();
-            e.Property(p => p.ErstelltAm).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
-            e.Property(p => p.AktualisiertAm).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(p => p.ErstelltAm).HasConversion(UnixMillisConverter);
+            e.Property(p => p.AktualisiertAm).HasConversion(UnixMillisConverter);
             e.HasIndex(p => p.Sortierung);
         });
 
@@ -349,9 +388,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.HasIndex(b => b.BenutzerId).IsUnique();
             e.Property(b => b.BannerModus).HasConversion<string>();
             e.Property(b => b.TonModus).HasConversion<string>();
-            e.Property(b => b.AktualisiertAm).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(b => b.AktualisiertAm).HasConversion(UnixMillisConverter);
         });
 
         // BenachrichtigungsAudioDatei
@@ -370,9 +407,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .HasMaxLength(100);
             e.Property(b => b.Inhalt)
                 .IsRequired();
-            e.Property(b => b.HochgeladenAm).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(b => b.HochgeladenAm).HasConversion(UnixMillisConverter);
         });
 
         // BenachrichtigungsDispatchLog
@@ -388,9 +423,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(b => b.Grund)
                 .IsRequired()
                 .HasMaxLength(200);
-            e.Property(b => b.ErstelltAm).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(b => b.ErstelltAm).HasConversion(UnixMillisConverter);
             e.HasIndex(b => new { b.EreignisId, b.BenutzerId, b.Kanal }).IsUnique();
             e.HasIndex(b => b.AufgabeId);
             e.HasIndex(b => b.ErstelltAm);
@@ -414,12 +447,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(dr => dr.GeneratedBy)
                 .IsRequired()
                 .HasMaxLength(200);
-            e.Property(dr => dr.GeneratedAt).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
-            e.Property(dr => dr.ExpiresAt).HasConversion(
-                v => v.HasValue ? v.Value.ToUnixTimeMilliseconds() : (long?)null,
-                v => v.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(v.Value) : (DateTimeOffset?)null);
+            e.Property(dr => dr.GeneratedAt).HasConversion(UnixMillisConverter);
+            e.Property(dr => dr.ExpiresAt).HasConversion(NullableUnixMillisConverter);
 
             // Foreign keys
             e.HasOne(dr => dr.Aufgabe)
@@ -491,12 +520,8 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(dc => dc.CachedData)
                 .IsRequired();
             e.Property(dc => dc.CachingStrategy).HasConversion<string>();
-            e.Property(dc => dc.CachedAt).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
-            e.Property(dc => dc.ExpiresAt).HasConversion(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
+            e.Property(dc => dc.CachedAt).HasConversion(UnixMillisConverter);
+            e.Property(dc => dc.ExpiresAt).HasConversion(UnixMillisConverter);
 
             // Indizes
             e.HasIndex(dc => dc.CacheKey).IsUnique();

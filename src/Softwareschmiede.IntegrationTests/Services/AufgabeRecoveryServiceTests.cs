@@ -138,14 +138,18 @@ public sealed class AufgabeRecoveryServiceTests
 
     private sealed class AlwaysNotRunningAutomationStatusSource : IRunningAutomationStatusSource
     {
+#pragma warning disable CS0067 // von IRunningAutomationStatusSource gefordert, in diesem Fake ungenutzt
         public event Action<int, int>? RunningCountChanged;
+#pragma warning restore CS0067
         public int GetRunningCount() => 0;
         public bool IsRunning(Guid aufgabeId) => false;
     }
 
     private sealed class AlwaysRunningAutomationStatusSource : IRunningAutomationStatusSource
     {
+#pragma warning disable CS0067 // von IRunningAutomationStatusSource gefordert, in diesem Fake ungenutzt
         public event Action<int, int>? RunningCountChanged;
+#pragma warning restore CS0067
         public int GetRunningCount() => 1;
         public bool IsRunning(Guid aufgabeId) => true;
     }
@@ -153,7 +157,9 @@ public sealed class AufgabeRecoveryServiceTests
     private sealed class MutatingNotRunningAutomationStatusSource(Action beforeReturn) : IRunningAutomationStatusSource
     {
         private int _called;
+#pragma warning disable CS0067 // von IRunningAutomationStatusSource gefordert, in diesem Fake ungenutzt
         public event Action<int, int>? RunningCountChanged;
+#pragma warning restore CS0067
         public int GetRunningCount() => 0;
 
         public bool IsRunning(Guid aufgabeId)
@@ -173,7 +179,9 @@ public sealed class AufgabeRecoveryServiceTests
     private sealed class BarrieredNotRunningStatusSource(int participantCount) : IRunningAutomationStatusSource
     {
         private readonly Barrier _barrier = new(participantCount);
+#pragma warning disable CS0067 // von IRunningAutomationStatusSource gefordert, in diesem Fake ungenutzt
         public event Action<int, int>? RunningCountChanged;
+#pragma warning restore CS0067
         public int GetRunningCount() => 0;
 
         public bool IsRunning(Guid aufgabeId)

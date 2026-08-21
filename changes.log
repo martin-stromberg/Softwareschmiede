@@ -1,3 +1,18 @@
+## 2026-08-20 — Autonome Aufgaben: Projektleiter-Agent-basierte Automatisierung
+
+- Neuer Aufgabentyp `AutonomAufgabe` implementiert, der eine vollständig automatisierte Projektentwicklung durch einen Hauptagenten (Projektleiter) ermöglicht
+- Drei neue Domain-Entities: `AutonomAufgabeKonfiguration` (Konfiguration und Persistierung), `UnteragentSpezifikation` (Metadaten erzeugter Unteragenten), `SkillDefinition` (versionierte Skill-Definitionen mit Lifecycle-Status)
+- Neue Enums: `PersistenzModus` (Standard/SessionReset), `PermissionsJsonOption` (Generieren/Auswählen/Vorhandene), `UnteragentStatus` (Erzeugt/Ausgeführt/Abgeschlossen/Fehler), `SkillStatus` (Entwurf/Review/Freigegeben/Archiviert)
+- Service `AutonomAufgabenInitialisierungsService` orchestriert Erstellung des strukturierten Arbeitsverzeichnisses mit plan.md, progress.md, state.json, governance.md, permissions.json und Unterverzeichnissen (skills, clones, tasks, logs)
+- Service `ProjektleiterAgentService` verwaltet Projektleiter-Agent-Lifecycle, Unteragenten-Erzeugung und Integration von Ergebnissen
+- Service `SessionManagementService` implementiert Session-Pause/Resume bei Budget-Limits und Heartbeat-basierte Unterbrechungserkennung
+- Service `UnteragentGovernanceService` (Infrastruktur vorbereitet) erzwingt Governance-Regeln für Unteragenten-Isolation
+- UI: Neue ViewModels `AutonomAufgabeInitialisierungsDialogViewModel` und `AutonomAufgabeDetailViewModel` mit XAML-Views für Initialisierungsdialog und Detail-Panel
+- Initialisierungsformular mit konfigurierbaren Optionen: Projektbranch, Initialprompt, Permissions-Quelle, Token-Budget, Laufzeitbegrenzung, Persistenz-Modus, Skill-Autogeneration
+- Datenbank: Neue Spalten in `Aufgaben`-Tabelle (ProjektleiterAgentId, SessionPauseUtc, AktiveUnteragenten, AutonomKonfigurationId), drei neue Tabellen für Konfiguration/Unteragenten/Skills
+- Konfiguration in `appsettings.json`: Feature-Flag, Standard-Token-Budget (500.000), Standard-Laufzeitlimit (480 min), Heartbeat-Timeout (300 sec), max. gleichzeitige Unteragenten (5)
+- Dokumentation: Neue `docs/help/aufgaben/autonome-aufgaben/`-Struktur mit beschreibung.md, ablauf-technisch.md, datenmodell.md und architektur.md
+
 ## 2026-08-20 — Korrektur des Arbeitsablaufs: CLI-Panel-Sichtbarkeit auch bei beendeter Ausführung
 
 - Fehler behoben: Das CLI-Panel wurde fälschlicherweise ausgeblendet, wenn `AusfuehrungsStatus == Beendet` gesetzt wurde, obwohl die Aufgabe noch im Status `Gestartet` oder `Wartend` war.

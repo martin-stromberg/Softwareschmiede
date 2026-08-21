@@ -12,7 +12,6 @@ public sealed class GitPluginBaseTests
 {
     /// <summary><summary>CreateBranchAsync_ShouldRunCheckoutMinusB.</summary>.</summary>
     [Fact]
-    /// <summary>CreateBranchAsync_ShouldRunCheckoutMinusB.</summary>
     public async Task CreateBranchAsync_ShouldRunCheckoutMinusB()
     {
         var cli = new Mock<ICliRunner>();
@@ -32,7 +31,6 @@ public sealed class GitPluginBaseTests
 
     /// <summary><summary>CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails.</summary>.</summary>
     [Fact]
-    /// <summary>CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails.</summary>
     public async Task CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -75,7 +73,6 @@ public sealed class GitPluginBaseTests
 
     /// <summary><summary>CommitAsync_ShouldRunAddAndCommit.</summary>.</summary>
     [Fact]
-    /// <summary>CommitAsync_ShouldRunAddAndCommit.</summary>
     public async Task CommitAsync_ShouldRunAddAndCommit()
     {
         var cli = new Mock<ICliRunner>();
@@ -102,7 +99,6 @@ public sealed class GitPluginBaseTests
 
     /// <summary><summary>CommitAsync_ShouldThrow_WhenGitAddFails.</summary>.</summary>
     [Fact]
-    /// <summary>CommitAsync_ShouldThrow_WhenGitAddFails.</summary>
     public async Task CommitAsync_ShouldThrow_WhenGitAddFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -123,7 +119,6 @@ public sealed class GitPluginBaseTests
 
     /// <summary><summary>CommitAsync_ShouldThrow_WhenGitCommitFails.</summary>.</summary>
     [Fact]
-    /// <summary>CommitAsync_ShouldThrow_WhenGitCommitFails.</summary>
     public async Task CommitAsync_ShouldThrow_WhenGitCommitFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -151,7 +146,6 @@ public sealed class GitPluginBaseTests
 
     /// <summary><summary>CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess.</summary>.</summary>
     [Fact]
-    /// <summary>CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess.</summary>
     public async Task CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess()
     {
         var cli = new Mock<ICliRunner>();
@@ -171,7 +165,6 @@ public sealed class GitPluginBaseTests
 
     /// <summary><summary>EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails.</summary>.</summary>
     [Fact]
-    /// <summary>EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails.</summary>
     public async Task EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails()
     {
         var cli = new Mock<ICliRunner>();
@@ -192,7 +185,6 @@ public sealed class GitPluginBaseTests
 
     /// <summary><summary>ResetAsync_ShouldThrow_WhenGitFails.</summary>.</summary>
     [Fact]
-    /// <summary>ResetAsync_ShouldThrow_WhenGitFails.</summary>
     public async Task ResetAsync_ShouldThrow_WhenGitFails()
     {
         var cli = new Mock<ICliRunner>();

@@ -47,6 +47,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
+    private readonly AutonomAufgabeStartCoordinator _autonomAufgabeStartCoordinator;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -534,6 +535,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
     public ICommand IssueBrowserOeffnenCommand { get; }
 
+    /// <summary>Öffnet den Initialisierungsdialog für eine Autonome Aufgabe und anschließend deren Detail-Ansicht.</summary>
+    public ICommand AutonomAufgabeInitialisierenCommand { get; }
+
     /// <summary>Sendet die gewählte Promptvorlage an die laufende CLI.</summary>
     public ICommand PromptVorlageAuswaehlenCommand { get; }
 
@@ -585,6 +589,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         FileExplorerViewModel fileExplorerViewModel,
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
+        AutonomAufgabeStartCoordinator autonomAufgabeStartCoordinator,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -602,6 +607,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _fileExplorerViewModel = fileExplorerViewModel;
         _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
+        _autonomAufgabeStartCoordinator = autonomAufgabeStartCoordinator;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -637,6 +643,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IssueBrowserOeffnenCommand = new RelayCommand(
             IssueBrowserOeffnen,
             () => CurrentIssueReferenz?.IssueUrl != null);
+        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => _aufgabe is not null);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
@@ -1198,6 +1205,30 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async Task AutonomAufgabeInitialisierenAsync(CancellationToken ct)
+    {
+        if (_aufgabe is null)
+        {
+            return;
+        }
+
+        var ergebnis = await _autonomAufgabeStartCoordinator.StarteAsync(_aufgabeId, _aufgabe, ct);
+        if (ergebnis is null)
+        {
+            return;
+        }
+
+        if (ergebnis.AktualisierteAufgabe is not null)
+        {
+            Aufgabe = ergebnis.AktualisierteAufgabe;
+        }
+
+        if (ergebnis.FehlerMeldung is not null)
+        {
+            FehlerMeldung = ergebnis.FehlerMeldung;
+        }
+    }
+
     private async Task IssueAnlegenAsync(CancellationToken ct)
     {
         if (_aufgabe == null)
@@ -1356,10 +1387,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         var standardAnsicht = ShowCliPanel
             ? DetailAnsicht.Cli
             : AufgabeStatus switch
-        {
-            Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
-            _ => DetailAnsicht.Info
-        };
+            {
+                Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
+                _ => DetailAnsicht.Info
+            };
 
         WaehleAnsicht(standardAnsicht);
     }
@@ -1836,7 +1867,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Formatiert einen Einstiegspunkt für die Anzeige im Auswahl-Dialog plugin-qualifiziert:
     /// <c>"{PluginName}: {DisplayName ?? Dateiname}"</c>, außer die ermittelte Bezeichnung ist bereits
-    /// identisch mit dem <see cref="IIdePlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
+    /// identisch mit dem <see cref="IPlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
     /// dessen einziger Einstiegspunkt bereits <c>DisplayName == PluginName</c> liefert) — dann wird nur der
     /// Plugin-Name angezeigt, um ein Doppel-Label zu vermeiden.
     /// </summary>

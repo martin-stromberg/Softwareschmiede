@@ -130,6 +130,12 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
+        var serviceProviderMock = new Mock<IServiceProvider>();
+        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+            serviceProviderMock.Object,
+            _dialogServiceMock.Object,
+            _aufgabeService,
+            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -142,12 +148,13 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             _promptZeitVersandService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
-            new Mock<IServiceProvider>().Object,
+            serviceProviderMock.Object,
             NullLogger<TaskDetailViewModel>.Instance,
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService);
+            arbeitsverzeichnisOeffnenService,
+            autonomAufgabeStartCoordinator);
     }
 
     /// <summary>Legt ein GitRepository (optional mit RepositoryStartKonfiguration) sowie eine damit verknüpfte Aufgabe an.</summary>

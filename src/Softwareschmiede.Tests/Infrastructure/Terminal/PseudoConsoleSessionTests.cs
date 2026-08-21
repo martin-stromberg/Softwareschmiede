@@ -57,7 +57,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>Ruft man <see cref="PseudoConsoleSession.Dispose"/> auf, muss die Leseschleife abgebrochen und
     /// die Ein-/Ausgabe-Streams geschlossen werden, damit keine verwaisten Leseschleifen zurückbleiben.</summary>
     [Fact]
-    public void SessionDispose_CancelsReadLoop()
+    public async Task SessionDispose_CancelsReadLoop()
     {
         var outputStream = new BlockingUntilCancelledStream();
         var session = CreateSession(outputStream);
@@ -66,17 +66,17 @@ public sealed class PseudoConsoleSessionTests
         session.Dispose();
 
         outputStream.WasDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
-        var finished = readLoopTask.IsCompleted || readLoopTask.Wait(TimeSpan.FromSeconds(5));
+        var finished = readLoopTask.IsCompleted || await WurdeInnerhalbAsync(readLoopTask, TimeSpan.FromSeconds(5));
         finished.Should().BeTrue("die Leseschleife muss nach Dispose() sauber beendet sein");
     }
 
     /// <summary>Blockiert der native Read bereits (z. B. weil ein isAsync:false-FileStream einen laufenden
-    /// ReadFile-Syscall wrappt), unterbricht <see cref="CancellationTokenSource.Cancel"/> ihn nicht, da das
+    /// ReadFile-Syscall wrappt), unterbricht <see cref="CancellationTokenSource.Cancel()"/> ihn nicht, da das
     /// Token nur zwischen zwei Lesevorgängen ausgewertet wird. <see cref="PseudoConsoleSession.Dispose"/> muss
     /// deshalb zusätzlich den Output-Stream schließen, damit ein solcher Read sofort mit einem I/O-Fehler
     /// zurückkehrt, statt den vollen Leseschleifen-Timeout ergebnislos ablaufen zu lassen.</summary>
     [Fact]
-    public void Dispose_ClosesOutputStreamImmediately_UnblocksNonCancelableRead()
+    public async Task Dispose_ClosesOutputStreamImmediately_UnblocksNonCancelableRead()
     {
         var outputStream = new NonCancelableBlockingStream();
         var session = CreateSession(outputStream);
@@ -91,8 +91,27 @@ public sealed class PseudoConsoleSessionTests
             "Dispose() darf nicht auf den vollen Leseschleifen-Timeout warten, wenn ein blockierter, nicht " +
             "kooperativ abbrechbarer Read durch das Schließen des Output-Streams sofort unterbrochen werden kann");
         outputStream.WasDisposed.Should().BeTrue("Dispose() muss den Output-Stream der Sitzung schließen");
-        var finished = readLoopTask.IsCompleted || readLoopTask.Wait(TimeSpan.FromSeconds(2));
+        var finished = readLoopTask.IsCompleted || await WurdeInnerhalbAsync(readLoopTask, TimeSpan.FromSeconds(2));
         finished.Should().BeTrue("die Leseschleife muss nach Dispose() sauber beendet sein");
+    }
+
+    /// <summary>Wartet auf <paramref name="task"/> bis <paramref name="timeout"/> und meldet, ob er dabei
+    /// abgeschlossen wurde (Verhalten von Task.Wait(TimeSpan) für Stresstests nachgebildet, ohne bei
+    /// Zeitüberschreitung eine TimeoutException zu werfen).</summary>
+    /// <param name="task">Der zu erwartende Task.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>true, wenn der Task innerhalb von <paramref name="timeout"/> abgeschlossen wurde; sonst false.</returns>
+    private static async Task<bool> WurdeInnerhalbAsync(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            await task.WaitAsync(timeout);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Ruft man <see cref="PseudoConsoleSession.Dispose"/> gleichzeitig von zwei Threads auf (z. B. weil
@@ -279,7 +298,7 @@ public sealed class PseudoConsoleSessionTests
     }
 
     /// <summary>Stream, dessen Lesevorgang erst zurückkehrt, wenn das übergebene CancellationToken abgebrochen
-    /// wird (simuliert einen Prozess, der aktuell keine Ausgabe produziert). Erfasst, ob <see cref="Dispose(bool)"/>
+    /// wird (simuliert einen Prozess, der aktuell keine Ausgabe produziert). Erfasst, ob <see cref="Stream.Dispose(bool)"/>
     /// aufgerufen wurde.</summary>
     private sealed class BlockingUntilCancelledStream : Stream
     {
@@ -310,7 +329,7 @@ public sealed class PseudoConsoleSessionTests
         }
     }
 
-    /// <summary>Stream, der zählt, wie oft <see cref="Dispose(bool)"/> aufgerufen wurde — dient zum Nachweis,
+    /// <summary>Stream, der zählt, wie oft <see cref="Stream.Dispose(bool)"/> aufgerufen wurde — dient zum Nachweis,
     /// dass <see cref="PseudoConsoleSession.Dispose"/> bei gleichzeitigem Aufruf aus mehreren Threads seinen
     /// Aufräum-Code nicht mehrfach ausführt.</summary>
     private sealed class DisposeCountingStream : Stream
@@ -346,7 +365,7 @@ public sealed class PseudoConsoleSessionTests
 
     /// <summary>Stream, dessen Lesevorgang das übergebene <see cref="CancellationToken"/> absichtlich ignoriert und
     /// erst zurückkehrt, wenn der Stream selbst disposed wird — simuliert einen bereits blockierten nativen Read
-    /// (isAsync:false-FileStream), der durch <see cref="CancellationTokenSource.Cancel"/> allein nicht unterbrochen
+    /// (isAsync:false-FileStream), der durch <see cref="CancellationTokenSource.Cancel()"/> allein nicht unterbrochen
     /// werden kann, sondern nur durch Schließen des Streams.</summary>
     private sealed class NonCancelableBlockingStream : Stream
     {
@@ -412,7 +431,7 @@ public sealed class PseudoConsoleSessionTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    /// <summary>Stream, dessen Lesevorgang niemals zurückkehrt — auch nicht nach <see cref="Dispose(bool)"/> —
+    /// <summary>Stream, dessen Lesevorgang niemals zurückkehrt — auch nicht nach <see cref="Stream.Dispose(bool)"/> —
     /// um den Worst Case einer Leseschleife zu simulieren, die partout nicht zeitnah beendet werden kann.</summary>
     private sealed class HangingForeverStream : Stream
     {

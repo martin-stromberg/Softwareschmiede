@@ -36,7 +36,6 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
     /// <summary><summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>.</summary>
     [Fact]
-    /// <summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>
     public async Task AddCliOutputAsync_StreichtAusgabeInProtokoll()
     {
         await SeedAufgabeAsync();
@@ -51,7 +50,6 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
     /// <summary><summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>.</summary>
     [Fact]
-    /// <summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>
     public async Task AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert()
     {
         await SeedAufgabeAsync();
@@ -68,7 +66,6 @@ public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 
     /// <summary><summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>.</summary>
     [Fact]
-    /// <summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>
     public async Task AddStatusUebergangAsync_ErstelltEintragImProtokoll()
     {
         await SeedAufgabeAsync();

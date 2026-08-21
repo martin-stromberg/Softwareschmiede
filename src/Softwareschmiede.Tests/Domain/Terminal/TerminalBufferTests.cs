@@ -132,7 +132,7 @@ public sealed class TerminalBufferTests
     /// <summary>Parallele Apply()- und GetRow()-Zugriffe aus mehreren Threads führen zu keiner Exception und
     /// liefern stets einen intern konsistenten Buffer-Zustand (keine Race Condition).</summary>
     [Fact]
-    public void Buffer_ParallelApplyAndRead_NoRaceCondition()
+    public async Task Buffer_ParallelApplyAndRead_NoRaceCondition()
     {
         var sut = new TerminalBuffer(80, 24);
         var stop = new CancellationTokenSource();
@@ -161,9 +161,9 @@ public sealed class TerminalBufferTests
             }
         });
 
-        writer.Wait(TimeSpan.FromSeconds(10));
+        await AwaitOhneTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
         stop.Cancel();
-        reader.Wait(TimeSpan.FromSeconds(10));
+        await AwaitOhneTimeoutExceptionAsync(reader, TimeSpan.FromSeconds(10));
 
         readerException.Should().BeNull("parallele Lesezugriffe während laufender Apply()-Aufrufe dürfen zu keiner Exception führen");
     }
@@ -171,7 +171,7 @@ public sealed class TerminalBufferTests
     /// <summary>GetSnapshot() liefert unter parallelen Apply()-Aufrufen stets einen intern konsistenten
     /// Zustand: Grid-Größe und Cursor-Position im Snapshot passen stets zusammen.</summary>
     [Fact]
-    public void Buffer_GetSnapshot_ReturnsConsistentState()
+    public async Task Buffer_GetSnapshot_ReturnsConsistentState()
     {
         var sut = new TerminalBuffer(10, 5);
         var stop = new CancellationTokenSource();
@@ -205,11 +205,26 @@ public sealed class TerminalBufferTests
             }
         });
 
-        writer.Wait(TimeSpan.FromSeconds(10));
+        await AwaitOhneTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
         stop.Cancel();
-        reader.Wait(TimeSpan.FromSeconds(10));
+        await AwaitOhneTimeoutExceptionAsync(reader, TimeSpan.FromSeconds(10));
 
         readerException.Should().BeNull("GetSnapshot() muss auch unter parallelen Apply()/Resize()-Aufrufen einen intern konsistenten Zustand liefern");
+    }
+
+    /// <summary>Wartet auf <paramref name="task"/> bis <paramref name="timeout"/>, ohne bei Zeitüberschreitung
+    /// eine TimeoutException zu werfen (Verhalten von Task.Wait(TimeSpan) für Stresstests nachgebildet).</summary>
+    /// <param name="task">Der zu erwartende Task.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    private static async Task AwaitOhneTimeoutExceptionAsync(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            await task.WaitAsync(timeout);
+        }
+        catch (TimeoutException)
+        {
+        }
     }
 
     /// <summary>Ein alleinstehendes Linefeed setzt die Cursor-Spalte auf 0 (kein Treppeneffekt).</summary>

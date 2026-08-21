@@ -26,7 +26,6 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
 
     /// <summary><summary>ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu.</summary>.</summary>
     [Fact]
-    /// <summary>ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu.</summary>
     public async Task ProjektErstellen_UndAufgabeHinzufuegen_StatusIstNeu()
     {
         var projekt = await _projektService.CreateAsync("Neues Projekt", null);
@@ -41,7 +40,6 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
 
     /// <summary><summary>MehrereProjekte_KoennenErstellt_UndGeladen_Werden.</summary>.</summary>
     [Fact]
-    /// <summary>MehrereProjekte_KoennenErstellt_UndGeladen_Werden.</summary>
     public async Task MehrereProjekte_KoennenErstellt_UndGeladen_Werden()
     {
         await _projektService.CreateAsync("Projekt A", null);
@@ -53,7 +51,6 @@ public sealed class ProjectServiceIntegrationTests : IDisposable
 
     /// <summary><summary>Aufgabe_KannInProjektGeladen_Werden.</summary>.</summary>
     [Fact]
-    /// <summary>Aufgabe_KannInProjektGeladen_Werden.</summary>
     public async Task Aufgabe_KannInProjektGeladen_Werden()
     {
         var projekt = await _projektService.CreateAsync("Test Projekt", null);

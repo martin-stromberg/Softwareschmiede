@@ -20,6 +20,8 @@ public partial class End2EndTest : WpfTestBase
         var mainWindow = app.GetMainWindow(Automation, Long)!;
 
         AppStarten_ZeigtVersionsTextInFusszeile_E2E(mainWindow);
+        await AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E(mainWindow);
+        await AutonomAufgabeAgentExecution_StartUnteragentUndSessionPause_E2E(mainWindow);
         Einstellungen_SpeichernCodexAlsStandardKiPluginUndExecutablePath_PersistiertBeides_E2E(mainWindow);
         IdePluginSettings_AktivierungValidierungUndReihenfolge_E2E(mainWindow);
         await RepositoryZuweisung(mainWindow);

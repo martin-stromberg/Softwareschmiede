@@ -1,6 +1,7 @@
 using System.Windows;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Services;
@@ -121,6 +122,37 @@ public sealed class WpfDialogService : IDialogService
             };
             var result = dialog.ShowDialog();
             return result == true ? viewModel.SelectedSolution : null;
+        }).Task;
+    }
+
+    /// <inheritdoc/>
+    public Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
+        AutonomAufgabeInitialisierungsDialogViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new AutonomAufgabeInitialisierungsDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            var result = dialog.ShowDialog();
+            return result == true ? viewModel.ErstellteKonfiguration : null;
+        }).Task;
+    }
+
+    /// <inheritdoc/>
+    public Task ShowAutonomAufgabeDetailAsync(
+        AutonomAufgabeDetailViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new AutonomAufgabeDetailDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            dialog.ShowDialog();
         }).Task;
     }
 }

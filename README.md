@@ -655,6 +655,12 @@ Feature-spezifische Testartefakte:
 - Benachrichtigungssystem für abgeschlossene KI-Aufgaben:
   - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
   - Einstellungs- und Audio-Validierung/Persistenz: `src/Softwareschmiede.Tests/Application/Services/BenachrichtigungsEinstellungenServiceTests.cs`
+- Issue 205 — Autonome Aufgaben (Projektleiter-Agent-basierte Automatisierung):
+  - Service-Tests (Initialisierung): `AutonomAufgabenInitialisierungsServiceTests` — Erstellung des Arbeitsverzeichnisses, Repository-Klon, state.json/permissions.json-Generierung
+  - ViewModel-Tests: `AutonomAufgabeInitialisierungsDialogViewModelTests` — Formularvalidierung, Service-Aufrufe, Dialog-Management
+  - ViewModel-Tests: `AutonomAufgabeDetailViewModel` — Laden von plan.md/progress.md/governance.md, Agent-Kontrolle (Start/Stop/Resume)
+  - E2E-Tests: `E2E_AutonomAufgabenInitialisierung` — Dialog-Anzeige, Arbeitsverzeichnis-Erstellung, Detail-View-Anzeige
+  - E2E-Tests: `E2E_AutonomAufgabenAgentExecution` — Projektleiter-Agent-Start, Unteragenten-Erzeugung, Session-Pause/Resume bei Budget-Limit, Heartbeat-Monitoring
 - Issue 81 — Aktive Aufgaben im Menü (in Arbeit):
   - Service-Tests: `AufgabeServiceTests` — `GetAktiveAufgabenAsync()` Filterung nach Status, Sortierung nach Aktivität
   - Converter-Tests: `KiAusfuehrungsStatusConverterTests` — Status-String-Berechnung (Läuft, Wartet, Fallback)
@@ -708,6 +714,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
 | [Basis-Branch-Konfiguration](docs/help/projekte/basis-branch-konfiguration.md) | Konfiguration eines Basis-Branches pro Repository für Feature-Branch-Erstellung und Pull-Request-Ziele |
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
+| [Autonome Aufgaben](docs/help/aufgaben/autonome-aufgaben/index.md) | Projektleiter-Agent-basierte Automatisierung mit Unteragenten-Orchestrierung, Session-Management, Governance-Enforcement und Skills-Lifecycle |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |
 | [Entwicklungsumgebungen](docs/help/entwicklungsumgebungen/index.md) | IDE-Plugin-System mit automatischer Erkennung und Auswahl (Visual Studio, Visual Studio Code) |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |

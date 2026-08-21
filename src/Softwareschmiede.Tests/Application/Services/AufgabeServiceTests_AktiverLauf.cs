@@ -13,7 +13,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// (<see cref="AufgabeService.AktivenLaufSetzenAsync"/>, <see cref="AufgabeService.AktivenLaufBeendenAsync"/>,
 /// <see cref="AufgabeService.AktualisiereLaufStatusAsync"/>). Deckt den vollständigen Substatus-Zyklus
 /// Bereit → Läuft → Wartet (während der Prozess noch lebt) → Bereit (nach Stopp) aus Sicht des Services ab
-/// (Issue 108, Folgefehler des Rückwegs Läuft → Wartet: <see cref="Domain.Entities.Aufgabe.LaufStatus"/>
+/// (Issue 108, Folgefehler des Rückwegs Läuft → Wartet: <see cref="Softwareschmiede.Domain.Entities.Aufgabe.LaufStatus"/>
 /// bildet den bis dahin nirgends persistierten Laufzeit-Substatus der CLI ab).
 /// </summary>
 public sealed class AufgabeServiceTests_AktiverLauf : IDisposable
