@@ -76,8 +76,10 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
 
         _sut.ErrorMessage.Should().BeNull();
         var aktualisiert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
-        aktualisiert!.ProjektleiterAgentId.Should().NotBeNullOrWhiteSpace();
-        aktualisiert.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        aktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+
+        var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(_konfiguration.Id);
+        konfigurationAktualisiert!.ProjektleiterAgentId.Should().NotBeNullOrWhiteSpace();
     }
 
     /// <summary>AktualisierePlanAsync speichert Änderungen an plan.md im Arbeitsverzeichnis.</summary>
@@ -129,8 +131,8 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         await _sut.StoppeAgentAsync();
 
         _sut.ErrorMessage.Should().BeNull();
-        var aktualisiert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
-        aktualisiert!.SessionPauseUtc.Should().NotBeNull();
+        var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(_konfiguration.Id);
+        konfigurationAktualisiert!.SessionPauseUtc.Should().NotBeNull();
     }
 
     /// <summary>ResumeAgentAsync delegiert an SessionManagementService.SetzeFortAsync und setzt SessionPauseUtc zurück.</summary>
@@ -143,8 +145,10 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
 
         _sut.ErrorMessage.Should().BeNull();
         var aktualisiert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
-        aktualisiert!.SessionPauseUtc.Should().BeNull();
-        aktualisiert.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        aktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+
+        var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(_konfiguration.Id);
+        konfigurationAktualisiert!.SessionPauseUtc.Should().BeNull();
     }
 
     /// <summary>FuehreAgentOperationAsync fängt Exceptions des zugrunde liegenden Service ab, setzt ErrorMessage und setzt IsBusy zurück.</summary>

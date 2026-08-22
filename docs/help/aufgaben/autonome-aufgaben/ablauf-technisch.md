@@ -207,7 +207,7 @@ ProjektleiterAgentService.StarteAgenAsync(konfiguration)
 
 4. **DB aktualisieren**
    ```csharp
-   aufgabe.ProjektleiterAgentId = agentId;
+   aufgabe.AutonomKonfiguration.ProjektleiterAgentId = agentId;
    aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
    aufgabe.AktiveRunId = agentId; // oder run-spezifische ID
    await _db.SaveChangesAsync();
@@ -313,7 +313,7 @@ Monitor Loop (z.B. alle 10 Sekunden):
 **Methode: `SessionManagementService.PauseAufgabeBeiBudgetLimitAsync()`**
 
 1. Agenten-Prozess beenden (graceful shutdown)
-2. Aufgabe.SessionPauseUtc = DateTimeOffset.UtcNow
+2. aufgabe.AutonomKonfiguration.SessionPauseUtc = DateTimeOffset.UtcNow
 3. Aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Wartend (oder Beendet)
 4. state.json aktualisieren: `runtime.paused_utc = now`
 5. Log: "Aufgabe wegen Budget-Limit pausiert"
@@ -403,7 +403,7 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
    ```csharp
    unteragent.AbschlussDatum = DateTimeOffset.UtcNow;
    unteragent.Status = UnteragentStatus.Abgeschlossen;
-   aufgabe.AktiveUnteragenten--;
+   aufgabe.AutonomKonfiguration.AktiveUnteragenten--;
    await _db.SaveChangesAsync();
    ```
 
@@ -438,7 +438,7 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
 
 4. **Status zurücksetzen**
    ```csharp
-   aufgabe.SessionPauseUtc = null;
+   aufgabe.AutonomKonfiguration.SessionPauseUtc = null;
    aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
    await _db.SaveChangesAsync();
    ```

@@ -45,7 +45,7 @@ public sealed class UnteragentGovernanceMonitoringService : PeriodicBackgroundSe
             .Where(u =>
                 (u.Status == UnteragentStatus.Erzeugt || u.Status == UnteragentStatus.Ausgefuehrt)
                 && u.AutonomAufgabe.Aufgabe.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.AutonomAufgabe
-                && u.AutonomAufgabe.Aufgabe.SessionPauseUtc == null)
+                && u.AutonomAufgabe.SessionPauseUtc == null)
             .ToListAsync(ct);
 
         foreach (var unteragent in aktiveUnteragenten)

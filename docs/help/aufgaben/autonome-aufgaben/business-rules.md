@@ -149,7 +149,7 @@
 
 **Verhalten:**
 - Agent wird unterbrochen
-- Aufgabe.SessionPauseUtc = now gesetzt
+- AutonomAufgabeKonfiguration.SessionPauseUtc = now gesetzt
 - Aufgabe.AusfuehrungsStatus → Wartend/Beendet
 - state.json wird aktualisiert
 

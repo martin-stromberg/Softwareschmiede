@@ -82,8 +82,10 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
 
         agentId.Should().NotBeNullOrWhiteSpace();
         var aktualisiert = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        aktualisiert!.ProjektleiterAgentId.Should().Be(agentId);
-        aktualisiert.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        aktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+
+        var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(konfiguration.Id);
+        konfigurationAktualisiert!.ProjektleiterAgentId.Should().Be(agentId);
 
         var skillPfad = Path.Combine(_testRoot, "skills", "skill_projektleiter_v1.md");
         File.Exists(skillPfad).Should().BeTrue();

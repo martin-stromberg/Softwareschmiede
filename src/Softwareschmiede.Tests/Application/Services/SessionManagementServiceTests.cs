@@ -44,26 +44,26 @@ public sealed class SessionManagementServiceTests : IDisposable
         }
     }
 
-    private async Task<Aufgabe> ErstelleAutonomeAufgabeAsync()
+    private async Task<(Aufgabe Aufgabe, AutonomAufgabeKonfiguration Konfiguration)> ErstelleAutonomeAufgabeAsync()
     {
-        var (aufgabe, _) = ProjektleiterAgentServiceTestDatenFactory.ErstelleAufgabeUndKonfiguration(_db, _projektId, _testRoot);
+        var (aufgabe, konfiguration) = ProjektleiterAgentServiceTestDatenFactory.ErstelleAufgabeUndKonfiguration(_db, _projektId, _testRoot);
 
         var state = new { runtime = new { started_utc = DateTimeOffset.UtcNow, paused_utc = (DateTimeOffset?)null } };
         await File.WriteAllTextAsync(Path.Combine(_testRoot, "state.json"), JsonSerializer.Serialize(state));
 
         await _db.SaveChangesAsync();
-        return aufgabe;
+        return (aufgabe, konfiguration);
     }
 
-    /// <summary>PauseAufgabeBeiBudgetLimitAsync setzt SessionPauseUtc auf der Aufgabe.</summary>
+    /// <summary>PauseAufgabeBeiBudgetLimitAsync setzt SessionPauseUtc auf der AutonomAufgabeKonfiguration.</summary>
     [Fact]
     public async Task PauseAufgabeBeiBudgetLimit_SetztSessionPauseUtc()
     {
-        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, konfiguration) = await ErstelleAutonomeAufgabeAsync();
 
         await _sut.PauseAufgabeBeiBudgetLimitAsync(aufgabe);
 
-        var aktualisiert = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        var aktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(konfiguration.Id);
         aktualisiert!.SessionPauseUtc.Should().NotBeNull();
         aktualisiert.SessionPauseUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
@@ -72,7 +72,7 @@ public sealed class SessionManagementServiceTests : IDisposable
     [Fact]
     public async Task PauseAufgabeBeiBudgetLimit_AktualisieertStateJson()
     {
-        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, _) = await ErstelleAutonomeAufgabeAsync();
 
         await _sut.PauseAufgabeBeiBudgetLimitAsync(aufgabe);
 
@@ -85,24 +85,26 @@ public sealed class SessionManagementServiceTests : IDisposable
     [Fact]
     public async Task SetzeFort_SendetWeitermachenPrompt()
     {
-        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, konfiguration) = await ErstelleAutonomeAufgabeAsync();
         await _sut.PauseAufgabeBeiBudgetLimitAsync(aufgabe);
 
         await _sut.SetzeFortAsync(aufgabe);
 
         var aktualisiert = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        aktualisiert!.SessionPauseUtc.Should().BeNull();
-        aktualisiert.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        aktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
         aktualisiert.VorschlagPrompt.Should().NotBeNullOrWhiteSpace();
         aktualisiert.VorschlagPrompt.Should().Contain("Weitermachen");
         aktualisiert.VorschlagAusfuehrenAbUtc.Should().NotBeNull();
+
+        var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(konfiguration.Id);
+        konfigurationAktualisiert!.SessionPauseUtc.Should().BeNull();
     }
 
     /// <summary>PruefeAusfuehrungAsync erkennt eine Unterbrechung, wenn der letzte Heartbeat älter als das Timeout ist.</summary>
     [Fact]
     public async Task PruefeAusfuehrung_ErkenntUnterbruch()
     {
-        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, _) = await ErstelleAutonomeAufgabeAsync();
         var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
         entity!.LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
         await _db.SaveChangesAsync();
@@ -118,7 +120,7 @@ public sealed class SessionManagementServiceTests : IDisposable
     [Fact]
     public async Task PruefeAusfuehrung_KeineUnterbrechung_WennHeartbeatAktuell()
     {
-        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, _) = await ErstelleAutonomeAufgabeAsync();
         var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
         entity!.LastHeartbeatUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
@@ -132,10 +134,11 @@ public sealed class SessionManagementServiceTests : IDisposable
     [Fact]
     public async Task PruefeAusfuehrung_GibtTrueZurueck_WennSessionPausiertIst()
     {
-        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, konfiguration) = await ErstelleAutonomeAufgabeAsync();
+        var konfigurationEntity = await _db.AutonomAufgabeKonfigurationen.FindAsync(konfiguration.Id);
+        konfigurationEntity!.SessionPauseUtc = DateTimeOffset.UtcNow;
         var entity = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        entity!.SessionPauseUtc = DateTimeOffset.UtcNow;
-        entity.LastHeartbeatUtc = DateTimeOffset.UtcNow.AddHours(-1);
+        entity!.LastHeartbeatUtc = DateTimeOffset.UtcNow.AddHours(-1);
         await _db.SaveChangesAsync();
 
         var ergebnis = await _sut.PruefeAusfuehrungAsync(aufgabe, TimeSpan.FromMinutes(5));
@@ -147,7 +150,7 @@ public sealed class SessionManagementServiceTests : IDisposable
     [Fact]
     public async Task PruefeAusfuehrung_GibtTrueZurueck_WennNochKeinHeartbeatVorliegt()
     {
-        var aufgabe = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, _) = await ErstelleAutonomeAufgabeAsync();
 
         var ergebnis = await _sut.PruefeAusfuehrungAsync(aufgabe, TimeSpan.FromMinutes(5));
 

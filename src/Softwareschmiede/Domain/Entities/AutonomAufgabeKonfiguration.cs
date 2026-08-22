@@ -53,6 +53,15 @@ public sealed class AutonomAufgabeKonfiguration
     /// <summary>Pfad zum Arbeitsverzeichnis der Autonomen Aufgabe.</summary>
     public string ArbeitsverzeichnisPfad { get; set; } = string.Empty;
 
+    /// <summary>ID des aktuell laufenden Projektleiter-Agenten.</summary>
+    public string? ProjektleiterAgentId { get; set; }
+
+    /// <summary>Zeitstempel der letzten Session-Pause wegen Budget-Limit.</summary>
+    public DateTimeOffset? SessionPauseUtc { get; set; }
+
+    /// <summary>Anzahl aktuell aktiver Unteragenten.</summary>
+    public int? AktiveUnteragenten { get; set; }
+
     /// <summary>Navigationseigenschaft zur zugehörigen Aufgabe.</summary>
     public Aufgabe Aufgabe { get; set; } = null!;
 

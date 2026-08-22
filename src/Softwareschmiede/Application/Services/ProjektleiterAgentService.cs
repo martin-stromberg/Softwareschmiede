@@ -41,13 +41,18 @@ public sealed class ProjektleiterAgentService
             await File.WriteAllTextAsync(skillPfad, BuildDefaultProjektleiterSkill(konfiguration), ct);
         }
 
-        var aufgabe = await _db.Aufgaben.FirstOrDefaultAsync(a => a.Id == konfiguration.AufgabeId, ct)
+        var aufgabe = await _db.Aufgaben
+            .Include(a => a.AutonomKonfiguration)
+            .FirstOrDefaultAsync(a => a.Id == konfiguration.AufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {konfiguration.AufgabeId} nicht gefunden.");
+
+        var autonomKonfiguration = aufgabe.AutonomKonfiguration
+            ?? throw new InvalidOperationException($"AutonomAufgabeKonfiguration für Aufgabe {konfiguration.AufgabeId} nicht gefunden.");
 
         var agentId = $"projektleiter-{Guid.NewGuid():N}";
 
         aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        aufgabe.ProjektleiterAgentId = agentId;
+        autonomKonfiguration.ProjektleiterAgentId = agentId;
         aufgabe.AktiveRunId = agentId;
         aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);

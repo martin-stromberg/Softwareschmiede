@@ -66,14 +66,15 @@ public partial class End2EndTest
         await WartenBisAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
-            return !string.IsNullOrWhiteSpace(aufgabe.ProjektleiterAgentId);
+            var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
+            return !string.IsNullOrWhiteSpace(konfiguration.ProjektleiterAgentId);
         });
 
         await using (var db = OpenTestDbContext())
         {
             var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
-            Assert.False(string.IsNullOrWhiteSpace(aufgabe.ProjektleiterAgentId), "Projektleiter-Agent wurde nicht gestartet.");
+            var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
+            Assert.False(string.IsNullOrWhiteSpace(konfiguration.ProjektleiterAgentId), "Projektleiter-Agent wurde nicht gestartet.");
             Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
         }
 
@@ -129,8 +130,8 @@ public partial class End2EndTest
 
         await using (var db = OpenTestDbContext())
         {
-            var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
-            Assert.NotNull(aufgabe.SessionPauseUtc);
+            var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
+            Assert.NotNull(konfiguration.SessionPauseUtc);
         }
 
         var stateJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "state.json");
@@ -159,7 +160,8 @@ public partial class End2EndTest
         await using (var db = OpenTestDbContext())
         {
             var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
-            Assert.Null(aufgabe.SessionPauseUtc);
+            var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
+            Assert.Null(konfiguration.SessionPauseUtc);
             Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
             Assert.False(string.IsNullOrWhiteSpace(aufgabe.VorschlagPrompt), "Weitermachen-Prompt wurde nicht gesetzt.");
         }

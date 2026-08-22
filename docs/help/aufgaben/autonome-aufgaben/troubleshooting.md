@@ -128,7 +128,7 @@
 
 **Lösung:**
 1. Überprüfe Session-Status:
-   - Aufgabe.SessionPauseUtc != null? → Budget-Limit erreicht → Fortsetzen mit erweitertem Budget
+   - Aufgabe.AutonomKonfiguration.SessionPauseUtc != null? → Budget-Limit erreicht → Fortsetzen mit erweitertem Budget
    - Aufgabe.AusfuehrungsStatus = Fehler? → Interner Fehler
 2. Überprüfe `logs/agent.log` im Arbeitsverzeichnis für Details
 3. Falls Budget-Limit: Erhöhe `DefaultTokenBudget` in appsettings.json (für nächste Aufgabe)

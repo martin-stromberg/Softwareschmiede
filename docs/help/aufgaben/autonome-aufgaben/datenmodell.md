@@ -15,10 +15,7 @@ Bestehende Entity mit neuen Properties für Autonome Aufgaben.
 | `Titel` | string | Aufgabentitel (bestehend) |
 | `Status` | AufgabeStatus | Aufgaben-Status: Geplant, Gestartet, Wartend, Abgeschlossen (bestehend) |
 | `AusfuehrungsStatus` | AufgabeAusfuehrungsStatus | KI-Ausführungsstatus: NichtGestartet, Aktiv, Beendet, **AutonomAufgabe** (erweitert) |
-| `ProjektleiterAgentId` | string? | ID des aktuell laufenden Projektleiter-Agenten (neu) |
-| `SessionPauseUtc` | DateTimeOffset? | Zeitstempel der letzten Session-Pause wegen Budget-Limit (neu) |
-| `AktiveUnteragenten` | int? | Anzahl aktuell aktiver Unteragenten (neu) |
-| `AutonomKonfiguration` | AutonomAufgabeKonfiguration? | Navigation zur Konfiguration (neu, 1:1) |
+| `AutonomKonfiguration` | AutonomAufgabeKonfiguration? | Navigation zur Konfiguration (neu, 1:1); trägt `ProjektleiterAgentId`, `SessionPauseUtc` und `AktiveUnteragenten` |
 | ... | ... | Weitere bestehende Properties... |
 
 ### `AutonomAufgabeKonfiguration` (neu)
@@ -38,6 +35,9 @@ Konfiguration und Persistierung einer Autonomen Aufgabe.
 | `PersistenzModus` | PersistenzModus | `Standard` oder `SitzungZuruecksetzen` |
 | `SkillAutogeneration` | bool | Sollen Skills automatisch generiert werden? |
 | `ArbeitsverzeichnisPfad` | string | Absoluter Pfad zum Arbeitsverzeichnis |
+| `ProjektleiterAgentId` | string? | ID des aktuell laufenden Projektleiter-Agenten |
+| `SessionPauseUtc` | DateTimeOffset? | Zeitstempel der letzten Session-Pause wegen Budget-Limit |
+| `AktiveUnteragenten` | int? | Anzahl aktuell aktiver Unteragenten |
 | `Aufgabe` | Aufgabe | Navigation (inverse 1:1) |
 | `Unteragenten` | List<UnteragentSpezifikation> | Navigation (1:N) |
 | `Skills` | List<SkillDefinition> | Navigation (1:N) |
@@ -106,9 +106,12 @@ Versionierte Skill-Definition für Projektleiter oder Unteragenten.
 │  └─ AufgabeId                        └─ AufgabeId (FK)
 │     AusfuehrungsStatus                  └─ ArbeitsverzeichnisPfad
 │     (= AutonomAufgabe)                  └─ InitialPrompt
-│     ProjektleiterAgentId               └─ TokenBudget
-│     SessionPauseUtc                     └─ etc.
-│     AktiveUnteragenten                  │
+│                                         └─ TokenBudget
+│                                         └─ ProjektleiterAgentId
+│                                         └─ SessionPauseUtc
+│                                         └─ AktiveUnteragenten
+│                                         └─ etc.
+│                                         │
 │                                         ├──── 1:N ────► UnteragentSpezifikation (neu)
 │                                         │               └─ Scope
 │                                         │               └─ Prompt
@@ -216,9 +219,6 @@ erDiagram
         string Titel
         AufgabeStatus Status
         AufgabeAusfuehrungsStatus AusfuehrungsStatus
-        string "ProjektleiterAgentId?"
-        datetime "SessionPauseUtc?"
-        int "AktiveUnteragenten?"
     }
 
     AUTONO_CONFIG {
@@ -233,6 +233,9 @@ erDiagram
         PersistenzModus PersistenzModus
         bool SkillAutogeneration
         string ArbeitsverzeichnisPfad
+        string "ProjektleiterAgentId?"
+        datetime "SessionPauseUtc?"
+        int "AktiveUnteragenten?"
     }
 
     UNTERAGENT {
@@ -271,11 +274,15 @@ Die folgenden Migrationen werden ausgeführt, um das Datenmodell zu erstellen:
    - Foreign Keys und Indizes
 
 2. **AddAutonomAufgabeColumnsToAufgaben**
-   - Erweitert Tabelle `Aufgaben` um Spalten: `ProjektleiterAgentId`, `SessionPauseUtc`, `AktiveUnteragenten`, `AutonomKonfigurationId`
+   - Erweitert Tabelle `Aufgaben` um die Fremdschlüssel-Spalte `AutonomKonfigurationId`
    - Erstellt Index auf `AutonomKonfigurationId`
 
 3. **UpdateAusfuehrungsStatusEnum** (falls nötig)
    - Aktualisiert Enum-Definition in `AufgabeAusfuehrungsStatus` um neuen Wert `AutonomAufgabe`
+
+4. **VerschiebeProjektleiterFelderZuAutonomKonfiguration**
+   - Verschiebt die Spalten `ProjektleiterAgentId`, `SessionPauseUtc`, `AktiveUnteragenten` von `Aufgaben` nach `AutonomAufgabeKonfigurationen` (Data-Clump-Bereinigung: die Felder sind nur für Autonome Aufgaben relevant, gehören also fachlich zur Konfiguration und nicht zur allgemeinen `Aufgabe`-Entity)
+   - Übernimmt vorhandene Werte per `UPDATE`-Statement (1:1-Zuordnung über `AufgabeId`), bevor die alten Spalten auf `Aufgaben` entfernt werden
 
 ## Indizes
 

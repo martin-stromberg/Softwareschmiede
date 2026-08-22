@@ -158,7 +158,6 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.RecoveryVersion)
                 .HasDefaultValue(0)
                 .IsConcurrencyToken();
-            e.Property(a => a.SessionPauseUtc).HasConversion(NullableUnixMillisConverter);
             e.HasOne(a => a.GitRepository)
                 .WithMany()
                 .HasForeignKey(a => a.GitRepositoryId)
@@ -204,6 +203,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(k => k.PermissionsJsonPfad).IsRequired().HasMaxLength(512);
             e.Property(k => k.PersistenzModus).IsRequired().HasConversion<string>();
             e.Property(k => k.ArbeitsverzeichnisPfad).IsRequired().HasMaxLength(512);
+            e.Property(k => k.SessionPauseUtc).HasConversion(NullableUnixMillisConverter);
             e.HasMany(k => k.Unteragenten)
                 .WithOne(u => u.AutonomAufgabe)
                 .HasForeignKey(u => u.AutonomAufgabeId)

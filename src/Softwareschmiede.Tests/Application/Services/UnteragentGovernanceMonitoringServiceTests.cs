@@ -122,8 +122,8 @@ public sealed class UnteragentGovernanceMonitoringServiceTests : IDisposable
     public async Task RunOnceAsync_PrueftNicht_WennAufgabePausiertIst()
     {
         using var db = TestDbContextFactory.Create();
-        var (aufgabe, konfiguration) = await ErstelleAutonomeAufgabeAsync(db);
-        aufgabe.SessionPauseUtc = _timeProvider.GetUtcNow();
+        var (_, konfiguration) = await ErstelleAutonomeAufgabeAsync(db);
+        konfiguration.SessionPauseUtc = _timeProvider.GetUtcNow();
         await db.SaveChangesAsync();
         var unteragent = ProjektleiterAgentServiceTestDatenFactory.ErstelleUnteragent(_testRoot, konfiguration.Id);
         unteragent.Status = UnteragentStatus.Ausgefuehrt;
