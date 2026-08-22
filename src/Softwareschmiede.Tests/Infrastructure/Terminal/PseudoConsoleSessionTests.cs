@@ -229,7 +229,7 @@ public sealed class PseudoConsoleSessionTests
     /// <summary>Die Leseschleife meldet gelesene Rohbytes an die optionale Output-Senke und aktualisiert den
     /// Terminal-Buffer weiterhin wie bisher.</summary>
     [Fact]
-    public void ReadLoopAsync_MeldetOutputChunksAnSink_UndAktualisiertBufferWeiterhin()
+    public async Task ReadLoopAsync_MeldetOutputChunksAnSink_UndAktualisiertBufferWeiterhin()
     {
         var sink = new CapturingOutputSink();
         using var session = TestPseudoConsoleSessionFactory.Create(
@@ -242,6 +242,7 @@ public sealed class PseudoConsoleSessionTests
 
         bufferChanged.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
         sink.Output.Should().Be("HELLO");
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
         sink.IsCompleted.Should().BeTrue("die Senke muss beim Ende der Leseschleife abgeschlossen werden");
         session.Buffer.GetRow(0)[0].Character.Should().Be('H');
     }
