@@ -280,7 +280,6 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<TodoListViewModel>();
         services.AddTransient<OpenTodosDialogViewModel>();
         services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
-        services.AddTransient<AutonomAufgabeDetailViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

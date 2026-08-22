@@ -50,8 +50,12 @@ public sealed class AutonomAufgabeStartService
 
             aktuelleAufgabe = await _aufgabeService.GetDetailAsync(aufgabe.Id, ct) ?? aktuelleAufgabe;
 
-            var detailVm = _serviceProvider.GetRequiredService<AutonomAufgabeDetailViewModel>();
-            detailVm.Initialize(aktuelleAufgabe, konfiguration);
+            var detailVm = new AutonomAufgabeDetailViewModel(
+                aktuelleAufgabe,
+                konfiguration,
+                _serviceProvider.GetRequiredService<ProjektleiterAgentService>(),
+                _serviceProvider.GetRequiredService<SessionManagementService>(),
+                _serviceProvider.GetRequiredService<ILogger<AutonomAufgabeDetailViewModel>>());
             await _dialogService.ShowAutonomAufgabeDetailAsync(detailVm, ct);
             return new AutonomAufgabeStartResult(aktuelleAufgabe, null);
         }

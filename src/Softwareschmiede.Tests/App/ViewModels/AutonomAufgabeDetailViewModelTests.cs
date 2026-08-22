@@ -39,8 +39,12 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         (_aufgabe, _konfiguration) = ProjektleiterAgentServiceTestDatenFactory.ErstelleAufgabeUndKonfiguration(_db, projektId, _testRoot);
         _db.SaveChanges();
 
-        _sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
-        _sut.Initialize(_aufgabe, _konfiguration);
+        _sut = new AutonomAufgabeDetailViewModel(
+            _aufgabe,
+            _konfiguration,
+            _projektleiterAgentService,
+            _sessionManagementService,
+            NullLogger<AutonomAufgabeDetailViewModel>.Instance);
     }
 
     /// <summary>Dispose.</summary>
@@ -129,18 +133,6 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         aktualisiert!.SessionPauseUtc.Should().NotBeNull();
     }
 
-    /// <summary>StoppeAgentAsync tut nichts, wenn keine Aufgabe initialisiert wurde.</summary>
-    [Fact]
-    public async Task StoppeAgentAsync_TutNichts_OhneInitialisierteAufgabe()
-    {
-        var sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
-
-        await sut.StoppeAgentAsync();
-
-        sut.IsBusy.Should().BeFalse();
-        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
-    }
-
     /// <summary>ResumeAgentAsync delegiert an SessionManagementService.SetzeFortAsync und setzt SessionPauseUtc zurück.</summary>
     [Fact]
     public async Task ResumeAgentAsync_DelegiertAnSessionManagementService()
@@ -155,31 +147,6 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         aktualisiert.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
     }
 
-    /// <summary>ResumeAgentAsync tut nichts, wenn keine Aufgabe initialisiert wurde.</summary>
-    [Fact]
-    public async Task ResumeAgentAsync_TutNichts_OhneInitialisierteAufgabe()
-    {
-        var sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
-
-        await sut.ResumeAgentAsync();
-
-        sut.IsBusy.Should().BeFalse();
-        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
-    }
-
-    /// <summary>StarteAgentAsync tut nichts, wenn keine Aufgabe initialisiert wurde (kein NullReferenceException auf Konfiguration).</summary>
-    [Fact]
-    public async Task StarteAgentAsync_TutNichts_OhneInitialisierteAufgabe()
-    {
-        var sut = new AutonomAufgabeDetailViewModel(_projektleiterAgentService, _sessionManagementService, NullLogger<AutonomAufgabeDetailViewModel>.Instance);
-
-        var akt = async () => await sut.StarteAgentAsync();
-
-        await akt.Should().NotThrowAsync();
-        sut.IsBusy.Should().BeFalse();
-        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
-    }
-
     /// <summary>FuehreAgentOperationAsync fängt Exceptions des zugrunde liegenden Service ab, setzt ErrorMessage und setzt IsBusy zurück.</summary>
     [Fact]
     public async Task StarteAgentAsync_SetztErrorMessage_WennServiceWirft()
@@ -187,11 +154,16 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         // Konfiguration referenziert eine nicht existierende Aufgabe, wodurch ProjektleiterAgentService.StarteAgentAsync
         // eine InvalidOperationException wirft.
         var verwaisteKonfiguration = ProjektleiterAgentServiceTestDatenFactory.ErstelleKonfigurationFuerNichtExistierendeAufgabe(_testRoot);
-        _sut.Initialize(_aufgabe, verwaisteKonfiguration);
+        var sut = new AutonomAufgabeDetailViewModel(
+            _aufgabe,
+            verwaisteKonfiguration,
+            _projektleiterAgentService,
+            _sessionManagementService,
+            NullLogger<AutonomAufgabeDetailViewModel>.Instance);
 
-        await _sut.StarteAgentAsync();
+        await sut.StarteAgentAsync();
 
-        _sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
-        _sut.IsBusy.Should().BeFalse();
+        sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        sut.IsBusy.Should().BeFalse();
     }
 }
