@@ -42,9 +42,17 @@ public sealed class UnteragentGovernanceMonitoringService : PeriodicBackgroundSe
         var aktiveUnteragenten = await db.UnteragentSpezifikationen
             .Include(u => u.AutonomAufgabe)
             .ThenInclude(k => k.Aufgabe)
+            // Der Modus (regulär/autonom) ist hier bereits implizit durch den Join über
+            // UnteragentSpezifikation.AutonomAufgabe gegeben (nur autonome Aufgaben haben Unteragenten);
+            // geprueft wird daher nur noch die Ausfuehrungsphase (Aufgabe muss noch aktiv laufen, nicht beendet
+            // sein). Vor dieser Umstellung wurde hier faelschlich der inzwischen entfernte Sentinel-Wert
+            // AufgabeAusfuehrungsStatus.AutonomAufgabe erwartet, der von ProjektleiterAgentService.StarteAgentAsync
+            // aber sofort beim Agent-Start auf Aktiv ueberschrieben wurde — der Filter griff dadurch in der
+            // Produktion nie. Mit dem Vergleich gegen Aktiv findet das Monitoring nun tatsaechlich laufende
+            // Unteragenten.
             .Where(u =>
                 (u.Status == UnteragentStatus.Erzeugt || u.Status == UnteragentStatus.Ausgefuehrt)
-                && u.AutonomAufgabe.Aufgabe.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.AutonomAufgabe
+                && u.AutonomAufgabe.Aufgabe.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
                 && u.AutonomAufgabe.SessionPauseUtc == null)
             .ToListAsync(ct);
 

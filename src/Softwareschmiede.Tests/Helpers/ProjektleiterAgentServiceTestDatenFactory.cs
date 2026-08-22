@@ -39,7 +39,11 @@ internal static class ProjektleiterAgentServiceTestDatenFactory
             ProjektId = projektId,
             Titel = "Autonome Testaufgabe",
             Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.AutonomAufgabe,
+            // Modus (regulär/autonom) wird nicht mehr über AusfuehrungsStatus abgebildet, sondern über
+            // AutonomKonfiguration != null (siehe Aufgabe.IstAutonom()). Aktiv steht hier für "Projektleiter-Agent
+            // läuft bereits" — der Zustand, den die meisten Tests dieser Fabrik (ProjektleiterAgentServiceTests,
+            // SessionManagementServiceTests, UnteragentGovernanceMonitoringServiceTests) voraussetzen.
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
             ErstellungsDatum = DateTimeOffset.UtcNow
         };
         db.Aufgaben.Add(aufgabe);

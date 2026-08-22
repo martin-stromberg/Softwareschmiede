@@ -93,9 +93,9 @@ public sealed class UnteragentGovernanceMonitoringServiceTests : IDisposable
         gespeichert.Status.Should().Be(UnteragentStatus.Abgeschlossen);
     }
 
-    /// <summary>RunOnceAsync prueft einen laufenden Unteragenten nicht, wenn die uebergeordnete Aufgabe nicht (mehr) im AusfuehrungsStatus AutonomAufgabe ist, selbst wenn ein Governance-Limit ueberschritten ist.</summary>
+    /// <summary>RunOnceAsync prueft einen laufenden Unteragenten nicht, wenn die uebergeordnete Aufgabe nicht mehr aktiv ist (AusfuehrungsStatus == Beendet), selbst wenn ein Governance-Limit ueberschritten ist.</summary>
     [Fact]
-    public async Task RunOnceAsync_PrueftNicht_WennAufgabeNichtImAusfuehrungsStatusAutonomAufgabeIst()
+    public async Task RunOnceAsync_PrueftNicht_WennAufgabeNichtMehrAktivIst()
     {
         using var db = TestDbContextFactory.Create();
         var (aufgabe, konfiguration) = await ErstelleAutonomeAufgabeAsync(db);

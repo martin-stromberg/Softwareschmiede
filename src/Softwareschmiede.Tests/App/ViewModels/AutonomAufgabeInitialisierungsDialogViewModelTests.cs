@@ -81,7 +81,8 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests : IDispos
         _closeRequestedResult.Should().BeTrue();
 
         var aufgabeAktualisiert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
-        aufgabeAktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.AutonomAufgabe);
+        aufgabeAktualisiert!.AutonomKonfiguration.Should().NotBeNull();
+        aufgabeAktualisiert.IstAutonom().Should().BeTrue();
     }
 
     /// <summary>BestaetigenAsync schlägt bei einem ungültigen Token-Budget mit einer Fehlermeldung fehl, ohne den Service aufzurufen.</summary>

@@ -70,7 +70,7 @@ public sealed class AutonomAufgabenInitialisierungsService
         };
 
         _db.AutonomAufgabeKonfigurationen.Add(konfiguration);
-        SetzeAusfuehrungsStatusAutonomAufgabe(aufgabe);
+        SicherstelleAufgabeGetrackt(aufgabe);
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
@@ -119,16 +119,20 @@ public sealed class AutonomAufgabenInitialisierungsService
         });
     }
 
-    private void SetzeAusfuehrungsStatusAutonomAufgabe(Aufgabe aufgabe)
+    /// <summary>
+    /// Stellt sicher, dass <paramref name="aufgabe"/> im <see cref="_db"/>-ChangeTracker getrackt ist, damit das
+    /// EF-Relationship-Fixup zwischen <see cref="AutonomAufgabeKonfiguration.AufgabeId"/> und
+    /// <see cref="Aufgabe.AutonomKonfiguration"/> greift — auch dann, wenn die aufrufende Seite eine
+    /// nicht-getrackte <see cref="Aufgabe"/>-Instanz übergeben hat.
+    /// </summary>
+    /// <param name="aufgabe">Die sicherzustellende Aufgabe.</param>
+    private void SicherstelleAufgabeGetrackt(Aufgabe aufgabe)
     {
         var verfolgteAufgabe = _db.ChangeTracker.Entries<Aufgabe>().Select(e => e.Entity).FirstOrDefault(a => a.Id == aufgabe.Id);
         if (verfolgteAufgabe is null)
         {
             _db.Attach(aufgabe);
-            verfolgteAufgabe = aufgabe;
         }
-
-        verfolgteAufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.AutonomAufgabe;
     }
 
     private Task KloneHauptRepositoryAsync(Aufgabe aufgabe, string zielPfad, CancellationToken ct)

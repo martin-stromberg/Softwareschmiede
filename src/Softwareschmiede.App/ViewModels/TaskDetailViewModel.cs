@@ -211,8 +211,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
     public bool KannCliStoppen => _isCliRunning;
 
-    /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann.</summary>
+    /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann. Fuer Autonome Aufgaben immer false, da diese ueber den Projektleiter-Agenten statt die reguläre CLI-Ansicht gesteuert werden.</summary>
     public bool KannCliNeuStarten => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
+        && !_aufgabe.IstAutonom()
         && !_isCliRunning;
 
     /// <summary>Gibt an, ob die Aufgabe endgueltig abgeschlossen werden kann.</summary>
@@ -402,8 +403,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Status == Neu, sonst false.</summary>
     public bool ShowEditPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Neu;
 
-    /// <summary>True wenn die Aufgabe eine aktive KI-Ausfuehrung anzeigen soll.</summary>
-    public bool ShowCliPanel => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true;
+    /// <summary>True wenn die Aufgabe eine aktive KI-Ausfuehrung anzeigen soll. Fuer Autonome Aufgaben immer false, da diese ueber eine eigene Ansicht (Projektleiter-Agent) statt die reguläre CLI-Ansicht gesteuert werden.</summary>
+    public bool ShowCliPanel => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
+        && !_aufgabe.IstAutonom();
 
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
     public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
@@ -621,7 +623,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         CliNeustartenCommand = new AsyncRelayCommand(CliNeustartenAsync, () => KannCliNeuStarten);
         StartenCommand = new AsyncRelayCommand(
             StartenAsync,
-            () => _aufgabe?.AusfuehrungsStatus.DarfAusfuehrungStarten(_aufgabe.Status) == true && !_isCliRunning);
+            () => _aufgabe?.AusfuehrungsStatus.DarfAusfuehrungStarten(_aufgabe.Status) == true
+                && !_aufgabe.IstAutonom()
+                && !_isCliRunning);
         PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => KannAufgabeAbschliessen);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
