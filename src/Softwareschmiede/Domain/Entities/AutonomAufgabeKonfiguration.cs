@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Entities;
 
@@ -29,6 +31,19 @@ public sealed class AutonomAufgabeKonfiguration
     /// <summary>Nettozeit-Limit in Minuten.</summary>
     public int LaufzeitLimitMinuten { get; set; }
 
+    /// <summary>Convenience-Zugriff auf <see cref="TokenBudget"/>, <see cref="TokenBudgetErweitert"/> und <see cref="LaufzeitLimitMinuten"/> als Value Object. Nicht von EF Core gemappt; die drei Werte bleiben einzeln als flache Spalten persistiert.</summary>
+    [NotMapped]
+    public RessourcenLimits RessourcenLimits
+    {
+        get => new(TokenBudget, TokenBudgetErweitert, LaufzeitLimitMinuten);
+        set
+        {
+            TokenBudget = value.TokenBudget;
+            TokenBudgetErweitert = value.TokenBudgetErweitert;
+            LaufzeitLimitMinuten = value.LaufzeitLimitMinuten;
+        }
+    }
+
     /// <summary>Persistenz-Modus.</summary>
     public PersistenzModus PersistenzModus { get; set; }
 
@@ -37,6 +52,15 @@ public sealed class AutonomAufgabeKonfiguration
 
     /// <summary>Pfad zum Arbeitsverzeichnis der Autonomen Aufgabe.</summary>
     public string ArbeitsverzeichnisPfad { get; set; } = string.Empty;
+
+    /// <summary>ID des aktuell laufenden Projektleiter-Agenten.</summary>
+    public string? ProjektleiterAgentId { get; set; }
+
+    /// <summary>Zeitstempel der letzten Session-Pause wegen Budget-Limit.</summary>
+    public DateTimeOffset? SessionPauseUtc { get; set; }
+
+    /// <summary>Anzahl aktuell aktiver Unteragenten.</summary>
+    public int? AktiveUnteragenten { get; set; }
 
     /// <summary>Navigationseigenschaft zur zugehörigen Aufgabe.</summary>
     public Aufgabe Aufgabe { get; set; } = null!;

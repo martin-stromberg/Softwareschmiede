@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -13,20 +12,20 @@ namespace Softwareschmiede.Application.Services;
 public sealed class ProjektleiterAgentService
 {
     private readonly SoftwareschmiededDbContext _db;
-    private readonly ICliRunner _cliRunner;
     private readonly UnteragentGovernanceService _governanceService;
+    private readonly UnteragentGitProvisioningService _gitProvisioningService;
     private readonly ILogger<ProjektleiterAgentService> _logger;
 
     /// <inheritdoc cref="ProjektleiterAgentService"/>
     public ProjektleiterAgentService(
         SoftwareschmiededDbContext db,
-        ICliRunner cliRunner,
         UnteragentGovernanceService governanceService,
+        UnteragentGitProvisioningService gitProvisioningService,
         ILogger<ProjektleiterAgentService> logger)
     {
         _db = db;
-        _cliRunner = cliRunner;
         _governanceService = governanceService;
+        _gitProvisioningService = gitProvisioningService;
         _logger = logger;
     }
 
@@ -42,13 +41,18 @@ public sealed class ProjektleiterAgentService
             await File.WriteAllTextAsync(skillPfad, BuildDefaultProjektleiterSkill(konfiguration), ct);
         }
 
-        var aufgabe = await _db.Aufgaben.FirstOrDefaultAsync(a => a.Id == konfiguration.AufgabeId, ct)
+        var aufgabe = await _db.Aufgaben
+            .Include(a => a.AutonomKonfiguration)
+            .FirstOrDefaultAsync(a => a.Id == konfiguration.AufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {konfiguration.AufgabeId} nicht gefunden.");
+
+        var autonomKonfiguration = aufgabe.AutonomKonfiguration
+            ?? throw new InvalidOperationException($"AutonomAufgabeKonfiguration für Aufgabe {konfiguration.AufgabeId} nicht gefunden.");
 
         var agentId = $"projektleiter-{Guid.NewGuid():N}";
 
         aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        aufgabe.ProjektleiterAgentId = agentId;
+        autonomKonfiguration.ProjektleiterAgentId = agentId;
         aufgabe.AktiveRunId = agentId;
         aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
@@ -63,48 +67,50 @@ public sealed class ProjektleiterAgentService
         ArgumentNullException.ThrowIfNull(unteragent);
         ValidiereUnteragent(unteragent);
 
-        var konfiguration = await _db.AutonomAufgabeKonfigurationen
-            .AsNoTracking()
-            .FirstOrDefaultAsync(k => k.Id == unteragent.AutonomAufgabeId, ct)
-            ?? throw new InvalidOperationException($"AutonomAufgabeKonfiguration {unteragent.AutonomAufgabeId} nicht gefunden.");
-
-        if (!_governanceService.VerifiziereBerechtigung(unteragent, UnteragentAktion.ArbeitsverzeichnisErstellen, unteragent.AgentDirectory))
-        {
-            throw new InvalidOperationException(
-                $"Unteragent {unteragent.AgentId}: Arbeitsverzeichnis '{unteragent.AgentDirectory}' liegt außerhalb des erlaubten Bereichs.");
-        }
-
-        Directory.CreateDirectory(unteragent.AgentDirectory);
+        var konfiguration = await LadeKonfigurationAsync(unteragent.AutonomAufgabeId, ct);
+        PruefeGovernance(unteragent, konfiguration);
 
         var repoMainPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "clones", "repo_main");
-        await _cliRunner.RunAsync("git", ["branch", unteragent.AgentBranch], repoMainPfad, null, ct);
+        await _gitProvisioningService.ProvisioniereAsync(unteragent, repoMainPfad, ct);
 
-        if (!Directory.Exists(unteragent.AgentClone) || !Directory.EnumerateFileSystemEntries(unteragent.AgentClone).Any())
+        await PersistiereUnteragentAsync(unteragent, ct);
+
+        _logger.LogInformation(
+            "Unteragent {AgentId} für Autonome Aufgabe {AutonomAufgabeId} erzeugt (Branch: {Branch}).",
+            unteragent.ExterneAgentId,
+            unteragent.AutonomAufgabeId,
+            unteragent.GitArbeitsbereich.BranchName);
+    }
+
+    /// <summary>Lädt die AutonomAufgabeKonfiguration für die gegebene Id.</summary>
+    private async Task<AutonomAufgabeKonfiguration> LadeKonfigurationAsync(Guid autonomAufgabeId, CancellationToken ct)
+        => await _db.AutonomAufgabeKonfigurationen
+            .AsNoTracking()
+            .FirstOrDefaultAsync(k => k.Id == autonomAufgabeId, ct)
+            ?? throw new InvalidOperationException($"AutonomAufgabeKonfiguration {autonomAufgabeId} nicht gefunden.");
+
+    /// <summary>Prüft, dass das Arbeitsverzeichnis des Unteragenten innerhalb des erlaubten Bereichs der Autonomen Aufgabe liegt.</summary>
+    private void PruefeGovernance(UnteragentSpezifikation unteragent, AutonomAufgabeKonfiguration konfiguration)
+    {
+        if (!_governanceService.VerifiziereBerechtigung(
+                konfiguration.ArbeitsverzeichnisPfad,
+                UnteragentAktion.ArbeitsverzeichnisErstellen,
+                unteragent.VerzeichnisPfad,
+                unteragent.ExterneAgentId))
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(unteragent.AgentClone)!);
-            var kloneErgebnis = await _cliRunner.RunAsync(
-                "git",
-                ["clone", "--branch", unteragent.AgentBranch, repoMainPfad, unteragent.AgentClone],
-                null,
-                null,
-                ct);
-            if (!kloneErgebnis.IsSuccess)
-            {
-                throw new InvalidOperationException($"Klon für Unteragent '{unteragent.AgentId}' fehlgeschlagen: {kloneErgebnis.StdErr}");
-            }
+            throw new InvalidOperationException(
+                $"Unteragent {unteragent.ExterneAgentId}: Arbeitsverzeichnis '{unteragent.VerzeichnisPfad}' liegt außerhalb des erlaubten Bereichs '{konfiguration.ArbeitsverzeichnisPfad}'.");
         }
+    }
 
+    /// <summary>Markiert den Unteragenten als erzeugt und persistiert die Spezifikation.</summary>
+    private async Task PersistiereUnteragentAsync(UnteragentSpezifikation unteragent, CancellationToken ct)
+    {
         unteragent.Status = UnteragentStatus.Erzeugt;
         unteragent.ErzeugungsDatum = DateTimeOffset.UtcNow;
 
         _db.UnteragentSpezifikationen.Add(unteragent);
         await _db.SaveChangesAsync(ct);
-
-        _logger.LogInformation(
-            "Unteragent {AgentId} für Autonome Aufgabe {AutonomAufgabeId} erzeugt (Branch: {Branch}).",
-            unteragent.AgentId,
-            unteragent.AutonomAufgabeId,
-            unteragent.AgentBranch);
     }
 
     /// <summary>Integriert die Ergebnisse eines abgeschlossenen Unteragenten in plan.md, progress.md und state.json.</summary>
@@ -113,16 +119,16 @@ public sealed class ProjektleiterAgentService
         ArgumentNullException.ThrowIfNull(konfiguration);
         ArgumentNullException.ThrowIfNull(unteragent);
 
-        var reportPfad = Path.Combine(unteragent.AgentDirectory, "task_report.md");
+        var reportPfad = Path.Combine(unteragent.VerzeichnisPfad, "task_report.md");
         var report = File.Exists(reportPfad)
             ? await File.ReadAllTextAsync(reportPfad, ct)
             : "(kein task_report.md gefunden)";
 
         var planPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "plan.md");
-        await File.AppendAllTextAsync(planPfad, $"\n## Teilaufgabe {unteragent.TaskId} ({unteragent.AgentScope})\nStatus: Abgeschlossen\n", ct);
+        await File.AppendAllTextAsync(planPfad, $"\n## Teilaufgabe {unteragent.TaskId} ({unteragent.Scope})\nStatus: Abgeschlossen\n", ct);
 
         var progressPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "progress.md");
-        await File.AppendAllTextAsync(progressPfad, $"\n## {DateTimeOffset.UtcNow:O} — Unteragent {unteragent.AgentId} abgeschlossen\n{report}\n", ct);
+        await File.AppendAllTextAsync(progressPfad, $"\n## {DateTimeOffset.UtcNow:O} — Unteragent {unteragent.ExterneAgentId} abgeschlossen\n{report}\n", ct);
 
         await AktualisiereSubagentsInStateJsonAsync(konfiguration.ArbeitsverzeichnisPfad, unteragent, ct);
 
@@ -135,19 +141,18 @@ public sealed class ProjektleiterAgentService
 
         _logger.LogInformation(
             "Ergebnisse von Unteragent {AgentId} integriert (plan.md, progress.md, state.json aktualisiert).",
-            unteragent.AgentId);
+            unteragent.ExterneAgentId);
     }
 
-    private static async Task AktualisiereSubagentsInStateJsonAsync(string arbeitsverzeichnispPfad, UnteragentSpezifikation unteragent, CancellationToken ct)
+    private async Task AktualisiereSubagentsInStateJsonAsync(string arbeitsverzeichnisPfad, UnteragentSpezifikation unteragent, CancellationToken ct)
     {
-        var stateJsonPfad = Path.Combine(arbeitsverzeichnispPfad, "state.json");
-        if (!File.Exists(stateJsonPfad))
+        var stateJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "state.json");
+        var node = await StateJsonHelper.LeseAsync(stateJsonPfad, _logger, ct);
+        if (node is null)
         {
             return;
         }
 
-        var json = await File.ReadAllTextAsync(stateJsonPfad, ct);
-        var node = JsonNode.Parse(json) as JsonObject ?? new JsonObject();
         if (node["subagents"] is not JsonArray subagents)
         {
             subagents = new JsonArray();
@@ -156,14 +161,14 @@ public sealed class ProjektleiterAgentService
 
         subagents.Add(new JsonObject
         {
-            ["agent_id"] = unteragent.AgentId,
+            ["agent_id"] = unteragent.ExterneAgentId,
             ["task_id"] = unteragent.TaskId,
-            ["scope"] = unteragent.AgentScope,
+            ["scope"] = unteragent.Scope,
             ["status"] = "Abgeschlossen",
             ["completed_utc"] = DateTimeOffset.UtcNow.ToString("O")
         });
 
-        await File.WriteAllTextAsync(stateJsonPfad, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), ct);
+        await StateJsonHelper.SchreibeAsync(stateJsonPfad, node, ct);
     }
 
     private static string BuildDefaultProjektleiterSkill(AutonomAufgabeKonfiguration konfiguration) => $"""
@@ -181,24 +186,24 @@ public sealed class ProjektleiterAgentService
 
     private static void ValidiereUnteragent(UnteragentSpezifikation unteragent)
     {
-        if (string.IsNullOrWhiteSpace(unteragent.AgentScope))
+        if (string.IsNullOrWhiteSpace(unteragent.Scope))
         {
-            throw new ArgumentException("AgentScope darf nicht leer sein.", nameof(unteragent));
+            throw new ArgumentException("Scope darf nicht leer sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.AgentBranch))
+        if (string.IsNullOrWhiteSpace(unteragent.GitArbeitsbereich.BranchName))
         {
-            throw new ArgumentException("AgentBranch darf nicht leer sein.", nameof(unteragent));
+            throw new ArgumentException("Branch darf nicht leer sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.AgentDirectory) || !Path.IsPathRooted(unteragent.AgentDirectory))
+        if (string.IsNullOrWhiteSpace(unteragent.VerzeichnisPfad) || !Path.IsPathRooted(unteragent.VerzeichnisPfad))
         {
-            throw new ArgumentException("AgentDirectory muss ein absoluter Pfad sein.", nameof(unteragent));
+            throw new ArgumentException("VerzeichnisPfad muss ein absoluter Pfad sein.", nameof(unteragent));
         }
 
-        if (string.IsNullOrWhiteSpace(unteragent.AgentClone) || !Path.IsPathRooted(unteragent.AgentClone))
+        if (string.IsNullOrWhiteSpace(unteragent.GitArbeitsbereich.ClonePfad) || !Path.IsPathRooted(unteragent.GitArbeitsbereich.ClonePfad))
         {
-            throw new ArgumentException("AgentClone muss ein absoluter Pfad sein.", nameof(unteragent));
+            throw new ArgumentException("ClonePfad muss ein absoluter Pfad sein.", nameof(unteragent));
         }
     }
 }

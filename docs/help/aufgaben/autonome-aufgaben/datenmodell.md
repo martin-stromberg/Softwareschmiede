@@ -15,10 +15,7 @@ Bestehende Entity mit neuen Properties für Autonome Aufgaben.
 | `Titel` | string | Aufgabentitel (bestehend) |
 | `Status` | AufgabeStatus | Aufgaben-Status: Geplant, Gestartet, Wartend, Abgeschlossen (bestehend) |
 | `AusfuehrungsStatus` | AufgabeAusfuehrungsStatus | KI-Ausführungsstatus: NichtGestartet, Aktiv, Beendet, **AutonomAufgabe** (erweitert) |
-| `ProjektleiterAgentId` | string? | ID des aktuell laufenden Projektleiter-Agenten (neu) |
-| `SessionPauseUtc` | DateTimeOffset? | Zeitstempel der letzten Session-Pause wegen Budget-Limit (neu) |
-| `AktiveUnteragenten` | int? | Anzahl aktuell aktiver Unteragenten (neu) |
-| `AutonomKonfiguration` | AutonomAufgabeKonfiguration? | Navigation zur Konfiguration (neu, 1:1) |
+| `AutonomKonfiguration` | AutonomAufgabeKonfiguration? | Navigation zur Konfiguration (neu, 1:1); trägt `ProjektleiterAgentId`, `SessionPauseUtc` und `AktiveUnteragenten` |
 | ... | ... | Weitere bestehende Properties... |
 
 ### `AutonomAufgabeKonfiguration` (neu)
@@ -35,9 +32,12 @@ Konfiguration und Persistierung einer Autonomen Aufgabe.
 | `TokenBudget` | int | Token-Budget für die Gesamtaufgabe |
 | `TokenBudgetErweitert` | int? | Optionales erweitertes Budget nach Pause |
 | `LaufzeitLimitMinuten` | int | Nettozeit-Limit in Minuten |
-| `PersistenzModus` | PersistenzModus | `Standard` oder `SessionReset` |
+| `PersistenzModus` | PersistenzModus | `Standard` oder `SitzungZuruecksetzen` |
 | `SkillAutogeneration` | bool | Sollen Skills automatisch generiert werden? |
 | `ArbeitsverzeichnisPfad` | string | Absoluter Pfad zum Arbeitsverzeichnis |
+| `ProjektleiterAgentId` | string? | ID des aktuell laufenden Projektleiter-Agenten |
+| `SessionPauseUtc` | DateTimeOffset? | Zeitstempel der letzten Session-Pause wegen Budget-Limit |
+| `AktiveUnteragenten` | int? | Anzahl aktuell aktiver Unteragenten |
 | `Aufgabe` | Aufgabe | Navigation (inverse 1:1) |
 | `Unteragenten` | List<UnteragentSpezifikation> | Navigation (1:N) |
 | `Skills` | List<SkillDefinition> | Navigation (1:N) |
@@ -58,21 +58,21 @@ Metadaten eines von einem Projektleiter-Agenten erzeugten Unteragenten.
 |-------------|-----|--------------|
 | `Id` | Guid | Eindeutige Unteragenten-ID |
 | `AutonomAufgabeId` | Guid | Foreign Key zu `AutonomAufgabeKonfiguration` (1:N) |
-| `AgentId` | string | Agent-Identifier (z.B. "subagent-001") |
+| `ExterneAgentId` | string | Externe Agent-Kennung, z.B. vom CLI-Tool vergeben (z.B. "subagent-001"), nicht identisch mit `Id` |
 | `TaskId` | string | Task-Identifier (z.B. "task-001") |
-| `AgentScope` | string | Geltungsbereich (z.B. "feature-backend", "feature-frontend") |
-| `AgentPrompt` | string | Task-Prompt für den Agenten |
-| `AgentDirectory` | string | Relativer Pfad zum Agent-Arbeitsbereich (z.B. "tasks/task_001") |
-| `AgentBranch` | string | Git-Branch für diesen Agenten (z.B. "feature-unteragent-001") |
-| `AgentClone` | string | Relativer Pfad zum Clone (z.B. "clones/repo_feature_001") |
+| `Scope` | string | Geltungsbereich (z.B. "feature-backend", "feature-frontend") |
+| `Prompt` | string | Task-Prompt für den Agenten |
+| `VerzeichnisPfad` | string | Relativer Pfad zum Agent-Arbeitsbereich (z.B. "tasks/task_001") |
+| `Branch` | string | Git-Branch für diesen Agenten (z.B. "feature-unteragent-001") |
+| `ClonePfad` | string | Relativer Pfad zum Clone (z.B. "clones/repo_feature_001") |
 | `ErzeugungsDatum` | DateTimeOffset | Zeitstempel der Erzeugung |
 | `AbschlussDatum` | DateTimeOffset? | Abschlusszeitpunkt (null wenn noch aktiv) |
 | `Status` | UnteragentStatus | `Erzeugt`, `Ausgeführt`, `Abgeschlossen`, `Fehler` |
 | `AutonomAufgabe` | AutonomAufgabeKonfiguration | Navigation (inverse 1:N) |
 
 **Constraints:**
-- `AgentScope`: Nicht null, eindeutig pro `AutonomAufgabeId`
-- `AgentBranch`: Gültiger Git-Branch-Name
+- `Scope`: Nicht null, eindeutig pro `AutonomAufgabeId`
+- `Branch`: Gültiger Git-Branch-Name
 - `Status`: Enum-Wert, keine null
 
 ### `SkillDefinition` (neu)
@@ -83,19 +83,19 @@ Versionierte Skill-Definition für Projektleiter oder Unteragenten.
 |-------------|-----|--------------|
 | `Id` | Guid | Eindeutige ID |
 | `AutonomAufgabeId` | Guid | Foreign Key zu `AutonomAufgabeKonfiguration` (1:N) |
-| `SkillName` | string | Name des Skills (z.B. "projektleiter-v1") |
-| `SkillVersion` | string | Versionsnummer (z.B. "1.0.0", "1.0.1") |
-| `SkillContent` | string | Markdown-Inhalt des Skills |
-| `SkillStatus` | SkillStatus | `Entwurf`, `Review`, `Freigegeben`, `Archiviert` |
+| `Name` | string | Name des Skills (z.B. "projektleiter-v1") |
+| `Version` | string | Versionsnummer (z.B. "1.0.0", "1.0.1") |
+| `Content` | string | Markdown-Inhalt des Skills |
+| `Status` | SkillStatus | `Entwurf`, `Pruefung`, `Freigegeben`, `Archiviert` |
 | `ErstellungsDatum` | DateTimeOffset | Zeitstempel der Erstellung |
 | `FreigabeDatum` | DateTimeOffset? | Freigabezeitpunkt (null wenn nicht freigegeben) |
 | `AutonomAufgabe` | AutonomAufgabeKonfiguration | Navigation (inverse 1:N) |
 
 **Constraints:**
-- `SkillName`: Nicht null, eindeutig pro `AutonomAufgabeId`
-- `SkillVersion`: Nicht null
-- `SkillContent`: Nicht null (kann leer sein, aber nicht null)
-- `SkillStatus`: Enum-Wert
+- `Name`: Nicht null, eindeutig pro `AutonomAufgabeId`
+- `Version`: Nicht null
+- `Content`: Nicht null (kann leer sein, aber nicht null)
+- `Status`: Enum-Wert
 
 ## Beziehungen
 
@@ -106,19 +106,22 @@ Versionierte Skill-Definition für Projektleiter oder Unteragenten.
 │  └─ AufgabeId                        └─ AufgabeId (FK)
 │     AusfuehrungsStatus                  └─ ArbeitsverzeichnisPfad
 │     (= AutonomAufgabe)                  └─ InitialPrompt
-│     ProjektleiterAgentId               └─ TokenBudget
-│     SessionPauseUtc                     └─ etc.
-│     AktiveUnteragenten                  │
+│                                         └─ TokenBudget
+│                                         └─ ProjektleiterAgentId
+│                                         └─ SessionPauseUtc
+│                                         └─ AktiveUnteragenten
+│                                         └─ etc.
+│                                         │
 │                                         ├──── 1:N ────► UnteragentSpezifikation (neu)
-│                                         │               └─ AgentScope
-│                                         │               └─ AgentPrompt
+│                                         │               └─ Scope
+│                                         │               └─ Prompt
 │                                         │               └─ Status
 │                                         │               └─ ErzeugungsDatum
 │                                         │
 │                                         └──── 1:N ────► SkillDefinition (neu)
-│                                                         └─ SkillName
-│                                                         └─ SkillVersion
-│                                                         └─ SkillStatus
+│                                                         └─ Name
+│                                                         └─ Version
+│                                                         └─ Status
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -163,7 +166,7 @@ public enum AufgabeAusfuehrungsStatus
 public enum PersistenzModus
 {
     Standard = 0,           // Normale Pause/Resume mit Kontext aus state.json
-    SessionReset = 1        // [Zukünftig] Pause setzt Kontext zurück
+    SitzungZuruecksetzen = 1 // [Zukünftig] Pause setzt Kontext zurück
 }
 ```
 
@@ -172,9 +175,9 @@ public enum PersistenzModus
 ```csharp
 public enum PermissionsJsonOption
 {
-    Generate = 0,           // permissions.json automatisch generieren
-    Select = 1,             // Bestehende Datei auswählen
-    Existing = 2            // Vordefiniertes Profil verwenden
+    Generieren = 0,         // permissions.json automatisch generieren
+    Auswaehlen = 1,         // Bestehende Datei auswählen
+    Vordefiniert = 2        // Vordefiniertes Profil verwenden
 }
 ```
 
@@ -196,7 +199,7 @@ public enum UnteragentStatus
 public enum SkillStatus
 {
     Entwurf = 0,            // Skill ist noch in Bearbeitung
-    Review = 1,             // Skill wartet auf Review
+    Pruefung = 1,           // Skill wartet auf Prüfung
     Freigegeben = 2,        // Skill ist freigegeben und kann verwendet werden
     Archiviert = 3          // Skill ist archiviert und wird nicht mehr verwendet
 }
@@ -216,9 +219,6 @@ erDiagram
         string Titel
         AufgabeStatus Status
         AufgabeAusfuehrungsStatus AusfuehrungsStatus
-        string "ProjektleiterAgentId?"
-        datetime "SessionPauseUtc?"
-        int "AktiveUnteragenten?"
     }
 
     AUTONO_CONFIG {
@@ -233,18 +233,21 @@ erDiagram
         PersistenzModus PersistenzModus
         bool SkillAutogeneration
         string ArbeitsverzeichnisPfad
+        string "ProjektleiterAgentId?"
+        datetime "SessionPauseUtc?"
+        int "AktiveUnteragenten?"
     }
 
     UNTERAGENT {
         guid Id
         guid AutonomAufgabeId FK
-        string AgentId
+        string ExterneAgentId
         string TaskId
-        string AgentScope
-        string AgentPrompt
-        string AgentDirectory
-        string AgentBranch
-        string AgentClone
+        string Scope
+        string Prompt
+        string VerzeichnisPfad
+        string Branch
+        string ClonePfad
         datetime ErzeugungsDatum
         datetime "AbschlussDatum?"
         UnteragentStatus Status
@@ -253,10 +256,10 @@ erDiagram
     SKILL {
         guid Id
         guid AutonomAufgabeId FK
-        string SkillName
-        string SkillVersion
-        string SkillContent
-        SkillStatus SkillStatus
+        string Name
+        string Version
+        string Content
+        SkillStatus Status
         datetime ErstellungsDatum
         datetime "FreigabeDatum?"
     }
@@ -271,11 +274,15 @@ Die folgenden Migrationen werden ausgeführt, um das Datenmodell zu erstellen:
    - Foreign Keys und Indizes
 
 2. **AddAutonomAufgabeColumnsToAufgaben**
-   - Erweitert Tabelle `Aufgaben` um Spalten: `ProjektleiterAgentId`, `SessionPauseUtc`, `AktiveUnteragenten`, `AutonomKonfigurationId`
+   - Erweitert Tabelle `Aufgaben` um die Fremdschlüssel-Spalte `AutonomKonfigurationId`
    - Erstellt Index auf `AutonomKonfigurationId`
 
 3. **UpdateAusfuehrungsStatusEnum** (falls nötig)
    - Aktualisiert Enum-Definition in `AufgabeAusfuehrungsStatus` um neuen Wert `AutonomAufgabe`
+
+4. **VerschiebeProjektleiterFelderZuAutonomKonfiguration**
+   - Verschiebt die Spalten `ProjektleiterAgentId`, `SessionPauseUtc`, `AktiveUnteragenten` von `Aufgaben` nach `AutonomAufgabeKonfigurationen` (Data-Clump-Bereinigung: die Felder sind nur für Autonome Aufgaben relevant, gehören also fachlich zur Konfiguration und nicht zur allgemeinen `Aufgabe`-Entity)
+   - Übernimmt vorhandene Werte per `UPDATE`-Statement (1:1-Zuordnung über `AufgabeId`), bevor die alten Spalten auf `Aufgaben` entfernt werden
 
 ## Indizes
 
@@ -287,4 +294,4 @@ Für Performanz werden folgende Indizes erstellt:
 | `UnteragentSpezifikationen` | `AutonomAufgabeId` | 1:N-Abfragen |
 | `UnteragentSpezifikationen` | `(AutonomAufgabeId, Status)` | Filtern nach Status |
 | `SkillDefinitionen` | `AutonomAufgabeId` | 1:N-Abfragen |
-| `SkillDefinitionen` | `(AutonomAufgabeId, SkillStatus)` | Filtern nach Status |
+| `SkillDefinitionen` | `(AutonomAufgabeId, Status)` | Filtern nach Status |

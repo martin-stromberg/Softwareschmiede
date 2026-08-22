@@ -128,7 +128,7 @@
 
 **Lösung:**
 1. Überprüfe Session-Status:
-   - Aufgabe.SessionPauseUtc != null? → Budget-Limit erreicht → Fortsetzen mit erweitertem Budget
+   - Aufgabe.AutonomKonfiguration.SessionPauseUtc != null? → Budget-Limit erreicht → Fortsetzen mit erweitertem Budget
    - Aufgabe.AusfuehrungsStatus = Fehler? → Interner Fehler
 2. Überprüfe `logs/agent.log` im Arbeitsverzeichnis für Details
 3. Falls Budget-Limit: Erhöhe `DefaultTokenBudget` in appsettings.json (für nächste Aufgabe)
@@ -146,7 +146,7 @@
 - Unteragent versucht, Skill zu modifizieren oder PR zu erstellen
 
 **Lösung:**
-1. Überprüfe `UnteragentSpezifikation.AgentScope` im Arbeitsverzeichnis (`state.json`)
+1. Überprüfe `UnteragentSpezifikation.Scope` im Arbeitsverzeichnis (`state.json`)
 2. Falls Scope zu eng: Initialisiere Aufgabe neu mit besserer Taskverteilung
 3. Falls Unteragent-Prompt falsch: Benutzer/Entwickler muss Prompt präzisieren
 4. Für Debug: Setze Logging-Level auf `Debug` in `appsettings.json`:

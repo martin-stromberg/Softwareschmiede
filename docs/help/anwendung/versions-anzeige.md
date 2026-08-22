@@ -53,6 +53,25 @@ Wenn Sie den Support kontaktieren:
 3. Notieren Sie die angezeigte Versionsnummer (z. B. „Version 1.2.3").
 4. Geben Sie diese Information im Support-Ticket an, um Kompatibilitätsprobleme schneller zu klären.
 
+## Verwandtes Verhalten: Datenbankpfad je nach Versionstyp
+
+Dieselbe `version.json` (genauer: das darin enthaltene `tagName`) steuert außerdem, wo die
+Anwendung ihre SQLite-Datenbankdatei (`softwareschmiede.db`) beim Start ablegt:
+
+| Versionstyp | Erkennung | Datenbankpfad |
+|---|---|---|
+| **Produktiv** | `version.json` vorhanden, `tagName` **ohne** `-rc`-Infix (z. B. `v1.2.3`) | `%LocalAppData%\Softwareschmiede\softwareschmiede.db` |
+| **Release Candidate (RC)** | `version.json` vorhanden, `tagName` **mit** `-rc`-Infix (z. B. `v1.2.3-rc.1`) | Lokales Programmverzeichnis (`softwareschmiede.db` neben der `.exe`) |
+| **Versionslos** | Keine (oder keine lesbare/gültige) `version.json` — z. B. Ausführung unter Visual Studio oder ein manuell kopierter Debug-Build | Lokales Programmverzeichnis (`softwareschmiede.db` neben der `.exe`) |
+
+Damit teilen sich RC- und Entwicklungs-Installationen niemals versehentlich die produktive
+Datenbank unter `%LocalAppData%`. Wer ein Backup der produktiven Daten einrichten möchte, sollte
+daher `%LocalAppData%\Softwareschmiede\softwareschmiede.db` sichern; bei einer RC- oder
+versionslosen Installation liegt die Datei stattdessen im Installations-/Buildverzeichnis selbst.
+Diese Zuordnung wird ausschließlich beim Programmstart ermittelt und wirkt sich nicht auf bereits
+laufende Instanzen aus; es findet keine automatische Migration bestehender Datenbankdateien
+zwischen den beiden Pfaden statt.
+
 ## Einschränkungen
 
 - **Nur für aufgeklappte Navigation sichtbar:** Die Versionsanzeige wird ausgeblendet, wenn die Seitenleiste eingeklappt ist. Dies ist beabsichtigt, um die Seitenleiste nicht zu überlasten.

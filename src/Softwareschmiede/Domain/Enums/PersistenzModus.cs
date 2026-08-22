@@ -7,5 +7,5 @@ public enum PersistenzModus
     Standard,
 
     /// <summary>Die Session wird beim Fortsetzen zurückgesetzt.</summary>
-    SessionReset
+    SitzungZuruecksetzen
 }

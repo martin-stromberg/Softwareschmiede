@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
-using Softwareschmiede.Domain.Exceptions;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Data;
@@ -13,9 +12,6 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Orchestriert die Erstellung des Arbeitsverzeichnisses, des Repository-Klons und der Initialisierung von state.json für eine Autonome Aufgabe.</summary>
 public sealed class AutonomAufgabenInitialisierungsService
 {
-    private const int MaxClones = 3;
-    private const int MaxFeatureBranches = 10;
-
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private readonly SoftwareschmiededDbContext _db;
@@ -36,53 +32,6 @@ public sealed class AutonomAufgabenInitialisierungsService
         _logger = logger;
     }
 
-    /// <summary>Baut eine <see cref="AutonomAufgabeInitialisierungsAnfrage"/> mit den Standardwerten aus <see cref="AutonomAufgabenOptions"/> und initialisiert die Autonome Aufgabe.</summary>
-    public Task<AutonomAufgabeKonfiguration> InitialisiereAsync(Aufgabe aufgabe, string initialPrompt, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(aufgabe);
-
-        return InitialisiereAsync(
-            aufgabe,
-            initialPrompt,
-            projektBranchName: null,
-            tokenBudget: _options.DefaultTokenBudget,
-            tokenBudgetErweitert: null,
-            laufzeitLimitMinuten: _options.DefaultRuntimeLimitMinutes,
-            persistenzModus: PersistenzModus.Standard,
-            skillAutogeneration: _options.SkillAutoGenerationEnabled,
-            permissionsQuelle: PermissionsJsonOption.Generate,
-            ct);
-    }
-
-    /// <summary>Baut eine <see cref="AutonomAufgabeInitialisierungsAnfrage"/> aus den übergebenen Werten (Fallback auf <see cref="AutonomAufgabenOptions"/>-Standardwerte für <paramref name="projektBranchName"/>) und initialisiert die Autonome Aufgabe.</summary>
-    public Task<AutonomAufgabeKonfiguration> InitialisiereAsync(
-        Aufgabe aufgabe,
-        string initialPrompt,
-        string? projektBranchName,
-        int tokenBudget,
-        int? tokenBudgetErweitert,
-        int laufzeitLimitMinuten,
-        PersistenzModus persistenzModus,
-        bool skillAutogeneration,
-        PermissionsJsonOption permissionsQuelle,
-        CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(aufgabe);
-
-        var anfrage = new AutonomAufgabeInitialisierungsAnfrage(
-            ProjektBranchName: projektBranchName ?? aufgabe.BranchName ?? $"autonom-{aufgabe.Id}",
-            InitialPrompt: initialPrompt,
-            ArbeitsverzeichnisPfad: Path.Combine(_options.WorkingDirectoryBase, aufgabe.Id.ToString()),
-            TokenBudget: tokenBudget,
-            TokenBudgetErweitert: tokenBudgetErweitert,
-            LaufzeitLimitMinuten: laufzeitLimitMinuten,
-            PersistenzModus: persistenzModus,
-            SkillAutogeneration: skillAutogeneration,
-            PermissionsQuelle: permissionsQuelle);
-
-        return InitialisiereAsync(aufgabe, anfrage, ct);
-    }
-
     /// <summary>Erstellt das Arbeitsverzeichnis, erzeugt den Repository-Klon und initialisiert state.json und permissions.json für eine Autonome Aufgabe.</summary>
     public async Task<AutonomAufgabeKonfiguration> InitialisiereAsync(Aufgabe aufgabe, AutonomAufgabeInitialisierungsAnfrage anfrage, CancellationToken ct = default)
     {
@@ -96,13 +45,16 @@ public sealed class AutonomAufgabenInitialisierungsService
         await KloneHauptRepositoryAsync(aufgabe, repoMainPfad, ct);
 
         var permissionsPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "permissions.json");
-        if (anfrage.PermissionsQuelle == PermissionsJsonOption.Generate || !File.Exists(permissionsPfad))
-        {
-            await File.WriteAllTextAsync(permissionsPfad, BuildPermissionsJson(anfrage), ct);
-        }
-
         var stateJsonPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "state.json");
-        await File.WriteAllTextAsync(stateJsonPfad, BuildStateJson(aufgabe, anfrage), ct);
+        await DirectoryAccessGuard.AusfuehrenAsync(anfrage.ArbeitsverzeichnisPfad, async () =>
+        {
+            if (anfrage.PermissionsQuelle == PermissionsJsonOption.Generieren || !File.Exists(permissionsPfad))
+            {
+                await File.WriteAllTextAsync(permissionsPfad, BuildPermissionsJson(anfrage), ct);
+            }
+
+            await File.WriteAllTextAsync(stateJsonPfad, BuildStateJson(aufgabe, anfrage), ct);
+        });
 
         var konfiguration = new AutonomAufgabeKonfiguration
         {
@@ -111,16 +63,14 @@ public sealed class AutonomAufgabenInitialisierungsService
             ProjektBranchName = anfrage.ProjektBranchName,
             InitialPrompt = anfrage.InitialPrompt,
             PermissionsJsonPfad = permissionsPfad,
-            TokenBudget = anfrage.TokenBudget,
-            TokenBudgetErweitert = anfrage.TokenBudgetErweitert,
-            LaufzeitLimitMinuten = anfrage.LaufzeitLimitMinuten,
+            RessourcenLimits = anfrage.RessourcenLimits,
             PersistenzModus = anfrage.PersistenzModus,
             SkillAutogeneration = anfrage.SkillAutogeneration,
             ArbeitsverzeichnisPfad = anfrage.ArbeitsverzeichnisPfad
         };
 
         _db.AutonomAufgabeKonfigurationen.Add(konfiguration);
-        SetzeAusfuehrungsStatusAutonomAufgabe(aufgabe);
+        SicherstelleAufgabeGetrackt(aufgabe);
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
@@ -140,7 +90,7 @@ public sealed class AutonomAufgabenInitialisierungsService
             throw new ArgumentException("ArbeitsverzeichnisPfad muss ein absoluter Pfad sein.", nameof(arbeitsverzeichnisPfad));
         }
 
-        try
+        await DirectoryAccessGuard.AusfuehrenAsync(arbeitsverzeichnisPfad, async () =>
         {
             Directory.CreateDirectory(arbeitsverzeichnisPfad);
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "skills"));
@@ -148,41 +98,41 @@ public sealed class AutonomAufgabenInitialisierungsService
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "clones"));
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "tasks"));
             Directory.CreateDirectory(Path.Combine(arbeitsverzeichnisPfad, "logs"));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            throw new DirectoryAccessException(arbeitsverzeichnisPfad, ex);
-        }
 
-        var planPfad = Path.Combine(arbeitsverzeichnisPfad, "plan.md");
-        if (!File.Exists(planPfad))
-        {
-            await File.WriteAllTextAsync(planPfad, "# Plan\n\nNoch keine Teilaufgaben geplant.\n", ct);
-        }
+            var planPfad = Path.Combine(arbeitsverzeichnisPfad, "plan.md");
+            if (!File.Exists(planPfad))
+            {
+                await File.WriteAllTextAsync(planPfad, "# Plan\n\nNoch keine Teilaufgaben geplant.\n", ct);
+            }
 
-        var progressPfad = Path.Combine(arbeitsverzeichnisPfad, "progress.md");
-        if (!File.Exists(progressPfad))
-        {
-            await File.WriteAllTextAsync(progressPfad, "# Fortschritt\n\nNoch kein Fortschritt protokolliert.\n", ct);
-        }
+            var progressPfad = Path.Combine(arbeitsverzeichnisPfad, "progress.md");
+            if (!File.Exists(progressPfad))
+            {
+                await File.WriteAllTextAsync(progressPfad, "# Fortschritt\n\nNoch kein Fortschritt protokolliert.\n", ct);
+            }
 
-        var governancePfad = Path.Combine(arbeitsverzeichnisPfad, "governance.md");
-        if (!File.Exists(governancePfad))
-        {
-            await File.WriteAllTextAsync(governancePfad, BuildGovernanceMarkdown(), ct);
-        }
+            var governancePfad = Path.Combine(arbeitsverzeichnisPfad, "governance.md");
+            if (!File.Exists(governancePfad))
+            {
+                await File.WriteAllTextAsync(governancePfad, BuildGovernanceMarkdown(), ct);
+            }
+        });
     }
 
-    private void SetzeAusfuehrungsStatusAutonomAufgabe(Aufgabe aufgabe)
+    /// <summary>
+    /// Stellt sicher, dass <paramref name="aufgabe"/> im <see cref="_db"/>-ChangeTracker getrackt ist, damit das
+    /// EF-Relationship-Fixup zwischen <see cref="AutonomAufgabeKonfiguration.AufgabeId"/> und
+    /// <see cref="Aufgabe.AutonomKonfiguration"/> greift — auch dann, wenn die aufrufende Seite eine
+    /// nicht-getrackte <see cref="Aufgabe"/>-Instanz übergeben hat.
+    /// </summary>
+    /// <param name="aufgabe">Die sicherzustellende Aufgabe.</param>
+    private void SicherstelleAufgabeGetrackt(Aufgabe aufgabe)
     {
         var verfolgteAufgabe = _db.ChangeTracker.Entries<Aufgabe>().Select(e => e.Entity).FirstOrDefault(a => a.Id == aufgabe.Id);
         if (verfolgteAufgabe is null)
         {
             _db.Attach(aufgabe);
-            verfolgteAufgabe = aufgabe;
         }
-
-        verfolgteAufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.AutonomAufgabe;
     }
 
     private Task KloneHauptRepositoryAsync(Aufgabe aufgabe, string zielPfad, CancellationToken ct)
@@ -214,11 +164,11 @@ public sealed class AutonomAufgabenInitialisierungsService
             },
             limits = new
             {
-                max_subagents = _options.MaxConcurrentSubagents,
-                max_clones = MaxClones,
-                max_feature_branches = MaxFeatureBranches,
-                token_budget = anfrage.TokenBudget,
-                net_runtime_minutes = anfrage.LaufzeitLimitMinuten
+                max_subagents = _options.MaxConcurrentUnteragenten,
+                max_clones = _options.MaxClones,
+                max_feature_branches = _options.MaxFeatureBranches,
+                token_budget = anfrage.RessourcenLimits.TokenBudget,
+                net_runtime_minutes = anfrage.RessourcenLimits.LaufzeitLimitMinuten
             },
             persistence = new
             {
@@ -242,15 +192,15 @@ public sealed class AutonomAufgabenInitialisierungsService
             {
                 started_utc = DateTimeOffset.UtcNow,
                 net_minutes_used = 0,
-                net_minutes_limit = anfrage.LaufzeitLimitMinuten,
+                net_minutes_limit = anfrage.RessourcenLimits.LaufzeitLimitMinuten,
                 paused_utc = (DateTimeOffset?)null
             },
             governance = new
             {
-                max_subagents = _options.MaxConcurrentSubagents,
-                max_clones = MaxClones,
-                max_feature_branches = MaxFeatureBranches,
-                token_budget = anfrage.TokenBudget
+                max_subagents = _options.MaxConcurrentUnteragenten,
+                max_clones = _options.MaxClones,
+                max_feature_branches = _options.MaxFeatureBranches,
+                token_budget = anfrage.RessourcenLimits.TokenBudget
             },
             clones = new[]
             {
@@ -271,7 +221,7 @@ public sealed class AutonomAufgabenInitialisierungsService
             },
             flags = new
             {
-                allow_token_extension = anfrage.TokenBudgetErweitert.HasValue,
+                allow_token_extension = anfrage.RessourcenLimits.TokenBudgetErweitert.HasValue,
                 skip_conpty_tests = false
             }
         };
@@ -303,12 +253,12 @@ public sealed class AutonomAufgabenInitialisierungsService
             throw new ArgumentException("InitialPrompt darf nicht leer sein und muss mindestens 10 Zeichen enthalten.", nameof(anfrage));
         }
 
-        if (anfrage.TokenBudget <= 0 || anfrage.TokenBudget > 5_000_000)
+        if (anfrage.RessourcenLimits.TokenBudget <= 0 || anfrage.RessourcenLimits.TokenBudget > 5_000_000)
         {
             throw new ArgumentException("TokenBudget muss größer als 0 und maximal 5.000.000 sein.", nameof(anfrage));
         }
 
-        if (anfrage.LaufzeitLimitMinuten < 60 || anfrage.LaufzeitLimitMinuten > 1440)
+        if (anfrage.RessourcenLimits.LaufzeitLimitMinuten < 60 || anfrage.RessourcenLimits.LaufzeitLimitMinuten > 1440)
         {
             throw new ArgumentException("LaufzeitLimitMinuten muss zwischen 60 und 1440 (24h) liegen.", nameof(anfrage));
         }

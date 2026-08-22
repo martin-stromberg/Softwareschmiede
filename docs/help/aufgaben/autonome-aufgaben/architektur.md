@@ -102,7 +102,7 @@ ProjektleiterAgentService.StarteAgenAsync()
     │   ├─ Initialprompt
     │   ├─ Skill-Registry
     │   └─ Working Directory
-    └─ Aufgabe.ProjektleiterAgentId speichern (DB)
+    └─ AutonomAufgabeKonfiguration.ProjektleiterAgentId speichern (DB)
         
 Projektleiter-Agent läuft ...
 ```
@@ -142,7 +142,7 @@ Token-Monitor:
     └─ Token-Limit erreicht?
         └─ SessionManagementService.PauseAufgabeBeiBudgetLimitAsync()
             ├─ IAgentRuntime.StopAgent() aufrufen
-            ├─ Aufgabe.SessionPauseUtc = now speichern (DB)
+            ├─ AutonomAufgabeKonfiguration.SessionPauseUtc = now speichern (DB)
             └─ state.json aktualisieren (Dateisystem)
 
 Heartbeat-Monitor:
@@ -160,7 +160,7 @@ Heartbeat-Monitor:
 - **Mehrere Unteragenten parallel**: Ja, das System unterstützt parallele Unteragenten-Ausführung
   - Koordination über `state.json` (Single Source of Truth)
   - Jeder Unteragent hat eigenen Scope (tasks/task_XXX/, branch, clone)
-  - `AktiveUnteragenten`-Zähler in `Aufgabe` trackst aktive Anzahl
+  - `AktiveUnteragenten`-Zähler in `AutonomAufgabeKonfiguration` trackst aktive Anzahl
   
 - **Token-Sharing**: Token-Budget ist **hart** — wenn erste Unteragent 300k verbraucht und Budget ist 500k, bleibt 200k für nachfolgende
   

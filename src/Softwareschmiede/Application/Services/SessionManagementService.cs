@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,7 +20,7 @@ public sealed class SessionManagementService
         _logger = logger;
     }
 
-    /// <summary>Pausiert die Aufgabe wegen Erreichens des Token-Budgets: setzt <see cref="Aufgabe.SessionPauseUtc"/> und aktualisiert state.json.</summary>
+    /// <summary>Pausiert die Aufgabe wegen Erreichens des Token-Budgets: setzt <see cref="AutonomAufgabeKonfiguration.SessionPauseUtc"/> und aktualisiert state.json.</summary>
     public async Task PauseAufgabeBeiBudgetLimitAsync(Aufgabe aufgabe, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(aufgabe);
@@ -32,7 +31,11 @@ public sealed class SessionManagementService
             ?? throw new InvalidOperationException($"Aufgabe {aufgabe.Id} nicht gefunden.");
 
         var now = DateTimeOffset.UtcNow;
-        entity.SessionPauseUtc = now;
+        if (entity.AutonomKonfiguration is not null)
+        {
+            entity.AutonomKonfiguration.SessionPauseUtc = now;
+        }
+
         await _db.SaveChangesAsync(ct);
 
         if (entity.AutonomKonfiguration is not null)
@@ -55,7 +58,11 @@ public sealed class SessionManagementService
 
         var weitermachenPrompt = ErstelleWeitermachenPrompt(entity.AutonomKonfiguration);
 
-        entity.SessionPauseUtc = null;
+        if (entity.AutonomKonfiguration is not null)
+        {
+            entity.AutonomKonfiguration.SessionPauseUtc = null;
+        }
+
         entity.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
         entity.VorschlagPrompt = weitermachenPrompt;
         entity.VorschlagAusfuehrenAbUtc = DateTimeOffset.UtcNow;
@@ -74,10 +81,12 @@ public sealed class SessionManagementService
     {
         ArgumentNullException.ThrowIfNull(aufgabe);
 
-        var entity = await _db.Aufgaben.FirstOrDefaultAsync(a => a.Id == aufgabe.Id, ct)
+        var entity = await _db.Aufgaben
+            .Include(a => a.AutonomKonfiguration)
+            .FirstOrDefaultAsync(a => a.Id == aufgabe.Id, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabe.Id} nicht gefunden.");
 
-        if (entity.SessionPauseUtc is not null)
+        if (entity.AutonomKonfiguration?.SessionPauseUtc is not null)
         {
             return true;
         }
@@ -118,16 +127,15 @@ public sealed class SessionManagementService
                "für den aktuellen Stand, bevor du weitermachst.";
     }
 
-    private static async Task AktualisierePausedUtcInStateJsonAsync(string arbeitsverzeichnispPfad, DateTimeOffset? pausedUtc, CancellationToken ct)
+    private async Task AktualisierePausedUtcInStateJsonAsync(string arbeitsverzeichnisPfad, DateTimeOffset? pausedUtc, CancellationToken ct)
     {
-        var stateJsonPfad = Path.Combine(arbeitsverzeichnispPfad, "state.json");
-        if (!File.Exists(stateJsonPfad))
+        var stateJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "state.json");
+        var node = await StateJsonHelper.LeseAsync(stateJsonPfad, _logger, ct);
+        if (node is null)
         {
             return;
         }
 
-        var json = await File.ReadAllTextAsync(stateJsonPfad, ct);
-        var node = JsonNode.Parse(json) as JsonObject ?? new JsonObject();
         if (node["runtime"] is not JsonObject runtime)
         {
             runtime = new JsonObject();
@@ -136,6 +144,6 @@ public sealed class SessionManagementService
 
         runtime["paused_utc"] = pausedUtc?.ToString("O");
 
-        await File.WriteAllTextAsync(stateJsonPfad, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), ct);
+        await StateJsonHelper.SchreibeAsync(stateJsonPfad, node, ct);
     }
 }

@@ -94,8 +94,8 @@
 **Beschreibung:** Jeder Unteragent arbeitet nur in seinem eigenen Scope (`tasks/task_XXX/`).
 
 **Bedingungen:**
-- Unteragent.AgentDirectory = `tasks/task_{N}`
-- Unteragent.AgentScope eindeutig pro AutonomAufgabeId
+- Unteragent.VerzeichnisPfad = `tasks/task_{N}`
+- Unteragent.Scope eindeutig pro AutonomAufgabeId
 
 **Verhalten:**
 - Unteragent kann nur in `tasks/task_{N}/` Dateien erstellen/ändern
@@ -124,17 +124,17 @@
 
 ### Regel: Skills sind nach Freigabe unveränderlich
 
-**Beschreibung:** Einmal freigegebene Skills (`SkillStatus == Freigegeben`) können nicht modifiziert werden.
+**Beschreibung:** Einmal freigegebene Skills (`Status == Freigegeben`) können nicht modifiziert werden.
 
 **Bedingungen:**
-- SkillStatus == Freigegeben
+- Status == Freigegeben
 
 **Verhalten:**
 - Änderungen auf freigegebene Skills sind nicht erlaubt
 - Neue Versionen müssen neue SkillDefinition-Einträge sein (versioniert)
 - Alte Versionen können archiviert werden
 
-**Umsetzung:** `SkillDefinition.SkillStatus` wird geprüft; schreibend ist nur Status != Freigegeben erlaubt
+**Umsetzung:** `SkillDefinition.Status` wird geprüft; schreibend ist nur Status != Freigegeben erlaubt
 
 ---
 
@@ -149,7 +149,7 @@
 
 **Verhalten:**
 - Agent wird unterbrochen
-- Aufgabe.SessionPauseUtc = now gesetzt
+- AutonomAufgabeKonfiguration.SessionPauseUtc = now gesetzt
 - Aufgabe.AusfuehrungsStatus → Wartend/Beendet
 - state.json wird aktualisiert
 
@@ -231,7 +231,7 @@
 **Beschreibung:** Jeder Unteragent erhält einen eindeutigen Git-Branch.
 
 **Bedingungen:**
-- AgentBranch = `feature-unteragent-{counter}` eindeutig pro AutonomAufgabeId
+- Branch = `feature-unteragent-{counter}` eindeutig pro AutonomAufgabeId
 
 **Verhalten:**
 - Counter wird inkrementiert für jeden neuen Unteragent
@@ -246,7 +246,7 @@
 **Beschreibung:** Jeder Unteragent hat sein eigenes Arbeitsverzeichnis.
 
 **Bedingungen:**
-- AgentDirectory = `tasks/task_{counter}` eindeutig pro AutonomAufgabeId
+- VerzeichnisPfad = `tasks/task_{counter}` eindeutig pro AutonomAufgabeId
 
 **Verhalten:**
 - Unteragent-Ergebnisse sind räumlich isoliert

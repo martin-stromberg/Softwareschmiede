@@ -18,6 +18,14 @@ Eine Autonome Aufgabe durchläuft folgende technische Phasen:
 
 **Aufruf-Chain:**
 ```
+Benutzer: Dialog öffnen
+    ↓
+AutonomAufgabeInitialisierungsDialogViewModel.Initialize(aufgabe)
+    ↓
+AutonomAufgabeInitialisierungsDialogViewModel.LadeAsync()
+    ↓
+LadeProjektBranchesAsync() + LadePromptVorlagenAsync()
+
 Benutzer: Dialog ausfüllen & bestätigen
     ↓
 AutonomAufgabeInitialisierungsDialogViewModel.BestaetigenAsync()
@@ -26,6 +34,35 @@ AufgabeService.ErzeugeAutonomAufgabeAsync(aufgabe, initialPrompt)
     ↓
 AutonomAufgabenInitialisierungsService.InitialisiereAsync(aufgabe, anfrage)
 ```
+
+**Vorgelagert: Laden von Projektbranches und Promptvorlagen (`LadeAsync`)**
+
+`AutonomAufgabeInitialisierungsDialogViewModel.LadeAsync()` wird von der View nach `Initialize(aufgabe)` und vor Anzeige des Dialogs aufgerufen und führt zwei unabhängige Ladeschritte aus:
+
+- `LadeProjektBranchesAsync()`:
+  1. Ermittelt über `ResolveGitPlugin()` das zur `GitRepository.PluginTyp` der Aufgabe passende `IGitPlugin` aus `IPluginManager.GetSourceCodeManagementPlugins()` (Fallback: erstes verfügbares Plugin)
+  2. Ist kein Plugin oder keine `RepositoryUrl` vorhanden: `IsProjectBranchManualInput = true` (Textfeld statt Auswahlliste)
+  3. Sonst: `IGitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct)` liefert die Branch-Liste, die (alphabetisch sortiert) in `AvailableProjectBranches` geschrieben wird; bei leerer Liste oder Exception fällt das ViewModel ebenfalls auf `IsProjectBranchManualInput = true` zurück (Fehler wird geloggt, nicht dem Anwender als harter Fehler angezeigt)
+- `LadePromptVorlagenAsync()`: lädt alle Einträge über `PromptVorlagenService.GetAllAsync(ct)` in die Collection `InitialPromptVorlagen`
+
+**Branch-Neuanlage über den „+"-Button**
+
+Beteiligte Commands/Methoden im ViewModel:
+- `ShowCreateBranchCommand` → `ZeigeBranchAnlegen()`: setzt `IsCreatingBranch = true`, leert `NewBranchName`/`NewBranchError`
+- `CancelCreateBranchCommand` → `AbbrechenBranchAnlegen()`: setzt `IsCreatingBranch = false` und leert Eingabe/Fehler
+- `CreateBranchCommand` (nur aktiv, wenn `NewBranchName` nicht leer ist) → `NeuenBranchAnlegenAsync(ct)`:
+  1. Bricht mit `NewBranchError` ab, falls `_aufgabe.LokalerKlonPfad` leer ist oder kein `IGitPlugin` ermittelbar ist
+  2. Ruft `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, NewBranchName, SelectedProjectBranch, ct)` auf — der aktuell gewählte Projektbranch dient als `sourceBranchName`
+  3. Bei Erfolg: fügt `NewBranchName` zu `AvailableProjectBranches` hinzu (falls noch nicht vorhanden), setzt `SelectedProjectBranch = NewBranchName`, `IsProjectBranchManualInput = false`, schließt die Eingabezeile (`IsCreatingBranch = false`)
+  4. Bei Exception (außer `OperationCanceledException`, die weitergereicht wird): `NewBranchError` wird mit der Fehlermeldung befüllt, der Dialog bleibt offen
+
+**Promptvorlagen-Auswahl**
+
+Die Property `SelectedInitialPromptVorlage` löst beim Setzen `PromptVorlagenPlatzhalterService.Resolve(vorlage.Prompttext, aufgabe)` auf und schreibt das Ergebnis in `InitialPrompt`. Der Anwender kann den übernommenen Text danach frei weiterbearbeiten.
+
+**Hilfe-Button**
+
+Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisierungsDialog.xaml.cs`) öffnet einen `HelpTextDialog` mit einem statischen, im Code-Behind hinterlegten Erklärungstext zum Gesamtablauf einer Autonomen Aufgabe und zu den Formularfeldern des Dialogs. Es ist keine ViewModel-Logik beteiligt.
 
 **Methode: `AutonomAufgabenInitialisierungsService.InitialisiereAsync()`**
 
@@ -122,6 +159,10 @@ AutonomAufgabenInitialisierungsService.InitialisiereAsync(aufgabe, anfrage)
 - `SoftwareschmiededDbContext` (Persistierung)
 - `ICliRunner` (Git-Befehle)
 - `ILogger` (Protokollierung)
+- `AutonomAufgabeInitialisierungsDialogViewModel` (Formular, Branch-/Vorlagen-Laden, Branch-Neuanlage)
+- `IGitPlugin` (`GetRemoteBranchesAsync`, `CreateBranchAsync` — Branch-Auswahl und -Neuanlage)
+- `IPluginManager` (Ermittlung des passenden Git-Plugins)
+- `PromptVorlagenService` / `PromptVorlagenPlatzhalterService` (Promptvorlagen laden und Platzhalter auflösen)
 
 ---
 
@@ -145,7 +186,7 @@ ProjektleiterAgentService.StarteAgenAsync(konfiguration)
 
 2. **Skills vorbereiten**
    - Lade Skill `skills/skill_projektleiter_v1.md` aus Dateisystem
-   - Registriere weitereSkills aus DB (`SkillDefinition` mit `SkillStatus == Freigegeben`)
+   - Registriere weitereSkills aus DB (`SkillDefinition` mit `Status == Freigegeben`)
 
 3. **Agent erzeugen und starten**
    ```csharp
@@ -166,7 +207,7 @@ ProjektleiterAgentService.StarteAgenAsync(konfiguration)
 
 4. **DB aktualisieren**
    ```csharp
-   aufgabe.ProjektleiterAgentId = agentId;
+   aufgabe.AutonomKonfiguration.ProjektleiterAgentId = agentId;
    aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
    aufgabe.AktiveRunId = agentId; // oder run-spezifische ID
    await _db.SaveChangesAsync();
@@ -213,13 +254,13 @@ Agent ruft (intern): ProjektleiterAgentService.SteuereUnteragentAsync()
    {
        Id = Guid.NewGuid(),
        AutonomAufgabeId = konfiguration.Id,
-       AgentId = $"subagent-{counter}",
+       ExterneAgentId = $"subagent-{counter}",
        TaskId = $"task-{counter}",
-       AgentScope = "feature-{bereich}", // z.B. "feature-backend"
-       AgentPrompt = taskPrompt,
-       AgentDirectory = $"tasks/task_{counter}",
-       AgentBranch = branchName,
-       AgentClone = $"clones/repo_feature_{counter}",
+       Scope = "feature-{bereich}", // z.B. "feature-backend"
+       Prompt = taskPrompt,
+       VerzeichnisPfad = $"tasks/task_{counter}",
+       Branch = branchName,
+       ClonePfad = $"clones/repo_feature_{counter}",
        ErzeugungsDatum = DateTimeOffset.UtcNow,
        Status = UnteragentStatus.Erzeugt
    };
@@ -240,8 +281,8 @@ Agent ruft (intern): ProjektleiterAgentService.SteuereUnteragentAsync()
    ```csharp
    var subagentRequest = new AgentStartRequest
    {
-       Prompt = unteragent.AgentPrompt,
-       WorkingDirectory = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, unteragent.AgentDirectory),
+       Prompt = unteragent.Prompt,
+       WorkingDirectory = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, unteragent.VerzeichnisPfad),
        SkillRegistry = skills,
        Limits = new AgentLimits { TokenBudget = /* portion */ }
    };
@@ -272,7 +313,7 @@ Monitor Loop (z.B. alle 10 Sekunden):
 **Methode: `SessionManagementService.PauseAufgabeBeiBudgetLimitAsync()`**
 
 1. Agenten-Prozess beenden (graceful shutdown)
-2. Aufgabe.SessionPauseUtc = DateTimeOffset.UtcNow
+2. aufgabe.AutonomKonfiguration.SessionPauseUtc = DateTimeOffset.UtcNow
 3. Aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Wartend (oder Beendet)
 4. state.json aktualisieren: `runtime.paused_utc = now`
 5. Log: "Aufgabe wegen Budget-Limit pausiert"
@@ -323,9 +364,9 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
 
 2. **plan.md aktualisieren**
    ```
-   Anhängen: "## Teilaufgabe {N} — {AgentScope}"
+   Anhängen: "## Teilaufgabe {N} — {Scope}"
    - Status: Abgeschlossen
-   - Branch: {AgentBranch}
+   - Branch: {Branch}
    - Commits: {anzahl}
    - Zusammenfassung: {task_report.md}
    ```
@@ -333,7 +374,7 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
 3. **progress.md aktualisieren**
    ```
    Anhängen:
-   - Meilenstein: "{AgentScope} abgeschlossen"
+   - Meilenstein: "{Scope} abgeschlossen"
    - Datum: {now}
    - Token verbraucht: {unteragent-token}
    - Nächste Schritte: ...
@@ -362,7 +403,7 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
    ```csharp
    unteragent.AbschlussDatum = DateTimeOffset.UtcNow;
    unteragent.Status = UnteragentStatus.Abgeschlossen;
-   aufgabe.AktiveUnteragenten--;
+   aufgabe.AutonomKonfiguration.AktiveUnteragenten--;
    await _db.SaveChangesAsync();
    ```
 
@@ -397,7 +438,7 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
 
 4. **Status zurücksetzen**
    ```csharp
-   aufgabe.SessionPauseUtc = null;
+   aufgabe.AutonomKonfiguration.SessionPauseUtc = null;
    aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
    await _db.SaveChangesAsync();
    ```

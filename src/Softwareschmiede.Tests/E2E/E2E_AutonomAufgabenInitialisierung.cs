@@ -48,7 +48,9 @@ public partial class End2EndTest
         initialisierenButton.AsButton().Click();
 
         var dialog = WaitForWindow("Autonome Aufgabe initialisieren", Medium);
-        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeProjektbranch"), Short);
+        // Aufgabe hat kein GitRepository zugewiesen (nur LokalerKlonPfad), daher fällt der Branch-Bereich
+        // auf die manuelle Texteingabe zurück (keine Remote-Branches ladbar).
+        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeProjektbranchEingabe"), Short);
         WaitForElement(dialog, cf => cf.ByName("AutonomAufgabePermissionsAuswahl"), Short);
         WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeTokenBudget"), Short);
         WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeLaufzeitLimit"), Short);
