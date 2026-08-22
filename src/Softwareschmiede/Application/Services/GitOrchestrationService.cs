@@ -203,8 +203,8 @@ public sealed class GitOrchestrationService
         if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
 
-        var prBody = await BuildPullRequestBodyAsync(aufgabe, body, ct);
         var baseBranch = await ResolveDefaultSourceBranchNameAsync(aufgabe, ct);
+        var prBody = await BuildPullRequestBodyAsync(aufgabe, body, baseBranch, ct);
 
         await gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
         var pullRequest = await gitPlugin.CreatePullRequestAsync(repositoryId, aufgabe.BranchName, baseBranch, prTitle, prBody, ct);
@@ -235,14 +235,14 @@ public sealed class GitOrchestrationService
         return pullRequest;
     }
 
-    private async Task<string> BuildPullRequestBodyAsync(Aufgabe aufgabe, string? fallbackBody, CancellationToken ct)
+    private async Task<string> BuildPullRequestBodyAsync(Aufgabe aufgabe, string? fallbackBody, string? baseBranch, CancellationToken ct)
     {
         if (_gitWorkspaceBrowserService is null || string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
         {
             return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
         }
 
-        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(aufgabe.LokalerKlonPfad, ct);
+        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(aufgabe.LokalerKlonPfad, baseBranch, ct);
         if (snapshot.HasError)
         {
             _logger.LogWarning(
