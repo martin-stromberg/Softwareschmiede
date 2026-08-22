@@ -7,7 +7,7 @@ public enum SkillStatus
     Entwurf,
 
     /// <summary>Der Skill wird überprüft.</summary>
-    Review,
+    Pruefung,
 
     /// <summary>Der Skill ist freigegeben und aktiv nutzbar.</summary>
     Freigegeben,

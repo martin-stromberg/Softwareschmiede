@@ -23,8 +23,14 @@ public sealed class AutonomAufgabenOptions
     public int HeartbeatTimeoutSeconds { get; set; } = 300;
 
     /// <summary>Maximale Anzahl gleichzeitig laufender Unteragenten pro Autonome Aufgabe.</summary>
-    public int MaxConcurrentSubagents { get; set; } = 5;
+    public int MaxConcurrentUnteragenten { get; set; } = 5;
 
     /// <summary>Standard für automatische Skill-Generierung.</summary>
-    public bool SkillAutoGenerationEnabled { get; set; }
+    public bool SkillAutogenerationEnabled { get; set; }
+
+    /// <summary>Maximale Anzahl gleichzeitiger Repository-Klone pro Autonome Aufgabe.</summary>
+    public int MaxClones { get; set; } = 3;
+
+    /// <summary>Maximale Anzahl gleichzeitiger Feature-Branches pro Autonome Aufgabe.</summary>
+    public int MaxFeatureBranches { get; set; } = 10;
 }

@@ -27,34 +27,26 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests : IDispos
     {
         _db = TestDbContextFactory.Create();
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "InitDialogVm", Guid.NewGuid().ToString("N"));
-        var quellRepo = _testRoot + "-quelle";
-        Directory.CreateDirectory(quellRepo);
 
-        var cliRunnerMock = new Mock<ICliRunner>();
-        cliRunnerMock
-            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(a => a.Contains("clone")), It.IsAny<string?>(), It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
-            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) => Directory.CreateDirectory(args.Last()))
-            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        var cliRunnerMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateCliRunnerMockMitErfolgreichemGitKlon();
+        _initialisierungsService = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(_db, cliRunnerMock.Object);
 
-        _initialisierungsService = new AutonomAufgabenInitialisierungsService(_db, cliRunnerMock.Object, Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
+        var promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
+        var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
 
-        var projektId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt { Id = projektId, Name = "Testprojekt", ErstellungsDatum = DateTimeOffset.UtcNow, Status = ProjektStatus.Aktiv });
-        _aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = projektId,
-            Titel = "Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            LokalerKlonPfad = quellRepo,
-            BranchName = "main"
-        };
-        _db.Aufgaben.Add(_aufgabe);
+        var projektId = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleProjekt(_db);
+        _aufgabe = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleAufgabeMitLokalemKlon(_db, projektId, _testRoot, "Testaufgabe", "main");
         _db.SaveChanges();
 
-        _sut = new AutonomAufgabeInitialisierungsDialogViewModel(_initialisierungsService, NullLogger<AutonomAufgabeInitialisierungsDialogViewModel>.Instance);
+        _sut = new AutonomAufgabeInitialisierungsDialogViewModel(
+            _initialisierungsService,
+            Options.Create(new AutonomAufgabenOptions()),
+            NullLogger<AutonomAufgabeInitialisierungsDialogViewModel>.Instance,
+            pluginManagerMock.Object,
+            promptVorlagenService,
+            promptVorlagenPlatzhalterService);
         _sut.Initialize(_aufgabe);
         _sut.CloseRequested += (_, result) => _closeRequestedResult = result;
     }
@@ -89,7 +81,8 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests : IDispos
         _closeRequestedResult.Should().BeTrue();
 
         var aufgabeAktualisiert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
-        aufgabeAktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.AutonomAufgabe);
+        aufgabeAktualisiert!.AutonomKonfiguration.Should().NotBeNull();
+        aufgabeAktualisiert.IstAutonom().Should().BeTrue();
     }
 
     /// <summary>BestaetigenAsync schlägt bei einem ungültigen Token-Budget mit einer Fehlermeldung fehl, ohne den Service aufzurufen.</summary>
@@ -108,6 +101,67 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests : IDispos
 
         var aufgabeUnveraendert = await _db.Aufgaben.FindAsync(_aufgabe.Id);
         aufgabeUnveraendert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.NichtGestartet);
+    }
+
+    /// <summary>BestaetigenAsync schlägt bei einem zu kurzen Initialprompt mit einer Fehlermeldung fehl, ohne den Service aufzurufen.</summary>
+    [Fact]
+    public async Task BestaetigenAsync_FailsOnInvalidInitialPrompt()
+    {
+        _sut.InitialPrompt = "zu kurz";
+        _sut.TokenBudget = 500000;
+        _sut.RuntimeLimitMinutes = 480;
+
+        await _sut.BestaetigenAsync();
+
+        _sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        _sut.ErstellteKonfiguration.Should().BeNull();
+        _closeRequestedResult.Should().BeNull();
+    }
+
+    /// <summary>BestaetigenAsync schlägt bei einer ungültigen Laufzeitbegrenzung mit einer Fehlermeldung fehl, ohne den Service aufzurufen.</summary>
+    [Fact]
+    public async Task BestaetigenAsync_FailsOnInvalidRuntimeLimit()
+    {
+        _sut.InitialPrompt = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
+        _sut.TokenBudget = 500000;
+        _sut.RuntimeLimitMinutes = 5;
+
+        await _sut.BestaetigenAsync();
+
+        _sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        _sut.ErstellteKonfiguration.Should().BeNull();
+        _closeRequestedResult.Should().BeNull();
+    }
+
+    /// <summary>BestaetigenAsync setzt ErrorMessage und schließt den Dialog nicht, wenn der Initialisierungsservice fehlschlägt.</summary>
+    [Fact]
+    public async Task BestaetigenAsync_SetsErrorMessage_WhenServiceThrows()
+    {
+        var fehlerhafteAufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _aufgabe.ProjektId,
+            Titel = "Aufgabe ohne Klon",
+            Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
+            ErstellungsDatum = DateTimeOffset.UtcNow,
+            LokalerKlonPfad = null,
+            BranchName = "main"
+        };
+        _db.Aufgaben.Add(fehlerhafteAufgabe);
+        _db.SaveChanges();
+
+        _sut.Initialize(fehlerhafteAufgabe);
+        _sut.InitialPrompt = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
+        _sut.TokenBudget = 500000;
+        _sut.RuntimeLimitMinutes = 480;
+
+        await _sut.BestaetigenAsync();
+
+        _sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+        _sut.ErstellteKonfiguration.Should().BeNull();
+        _sut.IsSubmitting.Should().BeFalse();
+        _closeRequestedResult.Should().BeNull();
     }
 
     /// <summary>Abbrechen schließt den Dialog, ohne den Service aufzurufen.</summary>

@@ -37,13 +37,13 @@ public sealed class UnteragentGovernanceServiceTests : IDisposable
     {
         Id = Guid.NewGuid(),
         AutonomAufgabeId = Guid.NewGuid(),
-        AgentId = "agent-001",
+        ExterneAgentId = "agent-001",
         TaskId = "task_001",
-        AgentScope = "feature-backend",
-        AgentPrompt = "Implementiere das Backend-Feature.",
-        AgentDirectory = _agentDirectory,
-        AgentBranch = "feature-unteragent-001",
-        AgentClone = Path.Combine(_testRoot, "clones", "repo_feature_001"),
+        Scope = "feature-backend",
+        Prompt = "Implementiere das Backend-Feature.",
+        VerzeichnisPfad = _agentDirectory,
+        Branch = "feature-unteragent-001",
+        ClonePfad = Path.Combine(_testRoot, "clones", "repo_feature_001"),
         ErzeugungsDatum = DateTimeOffset.UtcNow,
         Status = UnteragentStatus.Erzeugt
     };
@@ -149,5 +149,36 @@ public sealed class UnteragentGovernanceServiceTests : IDisposable
         var akt = () => _sut.ValidiereFehlerBedingungAsync(unteragent);
 
         await akt.Should().NotThrowAsync();
+    }
+
+    /// <summary>ValidiereFehlerBedingungAsync wirft keine Ausnahme, wenn task_state.json (noch) nicht existiert.</summary>
+    [Fact]
+    public async Task ValidiereFehlerBedingungAsync_WirftKeineAusnahme_OhneTaskStateJson()
+    {
+        var unteragent = ErstelleUnteragent();
+
+        var akt = () => _sut.ValidiereFehlerBedingungAsync(unteragent);
+
+        await akt.Should().NotThrowAsync();
+    }
+
+    /// <summary>VerifiziereBerechtigung wirft eine ArgumentNullException, wenn kein Unteragent übergeben wird.</summary>
+    [Fact]
+    public void VerifiziereBerechtigung_WirftBeiNullUnteragent()
+    {
+        var akt = () => _sut.VerifiziereBerechtigung(null!, UnteragentAktion.ArbeitsverzeichnisErstellen, _agentDirectory);
+
+        akt.Should().Throw<ArgumentNullException>();
+    }
+
+    /// <summary>VerifiziereBerechtigung wirft eine ArgumentException, wenn der Zielpfad leer ist.</summary>
+    [Fact]
+    public void VerifiziereBerechtigung_WirftBeiLeeremZielPfad()
+    {
+        var unteragent = ErstelleUnteragent();
+
+        var akt = () => _sut.VerifiziereBerechtigung(unteragent, UnteragentAktion.ArbeitsverzeichnisErstellen, string.Empty);
+
+        akt.Should().Throw<ArgumentException>();
     }
 }

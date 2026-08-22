@@ -20,13 +20,16 @@
 
 > **Hinweis:** Der Dialog wird nur angezeigt, wenn die Aufgabe noch nicht als Autonome Aufgabe initialisiert wurde (Status != `AutonomAufgabe`).
 
+> **Hinweis:** Oben rechts im Dialog befindet sich der Button **„Hilfe"**. Er öffnet einen Informationsdialog mit einer Erklärung des gesamten Ablaufs einer Autonomen Aufgabe (Initialisierung, Agent-Start, Unteragenten, Fortschritt/Integration, Session-Pause) sowie einer Kurzbeschreibung aller Formularfelder — hilfreich, wenn du zum ersten Mal eine Autonome Aufgabe anlegst.
+
 ### 2. Konfiguration ausfüllen
 
 Im Formular werden folgende Felder abgefragt:
 
 | Feld | Beschreibung | Standard | Erforderlich |
 |------|--------------|----------|-------------|
-| **Projektbranch** | Git-Branch für die Gesamtaufgabe | `autonom-{AufgabeId}` | Ja |
+| **Projektbranch** | Git-Branch für die Gesamtaufgabe. Wenn möglich als Auswahlliste der Remote-Branches des Repositories, sonst als Texteingabe | `autonom-{AufgabeId}` | Ja |
+| **Promptvorlage** | Optionale Auswahl einer vorhandenen Promptvorlage zur Vorbefüllung des Initialprompts | — | Nein |
 | **Initialprompt** | Fachliche Anforderung für den Projektleiter | — | Ja |
 | **Permissions** | Berechtigungsprofil-Quelle | Generieren | Nein |
 | **Token-Budget** | Max. Token für die Aufgabe | 500.000 | Ja |
@@ -38,6 +41,7 @@ Im Formular werden folgende Felder abgefragt:
 Beispiel-Ausfüllung:
 ```
 Projektbranch: feature/autonome-auth-system
+Promptvorlage: (keine — freier Text)
 Initialprompt: Implementiere JWT-basiertes Authentifizierungssystem mit Middleware, DB-Migrationen und Tests.
 Permissions: Automatisch generieren
 Token-Budget: 500000
@@ -47,6 +51,20 @@ Skill-Autogeneration: Deaktiviert
 ```
 
 > **Hinweis:** Der Initialprompt sollte mindestens 10 Zeichen lang sein und fachliche Anforderungen klar formulieren.
+
+#### Projektbranch aus Liste wählen oder neu anlegen
+
+- Ist der Aufgabe ein Git-Repository mit unterstütztem Plugin zugeordnet, zeigt das Feld **Projektbranch** eine Auswahlliste der vorhandenen Remote-Branches; solange diese geladen wird, erscheint der Hinweis „Wird geladen…". Ist kein Repository/Plugin vorhanden oder liefert es keine Branches, wird stattdessen ein freies Textfeld angezeigt.
+- Um einen neuen Branch anzulegen, klicke auf den **„+"-Button** rechts neben dem Projektbranch-Feld. Es erscheint eine Eingabezeile für den neuen Branchnamen mit den Buttons **„Anlegen"** und **„Abbrechen"**.
+- Nach Eingabe eines Namens und Klick auf **„Anlegen"** wird der Branch im lokalen Klon der Aufgabe erzeugt (ausgehend vom aktuell gewählten Projektbranch), automatisch der Branch-Liste hinzugefügt und als Projektbranch übernommen.
+
+> **Hinweis:** Die Branch-Neuanlage benötigt einen lokalen Klon der Aufgabe. Ist keiner vorhanden oder schlägt die Git-Operation fehl, erscheint eine Fehlermeldung unterhalb der Eingabezeile; der Dialog bleibt geöffnet und die Eingabe kann korrigiert oder abgebrochen werden.
+
+#### Promptvorlage für den Initialprompt nutzen
+
+- Im Feld **Promptvorlage** stehen die im System hinterlegten Promptvorlagen zur Auswahl.
+- Nach Auswahl einer Vorlage wird das Feld **Initialprompt** automatisch mit dem Vorlagentext befüllt; enthaltene Platzhalter (z. B. Bezug auf die aktuelle Aufgabe) werden dabei automatisch aufgelöst.
+- Der übernommene Text kann anschließend im Initialprompt-Feld frei weiterbearbeitet werden.
 
 ### 3. Initialisierung bestätigen
 

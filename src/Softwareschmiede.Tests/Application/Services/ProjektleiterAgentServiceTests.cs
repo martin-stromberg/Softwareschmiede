@@ -46,7 +46,8 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
-        _sut = new ProjektleiterAgentService(_db, _cliRunnerMock.Object, governanceService, NullLogger<ProjektleiterAgentService>.Instance);
+        var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "ProjektleiterAgent", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testRoot);
@@ -72,53 +73,20 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
         }
     }
 
-    private async Task<(Aufgabe Aufgabe, AutonomAufgabeKonfiguration Konfiguration)> ErstelleAutonomeAufgabeAsync()
-    {
-        var aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Autonome Testaufgabe",
-            Status = AufgabeStatus.Gestartet,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.AutonomAufgabe,
-            ErstellungsDatum = DateTimeOffset.UtcNow
-        };
-        _db.Aufgaben.Add(aufgabe);
-
-        var konfiguration = new AutonomAufgabeKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            AufgabeId = aufgabe.Id,
-            ProjektBranchName = "feature/autonom",
-            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
-            PermissionsJsonPfad = Path.Combine(_testRoot, "permissions.json"),
-            TokenBudget = 500000,
-            LaufzeitLimitMinuten = 480,
-            PersistenzModus = PersistenzModus.Standard,
-            ArbeitsverzeichnisPfad = _testRoot
-        };
-        _db.AutonomAufgabeKonfigurationen.Add(konfiguration);
-        await _db.SaveChangesAsync();
-
-        await File.WriteAllTextAsync(Path.Combine(_testRoot, "plan.md"), "# Plan\n");
-        await File.WriteAllTextAsync(Path.Combine(_testRoot, "progress.md"), "# Fortschritt\n");
-        await File.WriteAllTextAsync(Path.Combine(_testRoot, "state.json"), "{\"subagents\":[]}");
-
-        return (aufgabe, konfiguration);
-    }
-
     /// <summary>StarteAgentAsync startet den Projektleiter-Agenten mit dem Initialprompt und setzt den Ausführungsstatus.</summary>
     [Fact]
     public async Task StarteAgentAsync_StartetAgentMitInitialprompt()
     {
-        var (aufgabe, konfiguration) = await ErstelleAutonomeAufgabeAsync();
+        var (aufgabe, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
 
         var agentId = await _sut.StarteAgentAsync(konfiguration);
 
         agentId.Should().NotBeNullOrWhiteSpace();
         var aktualisiert = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        aktualisiert!.ProjektleiterAgentId.Should().Be(agentId);
-        aktualisiert.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+        aktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Aktiv);
+
+        var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(konfiguration.Id);
+        konfigurationAktualisiert!.ProjektleiterAgentId.Should().Be(agentId);
 
         var skillPfad = Path.Combine(_testRoot, "skills", "skill_projektleiter_v1.md");
         File.Exists(skillPfad).Should().BeTrue();
@@ -130,56 +98,34 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
     [Fact]
     public async Task SteuereUnteragentAsync_ErzeugtUnteragentSpezifikation()
     {
-        var (_, konfiguration) = await ErstelleAutonomeAufgabeAsync();
+        var (_, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
 
-        var unteragent = new UnteragentSpezifikation
-        {
-            Id = Guid.NewGuid(),
-            AutonomAufgabeId = konfiguration.Id,
-            AgentId = "agent-001",
-            TaskId = "task_001",
-            AgentScope = "feature-backend",
-            AgentPrompt = "Implementiere das Backend.",
-            AgentDirectory = Path.Combine(_testRoot, "tasks", "task_001"),
-            AgentBranch = "feature-unteragent-001",
-            AgentClone = Path.Combine(_testRoot, "clones", "repo_feature_001")
-        };
+        var unteragent = ProjektleiterAgentServiceTestDatenFactory.ErstelleUnteragent(_testRoot, konfiguration.Id);
 
         await _sut.SteuereUnteragentAsync(unteragent);
 
-        Directory.Exists(unteragent.AgentDirectory).Should().BeTrue();
-        Directory.Exists(unteragent.AgentClone).Should().BeTrue();
+        Directory.Exists(unteragent.VerzeichnisPfad).Should().BeTrue();
+        Directory.Exists(unteragent.ClonePfad).Should().BeTrue();
         unteragent.Status.Should().Be(UnteragentStatus.Erzeugt);
 
         var persistiert = await _db.UnteragentSpezifikationen.FindAsync(unteragent.Id);
         persistiert.Should().NotBeNull();
-        persistiert!.AgentBranch.Should().Be("feature-unteragent-001");
+        persistiert!.Branch.Should().Be("feature-unteragent-001");
     }
 
     /// <summary>IntegriereErgebnisseAsync aktualisiert plan.md und progress.md mit den Ergebnissen des Unteragenten.</summary>
     [Fact]
     public async Task IntegriereErgebnisseAsync_AktualisieertPlanMdUndProgressMd()
     {
-        var (_, konfiguration) = await ErstelleAutonomeAufgabeAsync();
+        var (_, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
 
-        var agentDirectory = Path.Combine(_testRoot, "tasks", "task_002");
-        Directory.CreateDirectory(agentDirectory);
-        await File.WriteAllTextAsync(Path.Combine(agentDirectory, "task_report.md"), "Backend-Feature erfolgreich implementiert.");
+        var unteragent = ProjektleiterAgentServiceTestDatenFactory.ErstelleUnteragent(_testRoot, konfiguration.Id, "002");
+        unteragent.ErzeugungsDatum = DateTimeOffset.UtcNow;
+        unteragent.Status = UnteragentStatus.Erzeugt;
 
-        var unteragent = new UnteragentSpezifikation
-        {
-            Id = Guid.NewGuid(),
-            AutonomAufgabeId = konfiguration.Id,
-            AgentId = "agent-002",
-            TaskId = "task_002",
-            AgentScope = "feature-backend",
-            AgentPrompt = "Implementiere das Backend.",
-            AgentDirectory = agentDirectory,
-            AgentBranch = "feature-unteragent-002",
-            AgentClone = Path.Combine(_testRoot, "clones", "repo_feature_002"),
-            ErzeugungsDatum = DateTimeOffset.UtcNow,
-            Status = UnteragentStatus.Erzeugt
-        };
+        Directory.CreateDirectory(unteragent.VerzeichnisPfad);
+        await File.WriteAllTextAsync(Path.Combine(unteragent.VerzeichnisPfad, "task_report.md"), "Backend-Feature erfolgreich implementiert.");
+
         _db.UnteragentSpezifikationen.Add(unteragent);
         await _db.SaveChangesAsync();
 

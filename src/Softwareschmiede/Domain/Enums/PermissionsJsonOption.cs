@@ -4,11 +4,11 @@ namespace Softwareschmiede.Domain.Enums;
 public enum PermissionsJsonOption
 {
     /// <summary>permissions.json wird automatisch generiert.</summary>
-    Generate,
+    Generieren,
 
     /// <summary>Eine bestehende permissions.json wird ausgewählt.</summary>
-    Select,
+    Auswaehlen,
 
     /// <summary>Eine vordefinierte permissions.json wird verwendet.</summary>
-    Existing
+    Vordefiniert
 }
