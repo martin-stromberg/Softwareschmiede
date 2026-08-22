@@ -29,7 +29,51 @@ Themenfremd zum Rest dieser Datei (betrifft nicht den Autonome-Aufgabe-Dialog, s
 Programmstart/die Datenbank-Initialisierung allgemein) — auf Wunsch des Anwenders trotzdem hier
 erfasst.
 
-- [ ] Aktuell wird beim Programmstart immer auf die Datenbankdatei unter `%LocalAppData%\Softwareschmiede\softwareschmiede.db` zugegriffen. Das Programm muss beim Start erkennen, ob es sich um eine RC-Version, eine versionslose Version (z. B. Ausführung unter Visual Studio) oder eine produktive Version handelt. Nur bei der produktiven Version soll weiterhin dieser `%LocalAppData%`-Pfad verwendet werden; bei den anderen beiden (RC und versionslos) soll stattdessen das lokale Programmverzeichnis für die Datenbankdatei genutzt werden.
+- [x] Aktuell wird beim Programmstart immer auf die Datenbankdatei unter `%LocalAppData%\Softwareschmiede\softwareschmiede.db` zugegriffen. Das Programm muss beim Start erkennen, ob es sich um eine RC-Version, eine versionslose Version (z. B. Ausführung unter Visual Studio) oder eine produktive Version handelt. Nur bei der produktiven Version soll weiterhin dieser `%LocalAppData%`-Pfad verwendet werden; bei den anderen beiden (RC und versionslos) soll stattdessen das lokale Programmverzeichnis für die Datenbankdatei genutzt werden.
+      Umgesetzt: Neue, eigenständige, synchrone, DI-freie Klasse `DatenbankPfadResolver` (statisch,
+      `src/Softwareschmiede/Infrastructure/Data/DatenbankPfadResolver.cs`) mit der öffentlichen
+      Methode `ErmittlePfad(string baseDirectory, string? testDbPathOverride)`. Erkennungslogik:
+      (1) Ist `testDbPathOverride` (= Wert der Umgebungsvariable `SOFTWARESCHMIEDE_TEST_DB_PATH`)
+      gesetzt, wird dieser unverändert zurückgegeben — höchste Priorität, bestehendes
+      Testinfrastruktur-Verhalten bleibt exakt erhalten (per Grep verifiziert: alle sieben
+      Verwendungsstellen, u. a. `WpfTestBase.cs`, `E2E_VerzeichnisAktionen.cs`,
+      `E2E_FileExplorer.cs`, `E2E_AufgabeStarten.cs`, `PluginManager.cs`, unverändert). (2) Sonst
+      wird `{baseDirectory}\version.json` geprüft: existiert die Datei nicht, ist sie nicht
+      lesbar/parsbar (IOException/UnauthorizedAccessException/JsonException/FormatException
+      abgefangen) oder enthält kein `tagName` → **versionslos** → Pfad =
+      `{baseDirectory}\softwareschmiede.db` (lokales Programmverzeichnis). Enthält `tagName` das
+      Infix `-rc` (case-insensitive) → **RC** → derselbe lokale Pfad. Enthält `tagName` kein `-rc`
+      → **produktiv** → unverändertes bisheriges Verhalten
+      (`%LocalAppData%\Softwareschmiede\softwareschmiede.db`). Die `-rc`-Konvention stammt aus den
+      bestehenden Release-Workflows: `staging-ci.yml` erzeugt RC-Tags im Format
+      `v{version}-rc.{n}`, `release.yml` produktive Tags im Format `v{version}` ohne `-rc`-Infix
+      (Job `release-manual-tag` hat sogar die explizite Bedingung
+      `!contains(github.ref_name, '-rc')`). `App.xaml.cs`/`ConfigureServices` ruft jetzt
+      `DatenbankPfadResolver.ErmittlePfad(AppContext.BaseDirectory, Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH"))`
+      auf statt die Pfadlogik inline zu bauen; `Directory.CreateDirectory(...)` für den Zielordner
+      bleibt unverändert bestehen (funktioniert für beide möglichen Pfade). Neue Unit-Tests
+      `src/Softwareschmiede.Tests/Infrastructure/Data/DatenbankPfadResolverTests.cs` (9 Testfälle,
+      temporäres Testverzeichnis analog `ApplicationVersionProviderTests.cs`): Override hat Vorrang
+      (auch bei vorhandener produktiver `version.json`), versionslos ohne `version.json`, RC mit
+      `-rc`-Tag (zwei Case-Varianten), produktiv ohne `-rc`-Tag, kaputte/leere `version.json` →
+      Fallback versionslos, `version.json` ohne `tagName` → Fallback versionslos. Doku-Ergänzung:
+      neuer Abschnitt „Verwandtes Verhalten: Datenbankpfad je nach Versionstyp" in
+      `docs/help/anwendung/versions-anzeige.md` (thematisch verwandte, bereits vorhandene Seite zu
+      `version.json`) mit Tabelle der drei Versionstypen und Backup-Hinweis. Volles Build
+      (`dotnet build Softwareschmiede.slnx -c Debug -p:TreatWarningsAsErrors=true`): 0 Fehler,
+      0 Warnungen. Stabile Testlane (`dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"`,
+      `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`): 1398 bestanden, 1 übersprungen, 0 Fehler (9 neue
+      Testfälle gegenüber dem Ausgangsstand 1389/1/0; der zuvor dokumentierte, last-abhängige Flake
+      in `PseudoConsoleSessionTests.ReadLoopAsync_MeldetOutputChunksAnSink_UndAktualisiertBufferWeiterhin`
+      trat in diesem Lauf nicht auf). **Wichtiger Hinweis:** Dies ist eine reine
+      Verhaltensänderung für NEU GESTARTETE, NEU GEBAUTE Instanzen — bereits laufende
+      Installationen sind erst nach ihrem nächsten Neustart mit einer neu gebauten Version
+      betroffen. Es findet **keine automatische Datenmigration** zwischen den beiden möglichen
+      Pfaden statt (bewusste Design-Entscheidung, nicht Teil dieses Auftrags): Eine bislang
+      versionslos/als RC gelaufene lokale Installation hatte ohnehin nie produktiv unter
+      `%LocalAppData%` abgelegte Daten in dem Sinne, dass sie mit einer echten Produktivinstallation
+      geteilt werden müssten — durch die Trennung wird im Gegenteil verhindert, dass RC-/Dev-Läufe
+      künftig versehentlich die produktive `%LocalAppData%`-Datenbank mitbenutzen oder verändern.
 
 ## Offene Planelemente
 

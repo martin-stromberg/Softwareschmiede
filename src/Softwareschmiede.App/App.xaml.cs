@@ -151,11 +151,9 @@ public sealed partial class App : System.Windows.Application
 
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
-        var dbPath = Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH")
-            ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Softwareschmiede",
-                "softwareschmiede.db");
+        var dbPath = DatenbankPfadResolver.ErmittlePfad(
+            AppContext.BaseDirectory,
+            Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH"));
 
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
