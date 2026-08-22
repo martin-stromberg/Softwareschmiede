@@ -19,7 +19,6 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
 
     /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldPersistValueInAppEinstellung.</summary>.</summary>
     [Fact]
-    /// <summary>SaveArbeitsverzeichnisAsync_ShouldPersistValueInAppEinstellung.</summary>
     public async Task SaveArbeitsverzeichnisAsync_ShouldPersistValueInAppEinstellung()
     {
         await using var db = CreateDb();
@@ -38,7 +37,6 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
 
     /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldAllowEmptyValue_ForFallbackUsage.</summary>.</summary>
     [Fact]
-    /// <summary>SaveArbeitsverzeichnisAsync_ShouldAllowEmptyValue_ForFallbackUsage.</summary>
     public async Task SaveArbeitsverzeichnisAsync_ShouldAllowEmptyValue_ForFallbackUsage()
     {
         await using var db = CreateDb();
@@ -52,7 +50,6 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
 
     /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenPathIsNotAbsolute.</summary>.</summary>
     [Fact]
-    /// <summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenPathIsNotAbsolute.</summary>
     public async Task SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenPathIsNotAbsolute()
     {
         await using var db = CreateDb();
@@ -65,7 +62,6 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
 
     /// <summary><summary>ValidatePathForConfiguration_ShouldThrowArgumentException_WhenPathContainsInvalidCharacter.</summary>.</summary>
     [Fact]
-    /// <summary>ValidatePathForConfiguration_ShouldThrowArgumentException_WhenPathContainsInvalidCharacter.</summary>
     public void ValidatePathForConfiguration_ShouldThrowArgumentException_WhenPathContainsInvalidCharacter()
     {
         var invalidPath = $"C:\\invalid{'\0'}path";
@@ -78,7 +74,6 @@ public sealed class ArbeitsverzeichnisSettingsServiceTests
 
     /// <summary><summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenDirectoryCannotBeCreated.</summary>.</summary>
     [Fact]
-    /// <summary>SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenDirectoryCannotBeCreated.</summary>
     public async Task SaveArbeitsverzeichnisAsync_ShouldThrowArgumentException_WhenDirectoryCannotBeCreated()
     {
         await using var db = CreateDb();

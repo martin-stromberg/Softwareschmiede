@@ -112,7 +112,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType.</summary>.</summary>
     [Fact]
-    /// <summary>CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType.</summary>
     public async Task CommitAsync_ShouldUseSelectedPlugin_WhenTaskRepositoryContainsTrimmedLowercasePluginType()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -180,7 +179,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed.</summary>.</summary>
     [Fact]
-    /// <summary>PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed.</summary>
     public async Task PullAsync_ShouldLogNoMergeHint_WhenLocalDirectoryPluginIsUsed()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe", null);
@@ -196,7 +194,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin.</summary>.</summary>
     [Fact]
-    /// <summary>PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin.</summary>
     public async Task PullAsync_ShouldLogRemotePullText_WhenPluginIsNotLocalDirectoryPlugin()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pull Aufgabe Remote", null);
@@ -213,7 +210,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository.</summary>.</summary>
     [Fact]
-    /// <summary>PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository.</summary>
     public async Task PullAsync_ShouldUseLocalDirectoryPlugin_WhenTaskHasNoLinkedRepositoryAndProjectHasSingleActiveRepository()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -244,7 +240,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved.</summary>.</summary>
     [Fact]
-    /// <summary>CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved.</summary>
     public async Task CommitAsync_ShouldFallbackToDefaultPlugin_WhenSelectedPluginTypeCannotBeResolved()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -273,7 +268,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous.</summary>.</summary>
     [Fact]
-    /// <summary>CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous.</summary>
     public async Task CommitAsync_ShouldUseDefaultPlugin_WhenProjectRepositorySelectionIsAmbiguous()
     {
         var defaultPluginMock = CreateGitPluginMock("Default Git", "Softwareschmiede.GitHub");
@@ -307,7 +301,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry.</summary>.</summary>
     [Fact]
-    /// <summary>MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry.</summary>
     public async Task MergeToSourceAsync_ShouldCallPluginAndWriteLogEntry()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Merge Aufgabe", null);
@@ -335,7 +328,6 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
     /// <summary><summary>GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities.</summary>.</summary>
     [Fact]
-    /// <summary>GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities.</summary>
     public async Task GetGitActionCapabilitiesAsync_ShouldReturnPluginCapabilities()
     {
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Capabilities Aufgabe", null);

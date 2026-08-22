@@ -64,7 +64,7 @@ public partial class End2EndTest
         WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
         // Protokoll wird nach dem erneuten Öffnen erneut asynchron nachgeladen und angezeigt.
-        WechsleAufgabenansicht(mainWindow, "InfoCliToggle"); 
+        WechsleAufgabenansicht(mainWindow, "InfoCliToggle");
         WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
 
         NavigateBackFromTaskToProject(mainWindow);

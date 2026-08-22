@@ -8,7 +8,10 @@ Erstellte Pull Requests werden persistent an der Aufgabe gespeichert. Die PR-Ans
 
 Die Navigationsmenü-Seitenleiste zeigt bis zu 20 derzeit aktive Aufgaben als Kacheln mit Titel, KI-Ausführungsstatus und Anzahl offener Todos an, um schnellen Zugriff auf laufende Arbeiten zu ermöglichen. Das Todo-Label ist anklickbar und öffnet einen rein lesenden Dialog mit den offenen Todos der ausgewählten Aufgabe oder einem Leerzustand bei `0 Todos`. Das Dashboard zeigt die gleiche Aufgabenliste an; die Menüsektion wird automatisch verborgen wenn das Dashboard aktiv ist, um Redundanz zu vermeiden.
 
-## Inhalt
+## Arten von Aufgaben
+
+### Reguläre Aufgaben
+Aufgaben werden durch einen KI-Agenten direkt bearbeitet. Der Anwender steuert den Prozess über Buttons (Start, Plugin wechseln, etc.).
 
 - [Beschreibung](beschreibung.md)
 - [Technischer Ablauf](ablauf-technisch.md)
@@ -16,3 +19,8 @@ Die Navigationsmenü-Seitenleiste zeigt bis zu 20 derzeit aktive Aufgaben als Ka
 - [API](api.md)
 - [Datenmodell](datenmodell.md)
 - [Business Rules](business-rules.md)
+
+### Autonome Aufgaben
+Neue Aufgabenart für automatisierte Projektentwicklung unter Kontrolle eines Projektleiter-Agenten. Der Projektleiter zerlegt die Aufgabe selbstständig, erzeugt Unteragenten und orchestriert den Prozess — ideal für komplexe, mehrstufige Projekte.
+
+- [Autonome Aufgaben — Übersicht](autonome-aufgaben/index.md)

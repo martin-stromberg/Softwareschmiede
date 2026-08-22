@@ -10,7 +10,6 @@ public sealed class AutoShutdownOrchestratorTests
 {
     /// <summary><summary>ShouldRequestShutdown_WhenEnabledAndTransitionFromOneToZero.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldRequestShutdown_WhenEnabledAndTransitionFromOneToZero.</summary>
     public async Task ShouldRequestShutdown_WhenEnabledAndTransitionFromOneToZero()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
@@ -26,7 +25,6 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary><summary>ShouldNotRequestShutdown_WhenDisabled.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldNotRequestShutdown_WhenDisabled.</summary>
     public async Task ShouldNotRequestShutdown_WhenDisabled()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
@@ -42,7 +40,6 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary><summary>ShouldRequestShutdownOnlyOnce_PerZeroTransition.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldRequestShutdownOnlyOnce_PerZeroTransition.</summary>
     public async Task ShouldRequestShutdownOnlyOnce_PerZeroTransition()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
@@ -60,7 +57,6 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary><summary>ShouldResetIdempotencyGuard_WhenCountBecomesPositiveAgain.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldResetIdempotencyGuard_WhenCountBecomesPositiveAgain.</summary>
     public async Task ShouldResetIdempotencyGuard_WhenCountBecomesPositiveAgain()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
@@ -80,7 +76,6 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary><summary>ShouldSkipShutdown_WhenFinalRecheckFindsRunningAutomation.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldSkipShutdown_WhenFinalRecheckFindsRunningAutomation.</summary>
     public async Task ShouldSkipShutdown_WhenFinalRecheckFindsRunningAutomation()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
@@ -96,7 +91,6 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary><summary>ShouldCatchException_WhenShutdownServiceThrows.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldCatchException_WhenShutdownServiceThrows.</summary>
     public async Task ShouldCatchException_WhenShutdownServiceThrows()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
@@ -112,7 +106,6 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary><summary>ShouldUnsubscribeFromRunningCountChanged_OnDispose.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldUnsubscribeFromRunningCountChanged_OnDispose.</summary>
     public async Task ShouldUnsubscribeFromRunningCountChanged_OnDispose()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
@@ -131,7 +124,6 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary><summary>ShouldResetGuardAfterFinalRecheckSkip_AndRequestShutdownOnNextValidTransition.</summary>.</summary>
     [Fact]
-    /// <summary>ShouldResetGuardAfterFinalRecheckSkip_AndRequestShutdownOnNextValidTransition.</summary>
     public async Task ShouldResetGuardAfterFinalRecheckSkip_AndRequestShutdownOnNextValidTransition()
     {
         var runningSource = new FakeRunningAutomationStatusSource();

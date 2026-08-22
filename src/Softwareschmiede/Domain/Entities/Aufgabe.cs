@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Entities;
 
@@ -31,6 +33,20 @@ public sealed class Aufgabe
 
     /// <summary>Lokaler Pfad des geklonten Repositories.</summary>
     public string? LokalerKlonPfad { get; set; }
+
+    /// <summary>Convenience-Zugriff auf <see cref="BranchName"/> und <see cref="LokalerKlonPfad"/> als Value Object. Nicht von EF Core gemappt; die beiden Werte bleiben einzeln als flache Spalten persistiert. Null, solange kein Branch/Klon-Pfad gesetzt ist.</summary>
+    [NotMapped]
+    public GitArbeitsbereich? GitArbeitsbereich
+    {
+        get => BranchName is null || LokalerKlonPfad is null
+            ? null
+            : new GitArbeitsbereich(BranchName, LokalerKlonPfad);
+        set
+        {
+            BranchName = value?.BranchName;
+            LokalerKlonPfad = value?.ClonePfad;
+        }
+    }
 
     /// <summary>Name des verwendeten Agentenpakets.</summary>
     public string? AgentenpaketName { get; set; }
@@ -73,6 +89,9 @@ public sealed class Aufgabe
 
     /// <summary>Geplanter Ausführungszeitpunkt für den nächsten Prompt.</summary>
     public DateTimeOffset? VorschlagAusfuehrenAbUtc { get; set; }
+
+    /// <summary>Navigationseigenschaft zur Konfiguration der Autonomen Aufgabe (null für reguläre Aufgaben). Enthält u.a. <see cref="AutonomAufgabeKonfiguration.ProjektleiterAgentId"/>, <see cref="AutonomAufgabeKonfiguration.SessionPauseUtc"/> und <see cref="AutonomAufgabeKonfiguration.AktiveUnteragenten"/>.</summary>
+    public AutonomAufgabeKonfiguration? AutonomKonfiguration { get; set; }
 
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;

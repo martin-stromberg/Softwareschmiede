@@ -23,7 +23,10 @@ public sealed class AufgabeService : IAktiveAufgabenService
     private readonly TodoService _todoService;
 
     /// <inheritdoc cref="AufgabeService"/>
-    public AufgabeService(SoftwareschmiededDbContext db, ILogger<AufgabeService> logger, TodoService todoService)
+    public AufgabeService(
+        SoftwareschmiededDbContext db,
+        ILogger<AufgabeService> logger,
+        TodoService todoService)
     {
         _db = db;
         _logger = logger;
@@ -90,6 +93,8 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .Include(a => a.GitRepository)
                 .ThenInclude(r => r!.StartKonfiguration)
             .Include(a => a.Todos)
+            // Fuer Aufgabe.IstAutonom() (Modus-Indikator regulär/autonom) benötigt, u. a. von TaskDetailViewModel.
+            .Include(a => a.AutonomKonfiguration)
             .FirstOrDefaultAsync(a => a.Id == id, ct);
     }
 
@@ -534,8 +539,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
 
         aufgabe.Status = AufgabeStatus.Gestartet;
         aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        aufgabe.BranchName = branchName;
-        aufgabe.LokalerKlonPfad = lokalerKlonPfad;
+        aufgabe.GitArbeitsbereich = new GitArbeitsbereich(branchName, lokalerKlonPfad);
         aufgabe.AktiveRunId = null;
         aufgabe.LastHeartbeatUtc = null;
         aufgabe.LetzterCliStartUtc = null;
@@ -590,8 +594,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
         aufgabe.Status = AufgabeStatus.Beendet;
         aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Beendet;
         aufgabe.AbschlussDatum = DateTimeOffset.UtcNow;
-        aufgabe.BranchName = null;
-        aufgabe.LokalerKlonPfad = null;
+        aufgabe.GitArbeitsbereich = null;
         aufgabe.AktiveRunId = null;
         aufgabe.LastHeartbeatUtc = null;
         aufgabe.LetzterCliStartUtc = null;
@@ -641,8 +644,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
 
         aufgabe.Status = AufgabeStatus.Neu;
         aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet;
-        aufgabe.BranchName = null;
-        aufgabe.LokalerKlonPfad = null;
+        aufgabe.GitArbeitsbereich = null;
         aufgabe.AktiveRunId = null;
         aufgabe.LastHeartbeatUtc = null;
         aufgabe.LetzterCliStartUtc = null;

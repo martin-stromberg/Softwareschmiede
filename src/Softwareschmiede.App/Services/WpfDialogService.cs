@@ -1,6 +1,7 @@
 using System.Windows;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Services;
@@ -121,6 +122,40 @@ public sealed class WpfDialogService : IDialogService
             };
             var result = dialog.ShowDialog();
             return result == true ? viewModel.SelectedSolution : null;
+        }).Task;
+    }
+
+    /// <inheritdoc/>
+    public Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
+        AutonomAufgabeInitialisierungsDialogViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ShowDialogAsync(
+            () => new AutonomAufgabeInitialisierungsDialog(viewModel),
+            () => viewModel.ErstellteKonfiguration);
+    }
+
+    /// <inheritdoc/>
+    public Task ShowAutonomAufgabeDetailAsync(
+        AutonomAufgabeDetailViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ShowDialogAsync(
+            () => new AutonomAufgabeDetailDialog(viewModel),
+            () => (object?)null);
+    }
+
+    /// <summary>Erzeugt über <paramref name="dialogFactory"/> ein Dialogfenster, zeigt es modal an und liefert das über <paramref name="resultSelector"/> bestimmte Ergebnis.</summary>
+    private static Task<TResult?> ShowDialogAsync<TResult>(Func<Window> dialogFactory, Func<TResult?> resultSelector)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = dialogFactory();
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            var result = dialog.ShowDialog();
+            return result == true ? resultSelector() : default;
         }).Task;
     }
 }

@@ -14,7 +14,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing.</summary>.</summary>
     [Fact]
-    /// <summary>GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing.</summary>
     public void GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing()
     {
         var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
@@ -25,7 +24,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists.</summary>.</summary>
     [Fact]
-    /// <summary>GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists.</summary>
     public void GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -39,7 +37,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist.</summary>.</summary>
     [Fact]
-    /// <summary>GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist.</summary>
     public void GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -69,7 +66,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>.</summary>
     [Fact]
-    /// <summary>GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>
     public void GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded()
     {
         var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
@@ -82,7 +78,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>.</summary>
     [Fact]
-    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>
     public void GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded()
     {
         var sut = CreateSut(Path.Combine(_tempDirectory, "missing"));
@@ -95,7 +90,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded.</summary>.</summary>
     [Fact]
-    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded.</summary>
     public void GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -112,7 +106,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded.</summary>.</summary>
     [Fact]
-    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded.</summary>
     public void GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded()
     {
         Directory.CreateDirectory(_tempDirectory);
@@ -127,7 +120,6 @@ public sealed class PluginManagerTests : IDisposable
 
     /// <summary><summary>GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes.</summary>.</summary>
     [Fact]
-    /// <summary>GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes.</summary>
     public void GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes()
     {
         Directory.CreateDirectory(_tempDirectory);

@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// Der Testmodus lädt als SCM-Plugin ausschließlich <c>LocalDirectoryPlugin</c>, das
 /// <c>GetRemoteBranchesAsync</c>/<c>GetDefaultBranchAsync</c> nicht unterstützt (siehe
 /// <c>LocalDirectoryPlugin.GetRemoteBranchesAsync</c>). Die Basis-Branch-Eingabefelder in
-/// <see cref="RepositoryAssignViewModel"/>/<see cref="ProjectDetailViewModel"/> degradieren in
+/// <see cref="Softwareschmiede.App.ViewModels.RepositoryAssignViewModel"/>/<see cref="Softwareschmiede.App.ViewModels.ProjectDetailViewModel"/> degradieren in
 /// diesem Fall bewusst auf freie Texteingabe ohne Vorschlagsliste/Validierung (siehe
 /// <c>RepositoryAssignViewModel.LoadSourceBranchesAsync</c>), sodass beide Szenarien hier den
 /// manuellen Eingabepfad prüfen.

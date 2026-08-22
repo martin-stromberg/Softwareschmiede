@@ -54,6 +54,11 @@ public static class TaskDetailViewModelTestFactory
 
         var arbeitsverzeichnisOeffnenService = CreateArbeitsverzeichnisOeffnenService();
 
+        var autonomAufgabeStartService = CreateAutonomAufgabeStartService(
+            serviceProviderMock.Object,
+            dialogServiceMock.Object,
+            aufgabeService);
+
         return new TaskDetailViewModel(
             aufgabeService,
             protokollService,
@@ -70,7 +75,8 @@ public static class TaskDetailViewModelTestFactory
             TimeProvider.System,
             fileExplorerViewModel,
             todoListViewModel,
-            arbeitsverzeichnisOeffnenService);
+            arbeitsverzeichnisOeffnenService,
+            autonomAufgabeStartService);
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
@@ -90,4 +96,19 @@ public static class TaskDetailViewModelTestFactory
         prozessStarterMock ??= new Mock<IProzessStarter>();
         return new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
     }
+
+    /// <summary>Erstellt einen AutonomAufgabeStartService mit den übergebenen Abhängigkeiten für Tests.</summary>
+    /// <param name="serviceProvider">Der zu verwendende IServiceProvider.</param>
+    /// <param name="dialogService">Der zu verwendende IDialogService.</param>
+    /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
+    /// <returns>Ein einsatzbereiter AutonomAufgabeStartService.</returns>
+    public static AutonomAufgabeStartService CreateAutonomAufgabeStartService(
+        IServiceProvider serviceProvider,
+        IDialogService dialogService,
+        AufgabeService aufgabeService)
+        => new(
+            serviceProvider,
+            dialogService,
+            aufgabeService,
+            NullLogger<AutonomAufgabeStartService>.Instance);
 }

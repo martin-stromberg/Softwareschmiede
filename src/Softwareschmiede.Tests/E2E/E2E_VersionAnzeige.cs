@@ -17,7 +17,7 @@ public partial class End2EndTest
     /// zeigt einen nicht-leeren Versionstext an.
     /// </summary>
     protected void AppStarten_ZeigtVersionsTextInFusszeile_E2E(FlaUI.Core.AutomationElements.Window mainWindow)
-    {        
+    {
         var versionText = WaitForElement(mainWindow, cf => cf.ByAutomationId("AppVersionText"), Short);
         Assert.False(string.IsNullOrWhiteSpace(versionText.Name));
     }

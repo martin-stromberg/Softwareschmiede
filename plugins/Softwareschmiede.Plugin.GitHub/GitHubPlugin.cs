@@ -117,13 +117,13 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
     {
         token ??= _credentialStore.GetCredential(GitHubTokenCredentialKey);
         var env = new Dictionary<string, string>();
-        
+
         // Disable terminal prompts completely
         env["GIT_TERMINAL_PROMPT"] = "0";
-        
+
         // Disable SSH host key checking to prevent /dev/tty access
         env["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
-        
+
         // Tell git to use .netrc for credentials
         // GIT_CREDENTIAL_HELPER=store will use ~/.git-credentials if it exists
         // But .netrc is more universal, so we make sure curl uses it too
@@ -134,7 +134,7 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
         }
-        
+
         return env;
     }
 
@@ -292,7 +292,7 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
         var netrcPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
-        
+
         var netrcContent = $@"machine github.com
 login oauth2
 password {token}
@@ -315,10 +315,10 @@ password {token}
         if (repositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             var authUrl = repositoryUrl.Replace(
-                "https://", 
+                "https://",
                 $"https://oauth2:{Uri.EscapeDataString(token)}@",
                 StringComparison.OrdinalIgnoreCase);
-            
+
             var setUrlResult = await _cliRunner.RunAsync(
                 "git",
                 ["remote", "set-url", "origin", authUrl],
@@ -874,7 +874,7 @@ password {token}
 
         // Parse the output text: "https://github.com/owner/repo/pull/123"
         var prUrl = result.StdOut.Trim();
-        
+
         // Extract PR number from URL
         var lastSlashIndex = prUrl.LastIndexOf('/');
         if (lastSlashIndex > 0 && int.TryParse(prUrl[(lastSlashIndex + 1)..], out var prNumber))

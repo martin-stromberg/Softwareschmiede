@@ -62,7 +62,7 @@ public sealed partial class SettingsView : UserControl
 
     /// <summary>
     /// Gemeinsame Guard-Prüfung für die Selektions-Handler der Plugin-Auswahlsteuerelemente: liefert das
-    /// <see cref="SettingsViewModel"/> des <see cref="DataContext"/> sowie das zuerst neu hinzugefügte Element
+    /// <see cref="SettingsViewModel"/> des <c>DataContext</c> sowie das zuerst neu hinzugefügte Element
     /// der Selektionsänderung, sofern beides vorhanden ist.
     /// </summary>
     /// <param name="e">Die Ereignisargumente mit dem neu ausgewählten Element.</param>

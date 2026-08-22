@@ -151,11 +151,9 @@ public sealed partial class App : System.Windows.Application
 
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
-        var dbPath = Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH")
-            ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Softwareschmiede",
-                "softwareschmiede.db");
+        var dbPath = DatenbankPfadResolver.ErmittlePfad(
+            AppContext.BaseDirectory,
+            Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH"));
 
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
@@ -164,11 +162,17 @@ public sealed partial class App : System.Windows.Application
 
         services.AddMemoryCache();
         services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
+        services.Configure<AutonomAufgabenOptions>(context.Configuration.GetSection(AutonomAufgabenOptions.SectionName));
         services.AddSingleton<IOptions<UpdateOptions>>(Options.Create(new UpdateOptions()));
         services.AddSingleton<DirectoryStructureBrowserService>();
 
         // Domain Services
         services.AddScoped<TodoService>();
+        services.AddScoped<AutonomAufgabenInitialisierungsService>();
+        services.AddScoped<UnteragentGovernanceService>();
+        services.AddScoped<UnteragentGitProvisioningService>();
+        services.AddScoped<SessionManagementService>();
+        services.AddScoped<ProjektleiterAgentService>();
         services.AddScoped<AufgabeService>();
         services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
         services.AddScoped<ProjektService>();
@@ -205,6 +209,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ArbeitsverzeichnisOeffnenService>();
         services.AddSingleton<IVisualStudioCodeLocator, VisualStudioCodeLocator>();
         services.AddScoped<ICliUpdateSafetyService, CliUpdateSafetyService>();
+        services.AddScoped<AutonomAufgabeStartService>();
         services.AddSingleton<IApplicationVersionProvider, ApplicationVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();
 
@@ -226,6 +231,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<PromptZeitVersandService>();
         services.AddSingleton<PullRequestMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
+        services.AddSingleton<UnteragentGovernanceMonitoringService>();
+        services.AddHostedService(sp => sp.GetRequiredService<UnteragentGovernanceMonitoringService>());
         services.AddSingleton<CliProcessManager>();
         services.AddSingleton<IBenachrichtigungsAudioService, WpfAudioService>();
         services.AddSingleton<IBenachrichtigungsBannerService, WpfBannerService>();
@@ -271,6 +278,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<FileExplorerViewModel>();
         services.AddTransient<TodoListViewModel>();
         services.AddTransient<OpenTodosDialogViewModel>();
+        services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

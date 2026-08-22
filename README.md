@@ -75,6 +75,7 @@ Die wichtigsten Features:
 - **Basis-Branch-Konfiguration** – Repositories können einen konfigurierbaren Basis-Branch speichern, von dem neue Feature-Branches für Aufgaben abgezweigt werden; konfiguriert in Repository-Details, validiert beim Aufgabenstart, als Ziel-Branch für Pull Requests genutzt
 - **PR-Monitoring & automatischer GitHub-Abschluss** – neuer PR-Bereich in Aufgaben mit PR-, Merge-/Monitoring- und Workflow-Run-Status; optionaler automatischer Abschluss nach erfolgreichen Actions
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
+- **Autonome Aufgaben (Projektleiter-Agent)** – vollautomatisierte Projektentwicklung: ein Projektleiter-Agent zerlegt die Aufgabe in Teilaufgaben, erzeugt und steuert Unteragenten in eigenen Branches/Klonen mit Governance-Grenzen und bereitet Pull Requests vor; Initialisierungsdialog mit auswählbarem Projektbranch (Dropdown der Remote-Branches mit „+"-Button zur Branch-Neuanlage, Fallback auf freie Texteingabe), auswählbarer Promptvorlage für den Initialprompt, Token-Budget/Laufzeitlimit/Persistenz-Modus/Skill-Autogeneration und Hilfe-Button mit Ablauferklärung
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
 - **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
 - **Programmupdate** – Update-Prüfung gegen GitHub-Releases direkt aus der Anwendung
@@ -655,6 +656,12 @@ Feature-spezifische Testartefakte:
 - Benachrichtigungssystem für abgeschlossene KI-Aufgaben:
   - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
   - Einstellungs- und Audio-Validierung/Persistenz: `src/Softwareschmiede.Tests/Application/Services/BenachrichtigungsEinstellungenServiceTests.cs`
+- Issue 205 — Autonome Aufgaben (Projektleiter-Agent-basierte Automatisierung):
+  - Service-Tests (Initialisierung): `AutonomAufgabenInitialisierungsServiceTests` — Erstellung des Arbeitsverzeichnisses, Repository-Klon, state.json/permissions.json-Generierung
+  - ViewModel-Tests: `AutonomAufgabeInitialisierungsDialogViewModelTests` — Formularvalidierung, Service-Aufrufe, Dialog-Management
+  - ViewModel-Tests: `AutonomAufgabeDetailViewModel` — Laden von plan.md/progress.md/governance.md, Agent-Kontrolle (Start/Stop/Resume)
+  - E2E-Tests: `E2E_AutonomAufgabenInitialisierung` — Dialog-Anzeige, Arbeitsverzeichnis-Erstellung, Detail-View-Anzeige
+  - E2E-Tests: `E2E_AutonomAufgabenAgentExecution` — Projektleiter-Agent-Start, Unteragenten-Erzeugung, Session-Pause/Resume bei Budget-Limit, Heartbeat-Monitoring
 - Issue 81 — Aktive Aufgaben im Menü (in Arbeit):
   - Service-Tests: `AufgabeServiceTests` — `GetAktiveAufgabenAsync()` Filterung nach Status, Sortierung nach Aktivität
   - Converter-Tests: `KiAusfuehrungsStatusConverterTests` — Status-String-Berechnung (Läuft, Wartet, Fallback)
@@ -708,6 +715,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
 | [Basis-Branch-Konfiguration](docs/help/projekte/basis-branch-konfiguration.md) | Konfiguration eines Basis-Branches pro Repository für Feature-Branch-Erstellung und Pull-Request-Ziele |
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
+| [Autonome Aufgaben](docs/help/aufgaben/autonome-aufgaben/index.md) | Projektleiter-Agent-basierte Automatisierung mit Unteragenten-Orchestrierung, Session-Management, Governance-Enforcement und Skills-Lifecycle |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |
 | [Entwicklungsumgebungen](docs/help/entwicklungsumgebungen/index.md) | IDE-Plugin-System mit automatischer Erkennung und Auswahl (Visual Studio, Visual Studio Code) |
 | [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins und Credential-Verwaltung |

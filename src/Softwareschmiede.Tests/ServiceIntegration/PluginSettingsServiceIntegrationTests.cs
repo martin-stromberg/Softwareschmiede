@@ -21,7 +21,6 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary><summary>SetValue_SpeichertWert_UndGetValue_LaeadtIhn.</summary>.</summary>
     [Fact]
-    /// <summary>SetValue_SpeichertWert_UndGetValue_LaeadtIhn.</summary>
     public void SetValue_SpeichertWert_UndGetValue_LaeadtIhn()
     {
         var plugin = new FakeSettingsPlugin("TestPlugin", "test.plugin");
@@ -35,7 +34,6 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary><summary>HasValue_GibtFalse_OhneGespeichertenWert.</summary>.</summary>
     [Fact]
-    /// <summary>HasValue_GibtFalse_OhneGespeichertenWert.</summary>
     public void HasValue_GibtFalse_OhneGespeichertenWert()
     {
         var plugin = new FakeSettingsPlugin("LeeresPlugin", "empty.plugin");
@@ -46,7 +44,6 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary><summary>HasValue_GibtTrue_NachSpeichern.</summary>.</summary>
     [Fact]
-    /// <summary>HasValue_GibtTrue_NachSpeichern.</summary>
     public void HasValue_GibtTrue_NachSpeichern()
     {
         var plugin = new FakeSettingsPlugin("VollPlugin", "voll.plugin");
@@ -58,7 +55,6 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary><summary>DeleteValue_EntferntGespeichertenWert.</summary>.</summary>
     [Fact]
-    /// <summary>DeleteValue_EntferntGespeichertenWert.</summary>
     public void DeleteValue_EntferntGespeichertenWert()
     {
         var plugin = new FakeSettingsPlugin("DeletePlugin", "delete.plugin");
@@ -72,7 +68,6 @@ public sealed class PluginSettingsServiceIntegrationTests
 
     /// <summary><summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>.</summary>
     [Fact]
-    /// <summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>
     public void GetValue_GibtNull_OhneGespeichertenWert()
     {
         var plugin = new FakeSettingsPlugin("NullPlugin", "null.plugin");

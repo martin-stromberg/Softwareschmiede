@@ -12,7 +12,6 @@ public sealed class DiffAlgorithmServiceTests
 
     /// <summary><summary>GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty.</summary>.</summary>
     [Fact]
-    /// <summary>GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty.</summary>
     public async Task GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty()
     {
         // Act
@@ -26,7 +25,6 @@ public sealed class DiffAlgorithmServiceTests
 
     /// <summary><summary>GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts.</summary>.</summary>
     [Fact]
-    /// <summary>GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts.</summary>
     public async Task GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts()
     {
         // Arrange
@@ -59,7 +57,6 @@ public sealed class DiffAlgorithmServiceTests
 
     /// <summary><summary>GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded.</summary>.</summary>
     [Fact]
-    /// <summary>GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded.</summary>
     public async Task GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded()
     {
         // Act

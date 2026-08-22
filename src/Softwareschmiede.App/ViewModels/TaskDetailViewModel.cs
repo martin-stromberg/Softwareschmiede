@@ -47,6 +47,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly FileExplorerViewModel _fileExplorerViewModel;
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
+    private readonly AutonomAufgabeStartService _autonomAufgabeStartService;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -210,8 +211,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
     public bool KannCliStoppen => _isCliRunning;
 
-    /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann.</summary>
+    /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann. Fuer Autonome Aufgaben immer false, da diese ueber den Projektleiter-Agenten statt die reguläre CLI-Ansicht gesteuert werden.</summary>
     public bool KannCliNeuStarten => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
+        && !_aufgabe.IstAutonom()
         && !_isCliRunning;
 
     /// <summary>Gibt an, ob die Aufgabe endgueltig abgeschlossen werden kann.</summary>
@@ -401,8 +403,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Status == Neu, sonst false.</summary>
     public bool ShowEditPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Neu;
 
-    /// <summary>True wenn die Aufgabe eine aktive KI-Ausfuehrung anzeigen soll.</summary>
-    public bool ShowCliPanel => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true;
+    /// <summary>True wenn die Aufgabe eine aktive KI-Ausfuehrung anzeigen soll. Fuer Autonome Aufgaben immer false, da diese ueber eine eigene Ansicht (Projektleiter-Agent) statt die reguläre CLI-Ansicht gesteuert werden.</summary>
+    public bool ShowCliPanel => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
+        && !_aufgabe.IstAutonom();
 
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
     public bool ShowDiffPanel => _aufgabe?.Status == Domain.Enums.AufgabeStatus.Beendet;
@@ -534,6 +537,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet die Issue-URL im Standard-Browser.</summary>
     public ICommand IssueBrowserOeffnenCommand { get; }
 
+    /// <summary>Öffnet den Initialisierungsdialog für eine Autonome Aufgabe und anschließend deren Detail-Ansicht.</summary>
+    public ICommand AutonomAufgabeInitialisierenCommand { get; }
+
     /// <summary>Sendet die gewählte Promptvorlage an die laufende CLI.</summary>
     public ICommand PromptVorlageAuswaehlenCommand { get; }
 
@@ -585,6 +591,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         FileExplorerViewModel fileExplorerViewModel,
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
+        AutonomAufgabeStartService autonomAufgabeStartService,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -602,6 +609,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _fileExplorerViewModel = fileExplorerViewModel;
         _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
+        _autonomAufgabeStartService = autonomAufgabeStartService;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -615,7 +623,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         CliNeustartenCommand = new AsyncRelayCommand(CliNeustartenAsync, () => KannCliNeuStarten);
         StartenCommand = new AsyncRelayCommand(
             StartenAsync,
-            () => _aufgabe?.AusfuehrungsStatus.DarfAusfuehrungStarten(_aufgabe.Status) == true && !_isCliRunning);
+            () => _aufgabe?.AusfuehrungsStatus.DarfAusfuehrungStarten(_aufgabe.Status) == true
+                && !_aufgabe.IstAutonom()
+                && !_isCliRunning);
         PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => KannAufgabeAbschliessen);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
@@ -637,6 +647,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IssueBrowserOeffnenCommand = new RelayCommand(
             IssueBrowserOeffnen,
             () => CurrentIssueReferenz?.IssueUrl != null);
+        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => _aufgabe is not null);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
@@ -1198,6 +1209,30 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async Task AutonomAufgabeInitialisierenAsync(CancellationToken ct)
+    {
+        if (_aufgabe is null)
+        {
+            return;
+        }
+
+        var ergebnis = await _autonomAufgabeStartService.StarteAsync(_aufgabe, ct);
+        if (ergebnis is null)
+        {
+            return;
+        }
+
+        if (ergebnis.AktualisierteAufgabe is not null)
+        {
+            Aufgabe = ergebnis.AktualisierteAufgabe;
+        }
+
+        if (ergebnis.FehlerMeldung is not null)
+        {
+            FehlerMeldung = ergebnis.FehlerMeldung;
+        }
+    }
+
     private async Task IssueAnlegenAsync(CancellationToken ct)
     {
         if (_aufgabe == null)
@@ -1356,10 +1391,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         var standardAnsicht = ShowCliPanel
             ? DetailAnsicht.Cli
             : AufgabeStatus switch
-        {
-            Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
-            _ => DetailAnsicht.Info
-        };
+            {
+                Domain.Enums.AufgabeStatus.Beendet => DetailAnsicht.Diff,
+                _ => DetailAnsicht.Info
+            };
 
         WaehleAnsicht(standardAnsicht);
     }
@@ -1836,7 +1871,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Formatiert einen Einstiegspunkt für die Anzeige im Auswahl-Dialog plugin-qualifiziert:
     /// <c>"{PluginName}: {DisplayName ?? Dateiname}"</c>, außer die ermittelte Bezeichnung ist bereits
-    /// identisch mit dem <see cref="IIdePlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
+    /// identisch mit dem <see cref="IPlugin.PluginName"/> (z. B. bei <c>VisualStudioCodeIdePlugin</c>,
     /// dessen einziger Einstiegspunkt bereits <c>DisplayName == PluginName</c> liefert) — dann wird nur der
     /// Plugin-Name angezeigt, um ein Doppel-Label zu vermeiden.
     /// </summary>

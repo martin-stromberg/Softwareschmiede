@@ -31,7 +31,6 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
 
     /// <summary><summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>.</summary>
     [Fact]
-    /// <summary>RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive.</summary>
     public async Task RunAsync_ShouldSkipExecution_WhenConfigurationIsInactive()
     {
         var sut = CreateSut();
@@ -52,7 +51,6 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
 
     /// <summary><summary>RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot.</summary>.</summary>
     [Fact]
-    /// <summary>RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot.</summary>
     public async Task RunAsync_ShouldThrow_WhenScriptPathEscapesRepositoryRoot()
     {
         var sut = CreateSut();
@@ -67,7 +65,6 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
 
     /// <summary><summary>RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds.</summary>.</summary>
     [Fact]
-    /// <summary>RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds.</summary>
     public async Task RunAsync_ShouldPassOnlyScriptArgumentsWithoutPortContract_WhenScriptExecutionSucceeds()
     {
         var scriptPath = CreateScript("scripts/start.ps1");
@@ -108,7 +105,6 @@ public sealed class RepositoryStartskriptServiceTests : IDisposable
 
     /// <summary><summary>RunAsync_ShouldThrow_WhenCliExecutionFails.</summary>.</summary>
     [Fact]
-    /// <summary>RunAsync_ShouldThrow_WhenCliExecutionFails.</summary>
     public async Task RunAsync_ShouldThrow_WhenCliExecutionFails()
     {
         var scriptPath = CreateScript("scripts/start.ps1");

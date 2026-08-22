@@ -1,4 +1,5 @@
 using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Services;
@@ -39,5 +40,15 @@ public interface IDialogService
     /// <summary>Zeigt den Solution-Auswahl-Dialog und gibt den gewählten Solution-Pfad zurück, oder null wenn abgebrochen.</summary>
     Task<string?> ShowSolutionSelectionDialogAsync(
         IReadOnlyList<string> solutionPfade,
+        CancellationToken ct = default);
+
+    /// <summary>Zeigt den Initialisierungsdialog für eine Autonome Aufgabe und gibt die erstellte Konfiguration zurück, oder null wenn abgebrochen.</summary>
+    Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
+        AutonomAufgabeInitialisierungsDialogViewModel viewModel,
+        CancellationToken ct = default);
+
+    /// <summary>Zeigt die Detail-Ansicht einer Autonomen Aufgabe.</summary>
+    Task ShowAutonomAufgabeDetailAsync(
+        AutonomAufgabeDetailViewModel viewModel,
         CancellationToken ct = default);
 }

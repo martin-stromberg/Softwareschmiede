@@ -26,7 +26,6 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
 
     /// <summary><summary>StartenAsync_Setzt_Status_AufGestartet.</summary>.</summary>
     [Fact]
-    /// <summary>StartenAsync_Setzt_Status_AufGestartet.</summary>
     public async Task StartenAsync_Setzt_Status_AufGestartet()
     {
         var projekt = await _projektService.CreateAsync("Startup-Projekt", null);
@@ -44,7 +43,6 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
 
     /// <summary><summary>StatusUebergang_Gestartet_NachWartend_IstErlaubt.</summary>.</summary>
     [Fact]
-    /// <summary>StatusUebergang_Gestartet_NachWartend_IstErlaubt.</summary>
     public async Task StatusUebergang_Gestartet_NachWartend_IstErlaubt()
     {
         var projekt = await _projektService.CreateAsync("Uebergang-Projekt", null);
@@ -59,7 +57,6 @@ public sealed class TaskStartupServiceIntegrationTests : IDisposable
 
     /// <summary><summary>StatusUebergang_Wartend_NachGestartet_IstErlaubt.</summary>.</summary>
     [Fact]
-    /// <summary>StatusUebergang_Wartend_NachGestartet_IstErlaubt.</summary>
     public async Task StatusUebergang_Wartend_NachGestartet_IstErlaubt()
     {
         var projekt = await _projektService.CreateAsync("Resume-Projekt", null);
