@@ -172,6 +172,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<TodoService>();
         services.AddScoped<AutonomAufgabenInitialisierungsService>();
         services.AddScoped<UnteragentGovernanceService>();
+        services.AddScoped<UnteragentGitProvisioningService>();
         services.AddScoped<SessionManagementService>();
         services.AddScoped<ProjektleiterAgentService>();
         services.AddScoped<AufgabeService>();

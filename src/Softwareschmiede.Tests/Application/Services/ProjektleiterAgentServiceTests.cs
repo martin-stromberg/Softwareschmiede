@@ -46,7 +46,8 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
-        _sut = new ProjektleiterAgentService(_db, _cliRunnerMock.Object, governanceService, NullLogger<ProjektleiterAgentService>.Instance);
+        var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "ProjektleiterAgent", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testRoot);

@@ -108,7 +108,8 @@ public partial class End2EndTest
         {
             var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
             var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
-            var projektleiterAgentService = new ProjektleiterAgentService(db, cliRunner, governanceService, NullLogger<ProjektleiterAgentService>.Instance);
+            var gitProvisioningService = new UnteragentGitProvisioningService(cliRunner, NullLogger<UnteragentGitProvisioningService>.Instance);
+            var projektleiterAgentService = new ProjektleiterAgentService(db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
             await projektleiterAgentService.SteuereUnteragentAsync(unteragent);
         }
 

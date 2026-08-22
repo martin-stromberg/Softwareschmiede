@@ -31,7 +31,8 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
 
         var cliRunnerMock = new Mock<ICliRunner>();
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
-        _projektleiterAgentService = new ProjektleiterAgentService(_db, cliRunnerMock.Object, governanceService, NullLogger<ProjektleiterAgentService>.Instance);
+        var gitProvisioningService = new UnteragentGitProvisioningService(cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        _projektleiterAgentService = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
         _sessionManagementService = new SessionManagementService(_db, NullLogger<SessionManagementService>.Instance);
 
         var projektId = Guid.NewGuid();
