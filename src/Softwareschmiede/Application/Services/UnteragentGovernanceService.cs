@@ -21,29 +21,47 @@ public sealed class UnteragentGovernanceService
     /// <inheritdoc cref="UnteragentGovernanceService"/>
     public UnteragentGovernanceService(ILogger<UnteragentGovernanceService> logger) => _logger = logger;
 
-    /// <summary>Validiert, dass ein Unteragent nur in seinem eigenen Bereich (<see cref="UnteragentSpezifikation.AgentDirectory"/>) arbeitet und keine grundsätzlich verbotene Aktion ausführt.</summary>
+    /// <summary>Validiert, dass ein Unteragent nur in seinem eigenen Bereich (<see cref="UnteragentSpezifikation.VerzeichnisPfad"/>) arbeitet und keine grundsätzlich verbotene Aktion ausführt.</summary>
+    /// <param name="unteragent">Der Unteragent, dessen Arbeitsbereich als erlaubter Basispfad dient.</param>
+    /// <param name="aktion">Die auszuführende Aktion.</param>
+    /// <param name="zielPfad">Der zu prüfende Zielpfad.</param>
+    /// <returns><see langword="true"/>, wenn die Aktion erlaubt ist, sonst <see langword="false"/>.</returns>
     public bool VerifiziereBerechtigung(UnteragentSpezifikation unteragent, UnteragentAktion aktion, string zielPfad)
     {
         ArgumentNullException.ThrowIfNull(unteragent);
+
+        return VerifiziereBerechtigung(unteragent.VerzeichnisPfad, aktion, zielPfad, unteragent.ExterneAgentId);
+    }
+
+    /// <summary>Validiert, dass ein Zielpfad innerhalb eines vorgegebenen Basispfads liegt und keine grundsätzlich verbotene Aktion vorliegt. Dient Aufrufern, die noch keine persistierte <see cref="UnteragentSpezifikation"/> besitzen (z. B. Prüfung des Arbeitsverzeichnisses vor dessen Erzeugung).</summary>
+    /// <param name="erlaubterBasisPfad">Der Basispfad, innerhalb dessen der Zielpfad liegen muss.</param>
+    /// <param name="aktion">Die auszuführende Aktion.</param>
+    /// <param name="zielPfad">Der zu prüfende Zielpfad.</param>
+    /// <param name="agentIdFuerLogging">Die Agent-Id, die in Log-Meldungen zur Nachverfolgung verwendet wird.</param>
+    /// <returns><see langword="true"/>, wenn die Aktion erlaubt ist, sonst <see langword="false"/>.</returns>
+    public bool VerifiziereBerechtigung(string erlaubterBasisPfad, UnteragentAktion aktion, string zielPfad, string agentIdFuerLogging)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(erlaubterBasisPfad);
         ArgumentException.ThrowIfNullOrWhiteSpace(zielPfad);
+        ArgumentException.ThrowIfNullOrWhiteSpace(agentIdFuerLogging);
 
         if (VerboteneAktionen.Contains(aktion))
         {
-            _logger.LogWarning("Unteragent {AgentId}: Aktion '{Aktion}' ist grundsätzlich verboten.", unteragent.AgentId, aktion);
+            _logger.LogWarning("Unteragent {AgentId}: Aktion '{Aktion}' ist grundsätzlich verboten.", agentIdFuerLogging, aktion);
             return false;
         }
 
-        var normalizedAgentDir = NormalizePath(unteragent.AgentDirectory);
+        var normalizedBasisPfad = NormalizePath(erlaubterBasisPfad);
         var normalizedZiel = NormalizePath(zielPfad);
 
-        var erlaubt = normalizedZiel.StartsWith(normalizedAgentDir, StringComparison.OrdinalIgnoreCase);
+        var erlaubt = normalizedZiel.StartsWith(normalizedBasisPfad, StringComparison.OrdinalIgnoreCase);
         if (!erlaubt)
         {
             _logger.LogWarning(
-                "Unteragent {AgentId}: Zugriff auf '{ZielPfad}' außerhalb des eigenen Bereichs '{AgentDirectory}' verweigert.",
-                unteragent.AgentId,
+                "Unteragent {AgentId}: Zugriff auf '{ZielPfad}' außerhalb des eigenen Bereichs '{BasisPfad}' verweigert.",
+                agentIdFuerLogging,
                 zielPfad,
-                unteragent.AgentDirectory);
+                erlaubterBasisPfad);
         }
 
         return erlaubt;
@@ -54,7 +72,7 @@ public sealed class UnteragentGovernanceService
     {
         ArgumentNullException.ThrowIfNull(unteragent);
 
-        var statePfad = Path.Combine(unteragent.AgentDirectory, "task_state.json");
+        var statePfad = Path.Combine(unteragent.VerzeichnisPfad, "task_state.json");
         if (!File.Exists(statePfad))
         {
             return;
@@ -69,12 +87,12 @@ public sealed class UnteragentGovernanceService
 
         if (state.TokenLimit > 0 && state.TokensUsed > state.TokenLimit)
         {
-            throw new UnteragentAbbruchException(unteragent.AgentId, $"Tokenlimit überschritten ({state.TokensUsed}/{state.TokenLimit}).");
+            throw new UnteragentAbbruchException(unteragent.ExterneAgentId, $"Tokenlimit überschritten ({state.TokensUsed}/{state.TokenLimit}).");
         }
 
         if (state.RuntimeLimitMinutes > 0 && DateTimeOffset.UtcNow - state.StartedUtc > TimeSpan.FromMinutes(state.RuntimeLimitMinutes))
         {
-            throw new UnteragentAbbruchException(unteragent.AgentId, $"Laufzeitlimit von {state.RuntimeLimitMinutes} Minuten überschritten.");
+            throw new UnteragentAbbruchException(unteragent.ExterneAgentId, $"Laufzeitlimit von {state.RuntimeLimitMinutes} Minuten überschritten.");
         }
     }
 

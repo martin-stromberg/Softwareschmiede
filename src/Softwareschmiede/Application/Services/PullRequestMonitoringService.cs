@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -9,11 +8,10 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Ueberwacht gespeicherte Pull Requests und fuehrt optional automatische Abschluesse aus.</summary>
-public sealed class PullRequestMonitoringService : BackgroundService
+public sealed class PullRequestMonitoringService : PeriodicBackgroundService
 {
     private static readonly TimeSpan PollingInterval = TimeSpan.FromMinutes(2);
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<PullRequestMonitoringService> _logger;
     private readonly TimeProvider _timeProvider;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="PullRequestMonitoringService"/>.</summary>
@@ -21,36 +19,14 @@ public sealed class PullRequestMonitoringService : BackgroundService
         IServiceScopeFactory scopeFactory,
         TimeProvider timeProvider,
         ILogger<PullRequestMonitoringService> logger)
+        : base(PollingInterval, timeProvider, logger, "Pull-Request-Monitoring ist fehlgeschlagen.")
     {
         _scopeFactory = scopeFactory;
         _timeProvider = timeProvider;
-        _logger = logger;
-    }
-
-    /// <inheritdoc/>
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                await RunOnceAsync(stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Pull-Request-Monitoring ist fehlgeschlagen.");
-            }
-
-            await Task.Delay(PollingInterval, _timeProvider, stoppingToken);
-        }
     }
 
     /// <summary>Fuehrt einen einzelnen Monitoring-Durchlauf aus.</summary>
-    public async Task RunOnceAsync(CancellationToken ct = default)
+    public override async Task RunOnceAsync(CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
         var references = scope.ServiceProvider.GetRequiredService<PullRequestReferenzService>();

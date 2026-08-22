@@ -20,41 +20,18 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
     private readonly Mock<ICliRunner> _cliRunnerMock;
     private readonly AutonomAufgabenInitialisierungsService _sut;
     private readonly string _testRoot;
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projektId;
 
     /// <summary>AutonomAufgabenInitialisierungsServiceTests.</summary>
     public AutonomAufgabenInitialisierungsServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _cliRunnerMock = new Mock<ICliRunner>();
-
-        // Simuliert einen erfolgreichen "git clone", indem das Zielverzeichnis inklusive Marker-Datei angelegt wird.
-        _cliRunnerMock
-            .Setup(r => r.RunAsync(
-                "git",
-                It.Is<IEnumerable<string>>(args => args.Contains("clone")),
-                It.IsAny<string?>(),
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((_, args, _, _, _) =>
-            {
-                var zielPfad = args.Last();
-                Directory.CreateDirectory(zielPfad);
-                File.WriteAllText(Path.Combine(zielPfad, ".git-marker"), "cloned");
-            })
-            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
-
-        _sut = new AutonomAufgabenInitialisierungsService(_db, _cliRunnerMock.Object, Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+        _cliRunnerMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateCliRunnerMockMitErfolgreichemGitKlon();
+        _sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(_db, _cliRunnerMock.Object);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "AutonomAufgabenInit", Guid.NewGuid().ToString("N"));
 
-        _db.Projekte.Add(new Projekt
-        {
-            Id = _projektId,
-            Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
-        });
+        _projektId = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleProjekt(_db);
         _db.SaveChanges();
     }
 
@@ -70,20 +47,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
 
     private Aufgabe ErstelleUndPersistiereAufgabe(string arbeitsverzeichnispPfad)
     {
-        var quellRepo = Path.Combine(arbeitsverzeichnispPfad + "-quelle");
-        Directory.CreateDirectory(quellRepo);
-
-        var aufgabe = new Aufgabe
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Autonome Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            LokalerKlonPfad = quellRepo
-        };
-        _db.Aufgaben.Add(aufgabe);
+        var aufgabe = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleAufgabeMitLokalemKlon(_db, _projektId, arbeitsverzeichnispPfad, "Autonome Testaufgabe");
         _db.SaveChanges();
         return aufgabe;
     }
@@ -92,9 +56,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         ProjektBranchName: "feature/autonom-test",
         InitialPrompt: "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.",
         ArbeitsverzeichnisPfad: arbeitsverzeichnispPfad,
-        TokenBudget: 500000,
-        TokenBudgetErweitert: null,
-        LaufzeitLimitMinuten: 480,
+        RessourcenLimits: new RessourcenLimits(TokenBudget: 500000, TokenBudgetErweitert: null, LaufzeitLimitMinuten: 480),
         PersistenzModus: PersistenzModus.Standard,
         SkillAutogeneration: false);
 
@@ -179,7 +141,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         root.TryGetProperty("allowed_actions", out var allowedActions).Should().BeTrue();
         allowedActions.GetArrayLength().Should().BeGreaterThan(0);
         root.TryGetProperty("limits", out var limits).Should().BeTrue();
-        limits.GetProperty("token_budget").GetInt32().Should().Be(anfrage.TokenBudget);
+        limits.GetProperty("token_budget").GetInt32().Should().Be(anfrage.RessourcenLimits.TokenBudget);
     }
 
     /// <summary>InitialisiereAsync lehnt ein ungültiges TokenBudget mit ArgumentException ab.</summary>
@@ -187,7 +149,8 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
     public async Task InitialisiereAsync_WirftArgumentException_BeiUngueltigemTokenBudget()
     {
         var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
-        var anfrage = ErstelleAnfrage(_testRoot) with { TokenBudget = 0 };
+        var basisAnfrage = ErstelleAnfrage(_testRoot);
+        var anfrage = basisAnfrage with { RessourcenLimits = basisAnfrage.RessourcenLimits with { TokenBudget = 0 } };
 
         var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
 
@@ -201,5 +164,86 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         var akt = () => _sut.ErstelleArbeitsverzeichnisStrukturAsync("relativer/pfad");
 
         await akt.Should().ThrowAsync<ArgumentException>();
+    }
+
+    /// <summary>InitialisiereAsync lehnt einen ungültigen ProjektBranchName mit ArgumentException ab.</summary>
+    [Fact]
+    public async Task InitialisiereAsync_WirftArgumentException_BeiUngueltigemProjektBranchName()
+    {
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot) with { ProjektBranchName = "ungueltig~branch" };
+
+        var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<ArgumentException>();
+    }
+
+    /// <summary>InitialisiereAsync lehnt einen zu kurzen InitialPrompt mit ArgumentException ab.</summary>
+    [Fact]
+    public async Task InitialisiereAsync_WirftArgumentException_BeiZuKurzemInitialPrompt()
+    {
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot) with { InitialPrompt = "kurz" };
+
+        var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<ArgumentException>();
+    }
+
+    /// <summary>InitialisiereAsync lehnt ein ungültiges LaufzeitLimitMinuten mit ArgumentException ab.</summary>
+    [Fact]
+    public async Task InitialisiereAsync_WirftArgumentException_BeiUngueltigemLaufzeitLimit()
+    {
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var basisAnfrage = ErstelleAnfrage(_testRoot);
+        var anfrage = basisAnfrage with { RessourcenLimits = basisAnfrage.RessourcenLimits with { LaufzeitLimitMinuten = 5 } };
+
+        var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<ArgumentException>();
+    }
+
+    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn die Aufgabe keinen lokalen Klon-Pfad besitzt.</summary>
+    [Fact]
+    public async Task InitialisiereAsync_WirftInvalidOperationException_OhneLokalenKlonPfad()
+    {
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Autonome Testaufgabe ohne Klon",
+            Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
+            ErstellungsDatum = DateTimeOffset.UtcNow,
+            LokalerKlonPfad = null
+        };
+        _db.Aufgaben.Add(aufgabe);
+        await _db.SaveChangesAsync();
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn der Repository-Klon fehlschlägt.</summary>
+    [Fact]
+    public async Task InitialisiereAsync_WirftInvalidOperationException_BeiFehlgeschlagenemGitKlon()
+    {
+        _cliRunnerMock
+            .Setup(r => r.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.Contains("clone")),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, "fatal: Klon fehlgeschlagen"));
+
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
     }
 }

@@ -25,11 +25,11 @@ Dies erstellt folgende neue Tabellen:
 - `UnteragentSpezifikationen`
 - `SkillDefinitionen`
 
-Und fügt folgende Spalten zur Tabelle `Aufgaben` hinzu:
-- `ProjektleiterAgentId` (string, nullable)
-- `SessionPauseUtc` (datetime2, nullable)
-- `AktiveUnteragenten` (int, nullable)
-- `AutonomKonfigurationId` (uniqueidentifier, FK)
+Und fügt folgende Spalten hinzu:
+- `Aufgaben.AutonomKonfigurationId` (uniqueidentifier, FK)
+- `AutonomAufgabeKonfigurationen.ProjektleiterAgentId` (string, nullable)
+- `AutonomAufgabeKonfigurationen.SessionPauseUtc` (datetime2, nullable)
+- `AutonomAufgabeKonfigurationen.AktiveUnteragenten` (int, nullable)
 
 ### 2. Anwendung neu starten
 
@@ -172,9 +172,9 @@ Die Datenbank-Tabellen können manuell gelöscht werden (optional):
 ```sql
 DROP TABLE UnteragentSpezifikationen;
 DROP TABLE SkillDefinitionen;
-DROP TABLE AutonomAufgabeKonfigurationen;
+DROP TABLE AutonomAufgabeKonfigurationen; -- enthält u.a. ProjektleiterAgentId, SessionPauseUtc, AktiveUnteragenten
 
-ALTER TABLE Aufgaben DROP COLUMN ProjektleiterAgentId, SessionPauseUtc, AktiveUnteragenten, AutonomKonfigurationId;
+ALTER TABLE Aufgaben DROP COLUMN AutonomKonfigurationId;
 ```
 
 Dies ist aber nicht erforderlich, um die Funktion zu deaktivieren.

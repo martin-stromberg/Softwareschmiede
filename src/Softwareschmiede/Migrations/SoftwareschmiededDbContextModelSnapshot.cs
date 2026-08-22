@@ -120,9 +120,6 @@ namespace Softwareschmiede.Migrations
                     b.Property<string>("AktiveRunId")
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("AktiveUnteragenten")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("AnforderungsBeschreibung")
                         .HasColumnType("TEXT");
 
@@ -159,17 +156,11 @@ namespace Softwareschmiede.Migrations
                     b.Property<Guid>("ProjektId")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ProjektleiterAgentId")
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("RecoveryVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(0);
-
-                    b.Property<long?>("SessionPauseUtc")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -200,8 +191,12 @@ namespace Softwareschmiede.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("AktiveUnteragenten")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ArbeitsverzeichnisPfad")
                         .IsRequired()
+                        .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("AufgabeId")
@@ -216,6 +211,7 @@ namespace Softwareschmiede.Migrations
 
                     b.Property<string>("PermissionsJsonPfad")
                         .IsRequired()
+                        .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PersistenzModus")
@@ -224,7 +220,14 @@ namespace Softwareschmiede.Migrations
 
                     b.Property<string>("ProjektBranchName")
                         .IsRequired()
+                        .HasMaxLength(255)
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("ProjektleiterAgentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("SessionPauseUtc")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("SkillAutogeneration")
                         .HasColumnType("INTEGER");
@@ -943,26 +946,28 @@ namespace Softwareschmiede.Migrations
                     b.Property<Guid>("AutonomAufgabeId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("ErstellungsDatum")
                         .HasColumnType("INTEGER");
 
                     b.Property<long?>("FreigabeDatum")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("SkillContent")
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("SkillName")
+                    b.Property<string>("Version")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SkillStatus")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SkillVersion")
-                        .IsRequired()
+                        .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -1037,35 +1042,35 @@ namespace Softwareschmiede.Migrations
                     b.Property<long?>("AbschlussDatum")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("AgentBranch")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AgentClone")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AgentDirectory")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AgentId")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AgentPrompt")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("AgentScope")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
                     b.Property<Guid>("AutonomAufgabeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Branch")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClonePfad")
+                        .IsRequired()
+                        .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
                     b.Property<long>("ErzeugungsDatum")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ExterneAgentId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1073,6 +1078,12 @@ namespace Softwareschmiede.Migrations
 
                     b.Property<string>("TaskId")
                         .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("VerzeichnisPfad")
+                        .IsRequired()
+                        .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -1249,7 +1260,7 @@ namespace Softwareschmiede.Migrations
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.SkillDefinition", b =>
                 {
                     b.HasOne("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", "AutonomAufgabe")
-                        .WithMany()
+                        .WithMany("Skills")
                         .HasForeignKey("AutonomAufgabeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1282,7 +1293,7 @@ namespace Softwareschmiede.Migrations
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.UnteragentSpezifikation", b =>
                 {
                     b.HasOne("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", "AutonomAufgabe")
-                        .WithMany()
+                        .WithMany("Unteragenten")
                         .HasForeignKey("AutonomAufgabeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1305,6 +1316,13 @@ namespace Softwareschmiede.Migrations
                     b.Navigation("PullRequests");
 
                     b.Navigation("Todos");
+                });
+
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.AutonomAufgabeKonfiguration", b =>
+                {
+                    b.Navigation("Skills");
+
+                    b.Navigation("Unteragenten");
                 });
 
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.DiffBlock", b =>

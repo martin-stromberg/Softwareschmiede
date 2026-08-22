@@ -173,11 +173,10 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _pluginManagerMockFuerPluginSelection.Setup(p => p.GetIdePlugins()).Returns([visualStudioPlugin, visualStudioCodePlugin]);
         _pluginManagerMockFuerPluginSelection.Setup(p => p.GetDefaultIdePlugin()).Returns(visualStudioPlugin);
 
-        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+        var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
             serviceProviderObj,
             _dialogServiceMock.Object,
-            _aufgabeService,
-            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
+            _aufgabeService);
 
         var vm = new TaskDetailViewModel(
             _aufgabeService,
@@ -196,7 +195,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartCoordinator);
+            autonomAufgabeStartService);
         vm.ZurueckAction = zurueckAction;
         return vm;
     }
@@ -211,6 +210,22 @@ public sealed class TaskDetailViewModelTests : IDisposable
                 await _aufgabeService.AusfuehrungAktivSetzenAsync(aufgabe.Id);
         }
         return await _aufgabeService.GetByIdAsync(aufgabe.Id) ?? aufgabe;
+    }
+
+    /// <summary>Macht eine bestehende Aufgabe zu einer Autonomen Aufgabe, indem eine AutonomAufgabeKonfiguration persistiert wird (Modus-Indikator, siehe Aufgabe.IstAutonom()).</summary>
+    /// <param name="aufgabeId">Die Id der zu autonomisierenden Aufgabe.</param>
+    private async Task MacheAufgabeAutonomAsync(Guid aufgabeId)
+    {
+        _db.AutonomAufgabeKonfigurationen.Add(new AutonomAufgabeKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabeId,
+            ProjektBranchName = "feature/autonom",
+            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
+            PermissionsJsonPfad = @"C:\arbeitsverzeichnis\permissions.json",
+            ArbeitsverzeichnisPfad = @"C:\arbeitsverzeichnis"
+        });
+        await _db.SaveChangesAsync();
     }
 
     // --- AufgabeBranchName ---
@@ -407,6 +422,22 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ShowDiffPanel.Should().BeTrue();
         sut.ShowEditPanel.Should().BeFalse();
         sut.ShowCliPanel.Should().BeFalse();
+    }
+
+    /// <summary>ShowCliPanel, KannCliNeuStarten und StartenCommand.CanExecute bleiben für Autonome Aufgaben durchgängig false/deaktiviert, auch wenn AusfuehrungsStatus == Aktiv ist (Projektleiter-Agent läuft) — die reguläre CLI-Ansicht/der Start-Button gehören zur regulären Ausführung, nicht zur Autonomen Aufgabe.</summary>
+    [Fact]
+    public async Task ShowCliPanel_ShouldBeFalse_WhenAufgabeIstAutonomAndAusfuehrungsStatusIstAktiv()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await MacheAufgabeAutonomAsync(aufgabe.Id);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.Aufgabe!.IstAutonom().Should().BeTrue("Vorbedingung: AutonomAufgabeKonfiguration muss ueber GetDetailAsync mitgeladen werden");
+        sut.ShowCliPanel.Should().BeFalse();
+        sut.KannCliNeuStarten.Should().BeFalse();
+        sut.StartenCommand.CanExecute(null).Should().BeFalse();
     }
 
     // --- ShowFileExplorerPanel, DateiViewCommand ---

@@ -78,11 +78,10 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
         var serviceProviderMock = new Mock<IServiceProvider>();
-        var autonomAufgabeStartCoordinator = new AutonomAufgabeStartCoordinator(
+        var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
             serviceProviderMock.Object,
             _dialogServiceMock.Object,
-            _aufgabeService,
-            NullLogger<AutonomAufgabeStartCoordinator>.Instance);
+            _aufgabeService);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -101,7 +100,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartCoordinator);
+            autonomAufgabeStartService);
     }
 
     private async Task<Aufgabe> ErstelleAufgabe()
