@@ -437,7 +437,7 @@ public sealed class GitOrchestrationServiceTests : IDisposable
 
         var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
         workspaceBrowserMock
-            .Setup(browser => browser.LoadSnapshotAsync(@"C:\repos\task-commit-body", It.IsAny<CancellationToken>()))
+            .Setup(browser => browser.LoadSnapshotAsync(@"C:\repos\task-commit-body", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceSnapshot
             {
                 RepositoryPath = @"C:\repos\task-commit-body",
