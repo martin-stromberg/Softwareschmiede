@@ -298,14 +298,16 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     }
 
     /// <inheritdoc/>
-    public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+    /// <remarks>Der <paramref name="branchName"/>-Parameter wird ignoriert, da lokale Verzeichnisse kein Branch-Konzept kennen.</remarks>
+    public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default, string? branchName = null)
     {
-        var result = await GetRepositoryStructureLoadResultAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+        var result = await GetRepositoryStructureLoadResultAsync(repositoryUrl, maxDepth, ct, branchName).ConfigureAwait(false);
         return result.Status == RepositoryStructureLoadStatus.Success ? result.Entries : [];
     }
 
     /// <inheritdoc/>
-    public override async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+    /// <remarks>Der <paramref name="branchName"/>-Parameter wird ignoriert, da lokale Verzeichnisse kein Branch-Konzept kennen.</remarks>
+    public override async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default, string? branchName = null)
     {
         ct.ThrowIfCancellationRequested();
 

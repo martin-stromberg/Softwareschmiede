@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -245,11 +246,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Liste ausführbarer Dateien aus dem Remote-Repository für die Initialisierungsskript-Auswahl.</summary>
     public ObservableCollection<string> InitialisierungsskriptSuggestionen { get; } = new();
 
+    /// <summary>Gefilterte Sicht auf <see cref="InitialisierungsskriptSuggestionen"/>, eingeengt anhand des in <see cref="SelectedInitialisierungsskript"/> eingegebenen Texts.</summary>
+    public CollectionView InitialisierungsskriptSuggestionenView { get; }
+
     /// <summary>Vom Benutzer ausgewähltes oder manuell eingegebenes Initialisierungsskript.</summary>
     public string? SelectedInitialisierungsskript
     {
         get => _selectedInitialisierungsskript;
-        set => SetProperty(ref _selectedInitialisierungsskript, value);
+        set => SetProperty(ref _selectedInitialisierungsskript, value, () => InitialisierungsskriptSuggestionenView.Refresh());
     }
 
     /// <summary>Gibt an, ob das Initialisierungsskript des ausgewählten Repositories gerade bearbeitet wird.</summary>
@@ -337,6 +341,9 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         _pluginManager = pluginManager;
         _logger = logger;
         _directoryStructureService = directoryStructureService;
+
+        InitialisierungsskriptSuggestionenView = (CollectionView)CollectionViewSource.GetDefaultView(InitialisierungsskriptSuggestionen);
+        InitialisierungsskriptSuggestionenView.Filter = FilterInitialisierungsskriptSuggestion;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
         AufgabeErstellenCommand = new AsyncRelayCommand(
@@ -721,7 +728,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var result = await _directoryStructureService.GetFileLoadResultAsync(gitPlugin, repository.RepositoryUrl, ct);
+        var result = await _directoryStructureService.GetFileLoadResultAsync(gitPlugin, repository.RepositoryUrl, ct, repository.DefaultSourceBranchName);
         ct.ThrowIfCancellationRequested();
 
         if (result.Status != RepositoryStructureLoadStatus.Success)
@@ -780,6 +787,14 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     {
         var extension = Path.GetExtension(path);
         return extension is ".ps1" or ".cmd" or ".bat" or ".sh" or ".exe";
+    }
+
+    private bool FilterInitialisierungsskriptSuggestion(object item)
+    {
+        if (string.IsNullOrWhiteSpace(SelectedInitialisierungsskript))
+            return true;
+
+        return item is string path && path.Contains(SelectedInitialisierungsskript, StringComparison.OrdinalIgnoreCase);
     }
 
     private void OeffneAufgabe(Guid id)

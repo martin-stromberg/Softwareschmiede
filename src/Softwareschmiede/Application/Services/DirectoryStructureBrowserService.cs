@@ -41,24 +41,27 @@ public sealed class DirectoryStructureBrowserService
     /// <param name="gitPlugin">Das zu verwendende Git-Plugin.</param>
     /// <param name="repositoryUrl">URL des Repositories.</param>
     /// <param name="ct">Cancellation Token.</param>
+    /// <param name="branchName">Optionaler Branch, aus dem die Verzeichnisstruktur geladen werden soll. Wenn <c>null</c>, wird der Remote-Standard-Branch verwendet.</param>
     /// <returns>Erfolgreich geladene, sortierte Verzeichnisse oder einen Fehler-/Nicht-unterstützt-Status.</returns>
-    public Task<RepositoryStructureLoadResult> GetDirectoryLoadResultAsync(IGitPlugin gitPlugin, string repositoryUrl, CancellationToken ct = default)
-        => GetLoadResultAsync(gitPlugin, repositoryUrl, "dirs", entry => entry.IsDirectory, ct);
+    public Task<RepositoryStructureLoadResult> GetDirectoryLoadResultAsync(IGitPlugin gitPlugin, string repositoryUrl, CancellationToken ct = default, string? branchName = null)
+        => GetLoadResultAsync(gitPlugin, repositoryUrl, "dirs", entry => entry.IsDirectory, ct, branchName);
 
     /// <summary>Ruft die Dateien eines externen Repositories mit explizitem Lade-Status ab (z. B. für die Auswahl von Skriptdateien).</summary>
     /// <param name="gitPlugin">Das zu verwendende Git-Plugin.</param>
     /// <param name="repositoryUrl">URL des Repositories.</param>
     /// <param name="ct">Cancellation Token.</param>
+    /// <param name="branchName">Optionaler Branch, aus dem die Dateien geladen werden sollen. Wenn <c>null</c>, wird der Remote-Standard-Branch verwendet.</param>
     /// <returns>Erfolgreich geladene, sortierte Dateien oder einen Fehler-/Nicht-unterstützt-Status.</returns>
-    public Task<RepositoryStructureLoadResult> GetFileLoadResultAsync(IGitPlugin gitPlugin, string repositoryUrl, CancellationToken ct = default)
-        => GetLoadResultAsync(gitPlugin, repositoryUrl, "files", entry => !entry.IsDirectory, ct);
+    public Task<RepositoryStructureLoadResult> GetFileLoadResultAsync(IGitPlugin gitPlugin, string repositoryUrl, CancellationToken ct = default, string? branchName = null)
+        => GetLoadResultAsync(gitPlugin, repositoryUrl, "files", entry => !entry.IsDirectory, ct, branchName);
 
     private async Task<RepositoryStructureLoadResult> GetLoadResultAsync(
         IGitPlugin gitPlugin,
         string repositoryUrl,
         string cacheKeyPrefix,
         Func<RepositoryDirectoryEntry, bool> entryFilter,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? branchName = null)
     {
         if (!_options.Enabled)
         {
@@ -66,7 +69,7 @@ public sealed class DirectoryStructureBrowserService
         }
 
         var pluginPrefix = string.IsNullOrWhiteSpace(gitPlugin.PluginPrefix) ? gitPlugin.GetType().FullName : gitPlugin.PluginPrefix;
-        var cacheKey = $"{cacheKeyPrefix}:{pluginPrefix}:{_options.MaxDepth}:{repositoryUrl}";
+        var cacheKey = $"{cacheKeyPrefix}:{pluginPrefix}:{_options.MaxDepth}:{branchName ?? string.Empty}:{repositoryUrl}";
         if (_cache.TryGetValue(cacheKey, out RepositoryStructureLoadResult? cached) && cached is not null)
         {
             return cached;
@@ -74,7 +77,7 @@ public sealed class DirectoryStructureBrowserService
 
         try
         {
-            var loadResult = await gitPlugin.GetRepositoryStructureLoadResultAsync(repositoryUrl, _options.MaxDepth, ct).ConfigureAwait(false);
+            var loadResult = await gitPlugin.GetRepositoryStructureLoadResultAsync(repositoryUrl, _options.MaxDepth, ct, branchName).ConfigureAwait(false);
             if (loadResult.Status != RepositoryStructureLoadStatus.Success)
             {
                 _logger.LogWarning(

@@ -195,4 +195,40 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
             p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2));
     }
+
+    /// <summary>GetFileLoadResultAsync reicht einen übergebenen Branch-Namen an das Git-Plugin durch.</summary>
+    [Fact]
+    public async Task GetFileLoadResultAsync_ShouldPassBranchNameToPlugin()
+    {
+        var pluginMock = CreatePluginMock([new RepositoryDirectoryEntry("init.sh", IsDirectory: false)]);
+        var sut = CreateSut();
+
+        await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: default, branchName: "develop");
+
+        pluginMock.Verify(
+            p => p.GetRepositoryStructureLoadResultAsync("https://example.com/repo.git", It.IsAny<int>(), It.IsAny<CancellationToken>(), "develop"),
+            Times.Once);
+    }
+
+    /// <summary>Abrufe mit unterschiedlichem Branch-Namen verwenden unabhängige Cache-Einträge und rufen das Plugin jeweils erneut auf.</summary>
+    [Fact]
+    public async Task GetFileLoadResultAsync_ShouldUseBranchNameInCacheKey()
+    {
+        var pluginMock = new Mock<IGitPlugin>();
+        pluginMock.Setup(p => p.PluginPrefix).Returns("Test");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), "main"))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([new RepositoryDirectoryEntry("main.sh", IsDirectory: false)]));
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), "develop"))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([new RepositoryDirectoryEntry("develop.sh", IsDirectory: false)]));
+        var sut = CreateSut();
+
+        var main = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: default, branchName: "main");
+        var develop = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git", ct: default, branchName: "develop");
+
+        main.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["main.sh"]);
+        develop.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["develop.sh"]);
+        pluginMock.Verify(
+            p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<string>()),
+            Times.Exactly(2));
+    }
 }

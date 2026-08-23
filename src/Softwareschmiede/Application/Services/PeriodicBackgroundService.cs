@@ -42,7 +42,14 @@ public abstract class PeriodicBackgroundService : BackgroundService
                 _logger.LogError(ex, _fehlerMeldung);
             }
 
-            await Task.Delay(_pollingInterval, _timeProvider, stoppingToken);
+            try
+            {
+                await Task.Delay(_pollingInterval, _timeProvider, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
         }
     }
 

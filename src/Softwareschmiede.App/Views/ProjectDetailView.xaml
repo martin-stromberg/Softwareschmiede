@@ -285,7 +285,7 @@
 
                         <!-- Bearbeitungs-Modus -->
                         <StackPanel Visibility="{Binding IsEditingInitialisierungsskript, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <ComboBox ItemsSource="{Binding InitialisierungsskriptSuggestionen}"
+                            <ComboBox ItemsSource="{Binding InitialisierungsskriptSuggestionenView}"
                                       Text="{Binding SelectedInitialisierungsskript, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                       IsEditable="True"
                                       AutomationProperties.Name="InitialisierungsskriptAuswahlComboBox"

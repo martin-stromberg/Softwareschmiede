@@ -1325,9 +1325,10 @@ password {token}
     public override async Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
         string repositoryUrl,
         int maxDepth = 2,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? branchName = null)
     {
-        var result = await GetRepositoryStructureLoadResultAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+        var result = await GetRepositoryStructureLoadResultAsync(repositoryUrl, maxDepth, ct, branchName).ConfigureAwait(false);
         return result.Status == RepositoryStructureLoadStatus.Success ? result.Entries : [];
     }
 
@@ -1335,7 +1336,8 @@ password {token}
     public override async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(
         string repositoryUrl,
         int maxDepth = 2,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? branchName = null)
     {
         var repositoryId = TryExtractRepositoryId(repositoryUrl);
         if (repositoryId is null)
@@ -1346,7 +1348,7 @@ password {token}
             return RepositoryStructureLoadResult.Failed("Repository-ID konnte nicht aus der URL ermittelt werden.");
         }
 
-        var branch = await GetDefaultBranchAsync(repositoryUrl, ct);
+        var branch = string.IsNullOrWhiteSpace(branchName) ? await GetDefaultBranchAsync(repositoryUrl, ct) : branchName;
 
         var result = await _cliRunner.RunAsync(
             "gh",

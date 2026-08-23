@@ -17,10 +17,13 @@ Wenn Sie ein Git-Repository zu einem Projekt zuweisen oder die Projektdetailansi
 1. **Projekt öffnen** → Projektdetailansicht
 2. **Repository auswählen** aus der Liste
 3. **Button „Initialisierungsskript laden"** klicken neben dem Repository
-4. Die Anwendung lädt eine Liste ausführbarer Dateien aus dem Remote-Repository (z. B. `.ps1`, `.bat`, `.cmd`, `.sh`, `.exe`)
-5. **Skript auswählen** aus der Dropdown-Liste oder **manuell eingeben**:
-   - **Aus Liste auswählen:** Der Eintrag wird übernommen.
-   - **Manuell eingeben:** Sie können jeden relativen Pfad eingeben, auch wenn er nicht in der Vorschlagsliste sichtbar ist.
+4. Die Anwendung lädt eine Liste ausführbarer Dateien aus dem Remote-Repository (z. B. `.ps1`, `.bat`, `.cmd`, `.sh`, `.exe`):
+   - Wenn ein **Basis-Branch** für das Repository konfiguriert ist, werden die Dateien aus diesem Branch geladen
+   - Andernfalls wird der Remote-Standard-Branch verwendet (z. B. `main` oder `master`)
+5. **Skript auswählen oder eingeben** — die Vorschlagsliste wird live gefiltert beim Tippen:
+   - **Suchfeld verwenden:** Tippen Sie einen Teil des Dateinamens ein — die Liste wird live gefiltert und zeigt nur noch Dateien, deren Pfad den eingegebenen Text enthält (Case-insensitive)
+   - **Aus gefilterte Liste auswählen:** Der Eintrag wird übernommen
+   - **Manuell eingeben:** Sie können jeden relativen Pfad eingeben, auch wenn er nicht in der Vorschlagsliste sichtbar ist (z. B. um Dateien in Branches zu referenzieren, die nicht gepullt wurden)
 6. **Button „Speichern"** klicken, um die Konfiguration zu persistieren.
 
 Die Konfiguration wird in der Datenbank gespeichert und ist persistent — auch nach einem Neustart der Anwendung.
@@ -31,7 +34,7 @@ Wenn Sie eine Aufgabe für das Repository starten (über `EntwicklungsprozessSer
 
 1. **Repository wird geklont** an den lokalen Pfad
 2. **Feature-Branch wird erstellt** (vom konfigurierten Basis-Branch, oder vom Standard-Branch, wenn nicht konfiguriert)
-3. **Initialisierungsskript wird ausgeführt** (falls konfiguriert):
+3. **Initialisierungsskript wird ausgeführt** (falls konfiguriert) — das Skript wird aus dem lokalen Klon (der auf dem Basis-Branch basiert, falls konfiguriert) ausgeführt:
    - Konfiguration wird auf Aktiv-Status geprüft
    - Skriptpfad wird aufgelöst (relativ zum Repository-Root)
    - Pfad wird validiert (muss innerhalb des Repository-Roots liegen — kein Directory-Escape)

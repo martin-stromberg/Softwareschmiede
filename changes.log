@@ -1,3 +1,11 @@
+## 2026-08-23 — Initialisierungsskript für geklonte Repositories: Verbesserungen
+
+- Verbesserung: Die Auswahl-ComboBox für das Initialisierungsskript in der Projektdetailansicht filtert die Vorschlagsliste jetzt live beim Tippen (echtes Suchfeld-Verhalten mit `CollectionView.Filter`), statt eine ungefilterte Liste anzuzeigen — Anwender können schneller die gewünschte Datei finden.
+- Verbesserung: Die Vorschlagsliste ausführbarer Dateien wird jetzt aus dem konfigurierten Basis-Branch des Repositorys (`GitRepository.DefaultSourceBranchName`) geladen, falls dieser gesetzt ist — nicht mehr zwingend aus dem Remote-Standard-Branch. Ist kein Basis-Branch konfiguriert, wird weiterhin der Remote-Standard-Branch verwendet. Dies ermöglicht, dass die Initialisierungsskripte aus dem genutzten Entwicklungs-Branch stammen, nicht aus dem Haupt-Branch.
+- API-Erweiterung `IGitPlugin`: Optionaler Parameter `branchName` bei `GetRepositoryStructureAsync()` und `GetRepositoryStructureLoadResultAsync()` ermöglicht es, die Verzeichnisstruktur aus einem beliebigen Remote-Branch abzurufen, nicht nur vom Standard-Branch. Plugin-Implementierungen müssen diesen Parameter optional unterstützen; Fallback auf Standard-Branch bei Nicht-Unterstützung ist zulässig.
+- Service-Erweiterung `DirectoryStructureBrowserService`: Neue Parameter `branchName` bei `GetFileLoadResultAsync()` und `GetDirectoryLoadResultAsync()` ermöglichen Branch-spezifisches Laden; Cache-Keys berücksichtigen jetzt auch den Branch-Namen, um korrekte Trennung je Branch zu sichern.
+- UI-Erweiterung `ProjectDetailViewModel`: `LoadInitialisierungsskriptSuggestionenAsync()` übergibt `repository.DefaultSourceBranchName` an `GetFileLoadResultAsync()`, sodass die Vorschlagsliste vom konfigurierten Basis-Branch stammt.
+
 ## 2026-08-23 — Initialisierungsskript für geklonte Repositories
 
 - Feature: Pro Projekt kann ein optionales Repository-Initialisierungsskript konfiguriert werden, das automatisch nach dem Klonen eines Repositorys für eine Aufgabe ausgeführt wird (z. B. zur Einrichtung von Git-Hooks, Build-Schritten oder projektspezifischer Konfiguration).

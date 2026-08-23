@@ -106,6 +106,56 @@ public sealed class ProjectDetailViewModelTests_Initialisierungsskript : IDispos
         sut.InitialisierungsskriptLoadingFailed.Should().BeFalse();
     }
 
+    /// <summary>Ist am Repository ein Basis-Branch konfiguriert, wird dieser (statt des Remote-Standard-Branches) beim Laden der Vorschläge verwendet.</summary>
+    [Fact]
+    public async Task LoadInitialisierungsskriptSuggestionenAsync_ShouldUseConfiguredBasisBranch()
+    {
+        var (projekt, repository) = await ErstelleProjektMitRepositoryAsync();
+        await _projektService.UpdateRepositorySourceBranchAsync(repository.Id, "develop", CancellationToken.None);
+        var pluginMock = CreatePluginMock("Softwareschmiede.GitHub");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), "develop"))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success([new RepositoryDirectoryEntry("init.sh", IsDirectory: false)]));
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
+
+        pluginMock.Verify(
+            p => p.GetRepositoryStructureLoadResultAsync(repository.RepositoryUrl!, It.IsAny<int>(), It.IsAny<CancellationToken>(), "develop"),
+            Times.Once);
+        sut.InitialisierungsskriptSuggestionen.Should().Contain("init.sh");
+    }
+
+    /// <summary>Die gefilterte Sicht auf die Vorschlagsliste engt sich beim Eingeben von Text auf passende Einträge ein (Live-Filter/Suchfeld-Verhalten).</summary>
+    [Fact]
+    public async Task InitialisierungsskriptSuggestionenView_ShouldFilter_WhenSelectedTextChanges()
+    {
+        var (projekt, _) = await ErstelleProjektMitRepositoryAsync();
+        var pluginMock = CreatePluginMock("Softwareschmiede.GitHub");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RepositoryStructureLoadResult.Success(
+            [
+                new RepositoryDirectoryEntry("scripts/init.ps1", IsDirectory: false),
+                new RepositoryDirectoryEntry("scripts/setup.sh", IsDirectory: false),
+                new RepositoryDirectoryEntry("tools/build.cmd", IsDirectory: false)
+            ]));
+        _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
+
+        var sut = CreateSut();
+        sut.ProjektId = projekt.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadInitialisierungsskriptSuggestionenCommand).ExecuteAsync();
+
+        sut.InitialisierungsskriptSuggestionenView.Cast<string>().Should().HaveCount(3);
+
+        sut.SelectedInitialisierungsskript = "scripts/";
+
+        sut.InitialisierungsskriptSuggestionenView.Cast<string>().Should().BeEquivalentTo(["scripts/init.ps1", "scripts/setup.sh"]);
+    }
+
     /// <summary>Schlägt der Remote-Zugriff fehl, bleibt die UI responsiv und der Fehler wird über ein Flag signalisiert.</summary>
     [Fact]
     public async Task LoadInitialisierungsskriptSuggestionenAsync_ShouldHandleNetworkError_Gracefully()
