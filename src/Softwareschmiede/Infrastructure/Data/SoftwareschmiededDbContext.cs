@@ -30,6 +30,9 @@ public sealed class SoftwareschmiededDbContext : DbContext
     /// <summary>Repository-Startkonfigurationen.</summary>
     public DbSet<RepositoryStartKonfiguration> RepositoryStartKonfigurationen => Set<RepositoryStartKonfiguration>();
 
+    /// <summary>Repository-Initialisierungskonfigurationen.</summary>
+    public DbSet<RepositoryInitialisierungKonfiguration> RepositoryInitialisierungKonfigurationen => Set<RepositoryInitialisierungKonfiguration>();
+
     /// <summary>Aufgaben.</summary>
     public DbSet<Aufgabe> Aufgaben => Set<Aufgabe>();
 
@@ -125,6 +128,10 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .WithOne(c => c.GitRepository)
                 .HasForeignKey<RepositoryStartKonfiguration>(c => c.GitRepositoryId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(r => r.InitialisierungKonfiguration)
+                .WithOne(c => c.GitRepository)
+                .HasForeignKey<RepositoryInitialisierungKonfiguration>(c => c.GitRepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // RepositoryStartKonfiguration
@@ -136,6 +143,16 @@ public sealed class SoftwareschmiededDbContext : DbContext
                 .HasMaxLength(512);
             e.Property(c => c.WorkingDirectoryRelativePath)
                 .IsRequired(false)
+                .HasMaxLength(512);
+            e.HasIndex(c => c.GitRepositoryId).IsUnique();
+        });
+
+        // RepositoryInitialisierungKonfiguration
+        modelBuilder.Entity<RepositoryInitialisierungKonfiguration>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.Property(c => c.InitialisierungsskriptRelativePath)
+                .IsRequired()
                 .HasMaxLength(512);
             e.HasIndex(c => c.GitRepositoryId).IsUnique();
         });

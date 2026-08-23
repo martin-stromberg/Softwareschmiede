@@ -1,3 +1,18 @@
+## 2026-08-23 — Initialisierungsskript für geklonte Repositories
+
+- Feature: Pro Projekt kann ein optionales Repository-Initialisierungsskript konfiguriert werden, das automatisch nach dem Klonen eines Repositorys für eine Aufgabe ausgeführt wird (z. B. zur Einrichtung von Git-Hooks, Build-Schritten oder projektspezifischer Konfiguration).
+- Neue Entity `RepositoryInitialisierungKonfiguration` speichert den relativen Pfad zum Skript pro Repository persistent mit optionalem Aktiv-Status.
+- Neuer Service `RepositoryInitialisierungService` führt das konfigurierte Skript mittels PowerShell aus, validiert den Pfad gegen Directory-Escape-Versuche und loggt Fehler als Warnung (blockiert die Aufgabe nicht).
+- Neue Utility-Klasse `RepositoryScriptExecutor` kapselt gemeinsame Ausführungslogik für Repository-Skripte (genutzt von `RepositoryStartskriptService` und dem neuen `RepositoryInitialisierungService`).
+- Integration in `EntwicklungsprozessService.FinalizeStartAsync()`: Initialisierungsskript wird nach erfolgreichem Klon und Branch-Setup, vor dem Startskript ausgeführt (Reihenfolge: Initialisierung → Startup).
+- UI-Erweiterung `ProjectDetailViewModel`: Neue Properties `InitialisierungsskriptSuggestionen`, `SelectedInitialisierungsskript`, `IsEditingInitialisierungsskript`, `InitialisierungsskriptLoadingFailed` mit Methoden `LoadInitialisierungsskriptSuggestionenAsync()`, `SaveInitialisierungsskriptAsync()`, `CancelInitialisierungsskriptEdit()`.
+- UI-Integration `ProjectDetailView.xaml`: Neue Ribbon-Buttons und Steuerelemente im Repository-Konfigurationsbereich (Label, AutoComplete-Feld mit Vorschlagsliste aus Remote-Repository, Buttons zum Laden/Speichern/Abbrechen).
+- Service-Erweiterung `ProjektService`: Neue Methode `SaveRepositoryInitialisierungskriptAsync()` zum Persistieren der Konfiguration; Speicherung von `null` löscht die Konfiguration.
+- Datenbankmigrationen: Neue Tabelle `RepositoryInitialisierungKonfigurationen` mit Spalten `Id` (PK), `GitRepositoryId` (FK), `InitialisierungsskriptRelativePath`, `Aktiv`; Foreign Key mit Cascade Delete zu `GitRepositories`.
+- Fehlertoleranz: Skript-Fehler werden geloggt, blockieren die Aufgabe aber nicht — diese Eigenschaft unterscheidet die Initialisierung vom Startskript (optional vs. kritisch).
+- Tests: Unit-Tests für `RepositoryInitialisierungService` (Erfolg, Fehlerbehandlung, Path-Traversal-Sicherheit, Deaktivierung); Integrations-Tests für `EntwicklungsprozessService` (Ausführungsreihenfolge, Fehlertoleranz); ViewModel-Tests für Suggestions und Speichern; E2E-Tests für Happy Path und Fehlertoleranz.
+- Dokumentation: Neue Datei `docs/help/projekte/initialisierungsskript-konfiguration.md` beschreibt Feature, Funktionsweise, Konfiguration und Fehlerbehandlung.
+
 ## 2026-08-21 — Autonome Aufgaben: Erweiterungen im Initialisierungsdialog
 
 - Projektbranch im Initialisierungsdialog (`AutonomAufgabeInitialisierungsDialog`) ist jetzt als Auswahlliste der Remote-Branches des zugeordneten Git-Repositories nutzbar (`AutonomAufgabeInitialisierungsDialogViewModel.LadeProjektBranchesAsync`, `IGitPlugin.GetRemoteBranchesAsync`); ohne Repository/Plugin fällt das Feld automatisch auf freie Texteingabe zurück.

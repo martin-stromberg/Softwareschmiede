@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private readonly IDialogService _dialogService;
     private readonly IPluginManager _pluginManager;
     private readonly ILogger<ProjectDetailViewModel> _logger;
+    private readonly DirectoryStructureBrowserService? _directoryStructureService;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur Listenansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -57,6 +59,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     private string? _sourceBranchNameBeforeEdit;
     private bool _isLoadingSourceBranchesForEdit;
     private bool _isEditingSourceBranchManualInput;
+    private string? _selectedInitialisierungsskript;
+    private bool _isEditingInitialisierungsskript;
+    private bool? _initialisierungsskriptLoadingFailed;
+    private string? _initialisierungsskriptBeforeEdit;
 
     /// <summary>Die Projekt-ID, deren Details angezeigt werden.</summary>
     public Guid ProjektId
@@ -136,6 +142,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 IsEditingSourceBranchManualInput = false;
                 SourceBranchInputError = null;
                 SelectedRepositorySourceBranchName = value?.DefaultSourceBranchName;
+                IsEditingInitialisierungsskript = false;
+                InitialisierungsskriptSuggestionen.Clear();
+                InitialisierungsskriptLoadingFailed = null;
+                SelectedInitialisierungsskript = value?.InitialisierungKonfiguration?.InitialisierungsskriptRelativePath;
             }
         }
     }
@@ -232,6 +242,30 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _isEditingSourceBranchManualInput, value);
     }
 
+    /// <summary>Liste ausführbarer Dateien aus dem Remote-Repository für die Initialisierungsskript-Auswahl.</summary>
+    public ObservableCollection<string> InitialisierungsskriptSuggestionen { get; } = new();
+
+    /// <summary>Vom Benutzer ausgewähltes oder manuell eingegebenes Initialisierungsskript.</summary>
+    public string? SelectedInitialisierungsskript
+    {
+        get => _selectedInitialisierungsskript;
+        set => SetProperty(ref _selectedInitialisierungsskript, value);
+    }
+
+    /// <summary>Gibt an, ob das Initialisierungsskript des ausgewählten Repositories gerade bearbeitet wird.</summary>
+    public bool IsEditingInitialisierungsskript
+    {
+        get => _isEditingInitialisierungsskript;
+        private set => SetProperty(ref _isEditingInitialisierungsskript, value);
+    }
+
+    /// <summary>Gibt an, ob das Laden der Initialisierungsskript-Vorschläge fehlgeschlagen ist. <c>null</c> bedeutet: noch nicht geladen.</summary>
+    public bool? InitialisierungsskriptLoadingFailed
+    {
+        get => _initialisierungsskriptLoadingFailed;
+        private set => SetProperty(ref _initialisierungsskriptLoadingFailed, value);
+    }
+
     /// <summary>Erstellt eine Aufgabe aus einer offenen SCM-Anforderung.</summary>
     public AsyncRelayCommand<ScmRequirement> AufgabeAusAnforderungErstellenCommand { get; }
 
@@ -277,6 +311,15 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Bricht die Bearbeitung des Basis-Branches ab und verwirft Änderungen.</summary>
     public ICommand CancelSourceBranchEditCommand { get; }
 
+    /// <summary>Lädt die Initialisierungsskript-Vorschläge des ausgewählten Repositories und öffnet den Bearbeitungsmodus.</summary>
+    public ICommand LoadInitialisierungsskriptSuggestionenCommand { get; }
+
+    /// <summary>Speichert das ausgewählte Initialisierungsskript des ausgewählten Repositories.</summary>
+    public ICommand SaveInitialisierungsskriptCommand { get; }
+
+    /// <summary>Bricht die Bearbeitung des Initialisierungsskripts ab und verwirft Änderungen.</summary>
+    public ICommand CancelInitialisierungsskriptEditCommand { get; }
+
     /// <inheritdoc cref="ProjectDetailViewModel"/>
     public ProjectDetailViewModel(
         ProjektService projektService,
@@ -284,7 +327,8 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         IServiceProvider serviceProvider,
         IDialogService dialogService,
         IPluginManager pluginManager,
-        ILogger<ProjectDetailViewModel> logger)
+        ILogger<ProjectDetailViewModel> logger,
+        DirectoryStructureBrowserService? directoryStructureService = null)
     {
         _projektService = projektService;
         _aufgabeService = aufgabeService;
@@ -292,6 +336,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         _dialogService = dialogService;
         _pluginManager = pluginManager;
         _logger = logger;
+        _directoryStructureService = directoryStructureService;
 
         LadenCommand = new AsyncRelayCommand(LadenAsync);
         AufgabeErstellenCommand = new AsyncRelayCommand(
@@ -308,6 +353,11 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         EditSourceBranchCommand = new AsyncRelayCommand(EditSourceBranchAsync, () => _selectedRepository != null);
         SaveSourceBranchCommand = new AsyncRelayCommand(SaveSourceBranchAsync, () => _isEditingSourceBranch);
         CancelSourceBranchEditCommand = new RelayCommand(CancelSourceBranchEdit, () => _isEditingSourceBranch);
+        LoadInitialisierungsskriptSuggestionenCommand = new AsyncRelayCommand(
+            ct => LoadInitialisierungsskriptSuggestionenAsync(_selectedRepository?.Id ?? Guid.Empty, ct),
+            () => _selectedRepository != null);
+        SaveInitialisierungsskriptCommand = new AsyncRelayCommand(SaveInitialisierungsskriptAsync, () => _isEditingInitialisierungsskript);
+        CancelInitialisierungsskriptEditCommand = new RelayCommand(CancelInitialisierungsskriptEdit, () => _isEditingInitialisierungsskript);
         AufgabeAusAnforderungErstellenCommand = new AsyncRelayCommand<ScmRequirement>(AufgabeAusAnforderungErstellenAsync);
         AufgabeAusIssueErstellenCommand = new AsyncRelayCommand<Issue>(AufgabeAusIssueErstellenAsync);
     }
@@ -649,6 +699,87 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
         var isValid = SourceBranchInputValidator.Validate(SelectedRepositorySourceBranchName, AvailableSourceBranchesForEdit, out var error);
         SourceBranchInputError = error;
         return isValid;
+    }
+
+    private async Task LoadInitialisierungsskriptSuggestionenAsync(Guid repositoryId, CancellationToken ct)
+    {
+        var repository = Projekt?.Repositories.FirstOrDefault(r => r.Id == repositoryId);
+        if (repository == null)
+            return;
+
+        _initialisierungsskriptBeforeEdit = SelectedInitialisierungsskript;
+        IsEditingInitialisierungsskript = true;
+        InitialisierungsskriptLoadingFailed = null;
+        InitialisierungsskriptSuggestionen.Clear();
+
+        var gitPlugin = _pluginManager.GetSourceCodeManagementPlugins()
+            .FirstOrDefault(p => string.Equals(p.PluginPrefix, repository.PluginTyp, StringComparison.OrdinalIgnoreCase));
+
+        if (gitPlugin == null || _directoryStructureService == null || string.IsNullOrWhiteSpace(repository.RepositoryUrl))
+        {
+            InitialisierungsskriptLoadingFailed = true;
+            return;
+        }
+
+        var result = await _directoryStructureService.GetFileLoadResultAsync(gitPlugin, repository.RepositoryUrl, ct);
+        ct.ThrowIfCancellationRequested();
+
+        if (result.Status != RepositoryStructureLoadStatus.Success)
+        {
+            InitialisierungsskriptLoadingFailed = true;
+            return;
+        }
+
+        foreach (var entry in result.Entries
+            .Where(entry => IstAusfuehrbareDatei(entry.Path))
+            .OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase))
+        {
+            InitialisierungsskriptSuggestionen.Add(entry.Path);
+        }
+
+        InitialisierungsskriptLoadingFailed = false;
+    }
+
+    private async Task SaveInitialisierungsskriptAsync(CancellationToken ct)
+    {
+        if (_selectedRepository == null)
+            return;
+
+        var repository = _selectedRepository;
+
+        try
+        {
+            var normalized = string.IsNullOrWhiteSpace(SelectedInitialisierungsskript)
+                ? null
+                : SelectedInitialisierungsskript.Trim();
+
+            var updatedKonfiguration = await _projektService.SaveRepositoryInitialisierungskriptAsync(repository.Id, normalized, ct);
+
+            repository.InitialisierungKonfiguration = updatedKonfiguration;
+            SelectedInitialisierungsskript = updatedKonfiguration?.InitialisierungsskriptRelativePath;
+            IsEditingInitialisierungsskript = false;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern des Initialisierungsskripts für Repository {RepositoryId}.", repository.Id);
+            SetFehler(ex);
+        }
+    }
+
+    private void CancelInitialisierungsskriptEdit()
+    {
+        SelectedInitialisierungsskript = _initialisierungsskriptBeforeEdit;
+        IsEditingInitialisierungsskript = false;
+    }
+
+    private static bool IstAusfuehrbareDatei(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return extension is ".ps1" or ".cmd" or ".bat" or ".sh" or ".exe";
     }
 
     private void OeffneAufgabe(Guid id)

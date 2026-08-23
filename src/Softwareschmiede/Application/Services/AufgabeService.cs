@@ -92,6 +92,8 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .Include(a => a.AlertReferenz)
             .Include(a => a.GitRepository)
                 .ThenInclude(r => r!.StartKonfiguration)
+            .Include(a => a.GitRepository)
+                .ThenInclude(r => r!.InitialisierungKonfiguration)
             .Include(a => a.Todos)
             // Fuer Aufgabe.IstAutonom() (Modus-Indikator regulär/autonom) benötigt, u. a. von TaskDetailViewModel.
             .Include(a => a.AutonomKonfiguration)

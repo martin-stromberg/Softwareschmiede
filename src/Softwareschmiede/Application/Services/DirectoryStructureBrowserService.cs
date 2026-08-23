@@ -42,7 +42,23 @@ public sealed class DirectoryStructureBrowserService
     /// <param name="repositoryUrl">URL des Repositories.</param>
     /// <param name="ct">Cancellation Token.</param>
     /// <returns>Erfolgreich geladene, sortierte Verzeichnisse oder einen Fehler-/Nicht-unterstützt-Status.</returns>
-    public async Task<RepositoryStructureLoadResult> GetDirectoryLoadResultAsync(IGitPlugin gitPlugin, string repositoryUrl, CancellationToken ct = default)
+    public Task<RepositoryStructureLoadResult> GetDirectoryLoadResultAsync(IGitPlugin gitPlugin, string repositoryUrl, CancellationToken ct = default)
+        => GetLoadResultAsync(gitPlugin, repositoryUrl, "dirs", entry => entry.IsDirectory, ct);
+
+    /// <summary>Ruft die Dateien eines externen Repositories mit explizitem Lade-Status ab (z. B. für die Auswahl von Skriptdateien).</summary>
+    /// <param name="gitPlugin">Das zu verwendende Git-Plugin.</param>
+    /// <param name="repositoryUrl">URL des Repositories.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    /// <returns>Erfolgreich geladene, sortierte Dateien oder einen Fehler-/Nicht-unterstützt-Status.</returns>
+    public Task<RepositoryStructureLoadResult> GetFileLoadResultAsync(IGitPlugin gitPlugin, string repositoryUrl, CancellationToken ct = default)
+        => GetLoadResultAsync(gitPlugin, repositoryUrl, "files", entry => !entry.IsDirectory, ct);
+
+    private async Task<RepositoryStructureLoadResult> GetLoadResultAsync(
+        IGitPlugin gitPlugin,
+        string repositoryUrl,
+        string cacheKeyPrefix,
+        Func<RepositoryDirectoryEntry, bool> entryFilter,
+        CancellationToken ct)
     {
         if (!_options.Enabled)
         {
@@ -50,7 +66,7 @@ public sealed class DirectoryStructureBrowserService
         }
 
         var pluginPrefix = string.IsNullOrWhiteSpace(gitPlugin.PluginPrefix) ? gitPlugin.GetType().FullName : gitPlugin.PluginPrefix;
-        var cacheKey = $"dirs:{pluginPrefix}:{_options.MaxDepth}:{repositoryUrl}";
+        var cacheKey = $"{cacheKeyPrefix}:{pluginPrefix}:{_options.MaxDepth}:{repositoryUrl}";
         if (_cache.TryGetValue(cacheKey, out RepositoryStructureLoadResult? cached) && cached is not null)
         {
             return cached;
@@ -69,14 +85,12 @@ public sealed class DirectoryStructureBrowserService
                 return loadResult;
             }
 
-            var directories = loadResult.Entries
-                .Where(item => item.IsDirectory)
-                .Select(item => item.Path)
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .Select(path => new RepositoryDirectoryEntry(path, IsDirectory: true))
+            var entries = loadResult.Entries
+                .Where(entryFilter)
+                .OrderBy(entry => entry.Path, StringComparer.Ordinal)
                 .ToList();
 
-            var result = RepositoryStructureLoadResult.Success(directories);
+            var result = RepositoryStructureLoadResult.Success(entries);
             _cache.Set(cacheKey, result, TimeSpan.FromSeconds(_options.CacheDurationSeconds));
             return result;
         }
