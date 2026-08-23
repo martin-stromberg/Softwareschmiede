@@ -137,4 +137,62 @@ public sealed class DirectoryStructureBrowserServiceTests : IDisposable
         first.Should().Equal("a");
         second.Should().Equal("b");
     }
+
+    /// <summary>GetFileLoadResultAsync liefert nur Datei-Einträge; Verzeichnisse werden ausgefiltert.</summary>
+    [Fact]
+    public async Task GetFileLoadResultAsync_ShouldReturnOnlyFiles_ForMixedEntries()
+    {
+        var pluginMock = CreatePluginMock(
+        [
+            new RepositoryDirectoryEntry("backend", IsDirectory: true),
+            new RepositoryDirectoryEntry("README.md", IsDirectory: false),
+            new RepositoryDirectoryEntry("init.sh", IsDirectory: false),
+        ]);
+        var sut = CreateSut();
+
+        var result = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Success);
+        result.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["README.md", "init.sh"]);
+    }
+
+    /// <summary>Plugin-Exceptions werden bei GetFileLoadResultAsync als Fehlerstatus gemeldet.</summary>
+    [Fact]
+    public async Task GetFileLoadResultAsync_ShouldReturnFailed_WhenPluginThrows()
+    {
+        var pluginMock = new Mock<IGitPlugin>();
+        pluginMock.Setup(p => p.PluginPrefix).Returns("Test");
+        pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Verbindungsfehler"));
+        var sut = CreateSut();
+
+        var result = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+
+        result.Status.Should().Be(RepositoryStructureLoadStatus.Failed);
+    }
+
+    /// <summary>GetDirectoryLoadResultAsync und GetFileLoadResultAsync verwenden für dieselbe Repository-URL unabhängige Cache-Einträge.</summary>
+    [Fact]
+    public async Task GetDirectoryLoadResultAsync_And_GetFileLoadResultAsync_ShouldUseIndependentCacheEntries()
+    {
+        var pluginMock = CreatePluginMock(
+        [
+            new RepositoryDirectoryEntry("backend", IsDirectory: true),
+            new RepositoryDirectoryEntry("README.md", IsDirectory: false),
+        ]);
+        var sut = CreateSut();
+
+        var dirsFirst = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var filesFirst = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var dirsSecond = await sut.GetDirectoryLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+        var filesSecond = await sut.GetFileLoadResultAsync(pluginMock.Object, "https://example.com/repo.git");
+
+        dirsFirst.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["backend"]);
+        filesFirst.Entries.Select(entry => entry.Path).Should().BeEquivalentTo(["README.md"]);
+        dirsSecond.Should().BeSameAs(dirsFirst);
+        filesSecond.Should().BeSameAs(filesFirst);
+        pluginMock.Verify(
+            p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
 }
