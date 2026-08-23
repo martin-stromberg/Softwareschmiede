@@ -1390,12 +1390,14 @@ password {token}
             }
 
             var entries = treeEl.EnumerateArray()
-                .Where(entry => entry.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "tree")
-                .Select(entry => entry.TryGetProperty("path", out var pathEl) ? pathEl.GetString() : null)
-                .Where(path => !string.IsNullOrEmpty(path))
-                .Select(path => path!)
-                .Where(path => path.Count(c => c == '/') + 1 <= maxDepth)
-                .Select(path => new RepositoryDirectoryEntry(path, true))
+                .Select(entry => new
+                {
+                    Type = entry.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null,
+                    Path = entry.TryGetProperty("path", out var pathEl) ? pathEl.GetString() : null
+                })
+                .Where(entry => (entry.Type == "tree" || entry.Type == "blob") && !string.IsNullOrEmpty(entry.Path))
+                .Where(entry => entry.Path!.Count(c => c == '/') + 1 <= maxDepth)
+                .Select(entry => new RepositoryDirectoryEntry(entry.Path!, entry.Type == "tree"))
                 .ToList();
 
             return RepositoryStructureLoadResult.Success(entries);
@@ -1404,41 +1406,6 @@ password {token}
         {
             _logger.LogError(ex, "Fehler beim Parsen der GitHub-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
             return RepositoryStructureLoadResult.Failed(ex.Message);
-        }
-    }
-
-    private IEnumerable<RepositoryDirectoryEntry> ParseRepositoryTree(string json, int maxDepth, string repositoryId)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-
-            if (doc.RootElement.TryGetProperty("truncated", out var truncatedEl) &&
-                truncatedEl.ValueKind == JsonValueKind.True)
-            {
-                _logger.LogWarning(
-                    "GitHub Git-Trees-API-Antwort für {RepositoryId} ist abgeschnitten (truncated=true) — bei sehr großen Repositories ist die ermittelte Verzeichnisstruktur ggf. unvollständig.",
-                    repositoryId);
-            }
-
-            if (!doc.RootElement.TryGetProperty("tree", out var treeEl) || treeEl.ValueKind != JsonValueKind.Array)
-            {
-                return [];
-            }
-
-            return treeEl.EnumerateArray()
-                .Where(entry => entry.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "tree")
-                .Select(entry => entry.TryGetProperty("path", out var pathEl) ? pathEl.GetString() : null)
-                .Where(path => !string.IsNullOrEmpty(path))
-                .Select(path => path!)
-                .Where(path => path.Count(c => c == '/') + 1 <= maxDepth)
-                .Select(path => new RepositoryDirectoryEntry(path, true))
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Fehler beim Parsen der GitHub-Verzeichnisstruktur für {RepositoryId}.", repositoryId);
-            return [];
         }
     }
 

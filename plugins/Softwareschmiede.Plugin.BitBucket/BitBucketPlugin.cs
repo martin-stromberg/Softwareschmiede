@@ -966,7 +966,8 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 foreach (var entry in values.EnumerateArray())
                 {
                     var type = entry.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null;
-                    if (type != "commit_directory")
+                    var isDirectory = type == "commit_directory";
+                    if (!isDirectory && type != "commit_file")
                     {
                         continue;
                     }
@@ -979,7 +980,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
                     if (path.Count(c => c == '/') + 1 <= maxDepth)
                     {
-                        entries.Add(new RepositoryDirectoryEntry(path, true));
+                        entries.Add(new RepositoryDirectoryEntry(path, isDirectory));
                     }
                 }
             }
@@ -1024,17 +1025,23 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             {
                 ct.ThrowIfCancellationRequested();
 
-                var childDirectories = await FetchSelfHostedDirectoryChildrenAsync(repositoryId, branch, parentPath, ct);
-                if (childDirectories.IsFailure)
+                var children = await FetchSelfHostedDirectoryChildrenAsync(repositoryId, branch, parentPath, ct);
+                if (children.IsFailure)
                 {
-                    return RepositoryStructureLoadResult.Failed(childDirectories.ErrorMessage);
+                    return RepositoryStructureLoadResult.Failed(children.ErrorMessage);
                 }
 
-                foreach (var name in childDirectories.Names)
+                foreach (var name in children.DirectoryNames)
                 {
                     var childPath = string.IsNullOrEmpty(parentPath) ? name : $"{parentPath}/{name}";
                     entries.Add(new RepositoryDirectoryEntry(childPath, true));
                     nextLevelPaths.Add(childPath);
+                }
+
+                foreach (var name in children.FileNames)
+                {
+                    var childPath = string.IsNullOrEmpty(parentPath) ? name : $"{parentPath}/{name}";
+                    entries.Add(new RepositoryDirectoryEntry(childPath, false));
                 }
 
                 if (nextLevelPaths.Count >= maxDirectoriesPerLevel)
@@ -1065,7 +1072,8 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     private async Task<SelfHostedDirectoryChildrenResult> FetchSelfHostedDirectoryChildrenAsync(
         string repositoryId, string branch, string relativePath, CancellationToken ct)
     {
-        var names = new List<string>();
+        var directoryNames = new List<string>();
+        var fileNames = new List<string>();
         var start = 0;
         var isLastPage = false;
 
@@ -1086,7 +1094,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 return SelfHostedDirectoryChildrenResult.Failed(result.StdErr);
             }
 
-            var (pageIsLast, nextStart) = ParseSelfHostedBrowsePage(result.StdOut, repositoryId, names);
+            var (pageIsLast, nextStart) = ParseSelfHostedBrowsePage(result.StdOut, repositoryId, directoryNames, fileNames);
             if (pageIsLast && nextStart == -1)
             {
                 return SelfHostedDirectoryChildrenResult.Failed("Bitbucket Self-Hosted Browse-Antwort konnte nicht verarbeitet werden.");
@@ -1096,7 +1104,7 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             start = nextStart ?? start;
         }
 
-        return SelfHostedDirectoryChildrenResult.Success(names);
+        return SelfHostedDirectoryChildrenResult.Success(directoryNames, fileNames);
     }
 
     /// <summary>
@@ -1106,8 +1114,9 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     /// <param name="json">Die JSON-Antwort der Self-Hosted-Browse-API.</param>
     /// <param name="repositoryId">Repository-ID (für Log-Meldungen).</param>
     /// <param name="directoryNames">Liste, der die gefundenen Verzeichnisnamen hinzugefügt werden.</param>
+    /// <param name="fileNames">Liste, der die gefundenen Dateinamen hinzugefügt werden.</param>
     /// <returns>Ob dies die letzte Seite war, sowie der Start-Index der nächsten Seite (falls vorhanden).</returns>
-    private (bool IsLastPage, int? NextStart) ParseSelfHostedBrowsePage(string json, string repositoryId, List<string> directoryNames)
+    private (bool IsLastPage, int? NextStart) ParseSelfHostedBrowsePage(string json, string repositoryId, List<string> directoryNames, List<string> fileNames)
     {
         try
         {
@@ -1129,7 +1138,9 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 foreach (var entry in values.EnumerateArray())
                 {
                     var type = entry.TryGetProperty("type", out var typeEl) ? typeEl.GetString() : null;
-                    if (!string.Equals(type, "DIRECTORY", StringComparison.OrdinalIgnoreCase))
+                    var isDirectory = string.Equals(type, "DIRECTORY", StringComparison.OrdinalIgnoreCase);
+                    var isFile = string.Equals(type, "FILE", StringComparison.OrdinalIgnoreCase);
+                    if (!isDirectory && !isFile)
                     {
                         continue;
                     }
@@ -1138,9 +1149,18 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                         ? nameEl.GetString()
                         : null;
 
-                    if (!string.IsNullOrEmpty(name))
+                    if (string.IsNullOrEmpty(name))
+                    {
+                        continue;
+                    }
+
+                    if (isDirectory)
                     {
                         directoryNames.Add(name);
+                    }
+                    else
+                    {
+                        fileNames.Add(name);
                     }
                 }
             }
@@ -1165,10 +1185,10 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
         public static CloudSourcePageParseResult Failed(string? errorMessage) => new(null, IsFailure: true, errorMessage);
     }
 
-    private sealed record SelfHostedDirectoryChildrenResult(IReadOnlyList<string> Names, bool IsFailure, string? ErrorMessage)
+    private sealed record SelfHostedDirectoryChildrenResult(IReadOnlyList<string> DirectoryNames, IReadOnlyList<string> FileNames, bool IsFailure, string? ErrorMessage)
     {
-        public static SelfHostedDirectoryChildrenResult Success(IReadOnlyList<string> names) => new(names, IsFailure: false, ErrorMessage: null);
-        public static SelfHostedDirectoryChildrenResult Failed(string? errorMessage) => new([], IsFailure: true, errorMessage);
+        public static SelfHostedDirectoryChildrenResult Success(IReadOnlyList<string> directoryNames, IReadOnlyList<string> fileNames) => new(directoryNames, fileNames, IsFailure: false, ErrorMessage: null);
+        public static SelfHostedDirectoryChildrenResult Failed(string? errorMessage) => new([], [], IsFailure: true, errorMessage);
     }
 
     /// <summary>Baut die Browse-API-URL für Bitbucket Server/Data Center (Self-Hosted) für ein Verzeichnis auf einem Branch.</summary>

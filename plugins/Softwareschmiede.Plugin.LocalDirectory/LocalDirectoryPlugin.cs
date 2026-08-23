@@ -31,6 +31,7 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
     private readonly ConcurrentDictionary<string, string> _workspaceMappings = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _workspaceSourceMappings = new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<string, IEnumerable<string>> _enumerateDirectories;
+    private readonly Func<string, IEnumerable<string>> _enumerateFiles;
 
     /// <inheritdoc/>
     public override string PluginName => "Local Directory";
@@ -114,21 +115,23 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         ICliRunner cliRunner,
         ICredentialStore credentialStore,
         ILogger<LocalDirectoryPlugin> logger)
-        : this(cliRunner, credentialStore, logger, Directory.EnumerateDirectories)
+        : this(cliRunner, credentialStore, logger, Directory.EnumerateDirectories, Directory.EnumerateFiles)
     {
     }
 
-    /// <summary>Erstellt eine neue Instanz von <see cref="LocalDirectoryPlugin"/> mit injizierbarem Verzeichnis-Enumerator (nur für Tests).</summary>
+    /// <summary>Erstellt eine neue Instanz von <see cref="LocalDirectoryPlugin"/> mit injizierbarem Verzeichnis-/Datei-Enumerator (nur für Tests).</summary>
     internal LocalDirectoryPlugin(
         ICliRunner cliRunner,
         ICredentialStore credentialStore,
         ILogger<LocalDirectoryPlugin> logger,
-        Func<string, IEnumerable<string>> enumerateDirectories)
+        Func<string, IEnumerable<string>> enumerateDirectories,
+        Func<string, IEnumerable<string>>? enumerateFiles = null)
         : base(cliRunner)
     {
         _credentialStore = credentialStore;
         _logger = logger;
         _enumerateDirectories = enumerateDirectories;
+        _enumerateFiles = enumerateFiles ?? Directory.EnumerateFiles;
     }
 
     /// <inheritdoc/>
@@ -343,14 +346,9 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
             return;
         }
 
-        List<string> directories;
-        try
+        var directories = EnumerateChildrenSafely(_enumerateDirectories, currentPath);
+        if (directories is null)
         {
-            directories = _enumerateDirectories(currentPath).ToList();
-        }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
-        {
-            _logger.LogWarning(ex, "Zugriff auf Verzeichnis '{Path}' verweigert, wird übersprungen.", currentPath);
             return;
         }
 
@@ -358,26 +356,75 @@ public sealed class LocalDirectoryPlugin : GitPluginBase<LocalDirectoryPlugin>
         {
             ct.ThrowIfCancellationRequested();
 
-            try
-            {
-                if (IsReparsePoint(directory))
-                {
-                    continue;
-                }
+            CollectEligibleEntry(
+                rootPath,
+                directory,
+                isDirectory: true,
+                entries,
+                onEligible: () => CollectDirectoryEntries(rootPath, directory, depth + 1, maxDepth, entries, ct));
+        }
 
-                var relative = Path.GetRelativePath(rootPath, directory);
-                if (ShouldSkipRelativePath(relative))
-                {
-                    continue;
-                }
+        var files = EnumerateChildrenSafely(_enumerateFiles, currentPath);
+        if (files is null)
+        {
+            return;
+        }
 
-                entries.Add(new RepositoryDirectoryEntry(relative.Replace(Path.DirectorySeparatorChar, '/'), IsDirectory: true));
-                CollectDirectoryEntries(rootPath, directory, depth + 1, maxDepth, entries, ct);
-            }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        foreach (var file in files)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            CollectEligibleEntry(rootPath, file, isDirectory: false, entries, onEligible: null);
+        }
+    }
+
+    // Listet die direkten Kind-Einträge (Verzeichnisse oder Dateien, je nach enumerate) von currentPath auf.
+    // Liefert null statt zu werfen, wenn der Zugriff auf currentPath selbst verweigert wird (z. B. fehlende
+    // Berechtigung).
+    private List<string>? EnumerateChildrenSafely(Func<string, IEnumerable<string>> enumerate, string currentPath)
+    {
+        try
+        {
+            return enumerate(currentPath).ToList();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            _logger.LogWarning(ex, "Zugriff auf Verzeichnis '{Path}' verweigert, wird übersprungen.", currentPath);
+            return null;
+        }
+    }
+
+    // Prüft einen einzelnen enumerierten Kind-Eintrag (Reparse-Point, relativer Pfad, Skip-Filter) und fügt ihn
+    // bei Eignung als RepositoryDirectoryEntry hinzu. Ruft anschließend optional onEligible auf (z. B. Rekursion
+    // für Unterverzeichnisse). Fehler beim Zugriff auf den Eintrag selbst (Race zwischen Enumeration und
+    // Verarbeitung) werden geloggt und übersprungen statt zu werfen.
+    private void CollectEligibleEntry(
+        string rootPath,
+        string entryPath,
+        bool isDirectory,
+        List<RepositoryDirectoryEntry> entries,
+        Action? onEligible)
+    {
+        try
+        {
+            if (IsReparsePoint(entryPath))
             {
-                _logger.LogWarning(ex, "Zugriff auf Verzeichnis '{Path}' verweigert, wird übersprungen.", directory);
+                return;
             }
+
+            var relative = Path.GetRelativePath(rootPath, entryPath);
+            if (ShouldSkipRelativePath(relative))
+            {
+                return;
+            }
+
+            entries.Add(new RepositoryDirectoryEntry(relative.Replace(Path.DirectorySeparatorChar, '/'), isDirectory));
+            onEligible?.Invoke();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            var kind = isDirectory ? "Verzeichnis" : "Datei";
+            _logger.LogWarning(ex, "Zugriff auf {Kind} '{Path}' verweigert, wird übersprungen.", kind, entryPath);
         }
     }
 

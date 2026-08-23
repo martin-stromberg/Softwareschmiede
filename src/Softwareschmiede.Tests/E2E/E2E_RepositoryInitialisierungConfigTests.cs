@@ -6,14 +6,16 @@ namespace Softwareschmiede.Tests.E2E;
 /// E2E-Tests für die Konfiguration eines Repository-Initialisierungsskripts in der Projektdetailansicht
 /// (Issue #228): Label, Eingabefeld (editierbare ComboBox mit Vorschlägen) sowie Speichern-/Abbrechen-Buttons.
 ///
-/// Der Testmodus lädt als SCM-Plugin ausschließlich <c>LocalDirectoryPlugin</c>, dessen
-/// <c>GetRepositoryStructureLoadResultAsync</c> ausschließlich Verzeichnis-Einträge liefert (siehe
-/// <c>LocalDirectoryPlugin.CollectDirectoryEntries</c>), sodass <c>InitialisierungsskriptSuggestionen</c>
-/// hier stets leer bleibt und die editierbare ComboBox über den manuellen Freitext-Eingabepfad geprüft wird.
+/// Das lokale Testrepository enthält echte Skriptdateien ("scripts/init.ps1", "scripts/deploy.sh"), damit
+/// <c>InitialisierungsskriptSuggestionen</c> tatsächlich befüllt wird — <c>LocalDirectoryPlugin.CollectDirectoryEntries</c>
+/// liefert seit der Issue-228-Nacharbeit sowohl Verzeichnis- als auch Datei-Einträge (zuvor wurden Dateien
+/// vollständig verworfen, wodurch die Vorschlagsliste immer leer blieb). Dieselbe Testinstanz deckt damit
+/// sowohl die Auswahl aus der Vorschlagsliste als auch die Live-Filterung per Freitext sowie die manuelle
+/// Eingabe eines nicht in der Liste enthaltenen Pfads ab.
 ///
-/// Konsolidierung: Beide Szenarien (Konfigurieren und Speichern, nachträgliches Bearbeiten mit Abbruch)
-/// laufen als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle, um die Laufzeit der
-/// FlaUI-E2E-Suite gering zu halten.
+/// Konsolidierung: Alle Aspekte (Auswahl aus Vorschlagsliste, Live-Filter, Freitext-Eingabe eines unbekannten
+/// Skripts, nachträgliches Bearbeiten mit Abbruch) laufen als aufeinanderfolgende Phasen in einem gemeinsamen
+/// App-Lifecycle, um die Laufzeit der FlaUI-E2E-Suite gering zu halten.
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
@@ -24,30 +26,41 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
 {
     private const string RepoFolderName = "Init-Config-Repo";
     private const string ProjektName = "Init-Config-Projekt";
+    private const string VorgeschlagenesSkript = "scripts/init.ps1";
+    private const string AndereVorgeschlageneDatei = "scripts/deploy.sh";
+    private const string UnbekanntesSkript = "scripts/does-not-exist.ps1";
 
     /// <summary>
-    /// Führt beide Initialisierungsskript-Konfigurationsszenarien nacheinander im selben App-Lifecycle aus:
-    /// Konfigurieren und Speichern eines Skripts, danach die nachträgliche Bearbeitung mit Abbruch.
+    /// Führt alle Initialisierungsskript-Konfigurationsszenarien nacheinander im selben App-Lifecycle aus:
+    /// Auswahl aus der Vorschlagsliste, Live-Filterung, Speichern eines nicht vorgeschlagenen Skripts, danach
+    /// die nachträgliche Bearbeitung mit Abbruch.
     /// </summary>
     [Fact]
     public async Task InitialisierungsskriptKonfiguration()
     {
         var mainWindow = LaunchAppAndGetMainWindow();
 
-        await InitialisierungsskriptKonfigurieren_SpeichertUndZeigtSkript_E2E(mainWindow);
+        await InitialisierungsskriptKonfigurieren_AuswahlFilterUndFreitext_E2E(mainWindow);
         await InitialisierungsskriptBearbeiten_Abbrechen_VerwirftAenderung_E2E(mainWindow);
     }
 
     /// <summary>
-    /// Szenario: Ein Repository wird zugewiesen und ein Initialisierungsskript konfiguriert.
-    /// Erwartung: Der manuell eingegebene Skriptpfad wird persistiert und in der Anzeige übernommen.
+    /// Szenario: Ein Repository mit echten Skriptdateien wird zugewiesen. Geprüft werden drei Aspekte der
+    /// editierbaren ComboBox in einem Durchlauf: (1) Auswahl eines vorgeschlagenen Skripts per Klick aus der
+    /// (jetzt korrekt gefüllten) Vorschlagsliste, (2) Live-Filterung der Vorschlagsliste per Freitexteingabe,
+    /// (3) Speichern eines frei eingegebenen, nicht in der Vorschlagsliste enthaltenen Skriptpfads. Das Öffnen
+    /// des Dropdowns erfolgt über <c>ExpandCollapsePattern</c> statt über einen Koordinaten-Klick, da der
+    /// ToggleButton im ComboBox-Template bei editierbaren ComboBoxen nur noch die Pfeil-Spalte abdeckt (die
+    /// Text-Spalte wird jetzt von der neu ergänzten <c>PART_EditableTextBox</c> für Fokus/Texteingabe benötigt).
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task InitialisierungsskriptKonfigurieren_SpeichertUndZeigtSkript_E2E(Window mainWindow)
+    private async Task InitialisierungsskriptKonfigurieren_AuswahlFilterUndFreitext_E2E(Window mainWindow)
     {
-        const string skriptPfad = "scripts/init.ps1";
-
         var sourceDirectory = CreateLocalSourceDirectory(RepoFolderName);
+        var scriptsDirectory = Path.Combine(sourceDirectory, RepoFolderName, "scripts");
+        Directory.CreateDirectory(scriptsDirectory);
+        File.WriteAllText(Path.Combine(scriptsDirectory, "init.ps1"), "# init");
+        File.WriteAllText(Path.Combine(scriptsDirectory, "deploy.sh"), "# deploy");
 
         ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory);
         NavigateToProjects(mainWindow);
@@ -59,16 +72,32 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         ladenButton.AsButton().Click();
 
         var auswahlBox = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptAuswahlComboBox"), Short);
-        auswahlBox.AsComboBox().EditableText = skriptPfad;
+
+        // (1) Auswahl aus der Vorschlagsliste: Beide erzeugten Skriptdateien müssen als Vorschlag erscheinen
+        // und ein Klick auf einen Vorschlag übernimmt ihn als ausgewähltes Skript.
+        auswahlBox.Patterns.ExpandCollapse.Pattern.Expand();
+        var vorschlag = WaitForElement(auswahlBox, cf => cf.ByName(VorgeschlagenesSkript), Short);
+        vorschlag.Click();
+        Assert.Equal(VorgeschlagenesSkript, auswahlBox.AsComboBox().EditableText);
+
+        // (2) Live-Filter: Freitexteingabe engt die (erneut geöffnete) Vorschlagsliste auf passende Einträge ein.
+        auswahlBox.Patterns.ExpandCollapse.Pattern.Expand();
+        auswahlBox.AsComboBox().EditableText = "deploy";
+        var gefiltertesElement = WaitForElement(auswahlBox, cf => cf.ByName(AndereVorgeschlageneDatei), Short);
+        Assert.NotNull(gefiltertesElement);
+        Assert.Null(auswahlBox.FindFirstDescendant(cf => cf.ByName(VorgeschlagenesSkript)));
+
+        // (3) Freitext-Eingabe eines nicht vorgeschlagenen Pfads wird trotzdem als Initialisierungsskript akzeptiert.
+        auswahlBox.AsComboBox().EditableText = UnbekanntesSkript;
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptSpeichern"), Short);
         speichernButton.AsButton().Click();
 
-        var saved = await WaitForSavedInitialisierungsskriptAsync(RepoFolderName, skriptPfad);
-        Assert.Equal(skriptPfad, saved);
+        var saved = await WaitForSavedInitialisierungsskriptAsync(RepoFolderName, UnbekanntesSkript);
+        Assert.Equal(UnbekanntesSkript, saved);
 
         var anzeige = WaitForElement(mainWindow, cf => cf.ByAutomationId("InitialisierungsskriptAnzeige"), Short);
-        Assert.Equal(skriptPfad, anzeige.Name);
+        Assert.Equal(UnbekanntesSkript, anzeige.Name);
     }
 
     /// <summary>
@@ -78,7 +107,6 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
     private async Task InitialisierungsskriptBearbeiten_Abbrechen_VerwirftAenderung_E2E(Window mainWindow)
     {
-        const string ursprungsSkript = "scripts/init.ps1";
         const string geaenderterSkript = "scripts/changed.ps1";
 
         var ladenButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptLaden"), Short);
@@ -91,10 +119,10 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         abbrechenButton.AsButton().Click();
 
         var anzeige = WaitForElement(mainWindow, cf => cf.ByAutomationId("InitialisierungsskriptAnzeige"), Short);
-        Assert.Equal(ursprungsSkript, anzeige.Name);
+        Assert.Equal(UnbekanntesSkript, anzeige.Name);
 
-        var saved = await WaitForSavedInitialisierungsskriptAsync(RepoFolderName, ursprungsSkript);
-        Assert.Equal(ursprungsSkript, saved);
+        var saved = await WaitForSavedInitialisierungsskriptAsync(RepoFolderName, UnbekanntesSkript);
+        Assert.Equal(UnbekanntesSkript, saved);
 
         DeleteCurrentProject(mainWindow);
         NavigateBackToDashboard(mainWindow);
