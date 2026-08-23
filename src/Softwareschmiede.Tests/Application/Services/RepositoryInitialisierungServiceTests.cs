@@ -163,10 +163,162 @@ public sealed class RepositoryInitialisierungServiceTests : IDisposable
         _cliRunnerMock.VerifyAll();
     }
 
+    /// <summary><summary>RunAsync_ShouldUseCmdExe_WhenScriptIsCmdOrBatFile.</summary>.</summary>
+    /// <param name="relativeScriptPath">Repository-relativer Pfad zum .cmd- bzw. .bat-Testskript.</param>
+    [Theory]
+    [InlineData("scripts/init.cmd")]
+    [InlineData("scripts/init.bat")]
+    public async Task RunAsync_ShouldUseCmdExe_WhenScriptIsCmdOrBatFile(string relativeScriptPath)
+    {
+        var scriptPath = CreateScript(relativeScriptPath);
+        var configuration = CreateConfig();
+        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+
+        var capture = SetupCliRunnerCapture();
+
+        var sut = CreateSut();
+        await sut.RunAsync(_repositoryRootPath, configuration);
+
+        capture.Command.Should().Be("cmd.exe");
+        capture.Args.Should().ContainInOrder("/c", scriptPath);
+    }
+
+    /// <summary><summary>RunAsync_ShouldExecuteExeDirectly_WhenScriptIsExeFile.</summary>.</summary>
+    [Fact]
+    public async Task RunAsync_ShouldExecuteExeDirectly_WhenScriptIsExeFile()
+    {
+        var scriptPath = CreateScript("scripts/init.exe");
+        var configuration = CreateConfig();
+        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+
+        var capture = SetupCliRunnerCapture();
+
+        var sut = CreateSut();
+        await sut.RunAsync(_repositoryRootPath, configuration);
+
+        capture.Command.Should().Be(scriptPath);
+        capture.Args.Should().BeEmpty();
+    }
+
+    /// <summary><summary>RunAsync_ShouldUseBashExe_WhenScriptIsShFile.</summary>.</summary>
+    [Fact]
+    public async Task RunAsync_ShouldUseBashExe_WhenScriptIsShFile()
+    {
+        var scriptPath = CreateScript("scripts/init.sh");
+        var capture = SetupCliRunnerCapture();
+
+        var fakeBashDirectory = Path.Combine(_repositoryRootPath, "fake-path-bin");
+        Directory.CreateDirectory(fakeBashDirectory);
+        var fakeBashExecutable = Path.Combine(fakeBashDirectory, "bash.exe");
+        File.WriteAllText(fakeBashExecutable, string.Empty);
+
+        await RepositoryScriptExecutor.RunAsync(
+            _repositoryRootPath,
+            true,
+            Path.GetRelativePath(_repositoryRootPath, scriptPath),
+            "Initialisierungsskript",
+            _cliRunnerMock.Object,
+            NullLogger.Instance,
+            CancellationToken.None,
+            getEnvironmentVariable: name => name == "PATH" ? fakeBashDirectory : null,
+            fileExists: File.Exists);
+
+        capture.Command.Should().Be(fakeBashExecutable);
+        capture.Args.Should().ContainSingle().Which.Should().Be(scriptPath);
+    }
+
+    /// <summary><summary>RunAsync_ShouldThrow_WhenBashExecutableNotFoundInPath.</summary>.</summary>
+    [Fact]
+    public async Task RunAsync_ShouldThrow_WhenBashExecutableNotFoundInPath()
+    {
+        var scriptPath = CreateScript("scripts/init.sh");
+
+        var act = () => RepositoryScriptExecutor.RunAsync(
+            _repositoryRootPath,
+            true,
+            Path.GetRelativePath(_repositoryRootPath, scriptPath),
+            "Initialisierungsskript",
+            _cliRunnerMock.Object,
+            NullLogger.Instance,
+            CancellationToken.None,
+            getEnvironmentVariable: _ => string.Empty,
+            fileExists: _ => false);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*bash.exe*PATH*");
+        _cliRunnerMock.Verify(
+            runner => runner.RunAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary><summary>RunAsync_ShouldThrow_WhenScriptExtensionIsUnsupported.</summary>.</summary>
+    [Fact]
+    public async Task RunAsync_ShouldThrow_WhenScriptExtensionIsUnsupported()
+    {
+        var scriptPath = CreateScript("scripts/init.txt");
+        var configuration = CreateConfig();
+        configuration.InitialisierungsskriptRelativePath = Path.GetRelativePath(_repositoryRootPath, scriptPath);
+
+        var sut = CreateSut();
+        var act = () => sut.RunAsync(_repositoryRootPath, configuration);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*nicht unterstützten Dateityp*");
+        _cliRunnerMock.Verify(
+            runner => runner.RunAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private RepositoryInitialisierungService CreateSut()
         => new(
             _cliRunnerMock.Object,
             NullLogger<RepositoryInitialisierungService>.Instance);
+
+    /// <summary>
+    /// Richtet das gemeinsame Mock-Setup für <see cref="ICliRunner.RunAsync"/> ein und liefert ein
+    /// Capture-Objekt, in das der beim Aufruf übergebene Befehl und die Argumente geschrieben werden.
+    /// </summary>
+    /// <returns>Das Capture-Objekt, das nach dem Aufruf Befehl und Argumente enthält.</returns>
+    private CliRunnerCapture SetupCliRunnerCapture()
+    {
+        var capture = new CliRunnerCapture();
+
+        _cliRunnerMock
+            .Setup(runner => runner.RunAsync(
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, IEnumerable<string>, string?, IDictionary<string, string>?, CancellationToken>((command, args, _, _, _) =>
+            {
+                capture.Command = command;
+                capture.Args = args.ToList();
+            })
+            .ReturnsAsync(new CliResult(0, "ok", string.Empty));
+
+        return capture;
+    }
+
+    /// <summary>Erfasst den beim gemockten <see cref="ICliRunner.RunAsync"/>-Aufruf übergebenen Befehl und die Argumente.</summary>
+    private sealed class CliRunnerCapture
+    {
+        /// <summary>Der erfasste Befehl (Executable-Pfad).</summary>
+        public string? Command { get; set; }
+
+        /// <summary>Die erfassten Argumente.</summary>
+        public IReadOnlyList<string> Args { get; set; } = [];
+    }
 
     private static RepositoryInitialisierungKonfiguration CreateConfig()
         => new()
