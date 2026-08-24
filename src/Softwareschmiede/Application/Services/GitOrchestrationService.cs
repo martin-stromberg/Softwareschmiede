@@ -242,7 +242,11 @@ public sealed class GitOrchestrationService
             return PullRequestBodyBuilder.Build(aufgabe, fallbackBody);
         }
 
-        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(aufgabe.LokalerKlonPfad, baseBranch, ct);
+        var sourceBranch = !string.IsNullOrWhiteSpace(aufgabe.BasisBranchName)
+            ? aufgabe.BasisBranchName
+            : baseBranch;
+
+        var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(aufgabe.LokalerKlonPfad, sourceBranch, ct);
         if (snapshot.HasError)
         {
             _logger.LogWarning(

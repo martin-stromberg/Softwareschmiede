@@ -107,8 +107,8 @@ public sealed class EntwicklungsprozessService
             await _options.GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(lokalerKlonPfad, repository.StartKonfiguration, gitPlugin);
         }
 
-        var (branchName, nutzeExistierendenBranch) = await SetupBranchAsync(gitPlugin, repository.RepositoryUrl, lokalerKlonPfad, basisBranchName, repository.DefaultSourceBranchName, aufgabe, ct);
-        await FinalizeStartAsync(aufgabeId, aufgabe, repository, lokalerKlonPfad, branchName, nutzeExistierendenBranch, ct);
+        var (branchName, nutzeExistierendenBranch, basisBranch) = await SetupBranchAsync(gitPlugin, repository.RepositoryUrl, lokalerKlonPfad, basisBranchName, repository.DefaultSourceBranchName, aufgabe, ct);
+        await FinalizeStartAsync(aufgabeId, aufgabe, repository, lokalerKlonPfad, branchName, nutzeExistierendenBranch, basisBranch, ct);
 
         _logger.LogInformation("Repository-Setup für Aufgabe {AufgabeId} abgeschlossen.", aufgabeId);
     }
@@ -498,7 +498,7 @@ public sealed class EntwicklungsprozessService
         return lokalerKlonPfad;
     }
 
-    private async Task<(string BranchName, bool NutzeExistierendenBranch)> SetupBranchAsync(
+    private async Task<(string BranchName, bool NutzeExistierendenBranch, string? BasisBranchName)> SetupBranchAsync(
         IGitPlugin gitPlugin,
         string repositoryUrl,
         string lokalerKlonPfad,
@@ -516,11 +516,13 @@ public sealed class EntwicklungsprozessService
         }
 
         string branchName;
+        string? basisBranch = null;
         if (nutzeExistierendenBranch)
         {
             _logger.LogInformation("Wechsle zu vorhandenem Branch '{BasisBranch}'.", basisBranchName);
             await gitPlugin.CheckoutRemoteBranchAsync(lokalerKlonPfad, basisBranchName!, ct);
             branchName = basisBranchName!;
+            basisBranch = null;
         }
         else
         {
@@ -537,15 +539,17 @@ public sealed class EntwicklungsprozessService
 
                 _logger.LogInformation("Branch '{BranchName}' vom Basis-Branch '{BasisBranch}' anlegen.", branchName, defaultSourceBranchName);
                 await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, defaultSourceBranchName, ct);
+                basisBranch = defaultSourceBranchName;
             }
             else
             {
                 _logger.LogInformation("Branch '{BranchName}' anlegen.", branchName);
                 await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, null, ct);
+                basisBranch = null;
             }
         }
 
-        return (branchName, nutzeExistierendenBranch);
+        return (branchName, nutzeExistierendenBranch, basisBranch);
     }
 
     private async Task FinalizeStartAsync(
@@ -555,6 +559,7 @@ public sealed class EntwicklungsprozessService
         string lokalerKlonPfad,
         string branchName,
         bool nutzeExistierendenBranch,
+        string? basisBranch,
         CancellationToken ct)
     {
         var initialisierungsskriptHinweis = await RunInitialisierungsskriptAsync(aufgabeId, repository, lokalerKlonPfad, ct);
@@ -563,7 +568,7 @@ public sealed class EntwicklungsprozessService
         await CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, repository.StartKonfiguration, ct);
         await UpdateGitignoreAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
 
-        await _aufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad, ct);
+        await _aufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad, basisBranch, ct);
 
         var protokollNachricht = nutzeExistierendenBranch
             ? $"Klon angelegt, vorhandener Branch ausgecheckt: {branchName} in {lokalerKlonPfad}"
