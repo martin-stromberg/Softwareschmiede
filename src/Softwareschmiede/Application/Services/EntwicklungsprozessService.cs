@@ -11,6 +11,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Optionale Abhängigkeiten für den EntwicklungsprozessService.</summary>
 /// <param name="ProjektService">Optionaler Dienst zum Auflösen von Projekt-Repositories.</param>
 /// <param name="RepositoryStartskriptService">Optionaler Dienst zum Ausführen von Repository-Startskripten.</param>
+/// <param name="RepositoryInitialisierungService">Optionaler Dienst zum Ausführen von Repository-Initialisierungsskripten.</param>
 /// <param name="KiAusfuehrungsService">Optionaler Dienst zum Starten der KI-CLI.</param>
 /// <param name="GitOrchestrationService">
 /// Optionaler Dienst zur Validierung des konfigurierten Arbeitsverzeichnisses direkt nach dem Git-Klon.
@@ -19,6 +20,7 @@ namespace Softwareschmiede.Application.Services;
 public sealed record EntwicklungsprozessServiceOptions(
     ProjektService? ProjektService = null,
     RepositoryStartskriptService? RepositoryStartskriptService = null,
+    RepositoryInitialisierungService? RepositoryInitialisierungService = null,
     KiAusfuehrungsService? KiAusfuehrungsService = null,
     GitOrchestrationService? GitOrchestrationService = null);
 
@@ -555,24 +557,8 @@ public sealed class EntwicklungsprozessService
         bool nutzeExistierendenBranch,
         CancellationToken ct)
     {
-        string? startskriptHinweis = null;
-        if (repository.StartKonfiguration is not null && _options.RepositoryStartskriptService is not null)
-        {
-            try
-            {
-                await _options.RepositoryStartskriptService.RunAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                startskriptHinweis =
-                    $"Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden ({ex.Message}).";
-                _logger.LogWarning(ex, "Repository-Startskript für Aufgabe {AufgabeId} ist fehlgeschlagen.", aufgabeId);
-            }
-        }
+        var initialisierungsskriptHinweis = await RunInitialisierungsskriptAsync(aufgabeId, repository, lokalerKlonPfad, ct);
+        var startskriptHinweis = await RunStartskriptAsync(aufgabeId, repository, lokalerKlonPfad, ct);
 
         await CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, repository.StartKonfiguration, ct);
         await UpdateGitignoreAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
@@ -582,12 +568,62 @@ public sealed class EntwicklungsprozessService
         var protokollNachricht = nutzeExistierendenBranch
             ? $"Klon angelegt, vorhandener Branch ausgecheckt: {branchName} in {lokalerKlonPfad}"
             : $"Klon und Branch angelegt: {branchName} in {lokalerKlonPfad}";
+        if (!string.IsNullOrWhiteSpace(initialisierungsskriptHinweis))
+        {
+            protokollNachricht = $"{protokollNachricht}\n{initialisierungsskriptHinweis}";
+        }
         if (!string.IsNullOrWhiteSpace(startskriptHinweis))
         {
             protokollNachricht = $"{protokollNachricht}\n{startskriptHinweis}";
         }
 
         await _protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.GitAktion, protokollNachricht, ct: ct);
+    }
+
+    private async Task<string?> RunInitialisierungsskriptAsync(Guid aufgabeId, GitRepository repository, string lokalerKlonPfad, CancellationToken ct)
+    {
+        if (repository.InitialisierungKonfiguration is null || _options.RepositoryInitialisierungService is null)
+        {
+            return null;
+        }
+
+        return await RunOptionalRepositoryScriptAsync(
+            aufgabeId,
+            "Initialisierungsskript",
+            () => _options.RepositoryInitialisierungService.RunAsync(lokalerKlonPfad, repository.InitialisierungKonfiguration, ct),
+            ct);
+    }
+
+    private async Task<string?> RunStartskriptAsync(Guid aufgabeId, GitRepository repository, string lokalerKlonPfad, CancellationToken ct)
+    {
+        if (repository.StartKonfiguration is null || _options.RepositoryStartskriptService is null)
+        {
+            return null;
+        }
+
+        return await RunOptionalRepositoryScriptAsync(
+            aufgabeId,
+            "Startskript",
+            () => _options.RepositoryStartskriptService.RunAsync(lokalerKlonPfad, repository.StartKonfiguration, ct),
+            ct);
+    }
+
+    private async Task<string?> RunOptionalRepositoryScriptAsync(Guid aufgabeId, string scriptLabel, Func<Task> runAsync, CancellationToken ct)
+    {
+        try
+        {
+            await runAsync();
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Repository-{ScriptLabel} für Aufgabe {AufgabeId} ist fehlgeschlagen.", scriptLabel, aufgabeId);
+            return $"Hinweis: Das Repository-{scriptLabel} konnte nicht ausgeführt werden ({ex.Message}).";
+        }
     }
 
     private async Task<GitRepository> ResolveRepositoryAsync(Aufgabe aufgabe, string repositoryUrl, CancellationToken ct)

@@ -747,4 +747,125 @@ public sealed class ProjektServiceTests : IDisposable
             .WithMessage("*relativ*");
     }
 
+    /// <summary>SaveRepositoryInitialisierungskriptAsync erstellt und persistiert eine neue Initialisierungskonfiguration.</summary>
+    [Fact]
+    public async Task SaveRepositoryInitialisierungskriptAsync_ShouldCreateConfiguration_WhenRepositoryExists()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit Initialisierungskonfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/init",
+            "test/init");
+
+        // Act
+        var saved = await _sut.SaveRepositoryInitialisierungskriptAsync(
+            repository.Id,
+            " scripts/init.ps1 ");
+
+        // Assert
+        saved.Should().NotBeNull();
+        saved!.GitRepositoryId.Should().Be(repository.Id);
+        saved.InitialisierungsskriptRelativePath.Should().Be("scripts/init.ps1");
+
+        var persisted = await _sut.GetDetailAsync(projekt.Id);
+        var persistedRepository = persisted!.Repositories.Single(r => r.Id == repository.Id);
+        persistedRepository.InitialisierungKonfiguration.Should().NotBeNull();
+        persistedRepository.InitialisierungKonfiguration!.InitialisierungsskriptRelativePath.Should().Be("scripts/init.ps1");
+    }
+
+    /// <summary>SaveRepositoryInitialisierungskriptAsync aktualisiert eine bestehende Initialisierungskonfiguration statt eine neue anzulegen.</summary>
+    [Fact]
+    public async Task SaveRepositoryInitialisierungskriptAsync_ShouldUpdateExistingConfiguration_WhenAlreadyPresent()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit bestehender Initialisierungskonfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/init-existing",
+            "test/init-existing");
+
+        var first = await _sut.SaveRepositoryInitialisierungskriptAsync(
+            repository.Id,
+            "scripts/init.ps1");
+
+        // Act
+        var updated = await _sut.SaveRepositoryInitialisierungskriptAsync(
+            repository.Id,
+            "scripts/updated-init.ps1");
+
+        // Assert
+        updated.Should().NotBeNull();
+        updated!.Id.Should().Be(first!.Id);
+        updated.InitialisierungsskriptRelativePath.Should().Be("scripts/updated-init.ps1");
+    }
+
+    /// <summary>SaveRepositoryInitialisierungskriptAsync löscht eine bestehende Initialisierungskonfiguration bei null/Leerstring-Eingabe.</summary>
+    /// <param name="emptyPath">Der zu übergebende leere/null-Pfad.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SaveRepositoryInitialisierungskriptAsync_ShouldDeleteExistingConfiguration_WhenPathIsNullOrEmpty(string? emptyPath)
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit zu löschender Initialisierungskonfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/init-delete",
+            "test/init-delete");
+        await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, "scripts/init.ps1");
+
+        // Act
+        var result = await _sut.SaveRepositoryInitialisierungskriptAsync(repository.Id, emptyPath);
+
+        // Assert
+        result.Should().BeNull();
+
+        var persisted = await _sut.GetDetailAsync(projekt.Id);
+        var persistedRepository = persisted!.Repositories.Single(r => r.Id == repository.Id);
+        persistedRepository.InitialisierungKonfiguration.Should().BeNull();
+    }
+
+    /// <summary>SaveRepositoryInitialisierungskriptAsync validiert absoluten Skriptpfad.</summary>
+    [Fact]
+    public async Task SaveRepositoryInitialisierungskriptAsync_ShouldThrow_WhenScriptPathIsAbsolute()
+    {
+        // Arrange
+        var projekt = await _sut.CreateAsync("Projekt mit invalider Initialisierungskonfiguration", null);
+        var repository = await _sut.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/init-invalid",
+            "test/init-invalid");
+        var absolutePath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "init.ps1");
+
+        // Act
+        var act = () => _sut.SaveRepositoryInitialisierungskriptAsync(
+            repository.Id,
+            absolutePath);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*relativ*");
+    }
+
+    /// <summary>SaveRepositoryInitialisierungskriptAsync wirft InvalidOperationException bei unbekannter repositoryId.</summary>
+    [Fact]
+    public async Task SaveRepositoryInitialisierungskriptAsync_ShouldThrow_WhenRepositoryDoesNotExist()
+    {
+        // Arrange
+        var nonExistentId = Guid.NewGuid();
+
+        // Act
+        var act = () => _sut.SaveRepositoryInitialisierungskriptAsync(nonExistentId, "scripts/init.ps1");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*{nonExistentId}*");
+    }
+
 }
