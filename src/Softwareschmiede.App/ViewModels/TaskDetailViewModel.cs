@@ -102,6 +102,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 _ladenCts?.Cancel();
                 _ladenCts?.Dispose();
                 _ladenCts = new CancellationTokenSource();
+                _autonomAufgabeDetailViewModel?.Dispose();
                 _autonomAufgabeDetailViewModel = null;
                 OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
                 OnPropertyChanged(nameof(ShowAutomatisierungPanel));
@@ -139,6 +140,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(CurrentIssueReferenz));
             OnPropertyChanged(nameof(ShowInfoPanel));
             OnPropertyChanged(nameof(IsPullRequestViewSelected));
+            OnPropertyChanged(nameof(IsAutonomAufgabe));
             WaehleStandardAnsicht();
             DetailTitelAenderungAction?.Invoke(value?.Titel);
 
@@ -214,7 +216,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
-    public bool KannCliStoppen => _isCliRunning;
+    public bool KannCliStoppen => _isCliRunning && !IsAutonomAufgabe;
 
     /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann. Fuer Autonome Aufgaben immer false, da diese ueber den Projektleiter-Agenten statt die reguläre CLI-Ansicht gesteuert werden.</summary>
     public bool KannCliNeuStarten => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
@@ -371,6 +373,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Das ViewModel der aktuell angezeigten Autonomen Aufgabe, oder null wenn keine initialisiert wurde.</summary>
     public AutonomAufgabeDetailViewModel? AutonomAufgabeDetailViewModel => _autonomAufgabeDetailViewModel;
+
+    /// <summary>Gibt an, ob die angezeigte Aufgabe eine Autonome Aufgabe ist. Steuert die Sichtbarkeit der regulären
+    /// Aufgaben-Steuerungs-Buttons im Ribbon (bei autonomen Aufgaben erfolgt die Steuerung ausschließlich über die
+    /// Gruppe "Autonome Aufgabe").</summary>
+    public bool IsAutonomAufgabe => _aufgabe?.IstAutonom() == true;
 
     /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
     public bool ShowPullRequestPanel => _aufgabe is not null;
@@ -1454,6 +1461,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <param name="vm">Das anzuzeigende ViewModel der Autonomen Aufgabe.</param>
     public Task SetzeAutonomAufgabeDetailViewAsync(AutonomAufgabeDetailViewModel? vm)
     {
+        if (!ReferenceEquals(_autonomAufgabeDetailViewModel, vm))
+        {
+            _autonomAufgabeDetailViewModel?.Dispose();
+        }
+
         _autonomAufgabeDetailViewModel = vm;
         OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
@@ -1549,6 +1561,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
         _promptZeitVersandService.PromptSent -= OnPromptSent;
         _promptZeitVersandService.CancelScheduledPrompt(_aufgabeId);
+        _autonomAufgabeDetailViewModel?.Dispose();
         AttachCliStatusSession(null);
         _ladenCts?.Cancel();
         _ladenCts?.Dispose();

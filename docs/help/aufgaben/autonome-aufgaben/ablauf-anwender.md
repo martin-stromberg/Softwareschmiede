@@ -84,10 +84,17 @@ Skill-Autogeneration: Deaktiviert
 ### 4. Projektleiter-Agenten starten
 
 1. Im Ribbon-Menü der Aufgabendetails, Gruppe **„Autonome Aufgabe"**, klicke auf den Button **„Start"**
-2. Der Projektleiter-Agenten wird mit dem Initialprompt und Skill-Registry initialisiert
-3. Status in der **„Automatisierung"**-Registerkarte wechselt zu **„Läuft"** (mit aktiver Agent-ID)
+2. Es wird ein echter KI-CLI-Prozess für die Aufgabe gestartet (dieselbe CLI-Infrastruktur wie bei regulären Aufgaben) und die Projektleiter-Skill-Datei erzeugt
+3. Wenige Sekunden nach dem CLI-Start wird der Initialprompt automatisch an die laufende CLI-Session gesendet, damit der Projektleiter-Agent seine Arbeit beginnt
+4. Status in der **„Automatisierung"**-Registerkarte wechselt zu **„Läuft"** (mit aktiver Agent-ID)
+
+Solange die CLI läuft, sind ausschließlich die Buttons **„Start"**, **„Stop"** und **„Resume"** im Ribbon (Gruppe **„Autonome Aufgabe"**) für die Steuerung zuständig — es gibt keine zusätzlichen Bedienelemente innerhalb der **„Automatisierung"**-Registerkarte selbst. Zudem sind für Autonome Aufgaben die regulären Ribbon-Buttons **„Starten"**/**„Beenden"** (Gruppe **„Aufgabe"**) sowie **„CLI starten"**/**„Stoppen"** (Gruppe **„Ausführung"**) ausgeblendet, da die gesamte Steuerung über die Gruppe **„Autonome Aufgabe"** läuft.
 
 > **Hinweis:** Der Agent läuft im Hintergrund. Sie können währenddessen zu anderen Aufgaben wechseln. Wenn Sie zu einer anderen Aufgabe wechseln und später zu dieser Aufgabe zurückkehren, wird für die Detailansicht eine neue Instanz erzeugt, in der die **„Automatisierung"**-Registerkarte zunächst nicht sichtbar ist — es wird beim Laden nicht automatisch geprüft, ob bereits eine Autonome Aufgabe initialisiert wurde.
+
+### 4a. Autonome Aufgabe beenden
+
+Ein Klick auf den Ribbon-Button **„Stop"** (Gruppe **„Autonome Aufgabe"**) stoppt den laufenden CLI-Prozess und merkt sich dauerhaft, dass die Aufgabe **explizit gestoppt** wurde. Das ist wichtig für das Verhalten bei einem App-Neustart (siehe Abschnitt 8): Nur explizit gestoppte Aufgaben werden beim nächsten Programmstart **nicht** automatisch fortgesetzt. Der Button ist auch dann klickbar, wenn der CLI-Prozess bereits von selbst beendet wurde (z. B. zwischen zwei Arbeitsschritten oder nach einem Absturz) — das Stoppen-Flag wird in jedem Fall gesetzt.
 
 ### 5. Fortschritt überwachen (optional)
 
@@ -125,6 +132,15 @@ Nach erfolgreicher Ausführung:
 3. Ein Pull Request wird vorbereitet (nicht automatisch gemergt)
 4. Sie können den PR öffnen und reviewen
 5. Bei Bedarf manuell mergen oder Änderungen anfordern
+
+### 8. Verhalten bei Beenden und Neustart des Programms
+
+Wird das Programm beendet und später wieder gestartet, prüft es beim Start automatisch alle Autonomen Aufgaben:
+
+- **Nicht explizit gestoppte Aufgaben** (Status weiterhin aktiv, siehe Abschnitt 4a) werden **automatisch fortgesetzt**: Die CLI wird neu gestartet, dabei wird — sofern das verwendete KI-Plugin Session-Fortsetzung unterstützt — versucht, an die zuletzt aktive Session anzuknüpfen, und ein „Weitermachen"-Prompt wird automatisch an die neue CLI-Session gesendet, der den Agenten auffordert, anhand von `state.json`, `plan.md` und `progress.md` den aktuellen Stand zu prüfen und fortzufahren.
+- **Explizit gestoppte Aufgaben** (Button „Stop" wurde geklickt) werden **nicht** automatisch neu gestartet. Um sie fortzusetzen, ist ein manueller Klick auf **„Start"** im Ribbon erforderlich.
+
+Fehler bei dieser automatischen Wiederaufnahme (z. B. wenn das Arbeitsverzeichnis nicht mehr existiert) werden protokolliert, verhindern aber nicht den normalen Programmstart — betroffen ist immer nur die jeweilige Aufgabe.
 
 ## Ergebnis
 

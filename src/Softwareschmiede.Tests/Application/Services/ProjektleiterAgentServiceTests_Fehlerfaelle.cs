@@ -15,6 +15,8 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly Mock<ICliRunner> _cliRunnerMock = new();
+    private readonly KiAusfuehrungsService _kiAusfuehrungsService;
+    private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly ProjektleiterAgentService _sut;
     private readonly string _testRoot;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -28,7 +30,9 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
 
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
         var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
-        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
+        _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
+        (_kiPluginMock, var pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(_db);
+        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "ProjektleiterAgentFehler", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testRoot);
@@ -41,6 +45,7 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
+        _kiAusfuehrungsService.Dispose();
         _db.Dispose();
         if (Directory.Exists(_testRoot))
         {
@@ -190,5 +195,22 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
 
         var progressInhalt = await File.ReadAllTextAsync(Path.Combine(_testRoot, "progress.md"));
         progressInhalt.Should().Contain("kein task_report.md gefunden");
+    }
+
+    /// <summary>StarteAgentAsync setzt AusfuehrungsStatus auf Beendet und wirft weiter, wenn der CLI-Start über KiAusfuehrungsService fehlschlägt.</summary>
+    [Fact]
+    public async Task StarteAgentAsync_WhenKiAusfuehrungsServiceThrows_SetsStatusBeendetAndRethrows()
+    {
+        var (aufgabe, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
+        _kiPluginMock
+            .Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("CLI-Start fehlgeschlagen"));
+
+        var akt = () => _sut.StarteAgentAsync(konfiguration);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+
+        var aktualisiert = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        aktualisiert!.AusfuehrungsStatus.Should().Be(AufgabeAusfuehrungsStatus.Beendet);
     }
 }

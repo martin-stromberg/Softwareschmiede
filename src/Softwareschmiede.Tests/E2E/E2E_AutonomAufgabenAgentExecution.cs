@@ -7,6 +7,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -63,12 +64,13 @@ public partial class End2EndTest
         ConfirmDialog(initDialog, "AutonomAufgabeBestaetigen");
 
         // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
-        // wechselt selbst zur "Automatisierung"-Registerkarte.
-        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStart"), Long);
+        // wechselt selbst zur "Automatisierung"-Registerkarte (identifiziert über deren TabControl
+        // "AutonomAufgabeDetailTabs" — eigene Start/Stop/Resume-Buttons im Inhaltsbereich gibt es bewusst
+        // nicht mehr, Steuerung erfolgt ausschließlich über das Ribbon).
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeDetailTabs"), Long);
 
         // Phase 1: Projektleiter-Agent-Start über echte UI-Interaktion — über den Ribbon-Button
-        // "Start" (Gruppe "Autonome Aufgabe"), nicht über den (weiterhin vorhandenen, aber hier bewusst
-        // nicht verwendeten) gleichnamigen Button innerhalb der eingebetteten AutonomAufgabeDetailView.
+        // "Start" (Gruppe "Autonome Aufgabe").
         var startButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStartAgent"), Long);
         startButton.AsButton().Click();
 
@@ -128,7 +130,9 @@ public partial class End2EndTest
                 .Returns<string, CancellationToken>((pfad, _) => Task.FromResult(ResolveLocalWorkspacePointerPath(pfad)));
 
             var gitProvisioningService = new UnteragentGitProvisioningService(cliRunner, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
-            var projektleiterAgentService = new ProjektleiterAgentService(db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
+            using var kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
+            var (_, pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(db);
+            var projektleiterAgentService = new ProjektleiterAgentService(db, governanceService, gitProvisioningService, kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
             await projektleiterAgentService.SteuereUnteragentAsync(unteragent);
         }
 
@@ -184,6 +188,32 @@ public partial class End2EndTest
             Assert.Null(konfiguration.SessionPauseUtc);
             Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
             Assert.False(string.IsNullOrWhiteSpace(aufgabe.VorschlagPrompt), "Weitermachen-Prompt wurde nicht gesetzt.");
+        }
+
+        // Phase 5: Reguläre Aufgaben-Buttons ("Starten"/"Beenden", Gruppe "Aufgabe") sind für Autonome Aufgaben
+        // ausgeblendet (TaskDetailViewModel.IsAutonomAufgabe == true) — Collapsed-Elemente erscheinen nicht im
+        // UIA-Baum, daher genügt FindFirstDescendant + Null-Check (siehe AufgabeStarten_KlontRepositoryUndStartetCli_E2E
+        // für dasselbe Assertion-Muster bei einem anderen Collapsed-Element).
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("Starten")));
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("Beenden")));
+
+        // Phase 6: Explizites Stoppen via Ribbon-Button "Beenden" (Gruppe "Autonome Aufgabe", AutomationName
+        // "AutonomAufgabeStopAgent") setzt ExplizitGestoppt und stoppt den laufenden Projektleiter-Agent-CLI-Prozess
+        // — verhindert einen automatischen Wiederstart durch App-Startup-Recovery.
+        var stopButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStopAgent"), Short);
+        stopButton.AsButton().Click();
+
+        await WartenBisAsync(async () =>
+        {
+            await using var db = OpenTestDbContext();
+            var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
+            return konfiguration.ExplizitGestoppt;
+        });
+
+        await using (var db = OpenTestDbContext())
+        {
+            var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
+            Assert.True(konfiguration.ExplizitGestoppt, "ExplizitGestoppt muss nach Klick auf den Ribbon-Button 'Beenden' gesetzt sein.");
         }
 
         NavigateBackFromTaskToProject(mainWindow);

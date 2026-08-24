@@ -55,6 +55,7 @@ public sealed class AutonomAufgabeStartService
                 konfiguration,
                 _serviceProvider.GetRequiredService<ProjektleiterAgentService>(),
                 _serviceProvider.GetRequiredService<SessionManagementService>(),
+                _serviceProvider.GetRequiredService<KiAusfuehrungsService>(),
                 _serviceProvider.GetRequiredService<ILogger<AutonomAufgabeDetailViewModel>>());
             return new AutonomAufgabeStartResult(aktuelleAufgabe, null, detailVm);
         }

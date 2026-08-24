@@ -62,6 +62,9 @@ public sealed class AutonomAufgabeKonfiguration
     /// <summary>Anzahl aktuell aktiver Unteragenten.</summary>
     public int? AktiveUnteragenten { get; set; }
 
+    /// <summary>Kennzeichnet, ob der Benutzer die CLI explizit gestoppt hat (im Unterschied zur Session-Pause bei Budget-Limit).</summary>
+    public bool ExplizitGestoppt { get; set; }
+
     /// <summary>Navigationseigenschaft zur zugehörigen Aufgabe.</summary>
     public Aufgabe Aufgabe { get; set; } = null!;
 

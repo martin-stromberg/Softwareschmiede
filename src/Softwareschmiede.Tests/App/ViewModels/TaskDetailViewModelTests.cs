@@ -440,6 +440,55 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.StartenCommand.CanExecute(null).Should().BeFalse();
     }
 
+    // --- IsAutonomAufgabe ---
+
+    /// <summary>IsAutonomAufgabe ist true, wenn für die Aufgabe eine AutonomAufgabeKonfiguration vorhanden ist.</summary>
+    [Fact]
+    public async Task IsAutonomAufgabe_True_WhenAutonomKonfigurationPresent()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await MacheAufgabeAutonomAsync(aufgabe.Id);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsAutonomAufgabe.Should().BeTrue();
+    }
+
+    /// <summary>IsAutonomAufgabe ist false für eine reguläre Aufgabe ohne AutonomAufgabeKonfiguration.</summary>
+    [Fact]
+    public async Task IsAutonomAufgabe_False_WhenAutonomKonfigurationNull()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsAutonomAufgabe.Should().BeFalse();
+    }
+
+    /// <summary>Der reguläre "Stoppen"-Button (Gruppe "Ausführung") darf für Autonome Aufgaben nicht verfügbar sein, auch
+    /// wenn deren CLI-Prozess tatsächlich läuft (Projektleiter-Agent registriert seinen Prozess unter derselben
+    /// AufgabeId in KiAusfuehrungsService). Andernfalls würde ein Klick den Prozess über CliStoppenCommand direkt
+    /// beenden, ohne AutonomAufgabeKonfiguration.ExplizitGestoppt zu setzen — die Aufgabe würde beim nächsten
+    /// App-Neustart fälschlich automatisch wieder fortgesetzt (siehe ProjektleiterAgentService.StoppeAgenExplizitAsync).</summary>
+    [Fact]
+    public async Task KannCliStoppen_ShouldBeFalse_WhenAufgabeIstAutonom_EvenIfCliIsRunning()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await MacheAufgabeAutonomAsync(aufgabe.Id);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        var arbeitsverzeichnis = _tempDirectoryFixture.CreateTempDirectory("autonom-cli-stoppen-test");
+        await _kiService.StartWithPseudoConsoleAsync(aufgabe.Id, _kiPluginMock.Object, arbeitsverzeichnis, null, CancellationToken.None);
+
+        sut.IsCliRunning.Should().BeTrue("Vorbedingung: der Projektleiter-Agent-Prozess läuft unter derselben AufgabeId");
+        sut.KannCliStoppen.Should().BeFalse();
+        sut.CliStoppenCommand.CanExecute(null).Should().BeFalse();
+    }
+
     // --- ShowFileExplorerPanel, DateiViewCommand ---
 
     /// <summary>DateiViewCommand wechselt zur Dateiexplorer-Ansicht.</summary>

@@ -7,7 +7,8 @@
 Eine Autonome Aufgabe durchläuft folgende technische Phasen:
 
 1. **Initialisierung** — Arbeitsverzeichnis, Repository-Klon, Konfiguration
-2. **Agent-Start** — Projektleiter-Agent wird mit Initialprompt und Skill-Registry geladen
+2. **Agent-Start** — echter CLI-Prozess wird über `KiAusfuehrungsService` gestartet, Initialprompt wird verzögert an die CLI-Session gesendet; explizites Stoppen setzt `ExplizitGestoppt` und verhindert automatischen Wiederstart
+2b. **App-Neustart-Recovery** — beim Programmstart werden nicht explizit gestoppte, aktive Autonome Aufgaben automatisch mit Weitermachen-Prompt neu gestartet
 3. **Unteragenten-Orchestrierung** — Projektleiter erzeugt und verwaltet Unteragenten
 4. **Session-Management** — Token-Budget, Laufzeitlimit, Heartbeat-Überwachung
 5. **Integrationn & Abschluss** — Ergebnisse zusammenfassen, PR vorbereiten
@@ -202,52 +203,79 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
 ```
 Benutzer: Klickt "Start"-Button im Ribbon (Gruppe "Autonome Aufgabe")
     ↓
-AutonomAufgabeDetailViewModel.StartCommand (gebunden von der "Automatisierung"-Registerkarte)
+AutonomAufgabeDetailViewModel.StartCommand → StarteAgentAsync(ct)
     ↓
-ProjektleiterAgentService.StarteAgenAsync(konfiguration)
+ProjektleiterAgentService.StarteAgentAsync(konfiguration, optionalResumePrompt: null, ct)
 ```
 
-Nach erfolgreichem Start wird der Agent mit dem Initialprompt und der Skill-Registry initialisiert. Die **„Automatisierung"**-Registerkarte zeigt den Status als **„Läuft"** an.
+`ProjektleiterAgentService.StarteAgentAsync()` startet — anders als in einem früheren Entwicklungsstand, in dem diese Methode nur DB-Felder setzte — einen **echten CLI-Prozess** über dieselbe Infrastruktur wie bei regulären Aufgaben (`KiAusfuehrungsService`).
 
-**Methode: `ProjektleiterAgentService.StarteAgenAsync()`**
+**Methode: `ProjektleiterAgentService.StarteAgentAsync(konfiguration, optionalResumePrompt, ct)`**
 
-1. **Konfiguration laden**
-   - Lese `AutonomAufgabeKonfiguration` aus DB
-   - Lese `state.json` aus Arbeitsverzeichnis
-   - Lese `governance.md` für Limits
+1. **Skill-Datei erzeugen** (falls nicht vorhanden): `skills/skill_projektleiter_v1.md` im Arbeitsverzeichnis, Inhalt aus `BuildDefaultProjektleiterSkill(konfiguration)` (enthält u. a. den Initialprompt).
+2. **Plugin auflösen**: `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync(aufgabe.KiPluginPrefix, ct)` liefert das zu verwendende `IKiPlugin`.
+3. **`optionalParameters` bestimmen**: `"--continue"`, wenn `optionalResumePrompt` gesetzt ist (Resume-Fall, siehe Phase 2b) **und** `kiPlugin.SupportsSessionContinuation() == true`; sonst `null`. Wichtig: Dieser Parameter wird von jedem KI-Plugin als rohe Kommandozeilenargumente interpretiert (`ProcessStartInfo.Arguments`) — er enthält **niemals** den Prompttext selbst.
+4. **CLI starten**: `KiAusfuehrungsService.StartWithPseudoConsoleAsync(aufgabeId, kiPlugin, konfiguration.ArbeitsverzeichnisPfad, optionalParameters, ct)` — startet den CLI-Prozess per ConPTY (dieselbe Mechanik wie `EntwicklungsprozessService.CliNeustartenAsync()` für reguläre Aufgaben). Schlägt dieser Schritt fehl, wird `AusfuehrungsStatus = Beendet` gesetzt und die Exception weitergeworfen.
+5. **Prompt verzögert senden**: Fire-and-Forget-Aufruf der privaten Methode `SendeInitialPromptVerzoegertAsync(aufgabeId, promptText, ct)` mit `promptText = optionalResumePrompt ?? konfiguration.InitialPrompt`. Diese wartet `PromptSendeVerzoegerungMs` (3000 ms — deutlich länger als die 300-ms-Verzögerung beim regulären CLI-Start, da zusätzlich der Eigenstart der KI-CLI abgewartet werden muss) und ruft anschließend `KiAusfuehrungsService.GetPseudoConsoleSession(aufgabeId)` sowie `PseudoConsoleSession.WritePromptAsync(promptText, ct)` auf — der Prompt wird damit als Texteingabe in die laufende CLI-Session geschrieben, nicht als Kommandozeilenargument. Fehler (z. B. Session bereits beendet) werden geloggt, nicht geworfen.
+6. **DB aktualisieren**: neue `agentId` (`projektleiter-{guid}`) erzeugen, `AutonomKonfiguration.ProjektleiterAgentId`, `AutonomKonfiguration.ExplizitGestoppt = false`, `Aufgabe.AusfuehrungsStatus = Aktiv`, `Aufgabe.AktiveRunId`, `Aufgabe.LastHeartbeatUtc` setzen, `SaveChangesAsync()`.
 
-2. **Skills vorbereiten**
-   - Lade Skill `skills/skill_projektleiter_v1.md` aus Dateisystem
-   - Registriere weitereSkills aus DB (`SkillDefinition` mit `Status == Freigegeben`)
-
-3. **Agent erzeugen und starten**
-   ```csharp
-   var agentRequest = new AgentStartRequest
-   {
-       Prompt = konfiguration.InitialPrompt,
-       SkillRegistry = skills,
-       WorkingDirectory = konfiguration.ArbeitsverzeichnisPfad,
-       Limits = new AgentLimits
-       {
-           TokenBudget = konfiguration.TokenBudget,
-           RuntimeMinutes = konfiguration.LaufzeitLimitMinuten,
-           MaxSubagents = governance.MaxSubagents
-       }
-   };
-   var agentId = await _agentRuntime.StartAgentAsync(agentRequest);
-   ```
-
-4. **DB aktualisieren**
-   ```csharp
-   aufgabe.AutonomKonfiguration.ProjektleiterAgentId = agentId;
-   aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-   aufgabe.AktiveRunId = agentId; // oder run-spezifische ID
-   await _db.SaveChangesAsync();
-   ```
+Die **„Automatisierung"**-Registerkarte zeigt den Status als **„Läuft"** an, sobald `KiAusfuehrungsService.CliProcessStatusChanged` das `AutonomAufgabeDetailViewModel` über den erfolgreichen Start informiert (`CliIsRunning` wird darüber aktualisiert).
 
 **Beteiligte Klassen:**
 - `ProjektleiterAgentService`
-- `AgentRuntime` (oder äquivalente Agent-Infrastruktur)
+- `KiAusfuehrungsService` (CLI-Prozessverwaltung, `StartWithPseudoConsoleAsync`, `GetPseudoConsoleSession`, `StopCliAsync`)
+- `PluginSelectionService` (`ResolveDevelopmentAutomationPluginAsync`)
+- `PseudoConsoleSession` (`WritePromptAsync`)
+- `SoftwareschmiededDbContext`
+
+---
+
+### Phase 2a: Explizites Stoppen
+
+**Aufruf-Chain:**
+```
+Benutzer: Klickt "Stop"-Button im Ribbon (Gruppe "Autonome Aufgabe")
+    ↓
+AutonomAufgabeDetailViewModel.StopCommand → StoppeAgentAsync(ct)
+    ↓
+ProjektleiterAgentService.StoppeAgenExplizitAsync(aufgabeId, ct)
+```
+
+**Methode: `ProjektleiterAgentService.StoppeAgenExplizitAsync()`**
+
+1. `AutonomAufgabeKonfiguration` laden, `ExplizitGestoppt = true` setzen und **sofort** per `SaveChangesAsync()` persistieren (bewusst vor dem CLI-Stopp, siehe unten).
+2. `KiAusfuehrungsService.StopCliAsync(aufgabeId, ct)` aufrufen (Best-Effort: SIGTERM/`CloseMainWindow()`, nach 5s `Kill`); Fehler werden geloggt, nicht geworfen.
+
+Die Reihenfolge (Flag zuerst, CLI-Stopp danach) ist bewusst gewählt: `ExplizitGestoppt` ist die sicherheitsrelevante Aussage, die einen ungewollten automatischen Wiederstart bei App-Neustart verhindert (Phase 2b), und muss unabhängig davon persistiert werden, ob der eigentliche Prozess-Stopp gelingt. `StopCommand.CanExecute` prüft dazu bewusst nur `!IsBusy` (nicht `CliIsRunning`), damit „Stop" auch klickbar bleibt, wenn der CLI-Prozess bereits von selbst beendet wurde.
+
+---
+
+### Phase 2b: App-Neustart-Recovery
+
+**Aufruf-Chain:**
+```
+App.xaml.cs: StartupAsync(e)
+    ↓ (nach PromptVorlagenService.EnsureInitialPromptVorlagenAsync())
+Neuer DI-Scope wird erstellt
+    ↓
+Abfrage: AutonomAufgabeKonfigurationen.Where(k => !k.ExplizitGestoppt && k.Aufgabe.AusfuehrungsStatus == Aktiv)
+    ↓ (für jede gefundene Konfiguration)
+ProjektleiterAgentService.StarteAgenNachAppNeustartAsync(aufgabeId, resumePrompt, ct)
+```
+
+**Methode: `App.ErstelleResumePromptNachAppNeustart()`** generiert einen statischen Weitermachen-Prompt-Text ("Weitermachen nach App-Neustart: Setze die Arbeit an der Autonomen Aufgabe im Arbeitsverzeichnis '...' fort. Prüfe state.json, plan.md und progress.md für den aktuellen Stand, bevor du weitermachst.").
+
+**Methode: `ProjektleiterAgentService.StarteAgenNachAppNeustartAsync(aufgabeId, resumePrompt, ct)`**
+
+1. `AutonomAufgabeKonfiguration` laden.
+2. Prüfen: `!ExplizitGestoppt && AusfuehrungsStatus == Aktiv` — sonst (explizit gestoppt oder nicht mehr aktiv) wird ohne Aktion zurückgekehrt.
+3. Sonst: `StarteAgentAsync(konfiguration, optionalResumePrompt: resumePrompt, ct)` aufrufen — durchläuft denselben Ablauf wie Phase 2, sendet aber den Resume-Prompt statt des Initialprompts und übergibt `optionalParameters = "--continue"`, falls das Plugin Session-Fortsetzung unterstützt (`SupportsSessionContinuation()`, aktuell verifiziert für `ClaudeCliPlugin`).
+
+Fehler pro Aufgabe werden geloggt, verhindern aber nicht den App-Start und die Recovery weiterer Aufgaben (Best-Effort, jede Aufgabe wird einzeln in einem eigenen `try`/`catch` behandelt).
+
+**Beteiligte Klassen:**
+- `App` (`App.xaml.cs`, Startup-Recovery-Block)
+- `ProjektleiterAgentService`
 - `SoftwareschmiededDbContext`
 
 ---
@@ -521,12 +549,13 @@ sequenceDiagram
     UI->>UI: Zeigt "Automatisierung"-Registerkarte mit Start/Stop/Fortsetzen-Buttons
 
     Benutzer->>UI: Klickt "Start" Button im Ribbon
-    UI->>Proj: StarteAgenAsync(konfiguration)
-    Proj->>Proj: Skills laden
-    Proj->>Agent: Agenten erzeugen & starten
-    Proj->>DB: ProjektleiterAgentId speichern
+    UI->>Proj: StarteAgentAsync(konfiguration)
+    Proj->>Proj: Skill-Datei erzeugen, Plugin auflösen
+    Proj->>Agent: KiAusfuehrungsService.StartWithPseudoConsoleAsync (echter CLI-Prozess)
+    Proj->>Agent: (verzögert, Fire-and-Forget) PseudoConsoleSession.WritePromptAsync(Initialprompt)
+    Proj->>DB: ProjektleiterAgentId, ExplizitGestoppt=false speichern
     Proj-->>UI: agent_id zurück
-    UI->>UI: Status auf "Läuft" aktualisieren
+    UI->>UI: Status auf "Läuft" aktualisieren (via CliProcessStatusChanged)
 
     par Projektleiter-Agent läuft
         Agent->>Proj: SteuereUnteragentAsync()

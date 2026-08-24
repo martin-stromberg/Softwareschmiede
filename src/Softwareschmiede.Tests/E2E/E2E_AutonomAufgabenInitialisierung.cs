@@ -77,8 +77,10 @@ public partial class End2EndTest
 
         // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
         // wechselt selbst zur neuen "Automatisierung"-Registerkarte, die die eingebettete
-        // AutonomAufgabeDetailView anzeigt.
-        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStart"), Long);
+        // AutonomAufgabeDetailView anzeigt (identifiziert über deren TabControl "AutonomAufgabeDetailTabs" —
+        // eigene Start/Stop/Resume-Buttons im Inhaltsbereich gibt es bewusst nicht mehr, Steuerung erfolgt
+        // ausschließlich über das Ribbon).
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeDetailTabs"), Long);
 
         // Die Ribbon-Buttons "Start"/"Stop"/"Resume" (Gruppe "Autonome Aufgabe") sind jetzt sichtbar.
         WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStartAgent"), Short);
@@ -90,11 +92,11 @@ public partial class End2EndTest
         var infoViewButton = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Short);
         infoViewButton.AsButton().Click();
         WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeStart")));
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeDetailTabs")));
 
         var automatisierungViewButton = WaitForElement(mainWindow, cf => cf.ByName("AutomatisierungViewButton"), Short);
         automatisierungViewButton.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStart"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeDetailTabs"), Short);
 
         string arbeitsverzeichnisPfad;
         string projektBranchName;

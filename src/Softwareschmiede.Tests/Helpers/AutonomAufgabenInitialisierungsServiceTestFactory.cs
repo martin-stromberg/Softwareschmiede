@@ -78,34 +78,44 @@ internal static class AutonomAufgabenInitialisierungsServiceTestFactory
     public static AutonomAufgabenInitialisierungsService CreateService(SoftwareschmiededDbContext db, ICliRunner cliRunner, IGitPlugin gitPlugin)
         => new(db, cliRunner, CreatePluginSelectionService(db, gitPlugin), Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
 
-    /// <summary>Erstellt einen ProjektleiterAgentService mit gemockten Governance-/Git-Provisionierungs-Abhängigkeiten für Tests.</summary>
+    /// <summary>Erstellt einen ProjektleiterAgentService mit gemockten Governance-/Git-Provisionierungs-Abhängigkeiten sowie einem
+    /// prozesslosen KiAusfuehrungsService (<see cref="TestKiAusfuehrungsServiceFactory"/>, sofern <paramref name="kiAusfuehrungsService"/>
+    /// nicht übergeben wird) und einem auf ein einziges KI-Plugin aufgelösten PluginSelectionService für Tests.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
+    /// <param name="kiAusfuehrungsService">Optionaler, bereits vorhandener KiAusfuehrungsService (z. B. um denselben Service auch für ein zugehöriges AutonomAufgabeDetailViewModel zu verwenden); wird sonst neu erstellt.</param>
     /// <returns>Ein einsatzbereiter ProjektleiterAgentService.</returns>
-    public static ProjektleiterAgentService CreateProjektleiterAgentService(SoftwareschmiededDbContext db)
+    public static ProjektleiterAgentService CreateProjektleiterAgentService(SoftwareschmiededDbContext db, KiAusfuehrungsService? kiAusfuehrungsService = null)
         => new(
             db,
             new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance),
             new UnteragentGitProvisioningService(new Mock<ICliRunner>().Object, new Mock<IGitPlugin>().Object, NullLogger<UnteragentGitProvisioningService>.Instance),
+            kiAusfuehrungsService ?? TestKiAusfuehrungsServiceFactory.Create(),
+            ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(db).PluginSelectionService,
             NullLogger<ProjektleiterAgentService>.Instance);
 
-    /// <summary>Erstellt ein einsatzbereites AutonomAufgabeDetailViewModel für <paramref name="aufgabe"/>/<paramref name="konfiguration"/> mit minimalen (aber echten) Abhängigkeiten.</summary>
+    /// <summary>Erstellt ein einsatzbereites AutonomAufgabeDetailViewModel für <paramref name="aufgabe"/>/<paramref name="konfiguration"/> mit minimalen (aber echten) Abhängigkeiten. Der intern erstellte ProjektleiterAgentService und das ViewModel selbst teilen sich denselben KiAusfuehrungsService, damit CLI-Start und CliIsRunning-Tracking konsistent bleiben.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="aufgabe">Die Aufgabe, für die das ViewModel erstellt wird.</param>
     /// <param name="konfiguration">Die zugehörige AutonomAufgabeKonfiguration.</param>
     /// <returns>Ein einsatzbereites AutonomAufgabeDetailViewModel.</returns>
     public static AutonomAufgabeDetailViewModel CreateAutonomAufgabeDetailViewModel(
         SoftwareschmiededDbContext db, Aufgabe aufgabe, AutonomAufgabeKonfiguration konfiguration)
-        => new(
+    {
+        var kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
+        return new AutonomAufgabeDetailViewModel(
             aufgabe,
             konfiguration,
-            CreateProjektleiterAgentService(db),
+            CreateProjektleiterAgentService(db, kiAusfuehrungsService),
             new SessionManagementService(db, NullLogger<SessionManagementService>.Instance),
+            kiAusfuehrungsService,
             NullLogger<AutonomAufgabeDetailViewModel>.Instance);
+    }
 
     /// <summary>
     /// Erstellt einen IServiceProvider mit den für <c>AutonomAufgabeStartService.StarteAsync</c> benötigten
     /// Registrierungen (AutonomAufgabeInitialisierungsDialogViewModel, ProjektleiterAgentService,
-    /// SessionManagementService, ILogger&lt;AutonomAufgabeDetailViewModel&gt;).
+    /// SessionManagementService, KiAusfuehrungsService, ILogger&lt;AutonomAufgabeDetailViewModel&gt;).
+    /// ProjektleiterAgentService und der direkt auflösbare KiAusfuehrungsService teilen sich dieselbe Instanz.
     /// </summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="initialisierungsService">Der für den Initialisierungsdialog zu verwendende Service.</param>
@@ -116,6 +126,7 @@ internal static class AutonomAufgabenInitialisierungsServiceTestFactory
     {
         var promptVorlagenService = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
         var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
+        var kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
 
         return new ServiceCollection()
             .AddTransient(_ => new AutonomAufgabeInitialisierungsDialogViewModel(
@@ -125,7 +136,8 @@ internal static class AutonomAufgabenInitialisierungsServiceTestFactory
                 pluginManager,
                 promptVorlagenService,
                 promptVorlagenPlatzhalterService))
-            .AddTransient(_ => CreateProjektleiterAgentService(db))
+            .AddSingleton(kiAusfuehrungsService)
+            .AddTransient(sp => CreateProjektleiterAgentService(db, sp.GetRequiredService<KiAusfuehrungsService>()))
             .AddTransient(_ => new SessionManagementService(db, NullLogger<SessionManagementService>.Instance))
             .AddTransient(_ => (ILogger<AutonomAufgabeDetailViewModel>)NullLogger<AutonomAufgabeDetailViewModel>.Instance)
             .BuildServiceProvider();

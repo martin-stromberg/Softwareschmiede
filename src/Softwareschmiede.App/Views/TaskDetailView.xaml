@@ -49,11 +49,13 @@
                             <controls:RibbonLargeButton ButtonIcon="▶"
                                                         ButtonText="Starten"
                                                         AutomationName="Starten"
-                                                        ButtonCommand="{Binding StartenCommand}" />
+                                                        ButtonCommand="{Binding StartenCommand}"
+                                                        Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="✓"
                                                         ButtonText="Beenden"
                                                         AutomationName="Beenden"
-                                                        ButtonCommand="{Binding AufgabeAbschliessenCommand}" />
+                                                        ButtonCommand="{Binding AufgabeAbschliessenCommand}"
+                                                        Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
                             <TextBlock Text="{Binding TodoList.OffeneTodoCount, StringFormat='⚠ {0} offen'}"
                                        AutomationProperties.Name="OffeneTodoCountBadge"
                                        AutomationProperties.HelpText="{Binding TodoList.OffeneTodoCount}"
@@ -86,7 +88,7 @@
                                                         ButtonText="Stoppen"
                                                         AutomationName="CliStoppen"
                                                         ButtonCommand="{Binding CliStoppenCommand}"
-                                                        Visibility="{Binding IsCliRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        Visibility="{Binding KannCliStoppen, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <StackPanel Margin="12,0,0,0"
                                         VerticalAlignment="Center">
                                 <TextBlock Text="Promptvorlage"
