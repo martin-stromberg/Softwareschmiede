@@ -84,31 +84,41 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
        - Erstelle: {pfad}/permissions.json (JSON mit Berechtigungen)
    ```
 
-3. **Repository-Klon**
+3. **Plugin-Auflösung**
    ```
-   Aufruf: KloneHauptRepositoryAsync(aufgabe, {pfad}/clones/repo_main)
+   Aufruf: _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(aufgabe.GitRepository?.PluginTyp, ct)
+       - Resolves das SCM-Plugin anhand der aufgabenspezifischen Konfiguration (aufgabe.GitRepository.PluginTyp)
+       - Falls aufgabe.GitRepository?.PluginTyp null ist, wird der gespeicherte Default herangezogen
+       - Falls auch kein Default vorhanden, wird ein Fallback-Plugin (alphabetisch erste aktive Implementierung) verwendet
+       - Rückgabe: vollständig initialisierte IGitPlugin-Instanz
+       - Dieses aufgelöste Plugin wird für alle nachfolgenden Klon- und Branch-Operationen verwendet (nicht das global konfigurierte Default-Plugin)
+   ```
+
+4. **Repository-Klon**
+   ```
+   Aufruf: KloneHauptRepositoryAsync(gitPlugin, aufgabe, {pfad}/clones/repo_main)
        - Quelle: aufgabe.GitRepository.RepositoryUrl (nicht mehr aufgabe.LokalerKlonPfad)
-       - _gitPlugin.CloneRepositoryAsync(repositoryUrl, zielPfad, ct)
+       - gitPlugin.CloneRepositoryAsync(repositoryUrl, zielPfad, ct) — verwendet das in Schritt 3 aufgelöste Plugin
        - Wirft InvalidOperationException, falls aufgabe.GitRepository?.RepositoryUrl leer ist
    ```
 
-4. **Projektbranch anlegen**
+5. **Projektbranch anlegen**
    ```
-   Aufruf: ErstelleProjektbranchAsync(aufgabe, {pfad}/clones/repo_main, anfrage.ProjektBranchName)
-       - Lädt Remote-Branches via _gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct)
+   Aufruf: ErstelleProjektbranchAsync(gitPlugin, aufgabe, {pfad}/clones/repo_main, anfrage.ProjektBranchName)
+       - Lädt Remote-Branches via gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct) — verwendet das in Schritt 3 aufgelöste Plugin
          (unterstützt das Plugin keine Remote-Branches, z. B. LocalDirectoryPlugin
          mit NotSupportedException, wird dies wie eine leere Liste behandelt)
-       - Branch bereits remote vorhanden: _gitPlugin.CheckoutRemoteBranchAsync(repoMainPfad, branchName, ct)
+       - Branch bereits remote vorhanden: gitPlugin.CheckoutRemoteBranchAsync(repoMainPfad, branchName, ct)
        - Sonst: Ist der lokale Branch bereits vorhanden (Retry-Fall, geprüft via
          "git branch --list" über _cliRunner), wird die Anlage übersprungen; andernfalls
-         _gitPlugin.CreateBranchAsync(repoMainPfad, branchName, sourceBranchName: null, ct)
+         gitPlugin.CreateBranchAsync(repoMainPfad, branchName, sourceBranchName: null, ct)
          (führt "git checkout -b" aus, checkt repoMainPfad dabei zugleich auf den neuen Branch
          aus — das ist der eigentliche Zweck dieses Schritts, da nachfolgend angelegte
          Unteragenten-Branches implizit von der aktuellen HEAD von repoMainPfad abzweigen)
        - Wirft InvalidOperationException bei Git-Fehler
    ```
 
-5. **state.json generieren**
+6. **state.json generieren**
    ```json
    {
      "task_id": "{aufgabe-id}",
@@ -148,7 +158,7 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
    }
    ```
 
-6. **DB-Eintrag erstellen**
+7. **DB-Eintrag erstellen**
    ```csharp
    var konfiguration = new AutonomAufgabeKonfiguration
    {
@@ -170,13 +180,14 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
    await _db.SaveChangesAsync();
    ```
 
-7. **Return** der `AutonomAufgabeKonfiguration`
+8. **Return** der `AutonomAufgabeKonfiguration`
 
 **Beteiligte Klassen:**
 - `AutonomAufgabenInitialisierungsService` (Orchestrierung, Repository-Klon, Projektbranch-Anlage)
 - `AutonomAufgabeInitialisierungsDialogViewModel` (Formular, Branch-/Vorlagen-Laden, Branch-Namensvalidierung)
 - `GitBranchNameValidator` (Validierung von Branch-Namen gegen Git-Regeln, verwendet sowohl im Dialog als auch im Service)
 - `IGitPlugin` (`CloneRepositoryAsync`, `GetRemoteBranchesAsync`, `CheckoutRemoteBranchAsync`, `CreateBranchAsync`, `ResolveEffectiveRepositoryPathAsync` — Klon sowie Branch-Auswahl/-Anlage im Service; `GetRemoteBranchesAsync` weiterhin für die Auswahlliste im Dialog)
+- `PluginSelectionService` (`ResolveSourceCodeManagementPluginAsync` — löst das für die Aufgabe zu verwendende `IGitPlugin` anhand von `aufgabe.GitRepository.PluginTyp` auf, siehe Schritt 3 „Plugin-Auflösung"; verwendet dasselbe Muster wie `EntwicklungsprozessService.ResolvePluginAsync` für reguläre Aufgaben)
 - `ICliRunner` (`git branch --list` für den Idempotenz-Check in `ErstelleProjektbranchAsync()` bzw. `LokalerBranchExistiertBereitsAsync()`)
 - `IPluginManager` (Ermittlung des passenden Git-Plugins im Dialog)
 - `PromptVorlagenService` / `PromptVorlagenPlatzhalterService` (Promptvorlagen laden und Platzhalter auflösen)

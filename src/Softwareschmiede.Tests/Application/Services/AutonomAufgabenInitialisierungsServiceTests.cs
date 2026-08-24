@@ -342,4 +342,63 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
 
         await akt.Should().ThrowAsync<InvalidOperationException>();
     }
+
+    /// <summary>
+    /// InitialisiereAsync löst das SCM-Plugin anhand von aufgabe.GitRepository.PluginTyp auf und verwendet für
+    /// Klon und Branch-Erstellung das dazu passende Plugin, nicht das global konfigurierte Default-Plugin
+    /// (Regressionstest für den in continue.md dokumentierten Bug: Klon lief bislang immer über
+    /// IPluginManager.GetDefaultSourceCodeManagementPlugin(), unabhängig vom tatsächlich am Repository der
+    /// Aufgabe konfigurierten Plugin).
+    /// </summary>
+    [Fact]
+    public async Task InitialisiereAsync_VerwendetPluginAusGitRepositoryPluginTyp_NichtDasDefaultPlugin()
+    {
+        var defaultGitPluginMock = new Mock<IGitPlugin>();
+        defaultGitPluginMock.SetupGet(p => p.PluginPrefix).Returns("DefaultScmPlugin");
+
+        var passendesGitPluginMock = new Mock<IGitPlugin>();
+        passendesGitPluginMock.SetupGet(p => p.PluginPrefix).Returns("TestGitPlugin");
+        passendesGitPluginMock
+            .Setup(p => p.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, zielPfad, _) =>
+            {
+                Directory.CreateDirectory(zielPfad);
+                File.WriteAllText(Path.Combine(zielPfad, ".git-marker"), "cloned");
+            })
+            .Returns(Task.CompletedTask);
+        passendesGitPluginMock
+            .Setup(p => p.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<string>());
+        passendesGitPluginMock.SetupPassthroughResolveEffectiveRepositoryPath();
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([defaultGitPluginMock.Object, passendesGitPluginMock.Object]);
+        pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(defaultGitPluginMock.Object);
+
+        var defaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var activationService = new PluginActivationService(
+            new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance),
+            pluginManagerMock.Object,
+            NullLogger<PluginActivationService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, defaultSettingsService, activationService, NullLogger<PluginSelectionService>.Instance);
+
+        var sut = new AutonomAufgabenInitialisierungsService(
+            _db,
+            _cliRunnerMock.Object,
+            pluginSelectionService,
+            Options.Create(new AutonomAufgabenOptions()),
+            NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+
+        // ErstelleAufgabeMitLokalemKlon legt GitRepository.PluginTyp = "TestGitPlugin" an.
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+        var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
+
+        await sut.InitialisiereAsync(aufgabe, anfrage);
+
+        passendesGitPluginMock.Verify(p => p.CloneRepositoryAsync(aufgabe.GitRepository!.RepositoryUrl, repoMainPfad, It.IsAny<CancellationToken>()), Times.Once);
+        passendesGitPluginMock.Verify(p => p.CreateBranchAsync(repoMainPfad, anfrage.ProjektBranchName, null, It.IsAny<CancellationToken>()), Times.Once);
+        defaultGitPluginMock.Verify(p => p.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        defaultGitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

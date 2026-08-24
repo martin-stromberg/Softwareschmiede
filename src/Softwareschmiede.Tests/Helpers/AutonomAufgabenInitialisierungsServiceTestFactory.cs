@@ -49,13 +49,31 @@ internal static class AutonomAufgabenInitialisierungsServiceTestFactory
         return gitPluginMock;
     }
 
+    /// <summary>Erstellt einen PluginSelectionService, der bei der Auflösung des SCM-Plugins stets gitPlugin liefert (einziges registriertes und zugleich Default-Plugin), analog zum in EntwicklungsprozessServiceTests etablierten Muster.</summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext (für PluginDefaultSettingsService/PluginActivationService).</param>
+    /// <param name="gitPlugin">Das IGitPlugin, das als einziges verfügbares und als Default-SCM-Plugin registriert wird.</param>
+    /// <returns>Ein einsatzbereiter PluginSelectionService.</returns>
+    public static PluginSelectionService CreatePluginSelectionService(SoftwareschmiededDbContext db, IGitPlugin gitPlugin)
+    {
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([gitPlugin]);
+        pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(gitPlugin);
+
+        var defaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var activationService = new PluginActivationService(
+            new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance),
+            pluginManagerMock.Object,
+            NullLogger<PluginActivationService>.Instance);
+        return new PluginSelectionService(pluginManagerMock.Object, defaultSettingsService, activationService, NullLogger<PluginSelectionService>.Instance);
+    }
+
     /// <summary>Erstellt einen AutonomAufgabenInitialisierungsService mit Standard-Options für Tests.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="cliRunner">Der zu verwendende ICliRunner.</param>
-    /// <param name="gitPlugin">Der zu verwendende IGitPlugin.</param>
+    /// <param name="gitPlugin">Das IGitPlugin, über das der (via <see cref="CreatePluginSelectionService"/> gebaute) PluginSelectionService auflöst.</param>
     /// <returns>Ein einsatzbereiter AutonomAufgabenInitialisierungsService.</returns>
     public static AutonomAufgabenInitialisierungsService CreateService(SoftwareschmiededDbContext db, ICliRunner cliRunner, IGitPlugin gitPlugin)
-        => new(db, cliRunner, gitPlugin, Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+        => new(db, cliRunner, CreatePluginSelectionService(db, gitPlugin), Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
 
     /// <summary>Erstellt ein Projekt und fügt es dem Datenbankkontext hinzu, ohne zu speichern.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>

@@ -58,12 +58,10 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests_BranchUnd
 
     private AutonomAufgabeInitialisierungsDialogViewModel CreateSut(PromptVorlagenService? promptVorlagenService = null, PromptVorlagenPlatzhalterService? platzhalterService = null)
     {
-        var initialisierungsService = new AutonomAufgabenInitialisierungsService(
+        var initialisierungsService = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
             _db,
             Mock.Of<ICliRunner>(),
-            Mock.Of<IGitPlugin>(),
-            Options.Create(new AutonomAufgabenOptions()),
-            NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+            Mock.Of<IGitPlugin>());
 
         var sut = new AutonomAufgabeInitialisierungsDialogViewModel(
             initialisierungsService,

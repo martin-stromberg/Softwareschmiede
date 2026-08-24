@@ -71,12 +71,14 @@ Skill-Autogeneration: Deaktiviert
 1. Klicke den Button **„Initialisieren"**
 2. Das System erstellt:
    - Strukturiertes Arbeitsverzeichnis
-   - Repository-Klon (direkt von der Repository-URL der Aufgabe)
-   - Projektbranch im geklonten Repository (neu angelegt oder — falls bereits remote vorhanden — ausgecheckt)
+   - Repository-Klon (direkt von der Repository-URL der Aufgabe, mit dem der Aufgabe zugeordneten Git-Plugin)
+   - Projektbranch im geklonten Repository (neu angelegt oder — falls bereits remote vorhanden — ausgecheckt, ebenfalls mit dem aufgabenspezifischen Git-Plugin)
    - Initial-Dateien (plan.md, progress.md, state.json, etc.)
    - Datenbankeinträge für Konfiguration
 3. Der Dialog schließt sich
 4. Die Detail-View zeigt jetzt die neue Autonome Aufgabe
+
+> **Hinweis:** Das Git-Plugin für Repository-Klon und Projektbranch-Operationen wird anhand der Aufgabenkonfiguration (`GitRepository.PluginTyp`) bestimmt, nicht anhand eines global konfigurierten Default-Plugins. Dies stellt sicher, dass die richtige SCM-Integration für jede Aufgabe verwendet wird.
 
 ### 4. Projektleiter-Agenten starten
 

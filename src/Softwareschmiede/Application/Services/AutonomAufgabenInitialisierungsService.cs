@@ -16,7 +16,7 @@ public sealed class AutonomAufgabenInitialisierungsService
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ICliRunner _cliRunner;
-    private readonly IGitPlugin _gitPlugin;
+    private readonly PluginSelectionService _pluginSelectionService;
     private readonly AutonomAufgabenOptions _options;
     private readonly ILogger<AutonomAufgabenInitialisierungsService> _logger;
 
@@ -24,13 +24,13 @@ public sealed class AutonomAufgabenInitialisierungsService
     public AutonomAufgabenInitialisierungsService(
         SoftwareschmiededDbContext db,
         ICliRunner cliRunner,
-        IGitPlugin gitPlugin,
+        PluginSelectionService pluginSelectionService,
         IOptions<AutonomAufgabenOptions> options,
         ILogger<AutonomAufgabenInitialisierungsService> logger)
     {
         _db = db;
         _cliRunner = cliRunner;
-        _gitPlugin = gitPlugin;
+        _pluginSelectionService = pluginSelectionService;
         _options = options.Value;
         _logger = logger;
     }
@@ -42,11 +42,13 @@ public sealed class AutonomAufgabenInitialisierungsService
         ArgumentNullException.ThrowIfNull(anfrage);
         ValidiereAnfrage(anfrage);
 
+        var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(aufgabe.GitRepository?.PluginTyp, ct);
+
         await ErstelleArbeitsverzeichnisStrukturAsync(anfrage.ArbeitsverzeichnisPfad, ct);
 
         var repoMainPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "clones", "repo_main");
-        await KloneHauptRepositoryAsync(aufgabe, repoMainPfad, ct);
-        await ErstelleProjektbranchAsync(aufgabe, repoMainPfad, anfrage.ProjektBranchName, ct);
+        await KloneHauptRepositoryAsync(gitPlugin, aufgabe, repoMainPfad, ct);
+        await ErstelleProjektbranchAsync(gitPlugin, aufgabe, repoMainPfad, anfrage.ProjektBranchName, ct);
 
         var permissionsPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "permissions.json");
         var stateJsonPfad = Path.Combine(anfrage.ArbeitsverzeichnisPfad, "state.json");
@@ -139,7 +141,7 @@ public sealed class AutonomAufgabenInitialisierungsService
         }
     }
 
-    private async Task KloneHauptRepositoryAsync(Aufgabe aufgabe, string zielPfad, CancellationToken ct)
+    private async Task KloneHauptRepositoryAsync(IGitPlugin gitPlugin, Aufgabe aufgabe, string zielPfad, CancellationToken ct)
     {
         var repositoryUrl = aufgabe.GitRepository?.RepositoryUrl;
         if (string.IsNullOrWhiteSpace(repositoryUrl))
@@ -161,7 +163,7 @@ public sealed class AutonomAufgabenInitialisierungsService
 
         try
         {
-            await _gitPlugin.CloneRepositoryAsync(repositoryUrl, zielPfad, ct);
+            await gitPlugin.CloneRepositoryAsync(repositoryUrl, zielPfad, ct);
         }
         catch (OperationCanceledException)
         {
@@ -185,18 +187,18 @@ public sealed class AutonomAufgabenInitialisierungsService
     /// bereits (z. B. weil ein vorheriger Initialisierungsversuch nach der Branch-Anlage, aber vor Abschluss
     /// fehlgeschlagen ist), wird die Neuanlage übersprungen.
     /// </summary>
-    private async Task ErstelleProjektbranchAsync(Aufgabe aufgabe, string repoMainPfad, string projektBranchName, CancellationToken ct)
+    private async Task ErstelleProjektbranchAsync(IGitPlugin gitPlugin, Aufgabe aufgabe, string repoMainPfad, string projektBranchName, CancellationToken ct)
     {
         try
         {
-            var remoteBranches = await LadeRemoteBranchesAsync(aufgabe.GitRepository?.RepositoryUrl, ct);
+            var remoteBranches = await LadeRemoteBranchesAsync(gitPlugin, aufgabe.GitRepository?.RepositoryUrl, ct);
             if (remoteBranches.Contains(projektBranchName, StringComparer.OrdinalIgnoreCase))
             {
-                await _gitPlugin.CheckoutRemoteBranchAsync(repoMainPfad, projektBranchName, ct);
+                await gitPlugin.CheckoutRemoteBranchAsync(repoMainPfad, projektBranchName, ct);
                 return;
             }
 
-            if (await LokalerBranchExistiertBereitsAsync(repoMainPfad, projektBranchName, ct))
+            if (await LokalerBranchExistiertBereitsAsync(gitPlugin, repoMainPfad, projektBranchName, ct))
             {
                 _logger.LogInformation(
                     "Lokaler Branch {BranchName} existiert in {RepoPfad} bereits, überspringe erneute Anlage (Retry-Fall).",
@@ -209,7 +211,7 @@ public sealed class AutonomAufgabenInitialisierungsService
             // tatsächlichen Repository-Pfad intern selbst auf (siehe LocalDirectoryPlugin.CreateBranchAsync,
             // dasselbe Muster wie CheckoutRemoteBranchAsync oben) und checkt den neuen Branch per
             // "git checkout -b" zugleich aus.
-            await _gitPlugin.CreateBranchAsync(repoMainPfad, projektBranchName, sourceBranchName: null, ct);
+            await gitPlugin.CreateBranchAsync(repoMainPfad, projektBranchName, sourceBranchName: null, ct);
         }
         catch (OperationCanceledException)
         {
@@ -231,9 +233,9 @@ public sealed class AutonomAufgabenInitialisierungsService
     /// die Branch-Neuanlage in <see cref="ErstelleProjektbranchAsync"/> retry-sicher, analog zum
     /// Klon-Idempotenz-Guard in <see cref="KloneHauptRepositoryAsync"/>.
     /// </summary>
-    private async Task<bool> LokalerBranchExistiertBereitsAsync(string repoPfad, string branchName, CancellationToken ct)
+    private async Task<bool> LokalerBranchExistiertBereitsAsync(IGitPlugin gitPlugin, string repoPfad, string branchName, CancellationToken ct)
     {
-        var effektiverRepoPfad = await _gitPlugin.ResolveEffectiveRepositoryPathAsync(repoPfad, ct);
+        var effektiverRepoPfad = await gitPlugin.ResolveEffectiveRepositoryPathAsync(repoPfad, ct);
         var ergebnis = await _cliRunner.RunAsync("git", ["branch", "--list", branchName], effektiverRepoPfad, null, ct);
         return ergebnis.IsSuccess && !string.IsNullOrWhiteSpace(ergebnis.StdOut);
     }
@@ -243,7 +245,7 @@ public sealed class AutonomAufgabenInitialisierungsService
     /// (z. B. <c>LocalDirectoryPlugin</c>, <see cref="NotSupportedException"/>), wird eine leere Liste
     /// zurückgegeben, sodass <see cref="ErstelleProjektbranchAsync"/> stets den lokalen Neuanlage-Pfad wählt.
     /// </summary>
-    private async Task<IEnumerable<string>> LadeRemoteBranchesAsync(string? repositoryUrl, CancellationToken ct)
+    private async Task<IEnumerable<string>> LadeRemoteBranchesAsync(IGitPlugin gitPlugin, string? repositoryUrl, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(repositoryUrl))
         {
@@ -252,7 +254,7 @@ public sealed class AutonomAufgabenInitialisierungsService
 
         try
         {
-            return await _gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
+            return await gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct);
         }
         catch (NotSupportedException)
         {
