@@ -61,6 +61,7 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests_BranchUnd
         var initialisierungsService = new AutonomAufgabenInitialisierungsService(
             _db,
             Mock.Of<ICliRunner>(),
+            Mock.Of<IGitPlugin>(),
             Options.Create(new AutonomAufgabenOptions()),
             NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
 
@@ -102,13 +103,11 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests_BranchUnd
         sut.IsProjectBranchManualInput.Should().BeTrue();
     }
 
-    /// <summary>CreateBranchCommand legt über das Git-Plugin einen neuen Branch an und wählt ihn aus.</summary>
+    /// <summary>NeuenBranchAnlegenAsync übernimmt den eingegebenen Branch-Namen ohne Git-Aufruf, da zum Dialog-Zeitpunkt bei autonomen Aufgaben nie ein lokaler Klon existiert.</summary>
     [Fact]
-    public async Task CreateBranchCommand_LegtBranchAnUndWaehltIhnAus()
+    public async Task NeuenBranchAnlegenAsync_UebernimmtBranchName_OhneGitAufruf()
     {
-        _gitPluginMock
-            .Setup(p => p.CreateBranchAsync(_aufgabe.LokalerKlonPfad!, "feature-neu", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+        _aufgabe.LokalerKlonPfad = null;
         var sut = CreateSut();
         sut.ShowCreateBranchCommand.Execute(null);
         sut.NewBranchName = "feature-neu";
@@ -119,22 +118,57 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModelTests_BranchUnd
         sut.AvailableProjectBranches.Should().Contain("feature-neu");
         sut.IsCreatingBranch.Should().BeFalse();
         sut.NewBranchError.Should().BeNull();
-        _gitPluginMock.Verify(p => p.CreateBranchAsync(_aufgabe.LokalerKlonPfad!, "feature-neu", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _gitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>CreateBranchCommand setzt NewBranchError, wenn die Aufgabe keinen lokalen Klon besitzt.</summary>
+    /// <summary>NeuenBranchAnlegenAsync setzt NewBranchError bei leerem Namen, ohne die Liste zu verändern.</summary>
     [Fact]
-    public async Task CreateBranchCommand_SetztFehler_WennKeinLokalerKlonVorhanden()
+    public async Task NeuenBranchAnlegenAsync_SetztFehler_BeiLeeremNamen()
     {
-        _aufgabe.LokalerKlonPfad = null;
         var sut = CreateSut();
         sut.ShowCreateBranchCommand.Execute(null);
-        sut.NewBranchName = "feature-neu";
+        sut.NewBranchName = string.Empty;
 
         await ((AsyncRelayCommand)sut.CreateBranchCommand).ExecuteAsync();
 
         sut.NewBranchError.Should().NotBeNullOrWhiteSpace();
         sut.IsCreatingBranch.Should().BeTrue();
+        _gitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>NeuenBranchAnlegenAsync setzt NewBranchError bei einem in AvailableProjectBranches bereits vorhandenen Namen (Duplikat), ohne die Liste zu verändern.</summary>
+    [Fact]
+    public async Task NeuenBranchAnlegenAsync_SetztFehler_BeiDuplikat()
+    {
+        var sut = CreateSut();
+        sut.ShowCreateBranchCommand.Execute(null);
+        sut.NewBranchName = "feature-x";
+        await ((AsyncRelayCommand)sut.CreateBranchCommand).ExecuteAsync();
+        sut.NewBranchError.Should().BeNull();
+
+        sut.ShowCreateBranchCommand.Execute(null);
+        sut.NewBranchName = "feature-x";
+        await ((AsyncRelayCommand)sut.CreateBranchCommand).ExecuteAsync();
+
+        sut.NewBranchError.Should().NotBeNullOrWhiteSpace();
+        sut.IsCreatingBranch.Should().BeTrue();
+        sut.AvailableProjectBranches.Should().ContainSingle(b => string.Equals(b, "feature-x", StringComparison.OrdinalIgnoreCase));
+        _gitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>NeuenBranchAnlegenAsync setzt NewBranchError bei einem ungültigen Git-Branch-Namen, ohne die Liste zu verändern.</summary>
+    [Fact]
+    public async Task NeuenBranchAnlegenAsync_SetztFehler_BeiUngueltigemNamen()
+    {
+        var sut = CreateSut();
+        sut.ShowCreateBranchCommand.Execute(null);
+        sut.NewBranchName = "feature x";
+
+        await ((AsyncRelayCommand)sut.CreateBranchCommand).ExecuteAsync();
+
+        sut.NewBranchError.Should().NotBeNullOrWhiteSpace();
+        sut.IsCreatingBranch.Should().BeTrue();
+        sut.AvailableProjectBranches.Should().NotContain("feature x");
         _gitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

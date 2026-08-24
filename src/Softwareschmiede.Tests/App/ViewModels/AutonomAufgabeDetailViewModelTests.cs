@@ -30,8 +30,10 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         Directory.CreateDirectory(_testRoot);
 
         var cliRunnerMock = new Mock<ICliRunner>();
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupPassthroughResolveEffectiveRepositoryPath();
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
-        var gitProvisioningService = new UnteragentGitProvisioningService(cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        var gitProvisioningService = new UnteragentGitProvisioningService(cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
         _projektleiterAgentService = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
         _sessionManagementService = new SessionManagementService(_db, NullLogger<SessionManagementService>.Instance);
 

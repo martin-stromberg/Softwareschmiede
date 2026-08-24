@@ -23,8 +23,11 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
     public ProjektleiterAgentServiceTests_Fehlerfaelle()
     {
         _db = TestDbContextFactory.Create();
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupPassthroughResolveEffectiveRepositoryPath();
+
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
-        var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
         _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "ProjektleiterAgentFehler", Guid.NewGuid().ToString("N"));

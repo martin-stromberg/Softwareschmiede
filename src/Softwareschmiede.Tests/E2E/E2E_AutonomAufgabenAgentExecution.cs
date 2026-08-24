@@ -1,9 +1,11 @@
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -108,7 +110,17 @@ public partial class End2EndTest
         {
             var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
             var cliRunner = new CliRunner(NullLogger<CliRunner>.Instance);
-            var gitProvisioningService = new UnteragentGitProvisioningService(cliRunner, NullLogger<UnteragentGitProvisioningService>.Instance);
+
+            // LocalDirectoryPlugin legt im (hier verwendeten) InSourceDirectory-Modus unter clones/repo_main
+            // nur eine Pointer-Datei ab, die auf das tatsächliche Quellverzeichnis verweist; dieser Stub
+            // repliziert exakt diese Auflösung, ohne die im laufenden App-Prozess konfigurierte
+            // Plugin-Instanz (mit eigenem CredentialStore) referenzieren zu müssen.
+            var gitPluginMock = new Mock<IGitPlugin>();
+            gitPluginMock
+                .Setup(p => p.ResolveEffectiveRepositoryPathAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns<string, CancellationToken>((pfad, _) => Task.FromResult(ResolveLocalWorkspacePointerPath(pfad)));
+
+            var gitProvisioningService = new UnteragentGitProvisioningService(cliRunner, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
             var projektleiterAgentService = new ProjektleiterAgentService(db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
             await projektleiterAgentService.SteuereUnteragentAsync(unteragent);
         }

@@ -51,10 +51,9 @@ Beteiligte Commands/Methoden im ViewModel:
 - `ShowCreateBranchCommand` → `ZeigeBranchAnlegen()`: setzt `IsCreatingBranch = true`, leert `NewBranchName`/`NewBranchError`
 - `CancelCreateBranchCommand` → `AbbrechenBranchAnlegen()`: setzt `IsCreatingBranch = false` und leert Eingabe/Fehler
 - `CreateBranchCommand` (nur aktiv, wenn `NewBranchName` nicht leer ist) → `NeuenBranchAnlegenAsync(ct)`:
-  1. Bricht mit `NewBranchError` ab, falls `_aufgabe.LokalerKlonPfad` leer ist oder kein `IGitPlugin` ermittelbar ist
-  2. Ruft `IGitPlugin.CreateBranchAsync(lokalerKlonPfad, NewBranchName, SelectedProjectBranch, ct)` auf — der aktuell gewählte Projektbranch dient als `sourceBranchName`
-  3. Bei Erfolg: fügt `NewBranchName` zu `AvailableProjectBranches` hinzu (falls noch nicht vorhanden), setzt `SelectedProjectBranch = NewBranchName`, `IsProjectBranchManualInput = false`, schließt die Eingabezeile (`IsCreatingBranch = false`)
-  4. Bei Exception (außer `OperationCanceledException`, die weitergereicht wird): `NewBranchError` wird mit der Fehlermeldung befüllt, der Dialog bleibt offen
+  1. Validiert `NewBranchName` (nicht leer/whitespace, gültiger Git-Branch-Name via `GitBranchNameValidator.IstGueltig()`) und prüft auf Duplikat (case-insensitive) in `AvailableProjectBranches`; bei Verstoß wird `NewBranchError` gesetzt und die Methode kehrt zurück, ohne die Eingabezeile zu schließen
+  2. Bei Erfolg: fügt `NewBranchName` zu `AvailableProjectBranches` hinzu, setzt `SelectedProjectBranch = NewBranchName`, `IsProjectBranchManualInput = false`, schließt die Eingabezeile (`IsCreatingBranch = false`)
+  3. Führt **keine** Git-Operation aus — zum Dialog-Zeitpunkt existiert bei Autonomen Aufgaben nie ein lokaler Klon. Der eigentliche Branch wird erst von `AutonomAufgabenInitialisierungsService.ErstelleProjektbranchAsync()` nach dem Repository-Klon in `InitialisiereAsync()` angelegt (siehe unten).
 
 **Promptvorlagen-Auswahl**
 
@@ -87,10 +86,29 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
 
 3. **Repository-Klon**
    ```
-   Aufruf: _cliRunner.RunAsync("git clone {repository} {pfad}/clones/repo_main")
+   Aufruf: KloneHauptRepositoryAsync(aufgabe, {pfad}/clones/repo_main)
+       - Quelle: aufgabe.GitRepository.RepositoryUrl (nicht mehr aufgabe.LokalerKlonPfad)
+       - _gitPlugin.CloneRepositoryAsync(repositoryUrl, zielPfad, ct)
+       - Wirft InvalidOperationException, falls aufgabe.GitRepository?.RepositoryUrl leer ist
    ```
 
-4. **state.json generieren**
+4. **Projektbranch anlegen**
+   ```
+   Aufruf: ErstelleProjektbranchAsync(aufgabe, {pfad}/clones/repo_main, anfrage.ProjektBranchName)
+       - Lädt Remote-Branches via _gitPlugin.GetRemoteBranchesAsync(repositoryUrl, ct)
+         (unterstützt das Plugin keine Remote-Branches, z. B. LocalDirectoryPlugin
+         mit NotSupportedException, wird dies wie eine leere Liste behandelt)
+       - Branch bereits remote vorhanden: _gitPlugin.CheckoutRemoteBranchAsync(repoMainPfad, branchName, ct)
+       - Sonst: Ist der lokale Branch bereits vorhanden (Retry-Fall, geprüft via
+         "git branch --list" über _cliRunner), wird die Anlage übersprungen; andernfalls
+         _gitPlugin.CreateBranchAsync(repoMainPfad, branchName, sourceBranchName: null, ct)
+         (führt "git checkout -b" aus, checkt repoMainPfad dabei zugleich auf den neuen Branch
+         aus — das ist der eigentliche Zweck dieses Schritts, da nachfolgend angelegte
+         Unteragenten-Branches implizit von der aktuellen HEAD von repoMainPfad abzweigen)
+       - Wirft InvalidOperationException bei Git-Fehler
+   ```
+
+5. **state.json generieren**
    ```json
    {
      "task_id": "{aufgabe-id}",
@@ -130,7 +148,7 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
    }
    ```
 
-5. **DB-Eintrag erstellen**
+6. **DB-Eintrag erstellen**
    ```csharp
    var konfiguration = new AutonomAufgabeKonfiguration
    {
@@ -152,17 +170,18 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
    await _db.SaveChangesAsync();
    ```
 
-6. **Return** der `AutonomAufgabeKonfiguration`
+7. **Return** der `AutonomAufgabeKonfiguration`
 
 **Beteiligte Klassen:**
-- `AutonomAufgabenInitialisierungsService` (Orchestrierung)
-- `SoftwareschmiededDbContext` (Persistierung)
-- `ICliRunner` (Git-Befehle)
-- `ILogger` (Protokollierung)
-- `AutonomAufgabeInitialisierungsDialogViewModel` (Formular, Branch-/Vorlagen-Laden, Branch-Neuanlage)
-- `IGitPlugin` (`GetRemoteBranchesAsync`, `CreateBranchAsync` — Branch-Auswahl und -Neuanlage)
-- `IPluginManager` (Ermittlung des passenden Git-Plugins)
+- `AutonomAufgabenInitialisierungsService` (Orchestrierung, Repository-Klon, Projektbranch-Anlage)
+- `AutonomAufgabeInitialisierungsDialogViewModel` (Formular, Branch-/Vorlagen-Laden, Branch-Namensvalidierung)
+- `GitBranchNameValidator` (Validierung von Branch-Namen gegen Git-Regeln, verwendet sowohl im Dialog als auch im Service)
+- `IGitPlugin` (`CloneRepositoryAsync`, `GetRemoteBranchesAsync`, `CheckoutRemoteBranchAsync`, `CreateBranchAsync`, `ResolveEffectiveRepositoryPathAsync` — Klon sowie Branch-Auswahl/-Anlage im Service; `GetRemoteBranchesAsync` weiterhin für die Auswahlliste im Dialog)
+- `ICliRunner` (`git branch --list` für den Idempotenz-Check in `ErstelleProjektbranchAsync()` bzw. `LokalerBranchExistiertBereitsAsync()`)
+- `IPluginManager` (Ermittlung des passenden Git-Plugins im Dialog)
 - `PromptVorlagenService` / `PromptVorlagenPlatzhalterService` (Promptvorlagen laden und Platzhalter auflösen)
+- `SoftwareschmiededDbContext` (Persistierung)
+- `ILogger` (Protokollierung)
 
 ---
 
@@ -236,16 +255,23 @@ Agent ruft (intern): ProjektleiterAgentService.SteuereUnteragentAsync()
    {arbeitsverzeichnis}/tasks/task_{counter}/
    ```
 
-2. **Feature-Branch erzeugen**
+2. **Feature-Branch erzeugen (lokal, ohne Checkout)**
    ```csharp
    var branchName = $"feature-unteragent-{counter}";
-   await _cliRunner.RunAsync($"git checkout -b {branchName} {projektBranch}");
+   // GitBranchHelper.ErstelleLokalenBranchAsync() ruft nur 'git branch' auf (kein Checkout),
+   // da mehrere Unteragenten nacheinander denselben repoMainPfad nutzen und Checkouts zu
+   // Wettlauf-Bedingungen führen würden. Der Checkout erfolgt implizit beim Klon (Schritt 3).
+   var effektiverRepoMainPfad = await GitBranchHelper.ErstelleLokalenBranchAsync(
+       _cliRunner, _gitPlugin, repoMainPfad, branchName, _logger, fehlerKontext, ct);
    ```
 
 3. **Repository-Klon für Unteragenten**
    ```csharp
    var clonePath = $"{arbeitsverzeichnis}/clones/repo_feature_{counter}";
-   await _cliRunner.RunAsync($"git clone -b {branchName} --reference {clonePath_main} {repository} {clonePath}");
+   // GitKlonHelper.KloneFallsNichtVorhandenAsync() klont den Feature-Branch
+   // (der im Schritt 2 lokal angelegt wurde) vom effektiven repoMainPfad in den clonePath
+   await GitKlonHelper.KloneFallsNichtVorhandenAsync(
+       _cliRunner, effektiverRepoMainPfad, clonePath, branchName, _logger, fehlerKontext, ct);
    ```
 
 4. **UnteragentSpezifikation erstellen & persistieren**
@@ -290,9 +316,12 @@ Agent ruft (intern): ProjektleiterAgentService.SteuereUnteragentAsync()
    ```
 
 **Beteiligte Klassen:**
-- `ProjektleiterAgentService`
+- `ProjektleiterAgentService` (Orchestrierung der Unteragenten)
+- `UnteragentGitProvisioningService` (Feature-Branch-Erstellung und Klon-Provisioning)
+- `GitBranchHelper` (Lokale Branch-Erstellung ohne Checkout)
+- `GitKlonHelper` (Repository-Klon für Unteragenten)
 - `UnteragentGovernanceService` (Governance-Checks)
-- `SoftwareschmiededDbContext`
+- `SoftwareschmiededDbContext` (Persistierung)
 
 ---
 
@@ -461,7 +490,8 @@ sequenceDiagram
     UI->>Init: InitialisiereAsync(aufgabe, anfrage)
     Init->>Init: Validierung
     Init->>Init: Arbeitsverzeichnis erstellen
-    Init->>Init: Repository-Klon
+    Init->>Init: Repository-Klon (von GitRepository.RepositoryUrl)
+    Init->>Init: Projektbranch anlegen/auschecken
     Init->>Init: state.json generieren
     Init->>DB: AutonomAufgabeKonfiguration speichern
     Init-->>UI: Zurück
@@ -507,7 +537,9 @@ sequenceDiagram
 | Fehlerfall | Ort | Handling |
 |-----------|-----|----------|
 | Arbeitsverzeichnis existiert | Initialisierung | `DirectoryAccessException` werfen |
-| Repository-Klon schlägt fehl | Initialisierung | Fehlerlog, Dialog-Fehlermeldung |
+| Repository-URL fehlt | Initialisierung | `InvalidOperationException` werfen, Dialog-Fehlermeldung |
+| Repository-Klon schlägt fehl | Initialisierung | `InvalidOperationException` werfen, Dialog-Fehlermeldung, partieller Klon bleibt erhalten für Retry |
+| Projektbranch-Erstellung schlägt fehl | Initialisierung (nach Klon) | `InvalidOperationException` werfen, Dialog-Fehlermeldung, Klon bleibt erhalten für Retry |
 | Token-Budget ungültig | Initialisierung | `ArgumentException` werfen |
 | Unteragenten-Verzeichnis nicht erstellbar | Unteragenten-Erzeugung | Fehlerlog, Unteragent auf Fehler setzen |
 | Governance-Verletzung | Unteragenten-Arbeitszeit | Blockierung durch `UnteragentGovernanceService`, Fehlerlog |

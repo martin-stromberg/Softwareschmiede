@@ -56,9 +56,9 @@ Skill-Autogeneration: Deaktiviert
 
 - Ist der Aufgabe ein Git-Repository mit unterstütztem Plugin zugeordnet, zeigt das Feld **Projektbranch** eine Auswahlliste der vorhandenen Remote-Branches; solange diese geladen wird, erscheint der Hinweis „Wird geladen…". Ist kein Repository/Plugin vorhanden oder liefert es keine Branches, wird stattdessen ein freies Textfeld angezeigt.
 - Um einen neuen Branch anzulegen, klicke auf den **„+"-Button** rechts neben dem Projektbranch-Feld. Es erscheint eine Eingabezeile für den neuen Branchnamen mit den Buttons **„Anlegen"** und **„Abbrechen"**.
-- Nach Eingabe eines Namens und Klick auf **„Anlegen"** wird der Branch im lokalen Klon der Aufgabe erzeugt (ausgehend vom aktuell gewählten Projektbranch), automatisch der Branch-Liste hinzugefügt und als Projektbranch übernommen.
+- Nach Eingabe eines Namens und Klick auf **„Anlegen"** wird der Name validiert, automatisch der Branch-Liste hinzugefügt und als Projektbranch übernommen. Es findet an dieser Stelle noch keine Git-Operation statt — zu diesem Zeitpunkt existiert noch kein lokaler Klon der Aufgabe. Der Branch wird erst beim Absenden des Dialogs (Schritt 3) im frisch geklonten Repository tatsächlich angelegt.
 
-> **Hinweis:** Die Branch-Neuanlage benötigt einen lokalen Klon der Aufgabe. Ist keiner vorhanden oder schlägt die Git-Operation fehl, erscheint eine Fehlermeldung unterhalb der Eingabezeile; der Dialog bleibt geöffnet und die Eingabe kann korrigiert oder abgebrochen werden.
+> **Hinweis:** Ist der eingegebene Name leer, kein gültiger Git-Branch-Name oder bereits in der Auswahlliste vorhanden (Duplikat), erscheint eine Fehlermeldung unterhalb der Eingabezeile; der Dialog bleibt geöffnet und die Eingabe kann korrigiert oder abgebrochen werden.
 
 #### Promptvorlage für den Initialprompt nutzen
 
@@ -71,7 +71,8 @@ Skill-Autogeneration: Deaktiviert
 1. Klicke den Button **„Initialisieren"**
 2. Das System erstellt:
    - Strukturiertes Arbeitsverzeichnis
-   - Repository-Klon
+   - Repository-Klon (direkt von der Repository-URL der Aufgabe)
+   - Projektbranch im geklonten Repository (neu angelegt oder — falls bereits remote vorhanden — ausgecheckt)
    - Initial-Dateien (plan.md, progress.md, state.json, etc.)
    - Datenbankeinträge für Konfiguration
 3. Der Dialog schließt sich
@@ -136,7 +137,8 @@ Nach erfolgreichem Abschluss einer Autonomen Aufgabe:
 | Problem | Anzeichen | Behebung |
 |---------|-----------|----------|
 | **Arbeitsverzeichnis nicht erstellt** | Fehlermeldung während Initialisierung | Überprüfe Pfadberechtigungen und Festplattenspeicher |
-| **Repository-Klon fehlgeschlagen** | Fehlermeldung „Git-Fehler" | Überprüfe Git-Zugang und Netzwerkverbindung |
+| **Repository-Klon fehlgeschlagen** | Fehlermeldung „Git-Fehler" | Überprüfe Git-Zugang und Netzwerkverbindung; löse die Initialisierung erneut aus (partieller Klon wird überschrieben) |
+| **Projektbranch-Erstellung fehlgeschlagen** | Fehlermeldung „Branch konnte nicht angelegt werden" | Überprüfe, ob der Branch-Name gültig ist; versuche mit anderem Namen neu zu initialisieren |
 | **Agent bricht unerwartet ab** | Status springt zu „Fehler" | Siehe Logs in `logs/agent.log` im Arbeitsverzeichnis |
 | **Heartbeat-Timeout** | Agent wird pausiert, obwohl aktiv | Prüfe Netzwerkverbindung; erhöhe ggf. Heartbeat-Timeout in Einstellungen |
 | **Permission-Fehler bei Unteragent** | Agent kann Dateien nicht schreiben | Unteragent versucht außerhalb seines Scope zu arbeiten — manuell debuggen |
