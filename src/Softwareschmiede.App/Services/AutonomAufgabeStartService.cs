@@ -56,8 +56,7 @@ public sealed class AutonomAufgabeStartService
                 _serviceProvider.GetRequiredService<ProjektleiterAgentService>(),
                 _serviceProvider.GetRequiredService<SessionManagementService>(),
                 _serviceProvider.GetRequiredService<ILogger<AutonomAufgabeDetailViewModel>>());
-            await _dialogService.ShowAutonomAufgabeDetailAsync(detailVm, ct);
-            return new AutonomAufgabeStartResult(aktuelleAufgabe, null);
+            return new AutonomAufgabeStartResult(aktuelleAufgabe, null, detailVm);
         }
         catch (OperationCanceledException)
         {
@@ -68,7 +67,8 @@ public sealed class AutonomAufgabeStartService
             _logger.LogError(ex, "Autonome Aufgabe {AufgabeId} konnte nicht initialisiert oder angezeigt werden.", aufgabe.Id);
             return new AutonomAufgabeStartResult(
                 aktuelleAufgabe,
-                $"Autonome Aufgabe konnte nicht initialisiert oder angezeigt werden: {ex.Message}");
+                $"Autonome Aufgabe konnte nicht initialisiert oder angezeigt werden: {ex.Message}",
+                null);
         }
     }
 }

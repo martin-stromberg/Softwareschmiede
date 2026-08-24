@@ -2,9 +2,11 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.App.Services;
+using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Tests.Helpers;
 
@@ -64,5 +66,72 @@ public sealed class AutonomAufgabeStartServiceTests : IDisposable
         ergebnis!.FehlerMeldung.Should().NotBeNullOrEmpty();
         ergebnis.AktualisierteAufgabe.Should().NotBeNull();
         ergebnis.AktualisierteAufgabe!.Id.Should().Be(aufgabe.Id);
+    }
+
+    /// <summary>
+    /// StarteAsync gibt bei erfolgreicher Initialisierung das erzeugte AutonomAufgabeDetailViewModel über
+    /// AutonomAufgabeStartResult.DetailViewModel zurück, statt (wie vor der UI-Integration in
+    /// TaskDetailView) einen separaten Dialog anzuzeigen: IDialogService.ShowAutonomAufgabeDetailAsync
+    /// existiert nicht mehr, daher genügt hier der Nachweis, dass ausschließlich der
+    /// Initialisierungsdialog (ShowAutonomAufgabeInitialisierungsDialogAsync) aufgerufen wird.
+    /// </summary>
+    [Fact]
+    public async Task StarteAsync_GibtErstelltesDetailViewModelImResultZurueck_OhneDialogAufruf()
+    {
+        var testRoot = Path.Combine(Path.GetTempPath(), "autonom_start_svc_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var aufgabe = AutonomAufgabenInitialisierungsServiceTestFactory.ErstelleAufgabeMitLokalemKlon(
+                _db, _projektId, testRoot, "Testaufgabe für Happy Path");
+            await _db.SaveChangesAsync();
+
+            var cliRunnerMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateCliRunnerMockMitErfolgreicherGitAusfuehrung();
+            var gitPluginMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateGitPluginMockMitErfolgreichemKlon();
+            var initialisierungsService = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(_db, cliRunnerMock.Object, gitPluginMock.Object);
+
+            var pluginManagerMock = new Mock<IPluginManager>();
+            pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([gitPluginMock.Object]);
+
+            var arbeitsverzeichnisPfad = Path.Combine(testRoot, "arbeitsverzeichnis");
+            Directory.CreateDirectory(arbeitsverzeichnisPfad);
+
+            var konfiguration = new AutonomAufgabeKonfiguration
+            {
+                Id = Guid.NewGuid(),
+                AufgabeId = aufgabe.Id,
+                ProjektBranchName = "feature/autonom",
+                InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
+                PermissionsJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "permissions.json"),
+                ArbeitsverzeichnisPfad = arbeitsverzeichnisPfad
+            };
+
+            var dialogServiceMock = new Mock<IDialogService>();
+            dialogServiceMock
+                .Setup(d => d.ShowAutonomAufgabeInitialisierungsDialogAsync(It.IsAny<AutonomAufgabeInitialisierungsDialogViewModel>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(konfiguration);
+
+            var serviceProvider = AutonomAufgabenInitialisierungsServiceTestFactory.CreateAutonomAufgabeStartServiceProvider(
+                _db, initialisierungsService, pluginManagerMock.Object);
+
+            var sut = new AutonomAufgabeStartService(
+                serviceProvider,
+                dialogServiceMock.Object,
+                _aufgabeService,
+                NullLogger<AutonomAufgabeStartService>.Instance);
+
+            var ergebnis = await sut.StarteAsync(aufgabe, CancellationToken.None);
+
+            ergebnis.Should().NotBeNull();
+            ergebnis!.FehlerMeldung.Should().BeNull();
+            ergebnis.DetailViewModel.Should().NotBeNull();
+            dialogServiceMock.Verify(
+                d => d.ShowAutonomAufgabeInitialisierungsDialogAsync(It.IsAny<AutonomAufgabeInitialisierungsDialogViewModel>(), It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+        finally
+        {
+            if (Directory.Exists(testRoot))
+                Directory.Delete(testRoot, true);
+        }
     }
 }

@@ -195,6 +195,21 @@
                                                         ButtonText="Autonome Aufgabe starten"
                                                         AutomationName="AutonomAufgabeInitialisieren"
                                                         ButtonCommand="{Binding AutonomAufgabeInitialisierenCommand}" />
+                            <controls:RibbonLargeButton ButtonIcon="▶"
+                                                        ButtonText="Start"
+                                                        AutomationName="AutonomAufgabeStartAgent"
+                                                        ButtonCommand="{Binding AutonomAufgabeDetailViewModel.StartCommand}"
+                                                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="■"
+                                                        ButtonText="Stop"
+                                                        AutomationName="AutonomAufgabeStopAgent"
+                                                        ButtonCommand="{Binding AutonomAufgabeDetailViewModel.StopCommand}"
+                                                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="▶"
+                                                        ButtonText="Resume"
+                                                        AutomationName="AutonomAufgabeResumeAgent"
+                                                        ButtonCommand="{Binding AutonomAufgabeDetailViewModel.ResumeCommand}"
+                                                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -309,6 +324,13 @@
                         Padding="12,4"
                         Margin="6,0,0,0"
                         FontSize="12" />
+                <Button Content="Automatisierung"
+                        AutomationProperties.Name="AutomatisierungViewButton"
+                        Command="{Binding AutomatisierungViewCommand}"
+                        Padding="12,4"
+                        Margin="6,0,0,0"
+                        FontSize="12"
+                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
 
             <Grid Grid.Row="1">
@@ -580,6 +602,13 @@
 
                 <views:TodoListView DataContext="{Binding TodoList}"
                                     Visibility="{Binding DataContext.IsTodoViewSelected, ElementName=Root, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="12"
+                              Visibility="{Binding IsAutomatisierungViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <views:AutonomAufgabeDetailView DataContext="{Binding AutonomAufgabeDetailViewModel}" />
+                </ScrollViewer>
             </Grid>
         </Grid>
 

@@ -94,11 +94,13 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <param name="prozessStarterMock">Optionaler Mock für IProzessStarter zur Prüfung gestarteter Prozesse.</param>
     /// <param name="visualStudioCodeLocator">Optionaler IVisualStudioCodeLocator zur Steuerung der VS-Code-Verfügbarkeit.</param>
     /// <param name="idePlugins">Optionale Überschreibung der aktiven IDE-Plugins (Standard: Visual Studio + Visual Studio Code).</param>
+    /// <param name="serviceProvider">Optionaler IServiceProvider für AutonomAufgabeStartService (Standard: leerer Mock ohne Registrierungen).</param>
     /// <returns>Das erzeugte TaskDetailViewModel.</returns>
     protected TaskDetailViewModel CreateSut(
         Mock<IProzessStarter>? prozessStarterMock = null,
         IVisualStudioCodeLocator? visualStudioCodeLocator = null,
-        IReadOnlyList<IIdePlugin>? idePlugins = null)
+        IReadOnlyList<IIdePlugin>? idePlugins = null,
+        IServiceProvider? serviceProvider = null)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
@@ -130,9 +132,9 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
-        var serviceProviderMock = new Mock<IServiceProvider>();
+        var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
         var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
-            serviceProviderMock.Object,
+            serviceProviderObj,
             _dialogServiceMock.Object,
             _aufgabeService);
 
@@ -147,7 +149,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             _promptZeitVersandService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
-            serviceProviderMock.Object,
+            serviceProviderObj,
             NullLogger<TaskDetailViewModel>.Instance,
             TimeProvider.System,
             fileExplorerViewModel,

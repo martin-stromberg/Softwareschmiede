@@ -46,9 +46,4 @@ public interface IDialogService
     Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
         AutonomAufgabeInitialisierungsDialogViewModel viewModel,
         CancellationToken ct = default);
-
-    /// <summary>Zeigt die Detail-Ansicht einer Autonomen Aufgabe.</summary>
-    Task ShowAutonomAufgabeDetailAsync(
-        AutonomAufgabeDetailViewModel viewModel,
-        CancellationToken ct = default);
 }

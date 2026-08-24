@@ -8,8 +8,13 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// Konsolidiert die im Umsetzungsplan beschriebenen Szenarien (Dialoganzeige, Branch-Namenseingabe ohne
 /// verfrühte Git-Operation, Arbeitsverzeichnis-/Repository-Klon-/Projektbranch-Erstellung beim Submit,
-/// Detail-View-Anzeige) in einer einzigen Testmethode mit einem gemeinsamen App-Lifecycle (siehe CLAUDE.md,
-/// Abschnitt FlaUI-Konsolidierung).
+/// Anzeige und Umschaltung der "Automatisierung"-Registerkarte, Sichtbarkeit der zugehörigen
+/// Ribbon-Buttons, Bereinigung der Ansicht bei erneutem Laden der Aufgabe) in einer einzigen
+/// Testmethode mit einem gemeinsamen App-Lifecycle (siehe CLAUDE.md, Abschnitt FlaUI-Konsolidierung).
+///
+/// Seit der UI-Integration der Autonomen Aufgabe in <c>TaskDetailView</c> (Folgeanforderung zu Issue 205)
+/// öffnet sich nach dem Bestätigen des Initialisierungsdialogs kein eigenes Detail-Fenster mehr; stattdessen
+/// wechselt die Aufgaben-Detailansicht selbst zur neuen Registerkarte "Automatisierung".
 ///
 /// Die im Umsetzungsplan zusätzlich vorgesehenen Szenarien "Bestehender Remote-Branch (Checkout)" und
 /// "Branch-Anlage-Fehler bei erfolgreichem Klon" sind über FlaUI nicht sinnvoll abbildbar: Das in dieser
@@ -28,7 +33,11 @@ public partial class End2EndTest
     /// keine Git-Operation aus. Nach Bestätigen des gesamten Formulars erstellt der Service
     /// Arbeitsverzeichnis, Repository-Klon (direkt von der Repository-URL der Aufgabe, nicht mehr von einem
     /// vorher gestarteten LokalerKlonPfad) und legt den gewählten Projektbranch im Klon tatsächlich an. Die
-    /// Detail-Ansicht der Autonomen Aufgabe öffnet sich automatisch und zeigt die Konfiguration an.
+    /// "Automatisierung"-Registerkarte in der Aufgaben-Detailansicht wird automatisch aktiviert und zeigt
+    /// die Konfiguration an; die zugehörigen Ribbon-Buttons ("Start"/"Stop"/"Resume") werden sichtbar.
+    /// Anschließend wird die Registerkarten-Umschaltung (Info ↔ Automatisierung) sowie die Bereinigung der
+    /// Ansicht beim erneuten Laden der Aufgabe (Zurück zum Projekt und erneutes Öffnen der Aufgabe blendet
+    /// die Registerkarte wieder aus) geprüft.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     protected async Task AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E(Window mainWindow)
@@ -66,8 +75,26 @@ public partial class End2EndTest
 
         ConfirmDialog(dialog, "AutonomAufgabeBestaetigen");
 
-        var detailFenster = WaitForWindow("Autonome Aufgabe", Long);
-        WaitForElement(detailFenster, cf => cf.ByName("AutonomAufgabeStart"), Long);
+        // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
+        // wechselt selbst zur neuen "Automatisierung"-Registerkarte, die die eingebettete
+        // AutonomAufgabeDetailView anzeigt.
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStart"), Long);
+
+        // Die Ribbon-Buttons "Start"/"Stop"/"Resume" (Gruppe "Autonome Aufgabe") sind jetzt sichtbar.
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStartAgent"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStopAgent"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeResumeAgent"), Short);
+
+        // Registerkarten-Umschaltung: zu "Info" wechseln blendet die Automatisierung-Inhalte aus,
+        // "Automatisierung" wechselt wieder zurück.
+        var infoViewButton = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Short);
+        infoViewButton.AsButton().Click();
+        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeStart")));
+
+        var automatisierungViewButton = WaitForElement(mainWindow, cf => cf.ByName("AutomatisierungViewButton"), Short);
+        automatisierungViewButton.AsButton().Click();
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStart"), Short);
 
         string arbeitsverzeichnisPfad;
         string projektBranchName;
@@ -101,7 +128,18 @@ public partial class End2EndTest
         // tatsächlich auf den neuen Branch zeigt.
         Assert.Equal(neuerProjektBranch, GitCurrentBranch(tatsaechlicherRepoPfad));
 
-        detailFenster.AsWindow().Close();
+        // Aufgabenwechsel bereinigt die Automatisierung-Ansicht: Zurück zum Projekt und die Aufgabe erneut
+        // öffnen erzeugt eine neue TaskDetailViewModel-Instanz (AddTransient, siehe App.xaml.cs), die
+        // "Automatisierung"-Registerkarte ist danach folglich nicht mehr sichtbar. Der eigentliche
+        // Regressionsschutz für dieselbe Instanz/dieselbe AufgabeId (Cleanup ausschließlich im
+        // AufgabeId-Property-Setter, nicht in WaehleStandardAnsicht()) wird gezielt durch den Unit-Test
+        // TaskDetailViewModelTests_Automatisierung.SetzeAutonomAufgabeDetailViewAsync_BleibtErhalten_BeimErneutenLadenDerselbenAufgabe
+        // abgedeckt.
+        NavigateBackFromTaskToProject(mainWindow);
+        AufgabeAusListeOeffnen(mainWindow, aufgabeTitel);
+        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutomatisierungViewButton")));
+        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeStartAgent")));
 
         NavigateBackFromTaskToProject(mainWindow);
         DeleteCurrentProject(mainWindow);

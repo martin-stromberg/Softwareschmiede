@@ -200,12 +200,14 @@ Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisieru
 
 **Aufruf-Chain:**
 ```
-Benutzer: Start-Button klicken
+Benutzer: Klickt "Start"-Button im Ribbon (Gruppe "Autonome Aufgabe")
     ↓
-AutonomAufgabeDetailViewModel.StartCommand
+AutonomAufgabeDetailViewModel.StartCommand (gebunden von der "Automatisierung"-Registerkarte)
     ↓
 ProjektleiterAgentService.StarteAgenAsync(konfiguration)
 ```
+
+Nach erfolgreichem Start wird der Agent mit dem Initialprompt und der Skill-Registry initialisiert. Die **„Automatisierung"**-Registerkarte zeigt den Status als **„Läuft"** an.
 
 **Methode: `ProjektleiterAgentService.StarteAgenAsync()`**
 
@@ -490,15 +492,20 @@ Heartbeat Loop (z.B. alle 30 Sekunden):
 ```mermaid
 sequenceDiagram
     participant Benutzer
-    participant UI as AutonomAufgabeDetailViewModel
+    participant UI as TaskDetailViewModel
     participant Init as AutonomAufgabenInitialisierungsService
+    participant Start as AutonomAufgabeStartService
     participant Proj as ProjektleiterAgentService
     participant Session as SessionManagementService
     participant Agent as ProjectManager Agent
     participant DB as Datenbank
 
-    Benutzer->>UI: Dialog ausfüllen & bestätigen
-    UI->>Init: InitialisiereAsync(aufgabe, anfrage)
+    Benutzer->>UI: Navigiert zu Aufgabe
+    UI->>UI: Zeigt Detailansicht mit Registerkarten
+
+    Benutzer->>UI: Klickt "Autonome Aufgabe starten" im Ribbon
+    UI->>Init: Initialisierungsdialog wird angezeigt
+    Benutzer->>Init: Dialog ausfüllen & bestätigen
     Init->>Init: Validierung
     Init->>Init: Arbeitsverzeichnis erstellen
     Init->>Init: Repository-Klon (von GitRepository.RepositoryUrl)
@@ -507,12 +514,19 @@ sequenceDiagram
     Init->>DB: AutonomAufgabeKonfiguration speichern
     Init-->>UI: Zurück
 
-    Benutzer->>UI: "Start" klicken
+    UI->>Start: StarteAsync(aufgabe)
+    Start->>Start: AutonomAufgabeDetailViewModel erzeugen
+    Start-->>UI: Ergebnis mit DetailViewModel zurück
+    UI->>UI: SetzeAutonomAufgabeDetailViewAsync(DetailViewModel)
+    UI->>UI: Zeigt "Automatisierung"-Registerkarte mit Start/Stop/Fortsetzen-Buttons
+
+    Benutzer->>UI: Klickt "Start" Button im Ribbon
     UI->>Proj: StarteAgenAsync(konfiguration)
     Proj->>Proj: Skills laden
     Proj->>Agent: Agenten erzeugen & starten
     Proj->>DB: ProjektleiterAgentId speichern
     Proj-->>UI: agent_id zurück
+    UI->>UI: Status auf "Läuft" aktualisieren
 
     par Projektleiter-Agent läuft
         Agent->>Proj: SteuereUnteragentAsync()

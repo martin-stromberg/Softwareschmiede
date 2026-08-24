@@ -30,7 +30,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         Diff,
         Dateibrowser,
         PullRequests,
-        Todos
+        Todos,
+        Automatisierung
     }
 
     private readonly AufgabeService _aufgabeService;
@@ -79,6 +80,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _canCreateIssue;
     private bool _isRefreshingPullRequests;
     private bool _kannIdeAuswaehlen;
+    private AutonomAufgabeDetailViewModel? _autonomAufgabeDetailViewModel;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -100,6 +102,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 _ladenCts?.Cancel();
                 _ladenCts?.Dispose();
                 _ladenCts = new CancellationTokenSource();
+                _autonomAufgabeDetailViewModel = null;
+                OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
+                OnPropertyChanged(nameof(ShowAutomatisierungPanel));
                 LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "TaskDetailViewModel.LadenAsync");
             }
         }
@@ -358,6 +363,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die Todo-Ansicht ausgewählt ist.</summary>
     public bool IsTodoViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Todos;
 
+    /// <summary>Gibt an, ob die Automatisierung-Ansicht ausgewählt ist.</summary>
+    public bool IsAutomatisierungViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Automatisierung;
+
+    /// <summary>Gibt an, ob die Automatisierung-Registerkarte und die zugehörigen Ribbon-Buttons angezeigt werden können, weil eine Autonome Aufgabe initialisiert wurde.</summary>
+    public bool ShowAutomatisierungPanel => _autonomAufgabeDetailViewModel is not null;
+
+    /// <summary>Das ViewModel der aktuell angezeigten Autonomen Aufgabe, oder null wenn keine initialisiert wurde.</summary>
+    public AutonomAufgabeDetailViewModel? AutonomAufgabeDetailViewModel => _autonomAufgabeDetailViewModel;
+
     /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
     public bool ShowPullRequestPanel => _aufgabe is not null;
 
@@ -525,6 +539,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Wechselt zur Pull-Request-Ansicht.</summary>
     public ICommand PullRequestViewCommand { get; }
 
+    /// <summary>Wechselt zur Automatisierung-Ansicht.</summary>
+    public ICommand AutomatisierungViewCommand { get; }
+
     /// <summary>Navigiert zurück zur vorherigen Ansicht.</summary>
     public ICommand ZurueckCommand { get; }
 
@@ -641,6 +658,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         DiffViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Diff), () => ShowDiffPanel);
         DateiViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Dateibrowser), () => ShowFileExplorerPanel);
         PullRequestViewCommand = new RelayCommand(PullRequestAnsichtWaehlen, () => ShowPullRequestPanel);
+        AutomatisierungViewCommand = new RelayCommand(() => WaehleAnsicht(DetailAnsicht.Automatisierung), () => ShowAutomatisierungPanel);
         ZurueckCommand = new RelayCommand(() => ZurueckAction?.Invoke());
         IssueZuweisenCommand = new AsyncRelayCommand(IssueZuweisenAsync, () => CanAssignIssue && !_isLoading);
         IssueAnlegenCommand = new AsyncRelayCommand(IssueAnlegenAsync, () => CanCreateIssue);
@@ -1231,6 +1249,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             FehlerMeldung = ergebnis.FehlerMeldung;
         }
+
+        if (ergebnis.DetailViewModel is not null)
+        {
+            await SetzeAutonomAufgabeDetailViewAsync(ergebnis.DetailViewModel);
+        }
     }
 
     private async Task IssueAnlegenAsync(CancellationToken ct)
@@ -1409,6 +1432,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             ansicht = DetailAnsicht.Info;
         if (ansicht == DetailAnsicht.PullRequests && !ShowPullRequestPanel)
             ansicht = DetailAnsicht.Info;
+        if (ansicht == DetailAnsicht.Automatisierung && !ShowAutomatisierungPanel)
+            ansicht = DetailAnsicht.Info;
 
         if (_ausgewaehlteAnsicht == ansicht)
             return;
@@ -1421,7 +1446,19 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsFileExplorerViewSelected));
         OnPropertyChanged(nameof(IsPullRequestViewSelected));
         OnPropertyChanged(nameof(IsTodoViewSelected));
+        OnPropertyChanged(nameof(IsAutomatisierungViewSelected));
         OnPropertyChanged(nameof(ShowInfoPanel));
+    }
+
+    /// <summary>Speichert <paramref name="vm"/> als ViewModel der Automatisierung-Ansicht, löst die zugehörigen PropertyChanged-Ereignisse aus und wechselt zur Automatisierung-Ansicht. Wird von <see cref="AutonomAufgabeStartService"/> über das Ergebnis von <see cref="AutonomAufgabeStartService.StarteAsync"/> aufgerufen.</summary>
+    /// <param name="vm">Das anzuzeigende ViewModel der Autonomen Aufgabe.</param>
+    public Task SetzeAutonomAufgabeDetailViewAsync(AutonomAufgabeDetailViewModel? vm)
+    {
+        _autonomAufgabeDetailViewModel = vm;
+        OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
+        OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+        WaehleAnsicht(DetailAnsicht.Automatisierung);
+        return Task.CompletedTask;
     }
 
     private void PullRequestAnsichtWaehlen()

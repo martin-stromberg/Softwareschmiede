@@ -13,14 +13,14 @@
 
 ### 1. Initialisierungsdialog öffnen
 
-1. Navigiere zur bestehenden oder neu erstellten Aufgabe
-2. Öffne das Aufgaben-Detailpanel
-3. Klicke auf den Button **„Autonome Aufgabe initialisieren"** (oder ähnlich)
-   - Der Initialisierungsdialog öffnet sich mit Formularfeldern
+1. Navigiere zur bestehenden oder neu erstellten Aufgabe in der Aufgabenliste
+2. Öffne die Detailansicht der Aufgabe (Doppelklick oder Auswahl im Panel)
+3. Im Ribbon-Menü der Aufgabe (unter der Gruppe **„Autonome Aufgabe"**) klicke auf den Button **„Autonome Aufgabe starten"**
+   - Ein Initialisierungsdialog öffnet sich mit Formularfeldern
 
 > **Hinweis:** Der Dialog wird nur angezeigt, wenn die Aufgabe noch nicht als Autonome Aufgabe initialisiert wurde (Status != `AutonomAufgabe`).
 
-> **Hinweis:** Oben rechts im Dialog befindet sich der Button **„Hilfe"**. Er öffnet einen Informationsdialog mit einer Erklärung des gesamten Ablaufs einer Autonomen Aufgabe (Initialisierung, Agent-Start, Unteragenten, Fortschritt/Integration, Session-Pause) sowie einer Kurzbeschreibung aller Formularfelder — hilfreich, wenn du zum ersten Mal eine Autonome Aufgabe anlegst.
+> **Hinweis:** Im Initialisierungsdialog gibt es oben rechts einen Button **„Hilfe"**. Er öffnet einen Informationsdialog mit einer Erklärung des gesamten Ablaufs einer Autonomen Aufgabe (Initialisierung, Agent-Start, Unteragenten, Fortschritt/Integration, Session-Pause) sowie einer Kurzbeschreibung aller Formularfelder — hilfreich, wenn du zum ersten Mal eine Autonome Aufgabe anlegst.
 
 ### 2. Konfiguration ausfüllen
 
@@ -75,26 +75,27 @@ Skill-Autogeneration: Deaktiviert
    - Projektbranch im geklonten Repository (neu angelegt oder — falls bereits remote vorhanden — ausgecheckt, ebenfalls mit dem aufgabenspezifischen Git-Plugin)
    - Initial-Dateien (plan.md, progress.md, state.json, etc.)
    - Datenbankeinträge für Konfiguration
-3. Der Dialog schließt sich
-4. Die Detail-View zeigt jetzt die neue Autonome Aufgabe
+3. Der Initialisierungsdialog schließt sich
+4. Die Detailansicht der Aufgabe zeigt jetzt eine neue Registerkarte **„Automatisierung"**, auf der die Details der Autonomen Aufgabe sichtbar sind
+5. Im Ribbon-Menü (Gruppe **„Autonome Aufgabe"**) sind jetzt die Buttons **„Start"**, **„Stop"** und **„Fortsetzen"** verfügbar
 
 > **Hinweis:** Das Git-Plugin für Repository-Klon und Projektbranch-Operationen wird anhand der Aufgabenkonfiguration (`GitRepository.PluginTyp`) bestimmt, nicht anhand eines global konfigurierten Default-Plugins. Dies stellt sicher, dass die richtige SCM-Integration für jede Aufgabe verwendet wird.
 
 ### 4. Projektleiter-Agenten starten
 
-1. Der Aufgaben-Detailpanel zeigt jetzt den **„Start"**-Button
-2. Klicke auf **„Start"**, um den Projektleiter-Agenten zu starten
-3. Der Agent wird mit dem Initialprompt und Skill-Registry initialisiert
-4. Status in der UI wechselt zu **„Läuft"** (mit aktiver Agent-ID)
+1. Im Ribbon-Menü der Aufgabendetails, Gruppe **„Autonome Aufgabe"**, klicke auf den Button **„Start"**
+2. Der Projektleiter-Agenten wird mit dem Initialprompt und Skill-Registry initialisiert
+3. Status in der **„Automatisierung"**-Registerkarte wechselt zu **„Läuft"** (mit aktiver Agent-ID)
 
-> **Hinweis:** Der Agent läuft im Hintergrund. Sie können währenddessen zu anderen Aufgaben wechseln.
+> **Hinweis:** Der Agent läuft im Hintergrund. Sie können währenddessen zu anderen Aufgaben wechseln. Wenn Sie zu einer anderen Aufgabe wechseln und später zu dieser Aufgabe zurückkehren, wird für die Detailansicht eine neue Instanz erzeugt, in der die **„Automatisierung"**-Registerkarte zunächst nicht sichtbar ist — es wird beim Laden nicht automatisch geprüft, ob bereits eine Autonome Aufgabe initialisiert wurde.
 
 ### 5. Fortschritt überwachen (optional)
 
-Im Detail-Panel können Sie folgende Tabs einsehen:
+Die **„Automatisierung"**-Registerkarte in der Aufgabendetailansicht enthält ein eigenes Register mit folgenden Tabs:
 
 | Tab | Inhalt | Aktualisierung |
 |-----|--------|----------------|
+| **Konfiguration** | Übersicht der Initialisierungs-Konfiguration (Projektbranch, Ressourcenlimits, Persistenzmodus) | Statisch |
 | **Plan** | `plan.md` — Gesamtplan mit Teilaufgaben | Live |
 | **Fortschritt** | `progress.md` — Meilensteine, Status | Live |
 | **Governance** | `governance.md` — Limits und Regeln | Statisch |

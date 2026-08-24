@@ -17,18 +17,21 @@ namespace Softwareschmiede.Tests.E2E;
 /// Konsolidiert die drei im Umsetzungsplan beschriebenen Szenarien in einer einzigen Testmethode mit
 /// einem gemeinsamen App-Lifecycle (siehe CLAUDE.md, Abschnitt FlaUI-Konsolidierung). Der
 /// Projektleiter-Agent-Start und die Session-Wiederaufnahme werden über echte UI-Interaktion
-/// (FlaUI-Klicks im laufenden App-Prozess) geprüft. Die Unteragenten-Erzeugung und die
-/// budgetbedingte Session-Pause sind laut Anforderung ausschließlich Projektleiter-Agent-interne
-/// Aktionen ohne eigenen UI-Auslöser; sie werden daher direkt über die Services gegen dieselbe
-/// SQLite-Testdatenbank des laufenden App-Prozesses ausgeführt und verifiziert.
+/// (FlaUI-Klicks im laufenden App-Prozess) geprüft — seit der UI-Integration der Autonomen Aufgabe in
+/// <c>TaskDetailView</c> (Folgeanforderung zu Issue 205) über die Ribbon-Buttons "Start"/"Resume" der
+/// Gruppe "Autonome Aufgabe" statt über Buttons in einem eigenen Detail-Fenster. Die
+/// Unteragenten-Erzeugung und die budgetbedingte Session-Pause sind laut Anforderung ausschließlich
+/// Projektleiter-Agent-interne Aktionen ohne eigenen UI-Auslöser; sie werden daher direkt über die
+/// Services gegen dieselbe SQLite-Testdatenbank des laufenden App-Prozesses ausgeführt und verifiziert.
 /// </summary>
 public partial class End2EndTest
 {
     /// <summary>
-    /// Szenario: Projektleiter-Agent wird über die Detail-Ansicht gestartet (UI zeigt aktiven Status),
-    /// ein Unteragent wird erzeugt (Verzeichnis, Branch, DB-Eintrag), die Aufgabe wird bei Budget-Limit
-    /// pausiert (SessionPauseUtc gesetzt, state.json aktualisiert) und anschließend über die
-    /// Detail-Ansicht fortgesetzt (SessionPauseUtc wieder null).
+    /// Szenario: Projektleiter-Agent wird über den Ribbon-Button "Start" der Aufgaben-Detailansicht
+    /// gestartet (UI zeigt aktiven Status), ein Unteragent wird erzeugt (Verzeichnis, Branch, DB-Eintrag),
+    /// die Aufgabe wird bei Budget-Limit pausiert (SessionPauseUtc gesetzt, state.json aktualisiert) und
+    /// anschließend fortgesetzt (SessionPauseUtc wieder null); der Ribbon-Button "Resume" ist dabei
+    /// erreichbar.
     /// </summary>
     protected async Task AutonomAufgabeAgentExecution_StartUnteragentUndSessionPause_E2E(Window mainWindow)
     {
@@ -59,10 +62,14 @@ public partial class End2EndTest
         promptBox.AsTextBox().Text = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
         ConfirmDialog(initDialog, "AutonomAufgabeBestaetigen");
 
-        var detailFenster = WaitForWindow("Autonome Aufgabe", Long);
+        // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
+        // wechselt selbst zur "Automatisierung"-Registerkarte.
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStart"), Long);
 
-        // Phase 1: Projektleiter-Agent-Start über echte UI-Interaktion.
-        var startButton = WaitForElement(detailFenster, cf => cf.ByName("AutonomAufgabeStart"), Long);
+        // Phase 1: Projektleiter-Agent-Start über echte UI-Interaktion — über den Ribbon-Button
+        // "Start" (Gruppe "Autonome Aufgabe"), nicht über den (weiterhin vorhandenen, aber hier bewusst
+        // nicht verwendeten) gleichnamigen Button innerhalb der eingebetteten AutonomAufgabeDetailView.
+        var startButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStartAgent"), Long);
         startButton.AsButton().Click();
 
         await WartenBisAsync(async () =>
@@ -151,16 +158,16 @@ public partial class End2EndTest
         var stateJson = await File.ReadAllTextAsync(stateJsonPfad);
         Assert.Contains("paused_utc", stateJson);
 
-        // Phase 4: Wiederaufnahme. Der Resume-Button in der Detail-Ansicht ist vorhanden und mit dem
-        // ResumeCommand verbunden (UI-Erreichbarkeit wird hier geprüft). Die eigentliche Ausführung
-        // erfolgt bewusst über einen direkten Service-Aufruf statt über einen FlaUI-Klick: Die
+        // Phase 4: Wiederaufnahme. Der Ribbon-Button "Resume" (Gruppe "Autonome Aufgabe") ist vorhanden
+        // und mit dem ResumeCommand verbunden (UI-Erreichbarkeit wird hier geprüft). Die eigentliche
+        // Ausführung erfolgt bewusst über einen direkten Service-Aufruf statt über einen FlaUI-Klick: Die
         // Detail-Ansicht läuft im Prozess der Anwendung mit einem eigenen, langlebigen DbContext, dessen
         // Change-Tracking die in Phase 3 außerhalb des Anwendungsprozesses (separate SQLite-Verbindung)
         // gesetzte SessionPauseUtc nicht sieht (EF-Core-Identity-Map hält die zuvor geladene Aufgabe-
         // Instanz mit dem alten Wert zurück) — ein reines Testaufbau-Artefakt der Kombination aus
         // In-Process-UI und Out-of-Process-DB-Seeding, keine Auswirkung auf reales Anwendungsverhalten,
         // bei dem Pause und Resume im selben Anwendungsprozess laufen.
-        var resumeButton = WaitForElement(detailFenster, cf => cf.ByName("AutonomAufgabeResume"), Short);
+        var resumeButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeResumeAgent"), Short);
         Assert.NotNull(resumeButton);
 
         await using (var db = OpenTestDbContext())
@@ -178,8 +185,6 @@ public partial class End2EndTest
             Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
             Assert.False(string.IsNullOrWhiteSpace(aufgabe.VorschlagPrompt), "Weitermachen-Prompt wurde nicht gesetzt.");
         }
-
-        detailFenster.AsWindow().Close();
 
         NavigateBackFromTaskToProject(mainWindow);
         DeleteCurrentProject(mainWindow);

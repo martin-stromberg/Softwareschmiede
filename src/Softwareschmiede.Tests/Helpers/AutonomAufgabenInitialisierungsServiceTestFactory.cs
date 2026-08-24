@@ -1,6 +1,9 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -74,6 +77,59 @@ internal static class AutonomAufgabenInitialisierungsServiceTestFactory
     /// <returns>Ein einsatzbereiter AutonomAufgabenInitialisierungsService.</returns>
     public static AutonomAufgabenInitialisierungsService CreateService(SoftwareschmiededDbContext db, ICliRunner cliRunner, IGitPlugin gitPlugin)
         => new(db, cliRunner, CreatePluginSelectionService(db, gitPlugin), Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+
+    /// <summary>Erstellt einen ProjektleiterAgentService mit gemockten Governance-/Git-Provisionierungs-Abhängigkeiten für Tests.</summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext.</param>
+    /// <returns>Ein einsatzbereiter ProjektleiterAgentService.</returns>
+    public static ProjektleiterAgentService CreateProjektleiterAgentService(SoftwareschmiededDbContext db)
+        => new(
+            db,
+            new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance),
+            new UnteragentGitProvisioningService(new Mock<ICliRunner>().Object, new Mock<IGitPlugin>().Object, NullLogger<UnteragentGitProvisioningService>.Instance),
+            NullLogger<ProjektleiterAgentService>.Instance);
+
+    /// <summary>Erstellt ein einsatzbereites AutonomAufgabeDetailViewModel für <paramref name="aufgabe"/>/<paramref name="konfiguration"/> mit minimalen (aber echten) Abhängigkeiten.</summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext.</param>
+    /// <param name="aufgabe">Die Aufgabe, für die das ViewModel erstellt wird.</param>
+    /// <param name="konfiguration">Die zugehörige AutonomAufgabeKonfiguration.</param>
+    /// <returns>Ein einsatzbereites AutonomAufgabeDetailViewModel.</returns>
+    public static AutonomAufgabeDetailViewModel CreateAutonomAufgabeDetailViewModel(
+        SoftwareschmiededDbContext db, Aufgabe aufgabe, AutonomAufgabeKonfiguration konfiguration)
+        => new(
+            aufgabe,
+            konfiguration,
+            CreateProjektleiterAgentService(db),
+            new SessionManagementService(db, NullLogger<SessionManagementService>.Instance),
+            NullLogger<AutonomAufgabeDetailViewModel>.Instance);
+
+    /// <summary>
+    /// Erstellt einen IServiceProvider mit den für <c>AutonomAufgabeStartService.StarteAsync</c> benötigten
+    /// Registrierungen (AutonomAufgabeInitialisierungsDialogViewModel, ProjektleiterAgentService,
+    /// SessionManagementService, ILogger&lt;AutonomAufgabeDetailViewModel&gt;).
+    /// </summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext.</param>
+    /// <param name="initialisierungsService">Der für den Initialisierungsdialog zu verwendende Service.</param>
+    /// <param name="pluginManager">Der IPluginManager für den Initialisierungsdialog.</param>
+    /// <returns>Ein einsatzbereiter IServiceProvider.</returns>
+    public static IServiceProvider CreateAutonomAufgabeStartServiceProvider(
+        SoftwareschmiededDbContext db, AutonomAufgabenInitialisierungsService initialisierungsService, IPluginManager pluginManager)
+    {
+        var promptVorlagenService = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
+        var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
+
+        return new ServiceCollection()
+            .AddTransient(_ => new AutonomAufgabeInitialisierungsDialogViewModel(
+                initialisierungsService,
+                Options.Create(new AutonomAufgabenOptions()),
+                NullLogger<AutonomAufgabeInitialisierungsDialogViewModel>.Instance,
+                pluginManager,
+                promptVorlagenService,
+                promptVorlagenPlatzhalterService))
+            .AddTransient(_ => CreateProjektleiterAgentService(db))
+            .AddTransient(_ => new SessionManagementService(db, NullLogger<SessionManagementService>.Instance))
+            .AddTransient(_ => (ILogger<AutonomAufgabeDetailViewModel>)NullLogger<AutonomAufgabeDetailViewModel>.Instance)
+            .BuildServiceProvider();
+    }
 
     /// <summary>Erstellt ein Projekt und fügt es dem Datenbankkontext hinzu, ohne zu speichern.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
