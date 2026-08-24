@@ -499,6 +499,85 @@ public sealed class GitOrchestrationServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>PullRequestErstellenAsync verwendet den gespeicherten Basis-Branch der Aufgabe fuer die Commit-Liste statt des Zielbranches.</summary>
+    [Fact]
+    public async Task PullRequestErstellenAsync_ShouldUseTaskBasisBranch_WhenLoadingWorkspaceSnapshotForBody()
+    {
+        // Arrange
+        var projekt = await _projektService.CreateAsync("Projekt mit Staging", null);
+        var repository = await _projektService.AddRepositoryAsync(
+            projekt.Id,
+            "GitHub",
+            "https://github.com/test/basis-branch",
+            "test/basis-branch");
+        repository.DefaultSourceBranchName = "main";
+        await _db.SaveChangesAsync();
+
+        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "PR mit Staging-Basis", "Alte Anforderung", repository.Id);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/staging-basis", @"C:\repos\task-staging", "staging");
+
+        var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
+        workspaceBrowserMock
+            .Setup(browser => browser.LoadSnapshotAsync(@"C:\repos\task-staging", "staging", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WorkspaceSnapshot
+            {
+                RepositoryPath = @"C:\repos\task-staging",
+                CommitCount = 1,
+                BranchCommits =
+                [
+                    new BranchCommit { Sha = "cccccccccccccccccccccccccccccccccccccccc", ShortSha = "ccccccc", Subject = "feat: nur Feature-Commits" }
+                ]
+            });
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(manager => manager.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
+        pluginManagerMock.Setup(manager => manager.GetDevelopmentAutomationPlugins()).Returns([]);
+        pluginManagerMock.Setup(manager => manager.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+
+        var sut = new GitOrchestrationService(
+            _aufgabeService,
+            _projektService,
+            _protokollService,
+            _gitPluginMock.Object,
+            new PluginSelectionService(
+                pluginManagerMock.Object,
+                new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object),
+                new PluginActivationService(new AppEinstellungService(_db, new Mock<ILogger<AppEinstellungService>>().Object), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object),
+                new Mock<ILogger<PluginSelectionService>>().Object),
+            new Mock<ILogger<GitOrchestrationService>>().Object,
+            workspaceBrowserMock.Object);
+
+        _gitPluginMock
+            .Setup(g => g.CreatePullRequestAsync(
+                "test/basis-branch",
+                "feature/staging-basis",
+                "main",
+                "PR mit Staging-Basis",
+                It.Is<string>(body =>
+                    body.Contains("## Commits")
+                    && body.Contains("- `ccccccc` feat: nur Feature-Commits")
+                    && !body.Contains("Alte Anforderung")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PullRequest(45, "PR mit Staging-Basis", "https://example/pr/45", "feature/staging-basis"));
+
+        // Act
+        await sut.PullRequestErstellenAsync(aufgabe.Id);
+
+        // Assert
+        _gitPluginMock.Verify(g => g.CreatePullRequestAsync(
+            "test/basis-branch",
+            "feature/staging-basis",
+            "main",
+            "PR mit Staging-Basis",
+            It.Is<string>(body =>
+                body.Contains("## Commits")
+                && body.Contains("- `ccccccc` feat: nur Feature-Commits")
+                && !body.Contains("Alte Anforderung")),
+            It.IsAny<CancellationToken>()), Times.Once);
+        workspaceBrowserMock.Verify(b => b.LoadSnapshotAsync(@"C:\repos\task-staging", "staging", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     /// <summary>PullRequestErstellenAsync nutzt das aktive Projekt-Repository, wenn die Aufgabe keines zugewiesen hat.</summary>
     [Fact]
     public async Task PullRequestErstellenAsync_ShouldUseProjectRepository_WhenAufgabeHasNoLinkedRepository()

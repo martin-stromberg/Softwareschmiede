@@ -527,7 +527,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
     }
 
     /// <summary>Startet eine Aufgabe: Status → Gestartet, Branch und Arbeitsverzeichnis setzen.</summary>
-    public async Task StartenAsync(Guid id, string branchName, string lokalerKlonPfad, CancellationToken ct = default)
+    public async Task StartenAsync(Guid id, string branchName, string lokalerKlonPfad, string? basisBranchName = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Aufgabe {AufgabeId} starten (Branch: {BranchName}).", id, branchName);
 
@@ -541,7 +541,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
 
         aufgabe.Status = AufgabeStatus.Gestartet;
         aufgabe.AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv;
-        aufgabe.GitArbeitsbereich = new GitArbeitsbereich(branchName, lokalerKlonPfad);
+        aufgabe.GitArbeitsbereich = new GitArbeitsbereich(branchName, lokalerKlonPfad, basisBranchName);
         aufgabe.AktiveRunId = null;
         aufgabe.LastHeartbeatUtc = null;
         aufgabe.LetzterCliStartUtc = null;
