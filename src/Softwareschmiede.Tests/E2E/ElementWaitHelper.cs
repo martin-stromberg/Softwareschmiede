@@ -24,11 +24,9 @@ internal static class ElementWaitHelper
     /// Interaktionen knapp über 10s lagen. 20s deckt diesen einmaligen Warmup-Puffer ab, ohne echte
     /// künftige Regressionen (die deutlich länger bräuchten) zu maskieren.
     /// </summary>
-    /// <returns>Das kurze Timeout (20s).</returns>
     internal static readonly TimeSpan Short = TimeSpan.FromSeconds(20);
 
     /// <summary>Mittleres Timeout (15s) für UI-Elemente nach asynchronen Operationen.</summary>
-    /// <returns>Das mittlere Timeout (15s).</returns>
     internal static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
 
     /// <summary>

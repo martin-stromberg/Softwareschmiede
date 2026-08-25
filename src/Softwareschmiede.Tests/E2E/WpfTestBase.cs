@@ -388,33 +388,21 @@ public abstract class WpfTestBase : IDisposable
         TimeSpan timeout)
         => Assert.Null(ElementWaitHelper.PollUntilGone(parent, conditionFunc, timeout));
 
-    /// <summary>Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch zurück.</summary>
+    /// <summary>
+    /// Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch
+    /// zurück. Delegiert an <see cref="Views.ProjectListView.CreateProject"/> (siehe
+    /// <see cref="Views.BaseWindowView"/> für die Begründung dieser Komposition statt eigener
+    /// Klick-/Warte-Logik).
+    /// </summary>
     protected void CreateProject(AutomationElement mainWindow, string name)
-    {
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
-        neuButton.AsButton().Click();
+        => new Softwareschmiede.Tests.E2E.Views.ProjectListView((Window)mainWindow).CreateProject(name);
 
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        nameBox.Click();
-        Keyboard.Type(name);
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-
-        // Warten bis Overlay geschlossen (Speichern-Button verschwunden)
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Medium);
-
-        // CreateAsync + Callback-Ausführung abwarten
-        WaitForElement(mainWindow, cf => cf.ByName(name), Medium);
-    }
-
-    /// <summary>Öffnet ein Projekt aus der Liste anhand seines Namens.</summary>
+    /// <summary>
+    /// Öffnet ein Projekt aus der Liste anhand seines Namens. Delegiert an
+    /// <see cref="Views.ProjectListView.OpenProject"/>.
+    /// </summary>
     protected void OpenProject(AutomationElement mainWindow, string name)
-    {
-        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), Short);
-        projektKachel.Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Medium);
-    }
+        => new Softwareschmiede.Tests.E2E.Views.ProjectListView((Window)mainWindow).OpenProject(name);
 
     /// <summary>Legt ein neues Projekt an, speichert es und öffnet es wieder.</summary>
     protected void CreateAndOpenProject(AutomationElement mainWindow, string name)
@@ -854,73 +842,40 @@ public abstract class WpfTestBase : IDisposable
 
     /// <summary>
     /// Verwirft die Bearbeitung über den "Zurück"-Button in der <c>TaskDetailView</c> und wartet auf
-    /// das Wiedererscheinen von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>).
+    /// das Wiedererscheinen von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>). Delegiert an
+    /// <see cref="Views.TaskDetailView.GoBack"/>.
     /// </summary>
     protected void AufgabeDetailZurueck(AutomationElement mainWindow)
-    {
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
-    }
+        => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).GoBack();
 
     /// <summary>
     /// Löscht das aktuell in der <c>ProjectDetailView</c> geöffnete Projekt über den "Löschen"-Button
     /// und bestätigt den nativen Win32-Bestätigungsdialog. Für mehrphasige Tests, die nach einer Phase
-    /// ihr Projekt aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt.
+    /// ihr Projekt aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt. Delegiert
+    /// an <see cref="Views.ProjectDetailView.DeleteProject"/> (das dortige
+    /// <see cref="Views.Dialogs.DeleteConfirmationDialogView"/> nutzt die stabilen, sprachunabhängigen
+    /// Win32-Dialog-Control-IDs IDYES/IDNO statt der Button-Beschriftung).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit geöffneter <c>ProjectDetailView</c> (Voraussetzung: "AufgabeNeu" sichtbar).</param>
     protected void DeleteCurrentProject(AutomationElement mainWindow)
-    {
-        WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-
-        var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
-        loeschenButton.AsButton().Click();
-
-        // MessageBox "Löschen bestätigen" erscheint als separates Fenster. Der Titel stammt aus der
-        // Anwendung (App-Ressource, daher sprachunabhängig sprachlich "Löschen bestätigen"), die
-        // Button-Beschriftung "Ja"/"Nein" dagegen wird vom nativen Win32-MessageBox-Control anhand
-        // der Systemsprache des ausführenden Betriebssystems gerendert (System.Windows.MessageBox
-        // erlaubt keine eigenen Button-Texte) - auf einem englischsprachigen CI-Runner (z. B.
-        // windows-latest bei GitHub Actions) heißt der Button "Yes" statt "Ja", wodurch die Suche
-        // nach dem Namen dort unabhängig vom Timeout nie etwas findet. Die Automation-ID des
-        // Ja/Yes-Buttons entspricht dagegen der stabilen, sprachunabhängigen Win32-Dialog-Control-ID
-        // IDYES (6) und funktioniert auf jeder Systemsprache identisch.
-        var msgBox = WaitForWindow("Löschen bestätigen", Short);
-        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
-        jaButton.AsButton().Click();
-
-        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
-    }
+        => new Softwareschmiede.Tests.E2E.Views.ProjectDetailView((Window)mainWindow).DeleteProject();
 
     /// <summary>
     /// Löscht die aktuell im Edit-Panel geöffnete Aufgabe über den "Löschen"-Button und bestätigt den
     /// nativen Win32-Bestätigungsdialog. Für mehrphasige Tests, die nach einer Phase ihre Aufgabe
-    /// aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt.
+    /// aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt. Delegiert an
+    /// <see cref="Views.TaskDetailView.DeleteTask"/>.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit geöffneter Aufgabe (Voraussetzung: "Starten" sichtbar, d. h. kein laufender CLI-Prozess).</param>
     protected void DeleteCurrentTask(AutomationElement mainWindow)
-    {
-        WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+        => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).DeleteTask();
 
-        var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
-        loeschenButton.AsButton().Click();
-
-        var msgBox = WaitForWindow("Löschen bestätigen", Short);
-        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
-        jaButton.AsButton().Click();
-
-        // Overlay geschlossen — "Starten" nicht mehr sichtbar
-        WaitUntilGone(mainWindow, cf => cf.ByName("Starten"), Short);
-    }
-
-    /// <summary>Wartet auf die "OffeneAufgabenListe" und gibt deren ListItem-Kinder zurück.</summary>
+    /// <summary>
+    /// Wartet auf die "OffeneAufgabenListe" und gibt deren ListItem-Kinder zurück. Delegiert an
+    /// <see cref="Views.ProjectDetailView.GetTaskElements"/>.
+    /// </summary>
     protected AutomationElement[] OffeneAufgabenItems(AutomationElement mainWindow)
-    {
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
-        return listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
-    }
+        => new Softwareschmiede.Tests.E2E.Views.ProjectDetailView((Window)mainWindow).GetTaskElements();
 
     /// <summary>
     /// Öffnet das erste Item aus einer bereits ermittelten Aufgabenliste per Doppelklick, wodurch die

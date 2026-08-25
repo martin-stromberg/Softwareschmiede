@@ -237,6 +237,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                     : $"Softwareschmiede – {detailTitel}";
             };
         }
+        else if (_projectListViewModel.DetailViewModel is not null)
+        {
+            // Die Seitenleisten-Navigation "Projekte" ist eine explizite Rückkehr zur Projektübersicht.
+            // _projectListViewModel wird über die Lebensdauer des Fensters wiederverwendet (siehe oben) -
+            // ein zuvor über das Vollbild-Overlay geöffnetes Projekt- oder Aufgabendetail (siehe
+            // ProjectListView.xaml / ProjectListViewModel.DetailViewModel) bleibt sonst bestehen, auch
+            // wenn es nie explizit über "Zurück" geschlossen wurde. Ohne dieses Zurücksetzen zeigt das
+            // Fenster nach einem erneuten Klick auf "Projekte" weiterhin die alte Detailansicht statt der
+            // Projektliste (Issue #231-Fortsetzung: WindowExtensions.CurrentView() erkannte dadurch
+            // reproduzierbar fälschlich TaskDetailView statt ProjectListView). SchliesseDetailCommand ist
+            // der bereits vorhandene, sichere Weg dafür - er disposed sowohl das aktuell offene
+            // Detail-ViewModel als auch ein ggf. zurückgehaltenes ProjectDetailViewModel korrekt
+            // (siehe ProjectListViewModel.DetailViewModel-Setter).
+            _projectListViewModel.SchliesseDetailCommand.Execute(null);
+        }
         CurrentView = _projectListViewModel;
         Title = "Softwareschmiede – Projekte";
     }
