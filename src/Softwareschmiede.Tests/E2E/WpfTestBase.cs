@@ -23,18 +23,13 @@ public abstract class WpfTestBase : IDisposable
     private const string TargetFramework = "net10.0-windows10.0.17763.0";
 
     /// <summary>
-    /// Kurzes Timeout (20s) für schnell erscheinende UI-Elemente. War ursprünglich 10s; auf
-    /// windows-latest-CI-Runnern (siehe .github/workflows/test.yml) zeigte sich ein einmaliger
-    /// JIT-/Rendering-Warmup-Effekt bei den ersten Popup-/Dialog-Interaktionen eines Testlaufs
-    /// (ComboBox-Dropdown, MessageBox) - belegt dadurch, dass spätere Tests mit identischen
-    /// UI-Mustern im selben Lauf durchgehend in 6-10s durchliefen, während die ersten 2-3 solcher
-    /// Interaktionen knapp über 10s lagen. 20s deckt diesen einmaligen Warmup-Puffer ab, ohne echte
-    /// künftige Regressionen (die deutlich länger bräuchten) zu maskieren.
+    /// Kurzes Timeout (20s) für schnell erscheinende UI-Elemente. Siehe <see cref="ElementWaitHelper.Short"/>
+    /// für die Begründung des konkreten Werts.
     /// </summary>
-    protected static readonly TimeSpan Short = TimeSpan.FromSeconds(20);
+    protected static readonly TimeSpan Short = ElementWaitHelper.Short;
 
     /// <summary>Mittleres Timeout (15s) für UI-Elemente nach asynchronen Operationen.</summary>
-    protected static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
+    protected static readonly TimeSpan Medium = ElementWaitHelper.Medium;
 
     /// <summary>Langes Timeout (30s), z. B. für das initiale Erscheinen des Hauptfensters.</summary>
     protected static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
@@ -298,58 +293,24 @@ public abstract class WpfTestBase : IDisposable
     /// erneute Zielsuche liefert es als regulären Treffer zurück. Zielt <paramref name="conditionFunc"/> auf
     /// ein anderes Element, bleibt die erneute Suche erfolglos und die Fail-Fast-Diagnose greift wie bisher.
     /// </remarks>
+    /// <param name="parent">Das Element, dessen Teilbaum durchsucht wird.</param>
+    /// <param name="conditionFunc">Die Suchbedingung.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Das gefundene Element.</returns>
     protected static AutomationElement WaitForElement(
         AutomationElement parent,
         Func<ConditionFactory, ConditionBase> conditionFunc,
         TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            var element = parent.FindFirstDescendant(conditionFunc);
-            if (element is not null)
-                return element;
-
-            var fehlerMeldung = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-            if (fehlerMeldung is not null)
-            {
-                // Letzter Versuch: Falls conditionFunc selbst auf "FehlerMeldung" zielt, ist das
-                // Element inzwischen sicher auffindbar (siehe Erklärung oben) und der Aufruf soll
-                // regulär mit diesem Treffer zurückkehren statt in den Fehlerpfad zu laufen.
-                element = parent.FindFirstDescendant(conditionFunc);
-                if (element is not null)
-                    return element;
-
-                throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
-            }
-
-            Thread.Sleep(200);
-        }
-        throw new TimeoutException(
-            $"Element wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
-    }
+        => ElementWaitHelper.WaitForElement(parent, conditionFunc, timeout);
 
     /// <summary>
     /// Liest den <c>HelpText</c> eines Elements aus; fällt auf <c>Name</c> zurück, wenn <c>HelpText</c>
     /// leer ist oder von der zugrunde liegenden Automatisierung nicht unterstützt wird.
     /// </summary>
+    /// <param name="element">Das auszulesende Element.</param>
+    /// <returns>Der HelpText, oder falls leer, der Name des Elements.</returns>
     protected static string GetHelpTextOrName(AutomationElement element)
-    {
-        string? helpText = null;
-        try
-        {
-            helpText = element.HelpText;
-        }
-        catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
-        {
-        }
-
-        if (!string.IsNullOrWhiteSpace(helpText))
-            return helpText;
-
-        return element.Name;
-    }
+        => ElementWaitHelper.GetHelpTextOrName(element);
 
     /// <summary>
     /// Wartet, bis ein Top-Level-Fenster mit dem angegebenen Titel auf dem Desktop erscheint.
@@ -418,22 +379,14 @@ public abstract class WpfTestBase : IDisposable
     /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> verschwunden ist.
     /// Assertiert anschließend, dass das Element nicht mehr vorhanden ist.
     /// </summary>
+    /// <param name="parent">Das Element, dessen Teilbaum durchsucht wird.</param>
+    /// <param name="conditionFunc">Die Suchbedingung.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
     protected static void WaitUntilGone(
         AutomationElement parent,
         Func<ConditionFactory, ConditionBase> conditionFunc,
         TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        AutomationElement? element = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            element = parent.FindFirstDescendant(conditionFunc);
-            if (element is null)
-                break;
-            Thread.Sleep(200);
-        }
-        Assert.Null(element);
-    }
+        => Assert.Null(ElementWaitHelper.PollUntilGone(parent, conditionFunc, timeout));
 
     /// <summary>Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch zurück.</summary>
     protected void CreateProject(AutomationElement mainWindow, string name)

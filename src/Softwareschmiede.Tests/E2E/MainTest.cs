@@ -29,6 +29,16 @@ public partial class End2EndTest : WpfTestBase
         TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
         CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);
 
+        RunViewPatternHappyPath_E2E(mainWindow);
+        RecognizeViewsCorrectly_E2E(mainWindow);
+        MenuNavigationWorks_E2E(mainWindow);
+        ForceShowNavigatesCorrectly_E2E(mainWindow);
+        ForceCloseWithoutRecursion_E2E(mainWindow);
+        ForceCloseWithRecursion_E2E(mainWindow);
+        RecognizeDialogsCorrectly_E2E(mainWindow);
+        UnrecognizedViewThrowsDetailedException_E2E(mainWindow);
+        await RecognizeErrorViewCorrectly_E2E(mainWindow);
+
         app.Close();
     }
 

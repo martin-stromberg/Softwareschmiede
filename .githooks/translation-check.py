@@ -121,35 +121,19 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-    root = repo_root()
-    if root is None:
-        return 1
-
-    resx = resx_files(root)
-    if not resx:
-        print('No .resx files found; nothing to check.')
-        return 0
-
-    all_keys = set()
-    for r in resx:
-        all_keys.update(resx_keys(r))
-
-    # Part 3: validate resx headers in all files
+def validate_resx_headers(root, resx):
+    """Validate required ResX headers in every given .resx file. Returns a list of (relative_path, errors) tuples."""
     header_errors = []
     for r in resx:
         errors = resx_header_errors(r)
         if errors:
             header_errors.append((r.relative_to(root), errors))
+    return header_errors
 
-    # Part 1: check source files for missing keys
-    if args.all:
-        files = all_source_files(root)
-        scan_mode = 'all'
-    else:
-        files = staged_files()
-        scan_mode = 'staged'
+
+def check_missing_keys(root, all_keys, files):
+    """Scan the given source files for used localization keys. Returns (used_keys, missing) where
+    missing is a list of (relative_path, key) tuples for keys not defined in any .resx."""
     source_files = [f for f in files if f.endswith(('.cs', '.razor', '.cshtml'))]
     used_keys = set()
     missing = []
@@ -167,8 +151,12 @@ def main():
                 used_keys.add(key)
                 if key not in all_keys:
                     missing.append((rel, key))
+    return used_keys, missing
 
-    # Part 2: check resx package consistency
+
+def check_package_consistency(root, resx):
+    """Group .resx files by package (neutral + language variants in the same directory) and find
+    keys missing from sibling language files. Returns a list of (relative_path, missing_keys) tuples."""
     packages = {}
     for r in resx:
         base, _ = resx_base(r)
@@ -178,18 +166,22 @@ def main():
         packages.setdefault(package_key, []).append(r)
 
     package_errors = []
-    for _, files in packages.items():
+    for _, package_files in packages.items():
         union = set()
         keys_per_file = {}
-        for f in files:
+        for f in package_files:
             keys = resx_keys(f)
             keys_per_file[f] = keys
             union |= keys
-        for f in files:
+        for f in package_files:
             missing_keys = union - keys_per_file[f]
             if missing_keys:
                 package_errors.append((f.relative_to(root), missing_keys))
+    return package_errors
 
+
+def report(missing, package_errors, header_errors, used_keys, scan_mode, resx_count):
+    """Print all collected errors. Returns True if the check failed."""
     failed = False
     if missing:
         failed = True
@@ -214,11 +206,42 @@ def main():
                 print(f'  {f}: {e}')
         print()
 
-    if failed:
+    if not failed:
+        print(f'OK: {len(used_keys)} {scan_mode} localization key(s) found, {resx_count} .resx package(s) are consistent and all resx headers are valid.')
+
+    return failed
+
+
+def main():
+    args = parse_args()
+    root = repo_root()
+    if root is None:
         return 1
 
-    print(f'OK: {len(used_keys)} {scan_mode} localization key(s) found, {len(resx)} .resx package(s) are consistent and all resx headers are valid.')
-    return 0
+    resx = resx_files(root)
+    if not resx:
+        print('No .resx files found; nothing to check.')
+        return 0
+
+    all_keys = set()
+    for r in resx:
+        all_keys.update(resx_keys(r))
+
+    header_errors = validate_resx_headers(root, resx)
+
+    if args.all:
+        files = all_source_files(root)
+        scan_mode = 'all'
+    else:
+        files = staged_files()
+        scan_mode = 'staged'
+
+    used_keys, missing = check_missing_keys(root, all_keys, files)
+    package_errors = check_package_consistency(root, resx)
+
+    failed = report(missing, package_errors, header_errors, used_keys, scan_mode, len(resx))
+
+    return 1 if failed else 0
 
 
 if __name__ == '__main__':

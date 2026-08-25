@@ -2,108 +2,108 @@
 
 | # | Bereich | Aufgabe | Status | Testnachweis |
 |---|---------|---------|--------|--------------|
-| 1 | Test Infrastructure | `BaseWindowView` abstrakte Basisklasse anlegen | Offen | — |
-| 2 | Test Infrastructure | `BaseWindowView`: Property `Window` implementieren | Offen | — |
-| 3 | Test Infrastructure | `BaseWindowView`: Abstrakte Property `IsVisible` definieren | Offen | — |
-| 4 | Test Infrastructure | `BaseWindowView`: Abstrakte Methode `ForceShow()` definieren | Offen | — |
-| 5 | Test Infrastructure | `BaseWindowView`: Abstrakte Methode `ForceClose(bool recurseToDashboard)` definieren | Offen | — |
-| 6 | Test Infrastructure | `BaseWindowView`: Property `Menu` vom Typ `MenuView` definieren | Offen | — |
-| 7 | Test Infrastructure | `BaseWindowView`: Geschützte Hilfsmethoden für Element-Suche implementieren | Offen | — |
-| 8 | Menu and Navigation | `MenuView` Klasse anlegen (erbt von `BaseWindowView`) | Offen | — |
-| 9 | Menu and Navigation | `MenuView`: `IsVisible` implementieren (prüfe auf Navigationsbuttons) | Offen | — |
-| 10 | Menu and Navigation | `MenuView`: `ForceShow()` als No-Op implementieren | Offen | — |
-| 11 | Menu and Navigation | `MenuView`: `NavigateToDashboard()` Methode implementieren | Offen | — |
-| 12 | Menu and Navigation | `MenuView`: `NavigateToProjects()` Methode implementieren | Offen | — |
-| 13 | Menu and Navigation | `MenuView`: `NavigateToSettings()` Methode implementieren | Offen | — |
-| 14 | Test Infrastructure | `DialogView` abstrakte Basisklasse anlegen (erbt von `BaseWindowView`) | Offen | — |
-| 15 | Test Infrastructure | `DialogView`: Fenster-Handle-Ermittlung für modale Dialoge implementieren | Offen | — |
-| 16 | Test Infrastructure | `DialogView`: `IsVisible` abstrakt definieren (mit Dialog-Fenster-Prüfung) | Offen | — |
-| 17 | Main App Views | `DashboardView` Klasse anlegen | Offen | — |
-| 18 | Main App Views | `DashboardView`: `IsVisible` implementieren (prüfe auf Navigationsbuttons) | Offen | — |
-| 19 | Main App Views | `DashboardView`: `ForceShow()` implementieren (Button-Klick) | Offen | — |
-| 20 | Main App Views | `DashboardView`: `ForceClose()` implementieren (No-Op, da oberste Ebene) | Offen | — |
-| 21 | Main App Views | `ProjectListView` Klasse anlegen | Offen | — |
-| 22 | Main App Views | `ProjectListView`: `IsVisible` implementieren (prüfe auf "Neu"-Button und Projekt-Elemente) | Offen | — |
-| 23 | Main App Views | `ProjectListView`: `ForceShow()` implementieren (klick " Projekte"-Button) | Offen | — |
-| 24 | Main App Views | `ProjectListView`: `GetProjectElements()` Hilfsmethode implementieren | Offen | — |
-| 25 | Main App Views | `ProjectListView`: `CreateProject(string name)` Hilfsmethode implementieren | Offen | — |
-| 26 | Main App Views | `ProjectListView`: `OpenProject(string name)` Hilfsmethode implementieren | Offen | — |
-| 27 | Main App Views | `ProjectDetailView` Klasse anlegen | Offen | — |
-| 28 | Main App Views | `ProjectDetailView`: `IsVisible` implementieren (prüfe auf "ProjektName" und "AufgabeNeu"-Button) | Offen | — |
-| 29 | Main App Views | `ProjectDetailView`: `ForceShow()` implementieren (öffne Projekt aus Liste) | Offen | — |
-| 30 | Main App Views | `ProjectDetailView`: `ForceClose()` implementieren (gehe zu ProjectListView) | Offen | — |
-| 31 | Main App Views | `ProjectDetailView`: `GetProjectName()` Hilfsmethode implementieren | Offen | — |
-| 32 | Main App Views | `ProjectDetailView`: `CreateTask()` Hilfsmethode implementieren | Offen | — |
-| 33 | Main App Views | `ProjectDetailView`: `DeleteProject()` Hilfsmethode implementieren | Offen | — |
-| 34 | Main App Views | `ProjectDetailView`: `GetTaskElements()` Hilfsmethode implementieren | Offen | — |
-| 35 | Main App Views | `TaskDetailView` Klasse anlegen | Offen | — |
-| 36 | Main App Views | `TaskDetailView`: `IsVisible` implementieren (prüfe auf "EditTitel" und Speichern-Button) | Offen | — |
-| 37 | Main App Views | `TaskDetailView`: `ForceShow()` implementieren (öffne Task aus Projektdetail) | Offen | — |
-| 38 | Main App Views | `TaskDetailView`: `ForceClose()` implementieren (gehe zu ProjectDetailView) | Offen | — |
-| 39 | Main App Views | `TaskDetailView`: `GetTaskTitle()` Hilfsmethode implementieren | Offen | — |
-| 40 | Main App Views | `TaskDetailView`: `SetTaskTitle(string title)` Hilfsmethode implementieren | Offen | — |
-| 41 | Main App Views | `TaskDetailView`: `SaveTask()` Hilfsmethode implementieren | Offen | — |
-| 42 | Main App Views | `TaskDetailView`: `DeleteTask()` Hilfsmethode implementieren | Offen | — |
-| 43 | Main App Views | `SettingsView` Klasse anlegen | Offen | — |
-| 44 | Main App Views | `SettingsView`: `IsVisible` implementieren (prüfe auf Einstellungs-Tabs) | Offen | — |
-| 45 | Main App Views | `SettingsView`: `ForceShow()` implementieren (klick " Einstellungen"-Button) | Offen | — |
-| 46 | Main App Views | `SettingsView`: `ForceClose()` implementieren (gehe zu DashboardView) | Offen | — |
-| 47 | Main App Views | `SettingsView`: `GetActiveTab()` Hilfsmethode implementieren | Offen | — |
-| 48 | Main App Views | `SettingsView`: `SwitchTab(string tabName)` Hilfsmethode implementieren | Offen | — |
-| 49 | Main App Views | `SettingsView`: `SaveSettings()` Hilfsmethode implementieren | Offen | — |
-| 50 | Main App Views | `FileExplorerView` Klasse anlegen | Offen | — |
-| 51 | Main App Views | `FileExplorerView`: `IsVisible` implementieren | Offen | — |
-| 52 | Main App Views | `FileExplorerView`: `ForceShow()` implementieren | Offen | — |
-| 53 | Main App Views | `FileExplorerView`: `ForceClose()` implementieren | Offen | — |
-| 54 | Main App Views | `AutonomAufgabeDetailView` Klasse anlegen | Offen | — |
-| 55 | Main App Views | `AutonomAufgabeDetailView`: `IsVisible` implementieren | Offen | — |
-| 56 | Main App Views | `AutonomAufgabeDetailView`: `ForceShow()` implementieren | Offen | — |
-| 57 | Main App Views | `AutonomAufgabeDetailView`: `ForceClose()` implementieren | Offen | — |
-| 58 | Main App Views | `TodoListView` Klasse anlegen | Offen | — |
-| 59 | Main App Views | `TodoListView`: `IsVisible` implementieren | Offen | — |
-| 60 | Main App Views | `TodoListView`: `ForceShow()` implementieren | Offen | — |
-| 61 | Main App Views | `TodoListView`: `ForceClose()` implementieren | Offen | — |
-| 62 | Main App Views | `ErrorView` Klasse anlegen (erkennt Fehler-Banner) | Offen | — |
-| 63 | Main App Views | `ErrorView`: `IsVisible` implementieren (prüfe auf "FehlerMeldung"-TextBlock) | Offen | — |
-| 64 | Main App Views | `ErrorView`: `GetErrorMessage()` Hilfsmethode implementieren | Offen | — |
-| 65 | Main App Views | `ErrorView`: `DismissError()` Hilfsmethode implementieren | Offen | — |
-| 66 | Dialog Views | `RepositoryAssignDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 67 | Dialog Views | `RepositoryAssignDialogView`: `IsVisible` implementieren (prüfe auf Dialog-Titel "Repository zuweisen") | Offen | — |
-| 68 | Dialog Views | `RepositoryAssignDialogView`: `SelectRepository(string name)` Hilfsmethode implementieren | Offen | — |
-| 69 | Dialog Views | `RepositoryAssignDialogView`: `Confirm()` Hilfsmethode implementieren | Offen | — |
-| 70 | Dialog Views | `PluginSelectionDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 71 | Dialog Views | `PluginSelectionDialogView`: `IsVisible` implementieren (prüfe auf Dialog-Titel "KI-Plugin auswählen") | Offen | — |
-| 72 | Dialog Views | `PluginSelectionDialogView`: `SelectPlugin(string name)` Hilfsmethode implementieren | Offen | — |
-| 73 | Dialog Views | `PluginSelectionDialogView`: `Confirm()` Hilfsmethode implementieren | Offen | — |
-| 74 | Dialog Views | `PluginSelectionDialogView`: `ConfirmForProject()` Hilfsmethode implementieren | Offen | — |
-| 75 | Dialog Views | `IssueSelectionDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 76 | Dialog Views | `IssueSelectionDialogView`: `IsVisible` implementieren | Offen | — |
-| 77 | Dialog Views | `IssueCreateDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 78 | Dialog Views | `IssueCreateDialogView`: `IsVisible` implementieren | Offen | — |
-| 79 | Dialog Views | `AutonomAufgabeInitialisierungsDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 80 | Dialog Views | `AutonomAufgabeInitialisierungsDialogView`: `IsVisible` implementieren | Offen | — |
-| 81 | Dialog Views | `AutonomAufgabeDetailDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 82 | Dialog Views | `AutonomAufgabeDetailDialogView`: `IsVisible` implementieren | Offen | — |
-| 83 | Dialog Views | `ArbeitsverzeichnisBearbeitenDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 84 | Dialog Views | `ArbeitsverzeichnisBearbeitenDialogView`: `IsVisible` implementieren | Offen | — |
-| 85 | Dialog Views | `OpenTodosDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 86 | Dialog Views | `OpenTodosDialogView`: `IsVisible` implementieren | Offen | — |
-| 87 | Dialog Views | `HelpTextDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 88 | Dialog Views | `HelpTextDialogView`: `IsVisible` implementieren | Offen | — |
-| 89 | Dialog Views | `SolutionSelectionDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 90 | Dialog Views | `SolutionSelectionDialogView`: `IsVisible` implementieren | Offen | — |
-| 91 | Dialog Views | `UpdateProgressDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 92 | Dialog Views | `UpdateProgressDialogView`: `IsVisible` implementieren | Offen | — |
-| 93 | Dialog Views | `DeleteConfirmationDialogView` Klasse anlegen (erbt von `DialogView`) | Offen | — |
-| 94 | Dialog Views | `DeleteConfirmationDialogView`: `IsVisible` implementieren (prüfe auf "Löschen bestätigen") | Offen | — |
-| 95 | Dialog Views | `DeleteConfirmationDialogView`: `Confirm()` Hilfsmethode implementieren | Offen | — |
-| 96 | Dialog Views | `DeleteConfirmationDialogView`: `Cancel()` Hilfsmethode implementieren | Offen | — |
-| 97 | Extension Methods | `WindowExtensions.cs` Datei anlegen | Offen | — |
-| 98 | Extension Methods | `Window.CurrentView()` Erweiterungsmethode implementieren | Offen | — |
-| 99 | Extension Methods | `CurrentView()`: Dialog-Fenster-Prüfung (RepositoryAssignDialog, PluginSelectionDialog, etc.) implementieren | Offen | — |
-| 100 | Extension Methods | `CurrentView()`: View-Erkennung für Haupt-Views implementieren (TaskDetail → ProjectDetail → ProjectList → DashboardView) | Offen | — |
-| 101 | Extension Methods | `CurrentView()`: Fallback-Prüfung für ErrorView implementieren | Offen | — |
-| 102 | Extension Methods | `CurrentView()`: Fehlerbericht bei unbekannter Ansicht (InvalidOperationException mit Marker-Diagnose) implementieren | Offen | — |
+| 1 | Test Infrastructure | `BaseWindowView` abstrakte Basisklasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 2 | Test Infrastructure | `BaseWindowView`: Property `Window` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 3 | Test Infrastructure | `BaseWindowView`: Abstrakte Property `IsVisible` definieren | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 4 | Test Infrastructure | `BaseWindowView`: Abstrakte Methode `ForceShow()` definieren | Erledigt | `E2E_ViewPattern.ForceShowNavigatesCorrectly_E2E` |
+| 5 | Test Infrastructure | `BaseWindowView`: Abstrakte Methode `ForceClose(bool recurseToDashboard)` definieren | Erledigt | `E2E_ViewPattern.ForceCloseWithRecursion_E2E` |
+| 6 | Test Infrastructure | `BaseWindowView`: Property `Menu` vom Typ `MenuView` definieren | Erledigt | `E2E_ViewPattern.MenuNavigationWorks_E2E` |
+| 7 | Test Infrastructure | `BaseWindowView`: Geschützte Hilfsmethoden für Element-Suche implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 8 | Menu and Navigation | `MenuView` Klasse anlegen (erbt von `BaseWindowView`) | Erledigt | `E2E_ViewPattern.MenuNavigationWorks_E2E` |
+| 9 | Menu and Navigation | `MenuView`: `IsVisible` implementieren (prüfe auf Navigationsbuttons) | Erledigt | `E2E_ViewPattern.MenuNavigationWorks_E2E` |
+| 10 | Menu and Navigation | `MenuView`: `ForceShow()` als No-Op implementieren | Erledigt | `E2E_ViewPattern.MenuNavigationWorks_E2E` |
+| 11 | Menu and Navigation | `MenuView`: `NavigateToDashboard()` Methode implementieren | Erledigt | `E2E_ViewPattern.MenuNavigationWorks_E2E` |
+| 12 | Menu and Navigation | `MenuView`: `NavigateToProjects()` Methode implementieren | Erledigt | `E2E_ViewPattern.MenuNavigationWorks_E2E` |
+| 13 | Menu and Navigation | `MenuView`: `NavigateToSettings()` Methode implementieren | Erledigt | `E2E_ViewPattern.MenuNavigationWorks_E2E` |
+| 14 | Test Infrastructure | `DialogView` abstrakte Basisklasse anlegen (erbt von `BaseWindowView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 15 | Test Infrastructure | `DialogView`: Fenster-Handle-Ermittlung für modale Dialoge implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 16 | Test Infrastructure | `DialogView`: `IsVisible` abstrakt definieren (mit Dialog-Fenster-Prüfung) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 17 | Main App Views | `DashboardView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 18 | Main App Views | `DashboardView`: `IsVisible` implementieren (prüfe auf Navigationsbuttons) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 19 | Main App Views | `DashboardView`: `ForceShow()` implementieren (Button-Klick) | Erledigt | `E2E_ViewPattern.ForceShowNavigatesCorrectly_E2E` |
+| 20 | Main App Views | `DashboardView`: `ForceClose()` implementieren (No-Op, da oberste Ebene) | Erledigt | `E2E_ViewPattern.ForceCloseWithRecursion_E2E` |
+| 21 | Main App Views | `ProjectListView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 22 | Main App Views | `ProjectListView`: `IsVisible` implementieren (prüfe auf "Neu"-Button und Projekt-Elemente) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 23 | Main App Views | `ProjectListView`: `ForceShow()` implementieren (klick " Projekte"-Button) | Erledigt | `E2E_ViewPattern.ForceShowNavigatesCorrectly_E2E` |
+| 24 | Main App Views | `ProjectListView`: `GetProjectElements()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 25 | Main App Views | `ProjectListView`: `CreateProject(string name)` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 26 | Main App Views | `ProjectListView`: `OpenProject(string name)` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 27 | Main App Views | `ProjectDetailView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 28 | Main App Views | `ProjectDetailView`: `IsVisible` implementieren (prüfe auf "ProjektName" und "AufgabeNeu"-Button) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 29 | Main App Views | `ProjectDetailView`: `ForceShow()` implementieren (öffne Projekt aus Liste) | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 30 | Main App Views | `ProjectDetailView`: `ForceClose()` implementieren (gehe zu ProjectListView) | Erledigt | `E2E_ViewPattern.ForceCloseWithoutRecursion_E2E` |
+| 31 | Main App Views | `ProjectDetailView`: `GetProjectName()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 32 | Main App Views | `ProjectDetailView`: `CreateTask()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 33 | Main App Views | `ProjectDetailView`: `DeleteProject()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 34 | Main App Views | `ProjectDetailView`: `GetTaskElements()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 35 | Main App Views | `TaskDetailView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 36 | Main App Views | `TaskDetailView`: `IsVisible` implementieren (prüfe auf "EditTitel" und Speichern-Button) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 37 | Main App Views | `TaskDetailView`: `ForceShow()` implementieren (öffne Task aus Projektdetail) | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 38 | Main App Views | `TaskDetailView`: `ForceClose()` implementieren (gehe zu ProjectDetailView) | Erledigt | `E2E_ViewPattern.ForceCloseWithoutRecursion_E2E` |
+| 39 | Main App Views | `TaskDetailView`: `GetTaskTitle()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 40 | Main App Views | `TaskDetailView`: `SetTaskTitle(string title)` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 41 | Main App Views | `TaskDetailView`: `SaveTask()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 42 | Main App Views | `TaskDetailView`: `DeleteTask()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 43 | Main App Views | `SettingsView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 44 | Main App Views | `SettingsView`: `IsVisible` implementieren (prüfe auf Einstellungs-Tabs) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 45 | Main App Views | `SettingsView`: `ForceShow()` implementieren (klick " Einstellungen"-Button) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 46 | Main App Views | `SettingsView`: `ForceClose()` implementieren (gehe zu DashboardView) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 47 | Main App Views | `SettingsView`: `GetActiveTab()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 48 | Main App Views | `SettingsView`: `SwitchTab(string tabName)` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 49 | Main App Views | `SettingsView`: `SaveSettings()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 50 | Main App Views | `FileExplorerView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 51 | Main App Views | `FileExplorerView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 52 | Main App Views | `FileExplorerView`: `ForceShow()` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 53 | Main App Views | `FileExplorerView`: `ForceClose()` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 54 | Main App Views | `AutonomAufgabeDetailView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 55 | Main App Views | `AutonomAufgabeDetailView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 56 | Main App Views | `AutonomAufgabeDetailView`: `ForceShow()` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 57 | Main App Views | `AutonomAufgabeDetailView`: `ForceClose()` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 58 | Main App Views | `TodoListView` Klasse anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 59 | Main App Views | `TodoListView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 60 | Main App Views | `TodoListView`: `ForceShow()` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 61 | Main App Views | `TodoListView`: `ForceClose()` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 62 | Main App Views | `ErrorView` Klasse anlegen (erkennt Fehler-Banner) | Erledigt | `E2E_ViewPattern.RecognizeErrorViewCorrectly_E2E` |
+| 63 | Main App Views | `ErrorView`: `IsVisible` implementieren (prüfe auf "FehlerMeldung"-TextBlock) | Erledigt | `E2E_ViewPattern.RecognizeErrorViewCorrectly_E2E` |
+| 64 | Main App Views | `ErrorView`: `GetErrorMessage()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeErrorViewCorrectly_E2E` |
+| 65 | Main App Views | `ErrorView`: `DismissError()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeErrorViewCorrectly_E2E` |
+| 66 | Dialog Views | `RepositoryAssignDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 67 | Dialog Views | `RepositoryAssignDialogView`: `IsVisible` implementieren (prüfe auf Dialog-Titel "Repository zuweisen") | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 68 | Dialog Views | `RepositoryAssignDialogView`: `SelectRepository(string name)` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 69 | Dialog Views | `RepositoryAssignDialogView`: `Confirm()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 70 | Dialog Views | `PluginSelectionDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 71 | Dialog Views | `PluginSelectionDialogView`: `IsVisible` implementieren (prüfe auf Dialog-Titel "KI-Plugin auswählen") | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 72 | Dialog Views | `PluginSelectionDialogView`: `SelectPlugin(string name)` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 73 | Dialog Views | `PluginSelectionDialogView`: `Confirm()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 74 | Dialog Views | `PluginSelectionDialogView`: `ConfirmForProject()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 75 | Dialog Views | `IssueSelectionDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 76 | Dialog Views | `IssueSelectionDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 77 | Dialog Views | `IssueCreateDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 78 | Dialog Views | `IssueCreateDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 79 | Dialog Views | `AutonomAufgabeInitialisierungsDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 80 | Dialog Views | `AutonomAufgabeInitialisierungsDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 81 | Dialog Views | `AutonomAufgabeDetailDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 82 | Dialog Views | `AutonomAufgabeDetailDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 83 | Dialog Views | `ArbeitsverzeichnisBearbeitenDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 84 | Dialog Views | `ArbeitsverzeichnisBearbeitenDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 85 | Dialog Views | `OpenTodosDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 86 | Dialog Views | `OpenTodosDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 87 | Dialog Views | `HelpTextDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 88 | Dialog Views | `HelpTextDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 89 | Dialog Views | `SolutionSelectionDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 90 | Dialog Views | `SolutionSelectionDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 91 | Dialog Views | `UpdateProgressDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 92 | Dialog Views | `UpdateProgressDialogView`: `IsVisible` implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 93 | Dialog Views | `DeleteConfirmationDialogView` Klasse anlegen (erbt von `DialogView`) | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 94 | Dialog Views | `DeleteConfirmationDialogView`: `IsVisible` implementieren (prüfe auf "Löschen bestätigen") | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 95 | Dialog Views | `DeleteConfirmationDialogView`: `Confirm()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 96 | Dialog Views | `DeleteConfirmationDialogView`: `Cancel()` Hilfsmethode implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 97 | Extension Methods | `WindowExtensions.cs` Datei anlegen | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 98 | Extension Methods | `Window.CurrentView()` Erweiterungsmethode implementieren | Erledigt | `E2E_ViewPattern.RunViewPatternHappyPath_E2E` |
+| 99 | Extension Methods | `CurrentView()`: Dialog-Fenster-Prüfung (RepositoryAssignDialog, PluginSelectionDialog, etc.) implementieren | Erledigt | `E2E_ViewPattern.RecognizeDialogsCorrectly_E2E` |
+| 100 | Extension Methods | `CurrentView()`: View-Erkennung für Haupt-Views implementieren (TaskDetail → ProjectDetail → ProjectList → DashboardView) | Erledigt | `E2E_ViewPattern.RecognizeViewsCorrectly_E2E` |
+| 101 | Extension Methods | `CurrentView()`: Fallback-Prüfung für ErrorView implementieren | Erledigt | `E2E_ViewPattern.RecognizeErrorViewCorrectly_E2E` |
+| 102 | Extension Methods | `CurrentView()`: Fehlerbericht bei unbekannter Ansicht (InvalidOperationException mit Marker-Diagnose) implementieren | Erledigt | `E2E_ViewPattern.UnrecognizedViewThrowsDetailedException_E2E` |
 | 103 | Unit Tests | `BaseWindowViewTests` Testklasse anlegen | Offen | — |
 | 104 | Unit Tests | Test: `BaseWindowView` Konstruktor und Fenster-Referenz | Offen | — |
 | 105 | Unit Tests | Test: `BaseWindowView.Menu` Property verfügbar | Offen | — |
@@ -153,16 +153,16 @@
 | 149 | Unit Tests | `ErrorViewTests` Testklasse anlegen | Offen | — |
 | 150 | Unit Tests | Test: `ErrorView.IsVisible` erkennt Fehler-Banner | Offen | — |
 | 151 | Unit Tests | Test: `ErrorView.GetErrorMessage()` liest Fehlermeldung | Offen | — |
-| 152 | E2E Tests | `E2E_ViewPattern.cs` Szenario-Datei anlegen | Offen | — |
-| 153 | E2E Tests | E2E Test: Happy Path (App-Start bis Aufgabenerstellung und Schließen) | Offen | — |
-| 154 | E2E Tests | E2E Test: View-Erkennung für alle Haupt-Views (Happy Path mit `CurrentView()`-Prüfungen) | Offen | — |
-| 155 | E2E Tests | E2E Test: MenuView-Navigation zwischen Ansichten | Offen | — |
-| 156 | E2E Tests | E2E Test: `ForceShow()` Navigation für alle Haupt-Views | Offen | — |
-| 157 | E2E Tests | E2E Test: `ForceClose()` ohne Rekursion (TaskDetail → ProjectDetail) | Offen | — |
-| 158 | E2E Tests | E2E Test: `ForceClose(recurseToDashboard: true)` (TaskDetail → ProjectDetail → ProjectList → Dashboard) | Offen | — |
-| 159 | E2E Tests | E2E Test: Dialog-Erkennung (RepositoryAssignDialog via `CurrentView()`) | Offen | — |
-| 160 | E2E Tests | E2E Test: Dialog-Erkennung (PluginSelectionDialog via `CurrentView()`) | Offen | — |
-| 161 | E2E Tests | E2E Test: ErrorView-Erkennung (Fehler erzwingen, Exception prüfen) | Offen | — |
-| 162 | E2E Tests | E2E Test: `CurrentView()` Fehlerfall (unbekannte Ansicht) wirft detaillierte Exception | Offen | — |
+| 152 | E2E Tests | `E2E_ViewPattern.cs` Szenario-Datei anlegen | Erledigt | `End2EndTest.RunViewPatternHappyPath_E2E` |
+| 153 | E2E Tests | E2E Test: Happy Path (App-Start bis Aufgabenerstellung und Schließen) | Erledigt | `End2EndTest.RunViewPatternHappyPath_E2E` |
+| 154 | E2E Tests | E2E Test: View-Erkennung für alle Haupt-Views (Happy Path mit `CurrentView()`-Prüfungen) | Erledigt | `End2EndTest.RecognizeViewsCorrectly_E2E` |
+| 155 | E2E Tests | E2E Test: MenuView-Navigation zwischen Ansichten | Erledigt | `End2EndTest.MenuNavigationWorks_E2E` |
+| 156 | E2E Tests | E2E Test: `ForceShow()` Navigation für alle Haupt-Views | Erledigt | `End2EndTest.ForceShowNavigatesCorrectly_E2E` |
+| 157 | E2E Tests | E2E Test: `ForceClose()` ohne Rekursion (TaskDetail → ProjectDetail) | Erledigt | `End2EndTest.ForceCloseWithoutRecursion_E2E` |
+| 158 | E2E Tests | E2E Test: `ForceClose(recurseToDashboard: true)` (TaskDetail → ProjectDetail → ProjectList → Dashboard) | Erledigt | `End2EndTest.ForceCloseWithRecursion_E2E` |
+| 159 | E2E Tests | E2E Test: Dialog-Erkennung (RepositoryAssignDialog via `CurrentView()`) | Erledigt | `End2EndTest.RecognizeDialogsCorrectly_E2E` |
+| 160 | E2E Tests | E2E Test: Dialog-Erkennung (PluginSelectionDialog via `CurrentView()`) | Erledigt | `End2EndTest.RecognizeDialogsCorrectly_E2E` |
+| 161 | E2E Tests | E2E Test: ErrorView-Erkennung (Fehler erzwingen, Exception prüfen) | Erledigt | `End2EndTest.RecognizeErrorViewCorrectly_E2E` |
+| 162 | E2E Tests | E2E Test: `CurrentView()` Fehlerfall (unbekannte Ansicht) wirft detaillierte Exception | Erledigt | `End2EndTest.UnrecognizedViewThrowsDetailedException_E2E` |
 | 163 | Documentation | E2E-Test-Dokumentation aktualisieren (Beispiele: Vorher/Nachher View-Pattern-Nutzung) | Offen | — |
 | 164 | Documentation | Views-Namespace Dokumentation erstellen (Naming-Konventionen, Best Practices) | Offen | — |
