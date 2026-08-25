@@ -32,8 +32,8 @@ SCM-Operationen auf einem lokalen Repository-Klon.
 | `GetPullRequestWorkflowRunsAsync` | `repositoryId`, `pullRequestNumber`, `headSha?`, `mergeCommitSha?`, `ct` | `Task<IReadOnlyList<PullRequestWorkflowRunInfo>>` | Zugeordnete Workflow-/Action-Runs eines Pull Requests abrufen. |
 | `CompletePullRequestAsync` | `repositoryId`, `pullRequestNumber`, `options`, `ct` | `Task<PullRequestCompletionResult>` | Pull Request nach konfigurierter Strategie abschliessen, Auto-Merge aktivieren oder genehmigen. Default: `NotSupported`. |
 | `ResetAsync` | `localPath`, `resetType`, `targetRef?`, `ct` | `Task` | Git-Reset ausführen |
-| `GetRepositoryStructureAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<IEnumerable<RepositoryDirectoryEntry>>` | Kompatibilitätsmethode für direkte Aufrufer: liefert Verzeichniseinträge oder wirft `NotSupportedException`, wenn das Plugin keinen Strukturabruf unterstützt. |
-| `GetRepositoryStructureLoadResultAsync` | `repositoryUrl`, `maxDepth`, `ct` | `Task<RepositoryStructureLoadResult>` | Bevorzugte Methode für UI und Services: liefert Verzeichnisstruktur mit expliziter Erfolg-/Fehlersemantik für die Arbeitsverzeichnis-Auswahl. Die Default-Implementierung ruft `GetRepositoryStructureAsync` auf und wandelt Erfolg, `NotSupportedException` und sonstige Fehler in ein Result um. |
+| `GetRepositoryStructureAsync` | `repositoryUrl`, `maxDepth`, `ct`, `branchName?` | `Task<IEnumerable<RepositoryDirectoryEntry>>` | Kompatibilitätsmethode für direkte Aufrufer: liefert Verzeichniseinträge aus dem angegebenen Branch (oder Remote-Standard-Branch, wenn `branchName` nicht gesetzt) oder wirft `NotSupportedException`, wenn das Plugin keinen Strukturabruf unterstützt. |
+| `GetRepositoryStructureLoadResultAsync` | `repositoryUrl`, `maxDepth`, `ct`, `branchName?` | `Task<RepositoryStructureLoadResult>` | Bevorzugte Methode für UI und Services: liefert Verzeichnisstruktur aus dem angegebenen Branch (oder Remote-Standard-Branch, wenn `branchName` nicht gesetzt) mit expliziter Erfolg-/Fehlersemantik für die Arbeitsverzeichnis-Auswahl und zur Auswahl von Skriptdateien. Die Default-Implementierung ruft `GetRepositoryStructureAsync` auf und wandelt Erfolg, `NotSupportedException` und sonstige Fehler in ein Result um. |
 
 ---
 
@@ -159,8 +159,8 @@ CLI-basierte Plugins können zusätzliche Startargumente über das Feld `Command
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
-| `Path` | `string` | Relativer Pfad des Verzeichnisses innerhalb des Repositories, `/`-getrennt |
-| `IsDirectory` | `bool` | Aktuell immer `true` — Datei-Einträge sind für die Arbeitsverzeichnis-Auswahl nicht relevant |
+| `Path` | `string` | Relativer Pfad des Eintrags innerhalb des Repositories, `/`-getrennt |
+| `IsDirectory` | `bool` | `true` für Verzeichnisse, `false` für Dateien. Datei-Einträge werden verwendet für die Auswahl von Initialisierungsskripten; Verzeichnisse für die Arbeitsverzeichnis-Auswahl. |
 
 ### `RepositoryStructureLoadResult`
 

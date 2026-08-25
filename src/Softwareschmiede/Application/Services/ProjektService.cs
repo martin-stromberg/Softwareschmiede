@@ -58,6 +58,8 @@ public sealed class ProjektService
             .AsNoTracking()
             .Include(p => p.Repositories)
                 .ThenInclude(r => r.StartKonfiguration)
+            .Include(p => p.Repositories)
+                .ThenInclude(r => r.InitialisierungKonfiguration)
             .Include(p => p.Aufgaben)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
     }
@@ -299,6 +301,55 @@ public sealed class ProjektService
     }
 
     /// <summary>
+    /// Speichert den relativen Pfad zum Initialisierungsskript für ein Repository. <c>null</c> oder ein leerer
+    /// Wert löschen eine bestehende Konfiguration.
+    /// </summary>
+    public async Task<RepositoryInitialisierungKonfiguration?> SaveRepositoryInitialisierungskriptAsync(
+        Guid repositoryId,
+        string? initialisierungsskriptRelativePath,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation("Initialisierungskonfiguration für Repository {RepositoryId} speichern.", repositoryId);
+
+        var repository = await _db.GitRepositories
+            .Include(r => r.InitialisierungKonfiguration)
+            .FirstOrDefaultAsync(r => r.Id == repositoryId, ct)
+            ?? throw new InvalidOperationException($"Repository {repositoryId} nicht gefunden.");
+
+        if (string.IsNullOrWhiteSpace(initialisierungsskriptRelativePath))
+        {
+            if (repository.InitialisierungKonfiguration is not null)
+            {
+                _db.Remove(repository.InitialisierungKonfiguration);
+                await _db.SaveChangesAsync(ct);
+                _logger.LogInformation("Initialisierungskonfiguration für Repository {RepositoryId} gelöscht.", repositoryId);
+            }
+
+            return null;
+        }
+
+        ValidateInitialisierungsKonfiguration(initialisierungsskriptRelativePath);
+
+        var configuration = repository.InitialisierungKonfiguration ?? new RepositoryInitialisierungKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            GitRepositoryId = repositoryId
+        };
+
+        configuration.InitialisierungsskriptRelativePath = NormalizeRequiredValue(initialisierungsskriptRelativePath, nameof(initialisierungsskriptRelativePath));
+
+        if (repository.InitialisierungKonfiguration is null)
+        {
+            _db.Add(configuration);
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Initialisierungskonfiguration für Repository {RepositoryId} gespeichert.", repositoryId);
+        return configuration;
+    }
+
+    /// <summary>
     /// Speichert das relative Arbeitsverzeichnis für ein Repository (z. B. bei der Zuweisung zu einem Projekt).
     /// <c>null</c> oder <c>"."</c> werden als Repository-Root behandelt und als <c>null</c> persistiert.
     /// Eine bereits vorhandene Startkonfiguration (Startskript) bleibt dabei unverändert.
@@ -470,15 +521,21 @@ public sealed class ProjektService
     }
 
     private static void ValidateStartConfiguration(string startScriptRelativePath)
+        => ValidateRelativeScriptPath(startScriptRelativePath, "Startskript");
+
+    private static void ValidateInitialisierungsKonfiguration(string initialisierungsskriptRelativePath)
+        => ValidateRelativeScriptPath(initialisierungsskriptRelativePath, "Initialisierungsskript");
+
+    private static void ValidateRelativeScriptPath(string relativePath, string scriptLabel)
     {
-        if (string.IsNullOrWhiteSpace(startScriptRelativePath))
+        if (string.IsNullOrWhiteSpace(relativePath))
         {
-            throw new InvalidOperationException("Der relative Pfad zum Startskript ist erforderlich.");
+            throw new InvalidOperationException($"Der relative Pfad zum {scriptLabel} ist erforderlich.");
         }
 
-        if (Path.IsPathRooted(startScriptRelativePath))
+        if (Path.IsPathRooted(relativePath))
         {
-            throw new InvalidOperationException("Das Startskript muss relativ zum Repository angegeben werden.");
+            throw new InvalidOperationException($"Das {scriptLabel} muss relativ zum Repository angegeben werden.");
         }
     }
 

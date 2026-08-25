@@ -159,6 +159,25 @@ public sealed class GitWorkspaceBrowserServiceTests : IDisposable
         snapshot.BranchCommits.Should().BeEmpty();
     }
 
+    /// <summary>Verwendet den angegebenen Zielbranch als Basis-Referenz, wenn dieser vom Hauptbranch abweicht.</summary>
+    [Fact]
+    public async Task LoadSnapshotAsync_ZielbranchAbweichend_VerwendetKonfiguriertenBaseBranch()
+    {
+        var repositoryPath = CreateTempDirectory();
+        var service = CreateService(
+            repositoryPath,
+            "?? src/file.cs",
+            fallbackBaseRef: "origin/staging",
+            commitCountStdOut: "2",
+            branchLogStdOut: "dddddddddddddddddddddddddddddddddddddddd\0ddddddd\0feat: staging commit");
+
+        var snapshot = await service.LoadSnapshotAsync(repositoryPath, "staging");
+
+        snapshot.CommitCount.Should().Be(2);
+        snapshot.BranchCommits.Should().ContainSingle();
+        snapshot.BranchCommits[0].ShortSha.Should().Be("ddddddd");
+    }
+
     /// <summary>Baut den Dateibaum aus dem Diff-Tree auf und weist jedem Knoten die Commit-SHA zu.</summary>
     [Fact]
     public async Task LoadCommitFilesAsync_BautBaumAufUndWeistCommitShaZu()

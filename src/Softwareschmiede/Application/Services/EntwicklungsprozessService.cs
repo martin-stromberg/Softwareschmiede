@@ -11,6 +11,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Optionale Abhängigkeiten für den EntwicklungsprozessService.</summary>
 /// <param name="ProjektService">Optionaler Dienst zum Auflösen von Projekt-Repositories.</param>
 /// <param name="RepositoryStartskriptService">Optionaler Dienst zum Ausführen von Repository-Startskripten.</param>
+/// <param name="RepositoryInitialisierungService">Optionaler Dienst zum Ausführen von Repository-Initialisierungsskripten.</param>
 /// <param name="KiAusfuehrungsService">Optionaler Dienst zum Starten der KI-CLI.</param>
 /// <param name="GitOrchestrationService">
 /// Optionaler Dienst zur Validierung des konfigurierten Arbeitsverzeichnisses direkt nach dem Git-Klon.
@@ -19,6 +20,7 @@ namespace Softwareschmiede.Application.Services;
 public sealed record EntwicklungsprozessServiceOptions(
     ProjektService? ProjektService = null,
     RepositoryStartskriptService? RepositoryStartskriptService = null,
+    RepositoryInitialisierungService? RepositoryInitialisierungService = null,
     KiAusfuehrungsService? KiAusfuehrungsService = null,
     GitOrchestrationService? GitOrchestrationService = null);
 
@@ -105,8 +107,8 @@ public sealed class EntwicklungsprozessService
             await _options.GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(lokalerKlonPfad, repository.StartKonfiguration, gitPlugin);
         }
 
-        var (branchName, nutzeExistierendenBranch) = await SetupBranchAsync(gitPlugin, repository.RepositoryUrl, lokalerKlonPfad, basisBranchName, repository.DefaultSourceBranchName, aufgabe, ct);
-        await FinalizeStartAsync(aufgabeId, aufgabe, repository, lokalerKlonPfad, branchName, nutzeExistierendenBranch, ct);
+        var (branchName, nutzeExistierendenBranch, basisBranch) = await SetupBranchAsync(gitPlugin, repository.RepositoryUrl, lokalerKlonPfad, basisBranchName, repository.DefaultSourceBranchName, aufgabe, ct);
+        await FinalizeStartAsync(aufgabeId, aufgabe, repository, lokalerKlonPfad, branchName, nutzeExistierendenBranch, basisBranch, ct);
 
         _logger.LogInformation("Repository-Setup für Aufgabe {AufgabeId} abgeschlossen.", aufgabeId);
     }
@@ -496,7 +498,7 @@ public sealed class EntwicklungsprozessService
         return lokalerKlonPfad;
     }
 
-    private async Task<(string BranchName, bool NutzeExistierendenBranch)> SetupBranchAsync(
+    private async Task<(string BranchName, bool NutzeExistierendenBranch, string? BasisBranchName)> SetupBranchAsync(
         IGitPlugin gitPlugin,
         string repositoryUrl,
         string lokalerKlonPfad,
@@ -514,11 +516,13 @@ public sealed class EntwicklungsprozessService
         }
 
         string branchName;
+        string? basisBranch = null;
         if (nutzeExistierendenBranch)
         {
             _logger.LogInformation("Wechsle zu vorhandenem Branch '{BasisBranch}'.", basisBranchName);
             await gitPlugin.CheckoutRemoteBranchAsync(lokalerKlonPfad, basisBranchName!, ct);
             branchName = basisBranchName!;
+            basisBranch = null;
         }
         else
         {
@@ -535,15 +539,17 @@ public sealed class EntwicklungsprozessService
 
                 _logger.LogInformation("Branch '{BranchName}' vom Basis-Branch '{BasisBranch}' anlegen.", branchName, defaultSourceBranchName);
                 await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, defaultSourceBranchName, ct);
+                basisBranch = defaultSourceBranchName;
             }
             else
             {
                 _logger.LogInformation("Branch '{BranchName}' anlegen.", branchName);
                 await gitPlugin.CreateBranchAsync(lokalerKlonPfad, branchName, null, ct);
+                basisBranch = null;
             }
         }
 
-        return (branchName, nutzeExistierendenBranch);
+        return (branchName, nutzeExistierendenBranch, basisBranch);
     }
 
     private async Task FinalizeStartAsync(
@@ -553,41 +559,76 @@ public sealed class EntwicklungsprozessService
         string lokalerKlonPfad,
         string branchName,
         bool nutzeExistierendenBranch,
+        string? basisBranch,
         CancellationToken ct)
     {
-        string? startskriptHinweis = null;
-        if (repository.StartKonfiguration is not null && _options.RepositoryStartskriptService is not null)
-        {
-            try
-            {
-                await _options.RepositoryStartskriptService.RunAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                startskriptHinweis =
-                    $"Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden ({ex.Message}).";
-                _logger.LogWarning(ex, "Repository-Startskript für Aufgabe {AufgabeId} ist fehlgeschlagen.", aufgabeId);
-            }
-        }
+        var initialisierungsskriptHinweis = await RunInitialisierungsskriptAsync(aufgabeId, repository, lokalerKlonPfad, ct);
+        var startskriptHinweis = await RunStartskriptAsync(aufgabeId, repository, lokalerKlonPfad, ct);
 
         await CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, repository.StartKonfiguration, ct);
         await UpdateGitignoreAsync(lokalerKlonPfad, repository.StartKonfiguration, ct);
 
-        await _aufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad, ct);
+        await _aufgabeService.StartenAsync(aufgabeId, branchName, lokalerKlonPfad, basisBranch, ct);
 
         var protokollNachricht = nutzeExistierendenBranch
             ? $"Klon angelegt, vorhandener Branch ausgecheckt: {branchName} in {lokalerKlonPfad}"
             : $"Klon und Branch angelegt: {branchName} in {lokalerKlonPfad}";
+        if (!string.IsNullOrWhiteSpace(initialisierungsskriptHinweis))
+        {
+            protokollNachricht = $"{protokollNachricht}\n{initialisierungsskriptHinweis}";
+        }
         if (!string.IsNullOrWhiteSpace(startskriptHinweis))
         {
             protokollNachricht = $"{protokollNachricht}\n{startskriptHinweis}";
         }
 
         await _protokollService.AddEintragAsync(aufgabeId, ProtokollTyp.GitAktion, protokollNachricht, ct: ct);
+    }
+
+    private async Task<string?> RunInitialisierungsskriptAsync(Guid aufgabeId, GitRepository repository, string lokalerKlonPfad, CancellationToken ct)
+    {
+        if (repository.InitialisierungKonfiguration is null || _options.RepositoryInitialisierungService is null)
+        {
+            return null;
+        }
+
+        return await RunOptionalRepositoryScriptAsync(
+            aufgabeId,
+            "Initialisierungsskript",
+            () => _options.RepositoryInitialisierungService.RunAsync(lokalerKlonPfad, repository.InitialisierungKonfiguration, ct),
+            ct);
+    }
+
+    private async Task<string?> RunStartskriptAsync(Guid aufgabeId, GitRepository repository, string lokalerKlonPfad, CancellationToken ct)
+    {
+        if (repository.StartKonfiguration is null || _options.RepositoryStartskriptService is null)
+        {
+            return null;
+        }
+
+        return await RunOptionalRepositoryScriptAsync(
+            aufgabeId,
+            "Startskript",
+            () => _options.RepositoryStartskriptService.RunAsync(lokalerKlonPfad, repository.StartKonfiguration, ct),
+            ct);
+    }
+
+    private async Task<string?> RunOptionalRepositoryScriptAsync(Guid aufgabeId, string scriptLabel, Func<Task> runAsync, CancellationToken ct)
+    {
+        try
+        {
+            await runAsync();
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Repository-{ScriptLabel} für Aufgabe {AufgabeId} ist fehlgeschlagen.", scriptLabel, aufgabeId);
+            return $"Hinweis: Das Repository-{scriptLabel} konnte nicht ausgeführt werden ({ex.Message}).";
+        }
     }
 
     private async Task<GitRepository> ResolveRepositoryAsync(Aufgabe aufgabe, string repositoryUrl, CancellationToken ct)
