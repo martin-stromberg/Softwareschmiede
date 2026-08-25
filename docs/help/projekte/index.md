@@ -11,6 +11,7 @@ Projekte sind die zentrale Organisationseinheit der Softwareschmiede. Jedes Proj
 - [Repository-Auswahl-Dialog](dialog-repository-auswahl.md)
 - [Dialog „Arbeitsverzeichnis bearbeiten"](dialog-arbeitsverzeichnis-bearbeiten.md)
 - [Basis-Branch-Konfiguration](basis-branch-konfiguration.md)
+- [Initialisierungsskript-Konfiguration](initialisierungsskript-konfiguration.md)
 - [Datenmodell](datenmodell.md)
 - [Business Rules](business-rules.md)
 - [Architektur](architektur.md)

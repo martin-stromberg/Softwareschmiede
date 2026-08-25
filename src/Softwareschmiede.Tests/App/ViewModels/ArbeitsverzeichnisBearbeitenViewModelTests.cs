@@ -138,7 +138,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         var pluginMock = new Mock<IGitPlugin>();
         pluginMock.SetupGet(p => p.PluginPrefix).Returns("Test");
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await tcs.Task));
+            .Returns(async (string _, int _, CancellationToken _, string? _) => RepositoryStructureLoadResult.Success(await tcs.Task));
         var sut = CreateSut(CreateDirectoryStructureService());
 
         var loadingWasTrue = false;
@@ -168,7 +168,7 @@ public sealed class ArbeitsverzeichnisBearbeitenViewModelTests : IDisposable
         var pluginMock = new Mock<IGitPlugin>();
         pluginMock.SetupGet(p => p.PluginPrefix).Returns("Test");
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns<string, int, CancellationToken>(async (_, _, ct) =>
+            .Returns<string, int, CancellationToken, string?>(async (_, _, ct, _) =>
             {
                 await Task.Delay(Timeout.Infinite, ct);
                 return RepositoryStructureLoadResult.Success([]);
