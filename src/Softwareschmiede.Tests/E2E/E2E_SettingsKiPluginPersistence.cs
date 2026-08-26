@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -15,75 +16,16 @@ public partial class End2EndTest
     {
         var codexPath = $@"C:\tools\codex-{Guid.NewGuid():N}.exe";
 
-        OpenKiSettings(mainWindow);
+        var settings = new SettingsView(mainWindow).ForceShow();
+        settings.SelectDefaultKiPlugin("Codex CLI");
+        settings.SetExecutablePath(codexPath);
+        settings.SaveSettings();
+        settings.Menu.NavigateToDashboard();
 
-        var kiPluginBox = SelectDefaultKiPlugin(mainWindow, "Codex CLI");
-        WaitForSelectedCodexPlugin(kiPluginBox, Short);
+        var settingsReopened = new SettingsView(mainWindow).ForceShow();
+        settingsReopened.SelectDefaultKiPlugin("Codex CLI");
+        Assert.Equal(codexPath, settingsReopened.GetExecutablePath());
 
-        var executablePathBox = WaitForElement(mainWindow, cf => cf.ByName("ExecutablePath"), Short);
-        executablePathBox.AsTextBox().Text = codexPath;
-
-        SaveSettings(mainWindow);
-
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
-
-        OpenKiSettings(mainWindow);
-
-        var reloadedKiPluginBox = FindDefaultKiPluginComboBox(mainWindow);
-        WaitForSelectedCodexPlugin(reloadedKiPluginBox, Short);
-
-        var reloadedExecutablePathBox = WaitForElement(mainWindow, cf => cf.ByName("ExecutablePath"), Short);
-        Assert.Equal(codexPath, reloadedExecutablePathBox.AsTextBox().Text);
-
-        NavigateBackToDashboard(mainWindow);
-    }
-
-    private static void OpenKiSettings(AutomationElement mainWindow)
-    {
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), Short);
-        einstellungenButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-
-        var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
-        pluginsTab.Click();
-    }
-
-    private static AutomationElement SelectDefaultKiPlugin(AutomationElement mainWindow, string pluginName)
-    {
-        var comboBox = FindDefaultKiPluginComboBox(mainWindow);
-        SelectComboBoxItemByClick(comboBox, pluginName, Short);
-        return comboBox;
-    }
-
-    private static AutomationElement FindDefaultKiPluginComboBox(AutomationElement mainWindow)
-        => WaitForElement(mainWindow, cf => cf.ByName("DefaultKiPlugin"), Short);
-
-    private static void SaveSettings(AutomationElement mainWindow)
-    {
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
-    }
-
-    private static void WaitForSelectedCodexPlugin(AutomationElement comboBoxElement, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        string? selectedItemName = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            selectedItemName = comboBoxElement.AsComboBox().SelectedItem?.Name;
-            if (string.Equals(selectedItemName, "Codex CLI", StringComparison.Ordinal)
-                || string.Equals(selectedItemName, "Softwareschmiede.Infrastructure.Plugins.CodexPlugin", StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            Thread.Sleep(200);
-        }
-
-        throw new TimeoutException(
-            $"ComboBox zeigte nicht innerhalb von {timeout.TotalSeconds}s das Codex-Plugin. Aktuell: '{selectedItemName}'.");
+        settingsReopened.Menu.NavigateToDashboard();
     }
 }

@@ -1,5 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -25,39 +27,53 @@ public partial class End2EndTest
     /// </summary>
     protected void AufgabeStarten_KlontRepositoryUndStartetCli_E2E(Window mainWindow)
     {
+        const string repositoryFolderName = "AufgabeStarten-Repo";
+        const string projektName = "AufgabeStarten-Projekt";
+        const string pluginName = "Softwareschmiede.KiSimulator";
+
         new WindowsCredentialStore().DeleteCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory");
 
-        SetupProjectMitNeuerAufgabe(mainWindow,
-            "AufgabeStarten-Repo",
-            "AufgabeStarten-Projekt",
-            initializeSourceGitRepository: false);
+        // InSourceDirectory-Modus ohne vorinitialisiertes Git-Repository: Der erste Startversuch muss
+        // an der fehlenden ConfirmGitInitInSourceDirectory-Bestätigung scheitern (siehe unten).
+        var sourceDirectory = CreateLocalSourceDirectory(repositoryFolderName, initializeGitRepository: false);
+
+        // ForceClose(recurseToDashboard: true) gibt laut Vertrag immer die ursprüngliche Instanz zurück
+        // (siehe BaseWindowView.ForceClose), nicht die tatsächlich erreichte Dashboard-Ansicht - deshalb
+        // wird der Rückgabewert verworfen und CurrentView() danach erneut abgefragt (siehe
+        // ForceClose_MitRekursion_SchliesstBisDashboard_E2E für dasselbe Muster).
+        mainWindow.CurrentView().ForceReset();
+        var dashboard = Assert.IsType<DashboardView>(mainWindow.CurrentView());
+        var settings = dashboard.Menu.NavigateToSettings();
+        dashboard = settings.ConfigureLocalDirectoryPlugin(sourceDirectory);
+
+        var projectList = dashboard.Menu.NavigateToProjects();
+        projectList.CreateProject(projektName);
+        var projectDetail = projectList.OpenProject(projektName);
+
+        projectDetail = new RepositoryAssignDialogView(mainWindow)
+            .ForceShow()
+            .SelectFirstRepository()
+            .Confirm();
+
+        var taskDetail = projectDetail.CreateTask();
 
         // Erster Versuch: ConfirmGitInitInSourceDirectory ist nicht gesetzt → Fehlermeldung erwartet
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-
-        // Fehlermeldung wird angezeigt, da git init im Quellverzeichnis nicht bestätigt ist
-        var fehlerBanner = WaitForElement(mainWindow, cf => cf.ByName("FehlerMeldung"), Medium);
-        Assert.NotNull(fehlerBanner);
+        taskDetail.Start(pluginName, fuerProjektVerwenden: false);
+        var errorView = Assert.IsType<ErrorView>(mainWindow.CurrentView());
+        Assert.False(string.IsNullOrWhiteSpace(errorView.GetErrorMessage()));
 
         // Einstellung korrigieren: ConfirmGitInitInSourceDirectory auf true setzen
         new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
 
         // Zweiter Versuch: Plugin-Dialog erneut bedienen, diesmal ist die Bestätigung gesetzt
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        taskDetail.Start(pluginName, fuerProjektVerwenden: false);
 
-        // Nach erfolgreichem Start: CLI-Panel sichtbar (Stoppen-Button erscheint, da IsCliRunning=true)
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        Assert.NotNull(stoppenButton);
+        // Nach erfolgreichem Start: CLI-Panel sichtbar (Stoppen-Button + Status "Gestartet"), kein Fehler mehr
+        taskDetail.WaitForCliRunning();
+        Assert.False(new ErrorView(mainWindow).IsVisible);
 
-        // Statusleiste zeigt "Gestartet"
-        var statusGestartet = WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
-        Assert.NotNull(statusGestartet);
-
-        // Kein Fehler mehr angezeigt (Border ist Collapsed → TextBlock nicht im UIA-Baum)
-        var fehlerMeldungNachStart = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerMeldungNachStart);
-
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetailAfterTask = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetailAfterTask.DeleteProject();
     }
 }

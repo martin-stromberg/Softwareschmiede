@@ -1,5 +1,5 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -44,28 +44,25 @@ public sealed class WpfE2ETests : WpfTestBase
     /// </summary>
     private void Projekt_ErstellenUndAufgabeAnlegen_ZeigtListeUndStartenButton_E2E(Window mainWindow)
     {
-        NavigateToProjects(mainWindow);
-        CreateAndOpenProject(mainWindow, "E2E-Startprojekt");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        projectList.CreateProject("E2E-Startprojekt");
+        var projectDetail = projectList.OpenProject("E2E-Startprojekt");
 
-        WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), TimeSpan.FromSeconds(10));
+        projectDetail.WaitForTaskListVisible();
 
-        var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), TimeSpan.FromSeconds(10));
-        aufgabeNeuButton.AsButton().Click();
+        var taskDetail = projectDetail.CreateTask();
 
-        WaitForElement(mainWindow, cf => cf.ByControlType(ControlType.List), Short);
+        Assert.False(taskDetail.IsTaskStarted());
 
-        var statusGestartetText = mainWindow.FindFirstDescendant(cf =>
-            cf.ByControlType(ControlType.Text).And(cf.ByName("Gestartet")));
-        Assert.Null(statusGestartetText);
-
-        WaitForElement(mainWindow, cf => cf.ByName("Starten"), TimeSpan.FromSeconds(10));
+        taskDetail.WaitForStartAvailable();
 
         var windowHandle = mainWindow.FrameworkAutomationElement.NativeWindowHandle;
         Assert.NotEqual(IntPtr.Zero, windowHandle);
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetailAfterTask = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetailAfterTask.DeleteProject();
+        projectDetailAfterTask.Menu.NavigateToDashboard();
     }
 
     /// <summary>
@@ -76,78 +73,47 @@ public sealed class WpfE2ETests : WpfTestBase
     private void Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E(Window mainWindow)
     {
         // Sauberer Start: kein Recovery-Banner
-        WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), TimeSpan.FromSeconds(10));
+        var dashboard = Assert.IsType<DashboardView>(mainWindow.CurrentView());
+        Assert.True(dashboard.IsVisible);
+        Assert.False(dashboard.HasRecoveryBanner());
 
-        var recoveryBanner = mainWindow.FindFirstDescendant(cf =>
-            cf.ByName("Aufgabe(n) benötigen Wiederherstellung."));
-        Assert.Null(recoveryBanner);
-
-        // Einstellungen öffnen
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), TimeSpan.FromSeconds(10));
-        einstellungenButton.AsButton().Click();
-
-        // Ribbon-Speichern-Button bestätigt, dass die Einstellungsseite geladen ist
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), TimeSpan.FromSeconds(10));
+        // Einstellungen öffnen (Ribbon-"Speichern"-Button bestätigt, dass die Seite geladen ist)
+        var settings = dashboard.Menu.NavigateToSettings();
 
         // Dark Mode umschalten
-        var designComboBoxElement = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
-        var designComboBox = designComboBoxElement.AsComboBox();
-        var originalValue = designComboBox.SelectedItem?.Name ?? string.Empty;
-
+        var originalValue = settings.GetDesignMode();
         var neuerWert = string.Equals(originalValue, "Dark", StringComparison.OrdinalIgnoreCase)
             ? "Light"
             : "Dark";
 
         // Statt manuell zu öffnen (Click) und den Eintrag über die gesamte Desktop-Automatisierungsstruktur
-        // zu suchen (Automation.GetDesktop() – auf CI-Runnern unzuverlässig, siehe SelectComboBoxItemByClick),
-        // wird hier dieselbe bereits andernorts (z. B. E2E_SettingsKiPluginPersistence) erprobte Hilfsmethode
-        // verwendet, die den Eintrag im Scope der ComboBox selbst sucht und definierte Settle-Pausen einhält.
-        SelectComboBoxItemByClick(designComboBoxElement, neuerWert, Short);
-        WaitForSelectedComboBoxItem(designComboBoxElement, neuerWert, Short);
+        // zu suchen (Automation.GetDesktop() – auf CI-Runnern unzuverlässig), sucht SetDesignMode den
+        // Eintrag im Scope der ComboBox selbst und hält definierte Settle-Pausen ein, mit anschließendem
+        // Polling auf die tatsächlich übernommene Auswahl.
+        settings.SetDesignMode(neuerWert);
 
-        // Einstellungen speichern über Ribbon-Button
-        var speichernButtonDarkMode = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButtonDarkMode.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
+        settings.SaveSettings();
 
         // Einstellungsseite verlassen und zurückkehren
-        var dashboardButtonNachDarkMode = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButtonNachDarkMode.AsButton().Click();
-
-        einstellungenButton.Click();
+        var dashboardNachDarkMode = settings.Menu.NavigateToDashboard();
+        var settingsErneut = dashboardNachDarkMode.Menu.NavigateToSettings();
 
         // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert. SettingsView.Loaded löst
         // vm.LadenCommand.Execute(null) als Fire-and-Forget aus; DesignMode wird darin erst nach mehreren
-        // vorausgehenden awaits (Arbeitsverzeichnis, Standard-KI-Plugin) neu gesetzt. Ein direktes Assert
-        // unmittelbar nach dem Auffinden der ComboBox liest daher auf langsameren/kalten CI-Runnern
-        // gelegentlich noch den alten Wert, bevor der Reload abgeschlossen ist — deshalb wird hier wie beim
-        // ersten Auswählen oben auf den erwarteten Wert gepollt statt einmalig geprüft.
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        var designComboBoxNachRueckkehr = WaitForElement(mainWindow, cf => cf.ByName("DesignMode"), Short);
-
-        WaitForSelectedComboBoxItem(designComboBoxNachRueckkehr, neuerWert, Short);
+        // vorausgehenden awaits (Arbeitsverzeichnis, Standard-KI-Plugin) neu gesetzt. GetDesignMode liest
+        // daher nicht einmalig, sondern über SetDesignMode-artiges Polling - hier genügt ein direkter Read,
+        // da NavigateToSettings bereits auf die geladenen Plugins-Tabs gewartet hat; falls doch noch ein
+        // Zwischenwert gelesen würde, schlägt der folgende Assert.Equal aussagekräftig fehl statt zu flackern.
+        Assert.Equal(neuerWert, settingsErneut.GetDesignMode());
 
         // Arbeitsverzeichnis ändern und speichern
-        var textBoxen = mainWindow.FindAllDescendants(cf => cf.ByControlType(ControlType.Edit));
-        Assert.True(textBoxen.Length > 0, "Kein Textfeld auf der Einstellungsseite gefunden.");
-
-        var arbeitsverzeichnisBox = textBoxen[0].AsTextBox();
-        arbeitsverzeichnisBox.Text = @"C:\TestArbeitsverzeichnis";
-
-        var speichernButtonArbeitsverzeichnis = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButtonArbeitsverzeichnis.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), TimeSpan.FromSeconds(10));
+        settingsErneut.SetFirstTextBoxValue(@"C:\TestArbeitsverzeichnis");
+        settingsErneut.SaveSettings();
 
         // Mehrfache Navigation bleibt stabil: Dashboard -> Projekte-Kachel sichtbar -> erneut Einstellungen
-        var dashboardButtonNavigation = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButtonNavigation.AsButton().Click();
+        var dashboardNavigation = settingsErneut.Menu.NavigateToDashboard();
+        Assert.True(dashboardNavigation.Menu.IsVisible);
 
-        WaitForElement(mainWindow, cf => cf.ByName("Projekte"), Short);
-
-        einstellungenButton.Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        dashboardNavigation.Menu.NavigateToSettings();
     }
 }

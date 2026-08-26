@@ -1,5 +1,5 @@
 using FlaUI.Core.AutomationElements;
-using FluentAssertions;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -39,64 +39,62 @@ public partial class End2EndTest
     /// </summary>
     protected void DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E(Window mainWindow)
     {
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
-        AktivierePlugin(mainWindow, "Softwareschmiede.GitHubCopilot");
-
+        var settings = new SettingsView(mainWindow).ForceShow();
+        settings.SwitchTab("Plugins");
+        settings.SetPluginEnabled("Softwareschmiede.GitHubCopilot", true);
+        settings.SaveSettings();
+        settings.Menu.NavigateToDashboard();
 
         SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-Repo", "FileExplorer-Projekt");
 
         // git init im Quellverzeichnis vorab bestätigen, damit "Starten" im ersten Versuch gelingt.
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
 
         // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt) und
         // das CLI-Panel sichtbar - das bestätigt, dass der kombinierte Klon-/Start-Ablauf durchlief.
         // Ab hier bleiben ShowCliPanel (Status=Gestartet) und ShowFileExplorerPanel (Klonpfad
         // existiert) für den Rest des Tests durchgehend true.
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.WaitForCliRunning();
 
         // In der initial ausgewählten CLI-Ansicht ist die Ribbon-Gruppe "CLI" sichtbar, die Gruppe
         // "Dateien" dagegen nicht - obwohl das Arbeitsverzeichnis (ShowFileExplorerPanel) bereits existiert.
-        WaitForElement(mainWindow, cf => cf.ByName("PluginAendern"), Short);
-        WaitUntilGone(mainWindow, cf => cf.ByName("DateiStandard"), Short);
+        taskDetail.WaitForPluginChangeButton();
+        var fileExplorer = new FileExplorerView(mainWindow);
+        fileExplorer.WaitUntilNodeGone("DateiStandard");
 
-        var dateiViewButton = WaitForElement(mainWindow, cf => cf.ByName("DateiViewButton"), Short);
-        dateiViewButton.AsButton().Click();
+        fileExplorer.ForceShow();
 
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("DateiStandard"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("DateiVergleich"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("DateiAktualisieren"), Short);
-        WaitForElement(mainWindow, cf => cf.ByName("DateiOeffnen"), Short);
+        fileExplorer.WaitForNode("DateiStandard");
+        Assert.True(fileExplorer.HasModeButtons());
 
         // Sobald zur Dateien-Ansicht gewechselt wurde, muss die Ribbon-Gruppe "CLI" verschwinden -
         // obwohl ShowCliPanel (Status=Gestartet) weiterhin true ist.
-        WaitUntilGone(mainWindow, cf => cf.ByName("PluginAendern"), Short);
+        taskDetail.WaitUntilPluginChangeButtonGone();
 
-        var infoButton = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Short);
-        infoButton.AsButton().Click();
+        taskDetail.SwitchPanel("InfoCliToggle");
 
         // Dateiexplorer-Baum muss verschwinden - vorher blieb er wegen des defekten Bindings dauerhaft
         // sichtbar und überdeckte das Info-Register.
-        WaitUntilGone(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
+        fileExplorer.WaitUntilNodeGone("FileExplorerBaum");
 
         // In der Info-Ansicht ist weder die CLI- noch die Dateien-Ansicht ausgewählt - beide
         // Ribbon-Gruppen müssen daher verschwinden, obwohl ShowCliPanel und ShowFileExplorerPanel
         // beide weiterhin true sind.
-        WaitUntilGone(mainWindow, cf => cf.ByName("PluginAendern"), Short);
-        WaitUntilGone(mainWindow, cf => cf.ByName("DateiStandard"), Short);
+        taskDetail.WaitUntilPluginChangeButtonGone();
+        fileExplorer.WaitUntilNodeGone("DateiStandard");
 
-        var cliViewButton = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
-        cliViewButton.AsButton().Click();
+        taskDetail.SwitchPanel("CliViewButton");
 
-        WaitForElement(mainWindow, cf => cf.ByName("TerminalConsole"), Short);
+        taskDetail.WaitForTerminalOutput();
 
         // Zurück in der CLI-Ansicht: Ribbon-Gruppe "CLI" erscheint wieder, "Dateien" bleibt verborgen.
-        WaitForElement(mainWindow, cf => cf.ByName("PluginAendern"), Short);
-        WaitUntilGone(mainWindow, cf => cf.ByName("DateiStandard"), Short);
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.WaitForPluginChangeButton();
+        fileExplorer.WaitUntilNodeGone("DateiStandard");
+
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 
     /// <summary>
@@ -112,9 +110,8 @@ public partial class End2EndTest
         SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-LazyLoad-Repo", "FileExplorer-LazyLoad-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.WaitForCliRunning();
 
         var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
         Directory.CreateDirectory(Path.Combine(lokalerKlonPfad, "Ebene1", "Ebene2"));
@@ -123,28 +120,25 @@ public partial class End2EndTest
         // Der Arbeitsbaum wird beim ersten Anzeigen der Aufgabendetailansicht einmalig geladen - ein
         // erneutes Öffnen erzwingt einen frischen InitialisierenAsync-Aufruf, der die soeben angelegte
         // Struktur von der Festplatte erfasst.
-        ReloadTaskDetail(mainWindow);
+        taskDetail = taskDetail.Reload();
 
-        var dateiViewButton = WaitForElement(mainWindow, cf => cf.ByName("DateiViewButton"), Short);
-        dateiViewButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
+        var fileExplorer = new FileExplorerView(mainWindow).ForceShow();
 
         // "Ebene1" (Depth 0) ist oberhalb der Grenztiefe bereits vollständig geladen (ChildrenLoaded = true) -
         // Aufklappen macht nur "Ebene2" sichtbar, ohne Lazy-Load auszulösen.
-        var ebene1 = WaitForElement(mainWindow, cf => cf.ByName("Ebene1"), Short);
-        ebene1.Patterns.ExpandCollapse.Pattern.Expand();
+        fileExplorer.ExpandNode("Ebene1");
 
         // "Ebene2" (Depth 1) liegt auf der Grenztiefe (ChildrenLoaded = false, Platzhalter-Kind). Erst das
         // Aufklappen löst OnBaumKnotenExpanded -> LadeKinderAsync -> LoadSubtreeAsync aus.
-        var ebene2 = WaitForElement(mainWindow, cf => cf.ByName("Ebene2"), Short);
-        WaitUntilGone(mainWindow, cf => cf.ByName("Deep.cs"), Short);
-        ebene2.Patterns.ExpandCollapse.Pattern.Expand();
+        fileExplorer.WaitForNode("Ebene2");
+        fileExplorer.WaitUntilNodeGone("Deep.cs");
+        fileExplorer.ExpandNode("Ebene2");
 
-        WaitForElement(mainWindow, cf => cf.ByName("Deep.cs"), Short);
+        fileExplorer.WaitForNode("Deep.cs");
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 
     /// <summary>
@@ -163,55 +157,48 @@ public partial class End2EndTest
         SetupProjectMitNeuerAufgabe(mainWindow, "FileExplorer-LazyLoad-Collapse-Repo", "FileExplorer-LazyLoad-Collapse-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.WaitForCliRunning();
 
         var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
         var ebene2Verzeichnis = Path.Combine(lokalerKlonPfad, "Ebene1", "Ebene2");
         Directory.CreateDirectory(ebene2Verzeichnis);
         File.WriteAllText(Path.Combine(ebene2Verzeichnis, "Deep.cs"), "tief verschachtelter Inhalt");
 
-        ReloadTaskDetail(mainWindow);
+        taskDetail = taskDetail.Reload();
 
-        var dateiViewButton = WaitForElement(mainWindow, cf => cf.ByName("DateiViewButton"), Short);
-        dateiViewButton.AsButton().Click();
+        var fileExplorer = new FileExplorerView(mainWindow).ForceShow();
 
-        WaitForElement(mainWindow, cf => cf.ByName("FileExplorerBaum"), Short);
-
-        var ebene1 = WaitForElement(mainWindow, cf => cf.ByName("Ebene1"), Short);
-        ebene1.Patterns.ExpandCollapse.Pattern.Expand();
-
-        var ebene2 = WaitForElement(mainWindow, cf => cf.ByName("Ebene2"), Short);
-        ebene2.Patterns.ExpandCollapse.Pattern.Expand();
-        WaitForElement(mainWindow, cf => cf.ByName("Deep.cs"), Short);
+        fileExplorer.ExpandNode("Ebene1");
+        fileExplorer.ExpandNode("Ebene2");
+        fileExplorer.WaitForNode("Deep.cs");
 
         // "Ebene2" selbst zuklappen (IsExpanded true -> false): notwendig, damit ein späteres erneutes
         // Aufklappen von "Ebene2" überhaupt einen TreeViewItem.Expanded-Übergang (und damit
         // LadeKinderAsync) auslöst - WPF feuert Expanded nur bei einem echten Zustandswechsel, nicht wenn
         // ein bereits aufgeklappter Knoten durch Zuklappen eines Vorfahren nur visuell verborgen wird.
-        ebene2.Patterns.ExpandCollapse.Pattern.Collapse();
+        fileExplorer.CollapseNode("Ebene2");
 
         // "Ebene1" zuklappen: BeraeumeKnoten wird für den zugeklappten Knoten aufgerufen und setzt dessen
         // DIREKTE Kinder zurück, die selbst geladene Verzeichnisse sind - hier "Ebene2". Dadurch wird
         // "Deep.cs" (Groß-Enkel von "Ebene1") entfernt und der Platzhalter unter "Ebene2" wiederhergestellt.
-        ebene1.Patterns.ExpandCollapse.Pattern.Collapse();
+        fileExplorer.CollapseNode("Ebene1");
 
         // Während zugeklappt ist, wird der Verzeichnisinhalt auf der Festplatte geändert - ein erneutes
         // Aufklappen kann den neuen Stand nur zeigen, wenn "Ebene2" tatsächlich neu geladen wird.
         File.Delete(Path.Combine(ebene2Verzeichnis, "Deep.cs"));
         File.WriteAllText(Path.Combine(ebene2Verzeichnis, "Deep2.cs"), "neuer Inhalt nach Bereinigung");
 
-        ebene1.Patterns.ExpandCollapse.Pattern.Expand();
-        var ebene2ErneutAufgeklappt = WaitForElement(mainWindow, cf => cf.ByName("Ebene2"), Short);
-        ebene2ErneutAufgeklappt.Patterns.ExpandCollapse.Pattern.Expand();
+        fileExplorer.ExpandNode("Ebene1");
+        fileExplorer.WaitForNode("Ebene2");
+        fileExplorer.ExpandNode("Ebene2");
 
-        WaitForElement(mainWindow, cf => cf.ByName("Deep2.cs"), Short);
-        var veralteterKnoten = mainWindow.FindFirstDescendant(cf => cf.ByName("Deep.cs"));
-        veralteterKnoten.Should().BeNull("die Zuklapp-Bereinigung muss den zwischengespeicherten Stand verwerfen, statt ihn beim erneuten Aufklappen weiterzuverwenden");
+        fileExplorer.WaitForNode("Deep2.cs");
+        Assert.False(fileExplorer.HasNode("Deep.cs"));
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 
     private async Task<string> GetLokalerKlonPfadAsync()
@@ -220,20 +207,5 @@ public partial class End2EndTest
         var aufgabe = db.Aufgaben.Single();
         return aufgabe.LokalerKlonPfad
             ?? throw new InvalidOperationException("LokalerKlonPfad wurde nach dem Starten der Aufgabe nicht gesetzt.");
-    }
-
-    /// <summary>
-    /// Verlässt die Aufgabendetailansicht und öffnet dieselbe (einzige) Aufgabe erneut, um einen frischen
-    /// FileExplorerViewModel.InitialisierenAsync-Aufruf zu erzwingen, der extern (im Testprozess) auf der
-    /// Festplatte vorgenommene Änderungen erfasst. Analog zum etablierten Muster in
-    /// E2E_VerzeichnisAktionen.ReloadTaskDetail.
-    /// </summary>
-    /// <param name="mainWindow">Das Hauptfenster mit geöffneter Aufgabendetailansicht.</param>
-    private void ReloadTaskDetail(AutomationElement mainWindow)
-    {
-        AufgabeDetailZurueck(mainWindow);
-        var items = OffeneAufgabenItems(mainWindow);
-        ErsteOffeneAufgabeOeffnen(items);
-        WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
     }
 }

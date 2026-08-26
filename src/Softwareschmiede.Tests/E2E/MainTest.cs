@@ -29,6 +29,16 @@ public partial class End2EndTest : WpfTestBase
         TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
         CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);
 
+        ViewPatternHappyPath_NavigiertUndErstelltKorrekt_E2E(mainWindow);
+        AnsichtenErkennung_LiefertKorrekteViewTypen_E2E(mainWindow);
+        MenueNavigation_WechseltZwischenAnsichten_E2E(mainWindow);
+        ForceShow_NavigiertKorrektZuAnsicht_E2E(mainWindow);
+        ForceClose_OhneRekursion_SchliesstNurEineEbene_E2E(mainWindow);
+        ForceClose_MitRekursion_SchliesstBisDashboard_E2E(mainWindow);
+        DialogErkennung_LiefertKorrekteDialogViewTypen_E2E(mainWindow);
+        UnbekannteAnsicht_WirftAussagekraeftigeException_E2E(mainWindow);
+        await FehlerAnsichtErkennung_ZeigtFehlermeldung_E2E(mainWindow);
+
         app.Close();
     }
 

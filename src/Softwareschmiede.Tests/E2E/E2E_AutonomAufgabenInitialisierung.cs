@@ -1,5 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -27,11 +29,12 @@ public partial class End2EndTest
 
         // Vorherige Phase (CommandLineParameters) endet auf der Einstellungsseite, nicht dem Dashboard;
         // ohne explizite Rücknavigation sieht CreateProject deren "Speichern"-Button als Altlast an.
-        NavigateBackToDashboard(mainWindow);
+        mainWindow.CurrentView().ForceReset();
 
         SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, repositoryFolderName, projektName);
-        AufgabeTitelSetzen(mainWindow, aufgabeTitel);
-        AufgabeDetailSpeichern(mainWindow, false);
+        var taskDetail = new TaskDetailView(mainWindow);
+        taskDetail.SetTaskTitle(aufgabeTitel);
+        taskDetail.SaveTask();
 
         // LokalerKlonPfad wird sonst nur beim (ConPTY-abhängigen) CLI-Start gesetzt; hier direkt in der
         // Test-Datenbank hinterlegt, da für dieses Szenario kein CLI-Prozess benötigt wird.
@@ -44,24 +47,13 @@ public partial class End2EndTest
             await seedDb.SaveChangesAsync();
         }
 
-        var initialisierenButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short);
-        initialisierenButton.AsButton().Click();
-
-        var dialog = WaitForWindow("Autonome Aufgabe initialisieren", Medium);
         // Aufgabe hat kein GitRepository zugewiesen (nur LokalerKlonPfad), daher fällt der Branch-Bereich
         // auf die manuelle Texteingabe zurück (keine Remote-Branches ladbar).
-        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeProjektbranchEingabe"), Short);
-        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabePermissionsAuswahl"), Short);
-        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeTokenBudget"), Short);
-        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeLaufzeitLimit"), Short);
+        var initDialog = new AutonomAufgabeInitialisierungsDialogView(mainWindow).ForceShow();
+        Assert.True(initDialog.HasFormFields());
 
-        var promptBox = WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeInitialPrompt"), Short);
-        promptBox.AsTextBox().Text = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
-
-        ConfirmDialog(dialog, "AutonomAufgabeBestaetigen");
-
-        var detailFenster = WaitForWindow("Autonome Aufgabe", Long);
-        WaitForElement(detailFenster, cf => cf.ByName("AutonomAufgabeStart"), Long);
+        initDialog.SetInitialPrompt("Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.");
+        var detailFenster = initDialog.Confirm();
 
         string arbeitsverzeichnisPfad;
         await using (var db = OpenTestDbContext())
@@ -80,10 +72,11 @@ public partial class End2EndTest
         Assert.True(File.Exists(Path.Combine(arbeitsverzeichnisPfad, "state.json")));
         Assert.True(Directory.Exists(Path.Combine(arbeitsverzeichnisPfad, "clones", "repo_main")), "Repository-Klon wurde nicht erstellt.");
 
-        detailFenster.AsWindow().Close();
+        detailFenster.Close();
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
+        projectDetail.Menu.NavigateToDashboard();
     }
 }

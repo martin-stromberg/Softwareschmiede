@@ -1,5 +1,6 @@
 using FlaUI.Core.AutomationElements;
-using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -55,26 +56,22 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
 
         var sourceDirectory = CreateLocalSourceDirectory(repoFolderName);
 
-        ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory);
-        NavigateToProjects(mainWindow);
-        CreateAndOpenProject(mainWindow, projektName);
+        var settings = new SettingsView(mainWindow).ForceShow();
+        var dashboard = settings.ConfigureLocalDirectoryPlugin(sourceDirectory);
+        var projectList = dashboard.Menu.NavigateToProjects();
+        projectList.CreateProject(projektName);
+        var projectDetail = projectList.OpenProject(projektName);
 
-        var dialog = OpenRepositoryAssignDialog(mainWindow);
-        var repositoryItem = WaitForFirstRepositoryItem(dialog);
-        repositoryItem.Click();
-
-        var basisBranchEingabe = WaitForEnabledElement(dialog, "BasisBranchEingabe", Short);
-        basisBranchEingabe.AsTextBox().Text = basisBranch;
-
-        ConfirmDialog(dialog, "Zuweisen");
+        var dialog = new RepositoryAssignDialogView(mainWindow).ForceShow();
+        dialog.SelectFirstRepository();
+        dialog.SetBaseBranch(basisBranch);
+        var projectDetailAfterAssign = dialog.Confirm();
 
         var saved = await WaitForSavedSourceBranchAsync(repoFolderName, basisBranch);
         Assert.Equal(basisBranch, saved);
+        Assert.Equal(basisBranch, projectDetailAfterAssign.GetBaseBranch());
 
-        var anzeige = WaitForElement(mainWindow, cf => cf.ByAutomationId("BasisBranchAnzeige"), Short);
-        Assert.Equal(basisBranch, anzeige.Name);
-
-        NavigateBackToDashboard(mainWindow);
+        projectDetailAfterAssign.Menu.NavigateToDashboard();
     }
 
     /// <summary>
@@ -88,51 +85,19 @@ public sealed class E2E_RepositoryManagementTests : WpfTestBase
         const string repoFolderName = "BasisBranch-Assign-Repo";
         const string neuerBasisBranch = "release";
 
-        NavigateToProjects(mainWindow);
-        OpenProject(mainWindow, "BasisBranch-Assign-Projekt");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        var projectDetail = projectList.OpenProject("BasisBranch-Assign-Projekt");
 
-        var bearbeitenButton = WaitForElement(mainWindow, cf => cf.ByName("BasisBranchBearbeiten"), Short);
-        bearbeitenButton.AsButton().Click();
-
-        var editEingabe = WaitForElement(mainWindow, cf => cf.ByName("BasisBranchBearbeitenEingabe"), Short);
-        editEingabe.AsTextBox().Text = neuerBasisBranch;
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("BasisBranchSpeichern"), Short);
-        speichernButton.AsButton().Click();
+        projectDetail.EditBaseBranch();
+        projectDetail.SetBaseBranch(neuerBasisBranch);
+        projectDetail.SaveBaseBranch();
 
         var saved = await WaitForSavedSourceBranchAsync(repoFolderName, neuerBasisBranch);
         Assert.Equal(neuerBasisBranch, saved);
+        Assert.Equal(neuerBasisBranch, projectDetail.GetBaseBranch());
 
-        var anzeige = WaitForElement(mainWindow, cf => cf.ByAutomationId("BasisBranchAnzeige"), Short);
-        Assert.Equal(neuerBasisBranch, anzeige.Name);
-
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
-    }
-
-    /// <summary>
-    /// Wartet, bis ein benanntes Element gefunden wird UND aktiviert ist (nicht mehr durch
-    /// IsLoadingSourceBranches deaktiviert).
-    /// </summary>
-    private static AutomationElement WaitForEnabledElement(AutomationElement parent, string automationName, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            var element = parent.FindFirstDescendant(cf => cf.ByName(automationName));
-            if (element is not null && element.IsEnabled)
-                return element;
-
-            Thread.Sleep(200);
-        }
-
-        throw new TimeoutException($"Element '{automationName}' wurde nicht innerhalb von {timeout.TotalSeconds}s aktiviert gefunden.");
-    }
-
-    private static void ConfirmDialog(AutomationElement dialog, string buttonName)
-    {
-        var button = WaitForElement(dialog, cf => cf.ByName(buttonName), Short);
-        button.AsButton().Click();
+        projectDetail.DeleteProject();
+        projectDetail.Menu.NavigateToDashboard();
     }
 
     private async Task<string?> WaitForSavedSourceBranchAsync(string repositoryName, string expected)

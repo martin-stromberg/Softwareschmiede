@@ -1,6 +1,6 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using FluentAssertions;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -31,43 +31,44 @@ public partial class End2EndTest
     {
         SetupProjectMitNeuerAufgabe(mainWindow, "IdeAuswahl-Repo", "IdeAuswahl-Projekt");
 
-        mainWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Maximized);
-
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.WaitForCliRunning();
 
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        NavigateBackFromProjectCardToProjectsList(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Phase 1: Visual-Studio-Code-Plugin deaktivieren (Einstellungen), damit ohne .sln-Datei kein
         // Fallback-Plugin mehr existiert und FindEntryPointsAsync 0 Einstiegspunkte liefert.
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
-        DeaktiviereIdePlugin(mainWindow, "Softwareschmiede.VisualStudioCode");
+        var settings = projectDetail.Menu.NavigateToSettings();
+        settings.SwitchTab("Plugins");
+        settings.SetIdePluginEnabled("Softwareschmiede.VisualStudioCode", false);
+        settings.SaveSettings();
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
+        var projectList = settings.Menu.NavigateToProjects();
+        var projectDetailReopened = projectList.OpenProject("IdeAuswahl-Projekt");
+        var taskDetailReopened = projectDetailReopened.OpenFirstTask();
 
-        NavigateToProjects(mainWindow);
-        var offeneAufgaben = OffeneAufgabenItems(mainWindow);
-        ErsteOffeneAufgabeOeffnen(offeneAufgaben);
-        WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
+        // Das Ribbon kann bei sichtbarer CLI-Gruppe breiter als das Standard-Fenster werden; einfache
+        // WPF-Buttons implementieren kein UIA-ScrollItemPattern und können daher nicht programmatisch in
+        // den sichtbaren Bereich gescrollt werden - das Fenster wird deshalb maximiert, damit die
+        // Ribbon-Buttons ("IdeOeffnen" etc.) tatsächlich im klickbaren Bereich liegen. Bewusst erst HIER
+        // (statt vor der Projektlisten-Navigation) maximiert: Klicks auf Projekt-Kacheln in der Projektliste
+        // waren bei bereits maximiertem Fenster nicht zuverlässig (vermutlich ein Koordinaten-/Hit-Test-
+        // Problem nach dem Zustandswechsel).
+        mainWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Maximized);
 
         // Phase 2: Ohne .sln-Datei und ohne aktives Fallback-Plugin liefert der Haupt-Button eine
         // Fehlermeldung; der Dropdown-Button bleibt unsichtbar (KannIdeAuswaehlen erfordert >= 2 Einstiegspunkte).
-        var ideHauptButtonOhneEinstiegspunkte = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
         var protokollVorFehler = await ReadProzessStartLogAsync();
-        ideHauptButtonOhneEinstiegspunkte.AsButton().Click();
+        taskDetailReopened.OpenIde();
 
-        var fehlerMeldung = WaitForElement(mainWindow, cf => cf.ByName("FehlerMeldung"), Short);
-        fehlerMeldung.Should().NotBeNull();
+        Assert.False(string.IsNullOrWhiteSpace(new ErrorView(mainWindow).GetErrorMessage()));
 
         var protokollNachFehler = await ReadProzessStartLogAsync();
-        protokollNachFehler.Should().Be(protokollVorFehler, "ohne gefundene Einstiegspunkte darf kein Prozess gestartet werden");
+        Assert.Equal(protokollVorFehler, protokollNachFehler);
 
-        var dropdownButtonOhneEinstiegspunkte = mainWindow.FindFirstDescendant(cf => cf.ByName("IdeOeffnenDropdown"));
-        dropdownButtonOhneEinstiegspunkte.Should().BeNull("ohne mindestens zwei Einstiegspunkte muss der Dropdown-Button unsichtbar sein");
+        Assert.False(taskDetailReopened.HasIdeDropdown());
 
         // Phase 3: Zwei .sln-Dateien anlegen und die Aufgabe neu laden - der Dropdown-Button wird sichtbar.
         var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
@@ -75,36 +76,29 @@ public partial class End2EndTest
         var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.sln");
         File.WriteAllText(ersteSolution, string.Empty);
         File.WriteAllText(zweiteSolution, string.Empty);
-        ReloadTaskDetail(mainWindow);
+        taskDetailReopened = taskDetailReopened.Reload();
 
-        var dropdownButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnenDropdown"), Short);
+        Assert.True(taskDetailReopened.HasIdeDropdown());
         var protokollVorAbbruch = await ReadProzessStartLogAsync();
-        dropdownButtonMitZweiSln.AsButton().Click();
-
-        var dialog = WaitForWindow("Solution auswählen", Short);
-        var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
-        abbrechenButton.AsButton().Click();
-
-        WaitUntilGone(Automation.GetDesktop(), cf => cf.ByName("Solution auswählen"), Short);
+        var solutionDialog = taskDetailReopened.OpenIdeDropdown();
+        solutionDialog.Cancel();
 
         var protokollNachAbbruch = await ReadProzessStartLogAsync();
-        protokollNachAbbruch.Should().Be(protokollVorAbbruch, "ein abgebrochener Auswahl-Dialog darf keinen Einstiegspunkt öffnen");
+        Assert.Equal(protokollVorAbbruch, protokollNachAbbruch);
 
         mainWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
-        NavigateBackFromProjectCardToProjectsList(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetailReopened.ForceClose(recurseToDashboard: false);
+        var projectDetailFinal = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetailFinal.DeleteProject();
 
         // Das in Phase 1 deaktivierte Visual-Studio-Code-Plugin wieder aktivieren und speichern, damit
         // nachfolgende E2E-Methoden in RunConPtyTests denselben App-Lifecycle mit beiden IDE-Plugins aktiv
         // vorfinden (analog zu E2E_IdePluginSettings.cs).
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
-        AktiviereIdePlugin(mainWindow, "Softwareschmiede.VisualStudioCode");
+        var settingsEnde = projectDetailFinal.Menu.NavigateToSettings();
+        settingsEnde.SwitchTab("Plugins");
+        settingsEnde.SetIdePluginEnabled("Softwareschmiede.VisualStudioCode", true);
+        settingsEnde.SaveSettings();
 
-        var speichernButtonEnde = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButtonEnde.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
-
-        NavigateBackToDashboard(mainWindow);
+        settingsEnde.Menu.NavigateToDashboard();
     }
 }

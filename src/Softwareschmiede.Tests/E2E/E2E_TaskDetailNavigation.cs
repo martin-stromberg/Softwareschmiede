@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -23,26 +24,27 @@ public partial class End2EndTest
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     protected void TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(Window mainWindow)
     {
-        NavigateToProjectsAndCreateProject(mainWindow, "TaskNav-Test");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        projectList.CreateProject("TaskNav-Test");
+        var projectDetail = projectList.OpenProject("TaskNav-Test");
 
         // Korrekte Daten
-        var editTitelBox = NeueAufgabeAnlegen(mainWindow);
-        Assert.Equal("Neue Aufgabe", editTitelBox.AsTextBox().Text);
+        var taskDetail = projectDetail.CreateTask();
+        Assert.Equal("Neue Aufgabe", taskDetail.GetTaskTitle());
 
         // Rücknavigation
-        AufgabeDetailZurueck(mainWindow);
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
+        taskDetail.GoBack();
+        var projectDetailAfterBack = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Fensterumfassendes Öffnen aus der Liste
-        var items = OffeneAufgabenItems(mainWindow);
+        var items = projectDetailAfterBack.GetTaskElements();
         Assert.True(items.Length >= 1, "Aufgabenliste sollte mindestens eine Aufgabe enthalten.");
-        ErsteOffeneAufgabeOeffnen(items);
+        var taskDetailReopened = projectDetailAfterBack.OpenFirstTask();
 
         // TaskDetailView zeigt eigenes Ribbon mit "Speichern"-Button (Edit-Panel bei Status Neu)
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        Assert.True(taskDetailReopened.IsVisible);
 
-        // ProjektName-TextBox (Teil der ProjectDetailView) ist nicht mehr sichtbar
-        var projektNameBoxNachOeffnen = mainWindow.FindFirstDescendant(cf => cf.ByName("ProjektName"));
-        Assert.Null(projektNameBoxNachOeffnen);
+        // ProjectDetailView (u. a. "ProjektName") ist nicht mehr sichtbar - fensterumfassend
+        Assert.False(new ProjectDetailView(mainWindow).IsVisible);
     }
 }
