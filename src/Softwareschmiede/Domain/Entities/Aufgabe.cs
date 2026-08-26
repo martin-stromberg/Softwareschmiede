@@ -34,17 +34,21 @@ public sealed class Aufgabe
     /// <summary>Lokaler Pfad des geklonten Repositories.</summary>
     public string? LokalerKlonPfad { get; set; }
 
-    /// <summary>Convenience-Zugriff auf <see cref="BranchName"/> und <see cref="LokalerKlonPfad"/> als Value Object. Nicht von EF Core gemappt; die beiden Werte bleiben einzeln als flache Spalten persistiert. Null, solange kein Branch/Klon-Pfad gesetzt ist.</summary>
+    /// <summary>Urspruenglicher Start-Branch, von dem der Feature-Branch abgezweigt wurde.</summary>
+    public string? BasisBranchName { get; set; }
+
+    /// <summary>Convenience-Zugriff auf <see cref="BranchName"/>, <see cref="LokalerKlonPfad"/> und <see cref="BasisBranchName"/> als Value Object. Nicht von EF Core gemappt; die Werte bleiben einzeln als flache Spalten persistiert. Null, solange kein Branch/Klon-Pfad gesetzt ist.</summary>
     [NotMapped]
     public GitArbeitsbereich? GitArbeitsbereich
     {
         get => BranchName is null || LokalerKlonPfad is null
             ? null
-            : new GitArbeitsbereich(BranchName, LokalerKlonPfad);
+            : new GitArbeitsbereich(BranchName, LokalerKlonPfad, BasisBranchName);
         set
         {
             BranchName = value?.BranchName;
             LokalerKlonPfad = value?.ClonePfad;
+            BasisBranchName = value?.BasisBranchName;
         }
     }
 

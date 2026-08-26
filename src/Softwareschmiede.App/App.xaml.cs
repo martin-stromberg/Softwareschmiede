@@ -220,6 +220,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<ProjektService>();
         services.AddScoped<ProtokollService>();
         services.AddScoped<RepositoryStartskriptService>();
+        services.AddScoped<RepositoryInitialisierungService>();
         services.AddScoped<GitOrchestrationService>();
         services.AddScoped<PullRequestReferenzService>();
         services.AddScoped<EntwicklungsprozessService>(sp => new EntwicklungsprozessService(
@@ -231,6 +232,7 @@ public sealed partial class App : System.Windows.Application
             new EntwicklungsprozessServiceOptions(
                 ProjektService: sp.GetRequiredService<ProjektService>(),
                 RepositoryStartskriptService: sp.GetRequiredService<RepositoryStartskriptService>(),
+                RepositoryInitialisierungService: sp.GetRequiredService<RepositoryInitialisierungService>(),
                 KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>(),
                 GitOrchestrationService: sp.GetRequiredService<GitOrchestrationService>()),
             sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));

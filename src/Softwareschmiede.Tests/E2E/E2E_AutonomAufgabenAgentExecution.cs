@@ -7,6 +7,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Tests.E2E.Views;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -34,6 +35,7 @@ public partial class End2EndTest
     /// anschließend fortgesetzt (SessionPauseUtc wieder null); der Ribbon-Button "Resume" ist dabei
     /// erreichbar.
     /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     protected async Task AutonomAufgabeAgentExecution_StartUnteragentUndSessionPause_E2E(Window mainWindow)
     {
         var repositoryFolderName = "autonom-exec-repo";
@@ -41,8 +43,9 @@ public partial class End2EndTest
         var aufgabeTitel = $"Autonome Exec-Aufgabe {Guid.NewGuid():N}"[..40];
 
         SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, repositoryFolderName, projektName);
-        AufgabeTitelSetzen(mainWindow, aufgabeTitel);
-        AufgabeDetailSpeichern(mainWindow, false);
+        var taskDetail = new TaskDetailView(mainWindow);
+        taskDetail.SetTaskTitle(aufgabeTitel);
+        taskDetail.SaveTask();
 
         var quellVerzeichnis = CreateLocalSourceDirectory("autonom-exec-quelle");
         var quellRepoPfad = Path.Combine(quellVerzeichnis, "autonom-exec-quelle");
@@ -61,7 +64,7 @@ public partial class End2EndTest
         var initDialog = WaitForWindow("Autonome Aufgabe initialisieren", Medium);
         var promptBox = WaitForElement(initDialog, cf => cf.ByName("AutonomAufgabeInitialPrompt"), Short);
         promptBox.AsTextBox().Text = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
-        ConfirmDialog(initDialog, "AutonomAufgabeBestaetigen");
+        WaitForElement(initDialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().Click();
 
         // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
         // wechselt selbst zur "Automatisierung"-Registerkarte (identifiziert über deren TabControl
@@ -86,7 +89,7 @@ public partial class End2EndTest
             var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
             var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
             Assert.False(string.IsNullOrWhiteSpace(konfiguration.ProjektleiterAgentId), "Projektleiter-Agent wurde nicht gestartet.");
-            Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
+            Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
         }
 
         // Phase 2: Unteragenten-Erzeugung (Projektleiter-Agent-intern, kein UI-Auslöser) — direkt über
@@ -186,7 +189,7 @@ public partial class End2EndTest
             var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
             var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
             Assert.Null(konfiguration.SessionPauseUtc);
-            Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
+            Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
             Assert.False(string.IsNullOrWhiteSpace(aufgabe.VorschlagPrompt), "Weitermachen-Prompt wurde nicht gesetzt.");
         }
 
@@ -216,9 +219,10 @@ public partial class End2EndTest
             Assert.True(konfiguration.ExplizitGestoppt, "ExplizitGestoppt muss nach Klick auf den Ribbon-Button 'Beenden' gesetzt sein.");
         }
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
+        projectDetail.Menu.NavigateToDashboard();
     }
 
     private static async Task WartenBisAsync(Func<Task<bool>> bedingung, int maxVersuche = 150)

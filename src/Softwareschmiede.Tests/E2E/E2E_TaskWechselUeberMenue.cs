@@ -1,4 +1,6 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -43,137 +45,92 @@ public partial class End2EndTest
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         var sourceDirectory = CreateLocalSourceDirectory("Wechsel-Repo");
-        ConfigureLocalDirectoryPlugin(mainWindow, sourceDirectory, useInSourceDirectoryMode: false);
+        var settings = new SettingsView(mainWindow).ForceShow();
+        var dashboard = settings.ConfigureLocalDirectoryPlugin(sourceDirectory, useInSourceDirectoryMode: false);
 
-        NavigateToProjects(mainWindow);
-        CreateAndOpenProject(mainWindow, "Wechsel-Projekt");
-        AssignLocalDirectoryRepository(mainWindow);
+        var projectList = dashboard.Menu.NavigateToProjects();
+        projectList.CreateProject("Wechsel-Projekt");
+        var projectDetail = projectList.OpenProject("Wechsel-Projekt");
+
+        var dialog = new RepositoryAssignDialogView(mainWindow).ForceShow();
+        dialog.SelectFirstRepository();
+        projectDetail = dialog.Confirm();
 
         // Aufgabe A anlegen, öffnen und CLI starten
-        ErstelleUndStarteAufgabe(mainWindow, TitelA);
-        var pidA = WaitForTerminalProzessId(mainWindow, Medium);
+        var taskA = ErstelleUndStarteAufgabe(projectDetail, TitelA);
+        var pidA = taskA.WaitForTerminalProcessId(Medium);
 
         // Zurück zum Projekt, um Aufgabe B anzulegen
-        AufgabeDetailZurueck(mainWindow);
+        taskA.GoBack();
+        var projectDetailForB = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Aufgabe B anlegen, öffnen und CLI starten (eigener Prozess, andere PID als Aufgabe A)
-        ErstelleUndStarteAufgabe(mainWindow, TitelB);
-        var pidB = WaitForTerminalProzessId(mainWindow, Medium);
+        var taskB = ErstelleUndStarteAufgabe(projectDetailForB, TitelB);
+        var pidB = taskB.WaitForTerminalProcessId(Medium);
         Assert.NotEqual(pidA, pidB);
 
         // Zurück zum Projekt und Aufgabe A erneut öffnen — Aufgabe A ist nun die "geöffnete" Aufgabe
-        AufgabeDetailZurueck(mainWindow);
+        taskB.GoBack();
+        var projectDetailForReopen = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
-        AufgabeAusListeOeffnen(mainWindow, TitelA);
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        var pidAErneutGeoeffnet = WaitForTerminalProzessId(mainWindow, Medium);
+        var taskAReopened = projectDetailForReopen.OpenTask(TitelA);
+        taskAReopened.WaitForCliRunning();
+        var pidAErneutGeoeffnet = taskAReopened.WaitForTerminalProcessId(Medium);
         Assert.Equal(pidA, pidAErneutGeoeffnet);
 
         // Über die Aufgabenliste in der Seitenleiste ("Aktive Aufgaben") zu Aufgabe B wechseln,
         // OHNE über "Zurück" zu navigieren — genau das im Bug-Report beschriebene Szenario.
-        var navigateZuB = WaitForElement(mainWindow, cf => cf.ByName($"AufgabeNavigieren:{TitelB}"), Medium);
-        navigateZuB.AsButton().Click();
+        var taskAfterSwitchToB = taskAReopened.Menu.NavigateToTask(TitelB);
 
         // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe B gehören (nicht mehr zu Aufgabe A).
-        var pidNachWechsel = WaitForTerminalProzessId(mainWindow, Medium);
+        var pidNachWechsel = taskAfterSwitchToB.WaitForTerminalProcessId(Medium);
         Assert.NotEqual(pidA, pidNachWechsel);
         Assert.Equal(pidB, pidNachWechsel);
 
         // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe B.
-        var infoToggle = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Medium);
-        infoToggle.Click();
-        WaitForElement(mainWindow, cf => cf.ByName(TitelB), Short);
+        taskAfterSwitchToB.SwitchPanel("InfoCliToggle");
+        taskAfterSwitchToB.WaitForText(TitelB);
 
         // Über die Aufgabenliste in der Seitenleiste("Aktive Aufgaben") zu Aufgabe A wechseln,
         // OHNE über "Zurück" zu navigieren — genau das im Bug-Report beschriebene Szenario.
-        var navigateZuA = WaitForElement(mainWindow, cf => cf.ByName($"AufgabeNavigieren:{TitelA}"), Medium);
-        navigateZuA.AsButton().Click();
+        var taskAfterSwitchToA = taskAfterSwitchToB.Menu.NavigateToTask(TitelA);
 
         // Die eingebettete CLI muss jetzt tatsächlich zu Aufgabe A gehören (nicht mehr zu Aufgabe B).
-        pidNachWechsel = WaitForTerminalProzessId(mainWindow, Medium);
+        pidNachWechsel = taskAfterSwitchToA.WaitForTerminalProcessId(Medium);
         Assert.NotEqual(pidB, pidNachWechsel);
         Assert.Equal(pidA, pidNachWechsel);
 
         // Zusätzlich (nicht nur Titel/Fußzeile): Das Info-Panel zeigt den Titel von Aufgabe A.
-        infoToggle = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Medium);
-        infoToggle.Click();
-        WaitForElement(mainWindow, cf => cf.ByName(TitelA), Short);
+        taskAfterSwitchToA.SwitchPanel("InfoCliToggle");
+        taskAfterSwitchToA.WaitForText(TitelA);
 
-        NavigateBackFromTaskToProject(mainWindow);
-        NavigateToProjects(mainWindow);
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        // taskAfterSwitchToA wurde zuletzt über das Menü (Menu.NavigateToTask) erreicht, nicht über die
+        // Projektdetailansicht. MainWindowViewModel.NavigateZuAufgabe setzt für diesen Navigationsweg
+        // ZurueckAction bewusst auf NavigateToDashboard (siehe dortiger Kommentar) - "Zurück" führt daher
+        // unabhängig vom vorherigen Navigationsverlauf zum Dashboard, nicht zur Projektdetailansicht.
+        taskAfterSwitchToA.ForceClose(recurseToDashboard: false);
+        var dashboardFinal = Assert.IsType<DashboardView>(mainWindow.CurrentView());
+        var projectListFinal = dashboardFinal.Menu.NavigateToProjects();
+        var projectDetailFinal = projectListFinal.OpenProject("Wechsel-Projekt");
+        projectDetailFinal.DeleteProject();
     }
 
-    /// <summary>Legt eine neue Aufgabe im aktuell geöffneten Projekt an, benennt sie um, öffnet sie erneut und startet die CLI mit dem KI-Simulator-Plugin.</summary>
-    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    /// <summary>Legt eine neue Aufgabe im übergebenen Projekt an, benennt sie um, öffnet sie erneut und startet die CLI mit dem KI-Simulator-Plugin.</summary>
+    /// <param name="projectDetail">Die Projektdetailansicht, in der die Aufgabe angelegt wird.</param>
     /// <param name="titel">Der Titel, auf den die neue Aufgabe umbenannt werden soll.</param>
-    private void ErstelleUndStarteAufgabe(AutomationElement mainWindow, string titel)
+    /// <returns>Die Aufgabendetailansicht der gestarteten Aufgabe.</returns>
+    private TaskDetailView ErstelleUndStarteAufgabe(ProjectDetailView projectDetail, string titel)
     {
-        NeueAufgabeAnlegen(mainWindow);
-        AufgabeTitelSetzen(mainWindow, titel);
-        AufgabeDetailSpeichern(mainWindow, true);
+        var task = projectDetail.CreateTask();
+        task.SetTaskTitle(titel);
+        task.SaveTask();
+        task.GoBack();
 
-        AufgabeAusListeOeffnen(mainWindow, titel);
+        var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(task.Window.CurrentView());
+        var taskReopened = projectDetailAfterSave.OpenTask(titel);
+        taskReopened.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskReopened.WaitForCliRunning();
 
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-    }
-
-    /// <summary>
-    /// Wartet, bis das TerminalConsole-Element eine nicht-leere Prozess-ID (AutomationProperties.HelpText,
-    /// siehe TaskDetailView.xaml.cs) anzeigt, und gibt diese zurück.
-    /// </summary>
-    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    /// <param name="timeout">Maximale Wartezeit.</param>
-    /// <returns>Die als HelpText hinterlegte Prozess-ID des aktuell eingebetteten CLI-Prozesses.</returns>
-    private static string WaitForTerminalProzessId(AutomationElement mainWindow, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            var terminal = mainWindow.FindFirstDescendant(cf => cf.ByName("TerminalConsole"));
-            var pid = terminal?.HelpText;
-            if (!string.IsNullOrWhiteSpace(pid))
-                return pid;
-            Thread.Sleep(200);
-        }
-        throw new TimeoutException(
-            "TerminalConsole zeigte innerhalb des Timeouts keine Prozess-ID (HelpText) an. "
-            + $"Vorhandene Descendants von mainWindow: {BeschreibeDescendants(mainWindow)}");
-    }
-
-    /// <summary>Listet zu Diagnosezwecken ControlType und Name aller Nachfahren eines Elements auf
-    /// (z. B. für die Fehlermeldung eines TimeoutException, um zu sehen, welche Elemente statt des
-    /// erwarteten tatsächlich im Automation-Baum vorhanden sind). Einzelne Elemente, deren Eigenschaften
-    /// nicht mehr abrufbar sind (z. B. bereits entfernt), werden übersprungen statt die Diagnose selbst
-    /// scheitern zu lassen.</summary>
-    /// <param name="parent">Das Element, dessen Nachfahren aufgelistet werden.</param>
-    /// <returns>Kommagetrennte Liste aus "ControlType:'Name'" je Nachfahre.</returns>
-    private static string BeschreibeDescendants(AutomationElement parent)
-    {
-        try
-        {
-            var descendants = parent.FindAllDescendants();
-            var beschreibungen = new List<string>(descendants.Length);
-            foreach (var element in descendants)
-            {
-                try
-                {
-                    beschreibungen.Add($"{element.ControlType}:'{element.Name}'");
-                }
-                catch
-                {
-                    // Element nicht mehr abrufbar (z. B. bereits aus dem Baum entfernt) — überspringen.
-                }
-            }
-            return beschreibungen.Count == 0
-                ? "(keine)"
-                : $"[{beschreibungen.Count}] {string.Join(", ", beschreibungen)}";
-        }
-        catch (Exception ex)
-        {
-            return $"(Descendants-Abfrage fehlgeschlagen: {ex.Message})";
-        }
+        return taskReopened;
     }
 }

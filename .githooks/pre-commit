@@ -1,0 +1,4 @@
+#!/bin/sh
+# Validate localization keys and resx package consistency before each commit.
+set -e
+python "$(dirname "$0")/translation-check.py"

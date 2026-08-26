@@ -77,6 +77,7 @@ Die wichtigsten Features:
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Autonome Aufgaben (Projektleiter-Agent)** – vollautomatisierte Projektentwicklung: ein Projektleiter-Agent zerlegt die Aufgabe in Teilaufgaben, erzeugt und steuert Unteragenten in eigenen Branches/Klonen mit Governance-Grenzen und bereitet Pull Requests vor; Initialisierungsdialog mit auswählbarem Projektbranch (Dropdown der Remote-Branches mit „+"-Button zur Branch-Neuanlage, Fallback auf freie Texteingabe), auswählbarer Promptvorlage für den Initialprompt, Token-Budget/Laufzeitlimit/Persistenz-Modus/Skill-Autogeneration und Hilfe-Button mit Ablauferklärung; nach erfolgreicher Initialisierung neue Registerkarte „Automatisierung" in der Aufgabendetailansicht mit Tabs für Konfiguration/Plan/Fortschritt/Governance/Skills/Unteragenten, sowie Start-/Stop-/Resume-Buttons ausschließlich im Ribbon-Menü (reguläre Aufgaben-Ribbon-Buttons werden dafür ausgeblendet); „Start" startet einen echten KI-CLI-Prozess und sendet den Initialprompt automatisch an die Session, „Stop" merkt sich einen expliziten Stopp dauerhaft; nicht explizit gestoppte Autonome Aufgaben werden bei einem Programmneustart automatisch mit Weitermachen-Prompt (und Session-Fortsetzung, sofern vom Plugin unterstützt) fortgesetzt
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
+- **Repository-Initialisierungsskripte** – Pro Projekt kann ein optionales Skript konfiguriert werden, das nach dem Klonen eines Repositorys automatisch ausgeführt wird (z. B. Git-Hooks, Build-Tools, Umgebungsvariablen-Setup); die Auswahl-ComboBox filtert die Vorschlagsliste live beim Tippen; die Vorschlagsliste wird aus dem konfigurierten Basis-Branch geladen (falls gesetzt), sonst aus dem Remote-Standard-Branch; Fehler werden geloggt, blockieren aber nicht die Aufgabe
 - **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
 - **Programmupdate** – Update-Prüfung gegen GitHub-Releases direkt aus der Anwendung
 
@@ -614,7 +615,88 @@ Die sichtbare CLI-Konsole nutzt denselben Terminal-Buffer mit begrenztem Scrollb
 
 ## 🧪 Tests
 
-Das Projekt enthält Unit-Tests im Projekt `Softwareschmiede.Tests` und Integrationstests im Projekt `Softwareschmiede.IntegrationTests`:
+Das Projekt enthält Unit-Tests im Projekt `Softwareschmiede.Tests` und Integrationstests im Projekt `Softwareschmiede.IntegrationTests`.
+
+### E2E-Test View-Pattern
+
+**E2E-Tests für die WPF-Desktopanwendung werden über ein strukturiertes View-Pattern entwickelt**, das die wiederholte Interaktion mit UI-Elementen über FlaUI abstrahiert und Tests leserlich sowie wartbar macht.
+
+**Klassenhierarchie:**
+
+- **`BaseWindowView`** – Basisklasse für alle View-Helper mit gemeinsamen Methoden:
+  - `IsVisible` – Prüft, ob diese Ansicht gerade aktiv im Fenster sichtbar ist
+  - `ForceShow()` – Navigiert zur Ansicht über UI-Klicks und wartet auf Synchronisation
+  - `ForceClose(bool recurseToDashboard)` – Schließt die Ansicht; optional rekursiv bis zum Dashboard
+  - `Menu` – Property vom Typ `MenuView` für Menü-Navigation
+
+- **Spezialisierte View-Klassen** – Eine Subklasse pro Anwendungsansicht (z. B. `DashboardView`, `ProjectListView`, `ProjectDetailView`, `TaskDetailView`, `SettingsView`, etc.)
+  - Implementieren `IsVisible` mit ansichtsspezifischen Markern (charakteristische UI-Elemente)
+  - Bieten spezialisierte Hilfsmethoden für view-spezifische Interaktionen (z. B. `CreateProject()`, `GetTaskTitle()`)
+
+- **`MenuView`** – Spezialisierte View für Menü-Interaktionen
+  - `NavigateToDashboard()`, `NavigateToProjects()`, `NavigateToSettings()`
+
+- **`DialogView`** – Abstrakte Basisklasse für modale Dialoge
+  - Spezifische Dialog-Subklassen (`RepositoryAssignDialogView`, `PluginSelectionDialogView`, etc.)
+
+- **Erweiterungsmethode `Window.CurrentView()`** – Erkennt automatisch die aktuelle Ansicht anhand ihres UI-Inhalts
+  - Durchsucht das FlaUI-Fenster nach charakteristischen Elementen
+  - Gibt die entsprechende View-Instanz zurück
+  - Wirft `InvalidOperationException` mit aussagekräftiger Diagnose, wenn keine Ansicht erkannt wird
+
+**Verwendungsbeispiel:**
+
+```csharp
+// Test-Setup: Fenster öffnen
+var mainWindow = WaitForMainWindow();
+
+// Aktuelle Ansicht erkennen
+var view = mainWindow.CurrentView();
+// -> gibt DashboardView zurück
+
+// Navigation via View
+var projectListView = new ProjectListView(mainWindow).ForceShow();
+// -> navigiert zur Projektliste und wartet auf charakteristische Elemente
+
+// View-spezifische Hilfsmethoden nutzen
+var projects = projectListView.GetProjectElements();
+
+// Menü-Navigation
+var dashboardView = projectListView.Menu.NavigateToDashboard();
+
+// Schließen mit Rekursion zum Dashboard
+projectListView.ForceClose(recurseToDashboard: true);
+// -> schließt alle dazwischen liegenden Views und navigiert zum Dashboard
+```
+
+**Vorteile:**
+
+- Tests sind lesbarer und wartbarer — UI-Interaktionen sind gekapselt, nicht über FlaUI verstreut
+- Änderungen an der UI erfordern nur Anpassungen in den View-Klassen, nicht in jedem Test
+- Fluent-API ermöglicht Kettenaufrufe für kompakte Test-Logik
+- Automatische View-Erkennung (`CurrentView()`) reduziert explizite Element-Suchen
+
+**View-Klassen und deren Standort:**
+
+Alle View-Klassen befinden sich unter `src/Softwareschmiede.Tests/E2E/Views/` und können direkt in E2E-Testmethoden genutzt oder importiert werden:
+
+```csharp
+using Softwareschmiede.Tests.E2E.Views;
+
+[Fact]
+public void MyE2ETest()
+{
+    var view = mainWindow.CurrentView() as DashboardView;
+    Assert.NotNull(view);
+    // ... weiterer Test
+}
+```
+
+---
+
+### Test-Ausführung
+
+Das Projekt enthält Unit-Tests im Projekt `Softwareschmiede.Tests` und Integrationstests im Projekt `Softwareschmiede.IntegrationTests`. E2E-Tests für die WPF-Anwendung verwenden das View-Pattern und erfordern eine grafische Sitzung.
 
 ```powershell
 # Regulaere Unit-/Service-/ViewModel-Tests ohne echte OS-Schnittstellen ausführen
@@ -623,13 +705,18 @@ dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "C
 # Regulaere Integrationstests ohne echte OS-Schnittstellen ausführen
 dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category!=OsInterface"
 
-# OS-Schnittstellen-Tests separat ausführen
+# OS-Schnittstellen-Tests separat ausführen (einschließlich E2E und ConPTY-Tests)
 dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface"
 dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category=OsInterface"
+
+# E2E-Tests nur ausführen (View-Pattern und FlaUI-basierte Tests)
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface&FullyQualifiedName~E2E"
 
 # Tests mit Coverage-Report
 dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface" --collect:"XPlat Code Coverage"
 ```
+
+**Hinweis:** ConPTY- und E2E-Tests werden in dieser Sandbox mit `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` übersprungen, da die Child-Prozesse nicht korrekt isoliert werden. Zum manuellen Testen von E2E-Szenarios wird empfohlen, Tests direkt aus Visual Studio oder mit aktivierter grafischer Sitzung auszuführen.
 
 **Test-Stack:**
 - [xUnit](https://xunit.net/) – Test-Framework
@@ -712,8 +799,10 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | Dokument | Beschreibung |
 |----------|-------------|
 | [Anwendungsdokumentation (Index)](docs/help/index.md) | Einstiegspunkt zur fachlichen und technischen Dokumentation je Anwendungsbereich |
+| [E2E-Test View-Pattern](src/Softwareschmiede.Tests/E2E/Views/) | Strukturierte WPF-UI-Interaktion über FlaUI mit View-Klassen-Hierarchie (Klassen unter `Views/`) |
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
 | [Basis-Branch-Konfiguration](docs/help/projekte/basis-branch-konfiguration.md) | Konfiguration eines Basis-Branches pro Repository für Feature-Branch-Erstellung und Pull-Request-Ziele |
+| [Initialisierungsskript-Konfiguration](docs/help/projekte/initialisierungsskript-konfiguration.md) | Konfiguration eines optionalen Initialisierungsskripts pro Repository, das nach dem Klonen automatisch ausgeführt wird |
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
 | [Autonome Aufgaben](docs/help/aufgaben/autonome-aufgaben/index.md) | Projektleiter-Agent-basierte Automatisierung mit Unteragenten-Orchestrierung, Session-Management, Governance-Enforcement und Skills-Lifecycle |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |

@@ -1696,7 +1696,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance, pluginManagerMock.Object);
         var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
         workspaceBrowserMock
-            .Setup(browser => browser.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(browser => browser.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceSnapshot
             {
                 RepositoryPath = Path.GetTempPath(),

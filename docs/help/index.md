@@ -40,3 +40,9 @@ Eigenschaften und Präsentation der Softwareschmiede Desktopanwendung.
 - [GitHub-Plugin](plugins/index.md) — GitHub.com Integration über GitHub CLI
 - [BitBucket-Plugin](plugins/bitbucket-plugin/index.md) — BitBucket Cloud und Self-Hosted (Server/Data Center) mit optionaler Jira-Integration
 - [Local Directory Plugin](plugins/index.md) — Lokale Git-Repositories ohne Remote
+
+## Entwicklung & Test-Infrastruktur
+
+Interne Infrastruktur für Tests und Produktentwicklung. Diese Dokumentation ist für Entwickler bestimmt, nicht für Anwender.
+
+- [E2E-Test-Infrastruktur](e2e-test-infrastruktur/index.md) — View-Pattern für wartbare UI-Automatisierung. Strukturierte Klassenhierarchie mit `BaseWindowView` abstrahiert wiederholte FlaUI-Interaktionsmuster und ermöglicht automatische Erkennung der aktuellen Anwendungsansicht anhand charakteristischer UI-Marker.

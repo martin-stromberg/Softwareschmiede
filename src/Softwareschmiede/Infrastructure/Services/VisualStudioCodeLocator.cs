@@ -44,11 +44,7 @@ public sealed class VisualStudioCodeLocator : IVisualStudioCodeLocator
 
     private IEnumerable<string> EnumeratePathCandidates()
     {
-        var path = _getEnvironmentVariable("PATH");
-        if (string.IsNullOrWhiteSpace(path))
-            yield break;
-
-        foreach (var entry in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var entry in PathExecutableResolver.EnumeratePathDirectories(_getEnvironmentVariable))
         {
             if (string.Equals(Path.GetFileName(entry), "bin", StringComparison.OrdinalIgnoreCase))
                 yield return Path.Combine(Directory.GetParent(entry)?.FullName ?? entry, "Code.exe");

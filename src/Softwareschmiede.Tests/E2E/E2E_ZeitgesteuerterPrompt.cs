@@ -1,5 +1,5 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Input;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -25,9 +25,8 @@ public partial class End2EndTest
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         SetupProjectMitNeuerAufgabe(mainWindow, "ZeitgesteuertPrompt-Repo", "ZeitgesteuertPrompt-Projekt");
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.WaitForCliRunning();
 
         // Die App berechnet die Zielzeit stets aus dem heutigen Datum. Läge "jetzt + 5 Minuten" bereits am
         // nächsten Tag (kurz vor Mitternacht), wäre die daraus resultierende heutige Uhrzeit bereits vergangen,
@@ -45,29 +44,17 @@ public partial class End2EndTest
             ? zielzeitKandidat
             : new DateTime(jetzt.Year, jetzt.Month, jetzt.Day, 23, 59, 0);
 
-        var stundeBox = WaitForElement(mainWindow, cf => cf.ByName("ScheduledPromptStunde"), Short);
-        stundeBox.Click();
-        Keyboard.Type(zielzeit.Hour.ToString("00"));
-
-        var minuteBox = WaitForElement(mainWindow, cf => cf.ByName("ScheduledPromptMinute"), Short);
-        minuteBox.Click();
-        Keyboard.Type(zielzeit.Minute.ToString("00"));
-
-        var promptVorlagenBox = WaitForElement(mainWindow, cf => cf.ByName("PromptVorlagenAuswahl"), Short);
-        SelectComboBoxItemByClick(promptVorlagenBox, "Weitermachen", Short);
-
-        var sendenButton = WaitForElement(mainWindow, cf => cf.ByName("ZeitgesteuertSenden"), Short);
-        sendenButton.AsButton().Click();
+        taskDetail.SetScheduledPromptTime(zielzeit.Hour, zielzeit.Minute);
+        taskDetail.SelectPromptTemplate("Weitermachen");
 
         // Erscheint erst, sobald ScheduledPromptStatus gesetzt ist (NullOrEmptyToVisibilityConverter).
-        var statusElement = WaitForElement(mainWindow, cf => cf.ByName("ScheduledPromptStatus"), Medium);
-        Assert.NotNull(statusElement);
+        taskDetail.SendScheduledPrompt();
 
-        var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerBanner);
+        Assert.False(new ErrorView(mainWindow).IsVisible);
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
+        projectDetail.Menu.NavigateToDashboard();
     }
 }

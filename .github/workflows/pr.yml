@@ -18,7 +18,8 @@ permissions:
   checks: write
 
 jobs:
-  test:
+  validate-and-test:
+    name: validate & test
     if: github.head_ref != 'main'
     runs-on: windows-latest
     timeout-minutes: 20
@@ -33,6 +34,33 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore Softwareschmiede.slnx
+        shell: pwsh
+
+      - name: Lint and format check
+        run: dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore
+        shell: pwsh
+
+      - name: Security dependency scan
+        run: |
+          $output = dotnet list Softwareschmiede.slnx package --vulnerable --include-transitive 2>&1 | Tee-Object -Variable scanOutput
+          $scanOutput | Out-File -FilePath vulnerable-packages-scan.log -Encoding utf8
+
+          if ($scanOutput -match "has the following vulnerable packages" -or $scanOutput -match "Severity") {
+            Write-Host "::error::Verwundbare NuGet-Pakete gefunden. Siehe Scan-Ausgabe."
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Upload scan log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerable-packages-pr
+          path: vulnerable-packages-scan.log
+          retention-days: 14
+
+      - name: Static code analysis
+        run: dotnet build Softwareschmiede.slnx -c Debug --no-restore -p:TreatWarningsAsErrors=true
         shell: pwsh
 
       - name: Build (Debug)
@@ -65,50 +93,6 @@ jobs:
           path: |
             src/Softwareschmiede.Tests/TestResults/*.trx
             src/Softwareschmiede.IntegrationTests/TestResults/*.trx
-          retention-days: 14
-
-  validate:
-    if: github.head_ref != 'main'
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Restore dependencies
-        run: dotnet restore Softwareschmiede.slnx
-        shell: pwsh
-
-      - name: Lint and format check
-        run: dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore
-        shell: pwsh
-
-      - name: Security dependency scan
-        run: |
-          $output = dotnet list Softwareschmiede.slnx package --vulnerable --include-transitive 2>&1 | Tee-Object -Variable scanOutput
-          $scanOutput | Out-File -FilePath vulnerable-packages-scan.log -Encoding utf8
-
-          if ($scanOutput -match "has the following vulnerable packages" -or $scanOutput -match "Severity") {
-            Write-Host "::error::Verwundbare NuGet-Pakete gefunden. Siehe Scan-Ausgabe."
-            exit 1
-          }
-        shell: pwsh
-
-      - name: Static code analysis
-        run: dotnet build Softwareschmiede.slnx -c Debug --no-restore -p:TreatWarningsAsErrors=true
-        shell: pwsh
-
-      - name: Upload scan log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulnerable-packages-pr
-          path: vulnerable-packages-scan.log
           retention-days: 14
 
   back-merge-skip:

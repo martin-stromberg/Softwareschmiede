@@ -10,6 +10,12 @@ public interface IGitWorkspaceBrowserService
     /// <param name="ct">Cancellation Token.</param>
     Task<WorkspaceSnapshot> LoadSnapshotAsync(string repositoryPath, CancellationToken ct = default);
 
+    /// <summary>Lädt den aktuellen Workspace-Zustand für ein Repository mit einem bestimmten Basis-Branch.</summary>
+    /// <param name="repositoryPath">Pfad des lokalen Repositories.</param>
+    /// <param name="baseBranch">Optionaler Basis-Branch, gegen den die Branch-Commits ermittelt werden. Bei <c>null</c>/leer wird der Remote-Standard-Branch verwendet.</param>
+    /// <param name="ct">Cancellation Token.</param>
+    Task<WorkspaceSnapshot> LoadSnapshotAsync(string repositoryPath, string? baseBranch, CancellationToken ct = default);
+
     /// <summary>Lädt die Vorschau für eine selektierte Datei.</summary>
     /// <param name="repositoryPath">Pfad des lokalen Repositories.</param>
     /// <param name="node">Ausgewählter Dateiknoten.</param>

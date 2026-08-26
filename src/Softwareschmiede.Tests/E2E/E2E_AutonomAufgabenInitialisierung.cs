@@ -1,5 +1,6 @@
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -9,7 +10,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// Konsolidiert die im Umsetzungsplan beschriebenen Szenarien (Dialoganzeige, Branch-Namenseingabe ohne
 /// verfrühte Git-Operation, Arbeitsverzeichnis-/Repository-Klon-/Projektbranch-Erstellung beim Submit,
 /// Anzeige und Umschaltung der "Automatisierung"-Registerkarte, Sichtbarkeit der zugehörigen
-/// Ribbon-Buttons, Bereinigung der Ansicht bei erneutem Laden der Aufgabe) in einer einzigen
+/// Ribbon-Buttons, Wiederherstellen der Ansicht bei erneutem Laden der Aufgabe) in einer einzigen
 /// Testmethode mit einem gemeinsamen App-Lifecycle (siehe CLAUDE.md, Abschnitt FlaUI-Konsolidierung).
 ///
 /// Seit der UI-Integration der Autonomen Aufgabe in <c>TaskDetailView</c> (Folgeanforderung zu Issue 205)
@@ -35,9 +36,10 @@ public partial class End2EndTest
     /// vorher gestarteten LokalerKlonPfad) und legt den gewählten Projektbranch im Klon tatsächlich an. Die
     /// "Automatisierung"-Registerkarte in der Aufgaben-Detailansicht wird automatisch aktiviert und zeigt
     /// die Konfiguration an; die zugehörigen Ribbon-Buttons ("Start"/"Stop"/"Resume") werden sichtbar.
-    /// Anschließend wird die Registerkarten-Umschaltung (Info ↔ Automatisierung) sowie die Bereinigung der
-    /// Ansicht beim erneuten Laden der Aufgabe (Zurück zum Projekt und erneutes Öffnen der Aufgabe blendet
-    /// die Registerkarte wieder aus) geprüft.
+    /// Anschließend wird die Registerkarten-Umschaltung (Info ↔ Automatisierung) sowie das Wiederherstellen
+    /// der Ansicht beim erneuten Laden der Aufgabe (Zurück zum Projekt und erneutes Öffnen der Aufgabe zeigt
+    /// die Registerkarte trotz neuer TaskDetailViewModel-Instanz weiterhin an, da LadenAsync die bereits in
+    /// der DB konfigurierte Autonome Aufgabe erkennt) geprüft.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     protected async Task AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E(Window mainWindow)
@@ -49,11 +51,12 @@ public partial class End2EndTest
 
         // Vorherige Phase (CommandLineParameters) endet auf der Einstellungsseite, nicht dem Dashboard;
         // ohne explizite Rücknavigation sieht CreateProject deren "Speichern"-Button als Altlast an.
-        NavigateBackToDashboard(mainWindow);
+        mainWindow.CurrentView().ForceReset();
 
         SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, repositoryFolderName, projektName);
-        AufgabeTitelSetzen(mainWindow, aufgabeTitel);
-        AufgabeDetailSpeichern(mainWindow, false);
+        var taskDetail = new TaskDetailView(mainWindow);
+        taskDetail.SetTaskTitle(aufgabeTitel);
+        taskDetail.SaveTask();
 
         var initialisierenButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short);
         initialisierenButton.AsButton().Click();
@@ -73,7 +76,7 @@ public partial class End2EndTest
         var promptBox = WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeInitialPrompt"), Short);
         promptBox.AsTextBox().Text = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
 
-        ConfirmDialog(dialog, "AutonomAufgabeBestaetigen");
+        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().Click();
 
         // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
         // wechselt selbst zur neuen "Automatisierung"-Registerkarte, die die eingebettete
@@ -130,21 +133,19 @@ public partial class End2EndTest
         // tatsächlich auf den neuen Branch zeigt.
         Assert.Equal(neuerProjektBranch, GitCurrentBranch(tatsaechlicherRepoPfad));
 
-        // Aufgabenwechsel bereinigt die Automatisierung-Ansicht: Zurück zum Projekt und die Aufgabe erneut
-        // öffnen erzeugt eine neue TaskDetailViewModel-Instanz (AddTransient, siehe App.xaml.cs), die
-        // "Automatisierung"-Registerkarte ist danach folglich nicht mehr sichtbar. Der eigentliche
-        // Regressionsschutz für dieselbe Instanz/dieselbe AufgabeId (Cleanup ausschließlich im
-        // AufgabeId-Property-Setter, nicht in WaehleStandardAnsicht()) wird gezielt durch den Unit-Test
-        // TaskDetailViewModelTests_Automatisierung.SetzeAutonomAufgabeDetailViewAsync_BleibtErhalten_BeimErneutenLadenDerselbenAufgabe
-        // abgedeckt.
-        NavigateBackFromTaskToProject(mainWindow);
-        AufgabeAusListeOeffnen(mainWindow, aufgabeTitel);
-        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutomatisierungViewButton")));
-        Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeStartAgent")));
+        // Verlässt die Aufgabendetailansicht und öffnet sie erneut (erzeugt eine neue
+        // TaskDetailViewModel-Instanz, AddTransient, siehe App.xaml.cs), ohne den Initialisierungs-Assistenten
+        // erneut zu durchlaufen. LadenAsync erkennt anhand der in der DB bereits vorhandenen
+        // AutonomAufgabeKonfiguration (Aufgabe.IstAutonom()) trotzdem, dass die Aufgabe autonom ist, und
+        // stellt AutonomAufgabeDetailViewModel automatisch wieder her - "Automatisierung"-Registerkarte und
+        // Ribbon-Buttons bleiben dadurch nach jedem erneuten Öffnen erreichbar.
+        taskDetail = taskDetail.Reload();
+        WaitForElement(mainWindow, cf => cf.ByName("AutomatisierungViewButton"), Short);
+        WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStartAgent"), Short);
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
+        projectDetail.Menu.NavigateToDashboard();
     }
 }

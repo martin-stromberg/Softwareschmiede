@@ -1,13 +1,10 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
 /// E2E-Tests für das CommandLineParameters-Einstellungsfeld und den Hilfe-Button in der KI-Plugin-Konfiguration.
-///
-/// Konsolidierung (Issue #153): Alle drei Szenarien teilen exakt dieselbe Vorbedingung
-/// (<see cref="OpenKiSettingsWithCodexCli"/>) und laufen deshalb als Phasen in einem App-Lifecycle.
 ///
 /// CI-Regular-Lauf: dotnet test --filter "Category!=OsInterface"
 /// </summary>
@@ -23,55 +20,21 @@ public partial class End2EndTest
     {
         var expectedValue = $"--test-{Guid.NewGuid():N}";
 
-        OpenKiSettingsWithCodexCli(mainWindow);
-
-        var commandLineParametersBox = WaitForElement(mainWindow, cf => cf.ByName("CommandLineParameters"), Short);
+        var settings = new SettingsView(mainWindow).ForceShow();
+        settings.SelectDefaultKiPlugin("Codex CLI");
 
         // Wert setzen, speichern, Seite verlassen und erneut betreten - Wert bleibt erhalten
-        commandLineParametersBox.AsTextBox().Text = expectedValue;
-        SaveSettings((AutomationElement)mainWindow);
+        settings.SetCommandLineParameters(expectedValue);
+        settings.SaveSettings();
+        settings.Menu.NavigateToDashboard();
 
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
-
-        OpenKiSettingsWithCodexCli(mainWindow);
-
-        var reloadedBox = WaitForElement(mainWindow, cf => cf.ByName("CommandLineParameters"), Short);
-        Assert.Equal(expectedValue, reloadedBox.AsTextBox().Text);
+        var settingsReopened = new SettingsView(mainWindow).ForceShow();
+        settingsReopened.SelectDefaultKiPlugin("Codex CLI");
+        Assert.Equal(expectedValue, settingsReopened.GetCommandLineParameters());
 
         // Hilfe-Button öffnet Dialog, der über "Schließen" wieder geschlossen werden kann
-        var hilfeButton = WaitForElement(mainWindow, cf => cf.ByName("CliHilfeButton"), Short);
-        hilfeButton.AsButton().Click();
-
-        var hilfeDialog = WaitForWindow("Hilfe", Medium);
-
-        var schliessenButton = WaitForElement(hilfeDialog, cf => cf.ByName("Schließen"), Short);
-        schliessenButton.AsButton().Click();
-
-        WaitUntilGone(Automation.GetDesktop(), cf => cf.ByName("Hilfe").And(cf.ByControlType(ControlType.Window)), Short);
-    }
-
-    private void OpenKiSettingsWithCodexCli(AutomationElement mainWindow)
-    {
-        var einstellungenButton = WaitForElement(mainWindow, cf => cf.ByName(" Einstellungen"), Short);
-        einstellungenButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-
-        var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
-        pluginsTab.Click();
-
-        var kiPluginBox = WaitForElement(mainWindow, cf => cf.ByName("DefaultKiPlugin"), Short);
-        SelectComboBoxItemByClick(kiPluginBox, "Codex CLI", Short);
-
-        var deadline = DateTime.UtcNow + Short;
-        while (DateTime.UtcNow < deadline)
-        {
-            var selected = kiPluginBox.AsComboBox().SelectedItem?.Name;
-            if (string.Equals(selected, "Codex CLI", StringComparison.Ordinal)
-                || string.Equals(selected, "Softwareschmiede.Infrastructure.Plugins.CodexPlugin", StringComparison.Ordinal))
-                return;
-            Thread.Sleep(200);
-        }
+        var helpDialog = settingsReopened.OpenCliHelp();
+        Assert.True(helpDialog.IsVisible);
+        helpDialog.Close();
     }
 }

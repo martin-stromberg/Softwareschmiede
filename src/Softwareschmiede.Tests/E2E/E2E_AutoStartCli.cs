@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -29,45 +30,42 @@ public partial class End2EndTest
 
         SetupProjectMitNeuerAufgabe(mainWindow, "AutoStartCli-Repo", "AutoStartCli-Projekt");
 
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.WaitForCliRunning();
 
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-
-        WechsleAufgabenansicht(mainWindow, "InfoCliToggle");
+        taskDetail.SwitchPanel("InfoCliToggle");
         // Protokoll-Nachladen (Issue 193): Der GitAktion-Eintrag aus der Repository-Vorbereitung
         // wird asynchron im Hintergrund geladen und muss ohne expliziten Reload sichtbar werden.
         // AutomationProperties.Name des Protokolltyp-TextBlocks ist explizit an Typ gebunden
         // (TaskDetailView.xaml, "ProtokollTyp-{Typ}"), statt zufällig am impliziten Textinhalt.
-        WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
+        taskDetail.WaitForLogEntry("GitAktion");
 
         // CLI manuell stoppen, Gesamtstatus bleibt "Gestartet"
-        WechsleAufgabenansicht(mainWindow, "CliViewButton");
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Short);
-        stoppenButton.AsButton().Click();
-
-        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-
-        WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
+        taskDetail.SwitchPanel("CliViewButton");
+        taskDetail.StopCli();
+        Assert.True(taskDetail.IsTaskStarted());
 
         // Zurück navigieren und Aufgabe erneut öffnen (löst TaskDetailViewModel.LadenAsync neu aus)
-        AufgabeDetailZurueck(mainWindow);
+        taskDetail.GoBack();
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
-        var items = OffeneAufgabenItems(mainWindow);
+        var items = projectDetail.GetTaskElements();
         Assert.True(items.Length >= 1, "Aufgabenliste sollte die gestartete Aufgabe enthalten.");
-        ErsteOffeneAufgabeOeffnen(items);
+        var taskDetailReopened = projectDetail.OpenFirstTask();
 
         // Kein impliziter CLI-Neustart beim Laden: Stoppen bleibt weg, Starten bleibt explizit verfügbar.
-        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Short);
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+        taskDetailReopened.WaitForCliStopped();
+        taskDetailReopened.WaitForStartAvailable();
 
-        startenButton.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetailReopened.Restart();
+        taskDetailReopened.WaitForCliRunning();
 
         // Protokoll wird nach dem erneuten Öffnen erneut asynchron nachgeladen und angezeigt.
-        WechsleAufgabenansicht(mainWindow, "InfoCliToggle");
-        WaitForElement(mainWindow, cf => cf.ByName("ProtokollTyp-GitAktion"), Medium);
+        taskDetailReopened.SwitchPanel("InfoCliToggle");
+        taskDetailReopened.WaitForLogEntry("GitAktion");
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetailReopened.ForceClose(recurseToDashboard: false);
+        var projectDetailFinal = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetailFinal.DeleteProject();
     }
 }

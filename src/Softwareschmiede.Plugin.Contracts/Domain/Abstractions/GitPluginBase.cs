@@ -74,18 +74,20 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
     public virtual Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(
         string repositoryUrl,
         int maxDepth = 2,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? branchName = null)
         => throw new NotSupportedException($"'{nameof(GetRepositoryStructureAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 
     /// <inheritdoc/>
     public virtual async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(
         string repositoryUrl,
         int maxDepth = 2,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? branchName = null)
     {
         try
         {
-            var entries = await GetRepositoryStructureAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+            var entries = await GetRepositoryStructureAsync(repositoryUrl, maxDepth, ct, branchName).ConfigureAwait(false);
             return RepositoryStructureLoadResult.Success(entries);
         }
         catch (OperationCanceledException)
