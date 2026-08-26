@@ -28,7 +28,7 @@ runs:
       shell: pwsh
 
     - name: Publish
-      run: dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release -o publish/
+      run: dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release -o publish/ /p:ReleaseTag=${{ inputs.release-tag }}
       shell: pwsh
 
     - name: Rename executable for release

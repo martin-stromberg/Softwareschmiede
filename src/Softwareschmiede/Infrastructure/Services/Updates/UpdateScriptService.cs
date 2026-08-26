@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
+using Softwareschmiede.Infrastructure.Services;
 
 namespace Softwareschmiede.Infrastructure.Services.Updates;
 
@@ -115,8 +116,7 @@ public sealed class UpdateScriptService : IUpdateScriptService
         if (Path.IsPathFullyQualified(executable))
             return File.Exists(executable);
 
-        var pathEntries = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var pathEntries = PathExecutableResolver.EnumeratePathDirectories(Environment.GetEnvironmentVariable);
         var extensions = OperatingSystem.IsWindows()
             ? (Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT")
                 .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

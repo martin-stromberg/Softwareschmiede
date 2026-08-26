@@ -28,6 +28,10 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
 
     /// <inheritdoc/>
     public async Task<WorkspaceSnapshot> LoadSnapshotAsync(string repositoryPath, CancellationToken ct = default)
+        => await LoadSnapshotAsync(repositoryPath, null, ct);
+
+    /// <inheritdoc/>
+    public async Task<WorkspaceSnapshot> LoadSnapshotAsync(string repositoryPath, string? baseBranch, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryPath);
 
@@ -44,7 +48,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
             return WorkspaceSnapshot.FromError($"Pfad '{repositoryPath}' ist kein Git-Repository.");
         }
 
-        var baseReference = await ResolveBaseReferenceAsync(repositoryPath, ct);
+        var baseReference = await ResolveBaseReferenceAsync(repositoryPath, baseBranch, ct);
         var commitCount = await ReadCommitCountAsync(repositoryPath, baseReference, ct);
         var branchCommits = await ReadBranchCommitsAsync(repositoryPath, baseReference, ct);
 
@@ -501,8 +505,25 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
         return commits;
     }
 
-    private async Task<string?> ResolveBaseReferenceAsync(string repositoryPath, CancellationToken ct)
+    private async Task<string?> ResolveBaseReferenceAsync(string repositoryPath, string? baseBranch, CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(baseBranch))
+        {
+            var remoteBase = baseBranch.StartsWith("origin/", StringComparison.Ordinal)
+                ? baseBranch
+                : $"origin/{baseBranch}";
+
+            if (await ReferenceExistsAsync(repositoryPath, remoteBase, ct))
+            {
+                return remoteBase;
+            }
+
+            _logger.LogWarning(
+                "Konfigurierter Basis-Branch '{ConfiguredBaseBranch}' konnte für {RepositoryPath} nicht als 'origin/'-Referenz aufgelöst werden, versuche Fallback.",
+                baseBranch,
+                repositoryPath);
+        }
+
         var remoteHead = await _cliRunner.RunAsync(
             "git",
             ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],

@@ -27,6 +27,9 @@ public sealed class GitRepository
     /// <summary>Optionale Startkonfiguration für Repository-Startskripte.</summary>
     public RepositoryStartKonfiguration? StartKonfiguration { get; set; }
 
+    /// <summary>Optionale Konfiguration für ein nach dem Klonen automatisch ausgeführtes Initialisierungsskript.</summary>
+    public RepositoryInitialisierungKonfiguration? InitialisierungKonfiguration { get; set; }
+
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Projekt Projekt { get; set; } = null!;
 

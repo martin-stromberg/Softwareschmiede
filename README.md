@@ -77,6 +77,7 @@ Die wichtigsten Features:
 - **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
 - **Autonome Aufgaben (Projektleiter-Agent)** – vollautomatisierte Projektentwicklung: ein Projektleiter-Agent zerlegt die Aufgabe in Teilaufgaben, erzeugt und steuert Unteragenten in eigenen Branches/Klonen mit Governance-Grenzen und bereitet Pull Requests vor; Initialisierungsdialog mit auswählbarem Projektbranch (Dropdown der Remote-Branches mit „+"-Button zur Branch-Neuanlage, Fallback auf freie Texteingabe), auswählbarer Promptvorlage für den Initialprompt, Token-Budget/Laufzeitlimit/Persistenz-Modus/Skill-Autogeneration und Hilfe-Button mit Ablauferklärung
 - **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
+- **Repository-Initialisierungsskripte** – Pro Projekt kann ein optionales Skript konfiguriert werden, das nach dem Klonen eines Repositorys automatisch ausgeführt wird (z. B. Git-Hooks, Build-Tools, Umgebungsvariablen-Setup); die Auswahl-ComboBox filtert die Vorschlagsliste live beim Tippen; die Vorschlagsliste wird aus dem konfigurierten Basis-Branch geladen (falls gesetzt), sonst aus dem Remote-Standard-Branch; Fehler werden geloggt, blockieren aber nicht die Aufgabe
 - **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
 - **Programmupdate** – Update-Prüfung gegen GitHub-Releases direkt aus der Anwendung
 
@@ -801,6 +802,7 @@ Versionsstände werden automatisiert per Semantic Release aus Conventional Commi
 | [E2E-Test View-Pattern](src/Softwareschmiede.Tests/E2E/Views/) | Strukturierte WPF-UI-Interaktion über FlaUI mit View-Klassen-Hierarchie (Klassen unter `Views/`) |
 | [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
 | [Basis-Branch-Konfiguration](docs/help/projekte/basis-branch-konfiguration.md) | Konfiguration eines Basis-Branches pro Repository für Feature-Branch-Erstellung und Pull-Request-Ziele |
+| [Initialisierungsskript-Konfiguration](docs/help/projekte/initialisierungsskript-konfiguration.md) | Konfiguration eines optionalen Initialisierungsskripts pro Repository, das nach dem Klonen automatisch ausgeführt wird |
 | [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
 | [Autonome Aufgaben](docs/help/aufgaben/autonome-aufgaben/index.md) | Projektleiter-Agent-basierte Automatisierung mit Unteragenten-Orchestrierung, Session-Management, Governance-Enforcement und Skills-Lifecycle |
 | [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |

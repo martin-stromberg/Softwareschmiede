@@ -23,6 +23,17 @@ Der separate Workflow `.github/workflows/test.yml` laeuft fuer Pull Requests nac
 
 Die Trennung ersetzt den frueheren Ausschluss ueber `Category!=E2E&Category!=ConPTY`. E2E- und ConPTY-Tests behalten diese Kategorien, tragen aber zusaetzlich `OsInterface`.
 
+### Staging-PR-Workflow
+
+Der Workflow `.github/workflows/pr.yml` laeuft fuer Pull Requests nach `staging` und zeigt fuer regulaere Feature-PRs einen gemeinsamen Job `validate & test`. Dieser Job fuehrt zuerst die Qualitaetspruefungen aus und startet die Tests erst danach:
+
+- `Lint and format check` prueft `dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore`.
+- `Security dependency scan` prueft verwundbare NuGet-Pakete inklusive transitiver Abhaengigkeiten und laedt das Scan-Log als `vulnerable-packages-pr` hoch.
+- `Static code analysis` baut die Solution mit `TreatWarningsAsErrors=true`.
+- Danach laufen die regulaeren Tests blockierend mit `Category!=OsInterface`; `Category=OsInterface` laeuft weiterhin best-effort mit `continue-on-error: true`.
+
+Pull Requests von `main` nach `staging` werden weiterhin ueber `back-merge-skip` erkannt; der kombinierte Validierungs-/Testjob wird fuer diesen Sonderfall uebersprungen.
+
 ### Job `release` (Push auf `main`)
 
 | # | Step | Zweck |

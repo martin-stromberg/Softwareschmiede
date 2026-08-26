@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Softwareschmiede.Infrastructure.Data;
 
@@ -10,9 +11,11 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Migrations
 {
     [DbContext(typeof(SoftwareschmiededDbContext))]
-    partial class SoftwareschmiededDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260823091609_AddRepositoryInitialisierungKonfiguration")]
+    partial class AddRepositoryInitialisierungKonfiguration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -128,10 +131,6 @@ namespace Softwareschmiede.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasDefaultValue("NichtGestartet");
-
-                    b.Property<string>("BasisBranchName")
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("BranchName")
                         .HasColumnType("TEXT");
