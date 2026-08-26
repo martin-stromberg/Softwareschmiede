@@ -96,10 +96,10 @@ public static class WindowExtensions
                     _ = w.Name;
                     return true;
                 }
-                catch(FlaUI.Core.Exceptions.PropertyNotSupportedException)
+                catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
                 {
                     return false;
-                }                
+                }
             })
             .Select(w => w.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
