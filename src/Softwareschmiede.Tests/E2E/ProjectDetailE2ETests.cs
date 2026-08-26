@@ -1,8 +1,9 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -16,9 +17,9 @@ namespace Softwareschmiede.Tests.E2E;
 /// Konsolidierung (Issue #153): <see cref="ProjektDetailSzenarien"/> führt alle sechs Szenarien
 /// (Navigation, Bearbeiten, Aufgaben/Filtern, Repository-Dialog, Offene/beendete Aufgaben-Trennung,
 /// Löschen) als aufeinanderfolgende Phasen in einem gemeinsamen App-Lifecycle aus. Jede Phase räumt ihr
-/// Projekt über <see cref="WpfTestBase.DeleteCurrentProject"/> auf und kehrt über
-/// <see cref="WpfTestBase.NavigateBackToDashboard"/> zum Dashboard zurück, bevor die nächste Phase mit
-/// <see cref="WpfTestBase.NavigateToProjects"/> neu beginnt - ein erneuter Klick auf " Projekte" direkt
+/// Projekt über <see cref="ProjectDetailView.DeleteProject"/> auf und kehrt über
+/// <see cref="MenuView.NavigateToDashboard"/> zum Dashboard zurück, bevor die nächste Phase mit
+/// <see cref="MenuView.NavigateToProjects"/> neu beginnt - ein erneuter Klick auf " Projekte" direkt
 /// aus einer bereits geöffneten Projektdetailansicht heraus navigiert nicht zuverlässig zur Übersicht,
 /// sondern bleibt in der zuletzt geöffneten Projektansicht (daher immer zuerst zurück zum Dashboard).
 ///
@@ -56,38 +57,42 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Projektkachel nach dem finalen "Zurück".
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E(AutomationElement mainWindow)
+    private void ProjektNavigation_NeuanlageAbbrechenUndOeffnenUndSchliessen_E2E(Window mainWindow)
     {
-        NavigateToProjects(mainWindow);
+        var projectList = new ProjectListView(mainWindow).ForceShow();
 
         // Erstes Projekt anlegen
-        CreateProject(mainWindow, "Bestehendes-Projekt");
+        projectList.CreateProject("Bestehendes-Projekt");
 
-        // Neuanlage starten und über Zurück abbrechen
+        // Neuanlage starten und über Zurück abbrechen (kein Speichern, direkter ForceClose reicht als "Abbrechen")
         var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
         neuButton.AsButton().Click();
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
-        ZurueckZurProjektuebersicht(mainWindow);
+        // ForceClose(false) gibt laut Vertrag stets die ursprüngliche Instanz zurück (siehe
+        // BaseWindowView.ForceClose), nicht die tatsächlich erreichte Ansicht - deshalb wird der
+        // Rückgabewert verworfen und CurrentView() danach erneut abgefragt.
+        new ProjectDetailView(mainWindow).ForceClose(recurseToDashboard: false);
+        var projectListAfterCancel = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
 
         // Erstes Projekt ist noch in der Liste und aufrufbar
-        OpenProject(mainWindow, "Bestehendes-Projekt");
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        var projectDetail = projectListAfterCancel.OpenProject("Bestehendes-Projekt");
+        Assert.True(projectDetail.IsVisible);
 
         // Zurück zur Übersicht, Projekt erneut öffnen
-        ZurueckZurProjektuebersicht(mainWindow);
-
-        OpenProject(mainWindow, "Bestehendes-Projekt");
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        projectDetail.ForceClose(recurseToDashboard: false);
+        var projectListErneut = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
+        var projectDetailErneut = projectListErneut.OpenProject("Bestehendes-Projekt");
+        Assert.True(projectDetailErneut.IsVisible);
 
         // Zurück zur Übersicht
-        ZurueckZurProjektuebersicht(mainWindow);
+        projectDetailErneut.ForceClose(recurseToDashboard: false);
+        var projectListFinal = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
+        Assert.True(projectListFinal.ProjectExists("Bestehendes-Projekt"));
 
-        WaitForElement(mainWindow, cf => cf.ByName("Bestehendes-Projekt"), Short);
-
-        OpenProject(mainWindow, "Bestehendes-Projekt");
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        var projectDetailToDelete = projectListFinal.OpenProject("Bestehendes-Projekt");
+        var projectListAfterDelete = projectDetailToDelete.DeleteProject();
+        projectListAfterDelete.Menu.NavigateToDashboard();
     }
 
     /// <summary>
@@ -97,31 +102,30 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// erneute Bearbeitung (UpdateAsync-Pfad) hält den aktualisierten Namen im Textfeld.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E(AutomationElement mainWindow)
+    private void ProjektBearbeiten_NamenAendernSpeichernZurueckUndErneutBearbeiten_E2E(Window mainWindow)
     {
-        NavigateToProjects(mainWindow);
-        CreateAndOpenProject(mainWindow, "Umbenennen-Test");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        projectList.CreateProject("Umbenennen-Test");
+        var projectDetail = projectList.OpenProject("Umbenennen-Test");
 
-        ProjektNamenAendernUndSpeichern(mainWindow, "Umbenennen-Test-Aktualisiert");
+        projectDetail.SetProjectName("Umbenennen-Test-Aktualisiert");
+        projectDetail.SaveChanges();
 
-        // Zurück zur Übersicht navigieren
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
+        // Zurück zur Übersicht navigieren; Projektkachel zeigt jetzt den neuen Namen
+        projectDetail.ForceClose(recurseToDashboard: false);
+        var projectListAfterRename = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
+        Assert.True(projectListAfterRename.ProjectExists("Umbenennen-Test-Aktualisiert"));
 
-        // Projektkachel zeigt jetzt den neuen Namen
-        var aktualisierteKachel = WaitForElement(mainWindow, cf => cf.ByName("Umbenennen-Test-Aktualisiert"), Short);
-
-        // Kachel erneut anklicken → Detailansicht öffnet sich
-        aktualisierteKachel.Click();
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
+        // Kachel erneut öffnen → Detailansicht öffnet sich
+        var projectDetailReopened = projectListAfterRename.OpenProject("Umbenennen-Test-Aktualisiert");
 
         // Erneut bearbeiten und speichern (UpdateAsync-Pfad); Name bleibt aktualisiert
-        ProjektNamenAendernUndSpeichern(mainWindow, "Umbenennen-Test-Aktualisiert-Erneut");
-        var nameBoxNachReload = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        Assert.Equal("Umbenennen-Test-Aktualisiert-Erneut", nameBoxNachReload.AsTextBox().Text);
+        projectDetailReopened.SetProjectName("Umbenennen-Test-Aktualisiert-Erneut");
+        projectDetailReopened.SaveChanges();
+        Assert.Equal("Umbenennen-Test-Aktualisiert-Erneut", projectDetailReopened.GetProjectName());
 
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        var projectListFinal = projectDetailReopened.DeleteProject();
+        projectListFinal.Menu.NavigateToDashboard();
     }
 
     /// <summary>
@@ -129,12 +133,13 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Prüft: Bestätigungsdialog erscheint, Löschen schließt das Overlay.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E(AutomationElement mainWindow)
+    private void ProjektLoeschen_BestaetigungErforderlichUndOverlayGeschlossen_E2E(Window mainWindow)
     {
-        NavigateToProjects(mainWindow);
-        CreateAndOpenProject(mainWindow, "Loeschen-Test");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        projectList.CreateProject("Loeschen-Test");
+        var projectDetail = projectList.OpenProject("Loeschen-Test");
 
-        DeleteCurrentProject(mainWindow);
+        projectDetail.DeleteProject();
     }
 
     /// <summary>
@@ -142,7 +147,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// Prueft: Offene Aufgaben sind direkt sichtbar, beendete Aufgaben erst nach Aufklappen des Expanders.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private async Task Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E(AutomationElement mainWindow)
+    private async Task Projektdetailansicht_TrenntOffeneUndBeendeteAufgaben_E2E(Window mainWindow)
     {
         var projektName = "Archivierte-Aufgaben-E2E";
         var offeneAufgabeTitel = "Offene Aufgabe E2E";
@@ -159,25 +164,20 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
             await aufgabeService.StatusSetzenAsync(beendeteAufgabe.Id, AufgabeStatus.Beendet);
         }
 
-        NavigateToProjects(mainWindow);
-        OpenProject(mainWindow, projektName);
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        var projectDetail = projectList.OpenProject(projektName);
 
-        var offeneItems = OffeneAufgabenItems(mainWindow);
+        var offeneItems = projectDetail.GetTaskElements();
         Assert.Contains(offeneItems, item => item.Name == offeneAufgabeTitel);
         Assert.DoesNotContain(offeneItems, item => item.Name == beendeteAufgabeTitel);
 
-        var beendeteAufgabenExpander = WaitForElement(mainWindow, cf => cf.ByName("BeendeteAufgabenExpander"), Short);
-        Assert.Equal(ExpandCollapseState.Collapsed, beendeteAufgabenExpander.Patterns.ExpandCollapse.Pattern.ExpandCollapseState);
+        Assert.True(projectDetail.IsFinishedTasksExpanderCollapsed());
 
-        beendeteAufgabenExpander.Patterns.ExpandCollapse.Pattern.Expand();
-
-        var beendeteAufgabenListe = WaitForElement(beendeteAufgabenExpander, cf => cf.ByName("BeendeteAufgabenListe"), Short);
-
-        var beendeteItems = beendeteAufgabenListe.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem));
+        var beendeteItems = projectDetail.ExpandAndGetFinishedTasks();
         Assert.Contains(beendeteItems, item => item.Name == beendeteAufgabeTitel);
 
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        var projectListAfterDelete = projectDetail.DeleteProject();
+        projectListAfterDelete.Menu.NavigateToDashboard();
     }
 
     /// <summary>
@@ -188,43 +188,30 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// und schließt sich korrekt.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E(AutomationElement mainWindow)
+    private void AufgabenInProjektdetail_NeuAnlegenUndFiltern_E2E(Window mainWindow)
     {
-        NavigateToProjects(mainWindow);
-        CreateAndOpenProject(mainWindow, "Aufgabe-Test");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        projectList.CreateProject("Aufgabe-Test");
+        var projectDetail = projectList.OpenProject("Aufgabe-Test");
 
         // Neue Aufgabe erstellen; Navigation zur separaten TaskDetailView (Edit-Panel, da Status == Neu)
-        NeueAufgabeAnlegen(mainWindow);
+        var taskDetail = projectDetail.CreateTask();
 
         // Zurück zur Projektdetailansicht navigieren
-        AufgabeDetailZurueck(mainWindow);
+        taskDetail.GoBack();
+        var projectDetailAfterCreate = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Aufgabenliste enthält jetzt mindestens eine Aufgabe
-        var items = OffeneAufgabenItems(mainWindow);
+        var items = projectDetailAfterCreate.GetTaskElements();
         Assert.True(items.Length >= 1, "Aufgabenliste sollte nach Anlage mindestens eine Aufgabe enthalten.");
 
-        // Filter-Overlay öffnen
-        var filterButton = WaitForElement(mainWindow, cf => cf.ByName("Filter"), Short);
-        filterButton.AsButton().Click();
+        // Filter-Overlay öffnen, RadioButton "Aktiv" wählen, Overlay wieder schließen
+        projectDetailAfterCreate.OpenFilter();
+        projectDetailAfterCreate.SelectFilterOption("Aktiv");
+        projectDetailAfterCreate.CloseFilter();
 
-        // Überschrift "Aufgaben filtern" erscheint
-        WaitForElement(mainWindow, cf => cf.ByName("Aufgaben filtern"), Short);
-
-        // RadioButton "Aktiv" wählen
-        var aktivRadio = WaitForElement(
-            mainWindow,
-            cf => cf.ByName("Aktiv").And(cf.ByControlType(ControlType.RadioButton)),
-            Short);
-        aktivRadio.Click();
-
-        // Filter-Overlay wieder schließen
-        filterButton.Click();
-
-        // Overlay weg
-        WaitUntilGone(mainWindow, cf => cf.ByName("Aufgaben filtern"), Short);
-
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        var projectListAfterDelete = projectDetailAfterCreate.DeleteProject();
+        projectListAfterDelete.Menu.NavigateToDashboard();
     }
 
     /// <summary>
@@ -236,48 +223,28 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
     /// ausgeblendet); nach "Abbrechen" bleibt das Hauptfenster-Overlay ("Speichern") weiterhin sichtbar.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem diese Phase ausgeführt wird.</param>
-    private void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(AutomationElement mainWindow)
+    private void RepositoryDialog_OeffnenButtonZuweisenPluginUndArbeitsverzeichnis_E2E(Window mainWindow)
     {
-        NavigateToProjects(mainWindow);
-        CreateAndOpenProject(mainWindow, "Repository-Dialog-Test");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        projectList.CreateProject("Repository-Dialog-Test");
+        var projectDetail = projectList.OpenProject("Repository-Dialog-Test");
 
-        WaitForElement(mainWindow, cf => cf.ByName("Öffnen"), Short);
+        Assert.True(projectDetail.HasOpenButton());
 
-        // "Zuweisen"-Button im Ribbon klicken
-        var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
+        var dialog = new RepositoryAssignDialogView(mainWindow).ForceShow();
 
-        // RepositoryAssignDialog erscheint als separates Fenster
-        var dialog = WaitForWindow("Repository zuweisen", Short);
+        // Label "Arbeitsverzeichnis im Repository" ist vorhanden. Die ComboBox für die
+        // Arbeitsverzeichnis-Auswahl ist vorhanden. Die Plugin-Auswahl-ComboBox wird nur angezeigt,
+        // wenn mehrere SCM-Plugins aktiv sind (hier nur LocalDirectoryPlugin).
+        Assert.True(dialog.HasWorkingDirectoryLabel());
+        Assert.True(dialog.HasWorkingDirectoryComboBox());
 
-        // Label "Arbeitsverzeichnis im Repository" ist vorhanden
-        WaitForElement(dialog, cf => cf.ByName("Arbeitsverzeichnis im Repository"), Short);
-
-        // ComboBox für die Arbeitsverzeichnis-Auswahl ist vorhanden. Die Plugin-Auswahl-ComboBox
-        // wird nur angezeigt, wenn mehrere SCM-Plugins aktiv sind (hier nur LocalDirectoryPlugin).
-        WaitForElement(dialog, cf => cf.ByName("ArbeitsverzeichnisComboBox"), Short);
-
-        // Dialog über "Abbrechen" schließen
-        var abbrechenButton = WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short);
-        abbrechenButton.AsButton().Click();
+        dialog.Cancel();
 
         // Hauptfenster-Overlay noch offen (Speichern-Button sichtbar)
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
+        Assert.True(projectDetail.IsVisible);
 
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
-    }
-
-    /// <summary>
-    /// Klickt den "Zurück"-Button in der Projektdetailansicht und wartet auf das Verschwinden des
-    /// "Speichern"-Buttons (Bestätigung, dass das Overlay geschlossen und die Übersicht wieder sichtbar ist).
-    /// </summary>
-    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    private void ZurueckZurProjektuebersicht(AutomationElement mainWindow)
-    {
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
-
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
+        var projectListAfterDelete = projectDetail.DeleteProject();
+        projectListAfterDelete.Menu.NavigateToDashboard();
     }
 }

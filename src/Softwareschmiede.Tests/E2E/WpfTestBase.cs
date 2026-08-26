@@ -32,7 +32,7 @@ public abstract class WpfTestBase : IDisposable
     protected static readonly TimeSpan Medium = ElementWaitHelper.Medium;
 
     /// <summary>Langes Timeout (30s), z. B. für das initiale Erscheinen des Hauptfensters.</summary>
-    protected static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
+    protected static readonly TimeSpan Long = ElementWaitHelper.Long;
 
     /// <summary>
     /// Credential-Schlüssel, die von E2E-Tests direkt oder indirekt (über die UI) im OS-weiten
@@ -446,33 +446,11 @@ public abstract class WpfTestBase : IDisposable
     /// FlaUI's <c>Select(string)</c>, das bei manchen TwoWay-Bindings das Binding nicht zuverlässig aktualisiert).
     /// </summary>
     protected static void SelectComboBoxItemByClick(AutomationElement comboBoxElement, string itemText, TimeSpan timeout)
-    {
-        var comboBox = comboBoxElement.AsComboBox();
-        comboBox.Click();
-        Thread.Sleep(300);
-
-        var item = WaitForElement(comboBoxElement, cf => cf.ByName(itemText), timeout);
-        item.Click();
-        Thread.Sleep(200);
-    }
+        => ElementWaitHelper.SelectComboBoxItemByClick(comboBoxElement, itemText, timeout);
 
     /// <summary>Wartet, bis eine ComboBox den erwarteten selektierten Eintrag anzeigt.</summary>
     protected static void WaitForSelectedComboBoxItem(AutomationElement comboBoxElement, string expectedItemText, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        string? selectedItemName = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            selectedItemName = comboBoxElement.AsComboBox().SelectedItem?.Name;
-            if (string.Equals(selectedItemName, expectedItemText, StringComparison.Ordinal))
-                return;
-
-            Thread.Sleep(200);
-        }
-
-        throw new TimeoutException(
-            $"ComboBox zeigte nicht innerhalb von {timeout.TotalSeconds}s den erwarteten Eintrag '{expectedItemText}'. Aktuell: '{selectedItemName}'.");
-    }
+        => ElementWaitHelper.WaitForSelectedComboBoxItem(comboBoxElement, expectedItemText, timeout);
 
     /// <summary>
     /// Erstellt ein temporäres lokales Quellverzeichnis mit einem Unterordner (simuliertes Repository)
@@ -705,7 +683,8 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>
     /// Klickt den "Starten"-Button und bedient den anschließend erscheinenden Plugin-Auswahl-Dialog:
     /// wählt das angegebene KI-Plugin aus, setzt optional die "FuerProjektVerwenden"-Checkbox
-    /// (Projekt-Standard speichern) und bestätigt mit "OK".
+    /// (Projekt-Standard speichern) und bestätigt mit "OK". Delegiert an
+    /// <see cref="Views.TaskDetailView.Start"/>.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
@@ -713,23 +692,7 @@ public abstract class WpfTestBase : IDisposable
     /// "FuerProjektVerwenden"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard
     /// gespeichert wird.</param>
     protected void StartenUndPluginWaehlen(AutomationElement mainWindow, string pluginName, bool fuerProjektVerwenden = false)
-    {
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
-        startenButton.AsButton().Click();
-
-        var dialog = WaitForWindow("KI-Plugin auswählen", Medium);
-        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
-        SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
-
-        if (fuerProjektVerwenden)
-        {
-            var checkbox = WaitForElement(dialog, cf => cf.ByName("FuerProjektVerwenden"), Short);
-            checkbox.AsCheckBox().IsChecked = true;
-        }
-
-        var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);
-        okButton.AsButton().Click();
-    }
+        => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).Start(pluginName, fuerProjektVerwenden);
 
     private static string ResolveAppExePath()
     {

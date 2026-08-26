@@ -5,6 +5,8 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -35,8 +37,9 @@ public partial class End2EndTest
         var aufgabeTitel = $"Autonome Exec-Aufgabe {Guid.NewGuid():N}"[..40];
 
         SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, repositoryFolderName, projektName);
-        AufgabeTitelSetzen(mainWindow, aufgabeTitel);
-        AufgabeDetailSpeichern(mainWindow, false);
+        var taskDetail = new TaskDetailView(mainWindow);
+        taskDetail.SetTaskTitle(aufgabeTitel);
+        taskDetail.SaveTask();
 
         var quellVerzeichnis = CreateLocalSourceDirectory("autonom-exec-quelle");
         var quellRepoPfad = Path.Combine(quellVerzeichnis, "autonom-exec-quelle");
@@ -49,19 +52,12 @@ public partial class End2EndTest
             aufgabeId = aufgabe.Id;
         }
 
-        var initialisierenButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short);
-        initialisierenButton.AsButton().Click();
-
-        var initDialog = WaitForWindow("Autonome Aufgabe initialisieren", Medium);
-        var promptBox = WaitForElement(initDialog, cf => cf.ByName("AutonomAufgabeInitialPrompt"), Short);
-        promptBox.AsTextBox().Text = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
-        ConfirmDialog(initDialog, "AutonomAufgabeBestaetigen");
-
-        var detailFenster = WaitForWindow("Autonome Aufgabe", Long);
+        var initDialog = new AutonomAufgabeInitialisierungsDialogView(mainWindow).ForceShow();
+        initDialog.SetInitialPrompt("Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.");
+        var detailDialog = initDialog.Confirm();
 
         // Phase 1: Projektleiter-Agent-Start über echte UI-Interaktion.
-        var startButton = WaitForElement(detailFenster, cf => cf.ByName("AutonomAufgabeStart"), Long);
-        startButton.AsButton().Click();
+        detailDialog.Start();
 
         await WartenBisAsync(async () =>
         {
@@ -75,7 +71,7 @@ public partial class End2EndTest
             var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
             var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
             Assert.False(string.IsNullOrWhiteSpace(konfiguration.ProjektleiterAgentId), "Projektleiter-Agent wurde nicht gestartet.");
-            Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
+            Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
         }
 
         // Phase 2: Unteragenten-Erzeugung (Projektleiter-Agent-intern, kein UI-Auslöser) — direkt über
@@ -148,8 +144,7 @@ public partial class End2EndTest
         // Instanz mit dem alten Wert zurück) — ein reines Testaufbau-Artefakt der Kombination aus
         // In-Process-UI und Out-of-Process-DB-Seeding, keine Auswirkung auf reales Anwendungsverhalten,
         // bei dem Pause und Resume im selben Anwendungsprozess laufen.
-        var resumeButton = WaitForElement(detailFenster, cf => cf.ByName("AutonomAufgabeResume"), Short);
-        Assert.NotNull(resumeButton);
+        Assert.True(detailDialog.HasResumeButton());
 
         await using (var db = OpenTestDbContext())
         {
@@ -163,15 +158,16 @@ public partial class End2EndTest
             var aufgabe = await db.Aufgaben.FirstAsync(a => a.Id == aufgabeId);
             var konfiguration = await db.AutonomAufgabeKonfigurationen.FirstAsync(k => k.AufgabeId == aufgabeId);
             Assert.Null(konfiguration.SessionPauseUtc);
-            Assert.Equal(Softwareschmiede.Domain.Enums.AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
+            Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, aufgabe.AusfuehrungsStatus);
             Assert.False(string.IsNullOrWhiteSpace(aufgabe.VorschlagPrompt), "Weitermachen-Prompt wurde nicht gesetzt.");
         }
 
-        detailFenster.AsWindow().Close();
+        detailDialog.Close();
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
-        NavigateBackToDashboard(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
+        projectDetail.Menu.NavigateToDashboard();
     }
 
     private static async Task WartenBisAsync(Func<Task<bool>> bedingung, int maxVersuche = 150)

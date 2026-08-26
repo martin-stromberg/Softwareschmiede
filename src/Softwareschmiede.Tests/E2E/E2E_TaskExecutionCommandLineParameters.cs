@@ -1,4 +1,6 @@
+using FlaUI.Core.AutomationElements;
 using Softwareschmiede.Infrastructure.Services;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -14,7 +16,7 @@ public partial class End2EndTest
     /// Speichert CommandLineParameters für das Codex-Plugin im Credential Store, startet dann eine
     /// Aufgabe mit dem KI Simulator und prüft, dass die Aufgabe trotzdem korrekt startet.
     /// </summary>
-    protected void AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E(FlaUI.Core.AutomationElements.Window mainWindow)
+    protected void AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E(Window mainWindow)
     {
         var credentialStore = new WindowsCredentialStore();
         var backup = credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters");
@@ -29,12 +31,12 @@ public partial class End2EndTest
                 "CmdParamsRegressionRepo",
                 "CmdParams-Regressions-Projekt");
 
-            StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+            var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+            taskDetail.WaitForCliRunning();
 
-            var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-            Assert.NotNull(stoppenButton);
-            NavigateBackFromTaskToProject(mainWindow);
-            DeleteCurrentProject(mainWindow);
+            taskDetail.ForceClose(recurseToDashboard: false);
+            var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+            projectDetail.DeleteProject();
         }
         finally
         {

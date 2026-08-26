@@ -37,6 +37,7 @@
             <StackPanel>
                 <!-- Projektkacheln -->
                 <ItemsControl ItemsSource="{Binding Projekte}"
+                              AutomationProperties.AutomationId="ProjektKachelnListe"
                               Margin="24,24,24,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>

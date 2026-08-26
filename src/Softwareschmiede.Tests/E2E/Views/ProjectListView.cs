@@ -1,6 +1,5 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using FlaUI.Core.Input;
 
 namespace Softwareschmiede.Tests.E2E.Views;
 
@@ -35,15 +34,22 @@ public sealed class ProjectListView : BaseWindowView
     }
 
     /// <summary>
-    /// Sucht Projekt-Kacheln anhand ihrer Titel-Textelemente. Projektkacheln haben keine eigene
-    /// Automation-Id; als Heuristik werden alle Text-Elemente zurückgegeben, deren Name nicht zu den
-    /// bekannten statischen Beschriftungen dieser Ansicht gehört (Projekttitel und -beschreibung).
+    /// Sucht Projekt-Kacheln anhand ihrer Titel-Textelemente, beschränkt auf den Projektkacheln-Container
+    /// ("ProjektKachelnListe"). Eine ungezielte Suche über das gesamte Fenster würde auch gleichnamige
+    /// Text-Elemente aus der Seitenleiste treffen - z. B. den Aufgabentitel einer aktiven Aufgabe in
+    /// "Aktive Aufgaben", der standardmäßig mit dem Projektnamen vorbelegt ist (siehe
+    /// <see cref="OpenProject"/>).
     /// </summary>
     /// <returns>Die gefundenen Projekt-Kachel-Textelemente.</returns>
     public AutomationElement[] GetProjectElements()
-        => Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
+        => GetProjectTilesContainer()
+            .FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
             .Where(e => !string.IsNullOrWhiteSpace(e.Name) && !StaticLabels.Contains(e.Name))
             .ToArray();
+
+    /// <returns>Der Container-Element der Projektkacheln-Liste (AutomationId "ProjektKachelnListe").</returns>
+    private AutomationElement GetProjectTilesContainer()
+        => WaitForElement(Window, cf => cf.ByAutomationId("ProjektKachelnListe"), Short);
 
     /// <summary>
     /// Erstellt ein neues Projekt über den "Neu"-Button und speichert es. Bildet dieselbe fachliche
@@ -64,15 +70,32 @@ public sealed class ProjectListView : BaseWindowView
     {
         WaitForElement(Window, cf => cf.ByName("Neu"), Short).AsButton().Click();
 
-        var nameBox = WaitForElement(Window, cf => cf.ByName("ProjektName"), Short);
-        nameBox.Click();
-        Keyboard.Type(name);
+        var projectView = new ProjectDetailView(Window);
+        Assert.True(projectView.IsVisible, "Projekt-Detailansicht sollte nach Klick auf 'Neu' sichtbar sein.");
+        projectView.SetProjectName(name);
+        projectView.SaveChanges();
 
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().Click();
-        WaitUntilGone(Window, cf => cf.ByName("Speichern"), Medium);
-        WaitForElement(Window, cf => cf.ByName(name), Medium);
-
+        Assert.True(IsVisible, "Projektlisten-Ansicht sollte nach Speichern des neuen Projekts sichtbar sein.");
+        Assert.Contains(name, GetProjectNames());
         return this;
+    }
+
+    /// <summary>
+    /// Ruft die Namen aller Projekte in der Projektliste ab.
+    /// </summary>
+    /// <returns>Ein Array der Projektnamen.</returns>
+    public string[] GetProjectNames()
+    {
+        return GetProjectElements().Select(e => e.Name).ToArray();
+    }
+    /// <summary>
+    /// Überprüft, ob ein Projekt mit dem angegebenen Namen in der Projektliste existiert.
+    /// </summary>
+    /// <param name="name">Der Projektname.</param>
+    /// <returns>True, wenn das Projekt existiert, andernfalls False.</returns>
+    public bool ProjectExists(string name)
+    {
+        return GetProjectNames().Contains(name);
     }
 
     /// <summary>
@@ -80,11 +103,17 @@ public sealed class ProjectListView : BaseWindowView
     /// Warte-Sequenz wie <see cref="Softwareschmiede.Tests.E2E.WpfTestBase.OpenProject"/> ab - siehe
     /// Begründung der bewussten Rest-Duplikation in <see cref="CreateProject"/>.
     /// </summary>
+    /// <remarks>
+    /// Die Suche ist bewusst auf den Projektkacheln-Container beschränkt (statt das gesamte Fenster zu
+    /// durchsuchen): Eine ungezielte Namenssuche würde bei gleichlautendem Projekt- und Aufgabentitel
+    /// auch den entsprechenden Eintrag in der Seitenleiste ("Aktive Aufgaben") treffen - der Aufgabentitel
+    /// ist standardmäßig mit dem Projektnamen vorbelegt, solange er nicht explizit geändert wurde.
+    /// </remarks>
     /// <param name="name">Der Projektname.</param>
     /// <returns>Die Projektdetailansicht des geöffneten Projekts.</returns>
     public ProjectDetailView OpenProject(string name)
     {
-        WaitForElement(Window, cf => cf.ByName(name), Short).Click();
+        WaitForElement(GetProjectTilesContainer(), cf => cf.ByName(name), Short).Click();
         WaitForElement(Window, cf => cf.ByName("Speichern"), Medium);
 
         return new ProjectDetailView(Window);

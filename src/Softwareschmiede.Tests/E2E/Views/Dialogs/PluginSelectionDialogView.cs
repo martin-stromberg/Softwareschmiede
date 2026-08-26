@@ -25,4 +25,40 @@ public sealed class PluginSelectionDialogView : DialogView
 
         return this;
     }
+
+    /// <summary>
+    /// Wählt das angegebene KI-Plugin in der "PluginAuswahl"-ComboBox aus und setzt optional die
+    /// "FuerProjektVerwenden"-Checkbox (Projekt-Standard speichern).
+    /// </summary>
+    /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
+    /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird die "FuerProjektVerwenden"-Checkbox gesetzt.</param>
+    /// <returns>Diese Instanz.</returns>
+    public PluginSelectionDialogView SelectPlugin(string pluginName, bool fuerProjektVerwenden = false)
+    {
+        var dialog = GetDialogWindow();
+        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
+        SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
+
+        if (fuerProjektVerwenden)
+        {
+            var checkbox = WaitForElement(dialog, cf => cf.ByName("FuerProjektVerwenden"), Short);
+            checkbox.AsCheckBox().IsChecked = true;
+        }
+
+        return this;
+    }
+
+    /// <summary>Bestätigt den Dialog über den "OK"-Button.</summary>
+    public void Confirm()
+    {
+        var dialog = GetDialogWindow();
+        WaitForElement(dialog, cf => cf.ByName("OK"), Short).AsButton().Click();
+    }
+
+    /// <summary>Bricht den Dialog über den "Abbrechen"-Button ab, ohne ein Plugin zu übernehmen.</summary>
+    public void Cancel()
+    {
+        var dialog = GetDialogWindow();
+        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().Click();
+    }
 }

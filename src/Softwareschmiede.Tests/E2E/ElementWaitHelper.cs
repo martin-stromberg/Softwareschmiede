@@ -29,6 +29,9 @@ internal static class ElementWaitHelper
     /// <summary>Mittleres Timeout (15s) für UI-Elemente nach asynchronen Operationen.</summary>
     internal static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
 
+    /// <summary>Langes Timeout (30s), z. B. für aufwendige Hintergrundoperationen wie Arbeitsverzeichnis-/Repository-Vorbereitung.</summary>
+    internal static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
+
     /// <summary>
     /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> gefunden wird, das zusätzlich
     /// <paramref name="isVisible"/> erfüllt (Standard: jedes gefundene Element gilt als sichtbar).
@@ -122,6 +125,51 @@ internal static class ElementWaitHelper
         }
 
         return element;
+    }
+
+    /// <summary>
+    /// Wählt einen Eintrag in einer ComboBox per Klick auf das ComboBoxItem aus (robuster als FlaUI's
+    /// <c>Select(string)</c>, das bei manchen TwoWay-Bindings das Binding nicht zuverlässig aktualisiert).
+    /// </summary>
+    /// <param name="comboBoxElement">Das ComboBox-Element.</param>
+    /// <param name="itemText">Der Name des auszuwählenden ComboBoxItems.</param>
+    /// <param name="timeout">Maximale Wartezeit, bis das ComboBoxItem nach dem Öffnen erscheint.</param>
+    /// <param name="isVisible">Optionales zusätzliches Sichtbarkeits-Prädikat für die Item-Suche; Standard: jeder Treffer gilt als sichtbar.</param>
+    internal static void SelectComboBoxItemByClick(
+        AutomationElement comboBoxElement,
+        string itemText,
+        TimeSpan timeout,
+        Func<AutomationElement, bool>? isVisible = null)
+    {
+        var comboBox = comboBoxElement.AsComboBox();
+        comboBox.Click();
+        Thread.Sleep(300);
+
+        var item = WaitForElement(comboBoxElement, cf => cf.ByName(itemText), timeout, isVisible);
+        item.Click();
+        Thread.Sleep(200);
+    }
+
+    /// <summary>Wartet, bis eine ComboBox den erwarteten selektierten Eintrag anzeigt.</summary>
+    /// <param name="comboBoxElement">Das ComboBox-Element.</param>
+    /// <param name="expectedItemText">Der erwartete Anzeigetext des ausgewählten Eintrags.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <exception cref="TimeoutException">Wird geworfen, wenn der erwartete Eintrag nicht rechtzeitig ausgewählt ist.</exception>
+    internal static void WaitForSelectedComboBoxItem(AutomationElement comboBoxElement, string expectedItemText, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        string? selectedItemName = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            selectedItemName = comboBoxElement.AsComboBox().SelectedItem?.Name;
+            if (string.Equals(selectedItemName, expectedItemText, StringComparison.Ordinal))
+                return;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"ComboBox zeigte nicht innerhalb von {timeout.TotalSeconds}s den erwarteten Eintrag '{expectedItemText}'. Aktuell: '{selectedItemName}'.");
     }
 
     /// <summary>

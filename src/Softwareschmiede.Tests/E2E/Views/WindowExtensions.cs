@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E.Views;
@@ -34,10 +35,18 @@ public static class WindowExtensions
     /// <exception cref="InvalidOperationException">Wird geworfen, wenn keine bekannte Ansicht erkannt werden konnte.</exception>
     public static BaseWindowView CurrentView(this Window window)
     {
+        // Statt pro bekanntem Dialogtyp eine eigene, vollständige Desktop-Teilbaum-Suche über
+        // DialogView.IsVisible auszulösen (12 Suchen, jede davon ein voller FindFirstDescendant-Durchlauf
+        // über die komplette Automation-Baumstruktur aller offenen Fenster auf dem Desktop - spürbar
+        // langsam), wird die Desktop-Suche einmal zentral ausgeführt: alle aktuell offenen Top-Level-Fenster
+        // werden in einem einzigen Durchlauf ermittelt, die Dialogerkennung vergleicht dagegen nur noch
+        // client-seitig (siehe DialogView.MatchesOpenWindow).
+        var openTopLevelWindowTitles = GetOpenTopLevelWindowTitles(window);
+
         foreach (var factory in DialogFactories)
         {
             var dialog = factory(window);
-            if (dialog.IsVisible)
+            if (dialog.MatchesOpenWindow(openTopLevelWindowTitles))
                 return dialog;
         }
 
@@ -67,6 +76,23 @@ public static class WindowExtensions
             return dashboardView;
 
         throw BuildUnrecognizedViewException(window);
+    }
+
+    /// <summary>
+    /// Ermittelt die Titel aller aktuell offenen Top-Level-Fenster (Control-Type <c>Window</c>) auf dem
+    /// Desktop in einem einzigen <c>FindAllDescendants</c>-Durchlauf, statt für jeden bekannten Dialogtyp
+    /// separat zu suchen (siehe <see cref="CurrentView"/>).
+    /// </summary>
+    /// <param name="window">Das Hauptfenster der Anwendung.</param>
+    /// <returns>Die Titel aller offenen Top-Level-Fenster.</returns>
+    private static HashSet<string> GetOpenTopLevelWindowTitles(Window window)
+    {
+        var desktop = window.Automation.GetDesktop();
+        return desktop
+            .FindAllDescendants(cf => cf.ByControlType(ControlType.Window))
+            .Select(w => w.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static InvalidOperationException BuildUnrecognizedViewException(Window window)

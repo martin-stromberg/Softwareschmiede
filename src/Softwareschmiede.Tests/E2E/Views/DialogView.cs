@@ -38,8 +38,21 @@ public abstract class DialogView : BaseWindowView
     /// bereits offenen Fensters treffen, da <c>FindFirstDescendant</c> auf dem Desktop-Element den
     /// kompletten Automation-Baum aller offenen Fenster rekursiv durchsucht.
     /// </summary>
-    private Func<FlaUI.Core.Conditions.ConditionFactory, FlaUI.Core.Conditions.ConditionBase> DialogWindowCondition
+    protected Func<FlaUI.Core.Conditions.ConditionFactory, FlaUI.Core.Conditions.ConditionBase> DialogWindowCondition
         => cf => cf.ByName(DialogTitle).And(cf.ByControlType(ControlType.Window));
+
+    /// <summary>
+    /// Prüft anhand einer bereits vorab ermittelten Menge offener Top-Level-Fenstertitel, ob dieser
+    /// Dialog aktuell sichtbar ist - ohne eine eigene Desktop-Suche auszulösen. Für
+    /// <see cref="WindowExtensions.CurrentView"/>, das sonst pro bekanntem Dialogtyp eine eigene,
+    /// vollständige Desktop-Teilbaum-Suche über <see cref="IsVisible"/> durchführen müsste (spürbar
+    /// langsam bei vielen registrierten Dialogtypen); stattdessen wird die Desktop-Teilbaum-Suche einmal
+    /// zentral ausgeführt und hier nur noch client-seitig gegen die bekannten Titel verglichen.
+    /// </summary>
+    /// <param name="openTopLevelWindowTitles">Die Titel aller aktuell offenen Top-Level-Fenster auf dem Desktop.</param>
+    /// <returns><c>true</c>, wenn <paramref name="openTopLevelWindowTitles"/> den Titel dieses Dialogs enthält.</returns>
+    internal bool MatchesOpenWindow(IReadOnlySet<string> openTopLevelWindowTitles)
+        => openTopLevelWindowTitles.Contains(DialogTitle);
 
     /// <summary>
     /// Wartet, bis der Dialog erscheint. Weicht bewusst vom in <see cref="BaseWindowView.ForceShow"/>

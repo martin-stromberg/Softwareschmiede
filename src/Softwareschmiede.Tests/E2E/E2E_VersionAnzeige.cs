@@ -1,3 +1,5 @@
+using Softwareschmiede.Tests.E2E.Views;
+
 namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
@@ -18,7 +20,7 @@ public partial class End2EndTest
     /// </summary>
     protected void AppStarten_ZeigtVersionsTextInFusszeile_E2E(FlaUI.Core.AutomationElements.Window mainWindow)
     {
-        var versionText = WaitForElement(mainWindow, cf => cf.ByAutomationId("AppVersionText"), Short);
-        Assert.False(string.IsNullOrWhiteSpace(versionText.Name));
+        var versionText = new MenuView(mainWindow).GetVersionText();
+        Assert.False(string.IsNullOrWhiteSpace(versionText));
     }
 }

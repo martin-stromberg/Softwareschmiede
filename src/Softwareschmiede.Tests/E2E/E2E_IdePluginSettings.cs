@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -41,44 +42,26 @@ public partial class End2EndTest
     /// beiden Plugins aktiv startet.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    private void IdePluginAktivierung_LetztesPluginBlockiertUndPersistiertStatus_E2E(AutomationElement mainWindow)
+    private void IdePluginAktivierung_LetztesPluginBlockiertUndPersistiertStatus_E2E(Window mainWindow)
     {
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
+        var settings = new SettingsView(mainWindow).ForceShow();
+        settings.SwitchTab("Plugins");
 
-        DeaktiviereIdePlugin(mainWindow, "Softwareschmiede.VisualStudioCode");
+        settings.SetIdePluginEnabled("Softwareschmiede.VisualStudioCode", false);
+        settings.SaveSettings();
+        settings.Menu.NavigateToDashboard();
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
+        var settingsReloaded = new SettingsView(mainWindow).ForceShow();
+        settingsReloaded.SwitchTab("Plugins");
+        Assert.False(settingsReloaded.IsIdePluginEnabled("Softwareschmiede.VisualStudioCode"));
 
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
-
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
-
-        var vsCodeEintragReloaded = WaitForElement(mainWindow, cf => cf.ByName("Softwareschmiede.VisualStudioCode.Eintrag"), Short);
-        vsCodeEintragReloaded.Click();
-        var idePluginCheckboxReloaded = WaitForElement(mainWindow, cf => cf.ByName("IdePluginAktiviert"), Short);
-        Assert.False(idePluginCheckboxReloaded.AsCheckBox().IsChecked);
-
-        DeaktiviereIdePlugin(mainWindow, "Softwareschmiede.VisualStudio");
-
-        var fehlerMeldung = WaitForElement(mainWindow, cf => cf.ByName("FehlerMeldung"), Short);
-        Assert.NotNull(fehlerMeldung);
-
-        var visualStudioEintragNachVersuch = WaitForElement(mainWindow, cf => cf.ByName("Softwareschmiede.VisualStudio.Eintrag"), Short);
-        visualStudioEintragNachVersuch.Click();
-        var visualStudioCheckboxNachVersuch = WaitForElement(mainWindow, cf => cf.ByName("IdePluginAktiviert"), Short);
-        Assert.True(visualStudioCheckboxNachVersuch.AsCheckBox().IsChecked);
+        settingsReloaded.SetIdePluginEnabled("Softwareschmiede.VisualStudio", false);
+        Assert.False(string.IsNullOrWhiteSpace(new ErrorView(mainWindow).GetErrorMessage()));
+        Assert.True(settingsReloaded.IsIdePluginEnabled("Softwareschmiede.VisualStudio"));
 
         // Visual Studio Code für Phase 2 wieder aktivieren und speichern.
-        AktiviereIdePlugin(mainWindow, "Softwareschmiede.VisualStudioCode");
-
-        var speichernButtonPhase1 = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButtonPhase1.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
+        settingsReloaded.SetIdePluginEnabled("Softwareschmiede.VisualStudioCode", true);
+        settingsReloaded.SaveSettings();
     }
 
     /// <summary>
@@ -87,57 +70,19 @@ public partial class End2EndTest
     /// Öffnen der Einstellungen erhalten (Persistenz in <c>plugins.ide.order</c>).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster, aktuell im Plugins-Register der Einstellungen.</param>
-    private void IdePluginReihenfolge_UpDownButtonsAendernUndPersistierenReihenfolge_E2E(AutomationElement mainWindow)
+    private void IdePluginReihenfolge_UpDownButtonsAendernUndPersistierenReihenfolge_E2E(Window mainWindow)
     {
-        var idePluginListe = WaitForElement(mainWindow, cf => cf.ByName("IdePluginListe"), Short);
-        var ersterEintragVorVerschieben = idePluginListe.FindFirstDescendant(cf => cf.ByName("Softwareschmiede.VisualStudio.Eintrag"));
-        Assert.NotNull(ersterEintragVorVerschieben);
+        var settings = Assert.IsType<SettingsView>(mainWindow.CurrentView());
 
-        var vsCodeNachObenButton = WaitForElement(mainWindow, cf => cf.ByName("Softwareschmiede.VisualStudioCode.NachOben"), Short);
-        vsCodeNachObenButton.AsButton().Click();
+        settings.MoveIdePluginUp("Softwareschmiede.VisualStudioCode");
+        Assert.True(settings.IsFirstIdePlugin("Softwareschmiede.VisualStudioCode"));
 
-        var listenEintraege = idePluginListe.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
-        Assert.True(listenEintraege.Length >= 2);
-        var ersterName = listenEintraege[0].FindFirstDescendant(cf => cf.ByName("Softwareschmiede.VisualStudioCode.Eintrag"));
-        Assert.NotNull(ersterName);
+        settings.Menu.NavigateToDashboard();
 
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
+        var settingsReloaded = new SettingsView(mainWindow).ForceShow();
+        settingsReloaded.SwitchTab("Plugins");
+        Assert.True(settingsReloaded.IsFirstIdePlugin("Softwareschmiede.VisualStudioCode"));
 
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
-
-        var idePluginListeReloaded = WaitForElement(mainWindow, cf => cf.ByName("IdePluginListe"), Short);
-        var listenEintraegeReloaded = idePluginListeReloaded.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
-        Assert.True(listenEintraegeReloaded.Length >= 2);
-        var ersterNameReloaded = listenEintraegeReloaded[0].FindFirstDescendant(cf => cf.ByName("Softwareschmiede.VisualStudioCode.Eintrag"));
-        Assert.NotNull(ersterNameReloaded);
-
-        var dashboardButtonEnde = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButtonEnde.AsButton().Click();
-    }
-
-    /// <summary>Wählt den Listeneintrag des IDE-Plugins aus und deaktiviert es über die Checkbox "IdePluginAktiviert" im Inhaltsbereich.</summary>
-    /// <param name="mainWindow">Das Hauptfenster, aktuell im Plugins-Register der Einstellungen.</param>
-    /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.VisualStudioCode".</param>
-    private static void DeaktiviereIdePlugin(AutomationElement mainWindow, string pluginPrefix) =>
-        SetzeIdePluginAktiviert(mainWindow, pluginPrefix, aktiviert: false);
-
-    /// <summary>Wählt den Listeneintrag des IDE-Plugins aus und aktiviert es über die Checkbox "IdePluginAktiviert" im Inhaltsbereich.</summary>
-    /// <param name="mainWindow">Das Hauptfenster, aktuell im Plugins-Register der Einstellungen.</param>
-    /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.VisualStudioCode".</param>
-    private static void AktiviereIdePlugin(AutomationElement mainWindow, string pluginPrefix) =>
-        SetzeIdePluginAktiviert(mainWindow, pluginPrefix, aktiviert: true);
-
-    /// <summary>Klickt den Listeneintrag "{pluginPrefix}.Eintrag" und setzt anschließend die Checkbox "IdePluginAktiviert" im Inhaltsbereich.</summary>
-    /// <param name="mainWindow">Das Hauptfenster, aktuell im Plugins-Register der Einstellungen.</param>
-    /// <param name="pluginPrefix">Der Plugin-Prefix, z. B. "Softwareschmiede.VisualStudioCode".</param>
-    /// <param name="aktiviert">Der gewünschte Aktivierungsstatus.</param>
-    private static void SetzeIdePluginAktiviert(AutomationElement mainWindow, string pluginPrefix, bool aktiviert)
-    {
-        var eintrag = WaitForElement(mainWindow, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short);
-        eintrag.Click();
-        var checkbox = WaitForElement(mainWindow, cf => cf.ByName("IdePluginAktiviert"), Short);
-        checkbox.AsCheckBox().IsChecked = aktiviert;
+        settingsReloaded.Menu.NavigateToDashboard();
     }
 }

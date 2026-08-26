@@ -66,9 +66,8 @@ public partial class End2EndTest
         Assert.True(settingsView.IsVisible);
         Assert.IsType<SettingsView>(mainWindow.CurrentView());
 
-        var initialTab = settingsView.GetActiveTab();
         settingsView.SwitchTab("Plugins");
-        Assert.NotEqual(initialTab, settingsView.GetActiveTab());
+        Assert.True(settingsView.IsOnPluginsTab());
         settingsView.SaveSettings();
 
         settingsView.ForceClose(recurseToDashboard: false);
@@ -201,7 +200,9 @@ public partial class End2EndTest
             var exception = Assert.Throws<InvalidOperationException>(() => msgBoxWindow.CurrentView());
             Assert.Contains("konnte keine bekannte Ansicht erkennen", exception.Message);
 
-            msgBoxWindow.Close();
+            // Native MessageBox unterstützt WindowPattern.Close() nicht (FlaUI.Core.Exceptions.
+            // MethodNotSupportedException) - stattdessen über den Standard-"OK"-Button schließen.
+            WaitForElement(msgBoxWindow, cf => cf.ByName("OK"), Short).AsButton().Click();
         }
         finally
         {

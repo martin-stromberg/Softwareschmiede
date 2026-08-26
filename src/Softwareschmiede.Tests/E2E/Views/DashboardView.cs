@@ -27,4 +27,7 @@ public sealed class DashboardView : BaseWindowView
 
     /// <inheritdoc/>
     public override DashboardView ForceClose(bool recurseToDashboard) => this;
+
+    /// <returns><c>true</c>, wenn das Recovery-Banner ("Aufgabe(n) benötigen Wiederherstellung.") sichtbar ist.</returns>
+    public bool HasRecoveryBanner() => ElementExists(Window, cf => cf.ByName("Aufgabe(n) benötigen Wiederherstellung."));
 }

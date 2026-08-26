@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -23,36 +24,37 @@ public partial class End2EndTest
     /// </summary>
     protected void AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(Window mainWindow)
     {
-        NavigateToProjectsAndCreateProject(mainWindow, "NeueAufgabe-Test");
+        var projectList = new ProjectListView(mainWindow).ForceShow();
+        projectList.CreateProject("NeueAufgabe-Test");
+        var projectDetail = projectList.OpenProject("NeueAufgabe-Test");
 
         // Phase Speichern
-        NeueAufgabeAnlegen(mainWindow);
-        AufgabeTitelSetzen(mainWindow, "Persistierte Neue Aufgabe");
-        AufgabeDetailSpeichern(mainWindow, false);
+        var taskDetail = projectDetail.CreateTask();
+        taskDetail.SetTaskTitle("Persistierte Neue Aufgabe");
+        taskDetail.SaveTask();
 
         // Die TaskDetailView bleibt geöffnet; der Anwender kann direkt starten statt zur Liste zurückzufallen.
-        WaitForElement(mainWindow, cf => cf.ByName("Starten"), Medium);
-        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
+        taskDetail.WaitForPersisted();
 
         // Erst explizite Rücknavigation zeigt wieder die Projektliste.
-        AufgabeDetailZurueck(mainWindow);
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
+        taskDetail.GoBack();
+        var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Neue Aufgabe erscheint mit aktualisiertem Titel in der Aufgabenliste.
-        WaitForElement(mainWindow, cf => cf.ByName("Persistierte Neue Aufgabe"), Short);
+        projectDetailAfterSave.WaitForTask("Persistierte Neue Aufgabe");
 
         // Phase Abbrechen
-        NeueAufgabeAnlegen(mainWindow);
-        AufgabeTitelSetzen(mainWindow, "Nicht gespeicherter Titel");
-        AufgabeDetailZurueck(mainWindow);
+        var taskDetailAbbrechen = projectDetailAfterSave.CreateTask();
+        taskDetailAbbrechen.SetTaskTitle("Nicht gespeicherter Titel");
+        taskDetailAbbrechen.GoBack();
+        var projectDetailAfterCancel = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Der nicht gespeicherte Titel erscheint nicht in der Aufgabenliste
-        var nichtGespeicherterTitel = mainWindow.FindFirstDescendant(cf => cf.ByName("Nicht gespeicherter Titel"));
-        Assert.Null(nichtGespeicherterTitel);
+        Assert.False(projectDetailAfterCancel.HasTask("Nicht gespeicherter Titel"));
 
         // Die Aufgabenliste enthält beide zuvor angelegten Aufgaben (Status "Neu")
-        var items = OffeneAufgabenItems(mainWindow);
+        var items = projectDetailAfterCancel.GetTaskElements();
         Assert.True(items.Length >= 2, "Aufgabenliste sollte beide angelegten Aufgaben weiterhin enthalten.");
-        DeleteCurrentProject(mainWindow);
+        projectDetailAfterCancel.DeleteProject();
     }
 }

@@ -21,6 +21,9 @@ public abstract class BaseWindowView
     /// <summary>Mittleres Timeout (15s) für UI-Elemente nach asynchronen Operationen.</summary>
     protected static readonly TimeSpan Medium = ElementWaitHelper.Medium;
 
+    /// <summary>Langes Timeout (30s), z. B. für aufwendige Hintergrundoperationen wie Arbeitsverzeichnis-/Repository-Vorbereitung.</summary>
+    protected static readonly TimeSpan Long = ElementWaitHelper.Long;
+
     /// <param name="window">Das FlaUI-Hauptfenster, auf das sich diese View bezieht.</param>
     protected BaseWindowView(Window window)
     {
@@ -41,6 +44,14 @@ public abstract class BaseWindowView
     /// <param name="recurseToDashboard">Wenn <c>true</c>, werden auch alle übergeordneten Ansichten bis zum Dashboard geschlossen.</param>
     /// <returns>Diese Instanz (Fluent-API).</returns>
     public abstract BaseWindowView ForceClose(bool recurseToDashboard);
+    /// <summary>
+    /// Sorgt dafür, dass die aktuelle Ansicht, sowie die darüber liegenden Ansichten geschlossen werden, bis das Dashboard sichtbar ist.
+    /// </summary>
+    /// <returns>Diese Instanz (Fluent-API).</returns>
+    public BaseWindowView ForceReset()
+    {
+        return ForceClose(true);
+    }
 
     /// <summary>Zugriff auf das Navigationsmenü der Anwendung.</summary>
     public virtual MenuView Menu => new(Window);
@@ -83,6 +94,21 @@ public abstract class BaseWindowView
         Func<ConditionFactory, ConditionBase> conditionFunc,
         TimeSpan timeout)
         => ElementWaitHelper.WaitForElement(parent, conditionFunc, timeout, IsOnScreen);
+
+    /// <summary>
+    /// Wartet, bis ein Top-Level-Fenster mit dem angegebenen Titel auf dem Desktop erscheint. Nutzt die
+    /// zum Hauptfenster gehörende <c>Window.Automation</c>-Instanz, statt eine neue
+    /// <c>UIA3Automation</c> zu erzeugen (vermeidet ein zusätzliches, unverwaltetes COM-Objekt pro Aufruf).
+    /// </summary>
+    protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
+        => ElementWaitHelper.WaitForElement(Window.Automation.GetDesktop(), cf => cf.ByName(title), timeout, IsOnScreen);
+
+    /// <summary>
+    /// Wählt einen Eintrag in einer ComboBox per Klick auf das ComboBoxItem aus (robuster als FlaUI's
+    /// <c>Select(string)</c>, das bei manchen TwoWay-Bindings das Binding nicht zuverlässig aktualisiert).
+    /// </summary>
+    protected static void SelectComboBoxItemByClick(AutomationElement comboBoxElement, string itemText, TimeSpan timeout)
+        => ElementWaitHelper.SelectComboBoxItemByClick(comboBoxElement, itemText, timeout, IsOnScreen);
 
     /// <param name="parent">Das Element, dessen Teilbaum durchsucht wird.</param>
     /// <param name="conditionFunc">Die Suchbedingung.</param>

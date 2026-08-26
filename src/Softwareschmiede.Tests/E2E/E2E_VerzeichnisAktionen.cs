@@ -1,7 +1,8 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
-using FluentAssertions;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -38,88 +39,74 @@ public partial class End2EndTest
 
         // git init im Quellverzeichnis vorab bestätigen, damit "Starten" im ersten Versuch gelingt.
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
 
         // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt).
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.WaitForCliRunning();
 
         var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
 
         // Phase 1: "Arbeitsverzeichnis öffnen" zeichnet den OS-Dateiexplorer-Start mit dem LokalerKlonPfad auf.
-        var arbeitsverzeichnisButton = WaitForElement(mainWindow, cf => cf.ByName("ArbeitsverzeichnisOeffnen"), Short);
-        arbeitsverzeichnisButton.AsButton().Click();
+        taskDetail.OpenWorkingDirectory();
         await WaitForProzessStartEintragAsync(lokalerKlonPfad);
 
         // Phase 2: Ohne "*.sln" ist "IDE öffnen" weiterhin aktiv (CanExecute hängt nur noch vom vorhandenen
         // Arbeitsverzeichnis ab, nicht mehr von gefundenen Solutions) - ein Klick löst über
         // PluginSelectionService.ResolveIdePluginAsync automatisch den Visual-Studio-Code-Fallback aus, da
         // Visual Studio Code standardmäßig als aktives IDE-Plugin gilt.
-        var ideButtonOhneSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonOhneSln.Properties.IsEnabled.Value.Should().BeTrue("das Arbeitsverzeichnis existiert bereits, auch ohne .sln-Datei");
+        Assert.True(taskDetail.IsIdeButtonEnabled(), "das Arbeitsverzeichnis existiert bereits, auch ohne .sln-Datei");
 
         var protokollVorFallback = await ReadProzessStartLogAsync();
-        ideButtonOhneSln.AsButton().Click();
+        taskDetail.OpenIde();
         await WaitForProzessStartEintragAsync(Path.GetFullPath(lokalerKlonPfad), sinceContent: protokollVorFallback);
 
-        var dialogBeiFallback = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
-        dialogBeiFallback.Should().BeNull("ohne gefundene Solution öffnet der Visual-Studio-Code-Fallback direkt, ohne Auswahl-Dialog");
+        Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "ohne gefundene Solution öffnet der Visual-Studio-Code-Fallback direkt, ohne Auswahl-Dialog");
 
         // Genau eine "*.sln" anlegen und die Aufgabe neu laden (Ribbon-Button-CanExecute wird beim Laden gecacht).
         var ersteSolution = Path.Combine(lokalerKlonPfad, "Erste.sln");
         File.WriteAllText(ersteSolution, string.Empty);
-        ReloadTaskDetail(mainWindow);
+        taskDetail = taskDetail.Reload();
 
         // Phase 3: Bei genau einer "*.sln" öffnet der Haupt-Button von "IDE öffnen" diese weiterhin direkt,
         // ohne Auswahl-Dialog (Visual Studio ist als Explicit-Plugin kompatibel und gewinnt beim Haupt-Button
         // gegenüber dem Fallback). Der Dropdown-Button ist aber bereits jetzt sichtbar: Zusätzlich zum einen
         // Visual-Studio-Einstiegspunkt liefert das weiterhin aktive Visual-Studio-Code-Fallback-Plugin einen
         // weiteren Einstiegspunkt - aggregiert über alle kompatiblen Plugins sind das 2 Einstiegspunkte.
-        var ideButtonMitEinerSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonMitEinerSln.Properties.IsEnabled.Value.Should().BeTrue("es existiert jetzt genau eine .sln-Datei");
-        ideButtonMitEinerSln.AsButton().Click();
+        Assert.True(taskDetail.IsIdeButtonEnabled(), "es existiert jetzt genau eine .sln-Datei");
+        taskDetail.OpenIde();
         await WaitForProzessStartEintragAsync(ersteSolution);
 
-        var dialogNachEinerSln = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
-        dialogNachEinerSln.Should().BeNull("der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
-
-        var dropdownButtonMitEinerSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnenDropdown"), Short);
-        dropdownButtonMitEinerSln.Should().NotBeNull("Visual Studio liefert die eine .sln als Explicit-Einstiegspunkt, zusätzlich liefert das weiterhin aktive Visual-Studio-Code-Fallback-Plugin einen weiteren Einstiegspunkt - aggregiert sind das 2 Einstiegspunkte, der Dropdown-Button muss also sichtbar sein");
+        Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
+        Assert.True(taskDetail.HasIdeDropdown(), "Visual Studio liefert die eine .sln als Explicit-Einstiegspunkt, zusätzlich liefert das weiterhin aktive Visual-Studio-Code-Fallback-Plugin einen weiteren Einstiegspunkt - aggregiert sind das 2 Einstiegspunkte, der Dropdown-Button muss also sichtbar sein");
 
         // Eine zweite "*.slnx" anlegen und die Aufgabe erneut neu laden.
         var zweiteSolution = Path.Combine(lokalerKlonPfad, "Zweite.slnx");
         File.WriteAllText(zweiteSolution, string.Empty);
-        ReloadTaskDetail(mainWindow);
+        taskDetail = taskDetail.Reload();
 
         // Phase 4: Bei mehreren "*.sln"-Dateien öffnet der Haupt-Button des Split-Buttons weiterhin direkt
         // den ersten (alphabetisch sortierten) Einstiegspunkt, ohne Auswahl-Dialog; der weiterhin sichtbare
         // Dropdown-Button zeigt bei Klick den Auswahl-Dialog mit allen (jetzt 3, plugin-qualifiziert
         // formatierten) Einstiegspunkten an.
-        var ideHauptButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        var ideDropdownButtonMitZweiSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnenDropdown"), Short);
+        Assert.True(taskDetail.HasIdeDropdown());
 
         var protokollVorHauptklick = await ReadProzessStartLogAsync();
-        ideHauptButtonMitZweiSln.AsButton().Click();
+        taskDetail.OpenIde();
         await WaitForProzessStartEintragAsync(ersteSolution, sinceContent: protokollVorHauptklick);
 
-        var dialogNachHauptklick = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
-        dialogNachHauptklick.Should().BeNull("der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
+        Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "der Haupt-Button des Split-Buttons öffnet weiterhin direkt, ohne Auswahl-Dialog");
 
-        ideDropdownButtonMitZweiSln.AsButton().Click();
-
-        var dialog = WaitForWindow("Solution auswählen", Short);
-        var solutionListe = WaitForElement(dialog, cf => cf.ByName("SolutionAuswahl"), Short);
+        var solutionDialog = taskDetail.OpenIdeDropdown();
         // Die Liste zeigt plugin-qualifizierte Anzeigewerte ("{PluginName}: {Dateiname}"), keine Rohpfade.
-        var zweiterEintrag = WaitForElement(solutionListe, cf => cf.ByName($"Visual Studio: {Path.GetFileName(zweiteSolution)}"), Short);
-        zweiterEintrag.Click();
-
-        var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);
-        okButton.AsButton().Click();
+        solutionDialog.SelectSolution($"Visual Studio: {Path.GetFileName(zweiteSolution)}");
+        solutionDialog.Confirm();
 
         await WaitForProzessStartEintragAsync(zweiteSolution);
 
         mainWindow.AsWindow().Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
-        NavigateBackFromProjectCardToProjectsList(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 
     /// <summary>
@@ -136,9 +123,8 @@ public partial class End2EndTest
         SetupProjectMitNeuerAufgabe(mainWindow, "WorkDir-Ribbon-Repo", "WorkDir-Ribbon-Projekt");
 
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.WaitForCliRunning();
 
         var lokalerKlonPfad = await GetLokalerKlonPfadAsync();
         var unterverzeichnis = Path.Combine(lokalerKlonPfad, "backend");
@@ -147,11 +133,10 @@ public partial class End2EndTest
         await SeedRepositoryWorkingDirectoryAsync("backend");
 
         // Aufgabe neu laden, damit TaskDetailViewModel die soeben hinterlegte RepositoryStartKonfiguration liest.
-        ReloadTaskDetail(mainWindow);
+        taskDetail = taskDetail.Reload();
 
         // Phase 1: "Arbeitsverzeichnis öffnen" muss das aufgelöste Unterverzeichnis öffnen, nicht den Repository-Root.
-        var arbeitsverzeichnisButton = WaitForElement(mainWindow, cf => cf.ByName("ArbeitsverzeichnisOeffnen"), Short);
-        arbeitsverzeichnisButton.AsButton().Click();
+        taskDetail.OpenWorkingDirectory();
         await WaitForProzessStartEintragAsync(Path.GetFullPath(unterverzeichnis));
 
         // Phase 2: Ohne "*.sln" im Unterverzeichnis ist "IDE öffnen" weiterhin aktiv (CanExecute hängt nur
@@ -162,28 +147,26 @@ public partial class End2EndTest
         // Teil der Log-Datei geprüft.
         var protokollVorFallback = await ReadProzessStartLogAsync();
 
-        var ideButtonOhneSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonOhneSln.Properties.IsEnabled.Value.Should().BeTrue("das konfigurierte Arbeitsverzeichnis existiert, auch ohne .sln-Datei");
-        ideButtonOhneSln.AsButton().Click();
+        Assert.True(taskDetail.IsIdeButtonEnabled(), "das konfigurierte Arbeitsverzeichnis existiert, auch ohne .sln-Datei");
+        taskDetail.OpenIde();
         await WaitForProzessStartEintragAsync(Path.GetFullPath(unterverzeichnis), sinceContent: protokollVorFallback);
 
-        var solutionAuswahlDialogBeiFallback = mainWindow.FindFirstDescendant(cf => cf.ByName("Solution auswählen"));
-        solutionAuswahlDialogBeiFallback.Should().BeNull("ohne gefundene Solution öffnet der Fallback Visual Studio Code direkt, ohne Auswahl-Dialog");
+        Assert.False(new SolutionSelectionDialogView(mainWindow).IsVisible, "ohne gefundene Solution öffnet der Fallback Visual Studio Code direkt, ohne Auswahl-Dialog");
 
         // Eine "*.sln" NUR im Unterverzeichnis anlegen (nicht im Repository-Root) und neu laden.
         var solutionImUnterverzeichnis = Path.Combine(unterverzeichnis, "Backend.sln");
         File.WriteAllText(solutionImUnterverzeichnis, string.Empty);
-        ReloadTaskDetail(mainWindow);
+        taskDetail = taskDetail.Reload();
 
         // Phase 3: "IDE öffnen" muss die Solution aus dem Unterverzeichnis finden und öffnen - der Repository-Root
         // enthält keine Solution, das kann also nur gelingen, wenn tatsächlich im aufgelösten Verzeichnis gesucht wurde.
-        var ideButtonMitSln = WaitForElement(mainWindow, cf => cf.ByName("IdeOeffnen"), Short);
-        ideButtonMitSln.Properties.IsEnabled.Value.Should().BeTrue("es liegt jetzt eine .sln-Datei im konfigurierten Arbeitsverzeichnis");
-        ideButtonMitSln.AsButton().Click();
+        Assert.True(taskDetail.IsIdeButtonEnabled(), "es liegt jetzt eine .sln-Datei im konfigurierten Arbeitsverzeichnis");
+        taskDetail.OpenIde();
         await WaitForProzessStartEintragAsync(solutionImUnterverzeichnis);
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 
     /// <summary>
