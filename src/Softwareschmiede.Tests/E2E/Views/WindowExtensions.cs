@@ -89,6 +89,18 @@ public static class WindowExtensions
         var desktop = window.Automation.GetDesktop();
         return desktop
             .FindAllDescendants(cf => cf.ByControlType(ControlType.Window))
+            .Where(w =>
+            {
+                try
+                {
+                    _ = w.Name;
+                    return true;
+                }
+                catch(FlaUI.Core.Exceptions.PropertyNotSupportedException)
+                {
+                    return false;
+                }                
+            })
             .Select(w => w.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .ToHashSet(StringComparer.Ordinal);

@@ -157,7 +157,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             pluginManager = defaultPluginManagerMock.Object;
         }
 
-        var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
+        var serviceProviderObj = serviceProvider ?? TaskDetailViewModelTestFactory.CreateDefaultServiceProvider(_db, _kiService);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 

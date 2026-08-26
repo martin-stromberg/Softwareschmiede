@@ -132,7 +132,7 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
         var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService(prozessStarterMock);
-        var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
+        var serviceProviderObj = serviceProvider ?? TaskDetailViewModelTestFactory.CreateDefaultServiceProvider(_db, _kiService);
         var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
             serviceProviderObj,
             _dialogServiceMock.Object,

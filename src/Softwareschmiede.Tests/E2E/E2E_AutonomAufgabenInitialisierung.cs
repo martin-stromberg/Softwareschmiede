@@ -138,7 +138,8 @@ public partial class End2EndTest
         // erneut zu durchlaufen. LadenAsync erkennt anhand der in der DB bereits vorhandenen
         // AutonomAufgabeKonfiguration (Aufgabe.IstAutonom()) trotzdem, dass die Aufgabe autonom ist, und
         // stellt AutonomAufgabeDetailViewModel automatisch wieder her - "Automatisierung"-Registerkarte und
-        // Ribbon-Buttons bleiben dadurch nach jedem erneuten Öffnen erreichbar.
+        // Ribbon-Buttons bleiben dadurch nach jedem erneuten Öffnen erreichbar, statt (wie vor der Korrektur)
+        // dauerhaft unsichtbar/ohne Command zu bleiben.
         taskDetail = taskDetail.Reload();
         WaitForElement(mainWindow, cf => cf.ByName("AutomatisierungViewButton"), Short);
         WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStartAgent"), Short);

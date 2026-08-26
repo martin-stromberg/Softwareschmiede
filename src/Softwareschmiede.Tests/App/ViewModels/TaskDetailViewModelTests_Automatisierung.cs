@@ -208,4 +208,70 @@ public sealed class TaskDetailViewModelTests_Automatisierung : TaskDetailViewMod
         sut.ShowAutomatisierungPanel.Should().BeTrue();
         sut.IsAutomatisierungViewSelected.Should().BeTrue();
     }
+
+    /// <summary>
+    /// Reproduziert einen realen Fehler: Wird eine bereits als Autonome Aufgabe konfigurierte Aufgabe
+    /// (AutonomAufgabeKonfiguration existiert bereits in der DB) über eine neue TaskDetailViewModel-Instanz
+    /// geladen — z. B. weil der Anwender die Aufgabe erneut öffnet, ohne den Initialisierungs-Assistenten
+    /// erneut zu durchlaufen —, blieb AutonomAufgabeDetailViewModel bislang null und ShowAutomatisierungPanel
+    /// false, weil ausschließlich AutonomAufgabeInitialisierenAsync (über SetzeAutonomAufgabeDetailViewAsync)
+    /// das ViewModel setzte. Die Ribbon-Buttons "Start"/"Stop"/"Resume" der Gruppe "Autonome Aufgabe" sind an
+    /// ShowAutomatisierungPanel gebunden (siehe TaskDetailView.xaml) und blieben dadurch nach jedem erneuten
+    /// Öffnen der Aufgabe unsichtbar bzw. ohne Command.
+    /// </summary>
+    [Fact]
+    public async Task LadenAsync_StelltAutonomAufgabeDetailViewModelWieder_WennAufgabeBereitsAutonomKonfiguriertIst()
+    {
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        var arbeitsverzeichnisPfad = CreateTempDirectory();
+        _db.AutonomAufgabeKonfigurationen.Add(new AutonomAufgabeKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            ProjektBranchName = "feature/autonom",
+            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
+            PermissionsJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "permissions.json"),
+            ArbeitsverzeichnisPfad = arbeitsverzeichnisPfad
+        });
+        await _db.SaveChangesAsync();
+
+        // Neue TaskDetailViewModel-Instanz, OHNE den Initialisierungs-Assistenten zu durchlaufen - simuliert
+        // das erneute Öffnen einer bereits konfigurierten Autonomen Aufgabe (z. B. nach Navigation weg und
+        // zurück oder nach einem App-Neustart).
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.AutonomAufgabeDetailViewModel.Should().NotBeNull();
+        sut.ShowAutomatisierungPanel.Should().BeTrue("die Ribbon-Buttons 'Start'/'Stop'/'Resume' sind daran gebunden");
+    }
+
+    /// <summary>
+    /// AutonomAufgabeInitialisierenCommand darf für eine bereits autonom konfigurierte Aufgabe nicht erneut
+    /// ausführbar sein: AutonomAufgabenInitialisierungsService.InitialisiereAsync prüft nicht, ob bereits eine
+    /// AutonomAufgabeKonfiguration existiert, und würde bei erneuter Ausführung entweder eine zweite
+    /// Konfiguration anlegen oder beim erneuten Klonen ins bereits vorhandene Arbeitsverzeichnis fehlschlagen.
+    /// </summary>
+    [Fact]
+    public async Task AutonomAufgabeInitialisierenCommand_CanExecute_FalseWennAufgabeBereitsAutonomKonfiguriertIst()
+    {
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        var arbeitsverzeichnisPfad = CreateTempDirectory();
+        _db.AutonomAufgabeKonfigurationen.Add(new AutonomAufgabeKonfiguration
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            ProjektBranchName = "feature/autonom",
+            InitialPrompt = "Implementiere die Aufgabe vollständig gemäß Anforderung.",
+            PermissionsJsonPfad = Path.Combine(arbeitsverzeichnisPfad, "permissions.json"),
+            ArbeitsverzeichnisPfad = arbeitsverzeichnisPfad
+        });
+        await _db.SaveChangesAsync();
+
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.AutonomAufgabeInitialisierenCommand.CanExecute(null).Should().BeFalse();
+    }
 }

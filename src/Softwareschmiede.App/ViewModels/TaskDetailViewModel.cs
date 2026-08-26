@@ -672,7 +672,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IssueBrowserOeffnenCommand = new RelayCommand(
             IssueBrowserOeffnen,
             () => CurrentIssueReferenz?.IssueUrl != null);
-        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => _aufgabe is not null);
+        // !IsAutonomAufgabe: Verhindert, dass der Initialisierungs-Assistent für eine bereits autonom
+        // konfigurierte Aufgabe versehentlich erneut durchlaufen wird (z. B. weil die eigentlichen
+        // Start/Stop/Resume-Buttons der Gruppe "Autonome Aufgabe" durch einen Lade-Fehler nicht sichtbar
+        // sind) - AutonomAufgabenInitialisierungsService.InitialisiereAsync legt dabei ungeprüft eine
+        // zweite AutonomAufgabeKonfiguration an bzw. bricht beim erneuten Klonen ins bereits vorhandene
+        // Arbeitsverzeichnis ab.
+        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => _aufgabe is not null && !IsAutonomAufgabe);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
@@ -730,6 +736,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
             // LadenAsync bindet nur vorhandene laufende Sitzungen wieder an. Ein neuer CLI-Prozess
             // wird ausschließlich über explizite Start-/Neustartaktionen gestartet.
+
+            await StelleAutonomAufgabeDetailViewModelWiederHerAsync(ct);
         }
         catch (OperationCanceledException)
         {
@@ -1471,6 +1479,45 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
         WaehleAnsicht(DetailAnsicht.Automatisierung);
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Stellt <see cref="AutonomAufgabeDetailViewModel"/> wieder her, wenn die geladene Aufgabe bereits als
+    /// Autonome Aufgabe konfiguriert ist (<see cref="Aufgabe.AutonomKonfiguration"/> vorhanden), das ViewModel
+    /// für diese TaskDetailViewModel-Instanz aber noch nicht gesetzt wurde. Ohne dies bliebe
+    /// <see cref="ShowAutomatisierungPanel"/> nach jedem erneuten Öffnen der Aufgabe (Navigation weg und
+    /// zurück, neue Detailansicht nach App-Neustart) dauerhaft false, da <see cref="_autonomAufgabeDetailViewModel"/>
+    /// bislang ausschließlich über den Initialisierungs-Assistenten (<see cref="AutonomAufgabeInitialisierenAsync"/>
+    /// → <see cref="SetzeAutonomAufgabeDetailViewAsync"/>) gesetzt wurde — die Ribbon-Buttons "Start"/"Stop"/"Resume"
+    /// der Gruppe "Autonome Aufgabe" sind an ShowAutomatisierungPanel gebunden und wären dadurch unsichtbar bzw.
+    /// ohne Command. Wechselt bewusst nicht automatisch zur Automatisierung-Ansicht (anders als
+    /// SetzeAutonomAufgabeDetailViewAsync), da LadenAsync auch für andere Ansichten wiederholt aufgerufen wird
+    /// und ein Wechsel dabei den aktuell angezeigten Tab des Anwenders kapern würde.
+    /// </summary>
+    /// <param name="ct">Abbruch-Token für das Laden von plan.md/progress.md/governance.md.</param>
+    private async Task StelleAutonomAufgabeDetailViewModelWiederHerAsync(CancellationToken ct)
+    {
+        if (_autonomAufgabeDetailViewModel is not null || _aufgabe?.AutonomKonfiguration is null)
+        {
+            return;
+        }
+
+        var detailVm = new AutonomAufgabeDetailViewModel(
+            _aufgabe,
+            _aufgabe.AutonomKonfiguration,
+            _serviceProvider.GetRequiredService<ProjektleiterAgentService>(),
+            _serviceProvider.GetRequiredService<SessionManagementService>(),
+            _kiService,
+            _serviceProvider.GetRequiredService<ILogger<AutonomAufgabeDetailViewModel>>());
+
+        _autonomAufgabeDetailViewModel = detailVm;
+        OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
+        OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+
+        await Task.WhenAll(
+            detailVm.LaedePlanAsync(ct),
+            detailVm.LaedeProgressAsync(ct),
+            detailVm.LaedeGovernanceAsync(ct)).ConfigureAwait(false);
     }
 
     private void PullRequestAnsichtWaehlen()
