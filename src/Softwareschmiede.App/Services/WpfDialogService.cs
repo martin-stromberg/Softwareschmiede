@@ -136,17 +136,6 @@ public sealed class WpfDialogService : IDialogService
             () => viewModel.ErstellteKonfiguration);
     }
 
-    /// <inheritdoc/>
-    public Task ShowAutonomAufgabeDetailAsync(
-        AutonomAufgabeDetailViewModel viewModel,
-        CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return ShowDialogAsync(
-            () => new AutonomAufgabeDetailDialog(viewModel),
-            () => (object?)null);
-    }
-
     /// <summary>Erzeugt über <paramref name="dialogFactory"/> ein Dialogfenster, zeigt es modal an und liefert das über <paramref name="resultSelector"/> bestimmte Ergebnis.</summary>
     private static Task<TResult?> ShowDialogAsync<TResult>(Func<Window> dialogFactory, Func<TResult?> resultSelector)
     {

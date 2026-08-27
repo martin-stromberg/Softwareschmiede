@@ -4,14 +4,16 @@ using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.App.ViewModels;
 
 /// <summary>ViewModel für die Detail-Ansicht einer Autonomen Aufgabe: Konfiguration, plan.md/progress.md/governance.md, Start/Stop/Resume-Kontrollen.</summary>
-public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
+public sealed class AutonomAufgabeDetailViewModel : ViewModelBase, IDisposable
 {
     private readonly ProjektleiterAgentService _projektleiterAgentService;
     private readonly SessionManagementService _sessionManagementService;
+    private readonly KiAusfuehrungsService _kiAusfuehrungsService;
     private readonly ILogger<AutonomAufgabeDetailViewModel> _logger;
     private readonly Aufgabe _aufgabe;
 
@@ -21,6 +23,8 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
     private string _governanceContent = string.Empty;
     private string? _errorMessage;
     private bool _isBusy;
+    private bool _cliIsRunning;
+    private bool _disposed;
 
     /// <summary>Konfiguration der angezeigten Autonomen Aufgabe.</summary>
     public AutonomAufgabeKonfiguration Konfiguration => _konfiguration;
@@ -66,6 +70,13 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
         private set => SetProperty(ref _isBusy, value);
     }
 
+    /// <summary>Gibt an, ob für die angezeigte Aufgabe aktuell ein echter CLI-Prozess läuft.</summary>
+    public bool CliIsRunning
+    {
+        get => _cliIsRunning;
+        private set => SetProperty(ref _cliIsRunning, value);
+    }
+
     /// <summary>Startet den Projektleiter-Agenten.</summary>
     public ICommand StartCommand { get; }
 
@@ -84,6 +95,7 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
         AutonomAufgabeKonfiguration konfiguration,
         ProjektleiterAgentService projektleiterAgentService,
         SessionManagementService sessionManagementService,
+        KiAusfuehrungsService kiAusfuehrungsService,
         ILogger<AutonomAufgabeDetailViewModel> logger,
         IReadOnlyList<UnteragentSpezifikation>? unteragenten = null,
         IReadOnlyList<SkillDefinition>? skills = null)
@@ -95,6 +107,7 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
         _konfiguration = konfiguration;
         _projektleiterAgentService = projektleiterAgentService;
         _sessionManagementService = sessionManagementService;
+        _kiAusfuehrungsService = kiAusfuehrungsService;
         _logger = logger;
 
         foreach (var unteragent in unteragenten ?? [])
@@ -107,9 +120,21 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
             Skills.Add(skill);
         }
 
-        StartCommand = new AsyncRelayCommand(ct => StarteAgentAsync(ct), () => !IsBusy);
+        _cliIsRunning = _kiAusfuehrungsService.IsRunning(_aufgabe.Id);
+        _kiAusfuehrungsService.CliProcessStatusChanged += OnCliProcessStatusChanged;
+
+        // Zusätzlich an !CliIsRunning gebunden: Start/Resume sind sinnlos (bzw. bei Start sogar schädlich), solange
+        // die CLI der Aufgabe bereits läuft. Verhindert insbesondere, dass ein zweiter Klick auf "Start" innerhalb
+        // des Verzögerungsfensters von SendeInitialPromptVerzoegertAsync (siehe ProjektleiterAgentService) den
+        // Initialprompt doppelt an dieselbe CLI-Session sendet: KiAusfuehrungsService.StartWithPseudoConsoleAsync
+        // setzt CliIsRunning bereits synchron auf true, bevor IsBusy im finally-Block zurückgesetzt wird.
+        StartCommand = new AsyncRelayCommand(ct => StarteAgentAsync(ct), () => !IsBusy && !CliIsRunning);
+        // Bewusst nicht auf CliIsRunning eingeschränkt: "Beenden" muss auch dann verfügbar sein, wenn der
+        // CLI-Prozess bereits (z. B. zwischen zwei Turns oder durch Absturz) nicht mehr läuft — StoppeAgenExplizitAsync
+        // setzt ExplizitGestoppt best-effort in jedem Fall und verhindert so einen ungewollten Auto-Resume beim
+        // nächsten App-Neustart, unabhängig vom aktuellen Prozessstatus.
         StopCommand = new AsyncRelayCommand(ct => StoppeAgentAsync(ct), () => !IsBusy);
-        ResumeCommand = new AsyncRelayCommand(ct => ResumeAgentAsync(ct), () => !IsBusy);
+        ResumeCommand = new AsyncRelayCommand(ct => ResumeAgentAsync(ct), () => !IsBusy && !CliIsRunning);
         SavePlanCommand = new AsyncRelayCommand(ct => AktualisierePlanAsync(PlanContent, ct), () => !IsBusy);
     }
 
@@ -136,14 +161,15 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
     /// <summary>Startet den Projektleiter-Agenten für die angezeigte Autonome Aufgabe.</summary>
     public Task StarteAgentAsync(CancellationToken ct = default)
         => FuehreAgentOperationAsync(
-            token => _projektleiterAgentService.StarteAgentAsync(Konfiguration, token),
+            token => _projektleiterAgentService.StarteAgentAsync(Konfiguration, optionalResumePrompt: null, ct: token),
             "Projektleiter-Agent konnte nicht gestartet werden",
             ct);
 
-    /// <summary>Stoppt (pausiert) den Projektleiter-Agenten.</summary>
+    /// <summary>Stoppt den Projektleiter-Agenten explizit: setzt <see cref="AutonomAufgabeKonfiguration.ExplizitGestoppt"/>
+    /// und beendet den laufenden CLI-Prozess. Verhindert einen automatischen Wiederstart nach dem nächsten App-Neustart.</summary>
     public Task StoppeAgentAsync(CancellationToken ct = default)
         => FuehreAgentOperationAsync(
-            token => _sessionManagementService.PauseAufgabeBeiBudgetLimitAsync(_aufgabe, token),
+            token => _projektleiterAgentService.StoppeAgenExplizitAsync(_aufgabe.Id, token),
             "Projektleiter-Agent konnte nicht gestoppt werden",
             ct);
 
@@ -177,5 +203,27 @@ public sealed class AutonomAufgabeDetailViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    private void OnCliProcessStatusChanged(Guid aufgabeId, CliProcessStatus status)
+    {
+        if (aufgabeId != _aufgabe.Id)
+        {
+            return;
+        }
+
+        CliIsRunning = status == CliProcessStatus.Gestartet;
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _kiAusfuehrungsService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
     }
 }

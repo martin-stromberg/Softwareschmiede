@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -17,6 +18,7 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly ProjektleiterAgentService _projektleiterAgentService;
     private readonly SessionManagementService _sessionManagementService;
+    private readonly KiAusfuehrungsService _kiAusfuehrungsService;
     private readonly AutonomAufgabeDetailViewModel _sut;
     private readonly string _testRoot;
     private readonly Aufgabe _aufgabe;
@@ -30,9 +32,13 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         Directory.CreateDirectory(_testRoot);
 
         var cliRunnerMock = new Mock<ICliRunner>();
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupPassthroughResolveEffectiveRepositoryPath();
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
-        var gitProvisioningService = new UnteragentGitProvisioningService(cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
-        _projektleiterAgentService = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
+        var gitProvisioningService = new UnteragentGitProvisioningService(cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
+        var (_, pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(_db);
+        _projektleiterAgentService = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
         _sessionManagementService = new SessionManagementService(_db, NullLogger<SessionManagementService>.Instance);
 
         var projektId = Guid.NewGuid();
@@ -45,12 +51,15 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
             _konfiguration,
             _projektleiterAgentService,
             _sessionManagementService,
+            _kiAusfuehrungsService,
             NullLogger<AutonomAufgabeDetailViewModel>.Instance);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
+        _sut.Dispose();
+        _kiAusfuehrungsService.Dispose();
         _db.Dispose();
         if (Directory.Exists(_testRoot))
         {
@@ -125,23 +134,21 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         _sut.GovernanceContent.Should().Contain("Regel 1");
     }
 
-    /// <summary>StoppeAgentAsync delegiert an SessionManagementService.PauseAufgabeBeiBudgetLimitAsync und setzt SessionPauseUtc.</summary>
+    /// <summary>StoppeAgentAsync delegiert an ProjektleiterAgentService.StoppeAgenExplizitAsync und setzt ExplizitGestoppt.</summary>
     [Fact]
-    public async Task StoppeAgentAsync_DelegiertAnSessionManagementService()
+    public async Task StoppeAgentAsync_SetztExplizitGestoppt()
     {
         await _sut.StoppeAgentAsync();
 
         _sut.ErrorMessage.Should().BeNull();
         var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(_konfiguration.Id);
-        konfigurationAktualisiert!.SessionPauseUtc.Should().NotBeNull();
+        konfigurationAktualisiert!.ExplizitGestoppt.Should().BeTrue();
     }
 
     /// <summary>ResumeAgentAsync delegiert an SessionManagementService.SetzeFortAsync und setzt SessionPauseUtc zurück.</summary>
     [Fact]
     public async Task ResumeAgentAsync_DelegiertAnSessionManagementService()
     {
-        await _sut.StoppeAgentAsync();
-
         await _sut.ResumeAgentAsync();
 
         _sut.ErrorMessage.Should().BeNull();
@@ -159,16 +166,88 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         // Konfiguration referenziert eine nicht existierende Aufgabe, wodurch ProjektleiterAgentService.StarteAgentAsync
         // eine InvalidOperationException wirft.
         var verwaisteKonfiguration = ProjektleiterAgentServiceTestDatenFactory.ErstelleKonfigurationFuerNichtExistierendeAufgabe(_testRoot);
-        var sut = new AutonomAufgabeDetailViewModel(
+        using var sut = new AutonomAufgabeDetailViewModel(
             _aufgabe,
             verwaisteKonfiguration,
             _projektleiterAgentService,
             _sessionManagementService,
+            _kiAusfuehrungsService,
             NullLogger<AutonomAufgabeDetailViewModel>.Instance);
 
         await sut.StarteAgentAsync();
 
         sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
         sut.IsBusy.Should().BeFalse();
+    }
+
+    /// <summary>CliIsRunning wird im Konstruktor mit KiAusfuehrungsService.IsRunning(aufgabeId) initialisiert.</summary>
+    [Fact]
+    public async Task CliIsRunning_InitializedWithKiAusfuehrungsServiceState()
+    {
+        await _sut.StarteAgentAsync();
+
+        using var sut = new AutonomAufgabeDetailViewModel(
+            _aufgabe,
+            _konfiguration,
+            _projektleiterAgentService,
+            _sessionManagementService,
+            _kiAusfuehrungsService,
+            NullLogger<AutonomAufgabeDetailViewModel>.Instance);
+
+        sut.CliIsRunning.Should().BeTrue();
+    }
+
+    /// <summary>CliIsRunning wird aktualisiert, wenn KiAusfuehrungsService.CliProcessStatusChanged für die angezeigte Aufgabe ausgelöst wird.</summary>
+    [Fact]
+    public void CliIsRunning_UpdatesWhenCliProcessStatusChanged()
+    {
+        _sut.CliIsRunning.Should().BeFalse();
+
+        RaiseCliProcessStatusChanged(_aufgabe.Id, CliProcessStatus.Gestartet);
+        _sut.CliIsRunning.Should().BeTrue();
+
+        RaiseCliProcessStatusChanged(_aufgabe.Id, CliProcessStatus.Gestoppt);
+        _sut.CliIsRunning.Should().BeFalse();
+    }
+
+    /// <summary>CliIsRunning bleibt unverändert, wenn das Event für eine andere Aufgabe ausgelöst wird.</summary>
+    [Fact]
+    public void CliIsRunning_IgnoresEventForOtherAufgabe()
+    {
+        RaiseCliProcessStatusChanged(Guid.NewGuid(), CliProcessStatus.Gestartet);
+
+        _sut.CliIsRunning.Should().BeFalse();
+    }
+
+    /// <summary>StopCommand ruft ProjektleiterAgentService.StoppeAgenExplizitAsync auf.</summary>
+    [Fact]
+    public async Task StopCommand_CallsProjektleiterAgentService()
+    {
+        await ((AsyncRelayCommand)_sut.StopCommand).ExecuteAsync();
+
+        var konfigurationAktualisiert = await _db.AutonomAufgabeKonfigurationen.FindAsync(_konfiguration.Id);
+        konfigurationAktualisiert!.ExplizitGestoppt.Should().BeTrue();
+    }
+
+    /// <summary>StopCommand.CanExecute ist unabhängig von CliIsRunning immer true (solange nicht IsBusy): "Beenden" muss
+    /// auch dann verfügbar sein, wenn der CLI-Prozess bereits nicht mehr läuft (z. B. zwischen zwei Turns oder nach
+    /// einem Absturz), damit ExplizitGestoppt in jedem Fall gesetzt werden kann und ein ungewollter Auto-Resume beim
+    /// nächsten App-Neustart verhindert wird.</summary>
+    [Fact]
+    public void StopCommand_CanExecute_UnabhaengigVonCliIsRunning()
+    {
+        _sut.CliIsRunning.Should().BeFalse("Vorbedingung: die CLI läuft noch nicht");
+        _sut.StopCommand.CanExecute(null).Should().BeTrue();
+
+        RaiseCliProcessStatusChanged(_aufgabe.Id, CliProcessStatus.Gestartet);
+
+        _sut.CliIsRunning.Should().BeTrue();
+        _sut.StopCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    private void RaiseCliProcessStatusChanged(Guid aufgabeId, CliProcessStatus status)
+    {
+        var method = typeof(AutonomAufgabeDetailViewModel).GetMethod("OnCliProcessStatusChanged", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        method.Invoke(_sut, [aufgabeId, status]);
     }
 }

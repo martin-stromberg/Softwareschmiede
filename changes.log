@@ -1,3 +1,13 @@
+## 2026-08-24 — Autonome Aufgaben: UI-Integration — Registerkarte statt separates Fenster
+
+- **Dialog-Entfernung:** Der separate `AutonomAufgabeDetailDialog` (Fenster) wurde entfernt. `ShowAutonomAufgabeDetailAsync()` aus `IDialogService`/`WpfDialogService` ist nicht mehr vorhanden.
+- **Registerkarten-Integration:** Der Inhalt der `AutonomAufgabeDetailView` ist jetzt als neue Registerkarte **„Automatisierung"** in der bestehenden `TaskDetailView` eingebettet, neben den bestehenden Registerkarten Info, CLI, Diff, Dateien, PR, Todos.
+- **Action-Buttons im Ribbon:** Die Action-Buttons Start, Stop und Resume wurden vom Dialog-Fenster in das Ribbon-Menü (Gruppe **„Autonome Aufgabe"**) der Aufgabendetailansicht verschoben. Sie sind nur sichtbar, wenn eine Autonome Aufgabe initialisiert ist (`ShowAutomatisierungPanel == true`).
+- **ViewModel-Erweiterung:** `TaskDetailViewModel` erweitert um `AutonomAufgabeDetailViewModel?`-Property, `ShowAutomatisierungPanel`-Boolean, `IsAutomatisierungViewSelected`-Boolean und neuer Command `AutomatisierungViewCommand` für Registerkarten-Umschaltung. Neue async-Methode `SetzeAutonomAufgabeDetailViewAsync()` wird vom `AutonomAufgabeStartService` aufgerufen, um das ViewModel zu speichern und die Ansicht zu wechseln.
+- **Service-Anpassung:** `AutonomAufgabeStartService.StarteAsync()` zeigt keinen Dialog mehr, sondern gibt das erzeugte `AutonomAufgabeDetailViewModel` über den bestehenden `AutonomAufgabeStartResult` zurück. `TaskDetailViewModel.AutonomAufgabeInitialisierenAsync()` ruft danach `SetzeAutonomAufgabeDetailViewAsync()` auf sich selbst auf.
+- **Aufgabenwechsel-Verhalten:** Wenn der Benutzer zu einer anderen Aufgabe wechselt, wird die `_autonomAufgabeDetailViewModel`-Referenz auf `null` gesetzt und die Automatisierung-Registerkarte ausgeblendet (neue Aufgabe erzeugt neues `TaskDetailViewModel`).
+- **Dokumentation:** `docs/help/aufgaben/autonome-aufgaben/{ablauf-anwender.md, ablauf-technisch.md}` aktualisiert, um neue Registerkarten-Integration und Ribbon-Button-Platzierungen zu dokumentieren; alte Dialog-Verweise entfernt.
+
 ## 2026-08-25 — E2E-Test-Infrastruktur: View-Pattern für wartbare UI-Automatisierung
 
 - Neues View-Pattern für E2E-Tests eingeführt: Strukturierte `BaseWindowView`-Klassenhierarchie abstrahiert wiederholte FlaUI-Interaktionsmuster und macht Tests wartbar.

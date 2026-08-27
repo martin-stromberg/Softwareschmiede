@@ -315,8 +315,18 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>
     /// Wartet, bis ein Top-Level-Fenster mit dem angegebenen Titel auf dem Desktop erscheint.
     /// </summary>
+    /// <remarks>
+    /// Filtert zusätzlich auf <see cref="FlaUI.Core.Definitions.ControlType.Window"/>: Ohne diesen Filter kann
+    /// die Teilbaum-Suche von <c>Automation.GetDesktop()</c> nach reinem Namen ein anderes, bereits vorhandenes
+    /// Element mit demselben AutomationProperties.Name im Baum treffen (z. B. eine RibbonGroup namens
+    /// "Autonome Aufgabe" in einer bereits offenen Ansicht, siehe TaskDetailView.xaml), statt auf das
+    /// tatsächliche Fenster zu warten. Das war zuvor eine latente Race Condition, die reproduzierbar wurde,
+    /// sobald sich das Timing bis zur tatsächlichen Fenster-Erstellung leicht verschob (siehe
+    /// AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E), und ist bereits
+    /// das etablierte Muster in mehreren anderen E2E-Tests (z. B. E2E_PluginAktivierung.cs).
+    /// </remarks>
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
-        => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title), timeout);
+        => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window)), timeout);
 
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjects(AutomationElement mainWindow)
@@ -510,6 +520,80 @@ public abstract class WpfTestBase : IDisposable
                 $"Git-Testrepository konnte nicht vorbereitet werden: git {string.Join(' ', arguments)} in '{workingDirectory}' " +
                 $"endete mit Exit-Code {process.ExitCode}.{Environment.NewLine}{stdout}{stderr}");
         }
+    }
+
+    /// <summary>
+    /// Prüft, ob <paramref name="branchName"/> im lokalen Git-Repository unter <paramref name="repositoryPath"/>
+    /// als lokaler Branch existiert (via <c>git branch --list</c>).
+    /// </summary>
+    protected static bool GitBranchExistsLocally(string repositoryPath, string branchName)
+    {
+        using var process = new Process();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = repositoryPath,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        process.StartInfo.ArgumentList.Add("branch");
+        process.StartInfo.ArgumentList.Add("--list");
+        process.StartInfo.ArgumentList.Add(branchName);
+
+        process.Start();
+        var stdout = process.StandardOutput.ReadToEnd();
+        process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        return process.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdout);
+    }
+
+    /// <summary>
+    /// Ermittelt den Namen des aktuell in <paramref name="repositoryPath"/> ausgecheckten Branches
+    /// (via <c>git rev-parse --abbrev-ref HEAD</c>). Anders als <see cref="GitBranchExistsLocally"/>, das nur
+    /// die reine Existenz eines Branch-Refs prüft, verifiziert dies, dass HEAD tatsächlich auf den Branch zeigt.
+    /// </summary>
+    protected static string GitCurrentBranch(string repositoryPath)
+    {
+        using var process = new Process();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = repositoryPath,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        process.StartInfo.ArgumentList.Add("rev-parse");
+        process.StartInfo.ArgumentList.Add("--abbrev-ref");
+        process.StartInfo.ArgumentList.Add("HEAD");
+
+        process.Start();
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"git rev-parse --abbrev-ref HEAD in '{repositoryPath}' endete mit Exit-Code {process.ExitCode}.{Environment.NewLine}{stderr}");
+        }
+
+        return stdout.Trim();
+    }
+
+    /// <summary>
+    /// Löst den tatsächlichen Repository-Pfad unter <paramref name="repoMainPfad"/> auf: Legt
+    /// <c>LocalDirectoryPlugin</c> im InSourceDirectory-Modus dort nur die Pointer-Datei
+    /// <c>.softwareschmiede-local-workspace</c> ab (statt tatsächlich zu klonen), wird deren Inhalt (das
+    /// tatsächliche Quellverzeichnis) zurückgegeben; andernfalls wird <paramref name="repoMainPfad"/> selbst
+    /// zurückgegeben.
+    /// </summary>
+    protected static string ResolveLocalWorkspacePointerPath(string repoMainPfad)
+    {
+        var pointerPfad = Path.Combine(repoMainPfad, ".softwareschmiede-local-workspace");
+        return File.Exists(pointerPfad) ? File.ReadAllText(pointerPfad).Trim() : repoMainPfad;
     }
 
     /// <summary>

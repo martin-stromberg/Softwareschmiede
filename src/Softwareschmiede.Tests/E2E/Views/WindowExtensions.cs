@@ -14,7 +14,6 @@ public static class WindowExtensions
         w => new IssueSelectionDialogView(w),
         w => new IssueCreateDialogView(w),
         w => new AutonomAufgabeInitialisierungsDialogView(w),
-        w => new AutonomAufgabeDetailDialogView(w),
         w => new ArbeitsverzeichnisBearbeitenDialogView(w),
         w => new OpenTodosDialogView(w),
         w => new HelpTextDialogView(w),
@@ -90,6 +89,18 @@ public static class WindowExtensions
         var desktop = window.Automation.GetDesktop();
         return desktop
             .FindAllDescendants(cf => cf.ByControlType(ControlType.Window))
+            .Where(w =>
+            {
+                try
+                {
+                    _ = w.Name;
+                    return true;
+                }
+                catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
+                {
+                    return false;
+                }
+            })
             .Select(w => w.Name)
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .ToHashSet(StringComparer.Ordinal);

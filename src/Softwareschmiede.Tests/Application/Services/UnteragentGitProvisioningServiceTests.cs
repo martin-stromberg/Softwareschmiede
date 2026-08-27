@@ -12,6 +12,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 public sealed class UnteragentGitProvisioningServiceTests : IDisposable
 {
     private readonly Mock<ICliRunner> _cliRunnerMock;
+    private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly UnteragentGitProvisioningService _sut;
     private readonly string _testRoot;
     private readonly string _repoMainPfad;
@@ -20,7 +21,9 @@ public sealed class UnteragentGitProvisioningServiceTests : IDisposable
     public UnteragentGitProvisioningServiceTests()
     {
         _cliRunnerMock = new Mock<ICliRunner>();
-        _sut = new UnteragentGitProvisioningService(_cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        _gitPluginMock = new Mock<IGitPlugin>();
+        _gitPluginMock.SetupPassthroughResolveEffectiveRepositoryPath();
+        _sut = new UnteragentGitProvisioningService(_cliRunnerMock.Object, _gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "UnteragentGitProvisioning", Guid.NewGuid().ToString("N"));
         _repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
@@ -36,7 +39,7 @@ public sealed class UnteragentGitProvisioningServiceTests : IDisposable
         }
     }
 
-    /// <summary>ProvisioniereAsync erstellt das Arbeitsverzeichnis, legt den Branch an und klont den Branch in den Zielpfad.</summary>
+    /// <summary>ProvisioniereAsync erstellt das Arbeitsverzeichnis, legt den Branch an und klont den Branch in den Zielpfad, wobei der Repository-Pfad nur einmal (nicht redundant zweimal) aufgelöst wird.</summary>
     [Fact]
     public async Task ProvisioniereAsync_ErstelltVerzeichnisBranchUndKlon()
     {
@@ -58,6 +61,7 @@ public sealed class UnteragentGitProvisioningServiceTests : IDisposable
         Directory.Exists(unteragent.VerzeichnisPfad).Should().BeTrue();
         Directory.Exists(unteragent.GitArbeitsbereich.ClonePfad).Should().BeTrue();
         _cliRunnerMock.Verify(r => r.RunAsync("git", It.Is<IEnumerable<string>>(a => a.Contains("branch") && a.Contains(unteragent.GitArbeitsbereich.BranchName)), _repoMainPfad, It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _gitPluginMock.Verify(p => p.ResolveEffectiveRepositoryPathAsync(_repoMainPfad, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>ProvisioniereAsync wirft eine InvalidOperationException, wenn die Branch-Erstellung fehlschlägt, und klont nicht.</summary>

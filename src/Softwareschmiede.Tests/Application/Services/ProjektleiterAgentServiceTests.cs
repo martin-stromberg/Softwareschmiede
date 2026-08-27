@@ -15,6 +15,8 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly Mock<ICliRunner> _cliRunnerMock;
+    private readonly KiAusfuehrungsService _kiAusfuehrungsService;
+    private readonly Mock<IKiPlugin> _kiPluginMock;
     private readonly ProjektleiterAgentService _sut;
     private readonly string _testRoot;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -45,9 +47,14 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
 
+        var gitPluginMock = new Mock<IGitPlugin>();
+        gitPluginMock.SetupPassthroughResolveEffectiveRepositoryPath();
+
         var governanceService = new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance);
-        var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
-        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, NullLogger<ProjektleiterAgentService>.Instance);
+        var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
+        _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
+        (_kiPluginMock, var pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(_db);
+        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "ProjektleiterAgent", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testRoot);
@@ -66,6 +73,7 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
+        _kiAusfuehrungsService.Dispose();
         _db.Dispose();
         if (Directory.Exists(_testRoot))
         {

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Softwareschmiede.App.Services;
@@ -95,6 +96,30 @@ public static class TaskDetailViewModelTestFactory
     {
         prozessStarterMock ??= new Mock<IProzessStarter>();
         return new ArbeitsverzeichnisOeffnenService(prozessStarterMock.Object);
+    }
+
+    /// <summary>
+    /// Erstellt einen IServiceProvider-Mock, der die von TaskDetailViewModel.LadenAsync via GetRequiredService
+    /// aufgelösten Abhängigkeiten für die Wiederherstellung von AutonomAufgabeDetailViewModel bei bereits
+    /// autonom konfigurierten Aufgaben bereitstellt (ProjektleiterAgentService, SessionManagementService,
+    /// ILogger&lt;AutonomAufgabeDetailViewModel&gt;), ansonsten aber wie ein leerer Mock reagiert (GetService
+    /// liefert für alle anderen Typen weiterhin null). Ohne diese Registrierungen würde jeder CreateSut()-Test
+    /// mit einer bereits autonom konfigurierten Aufgabe an einer InvalidOperationException aus
+    /// GetRequiredService scheitern, sobald LadenAsync (siehe TaskDetailViewModel.cs) versucht, das
+    /// ViewModel wiederherzustellen.
+    /// </summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext.</param>
+    /// <param name="kiAusfuehrungsService">Der zu verwendende KiAusfuehrungsService (dieselbe Instanz wie im übrigen Testaufbau).</param>
+    /// <returns>Ein IServiceProvider mit den für Autonome-Aufgabe-Rehydrierung nötigen Registrierungen.</returns>
+    public static IServiceProvider CreateDefaultServiceProvider(SoftwareschmiededDbContext db, KiAusfuehrungsService kiAusfuehrungsService)
+    {
+        var mock = new Mock<IServiceProvider>();
+        var projektleiterAgentService = AutonomAufgabenInitialisierungsServiceTestFactory.CreateProjektleiterAgentService(db, kiAusfuehrungsService);
+        var sessionManagementService = new SessionManagementService(db, NullLogger<SessionManagementService>.Instance);
+        mock.Setup(sp => sp.GetService(typeof(ProjektleiterAgentService))).Returns(projektleiterAgentService);
+        mock.Setup(sp => sp.GetService(typeof(SessionManagementService))).Returns(sessionManagementService);
+        mock.Setup(sp => sp.GetService(typeof(ILogger<AutonomAufgabeDetailViewModel>))).Returns(NullLogger<AutonomAufgabeDetailViewModel>.Instance);
+        return mock.Object;
     }
 
     /// <summary>Erstellt einen AutonomAufgabeStartService mit den übergebenen Abhängigkeiten für Tests.</summary>

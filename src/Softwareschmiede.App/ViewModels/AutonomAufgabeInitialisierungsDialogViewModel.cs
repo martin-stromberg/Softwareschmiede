@@ -183,7 +183,12 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModel : ViewModelBas
     /// <summary>Zeigt die Eingabe für einen neu anzulegenden Branch an.</summary>
     public ICommand ShowCreateBranchCommand { get; }
 
-    /// <summary>Legt den in <see cref="NewBranchName"/> angegebenen Branch im Repository der Aufgabe an.</summary>
+    /// <summary>
+    /// Übernimmt den in <see cref="NewBranchName"/> angegebenen Namen nach Validierung (nicht leer, kein
+    /// Duplikat in <see cref="AvailableProjectBranches"/>) in die Branch-Auswahlliste. Führt keine Git-Operation
+    /// aus; die tatsächliche Anlage des Branches erfolgt erst später durch
+    /// <see cref="AutonomAufgabenInitialisierungsService"/> nach dem Repository-Klon.
+    /// </summary>
     public ICommand CreateBranchCommand { get; }
 
     /// <summary>Bricht die Neuanlage eines Branches ab.</summary>
@@ -322,44 +327,37 @@ public sealed class AutonomAufgabeInitialisierungsDialogViewModel : ViewModelBas
         NewBranchError = null;
     }
 
-    private async Task NeuenBranchAnlegenAsync(CancellationToken ct)
+    // Die Methode ist rein synchron (nur lokale Validierung, keine Git-Operation), muss aber wegen des
+    // AsyncRelayCommand-Delegattyps (Func<CancellationToken, Task>) von CreateBranchCommand weiterhin einen
+    // CancellationToken-Parameter entgegennehmen; er wird daher bewusst nicht verwendet ("_").
+    private Task NeuenBranchAnlegenAsync(CancellationToken _)
     {
         NewBranchError = null;
 
-        if (_aufgabe is null || string.IsNullOrWhiteSpace(_aufgabe.LokalerKlonPfad))
+        if (string.IsNullOrWhiteSpace(NewBranchName))
         {
-            NewBranchError = "Kein lokaler Klon der Aufgabe vorhanden; Branch kann nicht angelegt werden.";
-            return;
+            NewBranchError = "Branch-Name darf nicht leer sein.";
+            return Task.CompletedTask;
         }
 
-        var gitPlugin = ResolveGitPlugin();
-        if (gitPlugin is null)
+        if (!GitBranchNameValidator.IstGueltig(NewBranchName))
         {
-            NewBranchError = "Kein Git-Plugin für das Repository der Aufgabe verfügbar.";
-            return;
+            NewBranchError = $"'{NewBranchName}' ist kein gültiger Git-Branch-Name.";
+            return Task.CompletedTask;
         }
 
-        try
+        if (AvailableProjectBranches.Contains(NewBranchName, StringComparer.OrdinalIgnoreCase))
         {
-            await gitPlugin.CreateBranchAsync(_aufgabe.LokalerKlonPfad, NewBranchName, SelectedProjectBranch, ct);
+            NewBranchError = $"Branch '{NewBranchName}' existiert bereits.";
+            return Task.CompletedTask;
+        }
 
-            if (!AvailableProjectBranches.Contains(NewBranchName, StringComparer.OrdinalIgnoreCase))
-                AvailableProjectBranches.Add(NewBranchName);
-
-            SelectedProjectBranch = NewBranchName;
-            IsProjectBranchManualInput = false;
-            IsCreatingBranch = false;
-            NewBranchName = string.Empty;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Branch '{BranchName}' konnte nicht angelegt werden.", NewBranchName);
-            NewBranchError = $"Branch konnte nicht angelegt werden: {ex.Message}";
-        }
+        AvailableProjectBranches.Add(NewBranchName);
+        SelectedProjectBranch = NewBranchName;
+        IsProjectBranchManualInput = false;
+        IsCreatingBranch = false;
+        NewBranchName = string.Empty;
+        return Task.CompletedTask;
     }
 
     /// <summary>Validiert die Eingaben und ruft <see cref="AutonomAufgabenInitialisierungsService"/> mit allen Formularwerten auf.</summary>

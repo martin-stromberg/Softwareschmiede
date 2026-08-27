@@ -49,11 +49,13 @@
                             <controls:RibbonLargeButton ButtonIcon="▶"
                                                         ButtonText="Starten"
                                                         AutomationName="Starten"
-                                                        ButtonCommand="{Binding StartenCommand}" />
+                                                        ButtonCommand="{Binding StartenCommand}"
+                                                        Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="✓"
                                                         ButtonText="Beenden"
                                                         AutomationName="Beenden"
-                                                        ButtonCommand="{Binding AufgabeAbschliessenCommand}" />
+                                                        ButtonCommand="{Binding AufgabeAbschliessenCommand}"
+                                                        Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
                             <TextBlock Text="{Binding TodoList.OffeneTodoCount, StringFormat='⚠ {0} offen'}"
                                        AutomationProperties.Name="OffeneTodoCountBadge"
                                        AutomationProperties.HelpText="{Binding TodoList.OffeneTodoCount}"
@@ -86,7 +88,7 @@
                                                         ButtonText="Stoppen"
                                                         AutomationName="CliStoppen"
                                                         ButtonCommand="{Binding CliStoppenCommand}"
-                                                        Visibility="{Binding IsCliRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        Visibility="{Binding KannCliStoppen, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <StackPanel Margin="12,0,0,0"
                                         VerticalAlignment="Center">
                                 <TextBlock Text="Promptvorlage"
@@ -194,7 +196,23 @@
                             <controls:RibbonLargeButton ButtonIcon="🤖"
                                                         ButtonText="Autonome Aufgabe starten"
                                                         AutomationName="AutonomAufgabeInitialisieren"
-                                                        ButtonCommand="{Binding AutonomAufgabeInitialisierenCommand}" />
+                                                        ButtonCommand="{Binding AutonomAufgabeInitialisierenCommand}"
+                                                        Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="▶"
+                                                        ButtonText="Start"
+                                                        AutomationName="AutonomAufgabeStartAgent"
+                                                        ButtonCommand="{Binding AutonomAufgabeDetailViewModel.StartCommand}"
+                                                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="■"
+                                                        ButtonText="Stop"
+                                                        AutomationName="AutonomAufgabeStopAgent"
+                                                        ButtonCommand="{Binding AutonomAufgabeDetailViewModel.StopCommand}"
+                                                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="▶"
+                                                        ButtonText="Resume"
+                                                        AutomationName="AutonomAufgabeResumeAgent"
+                                                        ButtonCommand="{Binding AutonomAufgabeDetailViewModel.ResumeCommand}"
+                                                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
                         </StackPanel>
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
@@ -309,6 +327,13 @@
                         Padding="12,4"
                         Margin="6,0,0,0"
                         FontSize="12" />
+                <Button Content="Automatisierung"
+                        AutomationProperties.Name="AutomatisierungViewButton"
+                        Command="{Binding AutomatisierungViewCommand}"
+                        Padding="12,4"
+                        Margin="6,0,0,0"
+                        FontSize="12"
+                        Visibility="{Binding ShowAutomatisierungPanel, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
 
             <Grid Grid.Row="1">
@@ -580,6 +605,13 @@
 
                 <views:TodoListView DataContext="{Binding TodoList}"
                                     Visibility="{Binding DataContext.IsTodoViewSelected, ElementName=Root, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="12"
+                              Visibility="{Binding IsAutomatisierungViewSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <views:AutonomAufgabeDetailView DataContext="{Binding AutonomAufgabeDetailViewModel}" />
+                </ScrollViewer>
             </Grid>
         </Grid>
 

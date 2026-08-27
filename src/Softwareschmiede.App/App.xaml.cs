@@ -12,6 +12,8 @@ using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
+using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Plugins;
@@ -98,6 +100,37 @@ public sealed partial class App : System.Windows.Application
             await promptVorlagenService.EnsureInitialPromptVorlagenAsync();
         }
 
+        using (var recoveryScope = _host.Services.CreateScope())
+        {
+            try
+            {
+                var db = recoveryScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                var projektleiterAgentService = recoveryScope.ServiceProvider.GetRequiredService<ProjektleiterAgentService>();
+
+                var wiederherzustellendeAufgaben = await db.AutonomAufgabeKonfigurationen
+                    .Include(k => k.Aufgabe)
+                    .Where(k => !k.ExplizitGestoppt && k.Aufgabe.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv)
+                    .ToListAsync();
+
+                foreach (var konfiguration in wiederherzustellendeAufgaben)
+                {
+                    try
+                    {
+                        var resumePrompt = ErstelleResumePromptNachAppNeustart(konfiguration);
+                        await projektleiterAgentService.StarteAgenNachAppNeustartAsync(konfiguration.AufgabeId, resumePrompt);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Error(ex, "Autonome Aufgabe {AufgabeId} konnte beim App-Start nicht automatisch fortgesetzt werden.", konfiguration.AufgabeId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "App-Startup-Recovery für Autonome Aufgaben ist fehlgeschlagen.");
+            }
+        }
+
         try
         {
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
@@ -108,6 +141,15 @@ public sealed partial class App : System.Windows.Application
             Log.Logger.Error(ex, "MainWindow konnte nicht angezeigt werden.");
         }
     }
+
+    /// <summary>Erzeugt den Weitermachen-Prompt für die automatische Wiederaufnahme einer Autonomen Aufgabe nach einem
+    /// App-Neustart (analog zu <see cref="SessionManagementService"/>s Weitermachen-Prompt-Generierung).</summary>
+    /// <param name="konfiguration">Die Konfiguration der Autonomen Aufgabe.</param>
+    /// <returns>Der zu sendende Weitermachen-Prompt.</returns>
+    private static string ErstelleResumePromptNachAppNeustart(AutonomAufgabeKonfiguration konfiguration)
+        => "Weitermachen nach App-Neustart: Setze die Arbeit an der Autonomen Aufgabe im Arbeitsverzeichnis " +
+           $"'{konfiguration.ArbeitsverzeichnisPfad}' fort. Prüfe state.json, plan.md und progress.md " +
+           "für den aktuellen Stand, bevor du weitermachst.";
 
     private static void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {

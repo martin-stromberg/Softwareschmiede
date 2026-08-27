@@ -47,17 +47,19 @@ public sealed class AutonomAufgabeInitialisierungsDialogView : DialogView
     }
 
     /// <summary>
-    /// Bestätigt den Dialog über "AutonomAufgabeBestaetigen" und wartet auf die anschließend
-    /// erscheinende Detailansicht (Arbeitsverzeichnis-/Repository-Vorbereitung kann einige Sekunden dauern).
+    /// Bestätigt den Dialog über "AutonomAufgabeBestaetigen" und wartet, bis die eingebettete
+    /// "Automatisierung"-Registerkarte der Aufgabendetailansicht sichtbar wird (Arbeitsverzeichnis-/
+    /// Repository-Vorbereitung kann einige Sekunden dauern). Kein eigenes Detail-Fenster mehr (Folge-
+    /// Integration zu Issue 205): Steuerung erfolgt danach ausschließlich über die Ribbon-Buttons der
+    /// Aufgabendetailansicht.
     /// </summary>
-    /// <returns>Die geöffnete Detailansicht der autonomen Aufgabe.</returns>
-    public AutonomAufgabeDetailDialogView Confirm()
+    /// <returns>Die Detailansicht der autonomen Aufgabe (eingebettete Registerkarte).</returns>
+    public AutonomAufgabeDetailView Confirm()
     {
         var dialog = GetDialogWindow();
         WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().Click();
 
-        var detail = new AutonomAufgabeDetailDialogView(Window);
-        detail.ForceShow();
-        return detail;
+        WaitForElement(Window, cf => cf.ByName("AutonomAufgabeDetailTabs"), Long);
+        return new AutonomAufgabeDetailView(Window);
     }
 }

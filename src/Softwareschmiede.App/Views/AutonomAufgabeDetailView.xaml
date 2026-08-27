@@ -5,7 +5,6 @@
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -20,24 +19,9 @@
                        TextWrapping="Wrap" />
         </Border>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
-            <Button Content="Start"
-                    AutomationProperties.Name="AutonomAufgabeStart"
-                    Command="{Binding StartCommand}"
-                    Padding="12,6"
-                    Margin="0,0,8,0" />
-            <Button Content="Stop"
-                    AutomationProperties.Name="AutonomAufgabeStop"
-                    Command="{Binding StopCommand}"
-                    Padding="12,6"
-                    Margin="0,0,8,0" />
-            <Button Content="Resume"
-                    AutomationProperties.Name="AutonomAufgabeResume"
-                    Command="{Binding ResumeCommand}"
-                    Padding="12,6" />
-        </StackPanel>
-
-        <TabControl Grid.Row="2" AutomationProperties.Name="AutonomAufgabeDetailTabs">
+        <!-- Start/Stop/Resume werden ausschließlich über das Ribbon (Gruppe "Autonome Aufgabe") gesteuert,
+             siehe TaskDetailView.xaml — keine doppelte Bedienung im Inhaltsbereich. -->
+        <TabControl Grid.Row="1" AutomationProperties.Name="AutonomAufgabeDetailTabs">
             <TabItem Header="Konfiguration">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
                     <StackPanel>

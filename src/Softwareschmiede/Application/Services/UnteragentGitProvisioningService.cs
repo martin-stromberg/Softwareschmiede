@@ -8,12 +8,14 @@ namespace Softwareschmiede.Application.Services;
 public sealed class UnteragentGitProvisioningService
 {
     private readonly ICliRunner _cliRunner;
+    private readonly IGitPlugin _gitPlugin;
     private readonly ILogger<UnteragentGitProvisioningService> _logger;
 
     /// <inheritdoc cref="UnteragentGitProvisioningService"/>
-    public UnteragentGitProvisioningService(ICliRunner cliRunner, ILogger<UnteragentGitProvisioningService> logger)
+    public UnteragentGitProvisioningService(ICliRunner cliRunner, IGitPlugin gitPlugin, ILogger<UnteragentGitProvisioningService> logger)
     {
         _cliRunner = cliRunner;
+        _gitPlugin = gitPlugin;
         _logger = logger;
     }
 
@@ -31,15 +33,23 @@ public sealed class UnteragentGitProvisioningService
             return Task.CompletedTask;
         });
 
-        var branchErgebnis = await _cliRunner.RunAsync("git", ["branch", unteragent.GitArbeitsbereich.BranchName], repoMainPfad, null, ct);
-        if (!branchErgebnis.IsSuccess)
-        {
-            throw new InvalidOperationException($"Branch '{unteragent.GitArbeitsbereich.BranchName}' für Unteragent '{unteragent.ExterneAgentId}' konnte nicht angelegt werden: {branchErgebnis.StdErr}");
-        }
+        // ErstelleLokalenBranchAsync löst repoMainPfad intern bereits über
+        // IGitPlugin.ResolveEffectiveRepositoryPathAsync auf (manche Plugins, z. B. LocalDirectoryPlugin im
+        // InSourceDirectory-Modus, legen dort nur eine Pointer-Datei ab, statt dort tatsächlich zu klonen) und
+        // gibt den aufgelösten Pfad zurück, damit er hier für den Klon wiederverwendet werden kann, statt ihn
+        // ein zweites Mal aufzulösen.
+        var effektiverRepoMainPfad = await GitBranchHelper.ErstelleLokalenBranchAsync(
+            _cliRunner,
+            _gitPlugin,
+            repoMainPfad,
+            unteragent.GitArbeitsbereich.BranchName,
+            _logger,
+            $"Branch '{unteragent.GitArbeitsbereich.BranchName}' für Unteragent '{unteragent.ExterneAgentId}' konnte nicht angelegt werden",
+            ct);
 
         await GitKlonHelper.KloneFallsNichtVorhandenAsync(
             _cliRunner,
-            repoMainPfad,
+            effektiverRepoMainPfad,
             unteragent.GitArbeitsbereich.ClonePfad,
             unteragent.GitArbeitsbereich.BranchName,
             _logger,

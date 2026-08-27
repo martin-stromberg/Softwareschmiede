@@ -88,7 +88,12 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         Assert.Null(auswahlBox.FindFirstDescendant(cf => cf.ByName(VorgeschlagenesSkript)));
 
         // (3) Freitext-Eingabe eines nicht vorgeschlagenen Pfads wird trotzdem als Initialisierungsskript akzeptiert.
+        // Das Dropdown aus der Live-Filterung (2) steht noch offen (ExpandCollapseState.Expanded); ein Klick
+        // auf "Speichern" würde vom offenen Popup abgefangen und nur dessen Schließen auslösen, statt den
+        // Button zu erreichen (WPF schließt ein offenes Popup beim ersten Klick außerhalb, ohne den Klick an
+        // darunterliegende Controls weiterzureichen). Daher muss das Dropdown vor dem Klick explizit geschlossen werden.
         auswahlBox.AsComboBox().EditableText = UnbekanntesSkript;
+        auswahlBox.Patterns.ExpandCollapse.Pattern.Collapse();
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptSpeichern"), Short);
         speichernButton.AsButton().Click();
