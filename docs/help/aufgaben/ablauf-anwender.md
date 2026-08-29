@@ -68,7 +68,7 @@ Wenn der Aufgabe noch kein Issue zugeordnet ist und der Repository-Provider die 
 1. Öffne die **Info-Ansicht** der Aufgabe und klicke auf **Issue anlegen**.
 2. Prüfe oder bearbeite den vorausgefüllten **Titel** und die **Beschreibung**. Die Anforderungsbeschreibung der Aufgabe wird als Ausgangstext übernommen; ein leerer Text ist zulässig.
 3. Falls Templates verfügbar sind, wähle ein **Template** aus. Die Beschreibung enthält danach den Template-Inhalt, eine Trennlinie und `Originalanforderung:` mit der ursprünglichen Anforderungsbeschreibung. Der zusammengesetzte Text kann vollständig geändert werden.
-4. Optional: Wähle einen angebotenen KI-Provider und klicke auf **Ausfüllen**, um das ausgewählte Template anhand der Originalanforderung ausfüllen zu lassen. Prüfe und bearbeite das Ergebnis vor dem Absenden.
+4. Optional: Wähle im Dialog einen der verfügbaren KI-Provider (Codex, Claude, Devin oder GitHub Copilot) und klicke auf **Ausfüllen**, um das ausgewählte Template anhand der Originalanforderung ausfüllen zu lassen. Prüfe und bearbeite das Ergebnis vor dem Absenden.
 5. Optional: Aktiviere **Aufgabenbeschreibung nach Issue-Anlage aktualisieren**, wenn die Aufgabenbeschreibung nach erfolgreicher Issue-Erstellung durch den Issue-Text ersetzt werden soll.
 6. Klicke auf **Anlegen**. Mit **Abbrechen** wird der Dialog ohne Provider- oder Speichervorgang geschlossen.
 

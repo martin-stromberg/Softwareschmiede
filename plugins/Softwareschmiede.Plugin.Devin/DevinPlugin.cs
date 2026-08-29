@@ -8,7 +8,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Devin-CLI Plugin fuer KI-gestuetzte Entwicklung.</summary>
-public sealed class DevinPlugin : CliKiPluginBase
+public sealed class DevinPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 
@@ -74,6 +74,40 @@ public sealed class DevinPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Pruefe Devin-CLI-Plugin-Health.");
         return await CheckHealthWithVersionCommandAsync(GetDevinCommand(), ct);
+    }
+
+    /// <inheritdoc/>
+    public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
+    {
+        var invocation = BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+        return RunOneShotTextGenerationAsync(invocation.ProcessStartInfo, null, ct);
+    }
+
+    internal (ProcessStartInfo ProcessStartInfo, string? StandardInput) BuildIssueTemplateFillInvocation(
+        string templateBody,
+        string? originalRequirement)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = GetDevinCommand(),
+            WorkingDirectory = Path.GetTempPath(),
+        };
+
+        psi.ArgumentList.Add("-p");
+        psi.ArgumentList.Add(BuildIssueTemplateFillPrompt(templateBody, originalRequirement));
+        psi.ArgumentList.Add("--respect-workspace-trust");
+        psi.ArgumentList.Add("false");
+
+        var commandLineParameters = _credentialStore.GetCredential($"{PluginPrefix}.CommandLineParameters");
+        if (!string.IsNullOrWhiteSpace(commandLineParameters))
+        {
+            foreach (var part in commandLineParameters.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                psi.ArgumentList.Add(part);
+            }
+        }
+
+        return (psi, null);
     }
 
     /// <inheritdoc/>
