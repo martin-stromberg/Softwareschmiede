@@ -149,4 +149,46 @@ public sealed class DevinPluginTests
         psi.EnvironmentVariables.ContainsKey("DEVIN_API_KEY").Should().BeFalse();
         psi.EnvironmentVariables.ContainsKey("DEVIN_TOKEN").Should().BeFalse();
     }
+
+    /// <summary>Devin bietet die rueckgabefaehige Issue-Template-Ausfuellhilfe an.</summary>
+    [Fact]
+    public void Plugin_ShouldExposeIssueTemplateTextGeneratorCapability()
+    {
+        _sut.Should().BeAssignableTo<IIssueTemplateTextGenerator>();
+    }
+
+    /// <summary>Issue-Ausfuellhilfe uebergibt den Prompt als Argument an Devin -p.</summary>
+    [Fact]
+    public void BuildIssueTemplateFillInvocation_ShouldPassPromptAsArgument()
+    {
+        const string templateBody = "## Fehlerbeschreibung\nBitte ausfuellen.";
+        const string originalRequirement = "Als Nutzer moechte ich ein Issue aus einer Aufgabe anlegen.";
+        _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.ExecutablePath"))
+            .Returns(@"C:\tools\devin.exe");
+
+        var invocation = _sut.BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+
+        invocation.ProcessStartInfo.FileName.Should().Be(@"C:\tools\devin.exe");
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("-p");
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("--respect-workspace-trust");
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("false");
+        invocation.StandardInput.Should().BeNull();
+        invocation.ProcessStartInfo.ArgumentList.Should().ContainSingle(arg =>
+            arg.Contains("Template:", StringComparison.Ordinal)
+            && arg.Contains(templateBody)
+            && arg.Contains("Originalanforderung:")
+            && arg.Contains(originalRequirement));
+    }
+
+    /// <summary>BuildIssueTemplateFillInvocation haengt gespeicherte CommandLineParameters als einzelne Argumente an.</summary>
+    [Fact]
+    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameters()
+    {
+        _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.CommandLineParameters"))
+            .Returns("--model sonnet --permission-mode plan");
+
+        var invocation = _sut.BuildIssueTemplateFillInvocation("template", null);
+
+        invocation.ProcessStartInfo.ArgumentList.Should().ContainInOrder("--model", "sonnet", "--permission-mode", "plan");
+    }
 }
