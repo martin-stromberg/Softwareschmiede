@@ -197,7 +197,7 @@
                                                         ButtonText="Autonome Aufgabe starten"
                                                         AutomationName="AutonomAufgabeInitialisieren"
                                                         ButtonCommand="{Binding AutonomAufgabeInitialisierenCommand}"
-                                                        Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                                                        Visibility="{Binding CanAutonomAufgabeInitialisieren, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="▶"
                                                         ButtonText="Start"
                                                         AutomationName="AutonomAufgabeStartAgent"
