@@ -37,20 +37,24 @@ Starten Sie die Softwareschmiede-Anwendung neu, damit alle Services initialisier
 
 ### 3. Feature-Flag prüfen
 
-Die Funktion ist standardmäßig aktiviert. Überprüfen Sie `appsettings.json`:
+Die Funktion ist standardmäßig aktiviert. Sie wird über zwei Ebenen gesteuert:
 
-```json
-"AutonomAufgaben": {
-  "Enabled": true,
-  "DefaultTokenBudget": 500000,
-  "DefaultRuntimeLimitMinutes": 480,
-  "HeartbeatTimeoutSeconds": 300,
-  "MaxConcurrentSubagents": 5,
-  "SkillAutoGenerationEnabled": false
-}
-```
+1. **Deployment-Zeit** (`appsettings.json`, gebunden über `IOptions<AutonomAufgabenOptions>`, erfordert Neustart):
 
-Falls Sie die Funktion deaktivieren möchten, setzen Sie `Enabled` auf `false`.
+   ```json
+   "AutonomAufgaben": {
+     "Enabled": true,
+     "DefaultTokenBudget": 500000,
+     "DefaultRuntimeLimitMinutes": 480,
+     "HeartbeatTimeoutSeconds": 300,
+     "MaxConcurrentSubagents": 5,
+     "SkillAutoGenerationEnabled": false
+   }
+   ```
+
+2. **Laufzeit / GUI** (`AppEinstellung`-Eintrag mit Schlüssel `autonomeaufgaben.enabled`, Konstante `AppEinstellungService.AutonomAufgabenEnabledKey`, kein Neustart erforderlich): Checkbox „Autonome Aufgaben aktivieren" in **Einstellungen → Allgemein → Automatisierung**, gebunden an `SettingsViewModel.IsAutonomAufgabenEnabled`; ohne gespeicherten Eintrag gilt der Fallback `true`.
+
+Ist `AutonomAufgaben:Enabled` auf `false` gesetzt, greifen die Guard-Klauseln in `AutonomAufgabeStartService.StarteAsync()`, `AutonomAufgabenInitialisierungsService.InitialisiereAsync()` und `ProjektleiterAgentService.StarteAgentAsync()` (siehe **Business Rules**): Statt des Initialisierungsdialogs bzw. der Agent-Ausführung wird ein Fehlerresultat (UI-Einstiegspunkt) bzw. eine `InvalidOperationException` mit der Meldung aus `AutonomAufgabenOptions.DisabledErrorMessage` ("Autonome Aufgaben sind nicht aktiviert.") zurückgegeben. Die GUI-Checkbox schreibt aktuell ausschließlich in die DB-Einstellung — sie ändert nicht den `appsettings.json`-Wert und wird von den Guard-Klauseln der Backend-Services (die gegen `IOptions<AutonomAufgabenOptions>` prüfen) nicht ausgewertet; sie steuert stattdessen die UI-Sichtbarkeit (`TaskDetailViewModel.IsAutonomAufgabenEnabled`, `ShowAutomatisierungPanel`).
 
 ## Konfiguration
 

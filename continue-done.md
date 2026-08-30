@@ -63,3 +63,19 @@ MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 ## Verifikation am 2026-07-19
 
 - `dotnet test src\Softwareschmiede.Tests\Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~TaskDetailViewModelTests.PullRequestErstellenCommand|FullyQualifiedName~TaskDetailViewTests"`: bestanden, 3/3.
+
+---
+
+# Aufgabe: Autonome Aufgaben in den Einstellungen deaktivierbar machen
+
+- [x] Die gesamte Funktionalität rund um die autonomen Aufgaben soll über die Einstellungen aktivierbar/deaktivierbar sein, wobei sie standardmäßig aktiviert ist.
+- [x] Ist die Funktionalität deaktiviert, so muss das einfache Starten einer Aufgabe mit CLI-Ausführung weiterhin wie bisher möglich sein (die Deaktivierung darf ausschließlich die autonome Ablaufsteuerung betreffen, nicht die grundlegende manuelle CLI-Ausführung einer Aufgabe).
+
+Umgesetzt über einen Dual-Layer-Feature-Flag: `AutonomAufgabenOptions.Enabled` (appsettings.json/Umgebungsvariable-Deployment-Default, Standard `true`) plus ein DB-persistierter Laufzeit-Schalter über eine neue Checkbox „Autonome Aufgaben aktivieren" in den Einstellungen (Registerkarte „Allgemein"), zusammengeführt über den zentralen Helper `AppEinstellungService.GetAutonomAufgabenEnabledAsync(deploymentDefault, ct)`. Guard-Klauseln in `AutonomAufgabenInitialisierungsService`, `ProjektleiterAgentService` und `AutonomAufgabeStartService` verhindern bei deaktiviertem Flag den autonomen Ablauf; die reguläre CLI-Aufgabenausführung bleibt davon unberührt. `TaskDetailViewModel` blendet die Registerkarte „Automatisierung" entsprechend aus.
+
+## Verifikation am 2026-08-30
+
+- `dotnet build Softwareschmiede.slnx`: erfolgreich, 0 Warnungen, 0 Fehler.
+- `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1 dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"`: bestanden, 1495/1496 (1 übersprungen, plattformbedingt, unabhängig von dieser Änderung).
+- `dotnet format Softwareschmiede.slnx --verify-no-changes`: keine Formatierungsabweichungen.
+- Vier Code-Review-Runden durchlaufen (drei mit Befunden, jeweils behoben; vierte Runde: keine Befunde mehr).

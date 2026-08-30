@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
@@ -23,6 +24,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly PluginActivationService _pluginActivationService;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptVorlagenService _promptVorlagenService;
+    private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly List<Guid> _geloeschtePromptVorlagenIds = [];
 
@@ -41,6 +43,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private List<string> _idePluginOrder = [];
     private PluginActivationEntry? _selectedIdePlugin;
     private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
+    private bool _isAutonomAufgabenEnabled = true;
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
     public string? Arbeitsverzeichnis
@@ -172,6 +175,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _selectedIdePluginSettings, value);
     }
 
+    /// <summary>Gibt an, ob das Feature-Flag "Autonome Aufgaben" aktiviert ist.</summary>
+    public bool IsAutonomAufgabenEnabled
+    {
+        get => _isAutonomAufgabenEnabled;
+        set => SetProperty(ref _isAutonomAufgabenEnabled, value);
+    }
+
     /// <summary>Editierbare Promptvorlagen.</summary>
     public ObservableCollection<PromptVorlageEntry> PromptVorlagen { get; } = [];
 
@@ -217,7 +227,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         PluginActivationService pluginActivationService,
         PluginSettingsService pluginSettingsService,
         PromptVorlagenService promptVorlagenService,
-        ILogger<SettingsViewModel> logger)
+        ILogger<SettingsViewModel> logger,
+        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions)
     {
         _einstellungService = einstellungService;
         _arbeitsverzeichnisService = arbeitsverzeichnisService;
@@ -227,6 +238,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _pluginSettingsService = pluginSettingsService;
         _promptVorlagenService = promptVorlagenService;
         _logger = logger;
+        _autonomAufgabenOptions = autonomAufgabenOptions;
 
         _designMode = darkModeService.Current;
         _darkModeService.ModeChanged += OnDarkModeChanged;
@@ -287,6 +299,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(DefaultScmPlugin));
 
             await LadePromptVorlagenAsync(ct);
+
+            IsAutonomAufgabenEnabled = await _einstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct);
         }
         catch (OperationCanceledException)
         {
@@ -322,6 +336,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, _defaultKiPlugin, ct);
             await _einstellungService.SetSettingAsync(AppEinstellungService.DefaultScmPluginKey, _defaultScmPlugin?.PluginName, ct);
             await SpeicherePromptVorlagenAsync(ct);
+
+            await _einstellungService.SetBoolSettingAsync(
+                AppEinstellungService.AutonomAufgabenEnabledKey,
+                IsAutonomAufgabenEnabled,
+                ct);
 
             try
             {

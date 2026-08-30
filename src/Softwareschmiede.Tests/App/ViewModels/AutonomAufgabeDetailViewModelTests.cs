@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
@@ -38,7 +39,7 @@ public sealed class AutonomAufgabeDetailViewModelTests : IDisposable
         var gitProvisioningService = new UnteragentGitProvisioningService(cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
         _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
         var (_, pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(_db);
-        _projektleiterAgentService = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
+        _projektleiterAgentService = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), Options.Create(new AutonomAufgabenOptions()), NullLogger<ProjektleiterAgentService>.Instance);
         _sessionManagementService = new SessionManagementService(_db, NullLogger<SessionManagementService>.Instance);
 
         var projektId = Guid.NewGuid();

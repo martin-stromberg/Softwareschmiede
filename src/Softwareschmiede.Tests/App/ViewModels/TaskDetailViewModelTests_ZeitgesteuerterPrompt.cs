@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Softwareschmiede.App.Services;
@@ -27,6 +28,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
     private readonly PromptVorlagenService _promptVorlagenService;
     private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
     private readonly PromptZeitVersandService _promptZeitVersandService;
+    private readonly AppEinstellungService _appEinstellungService;
     private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 7, 12, 10, 0, 0, TimeSpan.Zero));
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Guid _projektId = Guid.NewGuid();
@@ -46,8 +48,9 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
+        _appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginActivationService = new PluginActivationService(_appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
         _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
 
@@ -94,7 +97,9 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
             serviceProviderMock.Object,
             _dialogServiceMock.Object,
-            _aufgabeService);
+            _aufgabeService,
+            _db,
+            appEinstellungService: _appEinstellungService);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -113,7 +118,9 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService);
+            autonomAufgabeStartService,
+            _appEinstellungService,
+            Options.Create(new AutonomAufgabenOptions()));
     }
 
     private async Task<Aufgabe> ErstelleAufgabe(AufgabeStatus status = AufgabeStatus.Neu)

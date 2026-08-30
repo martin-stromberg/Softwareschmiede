@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -17,8 +18,9 @@ public static class TaskDetailViewModelTestFactory
     /// <summary>Erstellt ein TaskDetailViewModel mit Mock-Abhängigkeiten und dem übergebenen DbContext/AufgabeService.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
+    /// <param name="autonomAufgabenOptions">Optionale AutonomAufgabenOptions für das Feature-Flag-Gating, oder null für Standard-Options (Enabled = true, wie im Produktions-Default), konsistent für alle Kollaboratoren des ViewModels.</param>
     /// <returns>Ein vollständig konfiguriertes TaskDetailViewModel.</returns>
-    public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService)
+    public static TaskDetailViewModel Create(SoftwareschmiededDbContext db, AufgabeService aufgabeService, AutonomAufgabenOptions? autonomAufgabenOptions = null)
     {
         var dialogServiceMock = new Mock<IDialogService>();
         dialogServiceMock
@@ -31,8 +33,9 @@ public static class TaskDetailViewModelTestFactory
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetIdePlugins()).Returns([]);
+        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
         var promptVorlagenService = new PromptVorlagenService(db, NullLogger<PromptVorlagenService>.Instance);
         var promptVorlagenPlatzhalterService = new PromptVorlagenPlatzhalterService();
@@ -58,7 +61,10 @@ public static class TaskDetailViewModelTestFactory
         var autonomAufgabeStartService = CreateAutonomAufgabeStartService(
             serviceProviderMock.Object,
             dialogServiceMock.Object,
-            aufgabeService);
+            aufgabeService,
+            db,
+            autonomAufgabenOptions,
+            appEinstellungService);
 
         return new TaskDetailViewModel(
             aufgabeService,
@@ -77,7 +83,9 @@ public static class TaskDetailViewModelTestFactory
             fileExplorerViewModel,
             todoListViewModel,
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService);
+            autonomAufgabeStartService,
+            appEinstellungService,
+            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()));
     }
 
     /// <summary>Erstellt ein FileExplorerViewModel mit Mock-Abhängigkeiten für Tests, die kein spezielles Diff-/Browser-Verhalten benötigen.</summary>
@@ -126,14 +134,22 @@ public static class TaskDetailViewModelTestFactory
     /// <param name="serviceProvider">Der zu verwendende IServiceProvider.</param>
     /// <param name="dialogService">Der zu verwendende IDialogService.</param>
     /// <param name="aufgabeService">Der zu verwendende AufgabeService.</param>
+    /// <param name="db">Der zu verwendende Datenbankkontext, aus dem intern ein AppEinstellungService für die Feature-Flag-Guard-Klausel erzeugt wird (sofern <paramref name="appEinstellungService"/> nicht explizit übergeben wird).</param>
+    /// <param name="autonomAufgabenOptions">Die zu verwendenden AutonomAufgabenOptions, oder null für Standard-Options (Enabled = true).</param>
+    /// <param name="appEinstellungService">Optionaler, bereits vorhandener AppEinstellungService (z. B. um denselben DB-persistierten Feature-Flag-Zustand wie im übrigen Testaufbau zu verwenden); wird sonst aus <paramref name="db"/> neu erstellt.</param>
     /// <returns>Ein einsatzbereiter AutonomAufgabeStartService.</returns>
     public static AutonomAufgabeStartService CreateAutonomAufgabeStartService(
         IServiceProvider serviceProvider,
         IDialogService dialogService,
-        AufgabeService aufgabeService)
+        AufgabeService aufgabeService,
+        SoftwareschmiededDbContext db,
+        AutonomAufgabenOptions? autonomAufgabenOptions = null,
+        AppEinstellungService? appEinstellungService = null)
         => new(
             serviceProvider,
             dialogService,
             aufgabeService,
+            appEinstellungService ?? new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance),
+            Options.Create(autonomAufgabenOptions ?? new AutonomAufgabenOptions()),
             NullLogger<AutonomAufgabeStartService>.Instance);
 }
