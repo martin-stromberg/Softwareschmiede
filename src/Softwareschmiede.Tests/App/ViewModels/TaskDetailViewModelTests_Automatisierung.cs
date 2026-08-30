@@ -1,8 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Tests.Helpers;
@@ -272,6 +274,24 @@ public sealed class TaskDetailViewModelTests_Automatisierung : TaskDetailViewMod
         sut.AufgabeId = aufgabe.Id;
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
+        sut.AutonomAufgabeInitialisierenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Bei deaktiviertem Feature-Flag "Autonome Aufgaben" (Issue 205) darf der Ribbon-Button "Autonome Aufgabe
+    /// starten" weder ausführbar noch sichtbar sein: CanAutonomAufgabeInitialisieren steuert dessen Visibility-
+    /// Binding in TaskDetailView.xaml und muss false liefern, sobald das Flag deaktiviert ist - unabhängig davon,
+    /// ob die Aufgabe bereits autonom konfiguriert ist.
+    /// </summary>
+    [Fact]
+    public async Task AutonomAufgabeInitialisierenCommand_CanExecute_FalseWennFeatureFlagDeaktiviertIst()
+    {
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        var sut = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = false }));
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanAutonomAufgabeInitialisieren.Should().BeFalse();
         sut.AutonomAufgabeInitialisierenCommand.CanExecute(null).Should().BeFalse();
     }
 }

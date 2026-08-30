@@ -145,6 +145,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowInfoPanel));
             OnPropertyChanged(nameof(IsPullRequestViewSelected));
             OnPropertyChanged(nameof(IsAutonomAufgabe));
+            OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
             WaehleStandardAnsicht();
             DetailTitelAenderungAction?.Invoke(value?.Titel);
 
@@ -397,6 +398,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// Aufgaben-Steuerungs-Buttons im Ribbon (bei autonomen Aufgaben erfolgt die Steuerung ausschließlich über die
     /// Gruppe "Autonome Aufgabe").</summary>
     public bool IsAutonomAufgabe => _aufgabe?.IstAutonom() == true;
+
+    /// <summary>Gibt an, ob der Ribbon-Button "Autonome Aufgabe starten" angezeigt werden kann: eine Aufgabe ist
+    /// geladen, ist noch nicht selbst autonom konfiguriert und das Feature-Flag für Autonome Aufgaben ist
+    /// aktiviert.</summary>
+    public bool CanAutonomAufgabeInitialisieren => _aufgabe is not null && !IsAutonomAufgabe && IsAutonomAufgabenEnabled;
 
     /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
     public bool ShowPullRequestPanel => _aufgabe is not null;
@@ -703,8 +709,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         // Start/Stop/Resume-Buttons der Gruppe "Autonome Aufgabe" durch einen Lade-Fehler nicht sichtbar
         // sind) - AutonomAufgabenInitialisierungsService.InitialisiereAsync legt dabei ungeprüft eine
         // zweite AutonomAufgabeKonfiguration an bzw. bricht beim erneuten Klonen ins bereits vorhandene
-        // Arbeitsverzeichnis ab.
-        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => _aufgabe is not null && !IsAutonomAufgabe);
+        // Arbeitsverzeichnis ab. IsAutonomAufgabenEnabled: Feature-Flag für Autonome Aufgaben (Issue 205).
+        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => CanAutonomAufgabeInitialisieren);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
@@ -801,6 +807,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _isAutonomAufgabenEnabled = neuerWert;
         OnPropertyChanged(nameof(IsAutonomAufgabenEnabled));
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+        OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
         CommandManager.InvalidateRequerySuggested();
     }
 
