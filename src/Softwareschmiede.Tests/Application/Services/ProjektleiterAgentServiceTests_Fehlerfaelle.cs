@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -32,7 +33,7 @@ public sealed class ProjektleiterAgentServiceTests_Fehlerfaelle : IDisposable
         var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
         _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
         (_kiPluginMock, var pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(_db);
-        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
+        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), Options.Create(new AutonomAufgabenOptions()), NullLogger<ProjektleiterAgentService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "ProjektleiterAgentFehler", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testRoot);

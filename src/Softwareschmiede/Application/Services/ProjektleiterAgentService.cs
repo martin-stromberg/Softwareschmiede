@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -22,6 +23,8 @@ public sealed class ProjektleiterAgentService
     private readonly UnteragentGitProvisioningService _gitProvisioningService;
     private readonly KiAusfuehrungsService _kiAusfuehrungsService;
     private readonly PluginSelectionService _pluginSelectionService;
+    private readonly AppEinstellungService _appEinstellungService;
+    private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<ProjektleiterAgentService> _logger;
 
     /// <inheritdoc cref="ProjektleiterAgentService"/>
@@ -31,6 +34,8 @@ public sealed class ProjektleiterAgentService
         UnteragentGitProvisioningService gitProvisioningService,
         KiAusfuehrungsService kiAusfuehrungsService,
         PluginSelectionService pluginSelectionService,
+        AppEinstellungService appEinstellungService,
+        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         ILogger<ProjektleiterAgentService> logger)
     {
         _db = db;
@@ -38,6 +43,8 @@ public sealed class ProjektleiterAgentService
         _gitProvisioningService = gitProvisioningService;
         _kiAusfuehrungsService = kiAusfuehrungsService;
         _pluginSelectionService = pluginSelectionService;
+        _appEinstellungService = appEinstellungService;
+        _autonomAufgabenOptions = autonomAufgabenOptions;
         _logger = logger;
     }
 
@@ -53,6 +60,14 @@ public sealed class ProjektleiterAgentService
     public async Task<string> StarteAgentAsync(AutonomAufgabeKonfiguration konfiguration, string? optionalResumePrompt = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(konfiguration);
+
+        // DB-persistierter Laufzeit-Schalter (AppEinstellungService.AutonomAufgabenEnabledKey, GUI-Einstellung)
+        // hat Vorrang vor dem appsettings.json-/Umgebungsvariable-Deployment-Default, sofern der Anwender ihn
+        // bereits explizit in den Einstellungen gesetzt hat (Issue 205, Dual-Layer-Feature-Flag).
+        if (!await _appEinstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct))
+        {
+            throw new InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage);
+        }
 
         var skillPfad = Path.Combine(konfiguration.ArbeitsverzeichnisPfad, "skills", "skill_projektleiter_v1.md");
         if (!File.Exists(skillPfad))

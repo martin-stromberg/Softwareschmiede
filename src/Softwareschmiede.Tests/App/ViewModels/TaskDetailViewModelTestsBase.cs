@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -95,12 +96,14 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
     /// <param name="visualStudioCodeLocator">Optionaler IVisualStudioCodeLocator zur Steuerung der VS-Code-Verfügbarkeit.</param>
     /// <param name="idePlugins">Optionale Überschreibung der aktiven IDE-Plugins (Standard: Visual Studio + Visual Studio Code).</param>
     /// <param name="serviceProvider">Optionaler IServiceProvider für AutonomAufgabeStartService (Standard: leerer Mock ohne Registrierungen).</param>
+    /// <param name="autonomAufgabenOptions">Optionale AutonomAufgabenOptions für das Feature-Flag-Gating (Standard: Enabled = true, wie der Produktions-Default).</param>
     /// <returns>Das erzeugte TaskDetailViewModel.</returns>
     protected TaskDetailViewModel CreateSut(
         Mock<IProzessStarter>? prozessStarterMock = null,
         IVisualStudioCodeLocator? visualStudioCodeLocator = null,
         IReadOnlyList<IIdePlugin>? idePlugins = null,
-        IServiceProvider? serviceProvider = null)
+        IServiceProvider? serviceProvider = null,
+        IOptions<AutonomAufgabenOptions>? autonomAufgabenOptions = null)
     {
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
@@ -136,7 +139,9 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
         var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
             serviceProviderObj,
             _dialogServiceMock.Object,
-            _aufgabeService);
+            _aufgabeService,
+            _db,
+            appEinstellungService: appEinstellungService);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -155,7 +160,9 @@ public abstract class TaskDetailViewModelTestsBase : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService);
+            autonomAufgabeStartService,
+            appEinstellungService,
+            autonomAufgabenOptions ?? Options.Create(new AutonomAufgabenOptions()));
     }
 
     /// <summary>Legt ein GitRepository (optional mit RepositoryStartKonfiguration) sowie eine damit verknüpfte Aufgabe an.</summary>

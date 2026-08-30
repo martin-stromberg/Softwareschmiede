@@ -15,6 +15,25 @@ Eine Autonome Aufgabe durchläuft folgende technische Phasen:
 
 ## Detaillierter Ablauf
 
+### Phase 0: Feature-Flag-Guard beim Klick auf „Autonome Aufgabe starten"
+
+**Aufruf-Chain:**
+```
+Benutzer: Klickt "Autonome Aufgabe starten" im Ribbon
+    ↓
+TaskDetailViewModel.AutonomAufgabeInitialisierenAsync()
+    ↓
+AutonomAufgabeStartService.StarteAsync(aufgabe, ct)
+    ↓
+if (!_autonomAufgabenOptions.Value.Enabled) → AutonomAufgabeStartResult mit FehlerMeldung, kein Dialog
+```
+
+`AutonomAufgabeStartService.StarteAsync()` prüft als erste Anweisung `_autonomAufgabenOptions.Value.Enabled` (`IOptions<AutonomAufgabenOptions>`, aus `appsettings.json`/Umgebungsvariable beim App-Start gebunden). Ist das Flag `false`, wird ohne weitere Verarbeitung `new AutonomAufgabeStartResult(aufgabe, "Autonome Aufgaben sind in den Einstellungen deaktiviert.", null)` zurückgegeben — `AutonomAufgabeInitialisierungsDialogViewModel` wird nicht instanziiert, der Dialog erscheint nicht. `TaskDetailViewModel` zeigt `FehlerMeldung` an. Der Ribbon-Button selbst bleibt sichtbar/klickbar (Sichtbarkeit hängt nur von `IsAutonomAufgabe`, nicht vom Feature-Flag ab) — erst der Klick löst die Guard-Klausel aus. Ist das Flag `true`, läuft Phase 1 unverändert weiter.
+
+Zwei weitere, unabhängige Guard-Klauseln (Defense-in-Depth) prüfen dasselbe Flag erneut an tieferliegenden Einstiegspunkten und werfen dort `InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage)`, falls sie direkt (ohne den UI-Weg über `AutonomAufgabeStartService`) aufgerufen werden: `AutonomAufgabenInitialisierungsService.InitialisiereAsync()` (siehe Phase 1, Schritt 0) und `ProjektleiterAgentService.StarteAgentAsync()` (siehe Phase 2, Schritt 0). Siehe **Business Rules** für Details.
+
+---
+
 ### Phase 1: Initialisierung einer Autonomen Aufgabe
 
 **Aufruf-Chain:**
@@ -65,6 +84,8 @@ Die Property `SelectedInitialPromptVorlage` löst beim Setzen `PromptVorlagenPla
 Der Button „Hilfe" (`OnHilfeClick` im Code-Behind `AutonomAufgabeInitialisierungsDialog.xaml.cs`) öffnet einen `HelpTextDialog` mit einem statischen, im Code-Behind hinterlegten Erklärungstext zum Gesamtablauf einer Autonomen Aufgabe und zu den Formularfeldern des Dialogs. Es ist keine ViewModel-Logik beteiligt.
 
 **Methode: `AutonomAufgabenInitialisierungsService.InitialisiereAsync()`**
+
+0. **Feature-Flag-Guard**: `if (!_options.Enabled) throw new InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage);` — erste Anweisung der Methode, vor jeder weiteren Verarbeitung (siehe Phase 0 und Business Rules)
 
 1. **Validierung**
    - `anfrage.InitialPrompt` ≥ 10 Zeichen?
@@ -211,6 +232,8 @@ ProjektleiterAgentService.StarteAgentAsync(konfiguration, optionalResumePrompt: 
 `ProjektleiterAgentService.StarteAgentAsync()` startet — anders als in einem früheren Entwicklungsstand, in dem diese Methode nur DB-Felder setzte — einen **echten CLI-Prozess** über dieselbe Infrastruktur wie bei regulären Aufgaben (`KiAusfuehrungsService`).
 
 **Methode: `ProjektleiterAgentService.StarteAgentAsync(konfiguration, optionalResumePrompt, ct)`**
+
+0. **Feature-Flag-Guard**: `if (!_autonomAufgabenOptions.Value.Enabled) throw new InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage);` — erste Anweisung der Methode, greift auch bei der App-Neustart-Recovery (Phase 2b) und bei Session-Fortsetzung (Phase 6), da beide intern `StarteAgentAsync()` aufrufen
 
 1. **Skill-Datei erzeugen** (falls nicht vorhanden): `skills/skill_projektleiter_v1.md` im Arbeitsverzeichnis, Inhalt aus `BuildDefaultProjektleiterSkill(konfiguration)` (enthält u. a. den Initialprompt).
 2. **Plugin auflösen**: `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync(aufgabe.KiPluginPrefix, ct)` liefert das zu verwendende `IKiPlugin`.
@@ -532,21 +555,24 @@ sequenceDiagram
     UI->>UI: Zeigt Detailansicht mit Registerkarten
 
     Benutzer->>UI: Klickt "Autonome Aufgabe starten" im Ribbon
-    UI->>Init: Initialisierungsdialog wird angezeigt
-    Benutzer->>Init: Dialog ausfüllen & bestätigen
-    Init->>Init: Validierung
-    Init->>Init: Arbeitsverzeichnis erstellen
-    Init->>Init: Repository-Klon (von GitRepository.RepositoryUrl)
-    Init->>Init: Projektbranch anlegen/auschecken
-    Init->>Init: state.json generieren
-    Init->>DB: AutonomAufgabeKonfiguration speichern
-    Init-->>UI: Zurück
-
-    UI->>Start: StarteAsync(aufgabe)
-    Start->>Start: AutonomAufgabeDetailViewModel erzeugen
-    Start-->>UI: Ergebnis mit DetailViewModel zurück
-    UI->>UI: SetzeAutonomAufgabeDetailViewAsync(DetailViewModel)
-    UI->>UI: Zeigt "Automatisierung"-Registerkarte mit Start/Stop/Fortsetzen-Buttons
+    UI->>Start: StarteAsync(aufgabe, ct)
+    alt Feature-Flag deaktiviert
+        Start-->>UI: FehlerMeldung "Autonome Aufgaben sind in den Einstellungen deaktiviert.", kein Dialog
+    else Feature-Flag aktiviert
+        Start->>Init: Initialisierungsdialog wird angezeigt
+        Benutzer->>Init: Dialog ausfüllen & bestätigen
+        Init->>Init: Validierung
+        Init->>Init: Arbeitsverzeichnis erstellen
+        Init->>Init: Repository-Klon (von GitRepository.RepositoryUrl)
+        Init->>Init: Projektbranch anlegen/auschecken
+        Init->>Init: state.json generieren
+        Init->>DB: AutonomAufgabeKonfiguration speichern
+        Init-->>Start: Zurück
+        Start->>Start: AutonomAufgabeDetailViewModel erzeugen
+        Start-->>UI: Ergebnis mit DetailViewModel zurück
+        UI->>UI: SetzeAutonomAufgabeDetailViewAsync(DetailViewModel)
+        UI->>UI: Zeigt "Automatisierung"-Registerkarte mit Start/Stop/Fortsetzen-Buttons
+    end
 
     Benutzer->>UI: Klickt "Start" Button im Ribbon
     UI->>Proj: StarteAgentAsync(konfiguration)
@@ -590,6 +616,8 @@ sequenceDiagram
 
 | Fehlerfall | Ort | Handling |
 |-----------|-----|----------|
+| Feature-Flag deaktiviert (UI-Einstiegspunkt) | `AutonomAufgabeStartService.StarteAsync()` | `AutonomAufgabeStartResult` mit `FehlerMeldung = "Autonome Aufgaben sind in den Einstellungen deaktiviert."`, kein Dialog, keine Exception |
+| Feature-Flag deaktiviert (direkter Serviceaufruf) | `AutonomAufgabenInitialisierungsService.InitialisiereAsync()`, `ProjektleiterAgentService.StarteAgentAsync()` | `InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage)` werfen |
 | Arbeitsverzeichnis existiert | Initialisierung | `DirectoryAccessException` werfen |
 | Repository-URL fehlt | Initialisierung | `InvalidOperationException` werfen, Dialog-Fehlermeldung |
 | Repository-Klon schlägt fehl | Initialisierung | `InvalidOperationException` werfen, Dialog-Fehlermeldung, partieller Klon bleibt erhalten für Retry |

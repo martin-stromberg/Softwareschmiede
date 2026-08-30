@@ -2,6 +2,39 @@
 
 # Autonome Aufgaben — Business Rules
 
+## Verfügbarkeit
+
+### Regel: Feature-Flag steuert Verfügbarkeit Autonomer Aufgaben
+
+**Beschreibung:** Autonome Aufgaben können über `AutonomAufgabenOptions.Enabled` global deaktiviert werden. Ist das Flag deaktiviert, wird an jedem der drei Einstiegspunkte per Guard-Klausel verhindert, dass eine neue Autonome Aufgabe initialisiert oder ein Projektleiter-Agent gestartet wird.
+
+**Bedingungen:**
+- `IOptions<AutonomAufgabenOptions>.Value.Enabled == false` (gebunden aus `appsettings.json`, Sektion `AutonomAufgaben`, bzw. der Umgebungsvariable `AutonomAufgaben__Enabled`, beim App-Start)
+
+**Verhalten (Defense-in-Depth, drei unabhängige Guard-Klauseln):**
+- `AutonomAufgabeStartService.StarteAsync()` (UI-Einstiegspunkt, vor dem Öffnen des Initialisierungsdialogs): gibt statt einer Dialog-Anzeige ein `AutonomAufgabeStartResult` mit `FehlerMeldung = "Autonome Aufgaben sind in den Einstellungen deaktiviert."` zurück (kein Exception-Wurf, da UI-nah)
+- `AutonomAufgabenInitialisierungsService.InitialisiereAsync()`: wirft `InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage)` ("Autonome Aufgaben sind nicht aktiviert."), bevor Arbeitsverzeichnis oder Repository-Klon angelegt werden
+- `ProjektleiterAgentService.StarteAgentAsync()`: wirft ebenfalls `InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage)`, bevor der CLI-Prozess gestartet wird
+- `TaskDetailViewModel.IsAutonomAufgabenEnabled` (`_autonomAufgabenOptions?.Value.Enabled ?? false`) steuert zusätzlich `ShowAutomatisierungPanel` (`IsAutonomAufgabe && IsAutonomAufgabenEnabled`), sodass die Registerkarte „Automatisierung" bei deaktiviertem Flag nicht angezeigt wird
+
+**Umsetzung:** `AutonomAufgabeStartService.StarteAsync()`, `AutonomAufgabenInitialisierungsService.InitialisiereAsync()`, `ProjektleiterAgentService.StarteAgentAsync()`, `TaskDetailViewModel.IsAutonomAufgabenEnabled`/`ShowAutomatisierungPanel`
+
+> **Hinweis:** Die Registerkarte „Automatisierung" (Einstellungen → Allgemein) besitzt zusätzlich eine Checkbox „Autonome Aufgaben aktivieren", die über `AppEinstellungService` (Schlüssel `autonomeaufgaben.enabled`) in der Datenbank persistiert wird. Dieser Wert wird ausschließlich von `SettingsViewModel` gelesen/geschrieben (Round-Trip für die Anzeige) und fließt derzeit **nicht** in die oben genannten Guard-Klauseln oder in `TaskDetailViewModel.IsAutonomAufgabenEnabled` ein — diese prüfen ausschließlich `IOptions<AutonomAufgabenOptions>`. Maßgeblich für die tatsächliche Verfügbarkeit ist also der beim App-Start aus `appsettings.json`/Umgebungsvariable gebundene Wert.
+
+---
+
+### Regel: Nicht-autonomer Weg ist vom Feature-Flag unabhängig
+
+**Beschreibung:** Das einfache Starten einer Aufgabe mit direkter CLI-Ausführung (`EntwicklungsprozessService`, Ribbon-Button „Starten") prüft `AutonomAufgabenOptions.Enabled` an keiner Stelle und bleibt unabhängig vom Feature-Flag-Status uneingeschränkt nutzbar.
+
+**Bedingungen:** —
+
+**Verhalten:** `EntwicklungsprozessService.ProzessStartenUndCliStartenAsync()` und `KiAusfuehrungsService.StartCliAsync()` laufen unverändert, unabhängig davon, ob Autonome Aufgaben aktiviert sind.
+
+**Umsetzung:** `EntwicklungsprozessService` (kein Guard, bewusst neutral gehalten)
+
+---
+
 ## Initialisierung
 
 ### Regel: Einmalige Initialisierung pro Aufgabe

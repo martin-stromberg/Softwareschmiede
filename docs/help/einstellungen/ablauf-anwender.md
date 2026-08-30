@@ -27,6 +27,15 @@
 
 > **Hinweis:** Änderungen am Arbeitsverzeichnis wirken sich nur auf neue Aufgaben aus. Bereits gestartete Aufgaben behalten ihren ursprünglichen Klonpfad.
 
+### Autonome Aufgaben aktivieren oder deaktivieren
+
+1. Öffnen Sie die Registerkarte **Allgemein**
+2. Im Abschnitt **Automatisierung** finden Sie die Checkbox **„Autonome Aufgaben aktivieren"** (standardmäßig aktiviert)
+3. Entfernen Sie das Häkchen, um Ihre Präferenz gegen die Nutzung autonomer Aufgaben festzuhalten, oder setzen Sie es, um sie wieder zu befürworten
+4. Klicken Sie **Speichern**
+
+> **Hinweis:** Ist die Funktion für autonome Aufgaben deaktiviert, zeigt ein Klick auf „Autonome Aufgabe starten" in der Aufgabendetailansicht statt des Initialisierungsdialogs nur noch die Meldung „Autonome Aufgaben sind in den Einstellungen deaktiviert." an. Das einfache Starten einer Aufgabe mit direkter CLI-Ausführung (Button „Starten") funktioniert unabhängig davon weiterhin wie gewohnt.
+
 ## Plugins (Registerkarte) — IDE-Plugins
 
 ### IDE-Plugin aktivieren, deaktivieren oder priorisieren

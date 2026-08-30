@@ -109,6 +109,15 @@ Jeder **Unteragent** wird mit:
 4. Projektleiter wird mit "Weitermachen"-Prompt neugestartet
 5. Läuft weiter bis zum Abschluss oder nächster Pause
 
+## Verfügbarkeit steuern
+
+Ob Autonome Aufgaben grundsätzlich zur Verfügung stehen, wird zentral gesteuert. In den **Einstellungen** (Registerkarte „Allgemein", Abschnitt „Automatisierung") hält die Checkbox **„Autonome Aufgaben aktivieren"** (Standard: aktiviert) Ihre Präferenz dazu fest.
+
+Ist die Funktion für autonome Aufgaben deaktiviert:
+- Ein Klick auf den Button **„Autonome Aufgabe starten"** öffnet keinen Initialisierungsdialog mehr, sondern zeigt die Meldung „Autonome Aufgaben sind in den Einstellungen deaktiviert." an.
+- Bereits initialisierte Autonome Aufgaben zeigen die Registerkarte „Automatisierung" nicht mehr an.
+- Das **einfache Starten einer Aufgabe mit direkter CLI-Ausführung** (Button „Starten") bleibt davon vollständig unberührt und weiterhin uneingeschränkt nutzbar — es handelt sich um einen unabhängigen, nicht-autonomen Weg.
+
 ## Einschränkungen
 
 - **Keine automatischen Pull Request Merges** — Der Projektleiter bereitet PRs vor, der Merge erfolgt manuell durch Anwender oder CI/CD-Pipeline

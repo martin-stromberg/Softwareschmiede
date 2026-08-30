@@ -4,7 +4,7 @@
 
 ## Voraussetzungen
 
-- Projektleiter-Modus muss aktiviert sein (Feature-Flag `AutonomAufgaben.Enabled = true`)
+- Autonome Aufgaben müssen aktiviert sein (in den Einstellungen, Registerkarte „Allgemein", Abschnitt „Automatisierung", hält die Checkbox „Autonome Aufgaben aktivieren" — standardmäßig aktiv — Ihre Präferenz dazu fest)
 - Aufgabe muss existieren (Projekt und Aufgabe-Entity in der DB)
 - Git-Repository-Zugang muss vorhanden sein (für Repository-Klon)
 - Mindestens 60 Minuten Laufzeitbudget erforderlich
@@ -19,6 +19,8 @@
    - Ein Initialisierungsdialog öffnet sich mit Formularfeldern
 
 > **Hinweis:** Der Dialog wird nur angezeigt, wenn die Aufgabe noch nicht als Autonome Aufgabe initialisiert wurde (Status != `AutonomAufgabe`).
+
+> **Hinweis:** Sind Autonome Aufgaben deaktiviert, öffnet sich beim Klick auf „Autonome Aufgabe starten" kein Dialog — stattdessen erscheint die Meldung „Autonome Aufgaben sind in den Einstellungen deaktiviert.". Das einfache Starten der Aufgabe über den Button „Starten" (direkte CLI-Ausführung) bleibt davon unberührt.
 
 > **Hinweis:** Im Initialisierungsdialog gibt es oben rechts einen Button **„Hilfe"**. Er öffnet einen Informationsdialog mit einer Erklärung des gesamten Ablaufs einer Autonomen Aufgabe (Initialisierung, Agent-Start, Unteragenten, Fortschritt/Integration, Session-Pause) sowie einer Kurzbeschreibung aller Formularfelder — hilfreich, wenn du zum ersten Mal eine Autonome Aufgabe anlegst.
 

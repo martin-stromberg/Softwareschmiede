@@ -1,6 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -135,7 +136,7 @@ public partial class End2EndTest
             var gitProvisioningService = new UnteragentGitProvisioningService(cliRunner, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
             using var kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
             var (_, pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(db);
-            var projektleiterAgentService = new ProjektleiterAgentService(db, governanceService, gitProvisioningService, kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
+            var projektleiterAgentService = new ProjektleiterAgentService(db, governanceService, gitProvisioningService, kiAusfuehrungsService, pluginSelectionService, new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), Options.Create(new AutonomAufgabenOptions()), NullLogger<ProjektleiterAgentService>.Instance);
             await projektleiterAgentService.SteuereUnteragentAsync(unteragent);
         }
 

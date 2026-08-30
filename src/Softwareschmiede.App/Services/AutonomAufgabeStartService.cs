@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -12,6 +13,8 @@ public sealed class AutonomAufgabeStartService
     private readonly IServiceProvider _serviceProvider;
     private readonly IDialogService _dialogService;
     private readonly AufgabeService _aufgabeService;
+    private readonly AppEinstellungService _appEinstellungService;
+    private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<AutonomAufgabeStartService> _logger;
 
     /// <inheritdoc cref="AutonomAufgabeStartService"/>
@@ -19,17 +22,32 @@ public sealed class AutonomAufgabeStartService
         IServiceProvider serviceProvider,
         IDialogService dialogService,
         AufgabeService aufgabeService,
+        AppEinstellungService appEinstellungService,
+        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         ILogger<AutonomAufgabeStartService> logger)
     {
         _serviceProvider = serviceProvider;
         _dialogService = dialogService;
         _aufgabeService = aufgabeService;
+        _appEinstellungService = appEinstellungService;
+        _autonomAufgabenOptions = autonomAufgabenOptions;
         _logger = logger;
     }
 
     /// <summary>Zeigt den Initialisierungsdialog für <paramref name="aufgabe"/> an und öffnet bei Erfolg die Detail-Ansicht. Gibt <see langword="null"/> zurück, wenn der Dialog abgebrochen wurde.</summary>
     public async Task<AutonomAufgabeStartResult?> StarteAsync(Aufgabe aufgabe, CancellationToken ct)
     {
+        // DB-persistierter Laufzeit-Schalter (AppEinstellungService.AutonomAufgabenEnabledKey, GUI-Einstellung)
+        // hat Vorrang vor dem appsettings.json-/Umgebungsvariable-Deployment-Default, sofern der Anwender ihn
+        // bereits explizit in den Einstellungen gesetzt hat (Issue 205, Dual-Layer-Feature-Flag).
+        if (!await _appEinstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct))
+        {
+            return new AutonomAufgabeStartResult(
+                aufgabe,
+                "Autonome Aufgaben sind in den Einstellungen deaktiviert.",
+                null);
+        }
+
         var aktuelleAufgabe = aufgabe;
         try
         {

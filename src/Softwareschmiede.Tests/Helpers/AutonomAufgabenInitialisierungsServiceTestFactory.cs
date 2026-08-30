@@ -74,23 +74,33 @@ internal static class AutonomAufgabenInitialisierungsServiceTestFactory
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="cliRunner">Der zu verwendende ICliRunner.</param>
     /// <param name="gitPlugin">Das IGitPlugin, über das der (via <see cref="CreatePluginSelectionService"/> gebaute) PluginSelectionService auflöst.</param>
+    /// <param name="options">Die zu verwendenden AutonomAufgabenOptions, oder null für Standard-Options (Enabled = true).</param>
     /// <returns>Ein einsatzbereiter AutonomAufgabenInitialisierungsService.</returns>
-    public static AutonomAufgabenInitialisierungsService CreateService(SoftwareschmiededDbContext db, ICliRunner cliRunner, IGitPlugin gitPlugin)
-        => new(db, cliRunner, CreatePluginSelectionService(db, gitPlugin), Options.Create(new AutonomAufgabenOptions()), NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+    public static AutonomAufgabenInitialisierungsService CreateService(SoftwareschmiededDbContext db, ICliRunner cliRunner, IGitPlugin gitPlugin, AutonomAufgabenOptions? options = null)
+        => new(
+            db,
+            cliRunner,
+            CreatePluginSelectionService(db, gitPlugin),
+            new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance),
+            Options.Create(options ?? new AutonomAufgabenOptions()),
+            NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
 
     /// <summary>Erstellt einen ProjektleiterAgentService mit gemockten Governance-/Git-Provisionierungs-Abhängigkeiten sowie einem
     /// prozesslosen KiAusfuehrungsService (<see cref="TestKiAusfuehrungsServiceFactory"/>, sofern <paramref name="kiAusfuehrungsService"/>
     /// nicht übergeben wird) und einem auf ein einziges KI-Plugin aufgelösten PluginSelectionService für Tests.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="kiAusfuehrungsService">Optionaler, bereits vorhandener KiAusfuehrungsService (z. B. um denselben Service auch für ein zugehöriges AutonomAufgabeDetailViewModel zu verwenden); wird sonst neu erstellt.</param>
+    /// <param name="options">Die zu verwendenden AutonomAufgabenOptions, oder null für Standard-Options (Enabled = true).</param>
     /// <returns>Ein einsatzbereiter ProjektleiterAgentService.</returns>
-    public static ProjektleiterAgentService CreateProjektleiterAgentService(SoftwareschmiededDbContext db, KiAusfuehrungsService? kiAusfuehrungsService = null)
+    public static ProjektleiterAgentService CreateProjektleiterAgentService(SoftwareschmiededDbContext db, KiAusfuehrungsService? kiAusfuehrungsService = null, AutonomAufgabenOptions? options = null)
         => new(
             db,
             new UnteragentGovernanceService(NullLogger<UnteragentGovernanceService>.Instance),
             new UnteragentGitProvisioningService(new Mock<ICliRunner>().Object, new Mock<IGitPlugin>().Object, NullLogger<UnteragentGitProvisioningService>.Instance),
             kiAusfuehrungsService ?? TestKiAusfuehrungsServiceFactory.Create(),
             ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(db).PluginSelectionService,
+            new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance),
+            Options.Create(options ?? new AutonomAufgabenOptions()),
             NullLogger<ProjektleiterAgentService>.Instance);
 
     /// <summary>Erstellt ein einsatzbereites AutonomAufgabeDetailViewModel für <paramref name="aufgabe"/>/<paramref name="konfiguration"/> mit minimalen (aber echten) Abhängigkeiten. Der intern erstellte ProjektleiterAgentService und das ViewModel selbst teilen sich denselben KiAusfuehrungsService, damit CLI-Start und CliIsRunning-Tracking konsistent bleiben.</summary>

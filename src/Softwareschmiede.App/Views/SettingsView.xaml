@@ -273,6 +273,18 @@
                                  Padding="8,6"
                                  BorderBrush="{DynamicResource BorderBrush}" />
                     </StackPanel>
+
+                    <!-- Automatisierung -->
+                    <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
+                        <TextBlock Text="Automatisierung"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,4" />
+                        <CheckBox IsChecked="{Binding IsAutonomAufgabenEnabled, Mode=TwoWay}"
+                                  AutomationProperties.Name="IsAutonomAufgabenEnabled"
+                                  Content="Autonome Aufgaben aktivieren"
+                                  Foreground="{DynamicResource PrimaryTextBrush}" />
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
             <TabItem>
