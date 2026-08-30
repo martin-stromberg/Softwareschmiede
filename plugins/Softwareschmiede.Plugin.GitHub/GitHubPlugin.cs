@@ -17,6 +17,7 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
     private const string RepositoryUrlKey = "RepositoryUrl";
     private const string RepositoryNameKey = "RepositoryName";
+    private static readonly Regex EmbeddedTokenPattern = new(@"oauth2:[^@\s]+@", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private readonly ICliRunner _cliRunner;
     private readonly ICredentialStore _credentialStore;
     private readonly ILogger<GitHubPlugin> _logger;
@@ -124,12 +125,12 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
         // Disable SSH host key checking to prevent /dev/tty access
         env["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
 
-        // Tell git to use .netrc for credentials
-        // GIT_CREDENTIAL_HELPER=store will use ~/.git-credentials if it exists
-        // But .netrc is more universal, so we make sure curl uses it too
         if (!string.IsNullOrEmpty(token))
         {
-            // For curl (which git uses under the hood for HTTPS)
+            // Programm-Token für git-Authentifizierung bereitstellen, ohne ihn in URLs einzubetten
+            env["GH_TOKEN"] = token;
+
+            // .netrc bleibt als optionaler Fallback erhalten (For curl, das git unter Windows/HTTPS nutzt)
             env["NETRC"] = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 OperatingSystem.IsWindows() ? "_netrc" : ".netrc");
@@ -141,18 +142,6 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
     private static bool IsHttpsRepositoryUrl(string repositoryUrl)
         => Uri.TryCreate(repositoryUrl, UriKind.Absolute, out var uri)
            && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
-
-    private static string BuildAuthenticatedCloneUrl(string repositoryUrl, string token)
-    {
-        var repositoryUri = new Uri(repositoryUrl, UriKind.Absolute);
-        var uriBuilder = new UriBuilder(repositoryUri)
-        {
-            UserName = "oauth2",
-            Password = token
-        };
-
-        return uriBuilder.Uri.AbsoluteUri;
-    }
 
     private static bool IsAuthenticationFailure(string error)
     {
@@ -181,11 +170,7 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
             sanitizedMessage = sanitizedMessage.Replace(token, "***", StringComparison.Ordinal);
         }
 
-        sanitizedMessage = Regex.Replace(
-            sanitizedMessage,
-            "oauth2:[^@\\s]+@",
-            "oauth2:***@",
-            RegexOptions.IgnoreCase);
+        sanitizedMessage = EmbeddedTokenPattern.Replace(sanitizedMessage, "oauth2:***@");
 
         return sanitizedMessage.Trim();
     }
@@ -199,15 +184,8 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
                    && normalizedError.Contains("base sha", StringComparison.Ordinal));
     }
 
-    private async Task EnsureRemoteCredentialsAsync(string localPath, CancellationToken ct = default)
+    private async Task NormalizeRemoteUrlAsync(string localPath, CancellationToken ct = default)
     {
-        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
-        if (string.IsNullOrEmpty(token))
-        {
-            _logger.LogWarning("Kein GitHub-Token verfügbar für Remote-Konfiguration.");
-            return;
-        }
-
         // Get current remote URL
         var getUrlResult = await _cliRunner.RunAsync(
             "git",
@@ -224,33 +202,29 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
 
         var currentUrl = getUrlResult.StdOut.Trim();
 
-        // If URL doesn't have credentials yet, add them
-        if (!currentUrl.Contains("@"))
+        // Legacy-Repositories können noch einen eingebetteten Token aus früheren Klones enthalten.
+        // Diese werden entfernt, damit keine Klartext-Tokens in der Remote-URL verbleiben.
+        if (!EmbeddedTokenPattern.IsMatch(currentUrl))
         {
-            // Check if it's an HTTPS URL
-            if (currentUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                var authUrl = currentUrl.Replace(
-                    "https://",
-                    $"https://oauth2:{Uri.EscapeDataString(token)}@",
-                    StringComparison.OrdinalIgnoreCase);
+            return;
+        }
 
-                var setUrlResult = await _cliRunner.RunAsync(
-                    "git",
-                    ["remote", "set-url", "origin", authUrl],
-                    localPath,
-                    null,
-                    ct);
+        var normalizedUrl = EmbeddedTokenPattern.Replace(currentUrl, string.Empty);
 
-                if (!setUrlResult.IsSuccess)
-                {
-                    _logger.LogWarning("Konnte remote.origin.url mit Token nicht aktualisieren: {Error}", setUrlResult.StdErr);
-                }
-                else
-                {
-                    _logger.LogInformation("Remote origin URL mit Token aktualisiert.");
-                }
-            }
+        var setUrlResult = await _cliRunner.RunAsync(
+            "git",
+            ["remote", "set-url", "origin", normalizedUrl],
+            localPath,
+            null,
+            ct);
+
+        if (!setUrlResult.IsSuccess)
+        {
+            _logger.LogWarning("Konnte remote.origin.url nicht normalisieren: {Error}", setUrlResult.StdErr);
+        }
+        else
+        {
+            _logger.LogInformation("Remote origin URL von eingebettetem Token bereinigt.");
         }
     }
 
@@ -263,12 +237,14 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
             return;
         }
 
+        var gitEnvironment = GetGitEnvironment(token);
+
         // Configure user name and email for commits
         var userNameResult = await _cliRunner.RunAsync(
             "git",
             ["config", "user.name", "Softwareschmiede Bot"],
             localPath,
-            null,
+            gitEnvironment,
             ct);
 
         if (!userNameResult.IsSuccess)
@@ -280,7 +256,7 @@ public sealed class GitHubPlugin : GitPluginBase<GitHubPlugin>
             "git",
             ["config", "user.email", "bot@softwareschmiede.local"],
             localPath,
-            null,
+            gitEnvironment,
             ct);
 
         if (!userEmailResult.IsSuccess)
@@ -311,19 +287,15 @@ password {token}
             _logger.LogWarning(ex, "Git .netrc file konnte nicht erstellt werden");
         }
 
-        // Embed token directly in remote URL
+        // Remote-URL bleibt unauthentifiziert – der Token wird ausschließlich über GH_TOKEN
+        // (GetGitEnvironment()) bzw. .netrc bereitgestellt, niemals in der URL eingebettet.
         if (repositoryUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            var authUrl = repositoryUrl.Replace(
-                "https://",
-                $"https://oauth2:{Uri.EscapeDataString(token)}@",
-                StringComparison.OrdinalIgnoreCase);
-
             var setUrlResult = await _cliRunner.RunAsync(
                 "git",
-                ["remote", "set-url", "origin", authUrl],
+                ["remote", "set-url", "origin", repositoryUrl],
                 localPath,
-                null,
+                gitEnvironment,
                 ct);
 
             if (!setUrlResult.IsSuccess)
@@ -332,7 +304,7 @@ password {token}
             }
             else
             {
-                _logger.LogInformation("Git remote origin URL aktualisiert mit eingebettetem Token.");
+                _logger.LogInformation("Git remote origin URL aktualisiert (ohne eingebettetes Token).");
             }
         }
 
@@ -341,7 +313,7 @@ password {token}
             "git",
             ["config", "core.sshCommand", "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"],
             localPath,
-            null,
+            gitEnvironment,
             ct);
 
         if (!strictHostKeyResult.IsSuccess)
@@ -744,23 +716,18 @@ password {token}
         _logger.LogInformation("Klone Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
 
         var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
-        var cloneUrl = repositoryUrl;
 
-        if (IsHttpsRepositoryUrl(repositoryUrl))
+        if (IsHttpsRepositoryUrl(repositoryUrl) && string.IsNullOrWhiteSpace(token))
         {
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                throw new InvalidOperationException(
-                    "git clone abgebrochen: GitHub-Token fehlt. Bitte in den Plugin-Einstellungen einen gültigen Personal Access Token konfigurieren (Scope: repo, ggf. read:org).");
-            }
-
-            cloneUrl = BuildAuthenticatedCloneUrl(repositoryUrl, token);
+            throw new InvalidOperationException(
+                "git clone abgebrochen: GitHub-Token fehlt. Bitte in den Plugin-Einstellungen einen gültigen Personal Access Token konfigurieren (Scope: repo, ggf. read:org).");
         }
 
-        // Clone with environment that disables SSH prompts
+        // Clone mit unauthentifizierter URL – der Token wird ausschließlich über GH_TOKEN
+        // (GetGitEnvironment()) bereitgestellt, niemals in der URL eingebettet.
         var result = await _cliRunner.RunAsync(
             "git",
-            ["clone", cloneUrl, targetPath],
+            ["clone", repositoryUrl, targetPath],
             null,
             GetGitEnvironment(token),
             ct);
@@ -786,19 +753,22 @@ password {token}
     {
         _logger.LogInformation("Pushe Branch {BranchName} in {LocalPath}.", branchName, localPath);
 
-        // Ensure credentials are configured before pushing
-        await EnsureRemoteCredentialsAsync(localPath, ct);
+        // Remote-URL von einem ggf. eingebetteten Legacy-Token bereinigen, bevor gepusht wird
+        await NormalizeRemoteUrlAsync(localPath, ct);
+
+        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
 
         var result = await _cliRunner.RunAsync(
             "git",
             ["push", "--set-upstream", "origin", branchName],
             localPath,
-            GetGitEnvironment(),
+            GetGitEnvironment(token),
             ct);
 
         if (!result.IsSuccess)
         {
-            throw new InvalidOperationException($"git push fehlgeschlagen: {result.StdErr}");
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, token);
+            throw new InvalidOperationException($"git push fehlgeschlagen: {sanitizedError}");
         }
     }
 
@@ -807,19 +777,22 @@ password {token}
     {
         _logger.LogInformation("Führe git pull in {LocalPath} durch.", localPath);
 
-        // Ensure credentials are configured before pulling
-        await EnsureRemoteCredentialsAsync(localPath, ct);
+        // Remote-URL von einem ggf. eingebetteten Legacy-Token bereinigen, bevor gepullt wird
+        await NormalizeRemoteUrlAsync(localPath, ct);
+
+        var token = _credentialStore.GetCredential(GitHubTokenCredentialKey);
 
         var result = await _cliRunner.RunAsync(
             "git",
             ["pull"],
             localPath,
-            GetGitEnvironment(),
+            GetGitEnvironment(token),
             ct);
 
         if (!result.IsSuccess)
         {
-            throw new InvalidOperationException($"git pull fehlgeschlagen: {result.StdErr}");
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, token);
+            throw new InvalidOperationException($"git pull fehlgeschlagen: {sanitizedError}");
         }
     }
 
