@@ -12,7 +12,7 @@ Keine. `review.md` hat Status "Vollständig umgesetzt" (die im Plan geforderten 
 
 ## Code-Review-Befunde
 
-- [ ] Testmethode in `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubPluginTests.cs` heißt weiterhin nach der privaten Methode `NormalizeRemoteUrlAsync`, obwohl sie nur `PullAsync` aufruft — weicht von der sonst durchgängigen Namenskonvention `<ÖffentlicheMethode>_Should...` in der Testdatei ab. Umbenennen zu `PullAsync_ShouldNormalizeRemoteUrl_ToUnauthenticatedForm()`.
+- [x] Testmethode in `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubPluginTests.cs` heißt weiterhin nach der privaten Methode `NormalizeRemoteUrlAsync`, obwohl sie nur `PullAsync` aufruft — weicht von der sonst durchgängigen Namenskonvention `<ÖffentlicheMethode>_Should...` in der Testdatei ab. Umbenennen zu `PullAsync_ShouldNormalizeRemoteUrl_ToUnauthenticatedForm()`. ✓ **Behoben.**
 
 ## Fehlgeschlagene Tests
 

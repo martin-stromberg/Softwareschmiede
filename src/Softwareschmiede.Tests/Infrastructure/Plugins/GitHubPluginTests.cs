@@ -1102,9 +1102,9 @@ public sealed class GitHubPluginTests
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*git push fehlgeschlagen*");
     }
 
-    /// <summary>NormalizeRemoteUrlAsync normalisiert eine eingebettete Remote-URL auf die unauthentifizierte Form.</summary>
+    /// <summary>PullAsync normalisiert eine eingebettete Remote-URL auf die unauthentifizierte Form.</summary>
     [Fact]
-    public async Task NormalizeRemoteUrlAsync_ShouldNormalizeRemoteUrl_ToUnauthenticatedForm()
+    public async Task PullAsync_ShouldNormalizeRemoteUrl_ToUnauthenticatedForm()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("abc");
         _cliRunnerMock.Setup(c => c.RunAsync(

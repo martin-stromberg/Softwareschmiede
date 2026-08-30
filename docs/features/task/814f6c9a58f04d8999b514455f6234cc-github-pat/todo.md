@@ -21,5 +21,5 @@ Branch: `task/814f6c9a58f04d8999b514455f6234cc-github-pat`
 | [x] | 9 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
 | [ ] | – | Feature-Verzeichnis löschen | – |
-| [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
+| [x] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
 | [x] | – | Commit durchführen | – |

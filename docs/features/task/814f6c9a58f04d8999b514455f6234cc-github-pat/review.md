@@ -93,9 +93,9 @@ Die Implementierung setzt den Plan zu 100% um. Alle kritischen Code-Änderungen 
   - Überprüft, dass wenn Remote-URL einen eingebetteten Token hat, dieser entfernt wird
   - Testet die neue `NormalizeRemoteUrlAsync()` Methode
 
-- [x] `NormalizeRemoteUrlAsync_ShouldNormalizeRemoteUrl_ToUnauthenticatedForm()` (Zeile 1144)
-  - Überprüft URL-Normalisierung auf unauthentifizierte Form
-  - Testet verschiedene URL-Varianten
+- [x] `PullAsync_ShouldNormalizeRemoteUrl_ToUnauthenticatedForm()` (Zeile 1107)
+  - Überprüft URL-Normalisierung auf unauthentifizierte Form im Pull-Pfad
+  - Testet, dass `NormalizeRemoteUrlAsync()` vor Pull aufgerufen wird
 
 - [x] `PullAsync_ShouldNotRequireEmbeddedToken_InRemoteUrl()` (Zeile 1211)
   - Überprüft, dass Pull ohne eingebetteten Token funktioniert
