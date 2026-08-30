@@ -2,12 +2,13 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Deterministisches KI-Simulator-Plugin für Tests und lokale Entwicklung.</summary>
-public sealed class KiSimulatorPlugin : CliKiPluginBase
+public sealed class KiSimulatorPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
 {
     private readonly ILogger<KiSimulatorPlugin> _logger;
 
@@ -38,6 +39,10 @@ public sealed class KiSimulatorPlugin : CliKiPluginBase
     /// <inheritdoc/>
     public override Task<bool> CheckHealthAsync(CancellationToken ct = default)
         => Task.FromResult(true);
+
+    /// <inheritdoc/>
+    public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
+        => Task.FromResult($"KI-Simulator Ergebnis fuer Template:\n{templateBody}");
 
     /// <inheritdoc/>
     protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)

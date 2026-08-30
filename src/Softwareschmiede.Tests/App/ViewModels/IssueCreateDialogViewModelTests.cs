@@ -311,6 +311,31 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Body.Should().NotContain("SelbstwertgefÃ");
     }
 
+    /// <summary>Alle verfügbaren KI-Plugins mit Textgenerator-Fähigkeit werden in der Auswahl angezeigt.</summary>
+    [Fact]
+    public void Initialize_ShouldListAllAvailableTextGenerators_InKiPluginSelection()
+    {
+        var codexPlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.Codex" };
+        var claudePlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.ClaudeCli" };
+        var devinPlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.Devin" };
+        var copilotPlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.GitHubCopilot" };
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins())
+            .Returns([codexPlugin, claudePlugin, devinPlugin, copilotPlugin]);
+        var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
+
+        sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "Softwareschmiede.Devin");
+        sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
+
+        sut.VerfuegbareKiPlugins.Should().BeEquivalentTo([
+            "Softwareschmiede.Codex",
+            "Softwareschmiede.ClaudeCli",
+            "Softwareschmiede.Devin",
+            "Softwareschmiede.GitHubCopilot"
+        ], options => options.WithStrictOrdering());
+        sut.SelectedKiPluginPrefix.Should().Be("Softwareschmiede.Devin");
+        sut.CanUseAi.Should().BeTrue();
+    }
+
     /// <summary>KI-Aktion bleibt deaktiviert, wenn nur KI-Plugins ohne Textgenerator-Fähigkeit verfügbar sind.</summary>
     [Fact]
     public void Initialize_ShouldHideKiAction_WhenNoTextGeneratorIsAvailable()
@@ -431,7 +456,8 @@ public sealed class IssueCreateDialogViewModelTests
         public string? ReceivedTemplateBody { get; private set; }
         public string? ReceivedOriginalRequirement { get; private set; }
         public string PluginName => "Fake KI";
-        public string PluginPrefix => "FakeKi";
+        public string PluginPrefixOverride { get; set; } = "FakeKi";
+        public string PluginPrefix => PluginPrefixOverride;
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
         public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
