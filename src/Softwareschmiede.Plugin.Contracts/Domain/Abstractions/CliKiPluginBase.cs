@@ -203,11 +203,15 @@ public abstract class CliKiPluginBase : IKiPlugin
         psi.UseShellExecute = false;
         psi.RedirectStandardOutput = true;
         psi.RedirectStandardError = true;
-        psi.RedirectStandardInput = standardInput is not null;
         psi.StandardOutputEncoding = Encoding.UTF8;
         psi.StandardErrorEncoding = Encoding.UTF8;
-        psi.StandardInputEncoding = Encoding.UTF8;
         psi.CreateNoWindow = true;
+
+        if (standardInput is not null)
+        {
+            psi.RedirectStandardInput = true;
+            psi.StandardInputEncoding = Encoding.UTF8;
+        }
 
         if (!psi.EnvironmentVariables.ContainsKey("PATH"))
         {
