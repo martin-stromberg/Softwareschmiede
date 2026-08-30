@@ -22,4 +22,4 @@ Branch: `task/814f6c9a58f04d8999b514455f6234cc-github-pat`
 | [x] | 9b | README aktualisieren (Unteragent) | `README.md` |
 | [ ] | – | Feature-Verzeichnis löschen | – |
 | [ ] | 10 | Nacharbeiten abschließen (offene Punkte aus `continue.md`) | `continue-done.md` |
-| [ ] | – | Commit durchführen | – |
+| [x] | – | Commit durchführen | – |
