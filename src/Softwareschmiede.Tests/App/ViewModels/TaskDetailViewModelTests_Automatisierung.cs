@@ -281,7 +281,10 @@ public sealed class TaskDetailViewModelTests_Automatisierung : TaskDetailViewMod
     /// Bei deaktiviertem Feature-Flag "Autonome Aufgaben" (Issue 205) darf der Ribbon-Button "Autonome Aufgabe
     /// starten" weder ausführbar noch sichtbar sein: CanAutonomAufgabeInitialisieren steuert dessen Visibility-
     /// Binding in TaskDetailView.xaml und muss false liefern, sobald das Flag deaktiviert ist - unabhängig davon,
-    /// ob die Aufgabe bereits autonom konfiguriert ist.
+    /// ob die Aufgabe bereits autonom konfiguriert ist. Zusätzlich muss auch die gesamte Ribbon-Gruppe "Autonome
+    /// Aufgabe" ausgeblendet werden (ShowAutonomAufgabeRibbonGruppe), da bei deaktiviertem Flag alle darin
+    /// enthaltenen Buttons (Initialisieren, Start, Stop, Resume) unsichtbar sind und eine leere Gruppe sonst
+    /// sichtbar bliebe.
     /// </summary>
     [Fact]
     public async Task AutonomAufgabeInitialisierenCommand_CanExecute_FalseWennFeatureFlagDeaktiviertIst()
@@ -293,5 +296,23 @@ public sealed class TaskDetailViewModelTests_Automatisierung : TaskDetailViewMod
 
         sut.CanAutonomAufgabeInitialisieren.Should().BeFalse();
         sut.AutonomAufgabeInitialisierenCommand.CanExecute(null).Should().BeFalse();
+        sut.ShowAutonomAufgabeRibbonGruppe.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Bei aktiviertem Feature-Flag und einer noch nicht autonom konfigurierten Aufgabe muss die Ribbon-Gruppe
+    /// "Autonome Aufgabe" sichtbar sein (der Button "Autonome Aufgabe starten" ist darin ausführbar/sichtbar),
+    /// damit Anwender überhaupt Zugriff auf den Einstiegspunkt haben.
+    /// </summary>
+    [Fact]
+    public async Task ShowAutonomAufgabeRibbonGruppe_TrueWennFeatureFlagAktiviertIst()
+    {
+        var aufgabe = await ErstelleAufgabeMitRepositoryAsync(null);
+        var sut = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = true }));
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.CanAutonomAufgabeInitialisieren.Should().BeTrue();
+        sut.ShowAutonomAufgabeRibbonGruppe.Should().BeTrue();
     }
 }
