@@ -138,15 +138,22 @@ jobs:
           release-tag: ${{ steps.version.outputs.tag }}
 
       - name: Create automatic GitHub release
+        # Goes through semantic-release's own publish pipeline (releasePlugins in
+        # release.config.js: commit-analyzer, release-notes-generator, then
+        # @semantic-release/github, which creates the tag, the GitHub release and uploads
+        # the assets listed below) - matching FinanceManager's actual release.yml exactly for
+        # this path, rather than driving `gh release create` by hand. Manual-tag and
+        # asset-repair releases intentionally stay on gh CLI below: FinanceManager's own
+        # reference implementation does the same for those two cases, since semantic-release
+        # only knows about conventional-commit-driven releases on configured branches, not
+        # about a tag someone pushed manually or a one-off missing-asset repair.
         if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create' && steps.version.outputs.release_kind == 'automatic'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "${{ steps.version.outputs.tag }}"
-          gh release create $tag release.zip update.json `
-            --target $env:GITHUB_SHA `
-            --title $tag `
-            --generate-notes
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ASSET_PATH: release.zip
+          RELEASE_MANIFEST_PATH: update.json
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: npm run release
         shell: pwsh
 
       - name: Create manual-tag GitHub release

@@ -84,7 +84,11 @@ function runSemanticReleaseDryRun() {
   );
   const result = spawnSync(process.execPath, [semanticReleaseBinary, "--dry-run"], {
     encoding: "utf8",
-    env: { ...process.env, CI: "true" },
+    // RESOLVE_DRY_RUN selects release.config.js's lightweight dryRunPlugins (commit-analyzer
+    // only) instead of releasePlugins (which also loads @semantic-release/github and would
+    // otherwise run verifyConditions against release-asset env vars that aren't set yet
+    // during this dry-run-only call).
+    env: { ...process.env, CI: "true", RESOLVE_DRY_RUN: "true" },
     stdio: ["ignore", "pipe", "pipe"]
   });
 
