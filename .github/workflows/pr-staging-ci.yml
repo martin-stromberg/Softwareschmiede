@@ -1,0 +1,199 @@
+name: PR CI for Staging
+
+on:
+  pull_request:
+    branches:
+      - staging
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+concurrency:
+  group: pr-staging-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  detect-backmerge:
+    # Most thorough variant across the projects (ci-inventory.md section 8/10, decision 20):
+    # checks both whether main's tip is a merge-parent of this PR's merge commit, and whether
+    # the resulting tree is identical to main. actions/checkout on a pull_request event checks
+    # out the synthetic merge commit (base + head), so "origin/main is a parent of HEAD" is a
+    # direct, reliable signal that this PR's head branch is exactly main's current tip - i.e.
+    # the automated back-merge PR created by sync-staging-with-main.yml.
+    runs-on: ubuntu-latest
+    outputs:
+      is_backmerge: ${{ steps.check.outputs.is_backmerge }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check whether this PR is a pure back-merge from main
+        id: check
+        run: |
+          git fetch origin main:refs/remotes/origin/main --no-tags
+
+          main_sha="$(git rev-parse origin/main)"
+          is_main_merge_parent=false
+          for parent in $(git show -s --format=%P HEAD); do
+            if [[ "$parent" == "$main_sha" ]]; then
+              is_main_merge_parent=true
+              break
+            fi
+          done
+
+          if [[ "$is_main_merge_parent" == "true" ]]; then
+            echo "is_backmerge=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Back-merge from main detected - CI checks will be skipped."
+          elif git diff --quiet origin/main HEAD; then
+            echo "is_backmerge=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Pure back-merge from main detected (tree identical) - CI checks will be skipped."
+          else
+            echo "is_backmerge=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  static-checks:
+    name: static checks
+    needs: detect-backmerge
+    if: needs.detect-backmerge.outputs.is_backmerge != 'true'
+    # Hybrid job model (ci-target-schema.md section 4.2, decision 18): runs in parallel with
+    # build-and-test, with no `needs:` between them, so a format/security/lint failure is
+    # visible within seconds instead of waiting for the multi-minute test run to finish.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Softwareschmiede.slnx
+        shell: pwsh
+
+      - name: Format check
+        # Gate 1
+        run: dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore
+        shell: pwsh
+
+      - name: Security scan
+        # Gate 2 - shared composite action, see .github/actions/security-scan.
+        uses: ./.github/actions/security-scan
+        with:
+          solution-path: Softwareschmiede.slnx
+          artifact-name: vulnerable-packages-pr
+
+      - name: Static analysis
+        # Gate 3
+        run: dotnet build Softwareschmiede.slnx -c Debug --no-restore -p:TreatWarningsAsErrors=true
+        shell: pwsh
+
+  build-and-test:
+    name: build & test
+    needs: detect-backmerge
+    if: needs.detect-backmerge.outputs.is_backmerge != 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Softwareschmiede.slnx
+        shell: pwsh
+
+      - name: Build (Debug)
+        run: |
+          dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore -c Debug
+          dotnet build src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-restore -c Debug
+        shell: pwsh
+
+      - name: Test regular (Softwareschmiede.Tests)
+        # Gate 4 (blocking): collects coverage, since this is the blocking test category that
+        # feeds the coverage threshold below (ci-target-schema.md section 4.5).
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category!=OsInterface" --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test-results-regular-tests.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Test regular (IntegrationTests)
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Test OS interface (Softwareschmiede.Tests)
+        # Best-effort: real desktop/ConPTY/clipboard/process environment is not always
+        # reliable on GitHub-hosted runners. Results are uploaded separately but don't block
+        # PRs, and are excluded from the coverage collection above.
+        continue-on-error: true
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-tests.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Test OS interface (IntegrationTests)
+        continue-on-error: true
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.5.11
+        shell: pwsh
+
+      - name: Generate coverage report
+        run: reportgenerator "-reports:src/Softwareschmiede.Tests/TestResults/**/coverage.cobertura.xml;src/Softwareschmiede.IntegrationTests/TestResults/**/coverage.cobertura.xml" "-targetdir:coverage-report" "-reporttypes:TextSummary"
+        shell: pwsh
+
+      - name: Enforce coverage threshold
+        # Gate 5: hard 70% line-coverage minimum (ci-target-schema.md section 4.5), adopted
+        # from FinanceManager's test.yml. Only the blocking test category (Category!=OsInterface)
+        # feeds this, matching FinanceManager's own OsInterface handling.
+        env:
+          COVERAGE_THRESHOLD: '70'
+        run: |
+          $summary = Get-Content coverage-report/Summary.txt -Raw
+          if ($summary -notmatch "Line coverage:\s*([\d.,]+)%") {
+            throw "Could not determine line coverage from the generated report."
+          }
+          $lineCoverage = [double]($matches[1] -replace ',', '.')
+          $threshold = [double]$env:COVERAGE_THRESHOLD
+          Write-Host "Line coverage: $lineCoverage% (threshold: $threshold%)"
+          if ($lineCoverage -lt $threshold) {
+            throw "Code coverage $lineCoverage% is below the required threshold of $threshold%."
+          }
+        shell: pwsh
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-pr
+          path: coverage-report/
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-pr
+          path: |
+            src/Softwareschmiede.Tests/TestResults/*.trx
+            src/Softwareschmiede.IntegrationTests/TestResults/*.trx
+          retention-days: 14
+
+  back-merge-skip:
+    needs: detect-backmerge
+    if: needs.detect-backmerge.outputs.is_backmerge == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Back-merge detected
+        run: echo "Back-merge PR from main detected. Redundant checks are skipped."
