@@ -1,16 +1,17 @@
 name: Security Scan
 
-# Dauerhafter Vulnerability-Scan aller NuGet-Abhaengigkeiten (direkt + transitiv). Getrennt von
-# test.yml, damit der woechentliche "schedule"-Trigger nicht den PR-Test-Gate-Lauf beeinflusst.
+# Independent, schedule-driven dependency vulnerability scan for all NuGet dependencies
+# (direct + transitive). The pull_request trigger that used to live here is gone: the
+# PR-time scan now runs as Gate 2 of the "static-checks" job in pr-staging-ci.yml and
+# staging-ci.yml, using the same composite action (see .github/actions/security-scan), so
+# the scan logic itself only exists once instead of being duplicated between the two
+# trigger points - see ci-target-schema.md section 4.9.
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
   schedule:
-    # Woechentlich montags 04:00 UTC, damit auch auf unveraenderten Abhaengigkeiten neu gemeldete
-    # Advisories erkannt werden.
+    # Weekly on Monday 04:00 UTC, so newly disclosed advisories are also caught against
+    # otherwise unchanged dependencies.
     - cron: '0 4 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: security-scan-${{ github.workflow }}-${{ github.ref }}
@@ -23,10 +24,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -35,22 +36,7 @@ jobs:
         shell: pwsh
 
       - name: Scan for vulnerable packages
-        shell: pwsh
-        run: |
-          $output = dotnet list Softwareschmiede.slnx package --vulnerable --include-transitive 2>&1 | Tee-Object -Variable scanOutput
-          $scanOutput | Out-File -FilePath vulnerable-packages-scan.log -Encoding utf8
-
-          if ($scanOutput -match "has the following vulnerable packages" -or $scanOutput -match "Severity") {
-            Write-Host "::error::Es wurden verwundbare NuGet-Pakete gefunden. Siehe Scan-Ausgabe oben bzw. Artefakt 'vulnerable-packages-scan'."
-            exit 1
-          }
-
-          Write-Host "Keine verwundbaren Pakete gefunden."
-
-      - name: Upload scan log
-        if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/security-scan
         with:
-          name: vulnerable-packages-scan
-          path: vulnerable-packages-scan.log
-          retention-days: 14
+          solution-path: Softwareschmiede.slnx
+          artifact-name: vulnerable-packages-scan
