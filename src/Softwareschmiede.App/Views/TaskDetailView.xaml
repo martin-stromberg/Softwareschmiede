@@ -190,7 +190,8 @@
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Autonome Aufgabe -->
-                <controls:RibbonGroup GruppenName="Autonome Aufgabe">
+                <controls:RibbonGroup GruppenName="Autonome Aufgabe"
+                                      Visibility="{Binding ShowAutonomAufgabeRibbonGruppe, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="🤖"

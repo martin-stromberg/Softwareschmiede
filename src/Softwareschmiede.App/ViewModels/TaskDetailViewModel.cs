@@ -110,6 +110,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 _autonomAufgabeDetailViewModel = null;
                 OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
                 OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+                OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
                 LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "TaskDetailViewModel.LadenAsync");
             }
         }
@@ -146,6 +147,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(IsPullRequestViewSelected));
             OnPropertyChanged(nameof(IsAutonomAufgabe));
             OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
+            OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
             WaehleStandardAnsicht();
             DetailTitelAenderungAction?.Invoke(value?.Titel);
 
@@ -403,6 +405,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// geladen, ist noch nicht selbst autonom konfiguriert und das Feature-Flag für Autonome Aufgaben ist
     /// aktiviert.</summary>
     public bool CanAutonomAufgabeInitialisieren => _aufgabe is not null && !IsAutonomAufgabe && IsAutonomAufgabenEnabled;
+
+    /// <summary>Gibt an, ob die Ribbon-Gruppe "Autonome Aufgabe" überhaupt angezeigt werden soll. Alle Buttons
+    /// darin (Initialisieren, Start, Stop, Resume) sind einzeln an <see cref="CanAutonomAufgabeInitialisieren"/>
+    /// bzw. <see cref="ShowAutomatisierungPanel"/> gebunden, die beide bereits <see cref="IsAutonomAufgabenEnabled"/>
+    /// voraussetzen; ohne diese zusätzliche Gruppen-Sichtbarkeit bliebe bei deaktiviertem Feature-Flag eine leere
+    /// Ribbon-Gruppe sichtbar.</summary>
+    public bool ShowAutonomAufgabeRibbonGruppe => CanAutonomAufgabeInitialisieren || ShowAutomatisierungPanel;
 
     /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
     public bool ShowPullRequestPanel => _aufgabe is not null;
@@ -808,6 +817,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsAutonomAufgabenEnabled));
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
         OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
+        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
         CommandManager.InvalidateRequerySuggested();
     }
 
@@ -1534,6 +1544,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _autonomAufgabeDetailViewModel = vm;
         OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
         WaehleAnsicht(DetailAnsicht.Automatisierung);
         return Task.CompletedTask;
     }
@@ -1570,6 +1581,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _autonomAufgabeDetailViewModel = detailVm;
         OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
 
         await Task.WhenAll(
             detailVm.LaedePlanAsync(ct),
