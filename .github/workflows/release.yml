@@ -1,4 +1,4 @@
-name: Release & Publish
+name: Release
 
 on:
   push:
@@ -8,118 +8,165 @@ on:
 permissions:
   contents: write
 
-# Verhindert parallele Release-Laeufe (z. B. schneller Merge nach main + manueller Tag-Push
-# kurz danach): Der Release-Job berechnet die naechste Version aus dem zuletzt existierenden
-# Tag und erstellt danach Tag/Release ueber die GitHub-API - ohne Serialisierung droht ein
-# Wettlauf mit doppelt vergebenen Versionen oder fehlschlagenden Release-Erstellungen.
+# Prevents parallel release runs (e.g. a fast merge to main followed shortly after by a
+# manually pushed tag): resolve-release-version.mjs decides on a single target tag/version
+# by querying the GitHub API and existing tags - without serialization, two concurrent runs
+# could race for the same version or fail to create the release.
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  # Normalfall: Push/Merge auf main. Semantic Release wertet die Commits seit dem letzten
-  # Tag per Dry-Run aus und bestimmt die naechste Version. Tag/Release werden anschliessend
-  # per GitHub-API erstellt, damit der geschuetzte main-Branch nicht direkt beschrieben wird.
   release:
-    if: startsWith(github.ref, 'refs/heads/')
-    # Softwareschmiede.App ist eine WPF-Anwendung (net10.0-windows, UseWPF=true) und kann
-    # nur auf einem Windows-Runner gebaut und publiziert werden.
+    # Softwareschmiede.App is a WPF application (net10.0-windows, UseWPF=true) and can only
+    # be built and published on a Windows runner.
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
       - name: Install dependencies
         run: npm ci
-
-      - name: Determine next release version
-        id: release_version
         shell: pwsh
+
+      - name: Resolve release version
+        # Generalized asset-repair mechanism (ci-target-schema.md section 4.10): classifies
+        # this run as automatic (branch push to main, version via semantic-release --dry-run)
+        # or manual (a pushed vX.Y.Z tag), then checks whether a GitHub release for the
+        # resolved tag already exists and whether it already has all expected assets. Missing
+        # assets are repaired in place instead of duplicating the release. See
+        # scripts/resolve-release-version.mjs.
+        id: version
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/resolve-release-version.mjs
+        shell: pwsh
+
+      - name: Check out release tag for asset repair
+        # Only relevant for the repair path: a previous run created the tag/release but was
+        # interrupted before all assets were uploaded. This checks out the exact tagged
+        # commit so the rebuilt asset matches the already-published release, instead of
+        # rebuilding from whatever commit triggered this run.
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'upload-existing'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
-          $semanticReleaseOutput = & npx semantic-release --dry-run --no-ci 2>&1
-          $exitCode = $LASTEXITCODE
-          $output = $semanticReleaseOutput | Out-String
-
-          Write-Host "semantic-release exit code: $exitCode"
-          Write-Host $output
-
-          $version = $null
-          $shouldRelease = $false
-          if ($output -match 'The next release version is ([0-9]+\.[0-9]+\.[0-9]+(?:[-+][^\s]+)?)') {
-            $version = $Matches[1]
-            $shouldRelease = $true
+          git checkout --detach "$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not check out release tag '$env:RELEASE_TAG'."
           }
-          if (-not $version) {
-            try {
-              $package = Get-Content package.json -Raw | ConvertFrom-Json
-              $version = $package.version
-            }
-            catch {
-              Write-Host "Could not read package.json: $($_.Exception.Message)"
-              $version = "0.0.0"
-            }
+
+          $expectedCommit = git rev-parse "$env:RELEASE_TAG^{commit}"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not resolve release tag '$env:RELEASE_TAG' to a commit."
           }
-          Write-Host "Determined version: $version"
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "tag=v$version" >> $env:GITHUB_OUTPUT
-          "should_release=$($shouldRelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          exit 0
+
+          $checkedOutCommit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $checkedOutCommit -ne $expectedCommit) {
+            throw "Release tag checkout did not resolve to the tagged commit."
+          }
+        shell: pwsh
+
+      - name: Restore solution
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        run: dotnet restore Softwareschmiede.slnx
+        shell: pwsh
+
+      - name: Build (Debug)
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        run: dotnet build Softwareschmiede.slnx -c Debug --no-restore
+        shell: pwsh
+
+      - name: Release gate - regular tests (Softwareschmiede.Tests)
+        # Safety net now that there is no dedicated PR-gate workflow against main anymore
+        # (see ci-target-schema.md section 11, item 2): PRs against main can only come from
+        # staging, which was already fully validated by pr-staging-ci.yml/staging-ci.yml, so
+        # this re-run mainly guards against a race between that validation and the actual
+        # merge or tag push. Runs for both automatic and manual-tag releases, but not for the
+        # asset-repair path, which only needs to rebuild an already-validated release.
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category!=OsInterface" --logger "trx;LogFileName=test-results-regular-tests.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Release gate - regular tests (IntegrationTests)
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Release gate - OS interface tests (Softwareschmiede.Tests)
+        continue-on-error: true
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-tests.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Release gate - OS interface tests (IntegrationTests)
+        continue-on-error: true
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Upload release-gate test results
+        if: always() && steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-release
+          path: |
+            src/Softwareschmiede.Tests/TestResults/*.trx
+            src/Softwareschmiede.IntegrationTests/TestResults/*.trx
+          retention-days: 14
 
       - name: Build and package
-        if: steps.release_version.outputs.should_release == 'true'
+        if: steps.version.outputs.released == 'true'
         uses: ./.github/actions/build-and-package
         with:
-          release-version: ${{ steps.release_version.outputs.version }}
-          release-tag: ${{ steps.release_version.outputs.tag }}
+          release-version: ${{ steps.version.outputs.version }}
+          release-tag: ${{ steps.version.outputs.tag }}
 
-      - name: Create GitHub Release
-        if: steps.release_version.outputs.should_release == 'true'
-        shell: pwsh
+      - name: Create automatic GitHub release
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create' && steps.version.outputs.release_kind == 'automatic'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ steps.release_version.outputs.tag }}"
-          gh release create $tag release.zip `
+          $tag = "${{ steps.version.outputs.tag }}"
+          gh release create $tag release.zip update.json `
             --target $env:GITHUB_SHA `
             --title $tag `
             --generate-notes
+        shell: pwsh
 
-  # Manueller Override: Ein Tag im Format vX.Y.Z wurde bewusst gepusht (git tag vX.Y.Z && git push origin vX.Y.Z).
-  # Ein Tag-Push loest keinen "push: branches: [main]"-Trigger aus, daher baut dieser eigene Job
-  # Release Notes, Release und ZIP-Upload direkt fuer den gepushten Tag - unabhaengig von Commit-Typen
-  # und ohne semantic-release-Versionsberechnung.
-  release-manual-tag:
-    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-rc')
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Build and package
-        uses: ./.github/actions/build-and-package
-        with:
-          release-version: ${{ github.ref_name }}
-          release-tag: ${{ github.ref_name }}
-
-      - name: Create GitHub Release for manual tag
+      - name: Create manual-tag GitHub release
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create' && steps.version.outputs.release_kind == 'manual'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           generate_release_notes: true
-          files: release.zip
+          files: |
+            release.zip
+            update.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload missing assets to existing release
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'upload-existing'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          gh release upload $tag release.zip update.json --clobber
+        shell: pwsh
