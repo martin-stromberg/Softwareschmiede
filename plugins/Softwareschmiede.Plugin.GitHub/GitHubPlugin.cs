@@ -741,7 +741,13 @@ password {token}
     /// <inheritdoc/>
     public override async Task<IEnumerable<PullRequest>> GetOpenPullRequestsAsync(string repositoryId, CancellationToken ct = default)
     {
-        var normalizedRepositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, repositoryId);
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return [];
+        }
+
+        normalizedRepositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, normalizedRepositoryId);
         _logger.LogInformation("Rufe offene Pull Requests fuer Repository {RepositoryId} ab.", normalizedRepositoryId);
 
         var result = await _cliRunner.RunAsync(
