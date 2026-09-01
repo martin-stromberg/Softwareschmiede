@@ -6,6 +6,7 @@ using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Exceptions;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
@@ -244,6 +245,72 @@ public sealed class EntwicklungsprozessServiceTests_BasisBranch : IDisposable
                 It.IsAny<CancellationToken>()), Times.Once);
             var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
             updatedAufgabe!.BranchName.Should().StartWith("task/");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(clonePath);
+        }
+    }
+
+    /// <summary>
+    /// Aufgaben aus einem bestehenden Pull Request checken dessen Quellbranch aus, statt einen neuen
+    /// task/-Branch anzulegen.
+    /// </summary>
+    [Fact]
+    public async Task SetupBranchAsync_ShouldCheckoutPullRequestSource_WhenTaskHasReviewSource()
+    {
+        // Arrange
+        var repository = await CreateRepositoryAsync(null);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Bestehenden Pull Request reviewen", null, repository.Id);
+        _db.PullRequestReferenzen.Add(new PullRequestReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            Rolle = PullRequestReferenzRolle.ReviewSource,
+            Provider = PullRequestProvider.GitHub,
+            RepositoryId = "owner/repo",
+            PullRequestNumber = 17,
+            Titel = "Bestehenden Pull Request reviewen",
+            SourceBranch = "feature/existing-pr",
+            SourceRepositoryId = "fork/repo",
+            SourceRepositoryUrl = "https://github.com/fork/repo.git",
+            SourceRef = "refs/heads/feature/existing-pr",
+            TargetBranch = "main",
+            HeadSha = "abc123",
+            Status = PullRequestStatus.Open,
+            MergeStatus = PullRequestMergeStatus.Unknown,
+            MonitoringPhase = PullRequestMonitoringPhase.Created,
+            CreatedUtc = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        _gitPluginMock.Setup(g => g.CheckoutPullRequestSourceAsync(
+                It.IsAny<string>(),
+                It.IsAny<PullRequestCheckoutSpec>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var clonePath = SetupCloneWithDirectoryCreation();
+
+        try
+        {
+            // Act
+            await _sut.ProzessStartenAsync(aufgabe.Id, repository.RepositoryUrl);
+
+            // Assert
+            _gitPluginMock.Verify(g => g.CheckoutPullRequestSourceAsync(
+                It.IsAny<string>(),
+                It.Is<PullRequestCheckoutSpec>(spec =>
+                    spec.TargetRepositoryId == "owner/repo"
+                    && spec.SourceRepositoryId == "fork/repo"
+                    && spec.SourceRepositoryUrl == "https://github.com/fork/repo.git"
+                    && spec.SourceBranch == "feature/existing-pr"
+                    && spec.SourceRef == "refs/heads/feature/existing-pr"
+                    && spec.HeadSha == "abc123"),
+                It.IsAny<CancellationToken>()), Times.Once);
+            _gitPluginMock.Verify(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+
+            var updatedAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+            updatedAufgabe!.BranchName.Should().Be("feature/existing-pr");
         }
         finally
         {

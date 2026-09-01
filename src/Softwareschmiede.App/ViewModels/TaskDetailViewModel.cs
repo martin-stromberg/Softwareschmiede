@@ -435,7 +435,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob Pull Requests manuell aktualisiert werden koennen.</summary>
-    public bool CanRefreshPullRequests => _aufgabeId != Guid.Empty && !_isRefreshingPullRequests;
+    public bool CanRefreshPullRequests => _aufgabeId != Guid.Empty
+        && !_isRefreshingPullRequests
+        && PullRequests.Any(p => PullRequestMonitoringPolicy.CanMonitor(p.Rolle, p.Provider));
 
     /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
     public string? EditTitel
@@ -858,6 +860,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             OnPropertyChanged(nameof(HasNoPullRequests));
             OnPropertyChanged(nameof(HasPullRequests));
+            OnPropertyChanged(nameof(CanRefreshPullRequests));
             return;
         }
 
@@ -870,6 +873,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasNoPullRequests));
         OnPropertyChanged(nameof(HasPullRequests));
         OnPropertyChanged(nameof(ShowPullRequestPanel));
+        OnPropertyChanged(nameof(CanRefreshPullRequests));
     }
 
     private async Task PullRequestsAktualisierenAsync(CancellationToken ct)

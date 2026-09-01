@@ -297,11 +297,17 @@ public sealed class SoftwareschmiededDbContext : DbContext
         {
             e.HasKey(p => p.Id);
             e.Property(p => p.Provider).HasConversion<string>();
+            e.Property(p => p.Rolle)
+                .HasConversion<string>()
+                .HasDefaultValue(PullRequestReferenzRolle.CreatedByTask);
             e.Property(p => p.RepositoryId).IsRequired().HasMaxLength(500);
             e.Property(p => p.ProviderPullRequestId).HasMaxLength(200);
             e.Property(p => p.Url).IsRequired().HasMaxLength(1000);
             e.Property(p => p.Titel).IsRequired().HasMaxLength(500);
             e.Property(p => p.SourceBranch).IsRequired().HasMaxLength(300);
+            e.Property(p => p.SourceRepositoryId).IsRequired().HasMaxLength(500);
+            e.Property(p => p.SourceRepositoryUrl).HasMaxLength(1000);
+            e.Property(p => p.SourceRef).HasMaxLength(500);
             e.Property(p => p.TargetBranch).IsRequired().HasMaxLength(300);
             e.Property(p => p.HeadSha).HasMaxLength(100);
             e.Property(p => p.MergeCommitSha).HasMaxLength(100);
@@ -311,7 +317,12 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(p => p.CreatedUtc).HasConversion(UnixMillisConverter);
             e.Property(p => p.LastCheckedUtc).HasConversion(NullableUnixMillisConverter);
             e.Property(p => p.NextCheckUtc).HasConversion(NullableUnixMillisConverter);
-            e.HasIndex(p => p.AufgabeId);
+            e.HasIndex(p => p.AufgabeId)
+                .HasDatabaseName("IX_PullRequestReferenzen_AufgabeId");
+            e.HasIndex(p => p.AufgabeId)
+                .IsUnique()
+                .HasFilter("[Rolle] = 'ReviewSource'")
+                .HasDatabaseName("IX_PullRequestReferenzen_AufgabeId_ReviewSource");
             e.HasIndex(p => new { p.Provider, p.RepositoryId, p.PullRequestNumber }).IsUnique();
             e.HasIndex(p => new { p.MonitoringPhase, p.LastCheckedUtc });
             e.HasMany(p => p.WorkflowRuns)

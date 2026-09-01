@@ -2,7 +2,7 @@
 
 ## Zweck
 
-Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optional eine Issue-Referenz aus dem Git-Provider. Die Softwareschmiede führt die Aufgabe KI-gestützt durch, indem sie das Repository klont, einen Branch anlegt, eine lokale `issue.md`-Datei mit der Aufgabenbeschreibung erstellt und den KI-Agenten mit dem Prompt startet.
+Eine Aufgabe kapselt eine Entwicklungsanforderung: Titel, Beschreibung und optional eine Issue- oder Pull-Request-Referenz aus dem Git-Provider. Die Softwareschmiede führt die Aufgabe KI-gestützt durch, indem sie das Repository klont, einen Branch anlegt oder bei Review-Aufgaben den Pull-Request-Quellbranch auscheckt, eine lokale `issue.md`-Datei mit der Aufgabenbeschreibung erstellt und den KI-Agenten mit dem Prompt startet.
 
 ## Funktionsweise
 
@@ -94,7 +94,7 @@ Während eine CLI läuft, zeigt die Fußzeile den Namen des aktiven KI-Plugins b
 Zeigt die Änderungen im Git-Arbeitsverzeichnis nach Abschluss der Aufgabe. Bei beendeten Aufgaben wird die Diff-Ansicht bevorzugt ausgewählt, sofern sie verfügbar ist; die Info-Ansicht bleibt weiterhin auswählbar.
 
 #### PR-Ansicht
-Zeigt die Pull Requests, die aus der Aufgabe heraus erstellt und lokal gespeichert wurden. Pro Pull Request werden Provider, Repository, Nummer, Titel, Direktlink, PR-Status, Merge-Status, Monitoring-Phase, letzte Pruefung und ein sichtbarer Fehler- oder Blockierungsgrund angezeigt, sofern vorhanden.
+Zeigt die Pull Requests, die aus der Aufgabe heraus erstellt oder als Review-Quelle importiert und lokal gespeichert wurden. Pro Pull Request werden Provider, Rolle, Repository, Nummer, Titel, Direktlink, PR-Status, Merge-Status, Monitoring-Phase, letzte Pruefung und ein sichtbarer Fehler- oder Blockierungsgrund angezeigt, sofern vorhanden.
 
 Unter jedem Pull Request zeigt die Ansicht die zugeordneten GitHub-Actions-/Workflow-Runs mit Name, Status, Abschlussbewertung, Branch, Head-SHA und Run-Link. Die Anzeige unterscheidet normale Pre-Merge-Runs von Post-Merge-Runs, die nach einem Merge erneut beobachtet werden. Gibt es noch keinen Pull Request oder keine zugeordneten Actions, erscheint ein entsprechender Leerzustand.
 
@@ -111,6 +111,8 @@ Aktionsgruppen:
 Nach erfolgreicher Pull-Request-Erstellung speichert die Anwendung die PR-Referenz an der Aufgabe. Das Monitoring fragt fuer GitHub den PR-Status und die zugeordneten Workflow-Runs ab. Solange Pre-Merge-Actions laufen, bleibt der Pull Request in einer laufenden Monitoring-Phase. Erfolgreiche oder uebersprungene Runs gelten als unkritisch; fehlgeschlagene Runs, Berechtigungsprobleme oder Branch-Protection-Blockaden werden sichtbar gespeichert.
 
 Wenn im GitHub-Plugin der automatische PR-Abschluss aktiviert ist, versucht die Anwendung den konfigurierten Abschluss erst nach erfolgreichen zugeordneten Pre-Merge-Actions. Unterstuetzt werden die Strategien `Merge`, `AutoMerge` und `ApprovalOnly`. Direkte Merges koennen mit `Merge`, `Squash` oder `Rebase` ausgefuehrt werden; geschuetzte Branches koennen optional mit administrativem Bypass versucht werden, sofern GitHub und Token dies erlauben. Nach einem echten Merge werden zuordenbare Post-Merge-Actions weiter ueberwacht.
+
+Pull Requests, aus denen eine Aufgabe als Review-Aufgabe angelegt wurde, werden als `Review-Quelle` angezeigt. GitHub-Review-Quellen werden nur lesend aktualisiert und nicht automatisch abgeschlossen. Bitbucket-Review-Quellen werden aktuell nicht automatisch ueberwacht und erscheinen mit der neutralen Phase `Nicht automatisch ueberwacht`.
 
 ### Issue aus einer Aufgabe anlegen
 

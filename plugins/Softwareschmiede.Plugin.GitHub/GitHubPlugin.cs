@@ -739,6 +739,115 @@ password {token}
     }
 
     /// <inheritdoc/>
+    public override async Task<IEnumerable<PullRequest>> GetOpenPullRequestsAsync(string repositoryId, CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = NormalizeRepositoryId(repositoryId);
+        if (string.IsNullOrWhiteSpace(normalizedRepositoryId))
+        {
+            return [];
+        }
+
+        if (!PullRequestRepositoryId.TryNormalize(PullRequestProvider.GitHub, normalizedRepositoryId, out normalizedRepositoryId))
+        {
+            _logger.LogWarning("Pull Requests koennen nicht geladen werden: Repository-ID {RepositoryId} ist ungueltig.", repositoryId);
+            return [];
+        }
+
+        _logger.LogInformation("Rufe offene Pull Requests fuer Repository {RepositoryId} ab.", normalizedRepositoryId);
+
+        var result = await _cliRunner.RunAsync(
+            "gh",
+            ["api", "--paginate", "--slurp", $"repos/{normalizedRepositoryId}/pulls?state=open&per_page=100"],
+            null,
+            GetGhEnvironment(),
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            var sanitizedError = SanitizeSensitiveOutput(result.StdErr, _credentialStore.GetCredential(GitHubTokenCredentialKey));
+            _logger.LogWarning("gh api pulls fehlgeschlagen fuer {RepositoryId}: {StdErr}", normalizedRepositoryId, sanitizedError);
+            return [];
+        }
+
+        return ParseOpenPullRequests(result.StdOut, normalizedRepositoryId);
+    }
+
+    private static IEnumerable<PullRequest> ParseOpenPullRequests(string json, string repositoryId)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var list = new List<PullRequest>();
+        if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            return list;
+
+        foreach (var page in doc.RootElement.EnumerateArray())
+        {
+            if (page.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var element in page.EnumerateArray())
+                    AddOpenPullRequest(list, element, repositoryId);
+            }
+            else
+            {
+                AddOpenPullRequest(list, page, repositoryId);
+            }
+        }
+
+        return list;
+    }
+
+    private static void AddOpenPullRequest(List<PullRequest> list, JsonElement element, string repositoryId)
+    {
+        var state = GetStringOrNull(element, "state");
+        if (!string.IsNullOrWhiteSpace(state) && !string.Equals(state, "open", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var number = GetInt32OrDefault(element, "number");
+        if (number <= 0)
+            return;
+
+        var title = GetStringOrNull(element, "title") ?? string.Empty;
+        var body = GetStringOrNull(element, "body");
+        var url = GetStringOrNull(element, "html_url") ?? GetStringOrNull(element, "url") ?? string.Empty;
+        var head = element.TryGetProperty("head", out var headElement) && headElement.ValueKind == JsonValueKind.Object
+            ? headElement
+            : (JsonElement?)null;
+        var @base = element.TryGetProperty("base", out var baseElement) && baseElement.ValueKind == JsonValueKind.Object
+            ? baseElement
+            : (JsonElement?)null;
+
+        var sourceBranch = head is null ? string.Empty : GetStringOrNull(head.Value, "ref") ?? string.Empty;
+        var sourceSha = head is null ? null : GetStringOrNull(head.Value, "sha");
+        var sourceRepositoryId = repositoryId;
+        string? sourceRepositoryUrl = null;
+        if (head is not null
+            && head.Value.TryGetProperty("repo", out var headRepo)
+            && headRepo.ValueKind == JsonValueKind.Object)
+        {
+            var fullName = GetStringOrNull(headRepo, "full_name");
+            if (!string.IsNullOrWhiteSpace(fullName))
+                sourceRepositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, fullName);
+            sourceRepositoryUrl = GetStringOrNull(headRepo, "clone_url") ?? GetStringOrNull(headRepo, "ssh_url");
+        }
+
+        var targetBranch = @base is null ? null : GetStringOrNull(@base.Value, "ref");
+
+        list.Add(new PullRequest(
+            number,
+            title,
+            url,
+            sourceBranch,
+            PullRequestProvider.GitHub,
+            repositoryId,
+            GetStringOrNull(element, "node_id") ?? GetStringOrNull(element, "id"),
+            targetBranch,
+            sourceSha,
+            sourceRepositoryId,
+            sourceRepositoryUrl,
+            $"refs/heads/{sourceBranch}",
+            body));
+    }
+
+    /// <inheritdoc/>
     public override async Task CloneRepositoryAsync(string repositoryUrl, string targetPath, CancellationToken ct = default)
     {
         _logger.LogInformation("Klone Repository {Url} nach {TargetPath}.", repositoryUrl, targetPath);
