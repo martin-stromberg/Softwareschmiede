@@ -26,6 +26,7 @@ Bekannte Schlüssel:
 | `NotificationMode` | Enum | Benachrichtigungsmodus (`Deaktiviert` / `Banner` / `Ton`) |
 | `NotificationAudioPath` | string | Pfad zur Benachrichtigungs-Audiodatei (MP3/WAV) |
 | `LogLevel` | Enum | Logging-Granularität (`Debug` / `Information`) |
+| `autonomeaufgaben.enabled` | bool | Feature-Flag "Autonome Aufgaben aktivieren" (`AppEinstellungService.AutonomAufgabenEnabledKey`); Standardwert bei fehlendem Eintrag: `true` |
 
 ### `BenachrichtigungsEinstellung`
 

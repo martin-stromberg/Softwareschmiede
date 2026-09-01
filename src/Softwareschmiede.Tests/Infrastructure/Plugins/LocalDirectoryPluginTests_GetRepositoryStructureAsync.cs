@@ -27,9 +27,24 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
                 return Directory.EnumerateDirectories(path);
             });
 
-    /// <summary>Liefert die Unterverzeichnisse bis zur konfigurierten Tiefe als relative Pfade mit '/' als Trenner.</summary>
+    private static LocalDirectoryPlugin CreateSutWithThrowingFileEnumerator(string throwingDirectoryPath) =>
+        new(
+            new Mock<ICliRunner>(MockBehavior.Strict).Object,
+            new Mock<ICredentialStore>().Object,
+            NullLogger<LocalDirectoryPlugin>.Instance,
+            Directory.EnumerateDirectories,
+            path => path == throwingDirectoryPath
+                ? throw new IOException("Simulierter Zugriffsfehler bei der Datei-Enumeration.")
+                : Directory.EnumerateFiles(path));
+
+    /// <summary>
+    /// Liefert die Unterverzeichnisse und Dateien bis zur konfigurierten Tiefe als relative Pfade mit '/' als
+    /// Trenner, mit korrekt gesetztem <see cref="RepositoryDirectoryEntry.IsDirectory"/>. Regressionstest: die
+    /// ursprüngliche Implementierung rekursierte ausschließlich über Unterverzeichnisse und lieferte nie
+    /// Datei-Einträge (z. B. Initialisierungsskripte tauchten dadurch nie in der Vorschlagsliste auf).
+    /// </summary>
     [Fact]
-    public async Task GetRepositoryStructureAsync_ShouldReturnDirectories_UpToMaxDepth()
+    public async Task GetRepositoryStructureAsync_ShouldReturnFilesAndDirectories_UpToMaxDepth()
     {
         var root = Directory.CreateTempSubdirectory().FullName;
         try
@@ -38,14 +53,18 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
             Directory.CreateDirectory(Path.Combine(root, "backend", "src"));
             Directory.CreateDirectory(Path.Combine(root, "backend", "src", "too-deep"));
             Directory.CreateDirectory(Path.Combine(root, "frontend"));
+            File.WriteAllText(Path.Combine(root, "backend", "README.md"), "hello");
+            File.WriteAllText(Path.Combine(root, "backend", "src", "too-deep", "ignored.txt"), "hello");
             var sut = CreateSut();
 
-            var result = await sut.GetRepositoryStructureAsync(root, maxDepth: 2);
+            var result = (await sut.GetRepositoryStructureAsync(root, maxDepth: 2)).ToList();
 
             var paths = result.Select(e => e.Path).ToList();
-            paths.Should().Contain(["backend", "frontend", "backend/src"]);
+            paths.Should().Contain(["backend", "frontend", "backend/src", "backend/README.md"]);
             paths.Should().NotContain("backend/src/too-deep");
-            result.Should().OnlyContain(e => e.IsDirectory);
+            paths.Should().NotContain("backend/src/too-deep/ignored.txt");
+            result.Single(e => e.Path == "backend/README.md").IsDirectory.Should().BeFalse();
+            result.Where(e => e.Path is "backend" or "frontend" or "backend/src").Should().OnlyContain(e => e.IsDirectory);
         }
         finally
         {
@@ -140,6 +159,39 @@ public sealed class LocalDirectoryPluginTests_GetRepositoryStructureAsync
             var act = () => sut.GetRepositoryStructureAsync(root, maxDepth: 2, cts.Token);
 
             await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Schlägt die Datei-Enumeration eines Unterverzeichnisses mit <see cref="IOException"/> fehl (z. B. wegen
+    /// verweigerter Zugriffsberechtigung), wird dieses Verzeichnis für Dateien übersprungen statt die gesamte
+    /// Traversierung abzubrechen — analog zum bestehenden Verhalten bei einer fehlschlagenden
+    /// Verzeichnis-Enumeration. Deckt den zuvor ungetesteten Fehlerpfad um <c>Directory.EnumerateFiles</c> ab
+    /// (Code-Review-Befund), der erst durch den injizierbaren Datei-Enumerator-Seam testbar wurde.
+    /// </summary>
+    [Fact]
+    public async Task GetRepositoryStructureAsync_ShouldSkipFilesOfDirectory_WhenFileEnumerationThrows()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var okDir = Path.Combine(root, "ok");
+            var badDir = Path.Combine(root, "bad");
+            Directory.CreateDirectory(okDir);
+            Directory.CreateDirectory(badDir);
+            File.WriteAllText(Path.Combine(okDir, "keep.txt"), "hello");
+            File.WriteAllText(Path.Combine(root, "root-file.txt"), "hello");
+            var sut = CreateSutWithThrowingFileEnumerator(badDir);
+
+            var result = (await sut.GetRepositoryStructureAsync(root, maxDepth: 2)).ToList();
+
+            var paths = result.Select(e => e.Path).ToList();
+            paths.Should().Contain(["ok", "bad", "ok/keep.txt", "root-file.txt"]);
+            paths.Should().NotContain(p => p.StartsWith("bad/", StringComparison.Ordinal));
         }
         finally
         {

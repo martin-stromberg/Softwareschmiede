@@ -18,6 +18,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
     private readonly Mock<ICliRunner> _cliRunnerMock;
+    private readonly Mock<IGitPlugin> _gitPluginMock;
     private readonly AutonomAufgabenInitialisierungsService _sut;
     private readonly string _testRoot;
     private readonly Guid _projektId;
@@ -26,8 +27,9 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
     public AutonomAufgabenInitialisierungsServiceTests()
     {
         _db = TestDbContextFactory.Create();
-        _cliRunnerMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateCliRunnerMockMitErfolgreichemGitKlon();
-        _sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(_db, _cliRunnerMock.Object);
+        _cliRunnerMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateCliRunnerMockMitErfolgreicherGitAusfuehrung();
+        _gitPluginMock = AutonomAufgabenInitialisierungsServiceTestFactory.CreateGitPluginMockMitErfolgreichemKlon();
+        _sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(_db, _cliRunnerMock.Object, _gitPluginMock.Object);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "AutonomAufgabenInit", Guid.NewGuid().ToString("N"));
 
@@ -92,9 +94,108 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
         Directory.Exists(repoMainPfad).Should().BeTrue();
         File.Exists(Path.Combine(repoMainPfad, ".git-marker")).Should().BeTrue();
-        _cliRunnerMock.Verify(
-            r => r.RunAsync("git", It.Is<IEnumerable<string>>(a => a.Contains("clone")), It.IsAny<string?>(), It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()),
+        _gitPluginMock.Verify(p => p.CloneRepositoryAsync(aufgabe.GitRepository!.RepositoryUrl, repoMainPfad, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>InitialisiereAsync klont direkt von aufgabe.GitRepository.RepositoryUrl, nicht von aufgabe.LokalerKlonPfad.</summary>
+    [Fact]
+    public async Task InitialisiereAsync_KlontDirectVonRepositoryUrl()
+    {
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+        var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
+
+        await _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        _gitPluginMock.Verify(
+            p => p.CloneRepositoryAsync(aufgabe.GitRepository!.RepositoryUrl, repoMainPfad, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    /// <summary>InitialisiereAsync erstellt nach dem Klon den Projektbranch im geklonten Repository per IGitPlugin.CreateBranchAsync (checkt ihn dabei zugleich aus).</summary>
+    [Fact]
+    public async Task InitialisiereAsync_ErstelltProjektBranchNachKlon()
+    {
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+        var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
+
+        await _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        _gitPluginMock.Verify(
+            p => p.CreateBranchAsync(repoMainPfad, anfrage.ProjektBranchName, null, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>ErstelleProjektbranchAsync legt einen neuen lokalen Branch via IGitPlugin.CreateBranchAsync (checkout -b) an, wenn der Branch nicht remote existiert und lokal noch nicht existiert.</summary>
+    [Fact]
+    public async Task ErstelleProjektbranchAsync_AnlegtNeuenBranchMitGit()
+    {
+        _gitPluginMock
+            .Setup(p => p.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["main", "develop"]);
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+        var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
+
+        await _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        _gitPluginMock.Verify(
+            p => p.CreateBranchAsync(repoMainPfad, anfrage.ProjektBranchName, null, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _gitPluginMock.Verify(p => p.CheckoutRemoteBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>ErstelleProjektbranchAsync überspringt die Branch-Neuanlage, wenn der lokale Branch bereits existiert (Retry-Fall: ein vorheriger Initialisierungsversuch ist nach erfolgreicher Branch-Anlage, aber vor Abschluss fehlgeschlagen), statt mit "branch already exists" zu scheitern.</summary>
+    [Fact]
+    public async Task ErstelleProjektbranchAsync_UeberspringtAnlage_WennLokalerBranchBereitsExistiert()
+    {
+        var anfrage = ErstelleAnfrage(_testRoot);
+        var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
+        _cliRunnerMock
+            .Setup(r => r.RunAsync("git", It.Is<IEnumerable<string>>(a => a.Contains("--list") && a.Contains(anfrage.ProjektBranchName)), repoMainPfad, It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, $"  {anfrage.ProjektBranchName}\n", string.Empty));
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+
+        var konfiguration = await _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        konfiguration.ProjektBranchName.Should().Be(anfrage.ProjektBranchName);
+        _gitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>ErstelleProjektbranchAsync checkt den bestehenden Remote-Branch aus, statt einen neuen anzulegen, wenn der Branch bereits remote existiert.</summary>
+    [Fact]
+    public async Task ErstelleProjektbranchAsync_CheckoutRemoteBranch_WennExistent()
+    {
+        var anfrage = ErstelleAnfrage(_testRoot);
+        _gitPluginMock
+            .Setup(p => p.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([anfrage.ProjektBranchName]);
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
+
+        await _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        _gitPluginMock.Verify(p => p.CheckoutRemoteBranchAsync(repoMainPfad, anfrage.ProjektBranchName, It.IsAny<CancellationToken>()), Times.Once);
+        _cliRunnerMock.Verify(
+            r => r.RunAsync("git", It.Is<IEnumerable<string>>(a => a.Contains("branch")), It.IsAny<string?>(), It.IsAny<IDictionary<string, string>?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>ErstelleProjektbranchAsync wirft eine InvalidOperationException, wenn IGitPlugin.CreateBranchAsync ("git checkout -b") fehlschlägt.</summary>
+    [Fact]
+    public async Task ErstelleProjektbranchAsync_WirftException_BeiGitFehler()
+    {
+        _gitPluginMock
+            .Setup(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("git checkout -b fehlgeschlagen: fatal: Branch konnte nicht angelegt werden"));
+
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
     }
 
     /// <summary>InitialisiereAsync erzeugt state.json mit korrektem Schema und den erforderlichen Top-Level-Keys.</summary>
@@ -203,19 +304,19 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         await akt.Should().ThrowAsync<ArgumentException>();
     }
 
-    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn die Aufgabe keinen lokalen Klon-Pfad besitzt.</summary>
+    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn die Aufgabe kein verknüpftes GitRepository mit RepositoryUrl besitzt.</summary>
     [Fact]
-    public async Task InitialisiereAsync_WirftInvalidOperationException_OhneLokalenKlonPfad()
+    public async Task InitialisiereAsync_WirftInvalidOperationException_OhneGitRepository()
     {
         var aufgabe = new Aufgabe
         {
             Id = Guid.NewGuid(),
             ProjektId = _projektId,
-            Titel = "Autonome Testaufgabe ohne Klon",
+            Titel = "Autonome Testaufgabe ohne Repository",
             Status = AufgabeStatus.Neu,
             AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
             ErstellungsDatum = DateTimeOffset.UtcNow,
-            LokalerKlonPfad = null
+            GitRepository = null
         };
         _db.Aufgaben.Add(aufgabe);
         await _db.SaveChangesAsync();
@@ -230,14 +331,9 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
     [Fact]
     public async Task InitialisiereAsync_WirftInvalidOperationException_BeiFehlgeschlagenemGitKlon()
     {
-        _cliRunnerMock
-            .Setup(r => r.RunAsync(
-                "git",
-                It.Is<IEnumerable<string>>(args => args.Contains("clone")),
-                It.IsAny<string?>(),
-                It.IsAny<IDictionary<string, string>?>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(1, string.Empty, "fatal: Klon fehlgeschlagen"));
+        _gitPluginMock
+            .Setup(p => p.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("fatal: Klon fehlgeschlagen"));
 
         var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
         var anfrage = ErstelleAnfrage(_testRoot);
@@ -245,5 +341,151 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         var akt = () => _sut.InitialisiereAsync(aufgabe, anfrage);
 
         await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>
+    /// InitialisiereAsync löst das SCM-Plugin anhand von aufgabe.GitRepository.PluginTyp auf und verwendet für
+    /// Klon und Branch-Erstellung das dazu passende Plugin, nicht das global konfigurierte Default-Plugin
+    /// (Regressionstest für den in continue.md dokumentierten Bug: Klon lief bislang immer über
+    /// IPluginManager.GetDefaultSourceCodeManagementPlugin(), unabhängig vom tatsächlich am Repository der
+    /// Aufgabe konfigurierten Plugin).
+    /// </summary>
+    [Fact]
+    public async Task InitialisiereAsync_VerwendetPluginAusGitRepositoryPluginTyp_NichtDasDefaultPlugin()
+    {
+        var defaultGitPluginMock = new Mock<IGitPlugin>();
+        defaultGitPluginMock.SetupGet(p => p.PluginPrefix).Returns("DefaultScmPlugin");
+
+        var passendesGitPluginMock = new Mock<IGitPlugin>();
+        passendesGitPluginMock.SetupGet(p => p.PluginPrefix).Returns("TestGitPlugin");
+        passendesGitPluginMock
+            .Setup(p => p.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, zielPfad, _) =>
+            {
+                Directory.CreateDirectory(zielPfad);
+                File.WriteAllText(Path.Combine(zielPfad, ".git-marker"), "cloned");
+            })
+            .Returns(Task.CompletedTask);
+        passendesGitPluginMock
+            .Setup(p => p.GetRemoteBranchesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<string>());
+        passendesGitPluginMock.SetupPassthroughResolveEffectiveRepositoryPath();
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([defaultGitPluginMock.Object, passendesGitPluginMock.Object]);
+        pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(defaultGitPluginMock.Object);
+
+        var defaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var activationService = new PluginActivationService(
+            new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance),
+            pluginManagerMock.Object,
+            NullLogger<PluginActivationService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, defaultSettingsService, activationService, NullLogger<PluginSelectionService>.Instance);
+
+        var sut = new AutonomAufgabenInitialisierungsService(
+            _db,
+            _cliRunnerMock.Object,
+            pluginSelectionService,
+            new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance),
+            Options.Create(new AutonomAufgabenOptions()),
+            NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
+
+        // ErstelleAufgabeMitLokalemKlon legt GitRepository.PluginTyp = "TestGitPlugin" an.
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+        var repoMainPfad = Path.Combine(_testRoot, "clones", "repo_main");
+
+        await sut.InitialisiereAsync(aufgabe, anfrage);
+
+        passendesGitPluginMock.Verify(p => p.CloneRepositoryAsync(aufgabe.GitRepository!.RepositoryUrl, repoMainPfad, It.IsAny<CancellationToken>()), Times.Once);
+        passendesGitPluginMock.Verify(p => p.CreateBranchAsync(repoMainPfad, anfrage.ProjektBranchName, null, It.IsAny<CancellationToken>()), Times.Once);
+        defaultGitPluginMock.Verify(p => p.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        defaultGitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn das Feature-Flag AutonomAufgabenOptions.Enabled deaktiviert ist (Guard-Klausel, Issue 205).</summary>
+    [Fact]
+    public async Task WhenEnabledFlagIsFalse_InitialisiereAsync_ShouldThrow()
+    {
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = false });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var akt = () => sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>InitialisiereAsync führt die Initialisierung normal aus, wenn das Feature-Flag AutonomAufgabenOptions.Enabled aktiviert ist (Baseline-Test gegen Regression der Guard-Klausel, Issue 205).</summary>
+    [Fact]
+    public async Task WhenEnabledFlagIsTrue_InitialisiereAsync_ShouldSucceed()
+    {
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = true });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var konfiguration = await sut.InitialisiereAsync(aufgabe, anfrage);
+
+        konfiguration.Should().NotBeNull();
+        konfiguration.ProjektBranchName.Should().Be(anfrage.ProjektBranchName);
+    }
+
+    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn der DB-persistierte Laufzeit-Schalter
+    /// (AppEinstellungService.AutonomAufgabenEnabledKey, GUI-Einstellung) auf false steht, selbst wenn der
+    /// appsettings.json-/Umgebungsvariable-Deployment-Default AutonomAufgabenOptions.Enabled true ist: der
+    /// DB-Wert muss den Deployment-Default überschreiben (Issue 205, Verdrahtung Settings-Schalter -> Guard-Klausel).</summary>
+    [Fact]
+    public async Task WhenDbValueIsFalse_InitialisiereAsync_ShouldThrow_EvenIfOptionsEnabledIsTrue()
+    {
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        await appEinstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, false);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = true });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var akt = () => sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>InitialisiereAsync führt die Initialisierung normal aus, wenn der DB-persistierte Laufzeit-Schalter
+    /// (AppEinstellungService.AutonomAufgabenEnabledKey) auf true steht, selbst wenn der appsettings.json-
+    /// Deployment-Default AutonomAufgabenOptions.Enabled false ist: der DB-Wert muss den Deployment-Default
+    /// überschreiben (Issue 205, Verdrahtung Settings-Schalter -> Guard-Klausel).</summary>
+    [Fact]
+    public async Task WhenDbValueIsTrue_InitialisiereAsync_ShouldSucceed_EvenIfOptionsEnabledIsFalse()
+    {
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        await appEinstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, true);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = false });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var konfiguration = await sut.InitialisiereAsync(aufgabe, anfrage);
+
+        konfiguration.Should().NotBeNull();
+    }
+
+    /// <summary>InitialisiereAsync fällt auf den appsettings.json-Deployment-Default zurück, solange kein DB-Eintrag
+    /// für den Laufzeit-Schalter existiert (Issue 205, Fallback-Semantik von AppEinstellungService.GetAutonomAufgabenEnabledAsync).</summary>
+    [Fact]
+    public async Task WhenNoDbEntryExists_InitialisiereAsync_ShouldFallBackToOptionsDefault()
+    {
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = false });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        (await appEinstellungService.GetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey)).Should().BeNull(
+            "Vorbedingung: kein DB-Eintrag vorhanden");
+
+        var akt = () => sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>("ohne DB-Eintrag muss der Options-Default (Enabled=false) weiterhin gelten");
     }
 }

@@ -146,18 +146,20 @@ public interface IGitPlugin : IPlugin
     /// <param name="repositoryUrl">URL des Repositories.</param>
     /// <param name="maxDepth">Maximale Tiefe der abgerufenen Verzeichnisstruktur.</param>
     /// <param name="ct">Cancellation Token.</param>
-    Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+    /// <param name="branchName">Optionaler Branch, dessen Verzeichnisstruktur abgerufen werden soll. Wenn <c>null</c>/leer, wird der Remote-Standard-Branch verwendet.</param>
+    Task<IEnumerable<RepositoryDirectoryEntry>> GetRepositoryStructureAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default, string? branchName = null)
         => throw new NotSupportedException($"'{nameof(GetRepositoryStructureAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstützt.");
 
     /// <summary>Ruft die Verzeichnisstruktur eines externen Repositories mit expliziter Erfolg-/Fehlersemantik ab.</summary>
     /// <param name="repositoryUrl">URL des Repositories.</param>
     /// <param name="maxDepth">Maximale Tiefe der abgerufenen Verzeichnisstruktur.</param>
     /// <param name="ct">Cancellation Token.</param>
-    async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default)
+    /// <param name="branchName">Optionaler Branch, dessen Verzeichnisstruktur abgerufen werden soll. Wenn <c>null</c>/leer, wird der Remote-Standard-Branch verwendet.</param>
+    async Task<RepositoryStructureLoadResult> GetRepositoryStructureLoadResultAsync(string repositoryUrl, int maxDepth = 2, CancellationToken ct = default, string? branchName = null)
     {
         try
         {
-            var entries = await GetRepositoryStructureAsync(repositoryUrl, maxDepth, ct).ConfigureAwait(false);
+            var entries = await GetRepositoryStructureAsync(repositoryUrl, maxDepth, ct, branchName).ConfigureAwait(false);
             return RepositoryStructureLoadResult.Success(entries);
         }
         catch (OperationCanceledException)

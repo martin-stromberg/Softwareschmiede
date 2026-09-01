@@ -1,5 +1,10 @@
+using System.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Tests.Helpers;
@@ -7,6 +12,50 @@ namespace Softwareschmiede.Tests.Helpers;
 /// <summary>Erstellt die für ProjektleiterAgentService-Tests benötigten Testdaten (Aufgabe, AutonomAufgabeKonfiguration, UnteragentSpezifikation).</summary>
 internal static class ProjektleiterAgentServiceTestDatenFactory
 {
+    /// <summary>Erstellt einen gemockten <see cref="IKiPlugin"/> sowie einen darauf aufgelösten <see cref="PluginSelectionService"/>
+    /// (einziges verfügbares KI-Plugin, wird daher unabhängig von <c>Aufgabe.KiPluginPrefix</c> aufgelöst). Für Tests von
+    /// <see cref="ProjektleiterAgentService.StarteAgentAsync"/>, die einen echten (aber sicheren, prozesslosen) CLI-Start
+    /// über <see cref="TestKiAusfuehrungsServiceFactory"/> auslösen.</summary>
+    /// <param name="db">Der zu verwendende Datenbankkontext (für Plugin-Default-/Aktivierungs-Einstellungen).</param>
+    /// <param name="supportsSessionContinuation">Ob der gemockte KI-Plugin Session-Fortsetzung (<c>--continue</c>) unterstützt.</param>
+    /// <returns>Den gemockten KI-Plugin sowie den darauf konfigurierten <see cref="PluginSelectionService"/>.</returns>
+    public static (Mock<IKiPlugin> KiPluginMock, PluginSelectionService PluginSelectionService) ErstellePluginSelectionServiceMitKiPlugin(
+        SoftwareschmiededDbContext db, bool supportsSessionContinuation = false)
+    {
+        var kiPluginMock = new Mock<IKiPlugin>();
+        kiPluginMock.SetupGet(p => p.PluginName).Returns("Test-KI-Plugin");
+        kiPluginMock.SetupGet(p => p.PluginPrefix).Returns("Softwareschmiede.TestKi");
+        kiPluginMock.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
+        kiPluginMock.Setup(p => p.GetSettingGroups()).Returns([]);
+        kiPluginMock.Setup(p => p.SupportsSessionContinuation()).Returns(supportsSessionContinuation);
+        kiPluginMock
+            .Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+        var pluginManagerMock = new Mock<IPluginManager>();
+        pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([kiPluginMock.Object]);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(kiPluginMock.Object);
+
+        var defaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
+        var activationService = new PluginActivationService(
+            new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance),
+            pluginManagerMock.Object,
+            NullLogger<PluginActivationService>.Instance);
+        var pluginSelectionService = new PluginSelectionService(
+            pluginManagerMock.Object,
+            defaultSettingsService,
+            activationService,
+            NullLogger<PluginSelectionService>.Instance);
+
+        return (kiPluginMock, pluginSelectionService);
+    }
+
     /// <summary>Erstellt und persistiert eine Aufgabe samt AutonomAufgabeKonfiguration inkl. plan.md/progress.md/state.json im übergebenen Arbeitsverzeichnis.</summary>
     /// <param name="db">Der zu verwendende Datenbankkontext.</param>
     /// <param name="projektId">Die Id des Projekts, dem die Aufgabe zugeordnet wird.</param>

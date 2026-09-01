@@ -42,11 +42,14 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
     }
 
     /// <summary>
-    /// Ruft die Verzeichnisstruktur über die gh-Trees-API ab und filtert Verzeichniseinträge bis zur
-    /// konfigurierten Tiefe, ohne Dateien einzubeziehen.
+    /// Ruft die Verzeichnisstruktur über die gh-Trees-API ab und liefert sowohl Verzeichnis- (<c>type == "tree"</c>)
+    /// als auch Datei-Einträge (<c>type == "blob"</c>) bis zur konfigurierten Tiefe, mit korrekt gesetztem
+    /// <see cref="RepositoryDirectoryEntry.IsDirectory"/>. Regressionstest: die ursprüngliche Implementierung
+    /// verwarf <c>blob</c>-Einträge vollständig, wodurch Dateien (z. B. Initialisierungsskripte) nie in der
+    /// Vorschlagsliste auftauchten.
     /// </summary>
     [Fact]
-    public async Task GetRepositoryStructureAsync_ShouldReturnDirectories_UpToMaxDepth()
+    public async Task GetRepositoryStructureAsync_ShouldReturnFilesAndDirectories_UpToMaxDepth()
     {
         SetupDefaultBranch();
 
@@ -74,10 +77,10 @@ public sealed class GitHubPluginTests_GetRepositoryStructureAsync
         var result = (await _sut.GetRepositoryStructureAsync("https://github.com/owner/repo", maxDepth: 2)).ToList();
 
         var paths = result.Select(e => e.Path).ToList();
-        paths.Should().Contain(["backend", "frontend", "backend/src"]);
+        paths.Should().Contain(["backend", "frontend", "backend/src", "backend/README.md"]);
         paths.Should().NotContain("backend/src/too-deep");
-        paths.Should().NotContain("backend/README.md");
-        result.Should().OnlyContain(e => e.IsDirectory);
+        result.Single(e => e.Path == "backend/README.md").IsDirectory.Should().BeFalse();
+        result.Where(e => e.Path is "backend" or "frontend" or "backend/src").Should().OnlyContain(e => e.IsDirectory);
     }
 
     /// <summary>

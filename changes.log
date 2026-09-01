@@ -1,3 +1,56 @@
+## 2026-08-27 — Feature-Flag "Autonome Aufgaben aktivieren" in den Einstellungen
+
+- Neuer Schalter **"Autonome Aufgaben aktivieren"** auf der Registerkarte **Allgemein** der Einstellungsseite (Abschnitt „Automatisierung", Standard: aktiviert). Der Wert wird über `AppEinstellungService` (Schlüssel `autonomeaufgaben.enabled`) in der Datenbank persistiert und ergänzt den bestehenden Deployment-Schalter `AutonomAufgaben:Enabled` in `appsettings.json` um eine laufzeitkonfigurierbare, per GUI erreichbare Ebene.
+- Guard-Klauseln an allen drei Einstiegspunkten für autonome Aufgaben eingefügt: `AutonomAufgabeStartService.StarteAsync()` gibt bei deaktiviertem Flag ein Fehlerresultat ("Autonome Aufgaben sind in den Einstellungen deaktiviert.") zurück statt den Initialisierungsdialog zu öffnen; `AutonomAufgabenInitialisierungsService.InitialisiereAsync()` und `ProjektleiterAgentService.StarteAgentAsync()` werfen zusätzlich jeweils eine `InvalidOperationException` (Defense-in-Depth für Aufrufe, die nicht über den UI-Weg erfolgen).
+- `TaskDetailViewModel` erhält die neue berechnete Eigenschaft `IsAutonomAufgabenEnabled`; `ShowAutomatisierungPanel` berücksichtigt sie zusätzlich zu `IsAutonomAufgabe`, sodass die Registerkarte "Automatisierung" nur bei aktiviertem Feature angezeigt wird.
+- Der einfache, nicht-autonome Weg (Button "Starten", direkte CLI-Ausführung über `EntwicklungsprozessService`/`KiAusfuehrungsService`) bleibt unabhängig vom Feature-Flag unverändert nutzbar — es gibt kein Gating auf diesem Pfad.
+- Dokumentation unter `docs/help/aufgaben/autonome-aufgaben/` und `docs/help/einstellungen/` um den neuen Schalter, die Guard-Klauseln und das Fallback-Verhalten ergänzt.
+
+## 2026-08-24 — Autonome Aufgaben: UI-Integration — Registerkarte statt separates Fenster
+
+- **Dialog-Entfernung:** Der separate `AutonomAufgabeDetailDialog` (Fenster) wurde entfernt. `ShowAutonomAufgabeDetailAsync()` aus `IDialogService`/`WpfDialogService` ist nicht mehr vorhanden.
+- **Registerkarten-Integration:** Der Inhalt der `AutonomAufgabeDetailView` ist jetzt als neue Registerkarte **„Automatisierung"** in der bestehenden `TaskDetailView` eingebettet, neben den bestehenden Registerkarten Info, CLI, Diff, Dateien, PR, Todos.
+- **Action-Buttons im Ribbon:** Die Action-Buttons Start, Stop und Resume wurden vom Dialog-Fenster in das Ribbon-Menü (Gruppe **„Autonome Aufgabe"**) der Aufgabendetailansicht verschoben. Sie sind nur sichtbar, wenn eine Autonome Aufgabe initialisiert ist (`ShowAutomatisierungPanel == true`).
+- **ViewModel-Erweiterung:** `TaskDetailViewModel` erweitert um `AutonomAufgabeDetailViewModel?`-Property, `ShowAutomatisierungPanel`-Boolean, `IsAutomatisierungViewSelected`-Boolean und neuer Command `AutomatisierungViewCommand` für Registerkarten-Umschaltung. Neue async-Methode `SetzeAutonomAufgabeDetailViewAsync()` wird vom `AutonomAufgabeStartService` aufgerufen, um das ViewModel zu speichern und die Ansicht zu wechseln.
+- **Service-Anpassung:** `AutonomAufgabeStartService.StarteAsync()` zeigt keinen Dialog mehr, sondern gibt das erzeugte `AutonomAufgabeDetailViewModel` über den bestehenden `AutonomAufgabeStartResult` zurück. `TaskDetailViewModel.AutonomAufgabeInitialisierenAsync()` ruft danach `SetzeAutonomAufgabeDetailViewAsync()` auf sich selbst auf.
+- **Aufgabenwechsel-Verhalten:** Wenn der Benutzer zu einer anderen Aufgabe wechselt, wird die `_autonomAufgabeDetailViewModel`-Referenz auf `null` gesetzt und die Automatisierung-Registerkarte ausgeblendet (neue Aufgabe erzeugt neues `TaskDetailViewModel`).
+- **Dokumentation:** `docs/help/aufgaben/autonome-aufgaben/{ablauf-anwender.md, ablauf-technisch.md}` aktualisiert, um neue Registerkarten-Integration und Ribbon-Button-Platzierungen zu dokumentieren; alte Dialog-Verweise entfernt.
+
+## 2026-08-25 — E2E-Test-Infrastruktur: View-Pattern für wartbare UI-Automatisierung
+
+- Neues View-Pattern für E2E-Tests eingeführt: Strukturierte `BaseWindowView`-Klassenhierarchie abstrahiert wiederholte FlaUI-Interaktionsmuster und macht Tests wartbar.
+- `BaseWindowView`-Basisklasse definiert einheitliche API: `IsVisible` (Ansicht erkannt), `ForceShow()` (Navigation), `ForceClose(bool recurseToDashboard)` (Schließen mit optionaler Rekursion), `Menu` (Navigationsmenü-Zugriff).
+- Spezialisierte View-Klassen implementiert: `MenuView`, `DashboardView`, `ProjectListView`, `ProjectDetailView`, `TaskDetailView`, `SettingsView`, `FileExplorerView`, `AutonomAufgabeDetailView`, `TodoListView`, `ErrorView` sowie Dialog-Subklassen (`DialogView`, `RepositoryAssignDialogView`, `PluginSelectionDialogView`, `IssueSelectionDialogView`, `IssueCreateDialogView`, `AutonomAufgabeInitialisierungsDialogView`, `AutonomAufgabeDetailDialogView`, `ArbeitsverzeichnisBearbeitenDialogView`, `OpenTodosDialogView`, `HelpTextDialogView`, `SolutionSelectionDialogView`, `UpdateProgressDialogView`, `DeleteConfirmationDialogView`).
+- Automatische View-Erkennung via `Window.CurrentView()`-Erweiterungsmethode: Durchsucht Fenster nach charakteristischen UI-Markern und gibt passende View-Instanz zurück; wirft detaillierte `InvalidOperationException` bei unbekannter Ansicht.
+- Fluent-API-Unterstützung: `ForceShow()` und `ForceClose()` geben `this` zurück für Kettenaufrufe.
+- Fehlerbehandlung verbessert: `WaitForElement()`-Methode in `BaseWindowView` bricht sofort ab, wenn während des Wartens ein Fehlerbanner erscheint (statt stur bis zum Timeout zu warten), und liefert ausführliche Diagnose.
+- `ElementWaitHelper` abstrahiert gemeinsame Polling-/Timeout-Logik zwischen `WpfTestBase` und View-Klassen.
+- Bestehendes `WpfTestBase` bleibt unverändert; View-Pattern ist optionale Erweiterung für neue Tests.
+- Dokumentation unter `docs/help/e2e-test-infrastruktur/` erstellt (`beschreibung.md`, `ablauf-technisch.md`, `api.md`).
+
+## 2026-08-23 — Initialisierungsskript für geklonte Repositories: Verbesserungen
+
+- Verbesserung: Die Auswahl-ComboBox für das Initialisierungsskript in der Projektdetailansicht filtert die Vorschlagsliste jetzt live beim Tippen (echtes Suchfeld-Verhalten mit `CollectionView.Filter`), statt eine ungefilterte Liste anzuzeigen — Anwender können schneller die gewünschte Datei finden.
+- Verbesserung: Die Vorschlagsliste ausführbarer Dateien wird jetzt aus dem konfigurierten Basis-Branch des Repositorys (`GitRepository.DefaultSourceBranchName`) geladen, falls dieser gesetzt ist — nicht mehr zwingend aus dem Remote-Standard-Branch. Ist kein Basis-Branch konfiguriert, wird weiterhin der Remote-Standard-Branch verwendet. Dies ermöglicht, dass die Initialisierungsskripte aus dem genutzten Entwicklungs-Branch stammen, nicht aus dem Haupt-Branch.
+- API-Erweiterung `IGitPlugin`: Optionaler Parameter `branchName` bei `GetRepositoryStructureAsync()` und `GetRepositoryStructureLoadResultAsync()` ermöglicht es, die Verzeichnisstruktur aus einem beliebigen Remote-Branch abzurufen, nicht nur vom Standard-Branch. Plugin-Implementierungen müssen diesen Parameter optional unterstützen; Fallback auf Standard-Branch bei Nicht-Unterstützung ist zulässig.
+- Service-Erweiterung `DirectoryStructureBrowserService`: Neue Parameter `branchName` bei `GetFileLoadResultAsync()` und `GetDirectoryLoadResultAsync()` ermöglichen Branch-spezifisches Laden; Cache-Keys berücksichtigen jetzt auch den Branch-Namen, um korrekte Trennung je Branch zu sichern.
+- UI-Erweiterung `ProjectDetailViewModel`: `LoadInitialisierungsskriptSuggestionenAsync()` übergibt `repository.DefaultSourceBranchName` an `GetFileLoadResultAsync()`, sodass die Vorschlagsliste vom konfigurierten Basis-Branch stammt.
+
+## 2026-08-23 — Initialisierungsskript für geklonte Repositories
+
+- Feature: Pro Projekt kann ein optionales Repository-Initialisierungsskript konfiguriert werden, das automatisch nach dem Klonen eines Repositorys für eine Aufgabe ausgeführt wird (z. B. zur Einrichtung von Git-Hooks, Build-Schritten oder projektspezifischer Konfiguration).
+- Neue Entity `RepositoryInitialisierungKonfiguration` speichert den relativen Pfad zum Skript pro Repository persistent mit optionalem Aktiv-Status.
+- Neuer Service `RepositoryInitialisierungService` führt das konfigurierte Skript mittels PowerShell aus, validiert den Pfad gegen Directory-Escape-Versuche und loggt Fehler als Warnung (blockiert die Aufgabe nicht).
+- Neue Utility-Klasse `RepositoryScriptExecutor` kapselt gemeinsame Ausführungslogik für Repository-Skripte (genutzt von `RepositoryStartskriptService` und dem neuen `RepositoryInitialisierungService`).
+- Integration in `EntwicklungsprozessService.FinalizeStartAsync()`: Initialisierungsskript wird nach erfolgreichem Klon und Branch-Setup, vor dem Startskript ausgeführt (Reihenfolge: Initialisierung → Startup).
+- UI-Erweiterung `ProjectDetailViewModel`: Neue Properties `InitialisierungsskriptSuggestionen`, `SelectedInitialisierungsskript`, `IsEditingInitialisierungsskript`, `InitialisierungsskriptLoadingFailed` mit Methoden `LoadInitialisierungsskriptSuggestionenAsync()`, `SaveInitialisierungsskriptAsync()`, `CancelInitialisierungsskriptEdit()`.
+- UI-Integration `ProjectDetailView.xaml`: Neue Ribbon-Buttons und Steuerelemente im Repository-Konfigurationsbereich (Label, AutoComplete-Feld mit Vorschlagsliste aus Remote-Repository, Buttons zum Laden/Speichern/Abbrechen).
+- Service-Erweiterung `ProjektService`: Neue Methode `SaveRepositoryInitialisierungskriptAsync()` zum Persistieren der Konfiguration; Speicherung von `null` löscht die Konfiguration.
+- Datenbankmigrationen: Neue Tabelle `RepositoryInitialisierungKonfigurationen` mit Spalten `Id` (PK), `GitRepositoryId` (FK), `InitialisierungsskriptRelativePath`, `Aktiv`; Foreign Key mit Cascade Delete zu `GitRepositories`.
+- Fehlertoleranz: Skript-Fehler werden geloggt, blockieren die Aufgabe aber nicht — diese Eigenschaft unterscheidet die Initialisierung vom Startskript (optional vs. kritisch).
+- Tests: Unit-Tests für `RepositoryInitialisierungService` (Erfolg, Fehlerbehandlung, Path-Traversal-Sicherheit, Deaktivierung); Integrations-Tests für `EntwicklungsprozessService` (Ausführungsreihenfolge, Fehlertoleranz); ViewModel-Tests für Suggestions und Speichern; E2E-Tests für Happy Path und Fehlertoleranz.
+- Dokumentation: Neue Datei `docs/help/projekte/initialisierungsskript-konfiguration.md` beschreibt Feature, Funktionsweise, Konfiguration und Fehlerbehandlung.
+
 ## 2026-08-21 — Autonome Aufgaben: Erweiterungen im Initialisierungsdialog
 
 - Projektbranch im Initialisierungsdialog (`AutonomAufgabeInitialisierungsDialog`) ist jetzt als Auswahlliste der Remote-Branches des zugeordneten Git-Repositories nutzbar (`AutonomAufgabeInitialisierungsDialogViewModel.LadeProjektBranchesAsync`, `IGitPlugin.GetRemoteBranchesAsync`); ohne Repository/Plugin fällt das Feld automatisch auf freie Texteingabe zurück.

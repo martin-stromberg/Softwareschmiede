@@ -1,12 +1,17 @@
 name: Promote staging to main
 
-# After a successful "Staging Branch CI" run on staging, this workflow checks whether
-# main is behind staging. If so, it creates a draft PR staging -> main. The final
-# merge must be approved and completed manually by a maintainer.
+# After a successful "Pre-Release" run on staging, this workflow checks whether main is
+# behind staging. If so, it creates a draft PR staging -> main. The final merge must be
+# approved and completed manually by a maintainer.
+#
+# Critical: this workflow_run trigger references the *display name* of staging-ci.yml, not
+# its filename. If staging-ci.yml's `name:` field ever changes again, this array must be
+# updated in the same commit - otherwise the promotion silently stops firing (no error, it
+# just never runs). See ci-target-schema.md section 3.
 
 "on":
   workflow_run:
-    workflows: ["Staging Branch CI"]
+    workflows: ["Pre-Release"]
     types: [completed]
     branches: [staging]
 
@@ -27,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout staging
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha }}

@@ -129,6 +129,10 @@ namespace Softwareschmiede.Migrations
                         .HasColumnType("TEXT")
                         .HasDefaultValue("NichtGestartet");
 
+                    b.Property<string>("BasisBranchName")
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("BranchName")
                         .HasColumnType("TEXT");
 
@@ -201,6 +205,9 @@ namespace Softwareschmiede.Migrations
 
                     b.Property<Guid>("AufgabeId")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("ExplizitGestoppt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("InitialPrompt")
                         .IsRequired()
@@ -908,6 +915,31 @@ namespace Softwareschmiede.Migrations
                     b.ToTable("PullRequestWorkflowRuns");
                 });
 
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.RepositoryInitialisierungKonfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Aktiv")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("GitRepositoryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InitialisierungsskriptRelativePath")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GitRepositoryId")
+                        .IsUnique();
+
+                    b.ToTable("RepositoryInitialisierungKonfigurationen");
+                });
+
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.RepositoryStartKonfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1246,6 +1278,17 @@ namespace Softwareschmiede.Migrations
                     b.Navigation("PullRequestReferenz");
                 });
 
+            modelBuilder.Entity("Softwareschmiede.Domain.Entities.RepositoryInitialisierungKonfiguration", b =>
+                {
+                    b.HasOne("Softwareschmiede.Domain.Entities.GitRepository", "GitRepository")
+                        .WithOne("InitialisierungKonfiguration")
+                        .HasForeignKey("Softwareschmiede.Domain.Entities.RepositoryInitialisierungKonfiguration", "GitRepositoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GitRepository");
+                });
+
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.RepositoryStartKonfiguration", b =>
                 {
                     b.HasOne("Softwareschmiede.Domain.Entities.GitRepository", "GitRepository")
@@ -1340,6 +1383,8 @@ namespace Softwareschmiede.Migrations
             modelBuilder.Entity("Softwareschmiede.Domain.Entities.GitRepository", b =>
                 {
                     b.Navigation("DiffResults");
+
+                    b.Navigation("InitialisierungKonfiguration");
 
                     b.Navigation("StartKonfiguration");
                 });

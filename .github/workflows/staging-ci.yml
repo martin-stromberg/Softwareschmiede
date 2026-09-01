@@ -1,4 +1,9 @@
-name: Staging Branch CI
+name: Pre-Release
+
+# Filename stays staging-ci.yml (only the display name changes to "Pre-Release") - see
+# ci-target-schema.md section 3. staging-to-main-promotion.yml's workflow_run trigger
+# references this display name, not the filename; both were updated together in this
+# same commit so the promotion chain never briefly points at a name that no longer exists.
 
 on:
   push:
@@ -7,51 +12,116 @@ on:
 
 concurrency:
   group: staging-ci
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
   checks: write
 
 jobs:
-  staging:
-    runs-on: windows-latest
-    timeout-minutes: 30
+  detect-backmerge:
+    # Same thorough check as pr-staging-ci.yml's detect-backmerge (decision 20): checks both
+    # merge-parent and tree-diff against main. On a push event HEAD is the pushed commit
+    # itself (not a synthetic merge), so this mainly catches the case where the automated
+    # back-merge PR (main -> staging) was merged with "Create a merge commit", making
+    # main's tip a direct parent of the new staging HEAD.
+    runs-on: ubuntu-latest
+    outputs:
+      is_backmerge: ${{ steps.check.outputs.is_backmerge }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: staging
+
+      - name: Check whether this push is a pure back-merge from main
+        id: check
+        run: |
+          git fetch origin main:refs/remotes/origin/main --no-tags
+
+          main_sha="$(git rev-parse origin/main)"
+          is_main_merge_parent=false
+          for parent in $(git show -s --format=%P HEAD); do
+            if [[ "$parent" == "$main_sha" ]]; then
+              is_main_merge_parent=true
+              break
+            fi
+          done
+
+          if [[ "$is_main_merge_parent" == "true" ]]; then
+            echo "is_backmerge=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Back-merge from main detected - CI checks will be skipped."
+          elif git diff --quiet origin/main HEAD; then
+            echo "is_backmerge=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Pure back-merge from main detected (tree identical) - CI checks will be skipped."
+          else
+            echo "is_backmerge=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  static-checks:
+    name: static checks
+    needs: detect-backmerge
+    if: needs.detect-backmerge.outputs.is_backmerge != 'true'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Restore dependencies
+        run: dotnet restore Softwareschmiede.slnx
         shell: pwsh
+
+      - name: Format check
+        run: dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore
+        shell: pwsh
+
+      - name: Security scan
+        uses: ./.github/actions/security-scan
+        with:
+          solution-path: Softwareschmiede.slnx
+          artifact-name: vulnerable-packages-staging
+
+      - name: Static analysis
+        run: dotnet build Softwareschmiede.slnx -c Debug --no-restore -p:TreatWarningsAsErrors=true
+        shell: pwsh
+
+  build-and-test:
+    name: build & test
+    needs: detect-backmerge
+    if: needs.detect-backmerge.outputs.is_backmerge != 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
 
       - name: Restore dependencies
         run: dotnet restore Softwareschmiede.slnx
         shell: pwsh
 
       - name: Build (Debug)
-        run: dotnet build Softwareschmiede.slnx -c Debug --no-restore
+        run: |
+          dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore -c Debug
+          dotnet build src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-restore -c Debug
         shell: pwsh
 
       - name: Test regular (Softwareschmiede.Tests)
-        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category!=OsInterface" --logger "trx;LogFileName=test-results-regular-tests.trx" --logger "console;verbosity=normal"
+        run: dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-build -c Debug --filter "Category!=OsInterface" --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test-results-regular-tests.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
       - name: Test regular (IntegrationTests)
-        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
+        run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
       - name: Test OS interface (Softwareschmiede.Tests)
@@ -64,9 +134,41 @@ jobs:
         run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category=OsInterface" --logger "trx;LogFileName=test-results-os-interface-integration.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.5.11
+        shell: pwsh
+
+      - name: Generate coverage report
+        run: reportgenerator "-reports:src/Softwareschmiede.Tests/TestResults/**/coverage.cobertura.xml;src/Softwareschmiede.IntegrationTests/TestResults/**/coverage.cobertura.xml" "-targetdir:coverage-report" "-reporttypes:TextSummary"
+        shell: pwsh
+
+      - name: Enforce coverage threshold
+        env:
+          COVERAGE_THRESHOLD: '70'
+        run: |
+          $summary = Get-Content coverage-report/Summary.txt -Raw
+          if ($summary -notmatch "Line coverage:\s*([\d.,]+)%") {
+            throw "Could not determine line coverage from the generated report."
+          }
+          $lineCoverage = [double]($matches[1] -replace ',', '.')
+          $threshold = [double]$env:COVERAGE_THRESHOLD
+          Write-Host "Line coverage: $lineCoverage% (threshold: $threshold%)"
+          if ($lineCoverage -lt $threshold) {
+            throw "Code coverage $lineCoverage% is below the required threshold of $threshold%."
+          }
+        shell: pwsh
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-staging
+          path: coverage-report/
+          retention-days: 14
+
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-staging
           path: |
@@ -74,44 +176,97 @@ jobs:
             src/Softwareschmiede.IntegrationTests/TestResults/*.trx
           retention-days: 14
 
+  version:
+    name: version
+    needs: [detect-backmerge, static-checks, build-and-test]
+    if: needs.detect-backmerge.outputs.is_backmerge != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      changed: ${{ steps.semver.outputs.changed }}
+      version: ${{ steps.semver.outputs.version }}
+      rc_tag: ${{ steps.rc.outputs.rc_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+        shell: pwsh
+
       - name: Determine next version
-        id: version
+        # release.config.js only lists "main" as a release branch (see that file's own
+        # comment); staging is deliberately not a configured prerelease branch there. The
+        # --branches override below treats "staging" as a plain release branch for this one
+        # dry-run only, so the resulting X.Y.Z carries no prerelease identifier - the RC
+        # suffix is appended manually in the next step instead. This replaces the previous
+        # separate .github/scripts/determine-version.ps1 script, inlined here to match
+        # release.yml's equivalent inline version-resolution step.
+        id: semver
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: .github/scripts/determine-version.ps1 -Branch staging
+        run: |
+          $output = & npx semantic-release --dry-run --no-ci --branches staging 2>&1 | Out-String
+          Write-Host "semantic-release output:"
+          Write-Host $output
+
+          $version = $null
+          $changed = $false
+          if ($output -match 'The next release version is ([0-9]+\.[0-9]+\.[0-9]+(?:[-+][^\s]+)?)') {
+            $version = $Matches[1]
+            $changed = $true
+            Write-Host "Next release version: $version"
+          } else {
+            Write-Host "No new release version determined."
+          }
+
+          "version=$version" | Add-Content -Path $env:GITHUB_OUTPUT
+          "changed=$($changed.ToString().ToLowerInvariant())" | Add-Content -Path $env:GITHUB_OUTPUT
         shell: pwsh
 
       - name: Determine RC number
-        if: steps.version.outputs.changed == 'true'
+        if: steps.semver.outputs.changed == 'true'
         id: rc
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.version }}"
+          $version = "${{ steps.semver.outputs.version }}"
           $existing = @(git tag --list "v$version-rc.*")
           $rcNumber = $existing.Count + 1
           "rc_number=$rcNumber" | Add-Content -Path $env:GITHUB_OUTPUT
           "rc_tag=v$version-rc.$rcNumber" | Add-Content -Path $env:GITHUB_OUTPUT
 
-      - name: Pack Release Candidate
-        if: steps.version.outputs.changed == 'true'
+  prerelease:
+    name: prerelease
+    needs: [detect-backmerge, version]
+    if: needs.detect-backmerge.outputs.is_backmerge != 'true' && needs.version.outputs.changed == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build and package release candidate
         uses: ./.github/actions/build-and-package
         with:
-          release-version: ${{ steps.version.outputs.version }}
-          release-tag: ${{ steps.rc.outputs.rc_tag }}
+          release-version: ${{ needs.version.outputs.version }}
+          release-tag: ${{ needs.version.outputs.rc_tag }}
 
       - name: Create GitHub pre-release
-        if: steps.version.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ steps.rc.outputs.rc_tag }}"
-          gh release create $tag release.zip `
+          $tag = "${{ needs.version.outputs.rc_tag }}"
+          gh release create $tag release.zip update.json `
             --target $env:GITHUB_SHA `
             --title $tag `
             --prerelease `
             --generate-notes
         shell: pwsh
-
-      - name: Quality gate notice
-        if: always()
-        run: echo "::notice::Staging checks completed."

@@ -1,5 +1,6 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Input;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -32,15 +33,16 @@ public partial class End2EndTest
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         SetupProjectMitNeuerAufgabe(mainWindow, "ConPty-Repo", "ConPty-Projekt");
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
 
-        ConPtyStart_ZeigtTerminalPanelMitStoppenButton_E2E(mainWindow);
-        ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(mainWindow);
-        ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E(mainWindow);
-        ConPtyProcessEnd_NachStoppen_IsCliRunningFalse_E2E(mainWindow);
+        ConPtyStart_ZeigtTerminalPanelMitStoppenButton_E2E(mainWindow, taskDetail);
+        ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(mainWindow, taskDetail);
+        ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E(mainWindow, taskDetail);
+        ConPtyProcessEnd_NachStoppen_IsCliRunningFalse_E2E(mainWindow, taskDetail);
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 
     /// <summary>
@@ -49,15 +51,15 @@ public partial class End2EndTest
     /// PseudoConsoleSessionGestartet gefeuert wurde und die Session nicht null ist.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der bereits gestarteten ConPTY-Session.</param>
-    private void ConPtyStart_ZeigtTerminalPanelMitStoppenButton_E2E(AutomationElement mainWindow)
+    /// <param name="taskDetail">Die Aufgabendetailansicht der gestarteten Aufgabe.</param>
+    private void ConPtyStart_ZeigtTerminalPanelMitStoppenButton_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         // Stoppen-Button erscheint wenn IsCliRunning=true — dies belegt, dass
         // PseudoConsoleSessionGestartet gefeuert und die Session gesetzt wurde.
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.WaitForCliRunning();
 
         // Kein Fehler-Banner sichtbar
-        var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerBanner);
+        Assert.False(new ErrorView(mainWindow).IsVisible);
     }
 
     /// <summary>
@@ -66,7 +68,8 @@ public partial class End2EndTest
     /// sichtbar sein (CLI noch aktiv).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
-    private void ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(AutomationElement mainWindow)
+    /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
+    private void ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         // Fenstergröße ändern, um ResizePseudoConsole auszulösen
         var currentBounds = mainWindow.BoundingRectangle;
@@ -83,11 +86,8 @@ public partial class End2EndTest
         Thread.Sleep(300);
 
         // CLI muss noch laufen und kein Fehler erschienen sein
-        var stoppenButtonNachResize = mainWindow.FindFirstDescendant(cf => cf.ByName("CliStoppen"));
-        Assert.NotNull(stoppenButtonNachResize);
-
-        var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerBanner);
+        Assert.True(taskDetail.IsCliRunning());
+        Assert.False(new ErrorView(mainWindow).IsVisible);
     }
 
     /// <summary>
@@ -103,7 +103,8 @@ public partial class End2EndTest
     /// selbst zeichnet und keine Text-Automation-Pattern für den Bufferinhalt bereitstellt.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
-    private void ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E(AutomationElement mainWindow)
+    /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
+    private void ConPtyKeyboardInput_NachStart_KeinFehlerBanner_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         // Klick auf das Hauptfenster setzt den Fokus; anschließende Tastatureingabe
         // landet im fokussierten TerminalControl und wird via InputStream weitergeleitet.
@@ -119,12 +120,10 @@ public partial class End2EndTest
 
         // Kurz warten — bei ConPTY-Fehler würde ein FehlerMeldung-Banner erscheinen
         Thread.Sleep(500);
-        var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerBanner);
+        Assert.False(new ErrorView(mainWindow).IsVisible);
 
         // Die CLI-Session muss nach den neuen Tasteneingaben weiterhin aktiv sein (kein Absturz/Abbruch).
-        var stoppenButton = mainWindow.FindFirstDescendant(cf => cf.ByName("CliStoppen"));
-        Assert.NotNull(stoppenButton);
+        Assert.True(taskDetail.IsCliRunning());
     }
 
     /// <summary>
@@ -133,19 +132,16 @@ public partial class End2EndTest
     /// "Gestartet" (kein Rollback).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
-    private void ConPtyProcessEnd_NachStoppen_IsCliRunningFalse_E2E(AutomationElement mainWindow)
+    /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
+    private void ConPtyProcessEnd_NachStoppen_IsCliRunningFalse_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        stoppenButton.AsButton().Click();
-
         // Nach Prozessende: Stoppen-Button verschwindet (IsCliRunning=false)
-        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.StopCli();
 
         // Kein Fehler-Banner
-        var fehlerBanner = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerBanner);
+        Assert.False(new ErrorView(mainWindow).IsVisible);
 
         // Status-Anzeige zeigt weiterhin "Gestartet" (kein Rollback durch manuelles Stoppen)
-        WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
+        Assert.True(taskDetail.IsTaskStarted());
     }
 }

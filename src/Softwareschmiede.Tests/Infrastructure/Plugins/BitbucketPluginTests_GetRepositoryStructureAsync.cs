@@ -44,11 +44,14 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
     }
 
     /// <summary>
-    /// Ruft die Verzeichnisstruktur über die Bitbucket-Cloud-Source-API ab und filtert Verzeichniseinträge
-    /// (<c>type == "commit_directory"</c>) bis zur konfigurierten Tiefe, ohne Dateien einzubeziehen.
+    /// Ruft die Verzeichnisstruktur über die Bitbucket-Cloud-Source-API ab und liefert sowohl Verzeichnis-
+    /// (<c>type == "commit_directory"</c>) als auch Datei-Einträge (<c>type == "commit_file"</c>) bis zur
+    /// konfigurierten Tiefe, mit korrekt gesetztem <see cref="RepositoryDirectoryEntry.IsDirectory"/>.
+    /// Regressionstest: die ursprüngliche Implementierung verwarf <c>commit_file</c>-Einträge vollständig,
+    /// wodurch Dateien (z. B. Initialisierungsskripte) nie in der Vorschlagsliste auftauchten.
     /// </summary>
     [Fact]
-    public async Task GetRepositoryStructureAsync_ShouldReturnDirectories_UpToMaxDepth()
+    public async Task GetRepositoryStructureAsync_ShouldReturnFilesAndDirectories_UpToMaxDepth()
     {
         SetupDefaultBranch();
 
@@ -74,10 +77,10 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
         var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.org/workspace/repo", maxDepth: 2)).ToList();
 
         var paths = result.Select(e => e.Path).ToList();
-        paths.Should().Contain(["backend", "frontend", "backend/src"]);
+        paths.Should().Contain(["backend", "frontend", "backend/src", "backend/README.md"]);
         paths.Should().NotContain("backend/src/too-deep");
-        paths.Should().NotContain("backend/README.md");
-        result.Should().OnlyContain(e => e.IsDirectory);
+        result.Single(e => e.Path == "backend/README.md").IsDirectory.Should().BeFalse();
+        result.Where(e => e.Path is "backend" or "frontend" or "backend/src").Should().OnlyContain(e => e.IsDirectory);
     }
 
     /// <summary>Folgt dem <c>next</c>-Link über mehrere Seiten und aggregiert die Verzeichniseinträge aller Seiten.</summary>
@@ -211,15 +214,15 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
 
     /// <summary>
     /// Im Self-Hosted-Modus wird die Verzeichnisstruktur über die Bitbucket-Server-Browse-API level-by-level
-    /// abgerufen (verschachteltes <c>children.values</c>-Schema mit <c>type == "DIRECTORY"</c>, abweichend vom
-    /// Cloud-Schema), bis zur konfigurierten Tiefe: der Wurzel-Aufruf liefert "backend" (Verzeichnis) und
-    /// "README.md" (Datei, wird ignoriert), ein zweiter Aufruf für "backend" liefert dessen Unterverzeichnis
-    /// "src". Regressionstest für einen im Code-Review gefundenen Bug: die ursprüngliche Implementierung
-    /// nutzte fälschlich das Cloud-JSON-Schema für Self-Hosted-Antworten und lieferte dadurch in der Praxis
-    /// immer eine leere Liste.
+    /// abgerufen (verschachteltes <c>children.values</c>-Schema mit <c>type == "DIRECTORY"</c>/<c>"FILE"</c>,
+    /// abweichend vom Cloud-Schema), bis zur konfigurierten Tiefe: der Wurzel-Aufruf liefert "backend"
+    /// (Verzeichnis) und "README.md" (Datei), ein zweiter Aufruf für "backend" liefert dessen Unterverzeichnis
+    /// "src". Regressionstest: sowohl für den ursprünglichen Bug, dass die Implementierung fälschlich das
+    /// Cloud-JSON-Schema für Self-Hosted-Antworten nutzte (immer leere Liste), als auch für den Folgebug, dass
+    /// <c>FILE</c>-Einträge komplett verworfen statt als Datei-Ergebnis aufgenommen wurden.
     /// </summary>
     [Fact]
-    public async Task GetRepositoryStructureAsync_ShouldWalkDirectoryLevels_WhenHostingModeIsSelfHosted()
+    public async Task GetRepositoryStructureAsync_ShouldWalkDirectoryLevelsAndIncludeFiles_WhenHostingModeIsSelfHosted()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("SelfHosted");
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.SelfHostedUrl")).Returns("https://bitbucket.example.com");
@@ -268,9 +271,9 @@ public sealed class BitbucketPluginTests_GetRepositoryStructureAsync
         var result = (await _sut.GetRepositoryStructureAsync("https://bitbucket.example.com/projects/PROJ/repos/repo/browse", maxDepth: 2)).ToList();
 
         var paths = result.Select(e => e.Path).ToList();
-        paths.Should().Contain(["backend", "backend/src"]);
-        paths.Should().NotContain("README.md");
-        result.Should().OnlyContain(e => e.IsDirectory);
+        paths.Should().Contain(["backend", "backend/src", "README.md"]);
+        result.Single(e => e.Path == "README.md").IsDirectory.Should().BeFalse();
+        result.Where(e => e.Path is "backend" or "backend/src").Should().OnlyContain(e => e.IsDirectory);
     }
 
     /// <summary>Ein fehlgeschlagener Browse-Aufruf im Self-Hosted-Modus liefert eine leere Liste statt einer Exception.</summary>

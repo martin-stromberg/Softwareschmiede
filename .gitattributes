@@ -4,6 +4,12 @@
 * text=auto
 
 ###############################################################################
+# Git-Hook-Skripte muessen LF-Zeilenenden behalten, sonst schlaegt die Shebang-
+# Zeile beim Ausfuehren ueber Git Bash (core.autocrlf=true unter Windows) fehl.
+###############################################################################
+.githooks/* text eol=lf
+
+###############################################################################
 # Set default behavior for command prompt diff.
 #
 # This is need for earlier builds of msysgit that does not have it on by

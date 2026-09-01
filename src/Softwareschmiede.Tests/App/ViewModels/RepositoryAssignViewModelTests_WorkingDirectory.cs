@@ -75,7 +75,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns(firstLoadTcs.Task);
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await firstLoadTcs.Task));
+            .Returns(async (string _, int _, CancellationToken _, string? _) => RepositoryStructureLoadResult.Success(await firstLoadTcs.Task));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
         sut.SelectedRepository = new AvailableRepository("repo1", DateTime.UtcNow, "owner/repo1", "https://example.com/repo1.git");
@@ -87,7 +87,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns(secondLoadTcs.Task);
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await secondLoadTcs.Task));
+            .Returns(async (string _, int _, CancellationToken _, string? _) => RepositoryStructureLoadResult.Success(await secondLoadTcs.Task));
 
         sut.SelectedRepository = new AvailableRepository("repo2", DateTime.UtcNow, "owner/repo2", "https://example.com/repo2.git");
 
@@ -104,7 +104,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         var callCount = 0;
         var pluginMock = CreatePluginMock("GitHub");
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns<string, int, CancellationToken>(async (_, _, ct) =>
+            .Returns<string, int, CancellationToken, string?>(async (_, _, ct, _) =>
             {
                 if (Interlocked.Increment(ref callCount) == 1)
                 {
@@ -114,7 +114,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
                 return [];
             });
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns<string, int, CancellationToken>(async (_, _, ct) =>
+            .Returns<string, int, CancellationToken, string?>(async (_, _, ct, _) =>
             {
                 if (Interlocked.Increment(ref callCount) == 1)
                 {
@@ -146,7 +146,7 @@ public sealed class RepositoryAssignViewModelTests_WorkingDirectory : IDisposabl
         pluginMock.Setup(p => p.GetRepositoryStructureAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
         pluginMock.Setup(p => p.GetRepositoryStructureLoadResultAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string _, int _, CancellationToken _) => RepositoryStructureLoadResult.Success(await tcs.Task));
+            .Returns(async (string _, int _, CancellationToken _, string? _) => RepositoryStructureLoadResult.Success(await tcs.Task));
         var sut = CreateSut();
         await SelectPluginAndWaitAsync(sut, pluginMock.Object);
 

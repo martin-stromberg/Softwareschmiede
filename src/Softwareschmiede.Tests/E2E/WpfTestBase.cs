@@ -23,21 +23,16 @@ public abstract class WpfTestBase : IDisposable
     private const string TargetFramework = "net10.0-windows10.0.17763.0";
 
     /// <summary>
-    /// Kurzes Timeout (20s) für schnell erscheinende UI-Elemente. War ursprünglich 10s; auf
-    /// windows-latest-CI-Runnern (siehe .github/workflows/test.yml) zeigte sich ein einmaliger
-    /// JIT-/Rendering-Warmup-Effekt bei den ersten Popup-/Dialog-Interaktionen eines Testlaufs
-    /// (ComboBox-Dropdown, MessageBox) - belegt dadurch, dass spätere Tests mit identischen
-    /// UI-Mustern im selben Lauf durchgehend in 6-10s durchliefen, während die ersten 2-3 solcher
-    /// Interaktionen knapp über 10s lagen. 20s deckt diesen einmaligen Warmup-Puffer ab, ohne echte
-    /// künftige Regressionen (die deutlich länger bräuchten) zu maskieren.
+    /// Kurzes Timeout (20s) für schnell erscheinende UI-Elemente. Siehe <see cref="ElementWaitHelper.Short"/>
+    /// für die Begründung des konkreten Werts.
     /// </summary>
-    protected static readonly TimeSpan Short = TimeSpan.FromSeconds(20);
+    protected static readonly TimeSpan Short = ElementWaitHelper.Short;
 
     /// <summary>Mittleres Timeout (15s) für UI-Elemente nach asynchronen Operationen.</summary>
-    protected static readonly TimeSpan Medium = TimeSpan.FromSeconds(15);
+    protected static readonly TimeSpan Medium = ElementWaitHelper.Medium;
 
     /// <summary>Langes Timeout (30s), z. B. für das initiale Erscheinen des Hauptfensters.</summary>
-    protected static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
+    protected static readonly TimeSpan Long = ElementWaitHelper.Long;
 
     /// <summary>
     /// Credential-Schlüssel, die von E2E-Tests direkt oder indirekt (über die UI) im OS-weiten
@@ -298,64 +293,40 @@ public abstract class WpfTestBase : IDisposable
     /// erneute Zielsuche liefert es als regulären Treffer zurück. Zielt <paramref name="conditionFunc"/> auf
     /// ein anderes Element, bleibt die erneute Suche erfolglos und die Fail-Fast-Diagnose greift wie bisher.
     /// </remarks>
+    /// <param name="parent">Das Element, dessen Teilbaum durchsucht wird.</param>
+    /// <param name="conditionFunc">Die Suchbedingung.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Das gefundene Element.</returns>
     protected static AutomationElement WaitForElement(
         AutomationElement parent,
         Func<ConditionFactory, ConditionBase> conditionFunc,
         TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            var element = parent.FindFirstDescendant(conditionFunc);
-            if (element is not null)
-                return element;
-
-            var fehlerMeldung = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-            if (fehlerMeldung is not null)
-            {
-                // Letzter Versuch: Falls conditionFunc selbst auf "FehlerMeldung" zielt, ist das
-                // Element inzwischen sicher auffindbar (siehe Erklärung oben) und der Aufruf soll
-                // regulär mit diesem Treffer zurückkehren statt in den Fehlerpfad zu laufen.
-                element = parent.FindFirstDescendant(conditionFunc);
-                if (element is not null)
-                    return element;
-
-                throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
-            }
-
-            Thread.Sleep(200);
-        }
-        throw new TimeoutException(
-            $"Element wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden.");
-    }
+        => ElementWaitHelper.WaitForElement(parent, conditionFunc, timeout);
 
     /// <summary>
     /// Liest den <c>HelpText</c> eines Elements aus; fällt auf <c>Name</c> zurück, wenn <c>HelpText</c>
     /// leer ist oder von der zugrunde liegenden Automatisierung nicht unterstützt wird.
     /// </summary>
+    /// <param name="element">Das auszulesende Element.</param>
+    /// <returns>Der HelpText, oder falls leer, der Name des Elements.</returns>
     protected static string GetHelpTextOrName(AutomationElement element)
-    {
-        string? helpText = null;
-        try
-        {
-            helpText = element.HelpText;
-        }
-        catch (FlaUI.Core.Exceptions.PropertyNotSupportedException)
-        {
-        }
-
-        if (!string.IsNullOrWhiteSpace(helpText))
-            return helpText;
-
-        return element.Name;
-    }
+        => ElementWaitHelper.GetHelpTextOrName(element);
 
     /// <summary>
     /// Wartet, bis ein Top-Level-Fenster mit dem angegebenen Titel auf dem Desktop erscheint.
     /// </summary>
+    /// <remarks>
+    /// Filtert zusätzlich auf <see cref="FlaUI.Core.Definitions.ControlType.Window"/>: Ohne diesen Filter kann
+    /// die Teilbaum-Suche von <c>Automation.GetDesktop()</c> nach reinem Namen ein anderes, bereits vorhandenes
+    /// Element mit demselben AutomationProperties.Name im Baum treffen (z. B. eine RibbonGroup namens
+    /// "Autonome Aufgabe" in einer bereits offenen Ansicht, siehe TaskDetailView.xaml), statt auf das
+    /// tatsächliche Fenster zu warten. Das war zuvor eine latente Race Condition, die reproduzierbar wurde,
+    /// sobald sich das Timing bis zur tatsächlichen Fenster-Erstellung leicht verschob (siehe
+    /// AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E), und ist bereits
+    /// das etablierte Muster in mehreren anderen E2E-Tests (z. B. E2E_PluginAktivierung.cs).
+    /// </remarks>
     protected AutomationElement WaitForWindow(string title, TimeSpan timeout)
-        => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title), timeout);
+        => WaitForElement(Automation.GetDesktop(), cf => cf.ByName(title).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window)), timeout);
 
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjects(AutomationElement mainWindow)
@@ -418,50 +389,30 @@ public abstract class WpfTestBase : IDisposable
     /// Wartet, bis ein Element im Teilbaum von <paramref name="parent"/> verschwunden ist.
     /// Assertiert anschließend, dass das Element nicht mehr vorhanden ist.
     /// </summary>
+    /// <param name="parent">Das Element, dessen Teilbaum durchsucht wird.</param>
+    /// <param name="conditionFunc">Die Suchbedingung.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
     protected static void WaitUntilGone(
         AutomationElement parent,
         Func<ConditionFactory, ConditionBase> conditionFunc,
         TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        AutomationElement? element = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            element = parent.FindFirstDescendant(conditionFunc);
-            if (element is null)
-                break;
-            Thread.Sleep(200);
-        }
-        Assert.Null(element);
-    }
+        => Assert.Null(ElementWaitHelper.PollUntilGone(parent, conditionFunc, timeout));
 
-    /// <summary>Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch zurück.</summary>
+    /// <summary>
+    /// Legt ein neues Projekt an und speichert es. Nach dem Speichern navigiert das ViewModel automatisch
+    /// zurück. Delegiert an <see cref="Views.ProjectListView.CreateProject"/> (siehe
+    /// <see cref="Views.BaseWindowView"/> für die Begründung dieser Komposition statt eigener
+    /// Klick-/Warte-Logik).
+    /// </summary>
     protected void CreateProject(AutomationElement mainWindow, string name)
-    {
-        var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
-        neuButton.AsButton().Click();
+        => new Softwareschmiede.Tests.E2E.Views.ProjectListView((Window)mainWindow).CreateProject(name);
 
-        var nameBox = WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Short);
-        nameBox.Click();
-        Keyboard.Type(name);
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-
-        // Warten bis Overlay geschlossen (Speichern-Button verschwunden)
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Medium);
-
-        // CreateAsync + Callback-Ausführung abwarten
-        WaitForElement(mainWindow, cf => cf.ByName(name), Medium);
-    }
-
-    /// <summary>Öffnet ein Projekt aus der Liste anhand seines Namens.</summary>
+    /// <summary>
+    /// Öffnet ein Projekt aus der Liste anhand seines Namens. Delegiert an
+    /// <see cref="Views.ProjectListView.OpenProject"/>.
+    /// </summary>
     protected void OpenProject(AutomationElement mainWindow, string name)
-    {
-        var projektKachel = WaitForElement(mainWindow, cf => cf.ByName(name), Short);
-        projektKachel.Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Medium);
-    }
+        => new Softwareschmiede.Tests.E2E.Views.ProjectListView((Window)mainWindow).OpenProject(name);
 
     /// <summary>Legt ein neues Projekt an, speichert es und öffnet es wieder.</summary>
     protected void CreateAndOpenProject(AutomationElement mainWindow, string name)
@@ -505,33 +456,11 @@ public abstract class WpfTestBase : IDisposable
     /// FlaUI's <c>Select(string)</c>, das bei manchen TwoWay-Bindings das Binding nicht zuverlässig aktualisiert).
     /// </summary>
     protected static void SelectComboBoxItemByClick(AutomationElement comboBoxElement, string itemText, TimeSpan timeout)
-    {
-        var comboBox = comboBoxElement.AsComboBox();
-        comboBox.Click();
-        Thread.Sleep(300);
-
-        var item = WaitForElement(comboBoxElement, cf => cf.ByName(itemText), timeout);
-        item.Click();
-        Thread.Sleep(200);
-    }
+        => ElementWaitHelper.SelectComboBoxItemByClick(comboBoxElement, itemText, timeout);
 
     /// <summary>Wartet, bis eine ComboBox den erwarteten selektierten Eintrag anzeigt.</summary>
     protected static void WaitForSelectedComboBoxItem(AutomationElement comboBoxElement, string expectedItemText, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        string? selectedItemName = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            selectedItemName = comboBoxElement.AsComboBox().SelectedItem?.Name;
-            if (string.Equals(selectedItemName, expectedItemText, StringComparison.Ordinal))
-                return;
-
-            Thread.Sleep(200);
-        }
-
-        throw new TimeoutException(
-            $"ComboBox zeigte nicht innerhalb von {timeout.TotalSeconds}s den erwarteten Eintrag '{expectedItemText}'. Aktuell: '{selectedItemName}'.");
-    }
+        => ElementWaitHelper.WaitForSelectedComboBoxItem(comboBoxElement, expectedItemText, timeout);
 
     /// <summary>
     /// Erstellt ein temporäres lokales Quellverzeichnis mit einem Unterordner (simuliertes Repository)
@@ -591,6 +520,80 @@ public abstract class WpfTestBase : IDisposable
                 $"Git-Testrepository konnte nicht vorbereitet werden: git {string.Join(' ', arguments)} in '{workingDirectory}' " +
                 $"endete mit Exit-Code {process.ExitCode}.{Environment.NewLine}{stdout}{stderr}");
         }
+    }
+
+    /// <summary>
+    /// Prüft, ob <paramref name="branchName"/> im lokalen Git-Repository unter <paramref name="repositoryPath"/>
+    /// als lokaler Branch existiert (via <c>git branch --list</c>).
+    /// </summary>
+    protected static bool GitBranchExistsLocally(string repositoryPath, string branchName)
+    {
+        using var process = new Process();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = repositoryPath,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        process.StartInfo.ArgumentList.Add("branch");
+        process.StartInfo.ArgumentList.Add("--list");
+        process.StartInfo.ArgumentList.Add(branchName);
+
+        process.Start();
+        var stdout = process.StandardOutput.ReadToEnd();
+        process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        return process.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdout);
+    }
+
+    /// <summary>
+    /// Ermittelt den Namen des aktuell in <paramref name="repositoryPath"/> ausgecheckten Branches
+    /// (via <c>git rev-parse --abbrev-ref HEAD</c>). Anders als <see cref="GitBranchExistsLocally"/>, das nur
+    /// die reine Existenz eines Branch-Refs prüft, verifiziert dies, dass HEAD tatsächlich auf den Branch zeigt.
+    /// </summary>
+    protected static string GitCurrentBranch(string repositoryPath)
+    {
+        using var process = new Process();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = repositoryPath,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        process.StartInfo.ArgumentList.Add("rev-parse");
+        process.StartInfo.ArgumentList.Add("--abbrev-ref");
+        process.StartInfo.ArgumentList.Add("HEAD");
+
+        process.Start();
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"git rev-parse --abbrev-ref HEAD in '{repositoryPath}' endete mit Exit-Code {process.ExitCode}.{Environment.NewLine}{stderr}");
+        }
+
+        return stdout.Trim();
+    }
+
+    /// <summary>
+    /// Löst den tatsächlichen Repository-Pfad unter <paramref name="repoMainPfad"/> auf: Legt
+    /// <c>LocalDirectoryPlugin</c> im InSourceDirectory-Modus dort nur die Pointer-Datei
+    /// <c>.softwareschmiede-local-workspace</c> ab (statt tatsächlich zu klonen), wird deren Inhalt (das
+    /// tatsächliche Quellverzeichnis) zurückgegeben; andernfalls wird <paramref name="repoMainPfad"/> selbst
+    /// zurückgegeben.
+    /// </summary>
+    protected static string ResolveLocalWorkspacePointerPath(string repoMainPfad)
+    {
+        var pointerPfad = Path.Combine(repoMainPfad, ".softwareschmiede-local-workspace");
+        return File.Exists(pointerPfad) ? File.ReadAllText(pointerPfad).Trim() : repoMainPfad;
     }
 
     /// <summary>
@@ -764,7 +767,8 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>
     /// Klickt den "Starten"-Button und bedient den anschließend erscheinenden Plugin-Auswahl-Dialog:
     /// wählt das angegebene KI-Plugin aus, setzt optional die "FuerProjektVerwenden"-Checkbox
-    /// (Projekt-Standard speichern) und bestätigt mit "OK".
+    /// (Projekt-Standard speichern) und bestätigt mit "OK". Delegiert an
+    /// <see cref="Views.TaskDetailView.Start"/>.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
     /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
@@ -772,23 +776,7 @@ public abstract class WpfTestBase : IDisposable
     /// "FuerProjektVerwenden"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard
     /// gespeichert wird.</param>
     protected void StartenUndPluginWaehlen(AutomationElement mainWindow, string pluginName, bool fuerProjektVerwenden = false)
-    {
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
-        startenButton.AsButton().Click();
-
-        var dialog = WaitForWindow("KI-Plugin auswählen", Medium);
-        var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
-        SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
-
-        if (fuerProjektVerwenden)
-        {
-            var checkbox = WaitForElement(dialog, cf => cf.ByName("FuerProjektVerwenden"), Short);
-            checkbox.AsCheckBox().IsChecked = true;
-        }
-
-        var okButton = WaitForElement(dialog, cf => cf.ByName("OK"), Short);
-        okButton.AsButton().Click();
-    }
+        => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).Start(pluginName, fuerProjektVerwenden);
 
     private static string ResolveAppExePath()
     {
@@ -901,73 +889,40 @@ public abstract class WpfTestBase : IDisposable
 
     /// <summary>
     /// Verwirft die Bearbeitung über den "Zurück"-Button in der <c>TaskDetailView</c> und wartet auf
-    /// das Wiedererscheinen von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>).
+    /// das Wiedererscheinen von "ProjektName" (Rückkehr zur <c>ProjectDetailView</c>). Delegiert an
+    /// <see cref="Views.TaskDetailView.GoBack"/>.
     /// </summary>
     protected void AufgabeDetailZurueck(AutomationElement mainWindow)
-    {
-        var zurueckButton = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        zurueckButton.AsButton().Click();
-
-        WaitForElement(mainWindow, cf => cf.ByName("ProjektName"), Medium);
-    }
+        => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).GoBack();
 
     /// <summary>
     /// Löscht das aktuell in der <c>ProjectDetailView</c> geöffnete Projekt über den "Löschen"-Button
     /// und bestätigt den nativen Win32-Bestätigungsdialog. Für mehrphasige Tests, die nach einer Phase
-    /// ihr Projekt aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt.
+    /// ihr Projekt aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt. Delegiert
+    /// an <see cref="Views.ProjectDetailView.DeleteProject"/> (das dortige
+    /// <see cref="Views.Dialogs.DeleteConfirmationDialogView"/> nutzt die stabilen, sprachunabhängigen
+    /// Win32-Dialog-Control-IDs IDYES/IDNO statt der Button-Beschriftung).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit geöffneter <c>ProjectDetailView</c> (Voraussetzung: "AufgabeNeu" sichtbar).</param>
     protected void DeleteCurrentProject(AutomationElement mainWindow)
-    {
-        WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-
-        var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
-        loeschenButton.AsButton().Click();
-
-        // MessageBox "Löschen bestätigen" erscheint als separates Fenster. Der Titel stammt aus der
-        // Anwendung (App-Ressource, daher sprachunabhängig sprachlich "Löschen bestätigen"), die
-        // Button-Beschriftung "Ja"/"Nein" dagegen wird vom nativen Win32-MessageBox-Control anhand
-        // der Systemsprache des ausführenden Betriebssystems gerendert (System.Windows.MessageBox
-        // erlaubt keine eigenen Button-Texte) - auf einem englischsprachigen CI-Runner (z. B.
-        // windows-latest bei GitHub Actions) heißt der Button "Yes" statt "Ja", wodurch die Suche
-        // nach dem Namen dort unabhängig vom Timeout nie etwas findet. Die Automation-ID des
-        // Ja/Yes-Buttons entspricht dagegen der stabilen, sprachunabhängigen Win32-Dialog-Control-ID
-        // IDYES (6) und funktioniert auf jeder Systemsprache identisch.
-        var msgBox = WaitForWindow("Löschen bestätigen", Short);
-        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
-        jaButton.AsButton().Click();
-
-        // Overlay geschlossen — "Speichern" nicht mehr sichtbar
-        WaitUntilGone(mainWindow, cf => cf.ByName("Speichern"), Short);
-    }
+        => new Softwareschmiede.Tests.E2E.Views.ProjectDetailView((Window)mainWindow).DeleteProject();
 
     /// <summary>
     /// Löscht die aktuell im Edit-Panel geöffnete Aufgabe über den "Löschen"-Button und bestätigt den
     /// nativen Win32-Bestätigungsdialog. Für mehrphasige Tests, die nach einer Phase ihre Aufgabe
-    /// aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt.
+    /// aufräumen müssen, bevor die nächste Phase im selben App-Lifecycle beginnt. Delegiert an
+    /// <see cref="Views.TaskDetailView.DeleteTask"/>.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit geöffneter Aufgabe (Voraussetzung: "Starten" sichtbar, d. h. kein laufender CLI-Prozess).</param>
     protected void DeleteCurrentTask(AutomationElement mainWindow)
-    {
-        WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+        => new Softwareschmiede.Tests.E2E.Views.TaskDetailView((Window)mainWindow).DeleteTask();
 
-        var loeschenButton = WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short);
-        loeschenButton.AsButton().Click();
-
-        var msgBox = WaitForWindow("Löschen bestätigen", Short);
-        var jaButton = WaitForElement(msgBox, cf => cf.ByAutomationId("6"), Short);
-        jaButton.AsButton().Click();
-
-        // Overlay geschlossen — "Starten" nicht mehr sichtbar
-        WaitUntilGone(mainWindow, cf => cf.ByName("Starten"), Short);
-    }
-
-    /// <summary>Wartet auf die "OffeneAufgabenListe" und gibt deren ListItem-Kinder zurück.</summary>
+    /// <summary>
+    /// Wartet auf die "OffeneAufgabenListe" und gibt deren ListItem-Kinder zurück. Delegiert an
+    /// <see cref="Views.ProjectDetailView.GetTaskElements"/>.
+    /// </summary>
     protected AutomationElement[] OffeneAufgabenItems(AutomationElement mainWindow)
-    {
-        var listBox = WaitForElement(mainWindow, cf => cf.ByName("OffeneAufgabenListe"), Medium);
-        return listBox.FindAllChildren(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem));
-    }
+        => new Softwareschmiede.Tests.E2E.Views.ProjectDetailView((Window)mainWindow).GetTaskElements();
 
     /// <summary>
     /// Öffnet das erste Item aus einer bereits ermittelten Aufgabenliste per Doppelklick, wodurch die

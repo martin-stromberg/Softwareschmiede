@@ -29,7 +29,7 @@ Der Dialog ermittelt beim Öffnen über das der Aufgabe zugeordnete Git-Plugin d
 
 - Ist ein Repository samt passendem Plugin vorhanden und liefert es mindestens einen Branch, wird eine Auswahlliste (Dropdown) angezeigt; vorausgewählt ist der Branch der Aufgabe.
 - Kann keine Branch-Liste ermittelt werden (kein Repository, kein passendes Plugin, oder Fehler beim Laden), wechselt das Feld automatisch auf eine freie Texteingabe.
-- Über den „+"-Button neben dem Auswahlfeld öffnet sich eine Eingabezeile für einen neuen Branchnamen. Nach Bestätigung wird der Branch im lokalen Klon der Aufgabe angelegt (ausgehend vom aktuell gewählten Projektbranch als Basis), der Auswahlliste hinzugefügt und automatisch als Projektbranch übernommen. Ist kein lokaler Klon vorhanden oder schlägt die Anlage fehl, wird eine Fehlermeldung angezeigt, ohne den Dialog zu schließen.
+- Über den „+"-Button neben dem Auswahlfeld öffnet sich eine Eingabezeile für einen neuen Branchnamen. Nach Bestätigung wird der Name nur validiert (nicht leer, gültiger Git-Branch-Name, kein Duplikat in der Auswahlliste), der Auswahlliste hinzugefügt und automatisch als Projektbranch übernommen — zu diesem Zeitpunkt existiert noch kein lokaler Klon der Aufgabe, daher findet noch keine Git-Operation statt. Der eigentliche Branch wird erst beim Absenden des Dialogs im frisch geklonten Repository angelegt (siehe „Nach der Initialisierung" unten).
 
 ### Promptvorlagen für den Initialprompt
 
@@ -37,7 +37,8 @@ Der Dialog bietet eine Auswahl bestehender Promptvorlagen (aus der allgemeinen P
 
 Nach der Initialisierung:
 - Strukturiertes Arbeitsverzeichnis wird erstellt
-- Repository wird geklont
+- Repository wird direkt von der Repository-URL der Aufgabe geklont (`clones/repo_main`)
+- Der im Dialog gewählte Projektbranch wird im frisch geklonten Repository angelegt (neuer lokaler Branch) bzw. ausgecheckt (falls bereits remote vorhanden)
 - `state.json` wird mit Initialkonfiguration generiert
 - Projektleiter-Agent wird vorbereitet, aber noch nicht gestartet
 
@@ -107,6 +108,15 @@ Jeder **Unteragent** wird mit:
 3. Anwender kann später mit erweitertem Budget (750.000 Tokens) fortsetzen
 4. Projektleiter wird mit "Weitermachen"-Prompt neugestartet
 5. Läuft weiter bis zum Abschluss oder nächster Pause
+
+## Verfügbarkeit steuern
+
+Ob Autonome Aufgaben grundsätzlich zur Verfügung stehen, wird zentral gesteuert. In den **Einstellungen** (Registerkarte „Allgemein", Abschnitt „Automatisierung") hält die Checkbox **„Autonome Aufgaben aktivieren"** (Standard: aktiviert) Ihre Präferenz dazu fest.
+
+Ist die Funktion für autonome Aufgaben deaktiviert:
+- Ein Klick auf den Button **„Autonome Aufgabe starten"** öffnet keinen Initialisierungsdialog mehr, sondern zeigt die Meldung „Autonome Aufgaben sind in den Einstellungen deaktiviert." an.
+- Bereits initialisierte Autonome Aufgaben zeigen die Registerkarte „Automatisierung" nicht mehr an.
+- Das **einfache Starten einer Aufgabe mit direkter CLI-Ausführung** (Button „Starten") bleibt davon vollständig unberührt und weiterhin uneingeschränkt nutzbar — es handelt sich um einen unabhängigen, nicht-autonomen Weg.
 
 ## Einschränkungen
 

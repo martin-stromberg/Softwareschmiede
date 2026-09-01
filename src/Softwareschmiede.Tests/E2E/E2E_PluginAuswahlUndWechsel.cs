@@ -1,5 +1,5 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -26,16 +26,19 @@ public partial class End2EndTest
     /// Führt die Plugin-Auswahl (Abbrechen, dann OK) und den anschließenden Plugin-Wechsel bei
     /// laufender CLI als zwei Phasen an derselben Aufgabe aus.
     /// </summary>
+    /// <param name="mainWindow">Das bereits laufende Hauptfenster, in dem beide Phasen ausgeführt werden.</param>
     protected void PluginAuswahlAbbrechenOkUndWechsel_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
         SetupProjectMitNeuerAufgabe(mainWindow, "PluginDialog-Repo", "PluginDialog-Projekt");
 
-        PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(mainWindow);
-        PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(mainWindow);
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        var taskDetail = PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(mainWindow);
+        PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(taskDetail);
+
+        taskDetail.GoBack();
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 
     /// <summary>
@@ -48,29 +51,25 @@ public partial class End2EndTest
     /// kombinierte Start-Ablauf fortgesetzt (CLI startet).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der neu angelegten Aufgabe im Edit-Panel.</param>
-    private void PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(AutomationElement mainWindow)
+    /// <returns>Die Aufgabendetailansicht mit laufender CLI (Softwareschmiede.KiSimulator).</returns>
+    private TaskDetailView PluginAuswahl_AbbrechenBleibtNeu_UndOkStartetCli_E2E(Window mainWindow)
     {
         // Phase Abbrechen
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
-        startenButton.AsButton().Click();
-
-        var abbrechenDialog = WaitForWindow("KI-Plugin auswählen", Medium);
-
-        var abbrechenButton = WaitForElement(abbrechenDialog, cf => cf.ByName("Abbrechen"), Short);
-        abbrechenButton.AsButton().Click();
+        var taskDetail = new TaskDetailView(mainWindow);
+        var abbrechenDialog = new Views.Dialogs.PluginSelectionDialogView(mainWindow).ForceShow();
+        abbrechenDialog.Cancel();
 
         // Edit-Panel weiterhin sichtbar (Status nach wie vor "Neu")
-        WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
-
-        var stoppenButtonNachAbbrechen = mainWindow.FindFirstDescendant(cf =>
-            cf.ByName("CliStoppen").And(cf.ByControlType(ControlType.Button)));
-        Assert.Null(stoppenButtonNachAbbrechen);
+        Assert.True(taskDetail.IsVisible);
+        Assert.False(taskDetail.IsCliRunning());
 
         // Phase OK
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        taskDetail.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
 
         // Nach Bestätigung: kombinierter Start-Ablauf läuft weiter, CLI startet
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.WaitForCliRunning();
+
+        return taskDetail;
     }
 
     /// <summary>
@@ -81,40 +80,27 @@ public partial class End2EndTest
     /// (AusfuehrungsStatus wechselt auf "Beendet", bevor der neue Prozess "Aktiv" setzt) darf das
     /// CLI-Panel (CliViewButton, gebunden an ShowCliPanel) nicht verschwinden.
     /// </summary>
-    /// <param name="mainWindow">Das Hauptfenster mit bereits laufender CLI (Softwareschmiede.KiSimulator).</param>
-    private void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(AutomationElement mainWindow)
+    /// <param name="taskDetail">Die Aufgabendetailansicht mit bereits laufender CLI (Softwareschmiede.KiSimulator).</param>
+    private void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(TaskDetailView taskDetail)
     {
         // Kurze Stabilisierungspause nach Schließen des vorherigen Dialogs, damit die UIA-Elemente
         // wieder einen gültigen Klickpunkt liefern (sonst NoClickablePointException möglich).
         Thread.Sleep(500);
 
         // Vor dem Wechsel: CLI-Panel sichtbar (ShowCliPanel==true, AusfuehrungsStatus==Aktiv)
-        var cliViewButtonVorWechsel = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
-        Assert.NotNull(cliViewButtonVorWechsel);
+        Assert.True(taskDetail.HasCliPanel());
 
         // Plugin ändern: Dialog mit aktuellem Plugin vorselektiert anzeigen
-        var pluginAendernButton = WaitForElement(mainWindow, cf => cf.ByName("PluginAendern"), Short);
-        pluginAendernButton.AsButton().Click();
-
-        var wechselDialog = WaitForWindow("KI-Plugin auswählen", Medium);
-        var wechselPluginAuswahlBox = WaitForElement(wechselDialog, cf => cf.ByName("PluginAuswahl"), Short);
-        SelectComboBoxItemByClick(wechselPluginAuswahlBox, "Softwareschmiede.ClaudeCli", Short);
-
-        var wechselOkButton = WaitForElement(wechselDialog, cf => cf.ByName("OK"), Short);
-        wechselOkButton.AsButton().Click();
+        var wechselDialog = taskDetail.OpenPluginChangeDialog();
+        wechselDialog.SelectPlugin("Softwareschmiede.ClaudeCli");
+        wechselDialog.Confirm();
 
         // Nach dem Wechsel: alter Prozess gestoppt, neuer CLI-Prozess läuft (Stoppen-Button weiterhin sichtbar)
-        var stoppenButtonNachWechsel = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        Assert.NotNull(stoppenButtonNachWechsel);
+        taskDetail.WaitForCliRunning();
 
         // CLI-Panel bleibt während des gesamten Wechsels sichtbar (kein Verschwinden im Zwischenstand)
-        var cliViewButtonNachWechsel = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
-        Assert.NotNull(cliViewButtonNachWechsel);
+        Assert.True(taskDetail.HasCliPanel());
 
-        var statusGestartet = WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
-        Assert.NotNull(statusGestartet);
-
-        var fehlerMeldung = mainWindow.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-        Assert.Null(fehlerMeldung);
+        Assert.False(new ErrorView(taskDetail.Window).IsVisible);
     }
 }

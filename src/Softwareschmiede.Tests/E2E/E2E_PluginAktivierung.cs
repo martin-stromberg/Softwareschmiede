@@ -1,5 +1,6 @@
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Definitions;
+using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -42,13 +43,12 @@ public partial class End2EndTest
 
         // SetupProjectMitNeuerAufgabe legt die Aufgabe an und öffnet sie direkt im Edit-Panel der
         // TaskDetailView. Für die folgenden Phasen wird zur ProjectDetailView zurückgekehrt, damit
-        // "Neue Aufgabe" als ListItem in der Aufgabenliste auffindbar ist (siehe AufgabeAusListeOeffnen).
-        AufgabeDetailZurueck(mainWindow);
+        // "Neue Aufgabe" als ListItem in der Aufgabenliste auffindbar ist (siehe ProjectDetailView.OpenTask).
+        new TaskDetailView(mainWindow).GoBack();
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
-        DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(mainWindow);
-        DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(mainWindow);
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        var settings = DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(mainWindow, projectDetail);
+        DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(mainWindow, settings);
     }
 
     /// <summary>
@@ -58,28 +58,23 @@ public partial class End2EndTest
     /// Aktivierungsstatus anschließend über "Verwerfen" zurück, damit Phase 2 mit einem sauberen,
     /// weiterhin gültigen Zustand startet.
     /// </summary>
-    /// <param name="mainWindow">Das Hauptfenster mit der neu angelegten Aufgabe im Edit-Panel.</param>
-    private void DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(AutomationElement mainWindow)
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    /// <param name="projectDetail">Die Projektdetailansicht mit der neu angelegten Aufgabe in der Liste.</param>
+    /// <returns>Die Einstellungen-Ansicht (Plugins-Tab), bereit für Phase 2.</returns>
+    private SettingsView DeaktivierenDesLetztenScmPlugins_ZeigtValidierungsfehler_E2E(Window mainWindow, ProjectDetailView projectDetail)
     {
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
+        var settings = projectDetail.Menu.NavigateToSettings();
+        settings.SwitchTab("Plugins");
 
-        var scmEintrag = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
-        scmEintrag.Click();
-        var scmAktiviertCheckbox = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
-        scmAktiviertCheckbox.AsCheckBox().IsChecked = false;
+        settings.SetPluginEnabled("LocalDirectoryPlugin", false);
 
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-
-        var fehlerMeldung = WaitForElement(mainWindow, cf => cf.ByName("FehlerMeldung"), Short);
-        Assert.NotNull(fehlerMeldung);
+        Assert.Throws<InvalidOperationException>(() => settings.SaveSettings());
 
         // Zustand zurücksetzen (Aktivierungsstatus wurde ohnehin nicht persistiert), Plugins-Tab
         // bleibt dabei ausgewählt, da die Tab-Auswahl reines UI-Zustand ist und vom Reload nicht berührt wird.
-        var verwerfenButton = WaitForElement(mainWindow, cf => cf.ByName("Verwerfen"), Short);
-        verwerfenButton.AsButton().Click();
-        WaitUntilGone(mainWindow, cf => cf.ByName("FehlerMeldung"), Short);
+        settings.DiscardChanges();
+
+        return settings;
     }
 
     /// <summary>
@@ -89,71 +84,38 @@ public partial class End2EndTest
     /// Aufgabe erneut geöffnet und gestartet: weil nur ein KI-Plugin aktiv ist, entfällt sowohl der
     /// "Plugin ändern"-Selector als auch der Plugin-Auswahl-Dialog; die CLI startet direkt.
     /// </summary>
-    /// <param name="mainWindow">Das Hauptfenster, aktuell im Plugins-Register der Einstellungen.</param>
-    private void DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(AutomationElement mainWindow)
+    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
+    /// <param name="settings">Die Einstellungen-Ansicht, aktuell im Plugins-Register.</param>
+    private void DeaktivierenVonDreiKiPlugins_PersistiertUndBlendetAuswahlAus_E2E(Window mainWindow, SettingsView settings)
     {
-        DeaktivierePlugin(mainWindow, "Softwareschmiede.ClaudeCli");
-        DeaktivierePlugin(mainWindow, "Softwareschmiede.Codex");
-        DeaktivierePlugin(mainWindow, "Softwareschmiede.Devin");
-        DeaktivierePlugin(mainWindow, "Softwareschmiede.GitHubCopilot");
-
-        var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
-        WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
+        settings.SetPluginEnabled("Softwareschmiede.ClaudeCli", false);
+        settings.SetPluginEnabled("Softwareschmiede.Codex", false);
+        settings.SetPluginEnabled("Softwareschmiede.Devin", false);
+        settings.SetPluginEnabled("Softwareschmiede.GitHubCopilot", false);
+        settings.SaveSettings();
 
         // Einstellungen verlassen und erneut öffnen: Aktivierungsstatus bleibt erhalten (Persistenz)
-        var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
+        var dashboard = settings.Menu.NavigateToDashboard();
 
-        NavigateToSettings(mainWindow);
-        OpenPluginsTab(mainWindow);
-
-        var claudeEintragReloaded = WaitForElement(mainWindow, cf => cf.ByName("Softwareschmiede.ClaudeCli.Eintrag"), Short);
-        claudeEintragReloaded.Click();
-        var claudeCheckboxReloaded = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
-        Assert.False(claudeCheckboxReloaded.AsCheckBox().IsChecked);
+        var settingsReloaded = dashboard.Menu.NavigateToSettings();
+        settingsReloaded.SwitchTab("Plugins");
+        Assert.False(settingsReloaded.IsPluginEnabled("Softwareschmiede.ClaudeCli"));
 
         // Zurück zur Aufgabe: bei genau einem aktiven KI-Plugin entfällt Selector und Auswahl-Dialog
-        var dashboardButtonErneut = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButtonErneut.AsButton().Click();
-
-        NavigateToProjects(mainWindow);
-        OpenProject(mainWindow, "PluginAktivierung-Projekt");
-        AufgabeAusListeOeffnen(mainWindow, "Neue Aufgabe");
-
-        var startenButton = WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
-        startenButton.AsButton().Click();
+        var dashboardErneut = settingsReloaded.Menu.NavigateToDashboard();
+        var projectList = dashboardErneut.Menu.NavigateToProjects();
+        var projectDetail = projectList.OpenProject("PluginAktivierung-Projekt");
+        var taskDetail = projectDetail.OpenTask("Neue Aufgabe");
 
         // Kein Plugin-Auswahl-Dialog erscheint: CLI startet direkt mit dem einzigen aktiven Plugin
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.Restart();
+        taskDetail.WaitForCliRunning();
 
-        var pluginDialogFenster = Automation.GetDesktop().FindFirstChild(cf =>
-            cf.ByName("KI-Plugin auswählen").And(cf.ByControlType(ControlType.Window)));
-        Assert.Null(pluginDialogFenster);
+        Assert.False(new PluginSelectionDialogView(mainWindow).IsVisible);
+        Assert.False(taskDetail.HasPluginChangeButton());
 
-        var pluginAendernButton = mainWindow.FindFirstDescendant(cf => cf.ByName("PluginAendern"));
-        Assert.Null(pluginAendernButton);
-    }
-
-    private static void OpenPluginsTab(AutomationElement mainWindow)
-    {
-        var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
-        pluginsTab.Click();
-    }
-
-    private static void DeaktivierePlugin(AutomationElement mainWindow, string pluginPrefix)
-    {
-        var eintrag = WaitForElement(mainWindow, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short);
-        eintrag.Click();
-        var checkbox = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
-        checkbox.AsCheckBox().IsChecked = false;
-    }
-
-    private static void AktivierePlugin(AutomationElement mainWindow, string pluginPrefix)
-    {
-        var eintrag = WaitForElement(mainWindow, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short);
-        eintrag.Click();
-        var checkbox = WaitForElement(mainWindow, cf => cf.ByName("PluginAktiviert"), Short);
-        checkbox.AsCheckBox().IsChecked = true;
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetailFinal = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetailFinal.DeleteProject();
     }
 }

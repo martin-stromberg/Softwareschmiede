@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Reflection;
 using Softwareschmiede.App.Services;
@@ -147,7 +148,8 @@ public sealed class TaskDetailViewModelTests : IDisposable
         IPluginManager? pluginManager = null,
         IServiceProvider? serviceProvider = null,
         Mock<IProzessStarter>? prozessStarterMock = null,
-        IVisualStudioCodeLocator? visualStudioCodeLocator = null)
+        IVisualStudioCodeLocator? visualStudioCodeLocator = null,
+        IOptions<AutonomAufgabenOptions>? autonomAufgabenOptions = null)
     {
         if (pluginManager == null)
         {
@@ -157,7 +159,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             pluginManager = defaultPluginManagerMock.Object;
         }
 
-        var serviceProviderObj = serviceProvider ?? new Mock<IServiceProvider>().Object;
+        var serviceProviderObj = serviceProvider ?? TaskDetailViewModelTestFactory.CreateDefaultServiceProvider(_db, _kiService);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
 
@@ -176,7 +178,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
             serviceProviderObj,
             _dialogServiceMock.Object,
-            _aufgabeService);
+            _aufgabeService,
+            _db,
+            appEinstellungService: _einstellungService);
 
         var vm = new TaskDetailViewModel(
             _aufgabeService,
@@ -195,7 +199,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService);
+            autonomAufgabeStartService,
+            _einstellungService,
+            autonomAufgabenOptions ?? Options.Create(new AutonomAufgabenOptions()));
         vm.ZurueckAction = zurueckAction;
         return vm;
     }
@@ -438,6 +444,129 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ShowCliPanel.Should().BeFalse();
         sut.KannCliNeuStarten.Should().BeFalse();
         sut.StartenCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    // --- IsAutonomAufgabe ---
+
+    /// <summary>IsAutonomAufgabe ist true, wenn für die Aufgabe eine AutonomAufgabeKonfiguration vorhanden ist.</summary>
+    [Fact]
+    public async Task IsAutonomAufgabe_True_WhenAutonomKonfigurationPresent()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await MacheAufgabeAutonomAsync(aufgabe.Id);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsAutonomAufgabe.Should().BeTrue();
+    }
+
+    /// <summary>IsAutonomAufgabe ist false für eine reguläre Aufgabe ohne AutonomAufgabeKonfiguration.</summary>
+    [Fact]
+    public async Task IsAutonomAufgabe_False_WhenAutonomKonfigurationNull()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsAutonomAufgabe.Should().BeFalse();
+    }
+
+    // --- IsAutonomAufgabenEnabled / ShowAutomatisierungPanel (Feature-Flag, Issue 205) ---
+
+    /// <summary>IsAutonomAufgabenEnabled gibt false zurück, wenn AutonomAufgabenOptions.Enabled auf false steht.</summary>
+    [Fact]
+    public void IsAutonomAufgabenEnabled_WhenOptionsFalse_ShouldReturnFalse()
+    {
+        var sut = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = false }));
+
+        sut.IsAutonomAufgabenEnabled.Should().BeFalse();
+    }
+
+    /// <summary>IsAutonomAufgabenEnabled gibt true zurück, wenn AutonomAufgabenOptions.Enabled auf true steht.</summary>
+    [Fact]
+    public void IsAutonomAufgabenEnabled_WhenOptionsTrue_ShouldReturnTrue()
+    {
+        var sut = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = true }));
+
+        sut.IsAutonomAufgabenEnabled.Should().BeTrue();
+    }
+
+    /// <summary>ShowAutomatisierungPanel berücksichtigt sowohl die vorhandene AutonomAufgabeDetailViewModel-Instanz (über IsAutonomAufgabe/Wiederherstellung gesteuert) als auch das Feature-Flag IsAutonomAufgabenEnabled: Panel wird nur angezeigt, wenn eine Autonome Aufgabe geladen ist UND das Feature-Flag aktiviert ist.</summary>
+    [Fact]
+    public async Task ShowAutomatisierungPanel_ShouldConsiderBothConditions()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await MacheAufgabeAutonomAsync(aufgabe.Id);
+
+        // Flag deaktiviert: Panel bleibt trotz Autonomer Aufgabe verborgen.
+        var sutDeaktiviert = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = false }));
+        sutDeaktiviert.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sutDeaktiviert.LadenCommand).ExecuteAsync();
+        sutDeaktiviert.ShowAutomatisierungPanel.Should().BeFalse();
+
+        // Flag aktiviert: Panel wird angezeigt, da die Aufgabe autonom konfiguriert ist.
+        var sutAktiviert = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = true }));
+        sutAktiviert.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sutAktiviert.LadenCommand).ExecuteAsync();
+        sutAktiviert.ShowAutomatisierungPanel.Should().BeTrue();
+    }
+
+    /// <summary>IsAutonomAufgabenEnabled übernimmt nach dem Laden der Aufgabe (LadenCommand) den DB-persistierten
+    /// Laufzeit-Schalter (AppEinstellungService.AutonomAufgabenEnabledKey, GUI-Einstellung) und überschreibt damit
+    /// einen abweichenden appsettings.json-Deployment-Default (Issue 205, Verdrahtung DB-Wert -> UI-Sichtbarkeit).</summary>
+    [Fact]
+    public async Task IsAutonomAufgabenEnabled_ShouldBeOverriddenByDbValue_AfterLoad()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        await _einstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, false);
+        var sut = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = true }));
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsAutonomAufgabenEnabled.Should().BeFalse("der DB-persistierte Laufzeit-Schalter muss den appsettings.json-Default überschreiben");
+    }
+
+    /// <summary>IsAutonomAufgabenEnabled fällt nach dem Laden der Aufgabe weiterhin auf den appsettings.json-
+    /// Deployment-Default zurück, solange kein DB-Eintrag für den Laufzeit-Schalter existiert (Issue 205,
+    /// Fallback-Semantik von AppEinstellungService.GetAutonomAufgabenEnabledAsync).</summary>
+    [Fact]
+    public async Task IsAutonomAufgabenEnabled_ShouldFallBackToOptionsDefault_AfterLoad_WhenNoDbEntryExists()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut(autonomAufgabenOptions: Options.Create(new AutonomAufgabenOptions { Enabled = false }));
+
+        (await _einstellungService.GetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey)).Should().BeNull(
+            "Vorbedingung: kein DB-Eintrag vorhanden");
+
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        sut.IsAutonomAufgabenEnabled.Should().BeFalse("ohne DB-Eintrag muss der appsettings.json-Default (Enabled=false) weiterhin gelten");
+    }
+
+    /// <summary>Der reguläre "Stoppen"-Button (Gruppe "Ausführung") darf für Autonome Aufgaben nicht verfügbar sein, auch
+    /// wenn deren CLI-Prozess tatsächlich läuft (Projektleiter-Agent registriert seinen Prozess unter derselben
+    /// AufgabeId in KiAusfuehrungsService). Andernfalls würde ein Klick den Prozess über CliStoppenCommand direkt
+    /// beenden, ohne AutonomAufgabeKonfiguration.ExplizitGestoppt zu setzen — die Aufgabe würde beim nächsten
+    /// App-Neustart fälschlich automatisch wieder fortgesetzt (siehe ProjektleiterAgentService.StoppeAgenExplizitAsync).</summary>
+    [Fact]
+    public async Task KannCliStoppen_ShouldBeFalse_WhenAufgabeIstAutonom_EvenIfCliIsRunning()
+    {
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Gestartet);
+        await MacheAufgabeAutonomAsync(aufgabe.Id);
+        var sut = CreateSut();
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        var arbeitsverzeichnis = _tempDirectoryFixture.CreateTempDirectory("autonom-cli-stoppen-test");
+        await _kiService.StartWithPseudoConsoleAsync(aufgabe.Id, _kiPluginMock.Object, arbeitsverzeichnis, null, CancellationToken.None);
+
+        sut.IsCliRunning.Should().BeTrue("Vorbedingung: der Projektleiter-Agent-Prozess läuft unter derselben AufgabeId");
+        sut.KannCliStoppen.Should().BeFalse();
+        sut.CliStoppenCommand.CanExecute(null).Should().BeFalse();
     }
 
     // --- ShowFileExplorerPanel, DateiViewCommand ---
@@ -1647,7 +1776,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance, pluginManagerMock.Object);
         var workspaceBrowserMock = new Mock<IGitWorkspaceBrowserService>();
         workspaceBrowserMock
-            .Setup(browser => browser.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(browser => browser.LoadSnapshotAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new WorkspaceSnapshot
             {
                 RepositoryPath = Path.GetTempPath(),

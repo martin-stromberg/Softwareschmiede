@@ -11,7 +11,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// <summary>
 /// GitHub Copilot Plugin – nutzt das <c>copilot</c>-CLI für KI-gestützte Entwicklung.
 /// </summary>
-public sealed class GitHubCopilotPlugin : CliKiPluginBase
+public sealed class GitHubCopilotPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 
@@ -85,6 +85,46 @@ public sealed class GitHubCopilotPlugin : CliKiPluginBase
     {
         _logger.LogInformation("Pruefe GitHub-Copilot-Plugin-Health.");
         return await CheckHealthWithVersionCommandAsync(GetCopilotCommand(), ct);
+    }
+
+    /// <inheritdoc/>
+    public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
+    {
+        var invocation = BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+        return RunOneShotTextGenerationAsync(invocation.ProcessStartInfo, null, ct);
+    }
+
+    internal (ProcessStartInfo ProcessStartInfo, string? StandardInput) BuildIssueTemplateFillInvocation(
+        string templateBody,
+        string? originalRequirement)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = GetCopilotCommand(),
+            WorkingDirectory = Path.GetTempPath(),
+        };
+
+        psi.ArgumentList.Add("-p");
+        psi.ArgumentList.Add(BuildIssueTemplateFillPrompt(templateBody, originalRequirement));
+        psi.ArgumentList.Add("-s");
+        psi.ArgumentList.Add("--no-ask-user");
+
+        var token = _credentialStore.GetCredential("Softwareschmiede.GitHub.Token");
+        if (!string.IsNullOrEmpty(token))
+        {
+            psi.EnvironmentVariables["GH_TOKEN"] = token;
+        }
+
+        var commandLineParameters = _credentialStore.GetCredential($"{PluginPrefix}.CommandLineParameters");
+        if (!string.IsNullOrWhiteSpace(commandLineParameters))
+        {
+            foreach (var part in commandLineParameters.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                psi.ArgumentList.Add(part);
+            }
+        }
+
+        return (psi, null);
     }
 
     /// <inheritdoc/>

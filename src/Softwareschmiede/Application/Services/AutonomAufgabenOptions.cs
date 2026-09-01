@@ -6,6 +6,9 @@ public sealed class AutonomAufgabenOptions
     /// <summary>Name des Konfigurationsabschnitts in appsettings.json.</summary>
     public const string SectionName = "AutonomAufgaben";
 
+    /// <summary>Fehlermeldung für Guard-Klauseln, wenn das Feature "Autonome Aufgaben" deaktiviert ist.</summary>
+    public const string DisabledErrorMessage = "Autonome Aufgaben sind nicht aktiviert.";
+
     /// <summary>Feature-Flag zum Aktivieren/Deaktivieren von Autonomen Aufgaben.</summary>
     public bool Enabled { get; set; } = true;
 

@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -30,37 +31,29 @@ public partial class End2EndTest
 
         SetupProjectMitNeuerAufgabe(mainWindow, "CliPanelVisibility-Repo", "CliPanelVisibility-Projekt");
 
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
 
         // CLI läuft: Stoppen-Button sichtbar, CLI-Panel-Tab sichtbar (ShowCliPanel==true, AusfuehrungsStatus==Aktiv)
-        WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
-        var cliViewButtonWaehrendLauf = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
-        Assert.NotNull(cliViewButtonWaehrendLauf);
+        taskDetail.WaitForCliRunning();
+        Assert.True(taskDetail.HasCliPanel());
 
         // CLI manuell stoppen -> AusfuehrungsStatus wechselt auf "Beendet"
-        var stoppenButton = mainWindow.FindFirstDescendant(cf => cf.ByName("CliStoppen"));
-        stoppenButton!.AsButton().Click();
-
-        // Stoppen-Button verschwindet (CLI nicht mehr aktiv)
-        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.StopCli();
 
         // Nach der Korrektur bleibt das CLI-Panel weiterhin sichtbar, obwohl AusfuehrungsStatus==Beendet ist
-        var cliViewButtonNachStopp = WaitForElement(mainWindow, cf => cf.ByName("CliViewButton"), Short);
-        Assert.NotNull(cliViewButtonNachStopp);
+        Assert.True(taskDetail.HasCliPanel());
 
         // Letzte CLI-Ausgabe bleibt einsehbar
-        var terminalConsole = mainWindow.FindFirstDescendant(cf => cf.ByName("TerminalConsole"));
-        Assert.NotNull(terminalConsole);
+        Assert.True(taskDetail.HasTerminalOutput());
 
         // "CLI starten" (KannCliNeuStarten) ist verfügbar, damit die CLI manuell neu gestartet werden kann
-        var cliNeustartenButton = WaitForElement(mainWindow, cf => cf.ByName("CliNeustarten"), Short);
-        Assert.NotNull(cliNeustartenButton);
+        Assert.True(taskDetail.CanRestartCli());
 
         // Statusleiste zeigt weiterhin "Gestartet" (Aufgabenstatus unverändert)
-        var statusGestartet = WaitForElement(mainWindow, cf => cf.ByName("Gestartet"), Short);
-        Assert.NotNull(statusGestartet);
+        Assert.True(taskDetail.IsTaskStarted());
 
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 }

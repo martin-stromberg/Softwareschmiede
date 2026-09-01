@@ -10,6 +10,7 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 4. **Benachrichtigungen** — Ob und wie der Anwender bei abgeschlossenen KI-Läufen benachrichtigt wird
 5. **Erscheinungsbild** — Dark Mode ein-/ausschalten
 6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
+7. **Automatisierung** — Autonome Aufgaben aktivieren oder deaktivieren
 
 ## Funktionsweise
 
@@ -59,6 +60,14 @@ Für das Codex-Plugin gilt eine zusätzliche Schutzregel: Der Wert `Softwareschm
 ### Arbeitsverzeichnis
 
 Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons anlegt. Der Pfad wird als `AppEinstellung` in der SQLite-Datenbank gespeichert. Ist kein Verzeichnis konfiguriert oder ist der Pfad ungültig, greift ein Fallback auf das Temp-Verzeichnis. Der Fallback wird im Aufgabenprotokoll protokolliert.
+
+### Automatisierung
+
+Im Abschnitt **Automatisierung** der Registerkarte „Allgemein" befindet sich die Checkbox **„Autonome Aufgaben aktivieren"** (Standard: aktiviert). Sie hält fest, ob autonome Aufgaben grundsätzlich verwendet werden sollen, und wird beim erneuten Öffnen der Einstellungen wieder mit dem zuletzt gespeicherten Wert angezeigt.
+
+Ist die Funktion für autonome Aufgaben deaktiviert, öffnet ein Klick auf „Autonome Aufgabe starten" in der Aufgabendetailansicht keinen Dialog mehr, sondern zeigt die Meldung „Autonome Aufgaben sind in den Einstellungen deaktiviert." an. Das einfache Starten einer Aufgabe mit direkter CLI-Ausführung (Button „Starten") bleibt davon unberührt und weiterhin uneingeschränkt nutzbar.
+
+Die Checkbox wird erst nach einem Klick auf „Speichern" übernommen.
 
 ### IDE-Verhalten
 

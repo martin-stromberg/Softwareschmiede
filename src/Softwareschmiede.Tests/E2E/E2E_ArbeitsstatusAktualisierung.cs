@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -45,47 +46,23 @@ public partial class End2EndTest
 
         SetupProjectMitNeuerAufgabe(mainWindow, "ArbeitsstatusAktualisierung-Repo", "ArbeitsstatusAktualisierung-Projekt");
 
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
-        var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.WaitForCliRunning();
 
         // Assert: Kachel erscheint automatisch mit "▶ Läuft", sobald der echte CLI-Prozess läuft — ohne
         // manuelles Neuladen der Ansicht (CliProcessManager.OnCliProcessStatusChanged setzt AktiveRunId
         // beim Gestartet-Event; vor dem Fix für Issue 108 wurde AktiveRunId nirgends im Produktivcode
         // gesetzt, sodass die Kachel fälschlich dauerhaft "✓ Bereit" gezeigt hätte).
-        WaitForStatusHelpText(mainWindow, "▶ Läuft", Medium);
+        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "▶ Läuft", Medium);
 
-        stoppenButton.AsButton().Click();
-        WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
+        taskDetail.StopCli();
 
         // Assert: Kachel wechselt automatisch zurück auf "✓ Bereit", nachdem der CLI-Prozess beendet wurde
         // (CliProcessManager entfernt AktiveRunId beim Gestoppt-Event).
-        WaitForStatusHelpText(mainWindow, "✓ Bereit", Medium);
-        NavigateBackFromTaskToProject(mainWindow);
-        DeleteCurrentProject(mainWindow);
-    }
+        taskDetail.Menu.WaitForTaskStatus(AufgabenTitel, "✓ Bereit", Medium);
 
-    /// <summary>
-    /// Wartet, bis die Status-Kachel der Aufgabe in der Seitenleiste den erwarteten Status-Text als
-    /// <c>AutomationProperties.HelpText</c> anzeigt (siehe ActiveTasksListControl.xaml).
-    /// </summary>
-    /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    /// <param name="erwarteterStatus">Der erwartete Status-Text (z. B. "▶ Läuft").</param>
-    /// <param name="timeout">Maximale Wartezeit.</param>
-    private static void WaitForStatusHelpText(AutomationElement mainWindow, string erwarteterStatus, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        string? letzterStatus = null;
-        while (DateTime.UtcNow < deadline)
-        {
-            var statusElement = mainWindow.FindFirstDescendant(cf => cf.ByName($"AufgabeStatus:{AufgabenTitel}"));
-            letzterStatus = statusElement?.HelpText;
-            if (letzterStatus == erwarteterStatus)
-                return;
-
-            Thread.Sleep(200);
-        }
-
-        throw new TimeoutException(
-            $"Statuskachel zeigte innerhalb von {timeout.TotalSeconds}s nicht den erwarteten Status '{erwarteterStatus}' an. Zuletzt gesehen: '{letzterStatus}'.");
+        taskDetail.ForceClose(recurseToDashboard: false);
+        var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
+        projectDetail.DeleteProject();
     }
 }

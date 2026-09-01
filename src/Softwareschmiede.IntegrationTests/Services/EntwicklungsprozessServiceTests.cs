@@ -380,4 +380,43 @@ public sealed class EntwicklungsprozessServiceTests
         // Assert
         loaded!.DefaultSourceBranchName.Should().BeNull();
     }
+
+    /// <summary>
+    /// Prüft, dass der nicht-autonome Weg (Repository-Setup über <see cref="EntwicklungsprozessService.ProzessStartenAsync"/>,
+    /// dem zentralen Einstiegspunkt für den nicht-autonomen Weg, den auch <see cref="EntwicklungsprozessService.ProzessStartenUndCliStartenAsync"/>
+    /// intern zuerst aufruft) unabhängig vom Feature-Flag <see cref="AutonomAufgabenOptions.Enabled"/> für
+    /// Autonome Aufgaben funktioniert (Issue 205): <see cref="EntwicklungsprozessService"/> hat bewusst keine
+    /// Abhängigkeit zu <see cref="AutonomAufgabenOptions"/> und wird daher nicht durch das deaktivierte Flag
+    /// blockiert. Der eigentliche CLI-Start (<c>KiAusfuehrungsService.StartWithPseudoConsoleAsync</c>) wird hier
+    /// bewusst nicht mitgeprüft, da er einen echten ConPTY-Kindprozess erfordert (siehe CLAUDE.md, Abschnitt
+    /// Testing, zur ConPTY-Instabilität dieser Sandbox) und für den Nachweis der Feature-Flag-Unabhängigkeit
+    /// nicht erforderlich ist.
+    /// </summary>
+    [Fact]
+    public async Task WhenFeatureFlagDisabled_ShouldUseFallbackPath()
+    {
+        // Arrange
+        await using var db = await DatabaseFixture.CreateAsync();
+        var (_, aufgabeId) = await CreateTestDataAsync(db, "Fallback trotz deaktiviertem Feature-Flag");
+
+        var gitMock = new Mock<IGitPlugin>();
+        gitMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        gitMock.Setup(g => g.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService(db, gitMock, new Mock<IKiPlugin>());
+
+        // Act: der nicht-autonome Weg muss trotz eines deaktivierten AutonomAufgabenOptions.Enabled-Flags
+        // funktionieren, da EntwicklungsprozessService diese Option gar nicht kennt (kein Gating, siehe Plan
+        // Issue 205) und CreateService(...) (siehe oben) keinen AutonomAufgabenOptions-Parameter kennt oder
+        // benötigt.
+        await service.ProzessStartenAsync(aufgabeId, "https://github.com/test/repo");
+
+        // Assert
+        await using var db2 = db.CreateNewContext();
+        var loaded = await db2.Aufgaben.FindAsync(aufgabeId);
+        loaded!.Status.Should().Be(AufgabeStatus.Gestartet);
+        loaded.LokalerKlonPfad.Should().NotBeNullOrEmpty();
+    }
 }

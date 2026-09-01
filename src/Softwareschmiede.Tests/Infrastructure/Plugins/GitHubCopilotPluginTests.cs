@@ -97,4 +97,59 @@ public sealed class GitHubCopilotPluginTests
 
         psi.Arguments.Should().Contain("--model gpt-4o");
     }
+
+    /// <summary>Copilot bietet die rueckgabefaehige Issue-Template-Ausfuellhilfe an.</summary>
+    [Fact]
+    public void Plugin_ShouldExposeIssueTemplateTextGeneratorCapability()
+    {
+        _sut.Should().BeAssignableTo<IIssueTemplateTextGenerator>();
+    }
+
+    /// <summary>Issue-Ausfuellhilfe uebergibt den Prompt als Argument an copilot -p.</summary>
+    [Fact]
+    public void BuildIssueTemplateFillInvocation_ShouldPassPromptAsArgument()
+    {
+        const string templateBody = "## Akzeptanzkriterien\n- offen";
+        const string originalRequirement = "Die Issue-Anlage soll Templates per KI ausfuellen.";
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.ExecutablePath"))
+            .Returns(@"C:\tools\copilot.exe");
+
+        var invocation = _sut.BuildIssueTemplateFillInvocation(templateBody, originalRequirement);
+
+        invocation.ProcessStartInfo.FileName.Should().Be(@"C:\tools\copilot.exe");
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("-p");
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("-s");
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("--no-ask-user");
+        invocation.StandardInput.Should().BeNull();
+        invocation.ProcessStartInfo.ArgumentList.Should().ContainSingle(arg =>
+            arg.Contains("Template:", StringComparison.Ordinal)
+            && arg.Contains(templateBody)
+            && arg.Contains("Originalanforderung:")
+            && arg.Contains(originalRequirement));
+    }
+
+    /// <summary>BuildIssueTemplateFillInvocation setzt GH_TOKEN wenn ein GitHub-Token gespeichert ist.</summary>
+    [Fact]
+    public void BuildIssueTemplateFillInvocation_ShouldSetGhToken_WhenStored()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token"))
+            .Returns("ghp_test-token");
+
+        var invocation = _sut.BuildIssueTemplateFillInvocation("template", null);
+
+        invocation.ProcessStartInfo.EnvironmentVariables["GH_TOKEN"].Should().Be("ghp_test-token");
+    }
+
+    /// <summary>BuildIssueTemplateFillInvocation haengt gespeicherte CommandLineParameters als einzelne Argumente an.</summary>
+    [Fact]
+    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameters()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters"))
+            .Returns("--model gpt-4o");
+
+        var invocation = _sut.BuildIssueTemplateFillInvocation("template", null);
+
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("--model");
+        invocation.ProcessStartInfo.ArgumentList.Should().Contain("gpt-4o");
+    }
 }

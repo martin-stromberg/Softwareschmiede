@@ -133,20 +133,6 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}" />
-                        <ContentPresenter Grid.Column="0"
-                                          Content="{TemplateBinding SelectionBoxItem}"
-                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
-                                          IsHitTestVisible="False"
-                                          Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="Center" />
-                        <Path Grid.Column="1"
-                              Data="M 0 0 L 4 4 L 8 0 Z"
-                              Fill="{TemplateBinding Foreground}"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Center"
-                              IsHitTestVisible="False" />
                         <ToggleButton Grid.ColumnSpan="2"
                                       Focusable="False"
                                       IsTabStop="False"
@@ -158,6 +144,38 @@
                                 </ControlTemplate>
                             </ToggleButton.Template>
                         </ToggleButton>
+                        <ContentPresenter x:Name="contentPresenter"
+                                          Grid.Column="0"
+                                          Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                          IsHitTestVisible="False"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center" />
+                        <!--
+                            Liegt im Grid über dem ToggleButton, aber nur in Spalte 0 (Text-/Inhaltsbereich):
+                            bei IsEditable="True" fängt die TextBox Klicks im Textbereich für Fokus/Caret-
+                            Positionierung ab, während die Pfeil-Spalte (Spalte 1) weiterhin unverdeckt vom
+                            ToggleButton bedient wird und das Dropdown öffnet.
+                        -->
+                        <TextBox x:Name="PART_EditableTextBox"
+                                 Grid.Column="0"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="{TemplateBinding Foreground}"
+                                 CaretBrush="{TemplateBinding Foreground}"
+                                 Margin="{TemplateBinding Padding}"
+                                 VerticalAlignment="Center"
+                                 Focusable="True"
+                                 IsReadOnly="{TemplateBinding IsReadOnly}"
+                                 Visibility="Collapsed" />
+                        <Path Grid.Column="1"
+                              Data="M 0 0 L 4 4 L 8 0 Z"
+                              Fill="{TemplateBinding Foreground}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              IsHitTestVisible="False" />
                         <Popup x:Name="PART_Popup"
                                Grid.ColumnSpan="2"
                                AllowsTransparency="True"
@@ -176,6 +194,12 @@
                             </Border>
                         </Popup>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEditable" Value="True">
+                            <Setter TargetName="contentPresenter" Property="Visibility" Value="Collapsed" />
+                            <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
