@@ -4,5 +4,11 @@ namespace Softwareschmiede.Domain.Enums;
 public enum PullRequestProvider
 {
     /// <summary>GitHub Pull Request.</summary>
-    GitHub
+    GitHub = 0,
+
+    /// <summary>Bitbucket Cloud Pull Request.</summary>
+    BitbucketCloud = 1,
+
+    /// <summary>Bitbucket Server oder Data Center Pull Request.</summary>
+    BitbucketServerDataCenter = 2
 }

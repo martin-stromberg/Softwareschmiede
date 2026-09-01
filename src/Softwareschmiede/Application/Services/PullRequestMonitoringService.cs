@@ -34,7 +34,12 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
 
         foreach (var pullRequest in due)
         {
-            await MonitorAsync(scope.ServiceProvider, pullRequest, references, allowAutoComplete: true, ct);
+            await MonitorAsync(
+                scope.ServiceProvider,
+                pullRequest,
+                references,
+                PullRequestMonitoringPolicy.CanAutoComplete(pullRequest.Rolle, pullRequest.Provider),
+                ct);
         }
     }
 
@@ -58,9 +63,8 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
         bool allowAutoComplete,
         CancellationToken ct)
     {
-        if (pullRequest.Provider != PullRequestProvider.GitHub)
+        if (!PullRequestMonitoringPolicy.CanMonitor(pullRequest.Rolle, pullRequest.Provider))
         {
-            await references.SetProblemAsync(pullRequest, PullRequestMonitoringPhase.Failed, $"Provider '{pullRequest.Provider}' wird nicht unterstuetzt.", ct);
             return;
         }
 
@@ -97,6 +101,7 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
             }
 
             if (allowAutoComplete
+                && PullRequestMonitoringPolicy.CanAutoComplete(pullRequest.Rolle, pullRequest.Provider)
                 && phase == PullRequestMonitoringPhase.PreMergeSucceeded
                 && IsAutoCompleteEnabled(services, plugin))
             {
@@ -242,10 +247,10 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
     private static IGitPlugin ResolveProviderPlugin(IServiceProvider services, PullRequestProvider provider)
     {
         var pluginManager = services.GetRequiredService<IPluginManager>();
-        var expectedPrefix = provider == PullRequestProvider.GitHub ? "Softwareschmiede.GitHub" : provider.ToString();
+        var expectedPrefix = PullRequestProviderDescriptor.GetPluginPrefix(provider);
         return pluginManager.GetSourceCodeManagementPlugins()
                    .FirstOrDefault(p => string.Equals(p.PluginPrefix, expectedPrefix, StringComparison.OrdinalIgnoreCase))
-               ?? pluginManager.GetDefaultSourceCodeManagementPlugin();
+               ?? throw new InvalidOperationException($"Kein SCM-Plugin fuer Pull-Request-Provider '{provider}' registriert.");
     }
 
     private static bool IsAutoCompleteEnabled(IServiceProvider services, IGitPlugin plugin)

@@ -886,6 +886,10 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 .Where(a => !string.IsNullOrWhiteSpace(a.AlertReferenz?.SourceKey))
                 .Select(a => a.AlertReferenz!.SourceKey)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var repositoryContext = new ScmRepositoryContext(
+                repository.Id,
+                repository.PluginTyp,
+                string.IsNullOrWhiteSpace(repository.RepositoryName) ? repository.RepositoryUrl : repository.RepositoryName);
 
             var issues = await gitPlugin.GetIssuesAsync(repository.RepositoryUrl, ct);
             foreach (var issue in issues)
@@ -893,7 +897,27 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 if (!bereitsKonvertierteNummern.Contains(issue.Nummer))
                 {
                     IssueVorschlaege.Add(issue);
-                    OffeneAnforderungen.Add(ScmRequirement.FromIssue(issue));
+                    OffeneAnforderungen.Add(ScmRequirement.FromIssue(issue, repositoryContext));
+                }
+            }
+
+            var pullRequests = await gitPlugin.GetOpenPullRequestsAsync(repositoryContext.RepositoryId, ct);
+            foreach (var pullRequest in pullRequests)
+            {
+                var repositoryId = pullRequest.RepositoryId ?? repositoryContext.RepositoryId;
+                if (!PullRequestRepositoryId.TryNormalize(pullRequest.Provider, repositoryId, out var normalizedRepositoryId))
+                    continue;
+
+                var alreadyLinked = await _aufgabeService.IsPullRequestLinkedAsync(
+                    pullRequest.Provider,
+                    normalizedRepositoryId,
+                    pullRequest.Nummer,
+                    ct);
+                if (!alreadyLinked)
+                {
+                    OffeneAnforderungen.Add(ScmRequirement.FromPullRequest(
+                        pullRequest with { RepositoryId = normalizedRepositoryId },
+                        new ScmRepositoryContext(repositoryContext.GitRepositoryId, repositoryContext.PluginPrefix, normalizedRepositoryId)));
                 }
             }
 
@@ -934,7 +958,56 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        if (anforderung.Kind == ScmRequirementKind.PullRequest)
+        {
+            await AufgabeAusPullRequestErstellenAsync(anforderung, ct);
+            return;
+        }
+
         await AufgabeAusAlertErstellenAsync(anforderung, ct);
+    }
+
+    private async Task AufgabeAusPullRequestErstellenAsync(ScmRequirement anforderung, CancellationToken ct)
+    {
+        var pullRequest = anforderung.PullRequest;
+        var repositoryContext = anforderung.RepositoryContext;
+        if (pullRequest == null || repositoryContext == null || _projektId == Guid.Empty)
+            return;
+
+        if (!_dialogService.BestaetigenDialog(
+                $"Pull Request '{pullRequest.Titel}' als Review-Aufgabe erstellen?",
+                "Pull Request konvertieren"))
+            return;
+
+        try
+        {
+            var aufgabe = await _aufgabeService.CreateFromPullRequestAsync(
+                _projektId,
+                pullRequest,
+                repositoryContext,
+                ct);
+
+            var zuEntfernen = OffeneAnforderungen.FirstOrDefault(a =>
+                a.Kind == ScmRequirementKind.PullRequest
+                && a.PullRequest?.Provider == pullRequest.Provider
+                && a.PullRequest?.Nummer == pullRequest.Nummer
+                && string.Equals(a.RepositoryContext?.RepositoryId, repositoryContext.RepositoryId, StringComparison.OrdinalIgnoreCase));
+            if (zuEntfernen != null)
+                OffeneAnforderungen.Remove(zuEntfernen);
+
+            Aufgaben.Add(aufgabe);
+            AktualisiereAufgabenAnsichten();
+            OeffneAufgabe(aufgabe.Id);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen einer Aufgabe aus Pull Request #{PullRequestNumber}.", pullRequest.Nummer);
+            SetFehler(ex);
+        }
     }
 
     private async Task AufgabeAusIssueErstellenAsync(Issue? issue, CancellationToken ct)

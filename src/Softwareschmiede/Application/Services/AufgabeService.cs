@@ -41,6 +41,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .AsNoTracking()
             .Include(a => a.IssueReferenz)
             .Include(a => a.AlertReferenz)
+            .Include(a => a.PullRequests)
             .Where(a => a.ProjektId == projektId && a.Status != AufgabeStatus.Archiviert)
             .OrderByDescending(a => a.ErstellungsDatum)
             .ToListAsync(ct);
@@ -90,6 +91,7 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .Include(a => a.Projekt)
             .Include(a => a.IssueReferenz)
             .Include(a => a.AlertReferenz)
+            .Include(a => a.PullRequests)
             .Include(a => a.GitRepository)
                 .ThenInclude(r => r!.StartKonfiguration)
             .Include(a => a.GitRepository)
@@ -110,6 +112,22 @@ public sealed class AufgabeService : IAktiveAufgabenService
             .Include(a => a.IssueReferenz)
             .Include(a => a.AlertReferenz)
             .FirstOrDefaultAsync(a => a.AlertReferenz != null && a.AlertReferenz.SourceKey == sourceKey, ct);
+    }
+
+    /// <summary>Prueft global, ob ein Pull Request bereits einer Aufgabe zugeordnet ist.</summary>
+    public async Task<bool> IsPullRequestLinkedAsync(
+        PullRequestProvider provider,
+        string repositoryId,
+        int pullRequestNumber,
+        CancellationToken ct = default)
+    {
+        var normalizedRepositoryId = PullRequestRepositoryId.Normalize(provider, repositoryId);
+        return await _db.PullRequestReferenzen
+            .AsNoTracking()
+            .AnyAsync(p => p.Provider == provider
+                           && p.RepositoryId == normalizedRepositoryId
+                           && p.PullRequestNumber == pullRequestNumber,
+                ct);
     }
 
     /// <summary>Gibt die ID des zuletzt generierten Diff-Ergebnisses einer Aufgabe zurück.</summary>
@@ -225,6 +243,113 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation("Aufgabe aus Issue #{IssueNummer} mit ID {AufgabeId} erstellt.", issue.Nummer, aufgabe.Id);
+        return aufgabe;
+    }
+
+    /// <summary>Erstellt eine neue Aufgabe aus einem Pull-Request-Vorschlag.</summary>
+    public async Task<Aufgabe> CreateFromPullRequestAsync(
+        Guid projektId,
+        PullRequest pullRequest,
+        ScmRepositoryContext repositoryContext,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(pullRequest);
+        ArgumentNullException.ThrowIfNull(repositoryContext);
+
+        if (pullRequest.Nummer <= 0)
+            throw new InvalidOperationException("Der Pull Request besitzt keine gueltige Nummer.");
+        if (string.IsNullOrWhiteSpace(pullRequest.BranchName))
+            throw new InvalidOperationException("Der Pull Request besitzt keinen Quell-Branch.");
+
+        var provider = pullRequest.Provider;
+        var repositoryId = PullRequestRepositoryId.Normalize(provider, pullRequest.RepositoryId ?? repositoryContext.RepositoryId);
+        var sourceRepositoryId = PullRequestRepositoryId.Normalize(provider, pullRequest.SourceRepositoryId ?? repositoryId);
+        if (!string.Equals(repositoryId, repositoryContext.RepositoryId, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Der Pull-Request-Vorschlag passt nicht zum Repository-Kontext.");
+
+        if (string.IsNullOrWhiteSpace(pullRequest.SourceRef) && string.IsNullOrWhiteSpace(pullRequest.SourceRepositoryUrl))
+            throw new InvalidOperationException("Der Pull Request besitzt keine auscheckbare Quell-Referenz.");
+
+        var repositoryExists = await _db.GitRepositories
+            .AsNoTracking()
+            .AnyAsync(r => r.Id == repositoryContext.GitRepositoryId
+                           && r.ProjektId == projektId
+                           && r.Aktiv
+                           && r.PluginTyp == repositoryContext.PluginPrefix,
+                ct);
+        if (!repositoryExists)
+            throw new InvalidOperationException("Der Repository-Kontext des Pull-Request-Vorschlags ist nicht mehr gueltig.");
+
+        var alreadyLinked = await _db.PullRequestReferenzen
+            .AsNoTracking()
+            .AnyAsync(p => p.Provider == provider
+                           && p.RepositoryId == repositoryId
+                           && p.PullRequestNumber == pullRequest.Nummer,
+                ct);
+        if (alreadyLinked)
+            throw new InvalidOperationException("Dieser Pull Request ist bereits einer Aufgabe zugeordnet.");
+
+        var now = DateTimeOffset.UtcNow;
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            GitRepositoryId = repositoryContext.GitRepositoryId,
+            Titel = pullRequest.Titel,
+            AnforderungsBeschreibung = string.IsNullOrWhiteSpace(pullRequest.Url)
+                ? pullRequest.Titel
+                : $"{pullRequest.Titel}{Environment.NewLine}{Environment.NewLine}{pullRequest.Url}",
+            Status = AufgabeStatus.Neu,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
+            ErstellungsDatum = now
+        };
+
+        aufgabe.PullRequests.Add(new PullRequestReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            Provider = provider,
+            Rolle = PullRequestReferenzRolle.ReviewSource,
+            RepositoryId = repositoryId,
+            PullRequestNumber = pullRequest.Nummer,
+            ProviderPullRequestId = pullRequest.ProviderPullRequestId,
+            Url = pullRequest.Url,
+            Titel = pullRequest.Titel,
+            SourceBranch = pullRequest.BranchName,
+            SourceRepositoryId = sourceRepositoryId,
+            SourceRepositoryUrl = pullRequest.SourceRepositoryUrl,
+            SourceRef = pullRequest.SourceRef,
+            TargetBranch = pullRequest.TargetBranch ?? string.Empty,
+            HeadSha = pullRequest.HeadSha,
+            Status = PullRequestStatus.Open,
+            MergeStatus = PullRequestMergeStatus.Unknown,
+            MonitoringPhase = PullRequestMonitoringPolicy.GetInitialPhase(provider),
+            NextCheckUtc = PullRequestMonitoringPolicy.GetInitialPhase(provider) == PullRequestMonitoringPhase.NotMonitored ? null : now,
+            LastError = null,
+            CreatedUtc = now
+        });
+
+        _db.Aufgaben.Add(aufgabe);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            _db.ChangeTracker.Clear();
+            var concurrentlyLinked = await _db.PullRequestReferenzen
+                .AsNoTracking()
+                .AnyAsync(p => p.Provider == provider
+                               && p.RepositoryId == repositoryId
+                               && p.PullRequestNumber == pullRequest.Nummer,
+                    ct);
+            if (concurrentlyLinked)
+                throw new InvalidOperationException("Dieser Pull Request ist bereits einer Aufgabe zugeordnet.", ex);
+
+            throw;
+        }
+
         return aufgabe;
     }
 
