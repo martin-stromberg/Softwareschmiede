@@ -1,4 +1,6 @@
 using System.Linq.Expressions;
+using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
@@ -358,7 +360,11 @@ public sealed class AufgabeService : IAktiveAufgabenService
 
         if (!string.IsNullOrWhiteSpace(pullRequest.Body))
         {
-            parts.Add(pullRequest.Body.Trim());
+            var body = CleanPullRequestBody(pullRequest.Body);
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                parts.Add(body);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(pullRequest.Url))
@@ -367,6 +373,25 @@ public sealed class AufgabeService : IAktiveAufgabenService
         }
 
         return string.Join($"{Environment.NewLine}{Environment.NewLine}", parts);
+    }
+
+    private static string CleanPullRequestBody(string body)
+    {
+        var text = body.ReplaceLineEndings("\n");
+
+        text = Regex.Replace(text, @"(?m)^\[//\]:\s*#\s*\([^\n]*\)\s*$", string.Empty);
+        text = Regex.Replace(text, @"<!--.*?-->", string.Empty, RegexOptions.Singleline);
+        text = Regex.Replace(text, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, @"<li[^>]*>", "- ", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, @"</(p|div|blockquote|details|summary|h[1-6]|ul|ol|li)>", "\n", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, @"<code[^>]*>(.*?)</code>", "`$1`", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        text = Regex.Replace(text, @"<a\s+[^>]*href\s*=\s*[""'](?<href>[^""']+)[""'][^>]*>(?<text>.*?)</a>", "${text}", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        text = Regex.Replace(text, @"<[^>]+>", string.Empty);
+        text = WebUtility.HtmlDecode(text);
+        text = Regex.Replace(text, @"[ \t]+\n", "\n");
+        text = Regex.Replace(text, @"\n{3,}", "\n\n");
+
+        return text.Trim();
     }
 
     /// <summary>Erstellt eine neue Aufgabe aus einem Alert und verknüpft sie mit dem bereits erstellten externen Issue.</summary>
