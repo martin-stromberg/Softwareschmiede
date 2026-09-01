@@ -80,6 +80,58 @@ public sealed class AufgabeServiceTests : IDisposable
         result.IssueReferenz.Milestone.Should().Be("v1.0");
     }
 
+    /// <summary>CreateFromPullRequestAsync erstellt eine Aufgabe mit ReviewSource-Referenz.</summary>
+    [Fact]
+    public async Task CreateFromPullRequestAsync_ShouldCreateAufgabeWithReviewSourceReference()
+    {
+        // Arrange
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            RepositoryName = "owner/repo",
+            RepositoryUrl = "https://github.com/owner/repo.git",
+            PluginTyp = "Softwareschmiede.GitHub",
+            Aktiv = true
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+
+        var pullRequest = new PullRequest(
+            Nummer: 17,
+            Titel: "Review external change",
+            Url: "https://github.com/owner/repo/pull/17",
+            BranchName: "feature/external",
+            Provider: PullRequestProvider.GitHub,
+            RepositoryId: "OWNER/Repo",
+            ProviderPullRequestId: "PR_kwDO",
+            TargetBranch: "main",
+            HeadSha: "abc123",
+            SourceRepositoryId: "fork/repo",
+            SourceRepositoryUrl: "https://github.com/fork/repo.git",
+            SourceRef: "refs/heads/feature/external",
+            Body: "Bitte diese Dependency-Aktualisierung reviewen.");
+        var context = new ScmRepositoryContext(repository.Id, repository.PluginTyp, "owner/repo");
+
+        // Act
+        var result = await _sut.CreateFromPullRequestAsync(_projektId, pullRequest, context);
+
+        // Assert
+        result.Titel.Should().Be("Review external change");
+        result.AnforderungsBeschreibung.Should().Contain("Bitte diese Dependency-Aktualisierung reviewen.");
+        result.AnforderungsBeschreibung.Should().Contain("https://github.com/owner/repo/pull/17");
+        result.GitRepositoryId.Should().Be(repository.Id);
+        result.PullRequests.Should().ContainSingle();
+        var reference = result.PullRequests.Single();
+        reference.Rolle.Should().Be(PullRequestReferenzRolle.ReviewSource);
+        reference.RepositoryId.Should().Be("owner/repo");
+        reference.SourceRepositoryId.Should().Be("fork/repo");
+        reference.SourceRepositoryUrl.Should().Be("https://github.com/fork/repo.git");
+        reference.SourceRef.Should().Be("refs/heads/feature/external");
+        reference.MonitoringPhase.Should().Be(PullRequestMonitoringPhase.Created);
+        reference.NextCheckUtc.Should().NotBeNull();
+    }
+
     /// <summary>CreateFromAlertAsync erstellt Aufgabe, IssueReferenz und AlertReferenz.</summary>
     [Fact]
     public async Task CreateFromAlertAsync_ShouldCreateAufgabeWithIssueAndAlertReference()

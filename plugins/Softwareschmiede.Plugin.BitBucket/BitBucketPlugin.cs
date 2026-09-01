@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text.Json;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
@@ -371,6 +372,210 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
     }
 
     /// <inheritdoc/>
+    public override async Task<IEnumerable<PullRequest>> GetOpenPullRequestsAsync(string repositoryId, CancellationToken ct = default)
+    {
+        var provider = PullRequestProviderDescriptor.ParseBitbucketHostingMode(
+            _credentialStore.GetCredential(BitbucketHostingModeKey) ?? "Cloud");
+        var normalizedRepositoryId = PullRequestRepositoryId.Normalize(provider, repositoryId);
+
+        return provider == PullRequestProvider.BitbucketServerDataCenter
+            ? await GetOpenServerPullRequestsAsync(normalizedRepositoryId, ct)
+            : await GetOpenCloudPullRequestsAsync(normalizedRepositoryId, ct);
+    }
+
+    private async Task<IEnumerable<PullRequest>> GetOpenCloudPullRequestsAsync(string repositoryId, CancellationToken ct)
+    {
+        var result = new List<PullRequest>();
+        var nextUrl = $"{GetBitbucketApiBaseUrl()}/2.0/repositories/{repositoryId}/pullrequests?state=OPEN&pagelen=100";
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (!string.IsNullOrWhiteSpace(nextUrl))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!visited.Add(nextUrl))
+                throw new InvalidOperationException("Bitbucket-Cloud-Pagination lieferte eine wiederholte next-URL.");
+
+            var page = await _cliRunner.RunAsync("curl", ["-s", .. GetCurlAuthArgs(), nextUrl], null, null, ct);
+            if (!page.IsSuccess)
+                throw new InvalidOperationException($"Bitbucket-Pullrequests konnten nicht geladen werden: {page.StdErr}");
+
+            using var doc = JsonDocument.Parse(page.StdOut);
+            if (HasBitbucketErrors(doc.RootElement, out var error))
+                throw new InvalidOperationException($"Bitbucket-Pullrequests konnten nicht geladen werden: {error}");
+
+            if (doc.RootElement.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in values.EnumerateArray())
+                    result.Add(ParseCloudPullRequest(item, repositoryId));
+            }
+
+            nextUrl = doc.RootElement.TryGetProperty("next", out var next) ? next.GetString() : null;
+        }
+
+        return result;
+    }
+
+    private async Task<IEnumerable<PullRequest>> GetOpenServerPullRequestsAsync(string repositoryId, CancellationToken ct)
+    {
+        var parts = repositoryId.Split('/', 2);
+        if (parts.Length != 2)
+            throw new InvalidOperationException("Bitbucket Server/Data Center Repository-ID muss PROJECT/repository sein.");
+
+        var result = new List<PullRequest>();
+        int? start = 0;
+        var visited = new HashSet<int>();
+        while (start is not null)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!visited.Add(start.Value))
+                throw new InvalidOperationException("Bitbucket-Server-Pagination lieferte einen wiederholten Startwert.");
+
+            var url = $"{GetBitbucketApiBaseUrl()}/rest/api/1.0/projects/{parts[0]}/repos/{parts[1]}/pull-requests?state=OPEN&limit=100&start={start.Value}";
+            var page = await _cliRunner.RunAsync("curl", ["-s", .. GetCurlAuthArgs(), url], null, null, ct);
+            if (!page.IsSuccess)
+                throw new InvalidOperationException($"Bitbucket-Pullrequests konnten nicht geladen werden: {page.StdErr}");
+
+            using var doc = JsonDocument.Parse(page.StdOut);
+            if (HasBitbucketErrors(doc.RootElement, out var error))
+                throw new InvalidOperationException($"Bitbucket-Pullrequests konnten nicht geladen werden: {error}");
+
+            if (doc.RootElement.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in values.EnumerateArray())
+                    result.Add(ParseServerPullRequest(item, repositoryId));
+            }
+
+            var isLast = doc.RootElement.TryGetProperty("isLastPage", out var isLastEl) && isLastEl.ValueKind == JsonValueKind.True;
+            start = isLast ? null : doc.RootElement.TryGetProperty("nextPageStart", out var nextStart) && nextStart.TryGetInt32(out var nextValue) ? nextValue : null;
+        }
+
+        return result;
+    }
+
+    private static PullRequest ParseCloudPullRequest(JsonElement item, string repositoryId)
+    {
+        var id = item.GetProperty("id").GetInt32();
+        var title = item.TryGetProperty("title", out var titleEl) ? titleEl.GetString() ?? string.Empty : string.Empty;
+        var url = ReadBitbucketLink(item, "html") ?? string.Empty;
+        var source = item.TryGetProperty("source", out var sourceEl) ? sourceEl : default;
+        var destination = item.TryGetProperty("destination", out var destEl) ? destEl : default;
+        var sourceBranch = ReadNestedString(source, "branch", "name") ?? string.Empty;
+        var targetBranch = ReadNestedString(destination, "branch", "name");
+        var sourceRepositoryId = ReadNestedString(source, "repository", "full_name") ?? repositoryId;
+        sourceRepositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.BitbucketCloud, sourceRepositoryId);
+        var sourceUrl = source.TryGetProperty("repository", out var repoEl) ? ReadBitbucketCloneLink(repoEl) : null;
+
+        return new PullRequest(
+            id,
+            title,
+            url,
+            sourceBranch,
+            PullRequestProvider.BitbucketCloud,
+            repositoryId,
+            id.ToString(CultureInfo.InvariantCulture),
+            targetBranch,
+            null,
+            sourceRepositoryId,
+            sourceUrl,
+            $"refs/heads/{sourceBranch}");
+    }
+
+    private static PullRequest ParseServerPullRequest(JsonElement item, string repositoryId)
+    {
+        var id = item.GetProperty("id").GetInt32();
+        var title = item.TryGetProperty("title", out var titleEl) ? titleEl.GetString() ?? string.Empty : string.Empty;
+        var url = ReadBitbucketLink(item, "self") ?? string.Empty;
+        var fromRef = item.TryGetProperty("fromRef", out var fromEl) ? fromEl : default;
+        var toRef = item.TryGetProperty("toRef", out var toEl) ? toEl : default;
+        var sourceBranch = ReadString(fromRef, "displayId") ?? ReadString(fromRef, "id")?.Replace("refs/heads/", string.Empty, StringComparison.OrdinalIgnoreCase) ?? string.Empty;
+        var sourceRef = ReadString(fromRef, "id") ?? $"refs/heads/{sourceBranch}";
+        var targetBranch = ReadString(toRef, "displayId");
+        var sourceRepositoryId = repositoryId;
+        string? sourceUrl = null;
+        if (fromRef.TryGetProperty("repository", out var repoEl) && repoEl.ValueKind == JsonValueKind.Object)
+        {
+            var slug = ReadString(repoEl, "slug");
+            var projectKey = ReadNestedString(repoEl, "project", "key");
+            if (!string.IsNullOrWhiteSpace(slug) && !string.IsNullOrWhiteSpace(projectKey))
+                sourceRepositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.BitbucketServerDataCenter, $"{projectKey}/{slug}");
+            sourceUrl = ReadBitbucketCloneLink(repoEl);
+        }
+
+        return new PullRequest(
+            id,
+            title,
+            url,
+            sourceBranch,
+            PullRequestProvider.BitbucketServerDataCenter,
+            repositoryId,
+            id.ToString(CultureInfo.InvariantCulture),
+            targetBranch,
+            null,
+            sourceRepositoryId,
+            sourceUrl,
+            sourceRef);
+    }
+
+    private static string? ReadString(JsonElement element, string propertyName)
+        => element.ValueKind == JsonValueKind.Object
+           && element.TryGetProperty(propertyName, out var property)
+           && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
+
+    private static string? ReadNestedString(JsonElement element, string objectPropertyName, string valuePropertyName)
+        => element.ValueKind == JsonValueKind.Object
+           && element.TryGetProperty(objectPropertyName, out var nested)
+           && nested.ValueKind == JsonValueKind.Object
+            ? ReadString(nested, valuePropertyName)
+            : null;
+
+    private static string? ReadBitbucketLink(JsonElement element, string relation)
+    {
+        if (element.ValueKind != JsonValueKind.Object
+            || !element.TryGetProperty("links", out var links)
+            || links.ValueKind != JsonValueKind.Object
+            || !links.TryGetProperty(relation, out var relationElement))
+            return null;
+
+        if (relationElement.ValueKind == JsonValueKind.Object)
+            return ReadString(relationElement, "href");
+        if (relationElement.ValueKind == JsonValueKind.Array)
+        {
+            var first = relationElement.EnumerateArray().FirstOrDefault();
+            return first.ValueKind == JsonValueKind.Object ? ReadString(first, "href") : null;
+        }
+
+        return null;
+    }
+
+    private static string? ReadBitbucketCloneLink(JsonElement repositoryElement)
+    {
+        if (repositoryElement.ValueKind != JsonValueKind.Object
+            || !repositoryElement.TryGetProperty("links", out var links)
+            || links.ValueKind != JsonValueKind.Object
+            || !links.TryGetProperty("clone", out var clone)
+            || clone.ValueKind != JsonValueKind.Array)
+            return null;
+
+        foreach (var link in clone.EnumerateArray())
+        {
+            var name = ReadString(link, "name");
+            if (string.Equals(name, "https", StringComparison.OrdinalIgnoreCase))
+                return ReadString(link, "href");
+        }
+
+        foreach (var link in clone.EnumerateArray())
+        {
+            var href = ReadString(link, "href");
+            if (!string.IsNullOrWhiteSpace(href))
+                return href;
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc/>
     public override Task<bool> CanCreateIssueAsync(string repositoryId, CancellationToken ct = default)
     {
         var jiraUrl = _credentialStore.GetCredential(JiraUrlKey);
@@ -675,7 +880,22 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
             link = "";
         }
 
-        return new PullRequest(id, title, link, branchName);
+        var provider = PullRequestProviderDescriptor.ParseBitbucketHostingMode(hostingMode);
+        var normalizedRepositoryId = PullRequestRepositoryId.Normalize(provider, repositoryId);
+
+        return new PullRequest(
+            id,
+            title,
+            link,
+            branchName,
+            provider,
+            normalizedRepositoryId,
+            id.ToString(CultureInfo.InvariantCulture),
+            targetBranch,
+            null,
+            normalizedRepositoryId,
+            null,
+            $"refs/heads/{branchName}");
     }
 
     /// <inheritdoc/>

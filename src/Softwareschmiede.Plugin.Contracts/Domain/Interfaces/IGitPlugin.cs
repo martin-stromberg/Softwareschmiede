@@ -19,6 +19,10 @@ public interface IGitPlugin : IPlugin
     /// <param name="ct">Cancellation Token.</param>
     Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
 
+    /// <summary>Ruft alle offenen Pull Requests des Repositories ab.</summary>
+    Task<IEnumerable<PullRequest>> GetOpenPullRequestsAsync(string repositoryId, CancellationToken ct = default)
+        => Task.FromResult(Enumerable.Empty<PullRequest>());
+
     /// <summary>Klont ein Repository in das Zielverzeichnis.</summary>
     /// <param name="repositoryUrl">URL des Repositories.</param>
     /// <param name="targetPath">Zielpfad für den Klon.</param>
@@ -119,6 +123,13 @@ public interface IGitPlugin : IPlugin
     /// <param name="branchName">Name des Remote-Branches (ohne "origin/"-Präfix).</param>
     /// <param name="ct">Cancellation Token.</param>
     Task CheckoutRemoteBranchAsync(string localPath, string branchName, CancellationToken ct = default);
+
+    /// <summary>Checkt die Quell-Referenz eines Pull Requests ohne Task-Branch-Fallback aus.</summary>
+    Task CheckoutPullRequestSourceAsync(
+        string localPath,
+        PullRequestCheckoutSpec checkoutSpec,
+        CancellationToken ct = default)
+        => throw new NotSupportedException($"'{nameof(CheckoutPullRequestSourceAsync)}' wird von Plugin '{PluginPrefix}' nicht unterstuetzt.");
 
     /// <summary>Liefert die verfügbaren Git-Aktionen für die UI.</summary>
     /// <param name="localPath">Optionaler lokaler Arbeitsverzeichnispfad der Aufgabe.</param>

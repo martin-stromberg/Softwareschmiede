@@ -4,38 +4,41 @@ namespace Softwareschmiede.Domain.Enums;
 public enum PullRequestMonitoringPhase
 {
     /// <summary>Pull Request wurde erstellt und wartet auf die erste Statuspruefung.</summary>
-    Created,
+    Created = 0,
 
     /// <summary>Pre-Merge-Workflows laufen oder wurden noch nicht abgeschlossen.</summary>
-    PreMergeRunning,
+    PreMergeRunning = 1,
 
     /// <summary>Pre-Merge-Workflows wurden erfolgreich abgeschlossen.</summary>
-    PreMergeSucceeded,
+    PreMergeSucceeded = 2,
 
     /// <summary>Automatischer Abschluss wird ausgefuehrt.</summary>
-    Completing,
+    Completing = 3,
 
     /// <summary>Pull Request wurde abgeschlossen oder gemergt.</summary>
-    Completed,
+    Completed = 4,
 
     /// <summary>Pull Request wurde genehmigt, bleibt aber offen und wird weiter ueberwacht.</summary>
-    Approved,
+    Approved = 5,
 
     /// <summary>Pull Request ist gemergt, Post-Merge-Workflow-Zuordnung ist aber noch unklar.</summary>
-    PostMergeUncertain,
+    PostMergeUncertain = 6,
 
     /// <summary>Post-Merge-Workflows laufen oder wurden noch nicht abgeschlossen.</summary>
-    PostMergeRunning,
+    PostMergeRunning = 7,
 
     /// <summary>Post-Merge-Workflows wurden erfolgreich abgeschlossen.</summary>
-    PostMergeSucceeded,
+    PostMergeSucceeded = 8,
 
     /// <summary>Mindestens ein Post-Merge-Workflow ist fehlgeschlagen.</summary>
-    PostMergeFailed,
+    PostMergeFailed = 9,
 
     /// <summary>Ueberwachung oder Abschluss ist durch Rechte, Regeln oder Voraussetzungen blockiert.</summary>
-    Blocked,
+    Blocked = 10,
 
     /// <summary>Ueberwachung oder Abschluss ist fehlgeschlagen.</summary>
-    Failed
+    Failed = 11,
+
+    /// <summary>Der Provider wird fuer diese Referenz nicht automatisch ueberwacht.</summary>
+    NotMonitored = 12
 }

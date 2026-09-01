@@ -22,6 +22,8 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
     public abstract IReadOnlyList<PluginSettingGroup> GetSettingGroups();
     public virtual IReadOnlyList<PluginSettingField> GetRepositoryLinkFields() => [];
     public abstract Task<IEnumerable<Issue>> GetIssuesAsync(string repositoryId, CancellationToken ct = default);
+    public virtual Task<IEnumerable<PullRequest>> GetOpenPullRequestsAsync(string repositoryId, CancellationToken ct = default)
+        => Task.FromResult(Enumerable.Empty<PullRequest>());
     public virtual Task<IEnumerable<ScmAlert>> GetAlertsAsync(string repositoryId, CancellationToken ct = default)
         => Task.FromResult(Enumerable.Empty<ScmAlert>());
 
@@ -157,6 +159,53 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
         if (!result.IsSuccess)
         {
             throw new InvalidOperationException($"git checkout (remote branch) fehlgeschlagen: {result.StdErr}");
+        }
+    }
+
+    /// <inheritdoc/>
+    public virtual Task CheckoutPullRequestSourceAsync(
+        string localPath,
+        PullRequestCheckoutSpec checkoutSpec,
+        CancellationToken ct = default)
+        => CheckoutPullRequestSourceCoreAsync(localPath, checkoutSpec, null, ct);
+
+    /// <summary>Fuehrt den dedizierten PR-Checkout mit optionalen Git-Umgebungsvariablen aus.</summary>
+    protected async Task CheckoutPullRequestSourceCoreAsync(
+        string localPath,
+        PullRequestCheckoutSpec checkoutSpec,
+        IDictionary<string, string>? environmentVariables,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(checkoutSpec);
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkoutSpec.TargetRepositoryId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkoutSpec.TargetRepositoryUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkoutSpec.SourceRepositoryId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkoutSpec.SourceBranch);
+
+        var sameRepository = string.Equals(
+            checkoutSpec.TargetRepositoryId,
+            checkoutSpec.SourceRepositoryId,
+            StringComparison.OrdinalIgnoreCase);
+        var remote = sameRepository ? "origin" : checkoutSpec.SourceRepositoryUrl;
+        if (string.IsNullOrWhiteSpace(remote))
+            throw new InvalidOperationException("Fuer einen Fork-Pull-Request fehlt die Clone-URL des Quell-Repositories.");
+
+        var sourceRef = string.IsNullOrWhiteSpace(checkoutSpec.SourceRef)
+            ? $"refs/heads/{checkoutSpec.SourceBranch}"
+            : checkoutSpec.SourceRef;
+        var fetch = await RunGitAsync(["fetch", "--no-tags", remote, sourceRef], localPath, ct, environmentVariables);
+        if (!fetch.IsSuccess)
+            throw new InvalidOperationException($"Pull-Request-Quelle '{sourceRef}' konnte nicht abgerufen werden: {fetch.StdErr}");
+
+        var checkout = await RunGitAsync(["checkout", "-B", checkoutSpec.SourceBranch, "FETCH_HEAD"], localPath, ct, environmentVariables);
+        if (!checkout.IsSuccess)
+            throw new InvalidOperationException($"Pull-Request-Branch '{checkoutSpec.SourceBranch}' konnte nicht ausgecheckt werden: {checkout.StdErr}");
+
+        if (!string.IsNullOrWhiteSpace(checkoutSpec.HeadSha))
+        {
+            var head = await RunGitAsync(["rev-parse", "HEAD"], localPath, ct, environmentVariables);
+            if (!head.IsSuccess || !string.Equals(head.StdOut.Trim(), checkoutSpec.HeadSha.Trim(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Der ausgecheckte Pull-Request-Stand stimmt nicht mit dem erwarteten Head-SHA ueberein.");
         }
     }
 
