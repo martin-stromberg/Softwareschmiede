@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
-# Spiegelt den "Lint and format check"-Schritt aus .github/workflows/pr.yml lokal,
+# Spiegelt den "Format check"-Schritt aus .github/workflows/pr-staging-ci.yml lokal,
 # damit ein Formatierungsfehler vor dem Push auffaellt statt erst in der PR-CI.
 # Aktivierung (einmalig pro Klon): git config core.hooksPath .githooks
 
 set -e
 
-echo "pre-push: dotnet format Lint-Check laeuft (wie in .github/workflows/pr.yml)..."
+echo "pre-push: dotnet format Lint-Check laeuft (wie in .github/workflows/pr-staging-ci.yml)..."
 
 dotnet restore Softwareschmiede.slnx
 dotnet format Softwareschmiede.slnx --verify-no-changes --no-restore
