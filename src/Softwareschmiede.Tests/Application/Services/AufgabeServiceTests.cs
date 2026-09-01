@@ -109,7 +109,8 @@ public sealed class AufgabeServiceTests : IDisposable
             HeadSha: "abc123",
             SourceRepositoryId: "fork/repo",
             SourceRepositoryUrl: "https://github.com/fork/repo.git",
-            SourceRef: "refs/heads/feature/external");
+            SourceRef: "refs/heads/feature/external",
+            Body: "Bitte diese Dependency-Aktualisierung reviewen.");
         var context = new ScmRepositoryContext(repository.Id, repository.PluginTyp, "owner/repo");
 
         // Act
@@ -117,6 +118,8 @@ public sealed class AufgabeServiceTests : IDisposable
 
         // Assert
         result.Titel.Should().Be("Review external change");
+        result.AnforderungsBeschreibung.Should().Contain("Bitte diese Dependency-Aktualisierung reviewen.");
+        result.AnforderungsBeschreibung.Should().Contain("https://github.com/owner/repo/pull/17");
         result.GitRepositoryId.Should().Be(repository.Id);
         result.PullRequests.Should().ContainSingle();
         var reference = result.PullRequests.Single();

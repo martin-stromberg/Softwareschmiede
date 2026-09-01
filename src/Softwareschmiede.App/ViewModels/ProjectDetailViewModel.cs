@@ -901,7 +901,7 @@ public sealed class ProjectDetailViewModel : ViewModelBase, IDisposable
                 }
             }
 
-            var pullRequests = await gitPlugin.GetOpenPullRequestsAsync(repositoryContext.RepositoryId, ct);
+            var pullRequests = await gitPlugin.GetOpenPullRequestsAsync(repository.RepositoryUrl, ct);
             foreach (var pullRequest in pullRequests)
             {
                 var repositoryId = pullRequest.RepositoryId ?? repositoryContext.RepositoryId;

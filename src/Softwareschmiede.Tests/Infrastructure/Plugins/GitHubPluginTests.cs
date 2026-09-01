@@ -339,6 +339,7 @@ public sealed class GitHubPluginTests
                 {
                   "number": 42,
                   "title": "Bump package from 1.0.0 to 1.0.1",
+                  "body": "Dependabot updates the package dependency.",
                   "html_url": "https://github.com/owner/repo/pull/42",
                   "state": "open",
                   "node_id": "PR_kwDOExample",
@@ -373,6 +374,22 @@ public sealed class GitHubPluginTests
         result[0].Nummer.Should().Be(42);
         result[0].BranchName.Should().Be("dependabot/nuget/package-1.0.1");
         result[0].TargetBranch.Should().Be("main");
+        result[0].Body.Should().Be("Dependabot updates the package dependency.");
+    }
+
+    /// <summary>GetOpenPullRequestsAsync gibt bei unvollstaendiger Repository-ID leer zurueck.</summary>
+    [Fact]
+    public async Task GetOpenPullRequestsAsync_ShouldReturnEmpty_WhenRepositoryIdIsIncomplete()
+    {
+        var result = await _sut.GetOpenPullRequestsAsync("repo");
+
+        result.Should().BeEmpty();
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>GetIssueTemplatesAsync lädt Markdown-Templates aus .github/ISSUE_TEMPLATE.</summary>

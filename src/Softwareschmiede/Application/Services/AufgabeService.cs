@@ -290,15 +290,14 @@ public sealed class AufgabeService : IAktiveAufgabenService
             throw new InvalidOperationException("Dieser Pull Request ist bereits einer Aufgabe zugeordnet.");
 
         var now = DateTimeOffset.UtcNow;
+        var anforderungsBeschreibung = BuildPullRequestAnforderungsBeschreibung(pullRequest);
         var aufgabe = new Aufgabe
         {
             Id = Guid.NewGuid(),
             ProjektId = projektId,
             GitRepositoryId = repositoryContext.GitRepositoryId,
             Titel = pullRequest.Titel,
-            AnforderungsBeschreibung = string.IsNullOrWhiteSpace(pullRequest.Url)
-                ? pullRequest.Titel
-                : $"{pullRequest.Titel}{Environment.NewLine}{Environment.NewLine}{pullRequest.Url}",
+            AnforderungsBeschreibung = anforderungsBeschreibung,
             Status = AufgabeStatus.Neu,
             AusfuehrungsStatus = AufgabeAusfuehrungsStatus.NichtGestartet,
             ErstellungsDatum = now
@@ -351,6 +350,23 @@ public sealed class AufgabeService : IAktiveAufgabenService
         }
 
         return aufgabe;
+    }
+
+    private static string BuildPullRequestAnforderungsBeschreibung(PullRequest pullRequest)
+    {
+        var parts = new List<string> { pullRequest.Titel };
+
+        if (!string.IsNullOrWhiteSpace(pullRequest.Body))
+        {
+            parts.Add(pullRequest.Body.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(pullRequest.Url))
+        {
+            parts.Add(pullRequest.Url);
+        }
+
+        return string.Join($"{Environment.NewLine}{Environment.NewLine}", parts);
     }
 
     /// <summary>Erstellt eine neue Aufgabe aus einem Alert und verknüpft sie mit dem bereits erstellten externen Issue.</summary>

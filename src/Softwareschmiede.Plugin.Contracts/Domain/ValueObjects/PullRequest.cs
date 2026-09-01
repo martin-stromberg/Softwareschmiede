@@ -15,6 +15,7 @@ using Softwareschmiede.Domain.Enums;
 /// <param name="SourceRepositoryId">Repository-Identifier des Quell-Repositories.</param>
 /// <param name="SourceRepositoryUrl">Clone-URL des Quell-Repositories.</param>
 /// <param name="SourceRef">Vom Provider fetchbare Quell-Referenz.</param>
+/// <param name="Body">Beschreibungstext des Pull Requests.</param>
 public sealed record PullRequest(
     int Nummer,
     string Titel,
@@ -27,5 +28,6 @@ public sealed record PullRequest(
     string? HeadSha = null,
     string? SourceRepositoryId = null,
     string? SourceRepositoryUrl = null,
-    string? SourceRef = null
+    string? SourceRef = null,
+    string? Body = null
 );

@@ -747,7 +747,12 @@ password {token}
             return [];
         }
 
-        normalizedRepositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, normalizedRepositoryId);
+        if (!PullRequestRepositoryId.TryNormalize(PullRequestProvider.GitHub, normalizedRepositoryId, out normalizedRepositoryId))
+        {
+            _logger.LogWarning("Pull Requests koennen nicht geladen werden: Repository-ID {RepositoryId} ist ungueltig.", repositoryId);
+            return [];
+        }
+
         _logger.LogInformation("Rufe offene Pull Requests fuer Repository {RepositoryId} ab.", normalizedRepositoryId);
 
         var result = await _cliRunner.RunAsync(
@@ -801,6 +806,7 @@ password {token}
             return;
 
         var title = GetStringOrNull(element, "title") ?? string.Empty;
+        var body = GetStringOrNull(element, "body");
         var url = GetStringOrNull(element, "html_url") ?? GetStringOrNull(element, "url") ?? string.Empty;
         var head = element.TryGetProperty("head", out var headElement) && headElement.ValueKind == JsonValueKind.Object
             ? headElement
@@ -837,7 +843,8 @@ password {token}
             sourceSha,
             sourceRepositoryId,
             sourceRepositoryUrl,
-            $"refs/heads/{sourceBranch}"));
+            $"refs/heads/{sourceBranch}",
+            body));
     }
 
     /// <inheritdoc/>
