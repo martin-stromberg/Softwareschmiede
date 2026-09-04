@@ -1,3 +1,11 @@
+## 2026-08-27 — Feature-Flag "Autonome Aufgaben aktivieren" in den Einstellungen
+
+- Neuer Schalter **"Autonome Aufgaben aktivieren"** auf der Registerkarte **Allgemein** der Einstellungsseite (Abschnitt „Automatisierung", Standard: aktiviert). Der Wert wird über `AppEinstellungService` (Schlüssel `autonomeaufgaben.enabled`) in der Datenbank persistiert und ergänzt den bestehenden Deployment-Schalter `AutonomAufgaben:Enabled` in `appsettings.json` um eine laufzeitkonfigurierbare, per GUI erreichbare Ebene.
+- Guard-Klauseln an allen drei Einstiegspunkten für autonome Aufgaben eingefügt: `AutonomAufgabeStartService.StarteAsync()` gibt bei deaktiviertem Flag ein Fehlerresultat ("Autonome Aufgaben sind in den Einstellungen deaktiviert.") zurück statt den Initialisierungsdialog zu öffnen; `AutonomAufgabenInitialisierungsService.InitialisiereAsync()` und `ProjektleiterAgentService.StarteAgentAsync()` werfen zusätzlich jeweils eine `InvalidOperationException` (Defense-in-Depth für Aufrufe, die nicht über den UI-Weg erfolgen).
+- `TaskDetailViewModel` erhält die neue berechnete Eigenschaft `IsAutonomAufgabenEnabled`; `ShowAutomatisierungPanel` berücksichtigt sie zusätzlich zu `IsAutonomAufgabe`, sodass die Registerkarte "Automatisierung" nur bei aktiviertem Feature angezeigt wird.
+- Der einfache, nicht-autonome Weg (Button "Starten", direkte CLI-Ausführung über `EntwicklungsprozessService`/`KiAusfuehrungsService`) bleibt unabhängig vom Feature-Flag unverändert nutzbar — es gibt kein Gating auf diesem Pfad.
+- Dokumentation unter `docs/help/aufgaben/autonome-aufgaben/` und `docs/help/einstellungen/` um den neuen Schalter, die Guard-Klauseln und das Fallback-Verhalten ergänzt.
+
 ## 2026-08-24 — Autonome Aufgaben: UI-Integration — Registerkarte statt separates Fenster
 
 - **Dialog-Entfernung:** Der separate `AutonomAufgabeDetailDialog` (Fenster) wurde entfernt. `ShowAutonomAufgabeDetailAsync()` aus `IDialogService`/`WpfDialogService` ist nicht mehr vorhanden.

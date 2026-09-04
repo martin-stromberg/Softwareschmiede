@@ -1,4 +1,5 @@
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Domain.Entities;
 
@@ -13,6 +14,17 @@ public sealed class PullRequestReferenz
 
     /// <summary>Provider des Pull Requests.</summary>
     public PullRequestProvider Provider { get; set; }
+
+    /// <summary>Sichtbare Providerbezeichnung.</summary>
+    public string ProviderText => PullRequestProviderDescriptor.GetDisplayName(Provider);
+
+    /// <summary>Fachliche Rolle dieser Referenz an der Aufgabe.</summary>
+    public PullRequestReferenzRolle Rolle { get; set; } = PullRequestReferenzRolle.CreatedByTask;
+
+    /// <summary>Sichtbare Rollenbezeichnung.</summary>
+    public string RolleText => Rolle == PullRequestReferenzRolle.ReviewSource
+        ? "Review-Quelle"
+        : "Aus Aufgabe erstellt";
 
     /// <summary>Repository-Identifier beim Provider, z. B. owner/repo.</summary>
     public string RepositoryId { get; set; } = string.Empty;
@@ -32,6 +44,15 @@ public sealed class PullRequestReferenz
     /// <summary>Quellbranch.</summary>
     public string SourceBranch { get; set; } = string.Empty;
 
+    /// <summary>Provider-Identifier des Quell-Repositories.</summary>
+    public string SourceRepositoryId { get; set; } = string.Empty;
+
+    /// <summary>Clone-URL des Quell-Repositories, falls es vom Ziel-Repository abweicht.</summary>
+    public string? SourceRepositoryUrl { get; set; }
+
+    /// <summary>Providerseitig fetchbare Quell-Referenz.</summary>
+    public string? SourceRef { get; set; }
+
     /// <summary>Zielbranch.</summary>
     public string TargetBranch { get; set; } = string.Empty;
 
@@ -49,6 +70,11 @@ public sealed class PullRequestReferenz
 
     /// <summary>Aktuelle Monitoring-Phase.</summary>
     public PullRequestMonitoringPhase MonitoringPhase { get; set; } = PullRequestMonitoringPhase.Created;
+
+    /// <summary>Sichtbare Monitoring-Phase.</summary>
+    public string MonitoringPhaseText => MonitoringPhase == PullRequestMonitoringPhase.NotMonitored
+        ? "Nicht automatisch ueberwacht"
+        : MonitoringPhase.ToString();
 
     /// <summary>Zeitpunkt der letzten Statuspruefung.</summary>
     public DateTimeOffset? LastCheckedUtc { get; set; }

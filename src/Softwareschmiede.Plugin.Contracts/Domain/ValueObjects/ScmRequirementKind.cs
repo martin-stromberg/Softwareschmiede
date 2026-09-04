@@ -7,5 +7,8 @@ public enum ScmRequirementKind
     Issue = 0,
 
     /// <summary>Provider-Alert.</summary>
-    Alert = 1
+    Alert = 1,
+
+    /// <summary>Offener Pull Request.</summary>
+    PullRequest = 2
 }

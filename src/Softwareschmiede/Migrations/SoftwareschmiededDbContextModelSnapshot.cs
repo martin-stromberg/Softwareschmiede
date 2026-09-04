@@ -816,9 +816,27 @@ namespace Softwareschmiede.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Rolle")
+                        .IsRequired()
+                        .HasDefaultValue("CreatedByTask")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("SourceBranch")
                         .IsRequired()
                         .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceRef")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceRepositoryId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceRepositoryUrl")
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
@@ -842,7 +860,10 @@ namespace Softwareschmiede.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AufgabeId");
+                    b.HasIndex("AufgabeId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PullRequestReferenzen_AufgabeId_ReviewSource")
+                        .HasFilter("[Rolle] = 'ReviewSource'");
 
                     b.HasIndex("MonitoringPhase", "LastCheckedUtc");
 

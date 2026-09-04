@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
@@ -49,6 +50,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly TodoListViewModel _todoListViewModel;
     private readonly ArbeitsverzeichnisOeffnenService _arbeitsverzeichnisOeffnenService;
     private readonly AutonomAufgabeStartService _autonomAufgabeStartService;
+    private readonly AppEinstellungService _appEinstellungService;
+    private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly Action<Action> _dispatcherInvoke;
@@ -81,6 +84,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private bool _isRefreshingPullRequests;
     private bool _kannIdeAuswaehlen;
     private AutonomAufgabeDetailViewModel? _autonomAufgabeDetailViewModel;
+    private bool _isAutonomAufgabenEnabled;
 
     /// <summary>Wird aufgerufen, wenn der Nutzer zur vorherigen Ansicht zurückkehren möchte.</summary>
     public Action? ZurueckAction { get; set; }
@@ -106,6 +110,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 _autonomAufgabeDetailViewModel = null;
                 OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
                 OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+                OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
                 LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "TaskDetailViewModel.LadenAsync");
             }
         }
@@ -141,6 +146,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowInfoPanel));
             OnPropertyChanged(nameof(IsPullRequestViewSelected));
             OnPropertyChanged(nameof(IsAutonomAufgabe));
+            OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
+            OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
             WaehleStandardAnsicht();
             DetailTitelAenderungAction?.Invoke(value?.Titel);
 
@@ -368,8 +375,23 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die Automatisierung-Ansicht ausgewählt ist.</summary>
     public bool IsAutomatisierungViewSelected => _ausgewaehlteAnsicht == DetailAnsicht.Automatisierung;
 
-    /// <summary>Gibt an, ob die Automatisierung-Registerkarte und die zugehörigen Ribbon-Buttons angezeigt werden können, weil eine Autonome Aufgabe initialisiert wurde.</summary>
-    public bool ShowAutomatisierungPanel => _autonomAufgabeDetailViewModel is not null;
+    /// <summary>Gibt an, ob die Automatisierung-Registerkarte und die zugehörigen Ribbon-Buttons angezeigt werden können, weil eine Autonome Aufgabe initialisiert wurde und das Feature-Flag für Autonome Aufgaben aktiviert ist.</summary>
+    public bool ShowAutomatisierungPanel => _autonomAufgabeDetailViewModel is not null && IsAutonomAufgabenEnabled;
+
+    /// <summary>
+    /// Gibt an, ob das Feature-Flag für Autonome Aufgaben aktiviert ist: der DB-persistierte Laufzeit-Schalter
+    /// (<see cref="AppEinstellungService.AutonomAufgabenEnabledKey"/>, GUI-Einstellung) hat Vorrang, sofern der
+    /// Anwender ihn bereits explizit gesetzt hat, andernfalls gilt der aus appsettings.json/Umgebungsvariable
+    /// gebundene Deployment-Default <see cref="AutonomAufgabenOptions.Enabled"/> (Issue 205, Dual-Layer-Feature-
+    /// Flag). Da der DB-Zugriff asynchron ist, wird der Wert einmalig beim Laden der Aufgabe in
+    /// <see cref="LadenAsync"/> ermittelt und hier lediglich aus dem zwischengespeicherten Feld gelesen; direkt
+    /// nach der Konstruktion (bevor eine Aufgabe geladen wurde) liefert diese Eigenschaft bereits den
+    /// synchron verfügbaren Options-Default. Steuert die Sichtbarkeit von autonomen Aufgaben-UI-Elementen.
+    /// </summary>
+    public bool IsAutonomAufgabenEnabled => _isAutonomAufgabenEnabled;
+
+    /// <summary>Der aus appsettings.json/Umgebungsvariable gebundene Deployment-Default für das Feature-Flag "Autonome Aufgaben" (<see cref="AutonomAufgabenOptions.Enabled"/>).</summary>
+    private bool AutonomAufgabenDeploymentDefault => _autonomAufgabenOptions.Value.Enabled;
 
     /// <summary>Das ViewModel der aktuell angezeigten Autonomen Aufgabe, oder null wenn keine initialisiert wurde.</summary>
     public AutonomAufgabeDetailViewModel? AutonomAufgabeDetailViewModel => _autonomAufgabeDetailViewModel;
@@ -378,6 +400,18 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// Aufgaben-Steuerungs-Buttons im Ribbon (bei autonomen Aufgaben erfolgt die Steuerung ausschließlich über die
     /// Gruppe "Autonome Aufgabe").</summary>
     public bool IsAutonomAufgabe => _aufgabe?.IstAutonom() == true;
+
+    /// <summary>Gibt an, ob der Ribbon-Button "Autonome Aufgabe starten" angezeigt werden kann: eine Aufgabe ist
+    /// geladen, ist noch nicht selbst autonom konfiguriert und das Feature-Flag für Autonome Aufgaben ist
+    /// aktiviert.</summary>
+    public bool CanAutonomAufgabeInitialisieren => _aufgabe is not null && !IsAutonomAufgabe && IsAutonomAufgabenEnabled;
+
+    /// <summary>Gibt an, ob die Ribbon-Gruppe "Autonome Aufgabe" überhaupt angezeigt werden soll. Alle Buttons
+    /// darin (Initialisieren, Start, Stop, Resume) sind einzeln an <see cref="CanAutonomAufgabeInitialisieren"/>
+    /// bzw. <see cref="ShowAutomatisierungPanel"/> gebunden, die beide bereits <see cref="IsAutonomAufgabenEnabled"/>
+    /// voraussetzen; ohne diese zusätzliche Gruppen-Sichtbarkeit bliebe bei deaktiviertem Feature-Flag eine leere
+    /// Ribbon-Gruppe sichtbar.</summary>
+    public bool ShowAutonomAufgabeRibbonGruppe => CanAutonomAufgabeInitialisieren || ShowAutomatisierungPanel;
 
     /// <summary>Gibt an, ob Pull Requests angezeigt werden koennen.</summary>
     public bool ShowPullRequestPanel => _aufgabe is not null;
@@ -401,7 +435,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob Pull Requests manuell aktualisiert werden koennen.</summary>
-    public bool CanRefreshPullRequests => _aufgabeId != Guid.Empty && !_isRefreshingPullRequests;
+    public bool CanRefreshPullRequests => _aufgabeId != Guid.Empty
+        && !_isRefreshingPullRequests
+        && PullRequests.Any(p => PullRequestMonitoringPolicy.CanMonitor(p.Rolle, p.Provider));
 
     /// <summary>Editable Kopie von Aufgabe.Titel für den Edit-Modus (Two-Way-Binding).</summary>
     public string? EditTitel
@@ -616,6 +652,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         TodoListViewModel todoListViewModel,
         ArbeitsverzeichnisOeffnenService arbeitsverzeichnisOeffnenService,
         AutonomAufgabeStartService autonomAufgabeStartService,
+        AppEinstellungService appEinstellungService,
+        IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         Action<Action>? dispatcherInvoke = null)
     {
         _aufgabeService = aufgabeService;
@@ -634,8 +672,13 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _todoListViewModel = todoListViewModel;
         _arbeitsverzeichnisOeffnenService = arbeitsverzeichnisOeffnenService;
         _autonomAufgabeStartService = autonomAufgabeStartService;
+        _appEinstellungService = appEinstellungService;
+        _autonomAufgabenOptions = autonomAufgabenOptions;
         _timeProvider = timeProvider;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
+        // Synchroner Default vor dem ersten Laden einer Aufgabe: LadenAsync ermittelt den DB-Wert
+        // asynchron und überschreibt dieses Feld danach ggf. (siehe AktualisiereIsAutonomAufgabenEnabledAsync).
+        _isAutonomAufgabenEnabled = AutonomAufgabenDeploymentDefault;
 
         _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
         _promptZeitVersandService.PromptSent += OnPromptSent;
@@ -677,8 +720,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         // Start/Stop/Resume-Buttons der Gruppe "Autonome Aufgabe" durch einen Lade-Fehler nicht sichtbar
         // sind) - AutonomAufgabenInitialisierungsService.InitialisiereAsync legt dabei ungeprüft eine
         // zweite AutonomAufgabeKonfiguration an bzw. bricht beim erneuten Klonen ins bereits vorhandene
-        // Arbeitsverzeichnis ab.
-        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => _aufgabe is not null && !IsAutonomAufgabe);
+        // Arbeitsverzeichnis ab. IsAutonomAufgabenEnabled: Feature-Flag für Autonome Aufgaben (Issue 205).
+        AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => CanAutonomAufgabeInitialisieren);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
@@ -737,6 +780,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             // LadenAsync bindet nur vorhandene laufende Sitzungen wieder an. Ein neuer CLI-Prozess
             // wird ausschließlich über explizite Start-/Neustartaktionen gestartet.
 
+            await AktualisiereIsAutonomAufgabenEnabledAsync(ct);
             await StelleAutonomAufgabeDetailViewModelWiederHerAsync(ct);
         }
         catch (OperationCanceledException)
@@ -752,6 +796,31 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             IsLoading = false;
         }
+    }
+
+    /// <summary>
+    /// Ermittelt den aktuellen Wert von <see cref="IsAutonomAufgabenEnabled"/> asynchron über
+    /// <see cref="AppEinstellungService.GetAutonomAufgabenEnabledAsync"/> (DB-persistierter Laufzeit-Schalter mit
+    /// Fallback auf den Options-Deployment-Default) und speichert ihn im Feld <see cref="_isAutonomAufgabenEnabled"/>
+    /// zwischen, da <see cref="IsAutonomAufgabenEnabled"/> selbst synchron bleiben muss (Property-Binding). Löst
+    /// bei einer Wertänderung <see cref="ViewModelBase.OnPropertyChanged(string)"/> für
+    /// <see cref="IsAutonomAufgabenEnabled"/> und <see cref="ShowAutomatisierungPanel"/> aus, damit die Ribbon-
+    /// Buttons/Registerkarte "Automatisierung" ihre Sichtbarkeit neu auswerten (Issue 205).
+    /// </summary>
+    /// <param name="ct">Abbruch-Token.</param>
+    private async Task AktualisiereIsAutonomAufgabenEnabledAsync(CancellationToken ct)
+    {
+        var neuerWert = await _appEinstellungService.GetAutonomAufgabenEnabledAsync(AutonomAufgabenDeploymentDefault, ct);
+
+        if (neuerWert == _isAutonomAufgabenEnabled)
+            return;
+
+        _isAutonomAufgabenEnabled = neuerWert;
+        OnPropertyChanged(nameof(IsAutonomAufgabenEnabled));
+        OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+        OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
+        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
+        CommandManager.InvalidateRequerySuggested();
     }
 
     private async Task LadeProtokolleAsync(CancellationToken ct)
@@ -791,6 +860,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             OnPropertyChanged(nameof(HasNoPullRequests));
             OnPropertyChanged(nameof(HasPullRequests));
+            OnPropertyChanged(nameof(CanRefreshPullRequests));
             return;
         }
 
@@ -803,6 +873,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasNoPullRequests));
         OnPropertyChanged(nameof(HasPullRequests));
         OnPropertyChanged(nameof(ShowPullRequestPanel));
+        OnPropertyChanged(nameof(CanRefreshPullRequests));
     }
 
     private async Task PullRequestsAktualisierenAsync(CancellationToken ct)
@@ -1477,6 +1548,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _autonomAufgabeDetailViewModel = vm;
         OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
         WaehleAnsicht(DetailAnsicht.Automatisierung);
         return Task.CompletedTask;
     }
@@ -1513,6 +1585,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _autonomAufgabeDetailViewModel = detailVm;
         OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
         OnPropertyChanged(nameof(ShowAutomatisierungPanel));
+        OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
 
         await Task.WhenAll(
             detailVm.LaedePlanAsync(ct),

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -54,7 +55,7 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
         var gitProvisioningService = new UnteragentGitProvisioningService(_cliRunnerMock.Object, gitPluginMock.Object, NullLogger<UnteragentGitProvisioningService>.Instance);
         _kiAusfuehrungsService = TestKiAusfuehrungsServiceFactory.Create();
         (_kiPluginMock, var pluginSelectionService) = ProjektleiterAgentServiceTestDatenFactory.ErstellePluginSelectionServiceMitKiPlugin(_db);
-        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, NullLogger<ProjektleiterAgentService>.Instance);
+        _sut = new ProjektleiterAgentService(_db, governanceService, gitProvisioningService, _kiAusfuehrungsService, pluginSelectionService, new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), Options.Create(new AutonomAufgabenOptions()), NullLogger<ProjektleiterAgentService>.Instance);
 
         _testRoot = Path.Combine(Path.GetTempPath(), "SoftwareschmiedeTests", "ProjektleiterAgent", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testRoot);
@@ -148,5 +149,66 @@ public sealed class ProjektleiterAgentServiceTests : IDisposable
         var persistiert = await _db.UnteragentSpezifikationen.FindAsync(unteragent.Id);
         persistiert!.Status.Should().Be(UnteragentStatus.Abgeschlossen);
         persistiert.AbschlussDatum.Should().NotBeNull();
+    }
+
+    /// <summary>StarteAgentAsync wirft eine InvalidOperationException, wenn das Feature-Flag AutonomAufgabenOptions.Enabled deaktiviert ist (Guard-Klausel, Issue 205).</summary>
+    [Fact]
+    public async Task WhenEnabledFlagIsFalse_StarteAgentAsync_ShouldThrow()
+    {
+        var (_, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateProjektleiterAgentService(
+            _db, _kiAusfuehrungsService, new AutonomAufgabenOptions { Enabled = false });
+
+        var akt = () => sut.StarteAgentAsync(konfiguration);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>StarteAgentAsync startet den Agenten normal, wenn das Feature-Flag AutonomAufgabenOptions.Enabled aktiviert ist (Baseline-Test gegen Regression der Guard-Klausel, Issue 205).</summary>
+    [Fact]
+    public async Task WhenEnabledFlagIsTrue_StarteAgentAsync_ShouldSucceed()
+    {
+        var (_, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateProjektleiterAgentService(
+            _db, _kiAusfuehrungsService, new AutonomAufgabenOptions { Enabled = true });
+
+        var agentId = await sut.StarteAgentAsync(konfiguration);
+
+        agentId.Should().NotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>StarteAgentAsync wirft eine InvalidOperationException, wenn der DB-persistierte Laufzeit-Schalter
+    /// (AppEinstellungService.AutonomAufgabenEnabledKey, GUI-Einstellung) auf false steht, selbst wenn der
+    /// appsettings.json-Deployment-Default AutonomAufgabenOptions.Enabled true ist (Issue 205, Verdrahtung
+    /// Settings-Schalter -> Guard-Klausel).</summary>
+    [Fact]
+    public async Task WhenDbValueIsFalse_StarteAgentAsync_ShouldThrow_EvenIfOptionsEnabledIsTrue()
+    {
+        var (_, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        await appEinstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, false);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateProjektleiterAgentService(
+            _db, _kiAusfuehrungsService, new AutonomAufgabenOptions { Enabled = true });
+
+        var akt = () => sut.StarteAgentAsync(konfiguration);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>StarteAgentAsync startet den Agenten normal, wenn der DB-persistierte Laufzeit-Schalter auf true
+    /// steht, selbst wenn der appsettings.json-Deployment-Default AutonomAufgabenOptions.Enabled false ist
+    /// (Issue 205, Verdrahtung Settings-Schalter -> Guard-Klausel).</summary>
+    [Fact]
+    public async Task WhenDbValueIsTrue_StarteAgentAsync_ShouldSucceed_EvenIfOptionsEnabledIsFalse()
+    {
+        var (_, konfiguration) = await ProjektleiterAgentServiceTestDatenFactory.ErstelleAutonomeAufgabeAsync(_db, _projektId, _testRoot);
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        await appEinstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, true);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateProjektleiterAgentService(
+            _db, _kiAusfuehrungsService, new AutonomAufgabenOptions { Enabled = false });
+
+        var agentId = await sut.StarteAgentAsync(konfiguration);
+
+        agentId.Should().NotBeNullOrWhiteSpace();
     }
 }

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.App.ViewModels;
@@ -60,8 +61,9 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
 
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         var pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
@@ -81,7 +83,9 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         var autonomAufgabeStartService = TaskDetailViewModelTestFactory.CreateAutonomAufgabeStartService(
             serviceProviderMock.Object,
             _dialogServiceMock.Object,
-            _aufgabeService);
+            _aufgabeService,
+            _db,
+            appEinstellungService: appEinstellungService);
 
         return new TaskDetailViewModel(
             _aufgabeService,
@@ -100,7 +104,9 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
             arbeitsverzeichnisOeffnenService,
-            autonomAufgabeStartService);
+            autonomAufgabeStartService,
+            appEinstellungService,
+            Options.Create(new AutonomAufgabenOptions()));
     }
 
     private async Task<Aufgabe> ErstelleAufgabe()

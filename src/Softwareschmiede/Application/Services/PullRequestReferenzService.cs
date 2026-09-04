@@ -35,7 +35,8 @@ public sealed class PullRequestReferenzService
     {
         var now = _timeProvider.GetUtcNow();
         var provider = pullRequest.Provider;
-        var normalizedRepositoryId = pullRequest.RepositoryId ?? repositoryId;
+        var normalizedRepositoryId = PullRequestRepositoryId.Normalize(provider, pullRequest.RepositoryId ?? repositoryId);
+        var sourceRepositoryId = PullRequestRepositoryId.Normalize(provider, pullRequest.SourceRepositoryId ?? normalizedRepositoryId);
 
         var entity = await _db.PullRequestReferenzen
             .Include(p => p.WorkflowRuns)
@@ -52,19 +53,27 @@ public sealed class PullRequestReferenzService
                 Id = Guid.NewGuid(),
                 AufgabeId = aufgabeId,
                 Provider = provider,
+                Rolle = PullRequestReferenzRolle.CreatedByTask,
                 RepositoryId = normalizedRepositoryId,
                 PullRequestNumber = pullRequest.Nummer,
                 CreatedUtc = now,
-                MonitoringPhase = PullRequestMonitoringPhase.Created,
-                NextCheckUtc = now
+                MonitoringPhase = PullRequestMonitoringPolicy.GetInitialPhase(provider),
+                NextCheckUtc = PullRequestMonitoringPolicy.GetInitialPhase(provider) == PullRequestMonitoringPhase.NotMonitored ? null : now
             };
             _db.PullRequestReferenzen.Add(entity);
+        }
+        else if (entity.AufgabeId != aufgabeId || entity.Rolle != PullRequestReferenzRolle.CreatedByTask)
+        {
+            throw new InvalidOperationException("Dieser Pull Request ist bereits einer Aufgabe zugeordnet.");
         }
 
         entity.ProviderPullRequestId = pullRequest.ProviderPullRequestId;
         entity.Url = pullRequest.Url;
         entity.Titel = pullRequest.Titel;
         entity.SourceBranch = pullRequest.BranchName;
+        entity.SourceRepositoryId = sourceRepositoryId;
+        entity.SourceRepositoryUrl = pullRequest.SourceRepositoryUrl;
+        entity.SourceRef = pullRequest.SourceRef;
         entity.TargetBranch = pullRequest.TargetBranch ?? string.Empty;
         entity.HeadSha = pullRequest.HeadSha;
         entity.Status = PullRequestStatus.Open;
@@ -92,6 +101,8 @@ public sealed class PullRequestReferenzService
                         && p.MonitoringPhase != PullRequestMonitoringPhase.PostMergeFailed
                         && p.MonitoringPhase != PullRequestMonitoringPhase.Completed
                         && p.MonitoringPhase != PullRequestMonitoringPhase.Failed
+                        && p.MonitoringPhase != PullRequestMonitoringPhase.NotMonitored
+                        && p.Provider == PullRequestProvider.GitHub
                         && (p.NextCheckUtc == null || p.NextCheckUtc <= now))
             .OrderBy(p => p.LastCheckedUtc ?? DateTimeOffset.MinValue)
             .Take(take)
@@ -101,7 +112,9 @@ public sealed class PullRequestReferenzService
     public async Task<IReadOnlyList<PullRequestReferenz>> GetRefreshableByAufgabeAsync(Guid aufgabeId, CancellationToken ct = default)
         => await _db.PullRequestReferenzen
             .Include(p => p.WorkflowRuns)
-            .Where(p => p.AufgabeId == aufgabeId)
+            .Where(p => p.AufgabeId == aufgabeId
+                        && p.MonitoringPhase != PullRequestMonitoringPhase.NotMonitored
+                        && p.Provider == PullRequestProvider.GitHub)
             .OrderByDescending(p => p.CreatedUtc)
             .ToListAsync(ct);
 

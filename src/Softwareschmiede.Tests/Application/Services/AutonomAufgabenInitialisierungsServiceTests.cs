@@ -386,6 +386,7 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
             _db,
             _cliRunnerMock.Object,
             pluginSelectionService,
+            new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance),
             Options.Create(new AutonomAufgabenOptions()),
             NullLogger<AutonomAufgabenInitialisierungsService>.Instance);
 
@@ -400,5 +401,91 @@ public sealed class AutonomAufgabenInitialisierungsServiceTests : IDisposable
         passendesGitPluginMock.Verify(p => p.CreateBranchAsync(repoMainPfad, anfrage.ProjektBranchName, null, It.IsAny<CancellationToken>()), Times.Once);
         defaultGitPluginMock.Verify(p => p.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         defaultGitPluginMock.Verify(p => p.CreateBranchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn das Feature-Flag AutonomAufgabenOptions.Enabled deaktiviert ist (Guard-Klausel, Issue 205).</summary>
+    [Fact]
+    public async Task WhenEnabledFlagIsFalse_InitialisiereAsync_ShouldThrow()
+    {
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = false });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var akt = () => sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>InitialisiereAsync führt die Initialisierung normal aus, wenn das Feature-Flag AutonomAufgabenOptions.Enabled aktiviert ist (Baseline-Test gegen Regression der Guard-Klausel, Issue 205).</summary>
+    [Fact]
+    public async Task WhenEnabledFlagIsTrue_InitialisiereAsync_ShouldSucceed()
+    {
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = true });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var konfiguration = await sut.InitialisiereAsync(aufgabe, anfrage);
+
+        konfiguration.Should().NotBeNull();
+        konfiguration.ProjektBranchName.Should().Be(anfrage.ProjektBranchName);
+    }
+
+    /// <summary>InitialisiereAsync wirft eine InvalidOperationException, wenn der DB-persistierte Laufzeit-Schalter
+    /// (AppEinstellungService.AutonomAufgabenEnabledKey, GUI-Einstellung) auf false steht, selbst wenn der
+    /// appsettings.json-/Umgebungsvariable-Deployment-Default AutonomAufgabenOptions.Enabled true ist: der
+    /// DB-Wert muss den Deployment-Default überschreiben (Issue 205, Verdrahtung Settings-Schalter -> Guard-Klausel).</summary>
+    [Fact]
+    public async Task WhenDbValueIsFalse_InitialisiereAsync_ShouldThrow_EvenIfOptionsEnabledIsTrue()
+    {
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        await appEinstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, false);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = true });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var akt = () => sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    /// <summary>InitialisiereAsync führt die Initialisierung normal aus, wenn der DB-persistierte Laufzeit-Schalter
+    /// (AppEinstellungService.AutonomAufgabenEnabledKey) auf true steht, selbst wenn der appsettings.json-
+    /// Deployment-Default AutonomAufgabenOptions.Enabled false ist: der DB-Wert muss den Deployment-Default
+    /// überschreiben (Issue 205, Verdrahtung Settings-Schalter -> Guard-Klausel).</summary>
+    [Fact]
+    public async Task WhenDbValueIsTrue_InitialisiereAsync_ShouldSucceed_EvenIfOptionsEnabledIsFalse()
+    {
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        await appEinstellungService.SetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey, true);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = false });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        var konfiguration = await sut.InitialisiereAsync(aufgabe, anfrage);
+
+        konfiguration.Should().NotBeNull();
+    }
+
+    /// <summary>InitialisiereAsync fällt auf den appsettings.json-Deployment-Default zurück, solange kein DB-Eintrag
+    /// für den Laufzeit-Schalter existiert (Issue 205, Fallback-Semantik von AppEinstellungService.GetAutonomAufgabenEnabledAsync).</summary>
+    [Fact]
+    public async Task WhenNoDbEntryExists_InitialisiereAsync_ShouldFallBackToOptionsDefault()
+    {
+        var appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        var sut = AutonomAufgabenInitialisierungsServiceTestFactory.CreateService(
+            _db, _cliRunnerMock.Object, _gitPluginMock.Object, new AutonomAufgabenOptions { Enabled = false });
+        var aufgabe = ErstelleUndPersistiereAufgabe(_testRoot);
+        var anfrage = ErstelleAnfrage(_testRoot);
+
+        (await appEinstellungService.GetBoolSettingAsync(AppEinstellungService.AutonomAufgabenEnabledKey)).Should().BeNull(
+            "Vorbedingung: kein DB-Eintrag vorhanden");
+
+        var akt = () => sut.InitialisiereAsync(aufgabe, anfrage);
+
+        await akt.Should().ThrowAsync<InvalidOperationException>("ohne DB-Eintrag muss der Options-Default (Enabled=false) weiterhin gelten");
     }
 }

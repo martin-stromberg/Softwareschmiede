@@ -190,14 +190,15 @@
                 </controls:RibbonGroup>
 
                 <!-- Gruppe: Autonome Aufgabe -->
-                <controls:RibbonGroup GruppenName="Autonome Aufgabe">
+                <controls:RibbonGroup GruppenName="Autonome Aufgabe"
+                                      Visibility="{Binding ShowAutonomAufgabeRibbonGruppe, Converter={StaticResource BoolToVisibilityConverter}}">
                     <controls:RibbonGroup.ItemsContent>
                         <StackPanel Orientation="Horizontal">
                             <controls:RibbonLargeButton ButtonIcon="🤖"
                                                         ButtonText="Autonome Aufgabe starten"
                                                         AutomationName="AutonomAufgabeInitialisieren"
                                                         ButtonCommand="{Binding AutonomAufgabeInitialisierenCommand}"
-                                                        Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                                                        Visibility="{Binding CanAutonomAufgabeInitialisieren, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="▶"
                                                         ButtonText="Start"
                                                         AutomationName="AutonomAufgabeStartAgent"
@@ -546,13 +547,24 @@
                                                         <TextBlock Text="{Binding PullRequestNumber, StringFormat='PR #{0}'}"
                                                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                                                    FontSize="12" />
+                                                        <TextBlock Text="{Binding ProviderText}"
+                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                   FontSize="12" />
+                                                        <TextBlock Text="{Binding RolleText}"
+                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                   FontSize="12" />
                                                         <TextBlock Text="{Binding Status, StringFormat='Status: {0}'}"
                                                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                                                    FontSize="12" />
+                                                    </UniformGrid>
+                                                    <UniformGrid Columns="3" Margin="0,0,0,8">
                                                         <TextBlock Text="{Binding MergeStatus, StringFormat='Merge: {0}'}"
                                                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                                                    FontSize="12" />
-                                                        <TextBlock Text="{Binding MonitoringPhase, StringFormat='Phase: {0}'}"
+                                                        <TextBlock Text="{Binding MonitoringPhaseText, StringFormat='Phase: {0}'}"
+                                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                   FontSize="12" />
+                                                        <TextBlock Text="{Binding SourceBranch, StringFormat='Branch: {0}'}"
                                                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                                                    FontSize="12" />
                                                     </UniformGrid>

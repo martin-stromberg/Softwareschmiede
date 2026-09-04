@@ -54,6 +54,17 @@ Das Design wird in den Einstellungen geändert:
 
 Die Änderung wird sofort wirksam und beim nächsten Start automatisch beibehalten.
 
+## Feature-Flag "Autonome Aufgaben" konfigurieren
+
+Das Feature "Autonome Aufgaben" (Projektleiter-Agent) wird über zwei Ebenen gesteuert:
+
+| Ebene | Ort | Standardwert | Wirkung |
+|-------|-----|--------------|---------|
+| Deployment-Zeit | `appsettings.json`, Sektion `AutonomAufgaben:Enabled` (`AutonomAufgabenOptions.Enabled`) | `true` | Wird über `IOptions<AutonomAufgabenOptions>` injiziert und beim App-Start gebunden; Änderungen erfordern einen Neustart |
+| Laufzeit / GUI | `AppEinstellung`-Datensatz mit Schlüssel `autonomeaufgaben.enabled` (`AppEinstellungService.AutonomAufgabenEnabledKey`) | `true` (Fallback, falls kein Eintrag vorhanden) | Wird über die Checkbox „Autonome Aufgaben aktivieren" auf der Registerkarte „Allgemein" gesetzt (`SettingsViewModel.IsAutonomAufgabenEnabled`) |
+
+Ist `AutonomAufgaben:Enabled` in `appsettings.json` auf `false` gesetzt, greifen die Guard-Klauseln in `AutonomAufgabeStartService.StarteAsync()`, `AutonomAufgabenInitialisierungsService.InitialisiereAsync()` und `ProjektleiterAgentService.StarteAgentAsync()`: Der Initialisierungsdialog öffnet sich nicht mehr, stattdessen wird die Fehlermeldung `AutonomAufgabenOptions.DisabledErrorMessage` ("Autonome Aufgaben sind nicht aktiviert.") bzw. für den UI-Einstiegspunkt "Autonome Aufgaben sind in den Einstellungen deaktiviert." zurückgegeben. Der nicht-autonome Weg (`EntwicklungsprozessService`, Button "Starten") bleibt davon unberührt, da er nicht gegen dieses Flag prüft.
+
 ## Überprüfung
 
 Nach dem Speichern des Arbeitsverzeichnisses zeigt die Einstellungsseite den aufgelösten Pfad an. Ist ein Fallback aktiv, erscheint ein Hinweis mit dem Reason-Code.

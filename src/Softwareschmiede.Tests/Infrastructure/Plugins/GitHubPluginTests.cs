@@ -329,6 +329,69 @@ public sealed class GitHubPluginTests
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
+    /// <summary>GetOpenPullRequestsAsync normalisiert gespeicherte GitHub-URLs zu owner/repo.</summary>
+    [Fact]
+    public async Task GetOpenPullRequestsAsync_ShouldNormalizeRepositoryUrl()
+    {
+        const string json = """
+            [
+              [
+                {
+                  "number": 42,
+                  "title": "Bump package from 1.0.0 to 1.0.1",
+                  "body": "Dependabot updates the package dependency.",
+                  "html_url": "https://github.com/owner/repo/pull/42",
+                  "state": "open",
+                  "node_id": "PR_kwDOExample",
+                  "head": {
+                    "ref": "dependabot/nuget/package-1.0.1",
+                    "sha": "abc123",
+                    "repo": {
+                      "full_name": "owner/repo",
+                      "clone_url": "https://github.com/owner/repo.git"
+                    }
+                  },
+                  "base": {
+                    "ref": "main"
+                  }
+                }
+              ]
+            ]
+            """;
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "gh",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "api", "--paginate", "--slurp", "repos/owner/repo/pulls?state=open&per_page=100")),
+                null,
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, json, string.Empty));
+
+        var result = (await _sut.GetOpenPullRequestsAsync("https://github.com/owner/repo.git")).ToList();
+
+        result.Should().ContainSingle();
+        result[0].RepositoryId.Should().Be("owner/repo");
+        result[0].Nummer.Should().Be(42);
+        result[0].BranchName.Should().Be("dependabot/nuget/package-1.0.1");
+        result[0].TargetBranch.Should().Be("main");
+        result[0].Body.Should().Be("Dependabot updates the package dependency.");
+    }
+
+    /// <summary>GetOpenPullRequestsAsync gibt bei unvollstaendiger Repository-ID leer zurueck.</summary>
+    [Fact]
+    public async Task GetOpenPullRequestsAsync_ShouldReturnEmpty_WhenRepositoryIdIsIncomplete()
+    {
+        var result = await _sut.GetOpenPullRequestsAsync("repo");
+
+        result.Should().BeEmpty();
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<IEnumerable<string>>(),
+            It.IsAny<string?>(),
+            It.IsAny<IDictionary<string, string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     /// <summary>GetIssueTemplatesAsync lädt Markdown-Templates aus .github/ISSUE_TEMPLATE.</summary>
     [Fact]
     public async Task GetIssueTemplatesAsync_ShouldReturnTemplates_WhenRepositoryContainsTemplates()

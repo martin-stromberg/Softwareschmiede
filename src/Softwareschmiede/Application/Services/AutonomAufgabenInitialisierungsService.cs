@@ -17,6 +17,7 @@ public sealed class AutonomAufgabenInitialisierungsService
     private readonly SoftwareschmiededDbContext _db;
     private readonly ICliRunner _cliRunner;
     private readonly PluginSelectionService _pluginSelectionService;
+    private readonly AppEinstellungService _appEinstellungService;
     private readonly AutonomAufgabenOptions _options;
     private readonly ILogger<AutonomAufgabenInitialisierungsService> _logger;
 
@@ -25,12 +26,14 @@ public sealed class AutonomAufgabenInitialisierungsService
         SoftwareschmiededDbContext db,
         ICliRunner cliRunner,
         PluginSelectionService pluginSelectionService,
+        AppEinstellungService appEinstellungService,
         IOptions<AutonomAufgabenOptions> options,
         ILogger<AutonomAufgabenInitialisierungsService> logger)
     {
         _db = db;
         _cliRunner = cliRunner;
         _pluginSelectionService = pluginSelectionService;
+        _appEinstellungService = appEinstellungService;
         _options = options.Value;
         _logger = logger;
     }
@@ -40,6 +43,15 @@ public sealed class AutonomAufgabenInitialisierungsService
     {
         ArgumentNullException.ThrowIfNull(aufgabe);
         ArgumentNullException.ThrowIfNull(anfrage);
+
+        // DB-persistierter Laufzeit-Schalter (AppEinstellungService.AutonomAufgabenEnabledKey, GUI-Einstellung)
+        // hat Vorrang vor dem appsettings.json-/Umgebungsvariable-Deployment-Default _options.Enabled, sofern der
+        // Anwender ihn bereits explizit in den Einstellungen gesetzt hat (Issue 205, Dual-Layer-Feature-Flag).
+        if (!await _appEinstellungService.GetAutonomAufgabenEnabledAsync(_options.Enabled, ct))
+        {
+            throw new InvalidOperationException(AutonomAufgabenOptions.DisabledErrorMessage);
+        }
+
         ValidiereAnfrage(anfrage);
 
         var gitPlugin = await _pluginSelectionService.ResolveSourceCodeManagementPluginAsync(aufgabe.GitRepository?.PluginTyp, ct);

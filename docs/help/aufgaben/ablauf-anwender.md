@@ -86,13 +86,24 @@ Wenn ein Projekt ein GitHub-Repository verwendet, zeigt die Projektdetailansicht
 
 Nach erfolgreicher Erstellung verschwindet derselbe Alert aus der Liste der offenen Anforderungen. Das ursprüngliche GitHub-Code-Scanning-Alert wird in GitHub nicht automatisch geschlossen oder verändert.
 
+### 2c. Aufgabe aus offenem Pull Request erstellen
+
+Wenn das ausgewählte Repository offene Pull Requests liefert, erscheinen diese in der Projektdetailansicht unter **Offene Anforderungen** neben Issues und Alerts. Pull Requests sind als **Pull Request** gekennzeichnet und zeigen Provider sowie Quell- und Zielbranch.
+
+1. Öffne das Projekt und wähle das gewünschte Repository aus.
+2. Prüfe in **Offene Anforderungen** die Einträge vom Typ **Pull Request**.
+3. Wähle den Pull Request aus und bestätige die Erstellung.
+4. Die Anwendung legt eine neue lokale Aufgabe an und speichert den Pull Request als Review-Quelle.
+
+Pull Requests, die bereits einer Aufgabe zugeordnet sind, werden nicht erneut vorgeschlagen. Beim Start einer solchen Review-Aufgabe wird kein neuer `task/`-Branch angelegt; stattdessen checkt die Anwendung den Quellbranch des Pull Requests aus, damit der Code-Review direkt auf dieser Grundlage erfolgen kann.
+
 ### 3. Aufgabe starten oder KI-Ausführung erneut starten
 
 Im Status **Neu**, klicke im Ribbon (Gruppe „Aufgabe") auf **Starten**:
 
 - Während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`.
 - Die Anwendung klont das Repository in das konfigurierte Arbeitsverzeichnis.
-- Ein `task/`-Branch wird angelegt.
+- Bei normalen Aufgaben wird ein `task/`-Branch angelegt. Bei Aufgaben aus einem Pull Request wird stattdessen der PR-Quellbranch ausgecheckt.
 - Eine lokale `issue.md`-Datei wird automatisch erstellt, die die Aufgabebeschreibung enthält (Titel, ID, Branch-Name, Erstellungsdatum, Anforderung).
 - Die `.gitignore`-Datei wird automatisch angepasst, um `issue.md` von der Versionskontrolle auszuschließen.
 - Der Status wechselt auf **Gestartet**.

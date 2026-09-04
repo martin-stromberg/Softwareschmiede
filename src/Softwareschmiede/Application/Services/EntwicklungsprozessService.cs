@@ -507,6 +507,38 @@ public sealed class EntwicklungsprozessService
         Aufgabe aufgabe,
         CancellationToken ct)
     {
+        var reviewSources = aufgabe.PullRequests
+            .Where(p => p.Rolle == PullRequestReferenzRolle.ReviewSource)
+            .ToList();
+        if (reviewSources.Count > 1)
+        {
+            throw new InvalidOperationException("Die Aufgabe besitzt mehrere Pull-Request-Review-Quellen.");
+        }
+
+        if (reviewSources.Count == 1)
+        {
+            var reviewSource = reviewSources[0];
+            if (string.IsNullOrWhiteSpace(reviewSource.SourceBranch))
+                throw new InvalidOperationException("Die Pull-Request-Review-Quelle besitzt keinen Quell-Branch.");
+
+            var checkoutSpec = new PullRequestCheckoutSpec(
+                reviewSource.RepositoryId,
+                repositoryUrl,
+                string.IsNullOrWhiteSpace(reviewSource.SourceRepositoryId) ? reviewSource.RepositoryId : reviewSource.SourceRepositoryId,
+                reviewSource.SourceRepositoryUrl,
+                reviewSource.SourceBranch,
+                reviewSource.SourceRef,
+                reviewSource.HeadSha);
+
+            _logger.LogInformation(
+                "Checke Pull-Request-Review-Quelle {RepositoryId}#{PullRequestNumber} als Branch '{BranchName}' aus.",
+                reviewSource.RepositoryId,
+                reviewSource.PullRequestNumber,
+                reviewSource.SourceBranch);
+            await gitPlugin.CheckoutPullRequestSourceAsync(lokalerKlonPfad, checkoutSpec, ct);
+            return (reviewSource.SourceBranch, true, null);
+        }
+
         string? defaultBranch = null;
         var nutzeExistierendenBranch = false;
         if (!string.IsNullOrEmpty(basisBranchName))
