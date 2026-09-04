@@ -71,6 +71,25 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
+    /// <summary>Prüft, dass --no-track gesetzt wird, um automatisches Upstream-Tracking auf den Basis-Branch zu verhindern.</summary>
+    [Fact]
+    public async Task CreateBranchAsync_ShouldIncludeNoTrackFlag_WhenSourceBranchNameProvided()
+    {
+        var cli = new Mock<ICliRunner>();
+        cli.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(args => args.SequenceEqual(new[] { "checkout", "-b", "feature/x", "--no-track", "origin/staging" })),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        var sut = new TestGitPlugin(cli.Object);
+
+        await sut.CreateBranchAsync("/repo", "feature/x", "staging");
+
+        cli.VerifyAll();
+    }
+
     /// <summary><summary>CommitAsync_ShouldRunAddAndCommit.</summary>.</summary>
     [Fact]
     public async Task CommitAsync_ShouldRunAddAndCommit()

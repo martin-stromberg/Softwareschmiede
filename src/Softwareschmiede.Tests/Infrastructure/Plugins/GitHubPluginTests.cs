@@ -555,10 +555,29 @@ public sealed class GitHubPluginTests
                 It.IsAny<IDictionary<string, string>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        // Act
+        await _sut.CloneRepositoryAsync("https://github.com/test/repo", "/target/path");
+
+        // Assert
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Contains("https://github.com/test/repo") && a.Contains("/target/path")),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>CloneRepositoryAsync bettet den Token nicht mehr in die Clone-URL ein.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_ShouldNotEmbedToken_InCloneUrl()
+    {
+        // Arrange
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("secret-token");
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
-                It.Is<IEnumerable<string>>(a => a.Contains("clone")),
-                null,
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
                 It.IsAny<IDictionary<string, string>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
@@ -569,7 +588,9 @@ public sealed class GitHubPluginTests
         // Assert
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
-            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.Any(x => x.Contains("https://oauth2:token@github.com/test/repo", StringComparison.Ordinal)) && a.Contains("/target/path")),
+            It.Is<IEnumerable<string>>(a => a.Contains("clone")
+                && a.All(x => !x.Contains("oauth2:", StringComparison.Ordinal))
+                && a.All(x => !x.Contains("secret-token", StringComparison.Ordinal))),
             null,
             It.IsAny<IDictionary<string, string>?>(),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -1010,7 +1031,7 @@ public sealed class GitHubPluginTests
         result.Message.Should().Be("Auto-merge enabled");
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldConfigureRemoteUrlWithToken_BeforePush.</summary>.</summary>
+    /// <summary>PushBranchAsync entfernt einen bereits eingebetteten Token aus der Remote-URL vor dem Push (Normalisierung), statt einen neuen einzubetten.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldConfigureRemoteUrlWithToken_BeforePush()
     {
@@ -1021,7 +1042,7 @@ public sealed class GitHubPluginTests
                 "/repo",
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+            .ReturnsAsync(new CliResult(0, "https://oauth2:token123@github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("set-url") && a.Contains("origin")),
@@ -1047,7 +1068,7 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Once);
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
-            It.Is<IEnumerable<string>>(a => a.Contains("remote") && a.Contains("set-url") && a.Contains("origin") && a.Any(x => x.Contains("oauth2:token123@", StringComparison.Ordinal))),
+            It.Is<IEnumerable<string>>(a => a.Contains("remote") && a.Contains("set-url") && a.Contains("origin") && a.Any(x => x == "https://github.com/owner/repo.git")),
             "/repo",
             null,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -1055,15 +1076,22 @@ public sealed class GitHubPluginTests
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "push", "--set-upstream", "origin", "feature/a")),
             "/repo",
-            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GIT_TERMINAL_PROMPT")),
+            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GIT_TERMINAL_PROMPT") && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token123"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldNotSetRemoteUrl_WhenTokenIsMissing.</summary>.</summary>
+    /// <summary>PushBranchAsync bettet keinen Token in die Remote-URL ein, wenn diese bereits unauthentifiziert ist.</summary>
     [Fact]
-    public async Task PushBranchAsync_ShouldNotSetRemoteUrl_WhenTokenIsMissing()
+    public async Task PushBranchAsync_ShouldNotEmbedToken_InRemoteUrl()
     {
-        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns((string?)null);
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("push")),
@@ -1076,7 +1104,37 @@ public sealed class GitHubPluginTests
 
         _cliRunnerMock.Verify(c => c.RunAsync(
             "git",
-            It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+            It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
+            It.IsAny<string?>(),
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>PushBranchAsync liest die Remote-URL auch dann, wenn kein Token verfügbar ist (Normalisierung ist token-unabhängig), setzt sie aber nicht neu, wenn kein Token eingebettet ist.</summary>
+    [Fact]
+    public async Task PushBranchAsync_ShouldNotSetRemoteUrl_WhenTokenIsMissing()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns((string?)null);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("push")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PushBranchAsync("/repo", "feature/a");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
             It.IsAny<string?>(),
             null,
             It.IsAny<CancellationToken>()), Times.Never);
@@ -1093,7 +1151,7 @@ public sealed class GitHubPluginTests
                 "/repo",
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, "https://oauth2:token@github.com/owner/repo.git", string.Empty));
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => a.Contains("push")),
@@ -1107,7 +1165,44 @@ public sealed class GitHubPluginTests
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*git push fehlgeschlagen*");
     }
 
-    /// <summary><summary>PullAsync_ShouldRunGitPull_WithConfiguredCredentials.</summary>.</summary>
+    /// <summary>PullAsync normalisiert eine eingebettete Remote-URL auf die unauthentifizierte Form.</summary>
+    [Fact]
+    public async Task PullAsync_ShouldNormalizeRemoteUrl_ToUnauthenticatedForm()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("abc");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://oauth2:abc@github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Last() == "https://github.com/owner/repo.git"),
+            "/repo",
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullAsync entfernt einen bereits eingebetteten Token aus der Remote-URL vor dem Pull (Normalisierung), statt einen neuen einzubetten.</summary>
     [Fact]
     public async Task PullAsync_ShouldRunGitPull_WithConfiguredCredentials()
     {
@@ -1118,7 +1213,7 @@ public sealed class GitHubPluginTests
                 "/repo",
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliResult(0, "https://oauth2:token@github.com/owner/repo.git", string.Empty));
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
@@ -1133,8 +1228,38 @@ public sealed class GitHubPluginTests
             "git",
             It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
             "/repo",
-            It.IsAny<IDictionary<string, string>?>(),
+            It.Is<IDictionary<string, string>?>(env => env != null && env.ContainsKey("GH_TOKEN") && env["GH_TOKEN"] == "token"),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>PullAsync benötigt keinen im Voraus in der Remote-URL eingebetteten Token; die Authentifizierung erfolgt ausschließlich über GH_TOKEN.</summary>
+    [Fact]
+    public async Task PullAsync_ShouldNotRequireEmbeddedToken_InRemoteUrl()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        await _sut.PullAsync("/repo");
+
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("set-url")),
+            It.IsAny<string?>(),
+            null,
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary><summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>.</summary>
@@ -1142,6 +1267,13 @@ public sealed class GitHubPluginTests
     public async Task PullAsync_ShouldThrow_WhenGitPullFails()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns((string?)null);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
                 It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
@@ -1153,6 +1285,62 @@ public sealed class GitHubPluginTests
         var act = () => _sut.PullAsync("/repo");
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*git pull fehlgeschlagen*");
+    }
+
+    /// <summary>SanitizeSensitiveOutput maskiert einen im git-push-Fehler enthaltenen Token, sodass er nie im Klartext auftaucht.</summary>
+    [Fact]
+    public async Task SanitizeSensitiveOutput_ShouldMaskToken_InPushErrorMessages()
+    {
+        const string token = "push-secret-token";
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns(token);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("push")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, $"fatal: unable to access 'https://oauth2:{token}@github.com/owner/repo.git/': push failed"));
+
+        Func<Task> act = () => _sut.PushBranchAsync("/repo", "feature/a");
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().NotContain(token);
+        exception.Which.Message.Should().Contain("oauth2:***@");
+    }
+
+    /// <summary>SanitizeSensitiveOutput maskiert einen im git-pull-Fehler enthaltenen Token, sodass er nie im Klartext auftaucht.</summary>
+    [Fact]
+    public async Task SanitizeSensitiveOutput_ShouldMaskToken_InPullErrorMessages()
+    {
+        const string token = "pull-secret-token";
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns(token);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "pull")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, $"fatal: unable to access 'https://oauth2:{token}@github.com/owner/repo.git/': pull failed"));
+
+        Func<Task> act = () => _sut.PullAsync("/repo");
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().NotContain(token);
+        exception.Which.Message.Should().Contain("oauth2:***@");
     }
 
     /// <summary><summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>.</summary>
