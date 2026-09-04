@@ -113,9 +113,11 @@ public abstract class GitPluginBase<TPlugin> : IGitPlugin, IIssueCreateProvider,
     /// <inheritdoc/>
     public virtual async Task CreateBranchAsync(string localPath, string branchName, string? sourceBranchName = null, CancellationToken ct = default)
     {
+        // --no-track verhindert, dass Git automatisch ein Upstream-Tracking auf den Basis-Branch einrichtet,
+        // wodurch ein "git push" ohne Zielangabe sonst versehentlich in den Basis-Branch pushen würde.
         var args = string.IsNullOrEmpty(sourceBranchName)
             ? new List<string> { "checkout", "-b", branchName }
-            : new List<string> { "checkout", "-b", branchName, $"origin/{sourceBranchName}" };
+            : new List<string> { "checkout", "-b", branchName, "--no-track", $"origin/{sourceBranchName}" };
 
         var result = await RunGitAsync(args, localPath, ct);
         if (!result.IsSuccess)
