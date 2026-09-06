@@ -69,6 +69,8 @@ public partial class End2EndTest : WpfTestBase
         ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(mainWindow);
         AufgabeOeffnen_NachStoppen_StartetCliNichtAutomatischErstExplizit_E2E(mainWindow);
         AufgabeStarten_KlontRepositoryUndStartetCli_E2E(mainWindow);
+        CliRawExport_ErstelltRawDateiMitCliOutput_HappyPath_E2E(mainWindow);
+        CliRawExport_AbbruchErzeugtKeineDateiUndKeinenFehlerbanner_E2E(mainWindow);
         CliPanel_BleibtSichtbarNachBeendigung_E2E(mainWindow);
         SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E(mainWindow);
         await DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E(mainWindow);

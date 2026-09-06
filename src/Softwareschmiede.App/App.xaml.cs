@@ -284,6 +284,7 @@ public sealed partial class App : System.Windows.Application
             sp.GetRequiredService<KiAusfuehrungsService>());
         services.AddSingleton<DarkModeService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
+        services.AddSingleton<ICliRawExportService, CliRawExportService>();
         services.AddSingleton<IUpdateProgressDialogService, WpfUpdateProgressDialogService>();
         services.AddSingleton<IApplicationShutdownService, WpfApplicationShutdownService>();
         services.AddSingleton<PluginSelectionDialogService>();

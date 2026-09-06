@@ -45,6 +45,20 @@ public sealed class TaskDetailViewTests
         xaml.Should().Contain("AutomationProperties.Name=\"TerminalConsole\"");
     }
 
+    /// <summary>Die CLI-Ribbon-Gruppe enthält einen Export-Button für die Rohausgabe mit stabilem Automation-Namen und Command-Binding.</summary>
+    [Fact]
+    public void Xaml_ContainsCliRawExportButton()
+    {
+        var solutionRoot = FindSolutionRoot();
+        var xamlPath = Path.Combine(solutionRoot, "src", "Softwareschmiede.App", "Views", "TaskDetailView.xaml");
+
+        var xaml = File.ReadAllText(xamlPath);
+
+        xaml.Should().Contain("GruppenName=\"CLI\"");
+        xaml.Should().Contain("AutomationName=\"CliRawExport\"");
+        xaml.Should().Contain("ButtonCommand=\"{Binding ExportCliRawCommand}\"");
+    }
+
     /// <summary>Klicks in die CLI-Fläche sollen den Terminal-Fokuspfad auslösen, Scrollbar-Bedienung nicht.</summary>
     [Fact]
     public void TerminalScrollViewer_Clickziel_SteuertFokuspfad()

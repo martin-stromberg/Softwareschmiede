@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.App.Services;
@@ -54,6 +56,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly IOptions<AutonomAufgabenOptions> _autonomAufgabenOptions;
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly ICliRawExportService _cliRawExportService;
     private readonly Action<Action> _dispatcherInvoke;
 
     private Guid _aufgabeId;
@@ -111,6 +114,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged(nameof(AutonomAufgabeDetailViewModel));
                 OnPropertyChanged(nameof(ShowAutomatisierungPanel));
                 OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
+                OnPropertyChanged(nameof(KannCliRawExportieren));
                 LadenAsync(_ladenCts.Token).SafeFireAndForget(_logger, "TaskDetailViewModel.LadenAsync");
             }
         }
@@ -145,6 +149,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(CurrentIssueReferenz));
             OnPropertyChanged(nameof(ShowInfoPanel));
             OnPropertyChanged(nameof(IsPullRequestViewSelected));
+            OnPropertyChanged(nameof(KannCliRawExportieren));
             OnPropertyChanged(nameof(IsAutonomAufgabe));
             OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
             OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
@@ -531,6 +536,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Aktuelle Issue-Zuweisung der Aufgabe.</summary>
     public IssueReferenz? CurrentIssueReferenz => _aufgabe?.IssueReferenz;
 
+    /// <summary>Gibt an, ob die CLI-Rohausgabe exportiert werden kann.</summary>
+    public bool KannCliRawExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
+
     /// <summary>Lädt die Aufgabe.</summary>
     public ICommand LadenCommand { get; }
 
@@ -600,6 +608,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Öffnet den Initialisierungsdialog für eine Autonome Aufgabe und anschließend deren Detail-Ansicht.</summary>
     public ICommand AutonomAufgabeInitialisierenCommand { get; }
 
+    /// <summary>Exportiert die protokollierte CLI-Rohausgabe in eine *.raw-Datei.</summary>
+    public ICommand ExportCliRawCommand { get; }
+
     /// <summary>Sendet die gewählte Promptvorlage an die laufende CLI.</summary>
     public ICommand PromptVorlageAuswaehlenCommand { get; }
 
@@ -654,7 +665,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         AutonomAufgabeStartService autonomAufgabeStartService,
         AppEinstellungService appEinstellungService,
         IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
-        Action<Action>? dispatcherInvoke = null)
+        Action<Action>? dispatcherInvoke = null,
+        ICliRawExportService? cliRawExportService = null)
     {
         _aufgabeService = aufgabeService;
         _protokollService = protokollService;
@@ -675,6 +687,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _appEinstellungService = appEinstellungService;
         _autonomAufgabenOptions = autonomAufgabenOptions;
         _timeProvider = timeProvider;
+        _cliRawExportService = cliRawExportService ?? new CliRawExportService(protokollService, NullLogger<CliRawExportService>.Instance);
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
         // Synchroner Default vor dem ersten Laden einer Aufgabe: LadenAsync ermittelt den DB-Wert
         // asynchron und überschreibt dieses Feld danach ggf. (siehe AktualisiereIsAutonomAufgabenEnabledAsync).
@@ -722,6 +735,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         // zweite AutonomAufgabeKonfiguration an bzw. bricht beim erneuten Klonen ins bereits vorhandene
         // Arbeitsverzeichnis ab. IsAutonomAufgabenEnabled: Feature-Flag für Autonome Aufgaben (Issue 205).
         AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => CanAutonomAufgabeInitialisieren);
+        ExportCliRawCommand = new AsyncRelayCommand(ExportCliRawAsync, () => KannCliRawExportieren);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
@@ -2226,6 +2240,45 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
         var index = anzeigeWerte.IndexOf(gewaehlterWert);
         return index >= 0 ? eintraege[index] : null;
+    }
+
+    private async Task ExportCliRawAsync(CancellationToken ct)
+    {
+        if (!KannCliRawExportieren)
+            return;
+
+        var defaultDateiname = $"cli-output-{_aufgabeId:N}.raw";
+        var zielPfad = await _dialogService.ShowSaveFileDialogAsync(
+            "CLI-Rohausgabe exportieren",
+            "Raw files (*.raw)|*.raw",
+            defaultDateiname,
+            null,
+            ct);
+
+        if (string.IsNullOrWhiteSpace(zielPfad))
+            return;
+
+        if (!zielPfad.EndsWith(".raw", StringComparison.OrdinalIgnoreCase))
+        {
+            FehlerMeldung = "Export-Zielpfad muss auf .raw enden.";
+            return;
+        }
+
+        FehlerMeldung = null;
+
+        try
+        {
+            await _cliRawExportService.ExportCliRawAsync(_aufgabeId, zielPfad, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CLI-Rohausgabe für Aufgabe {AufgabeId} konnte nicht exportiert werden.", _aufgabeId);
+            FehlerMeldung = $"CLI-Rohausgabe konnte nicht exportiert werden: {ex.Message}";
+        }
     }
 
     /// <summary>

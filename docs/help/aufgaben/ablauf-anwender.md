@@ -164,6 +164,17 @@ Statt einen Prompt sofort zu versenden, kannst du ihn auch für eine später Uhr
 >
 > Wenn du einen neuen Prompt zur gleichen oder anderen Uhrzeit planst, wird der vorherige Plan ersetzt.
 
+### 6b. CLI-Rohausgabe exportieren
+
+Wenn du die bisherige Ausgabe der CLI als Datei sichern möchtest:
+
+1. Öffne die Aufgabendetailansicht einer Aufgabe mit vorhandener CLI-Ausgabe.
+2. Klicke in der Ribbon-Gruppe **CLI** auf **Rohausgabe exportieren**.
+3. Gib im Speichern-Dialog einen Dateinamen mit der Endung `.raw` an und bestätige.
+4. Die Anwendung speichert die bisherigen CLI-Ausgabezeilen der Aufgabe in der gewählten Datei.
+
+> **Hinweis:** Wenn du den Dialog abbrichst, wird keine Datei angelegt. Bereits gespeicherte andere Protokolleinträge werden nicht mit exportiert.
+
 ### 7. KI-Ausführung beenden
 
 Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alternativ kannst du im Ribbon (Gruppe „CLI") auf **Stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).

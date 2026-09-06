@@ -1,3 +1,9 @@
+## 2026-09-06 — Export der CLI-Rohausgabe
+
+- Die Aufgabendetailansicht bietet in der CLI-Gruppe jetzt die Aktion **Rohausgabe exportieren**. Der Benutzer wählt den Zielpfad per Speichern-Dialog und speichert die bisher protokollierten CLI-Ausgabezeilen als `.raw`-Datei.
+- Der Export liest ausschließlich bereits gespeicherte `ProtokollTyp.CliOutput`-Einträge, behält deren Reihenfolge bei und schreibt sie als UTF-8 ohne BOM. Abbruch im Dialog und Schreibfehler werden getrennt behandelt.
+- Die Hilfedokumentation unter `docs/help/aufgaben/` wurde um Beschreibung, Ablauf, API, Architektur, Business Rules und Fehlerbehebung für den Export ergänzt.
+
 ## 2026-08-27 — Feature-Flag "Autonome Aufgaben aktivieren" in den Einstellungen
 
 - Neuer Schalter **"Autonome Aufgaben aktivieren"** auf der Registerkarte **Allgemein** der Einstellungsseite (Abschnitt „Automatisierung", Standard: aktiviert). Der Wert wird über `AppEinstellungService` (Schlüssel `autonomeaufgaben.enabled`) in der Datenbank persistiert und ergänzt den bestehenden Deployment-Schalter `AutonomAufgaben:Enabled` in `appsettings.json` um eine laufzeitkonfigurierbare, per GUI erreichbare Ebene.
