@@ -1,4 +1,5 @@
 using System.Windows;
+using Microsoft.Win32;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
 using Softwareschmiede.Domain.Entities;
@@ -134,6 +135,35 @@ public sealed class WpfDialogService : IDialogService
         return ShowDialogAsync(
             () => new AutonomAufgabeInitialisierungsDialog(viewModel),
             () => viewModel.ErstellteKonfiguration);
+    }
+
+    /// <inheritdoc/>
+    public Task<string?> ShowSaveFileDialogAsync(
+        string title,
+        string filter,
+        string defaultFileName,
+        string? initialDirectory = null,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var dialog = new SaveFileDialog
+            {
+                Title = title,
+                Filter = filter,
+                FileName = defaultFileName
+            };
+
+            if (!string.IsNullOrWhiteSpace(initialDirectory))
+                dialog.InitialDirectory = initialDirectory;
+
+            var result = dialog.ShowDialog(System.Windows.Application.Current.MainWindow);
+            return result == true ? dialog.FileName : null;
+        }).Task;
     }
 
     /// <summary>Erzeugt über <paramref name="dialogFactory"/> ein Dialogfenster, zeigt es modal an und liefert das über <paramref name="resultSelector"/> bestimmte Ergebnis.</summary>

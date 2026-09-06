@@ -146,6 +146,12 @@ Für jeden ConPTY-Start erzeugt `KiAusfuehrungsService` einen `CliOutputProtokol
 
 Die Protokollierung hängt nicht davon ab, dass die CLI-Ansicht geöffnet ist. Persistenzfehler werden geloggt und unterbrechen den CLI-Prozess nicht. Bei sehr schneller Ausgabe ist die interne Queue begrenzt; wenn sie voll ist, wartet der Output-Reader auf freie Kapazität. Ein bekannter Abschluss-Race bei voller Queue und parallelem Cleanup ist noch als Nacharbeit offen.
 
+### CLI-Rohausgabe exportieren
+
+In der Aufgabendetailansicht steht in der Ribbon-Gruppe **CLI** der Button **Rohausgabe exportieren** zur Verfügung. Der Benutzer wählt darüber über einen Speichern-Dialog den Zielpfad; vorgeschlagen wird ein Dateiname nach dem Muster `cli-output-<AufgabenId>.raw`.
+
+Der Export schreibt nur die bereits protokollierten `CliOutput`-Zeilen der Aufgabe in ihrer gespeicherten Reihenfolge in eine `.raw`-Datei. Zusätzliche Metadaten, Formatierungen oder andere Protokolltypen werden nicht ergänzt. Wird der Dialog abgebrochen, bleibt die Aufgabe unverändert.
+
 ### Rate-Limit-Vorschlag
 
 Erkennt die KI ein Rate-Limit (Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601]]` in der Ausgabe), speichert der `ProtokollService` automatisch einen Prompt-Vorschlag mit Ausführungszeitpunkt in der Aufgabe. Der Status wechselt auf `Wartend`.
@@ -177,6 +183,14 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 7. Bei Erreichen von 16:30 Uhr wird der Prompt automatisch an die CLI versendet; die Status-Anzeige verschwindet.
 8. Falls die CLI zwischenzeitlich beendet wurde, wird der Prompt still verworfen (ohne Fehlermeldung).
 
+### CLI-Rohausgabe exportieren
+
+1. Öffne eine Aufgabe mit aktivem oder bereits beendigtem CLI-Verlauf.
+2. Klicke in der Ribbon-Gruppe **CLI** auf **Rohausgabe exportieren**.
+3. Wähle im Speichern-Dialog einen Zielpfad mit der Endung `.raw` und bestätige.
+4. Die Anwendung speichert die bisherigen `CliOutput`-Zeilen der Aufgabe als Textdatei.
+5. Wenn du den Dialog abbrichst, wird keine Datei erzeugt und die Ansicht bleibt unverändert.
+
 ### To-Do-Liste für Aufgabengliederung und Fortschrittsverfolgung
 
 Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-Do-Liste:
@@ -199,3 +213,4 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
 - Der Status `Gestartet` bedeutet: Repository geklont und CLI läuft (oder sollte laufen). Wenn die Ansicht eines Status-`Gestartet`-Tasks ohne laufende CLI geöffnet wird, wird die CLI automatisch neu gestartet.
 - Zeitgesteuerter Prompt-Versand: Pro Aufgabe kann maximal ein Prompt gleichzeitig geplant sein; erneutes Planen ersetzt den vorhandenen Eintrag. Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts. Ist die CLI zur Zielzeit nicht mehr aktiv, wird der Prompt still verworfen.
 - Das CLI-Ausgabeprotokoll speichert dekodierte Zeilen aus dem Terminal-Rohstream. ANSI- und Control-Sequenzen werden nicht bereinigt und können im Protokoll sichtbar sein.
+- Der CLI-Rohausgabe-Export enthält ausschließlich gespeicherte `CliOutput`-Zeilen; andere Protokolltypen oder Zusatzinformationen werden nicht exportiert.

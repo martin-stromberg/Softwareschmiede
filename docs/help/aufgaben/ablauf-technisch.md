@@ -214,6 +214,30 @@ Ablauf:
 
 Die Protokollierung ist UI-unabhängig. Neue `CliOutput`-Einträge müssen nicht live in der Info-Ansicht auftauchen; nach erneutem Laden der Aufgabe werden sie über den normalen Protokollabruf sichtbar.
 
+### 0.4.1. CLI-Rohausgabe exportieren
+
+Ausgelöst durch den Button **Rohausgabe exportieren** in der CLI-Ribbon-Gruppe der `TaskDetailView`.
+
+Beteiligte Komponenten:
+- `TaskDetailView.xaml` — stellt den Export-Button mit `AutomationName="CliRawExport"` bereit
+- `TaskDetailViewModel.ExportCliRawCommand` — startet den Exportpfad
+- `TaskDetailViewModel.ExportCliRawAsync` — orchestriert Dialog, Validierung und Export
+- `IDialogService.ShowSaveFileDialogAsync` — liefert den Zielpfad oder `null` bei Abbruch
+- `ICliRawExportService.ExportCliRawAsync` — liest `CliOutput`-Einträge und schreibt die `.raw`-Datei
+- `ProtokollService.GetByAufgabeAsync` — lädt den persistierten Protokoll-Snapshot
+
+Ablauf:
+1. Nutzer klickt in der CLI-Ribbon-Gruppe auf **Rohausgabe exportieren**.
+2. `TaskDetailViewModel.ExportCliRawAsync(ct)` prüft zuerst `KannCliRawExportieren`.
+3. Das ViewModel öffnet über `IDialogService.ShowSaveFileDialogAsync(...)` einen nativen Save-Dialog mit Filter `Raw files (*.raw)|*.raw` und einem Default-Dateinamen auf Basis der Aufgaben-ID.
+4. Bricht der Nutzer den Dialog ab, endet der Ablauf ohne Fehler und ohne Dateioperation.
+5. Gibt der Dialog einen Zielpfad zurück, prüft das ViewModel, ob der Pfad auf `.raw` endet.
+6. Anschließend ruft das ViewModel `_cliRawExportService.ExportCliRawAsync(_aufgabeId, zielPfad, ct)` auf.
+7. `CliRawExportService` lädt die Protokolle der Aufgabe über `ProtokollService.GetByAufgabeAsync(...)`.
+8. Der Service filtert auf `ProtokollTyp.CliOutput`, übernimmt nur `Inhalt` und verbindet die Zeilen mit `Environment.NewLine`.
+9. Die resultierende Textdatei wird mit UTF-8 ohne BOM geschrieben.
+10. Schlägt der Schreibvorgang fehl, wird die Ausnahme im ViewModel geloggt und als Benutzerfehler angezeigt; der restliche UI-Zustand bleibt unverändert.
+
 ### 0.5. Aufgabe anlegen und bearbeiten (Status: Neu)
 
 Ausgelöst durch den „Speichern"-Button in der Info-Ansicht.

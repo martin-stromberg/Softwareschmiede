@@ -141,11 +141,15 @@ internal static class ElementWaitHelper
         TimeSpan timeout,
         Func<AutomationElement, bool>? isVisible = null)
     {
+        isVisible ??= static _ => true;
         var comboBox = comboBoxElement.AsComboBox();
         comboBox.Click();
         Thread.Sleep(300);
 
-        var item = WaitForElement(comboBoxElement, cf => cf.ByName(itemText), timeout, isVisible);
+        AutomationElement? item = comboBoxElement.FindFirstDescendant(cf => cf.ByName(itemText));
+        if (item is null || !isVisible(item))
+            item = WaitForElement(comboBoxElement.Automation.GetDesktop(), cf => cf.ByName(itemText), timeout, isVisible);
+
         item.Click();
         Thread.Sleep(200);
     }

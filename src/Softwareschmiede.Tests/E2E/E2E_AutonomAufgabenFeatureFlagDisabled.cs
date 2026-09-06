@@ -22,11 +22,9 @@ namespace Softwareschmiede.Tests.E2E;
 public sealed class E2E_AutonomAufgabenFeatureFlagDisabled : WpfTestBase
 {
     /// <summary>
-    /// Szenario: Bei deaktiviertem Feature-Flag zeigt ein Klick auf "Autonome Aufgabe starten" statt des
-    /// Initialisierungsdialogs eine Fehlermeldung ("Autonome Aufgaben sind in den Einstellungen deaktiviert.")
-    /// über die Guard-Klausel in <c>AutonomAufgabeStartService.StarteAsync()</c>. Der Fallback-Button "Starten"
-    /// (nicht-autonomer Weg) bleibt unabhängig vom Feature-Flag sichtbar und funktionsfähig. In der Datenbank
-    /// wird keine <c>AutonomAufgabeKonfiguration</c> angelegt, der Projektleiter-Agent startet also nicht.
+    /// Szenario: Bei deaktiviertem Feature-Flag bleibt der Fallback-Button "Starten" (nicht-autonomer Weg)
+    /// verfügbar, der Einstieg "Autonome Aufgabe starten" ist jedoch nicht sichtbar/ausführbar. Es erscheint
+    /// kein Initialisierungsdialog und in der Datenbank wird keine <c>AutonomAufgabeKonfiguration</c> angelegt.
     /// </summary>
     [Fact]
     public async Task AutonomAufgabeInitialisieren_ZeigtFehlermeldungStattDialog_WennFeatureFlagDeaktiviert()
@@ -43,21 +41,11 @@ public sealed class E2E_AutonomAufgabenFeatureFlagDisabled : WpfTestBase
             SetupProjectMitNeuerAufgabe(mainWindow, repositoryFolderName, projektName);
             var taskDetail = new TaskDetailView(mainWindow);
             taskDetail.SetTaskTitle(aufgabeTitel);
-            taskDetail.SaveTask();
+            taskDetail.SaveTask().WaitForPersisted();
 
-            // Fallback-Button "Starten" (nicht-autonomer Weg) bleibt verfügbar, unabhängig vom Feature-Flag.
-            WaitForElement(mainWindow, cf => cf.ByName("Starten"), Short);
+            Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeInitialisieren")));
 
-            var initialisierenButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short);
-            initialisierenButton.AsButton().Click();
-
-            var fehlerMeldung = WaitForElement(mainWindow, cf => cf.ByName("FehlerMeldung"), Short);
-            Assert.Equal(
-                "Autonome Aufgaben sind in den Einstellungen deaktiviert.",
-                GetHelpTextOrName(fehlerMeldung));
-
-            // Der Initialisierungsdialog darf nicht erscheinen: die Guard-Klausel greift, bevor der Dialog
-            // geöffnet wird (AutonomAufgabeStartService.StarteAsync gibt vorher ein Fehlerresultat zurück).
+            // Der Initialisierungsdialog darf bei deaktiviertem Feature-Flag nicht erscheinen.
             Assert.Null(Automation.GetDesktop().FindFirstDescendant(
                 cf => cf.ByName("Autonome Aufgabe initialisieren").And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window))));
 

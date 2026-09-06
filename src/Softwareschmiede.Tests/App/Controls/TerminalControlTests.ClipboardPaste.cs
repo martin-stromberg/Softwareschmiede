@@ -74,8 +74,6 @@ public sealed partial class TerminalControlTests
             using var session = CreateSession(new ImmediateEofStream());
             control.Session = session;
 
-            SetClipboardTextWithRetry("x");
-
             var args = InvokeCtrlV(control);
 
             args.Handled.Should().BeTrue("Ctrl+V muss das Tastaturereignis als behandelt markieren");

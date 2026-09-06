@@ -47,6 +47,8 @@ public abstract class WpfTestBase : IDisposable
         "LocalDirectoryPlugin.SourceDirectory",
         "Softwareschmiede.Codex.ExecutablePath",
     ];
+    private static readonly string[] ProjekteButtonNamen = [" Projekte", "Projekte"];
+    private static readonly string[] EinstellungenButtonNamen = [" Einstellungen", "Einstellungen"];
 
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
@@ -331,8 +333,7 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjects(AutomationElement mainWindow)
     {
-        var button = WaitForElement(mainWindow, cf => cf.ByName(" Projekte"), Short);
-        button.AsButton().Click();
+        WaitForNavigationButton(mainWindow, ProjekteButtonNamen, Short).AsButton().Click();
     }
     /// <summary>
     /// Navigiert von der Projekt-Kachel zurück zur Projektliste. Wird benötigt, wenn ein Test nach dem Öffnen eines Projekts wieder zur Projektliste zurückkehren muss.
@@ -371,7 +372,7 @@ public abstract class WpfTestBase : IDisposable
         {
             mainWindow.Focus();
 
-            var button = mainWindow.FindFirstDescendant(cf => cf.ByName(" Einstellungen"));
+            var button = FindNavigationButton(mainWindow, EinstellungenButtonNamen);
             if (button is not null)
                 button.AsButton().Click();
 
@@ -383,6 +384,37 @@ public abstract class WpfTestBase : IDisposable
         }
 
         WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
+    }
+
+    private static AutomationElement WaitForNavigationButton(
+        AutomationElement mainWindow,
+        IReadOnlyList<string> names,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var button = FindNavigationButton(mainWindow, names);
+            if (button is not null)
+                return button;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Navigations-Button wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden. Gesucht: {string.Join(", ", names)}");
+    }
+
+    private static AutomationElement? FindNavigationButton(AutomationElement mainWindow, IReadOnlyList<string> names)
+    {
+        foreach (var name in names)
+        {
+            var button = mainWindow.FindFirstDescendant(
+                cf => cf.ByName(name).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button)));
+            if (button is not null)
+                return button;
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ namespace Softwareschmiede.Tests.E2E.Views;
 /// <summary>View für die Projektlisten-Ansicht.</summary>
 public sealed class ProjectListView : BaseWindowView
 {
-    private static readonly string[] StaticLabels = ["Neu", "Dashboard", " Projekte", " Einstellungen", "FehlerMeldung"];
+    private static readonly string[] StaticLabels = ["Neu", "Dashboard", " Projekte", "Projekte", " Einstellungen", "Einstellungen", "FehlerMeldung"];
 
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
     public ProjectListView(Window window) : base(window)
@@ -71,6 +71,8 @@ public sealed class ProjectListView : BaseWindowView
         WaitForElement(Window, cf => cf.ByName("Neu"), Short).AsButton().Click();
 
         var projectView = new ProjectDetailView(Window);
+        WaitForElement(Window, cf => cf.ByName("ProjektName"), Medium);
+        WaitForElement(Window, cf => cf.ByName("Speichern"), Medium);
         Assert.True(projectView.IsVisible, "Projekt-Detailansicht sollte nach Klick auf 'Neu' sichtbar sein.");
         projectView.SetProjectName(name);
         projectView.SaveChanges();
