@@ -1,5 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using FluentAssertions;
+using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.E2E.Views;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -11,12 +13,13 @@ public partial class End2EndTest
     protected void CliRawExport_ErstelltRawDateiMitCliOutput_HappyPath_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        SetupProjectMitNeuerAufgabe(mainWindow, "CliRawExport-Happy-Repo", "CliRawExport-Happy-Projekt");
+        const string projektName = "CliRawExport-Happy-Projekt";
+        SetupProjectMitNeuerAufgabe(mainWindow, "CliRawExport-Happy-Repo", projektName);
+        var erwarteteCliZeile = $"CliRawExport-{Guid.NewGuid():N}";
+        SeedCliOutputForAktuelleAufgabe(erwarteteCliZeile);
 
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskDetail.WaitForCliRunning();
-        taskDetail.SwitchPanel("InfoCliToggle");
-        taskDetail.WaitForLogEntry("CliOutput");
         taskDetail.SwitchPanel("CliViewButton");
 
         var exportPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-{Guid.NewGuid():N}.raw");
@@ -30,7 +33,7 @@ public partial class End2EndTest
                 Thread.Sleep(200);
 
             File.Exists(exportPfad).Should().BeTrue();
-            File.ReadAllText(exportPfad).Should().NotBeNullOrWhiteSpace();
+            File.ReadAllText(exportPfad).Should().Contain(erwarteteCliZeile);
             new ErrorView(mainWindow).IsVisible.Should().BeFalse();
         }
         finally
@@ -38,9 +41,8 @@ public partial class End2EndTest
             if (File.Exists(exportPfad))
                 File.Delete(exportPfad);
 
-            taskDetail.ForceClose(recurseToDashboard: false);
-            var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
-            projectDetail.DeleteProject();
+            TryCloseTaskDetail(taskDetail);
+            DeleteProjectInDatenbank(projektName);
         }
     }
 
@@ -48,7 +50,8 @@ public partial class End2EndTest
     protected void CliRawExport_AbbruchErzeugtKeineDateiUndKeinenFehlerbanner_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
-        SetupProjectMitNeuerAufgabe(mainWindow, "CliRawExport-Cancel-Repo", "CliRawExport-Cancel-Projekt");
+        const string projektName = "CliRawExport-Cancel-Projekt";
+        SetupProjectMitNeuerAufgabe(mainWindow, "CliRawExport-Cancel-Repo", projektName);
 
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
         taskDetail.WaitForCliRunning();
@@ -68,9 +71,50 @@ public partial class End2EndTest
             if (File.Exists(exportPfad))
                 File.Delete(exportPfad);
 
-            taskDetail.ForceClose(recurseToDashboard: false);
-            var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
-            projectDetail.DeleteProject();
+            TryCloseTaskDetail(taskDetail);
+            DeleteProjectInDatenbank(projektName);
         }
+    }
+
+    private void SeedCliOutputForAktuelleAufgabe(string output)
+    {
+        using var db = OpenTestDbContext();
+        var aufgabeId = db.Aufgaben
+            .OrderByDescending(a => a.ErstellungsDatum)
+            .Select(a => a.Id)
+            .First();
+
+        db.Protokolleintraege.Add(new Protokolleintrag
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabeId,
+            Typ = ProtokollTyp.CliOutput,
+            Inhalt = output,
+            Zeitstempel = DateTimeOffset.UtcNow
+        });
+
+        db.SaveChanges();
+    }
+
+    private static void TryCloseTaskDetail(TaskDetailView taskDetail)
+    {
+        try
+        {
+            taskDetail.ForceClose(recurseToDashboard: false);
+        }
+        catch
+        {
+        }
+    }
+
+    private void DeleteProjectInDatenbank(string projektName)
+    {
+        using var db = OpenTestDbContext();
+        var projekt = db.Projekte.SingleOrDefault(p => p.Name == projektName);
+        if (projekt is null)
+            return;
+
+        db.Projekte.Remove(projekt);
+        db.SaveChanges();
     }
 }

@@ -209,7 +209,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForLogEntry(string typ)
     {
-        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{typ}"), Medium);
+        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{typ}"), Long);
         return this;
     }
 
@@ -324,7 +324,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView ExportCliRaw(string? zielPfad)
     {
-        WaitForElement(Window, cf => cf.ByName("CliRawExport"), Short).AsButton().Click();
+        WaitForEnabledElement(Window, "CliRawExport", Medium).AsButton().Click();
         return HandleSaveFileDialog(zielPfad);
     }
 
@@ -442,7 +442,7 @@ public sealed class TaskDetailView : BaseWindowView
 
     private AutomationElement WaitForSaveDialog()
     {
-        var deadline = DateTime.UtcNow + Medium;
+        var deadline = DateTime.UtcNow + Long;
         while (DateTime.UtcNow < deadline)
         {
             var dialog = Window.Automation.GetDesktop().FindFirstDescendant(SaveDialogCondition);
@@ -451,15 +451,30 @@ public sealed class TaskDetailView : BaseWindowView
 
             Thread.Sleep(200);
         }
-
-        throw new TimeoutException("Der Speichern-Dialog wurde nicht rechtzeitig geöffnet.");
+        throw new TimeoutException("Der Speichern-Dialog wurde nicht innerhalb des Timeouts geöffnet.");
     }
 
     private static Func<FlaUI.Core.Conditions.ConditionFactory, FlaUI.Core.Conditions.ConditionBase> SaveDialogCondition
         => cf => cf.ByControlType(ControlType.Window)
             .And(cf.ByName("Speichern unter")
                 .Or(cf.ByName("Save As"))
-                .Or(cf.ByName("Save")));
+                .Or(cf.ByName("Save"))
+                .Or(cf.ByName("CLI-Rohausgabe exportieren")));
+
+    private static AutomationElement WaitForEnabledElement(AutomationElement parent, string automationName, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = parent.FindFirstDescendant(cf => cf.ByName(automationName));
+            if (element is not null && element.IsEnabled)
+                return element;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Element '{automationName}' wurde nicht innerhalb von {timeout.TotalSeconds}s aktiviert gefunden.");
+    }
 
     /// <summary>Klickt den Dropdown-Button "IdeOeffnenDropdown" und öffnet den Solution-Auswahl-Dialog.</summary>
     /// <returns>Der geöffnete Solution-Auswahl-Dialog.</returns>

@@ -6,6 +6,9 @@ namespace Softwareschmiede.Tests.E2E.Views;
 /// <summary>View für das persistente Navigationsmenü der Anwendung (Dashboard/Projekte/Einstellungen).</summary>
 public sealed class MenuView : BaseWindowView
 {
+    private static readonly string[] ProjekteButtonNamen = [" Projekte", "Projekte"];
+    private static readonly string[] EinstellungenButtonNamen = [" Einstellungen", "Einstellungen"];
+
     /// <param name="window">Das Hauptfenster der Anwendung.</param>
     public MenuView(Window window) : base(window)
     {
@@ -14,8 +17,8 @@ public sealed class MenuView : BaseWindowView
     /// <inheritdoc/>
     public override bool IsVisible
         => ElementExists(Window, cf => cf.ByName("Dashboard"))
-           && ElementExists(Window, cf => cf.ByName(" Projekte"))
-           && ElementExists(Window, cf => cf.ByName(" Einstellungen"));
+           && TryFindNavigationButton(ProjekteButtonNamen) is not null
+           && TryFindNavigationButton(EinstellungenButtonNamen) is not null;
 
     /// <inheritdoc/>
     public override MenuView ForceShow() => this;
@@ -39,7 +42,7 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Projektlisten-Ansicht.</returns>
     public ProjectListView NavigateToProjects()
     {
-        WaitForElement(Window, cf => cf.ByName(" Projekte"), Short).AsButton().Click();
+        WaitForNavigationButton(ProjekteButtonNamen, Short).AsButton().Click();
         WaitForElement(Window, cf => cf.ByName("Neu"), Medium);
         var projectList = new ProjectListView(Window);
         Assert.True(projectList.IsVisible, "Projektliste sollte nach Klick auf 'Projekte' sichtbar sein.");
@@ -50,7 +53,7 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Einstellungen-Ansicht.</returns>
     public SettingsView NavigateToSettings()
     {
-        WaitForElement(Window, cf => cf.ByName(" Einstellungen"), Short).AsButton().Click();
+        WaitForNavigationButton(EinstellungenButtonNamen, Short).AsButton().Click();
         WaitForElement(Window, cf => cf.ByName("Plugins"), Medium);
 
         var settings = new SettingsView(Window);
@@ -98,5 +101,32 @@ public sealed class MenuView : BaseWindowView
 
         throw new TimeoutException(
             $"Statuskachel zeigte innerhalb von {timeout.TotalSeconds}s nicht den erwarteten Status '{expectedStatus}' an. Zuletzt gesehen: '{lastStatus}'.");
+    }
+
+    private AutomationElement WaitForNavigationButton(IReadOnlyList<string> names, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var button = TryFindNavigationButton(names);
+            if (button is not null)
+                return button;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Navigations-Button wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden. Gesucht: {string.Join(", ", names)}");
+    }
+
+    private AutomationElement? TryFindNavigationButton(IReadOnlyList<string> names)
+    {
+        foreach (var name in names)
+        {
+            var button = Window.FindFirstDescendant(cf => cf.ByName(name).And(cf.ByControlType(ControlType.Button)));
+            if (button is not null)
+                return button;
+        }
+
+        return null;
     }
 }

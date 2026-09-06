@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.App.Views;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -77,5 +78,18 @@ public partial class End2EndTest : WpfTestBase
         await DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E(mainWindow);
 
         app.Close();
+    }
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns></returns>
+    [SkippableFact]
+    public async Task RunCurrentTest()
+    {
+        SkipWennConPtyNichtVerfuegbar();
+
+        var app = LaunchApp(true);
+        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        CliRawExport_ErstelltRawDateiMitCliOutput_HappyPath_E2E(mainWindow);
     }
 }
