@@ -116,6 +116,27 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         Directory.Delete(path, recursive: true);
     }
 
+    private async Task<GitRepository> CreateTestRepositoryAsync(string url, string name, RepositoryStartKonfiguration? config = null)
+    {
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            PluginTyp = "Softwareschmiede.GitHub",
+            RepositoryUrl = url,
+            RepositoryName = name,
+            Aktiv = true
+        };
+        if (config is not null)
+        {
+            config.GitRepository = repository;
+            repository.StartKonfiguration = config;
+        }
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync();
+        return repository;
+    }
+
     /// <summary>ProzessStartenAsync klont das Repository und legt einen Branch an.</summary>
     [Fact]
     public async Task ProzessStartenAsync_ShouldCloneAndCreateBranch_WhenAufgabeExists()
@@ -206,24 +227,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenUndCliStartenAsync_ShouldUseConfiguredWorkingDirectory_WhenStartConfigHasWorkingDirectory()
     {
         // Arrange
-        var repository = new GitRepository
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            PluginTyp = "Softwareschmiede.GitHub",
-            RepositoryUrl = "https://github.com/test/repo-workdir",
-            RepositoryName = "repo-workdir",
-            Aktiv = true
-        };
-        repository.StartKonfiguration = new RepositoryStartKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            WorkingDirectoryRelativePath = "backend",
-            Aktiv = true,
-            GitRepository = repository
-        };
-        _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
+        var repository = await CreateTestRepositoryAsync(
+            "https://github.com/test/repo-workdir",
+            "repo-workdir",
+            new RepositoryStartKonfiguration { Id = Guid.NewGuid(), WorkingDirectoryRelativePath = "backend", Aktiv = true });
 
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Start mit Arbeitsverzeichnis", null, repository.Id);
 
@@ -281,24 +288,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenUndCliStartenAsync_ShouldRollback_WhenConfiguredWorkingDirectoryMissing()
     {
         // Arrange
-        var repository = new GitRepository
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            PluginTyp = "Softwareschmiede.GitHub",
-            RepositoryUrl = "https://github.com/test/repo-workdir-missing",
-            RepositoryName = "repo-workdir-missing",
-            Aktiv = true
-        };
-        repository.StartKonfiguration = new RepositoryStartKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            WorkingDirectoryRelativePath = "does-not-exist",
-            Aktiv = true,
-            GitRepository = repository
-        };
-        _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
+        var repository = await CreateTestRepositoryAsync(
+            "https://github.com/test/repo-workdir-missing",
+            "repo-workdir-missing",
+            new RepositoryStartKonfiguration { Id = Guid.NewGuid(), WorkingDirectoryRelativePath = "does-not-exist", Aktiv = true });
 
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Start mit fehlendem Arbeitsverzeichnis", null, repository.Id);
 
@@ -347,24 +340,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldContinue_WhenRepositoryStartScriptFails()
     {
         // Arrange
-        var repository = new GitRepository
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            PluginTyp = "Softwareschmiede.GitHub",
-            RepositoryUrl = "https://github.com/test/repo-start-script",
-            RepositoryName = "repo-start-script",
-            Aktiv = true
-        };
-        repository.StartKonfiguration = new RepositoryStartKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            StartScriptRelativePath = "scripts/start.ps1",
-            Aktiv = true,
-            GitRepository = repository
-        };
-        _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
+        var repository = await CreateTestRepositoryAsync(
+            "https://github.com/test/repo-start-script",
+            "repo-start-script",
+            new RepositoryStartKonfiguration { Id = Guid.NewGuid(), StartScriptRelativePath = "scripts/start.ps1", Aktiv = true });
 
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Startskript robust starten", null, repository.Id);
         _gitPluginMock.Setup(g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -431,17 +410,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     [Fact]
     public async Task ProzessStartenUndCliStartenAsync_ShouldStartTaskWithoutIssueReference_WhenSingleProjectRepositoryExists()
     {
-        var repository = new GitRepository
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            PluginTyp = "Softwareschmiede.GitHub",
-            RepositoryUrl = "https://github.com/test/repo-ohne-issue",
-            RepositoryName = "repo-ohne-issue",
-            Aktiv = true
-        };
-        _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
+        var repository = await CreateTestRepositoryAsync("https://github.com/test/repo-ohne-issue", "repo-ohne-issue");
 
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Issue", "Beschreibung");
         var cloneBase = SetupCloneWithDirectoryCreation();
@@ -722,26 +691,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous()
     {
         // Arrange
-        _db.GitRepositories.AddRange(
-            new GitRepository
-            {
-                Id = Guid.NewGuid(),
-                ProjektId = _projektId,
-                PluginTyp = "Softwareschmiede.GitHub",
-                RepositoryUrl = "https://github.com/test/repo-a",
-                RepositoryName = "repo-a",
-                Aktiv = true
-            },
-            new GitRepository
-            {
-                Id = Guid.NewGuid(),
-                ProjektId = _projektId,
-                PluginTyp = "Softwareschmiede.GitHub",
-                RepositoryUrl = "https://github.com/test/repo-b",
-                RepositoryName = "repo-b",
-                Aktiv = true
-            });
-        await _db.SaveChangesAsync();
+        await CreateTestRepositoryAsync("https://github.com/test/repo-a", "repo-a");
+        await CreateTestRepositoryAsync("https://github.com/test/repo-b", "repo-b");
 
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Mehrdeutiger Repository-Kontext", null);
         var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
@@ -861,6 +812,89 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         DeleteDirectoryIfExists(clonePath);
     }
 
+    /// <summary>CreateIssueFileAsync schreibt Verknüpftes-Issue-Abschnitt mit Kennung und Titel wenn IssueReferenz mit gültiger Nummer gesetzt ist.</summary>
+    [Fact]
+    public async Task CreateIssueFileAsync_ShouldIncludeIssueReference_WhenIssueReferenzIsSet()
+    {
+        // Arrange
+        var issue = new Issue(42, "Anmeldung fehlerhaft", "Beschreibung des Issues", [], null, "https://github.com/test/repo/issues/42");
+        var aufgabe = await _aufgabeService.CreateFromIssueAsync(_projektId, issue);
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        var issueFilePath = Path.Combine(expectedClonePath, "issue.md");
+        File.Exists(issueFilePath).Should().BeTrue();
+        var content = await File.ReadAllTextAsync(issueFilePath);
+        content.Should().Contain("## Verknüpftes Issue");
+        content.Should().Contain("#42");
+        content.Should().Contain("Anmeldung fehlerhaft");
+
+        // Reihenfolge: Issue-Abschnitt nach Metadaten, vor ## Anforderung
+        var posIssueSection = content.IndexOf("## Verknüpftes Issue", StringComparison.Ordinal);
+        var posAnforderung = content.IndexOf("## Anforderung", StringComparison.Ordinal);
+        posIssueSection.Should().BeLessThan(posAnforderung);
+
+        DeleteDirectoryIfExists(uniqueBase);
+    }
+
+    /// <summary>CreateIssueFileAsync lässt den Issue-Abschnitt weg wenn IssueReferenz null ist.</summary>
+    [Fact]
+    public async Task CreateIssueFileAsync_ShouldNotIncludeIssueReference_WhenIssueReferenzIsNull()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Issue", "Normale Beschreibung");
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        var issueFilePath = Path.Combine(expectedClonePath, "issue.md");
+        File.Exists(issueFilePath).Should().BeTrue();
+        var content = await File.ReadAllTextAsync(issueFilePath);
+        content.Should().NotContain("## Verknüpftes Issue");
+        content.Should().Contain("## Anforderung");
+
+        DeleteDirectoryIfExists(uniqueBase);
+    }
+
+    /// <summary>CreateIssueFileAsync lässt den Issue-Abschnitt weg wenn IssueReferenz gesetzt ist, aber IssueNummer null ist.</summary>
+    [Fact]
+    public async Task CreateIssueFileAsync_ShouldNotIncludeIssueReference_WhenIssueNummerIsNull()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Aufgabe ohne Nummer", "Beschreibung ohne Nummer");
+        _db.IssueReferenzen.Add(new IssueReferenz
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabe.Id,
+            IssueNummer = null,
+            Titel = "Issue ohne Nummer",
+            LabelsJson = "[]"
+        });
+        await _db.SaveChangesAsync();
+
+        var uniqueBase = SetupCloneWithDirectoryCreation();
+        var expectedClonePath = Path.Combine(uniqueBase, "softwareschmiede", aufgabe.Id.ToString());
+
+        // Act
+        await _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        var issueFilePath = Path.Combine(expectedClonePath, "issue.md");
+        File.Exists(issueFilePath).Should().BeTrue();
+        var content = await File.ReadAllTextAsync(issueFilePath);
+        content.Should().NotContain("## Verknüpftes Issue");
+        content.Should().Contain("## Anforderung");
+
+        DeleteDirectoryIfExists(uniqueBase);
+    }
+
     /// <summary>UpdateGitignoreAsync erstellt eine neue .gitignore mit dem Eintrag issue.md wenn keine existiert.</summary>
     [Fact]
     public async Task UpdateGitignoreAsync_ShouldCreateGitignore_WhenFileDoesNotExist()
@@ -931,24 +965,10 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     public async Task ProzessStartenAsync_ShouldWriteIssueFileAndGitignoreIntoWorkingDirectory_WhenWorkingDirectoryConfigured()
     {
         // Arrange
-        var repository = new GitRepository
-        {
-            Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            PluginTyp = "Softwareschmiede.GitHub",
-            RepositoryUrl = "https://github.com/test/repo-issuefile-workdir",
-            RepositoryName = "repo-issuefile-workdir",
-            Aktiv = true
-        };
-        repository.StartKonfiguration = new RepositoryStartKonfiguration
-        {
-            Id = Guid.NewGuid(),
-            WorkingDirectoryRelativePath = "backend",
-            Aktiv = true,
-            GitRepository = repository
-        };
-        _db.GitRepositories.Add(repository);
-        await _db.SaveChangesAsync();
+        var repository = await CreateTestRepositoryAsync(
+            "https://github.com/test/repo-issuefile-workdir",
+            "repo-issuefile-workdir",
+            new RepositoryStartKonfiguration { Id = Guid.NewGuid(), WorkingDirectoryRelativePath = "backend", Aktiv = true });
 
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Issue-Datei im Arbeitsverzeichnis", "Beschreibung", repository.Id);
         var uniqueBase = SetupCloneWithDirectoryCreation();

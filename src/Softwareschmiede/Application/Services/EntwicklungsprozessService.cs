@@ -235,13 +235,9 @@ public sealed class EntwicklungsprozessService
     {
         _logger.LogInformation("Commit für Aufgabe {AufgabeId} durchführen.", aufgabeId);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var aufgabe = await GetAufgabeMitKlonPfadAsync(aufgabeId, ct);
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
-
-        await _gitPlugin.CommitAsync(aufgabe.LokalerKlonPfad, message, ct);
+        await _gitPlugin.CommitAsync(aufgabe.LokalerKlonPfad!, message, ct);
 
         await _protokollService.AddEintragAsync(
             aufgabeId,
@@ -261,13 +257,9 @@ public sealed class EntwicklungsprozessService
     {
         _logger.LogInformation("Reset ({ResetType}) für Aufgabe {AufgabeId} durchführen.", resetType, aufgabeId);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var aufgabe = await GetAufgabeMitKlonPfadAsync(aufgabeId, ct);
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
-
-        await _gitPlugin.ResetAsync(aufgabe.LokalerKlonPfad, resetType, targetRef, ct);
+        await _gitPlugin.ResetAsync(aufgabe.LokalerKlonPfad!, resetType, targetRef, ct);
 
         var ziel = targetRef ?? "HEAD";
         await _protokollService.AddEintragAsync(
@@ -284,16 +276,12 @@ public sealed class EntwicklungsprozessService
     {
         _logger.LogInformation("Push für Aufgabe {AufgabeId} durchführen.", aufgabeId);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
-
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+        var aufgabe = await GetAufgabeMitKlonPfadAsync(aufgabeId, ct);
 
         if (string.IsNullOrEmpty(aufgabe.BranchName))
             throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen Branch-Namen.");
 
-        await _gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad, aufgabe.BranchName, ct);
+        await _gitPlugin.PushBranchAsync(aufgabe.LokalerKlonPfad!, aufgabe.BranchName, ct);
 
         await _protokollService.AddEintragAsync(
             aufgabeId,
@@ -309,13 +297,9 @@ public sealed class EntwicklungsprozessService
     {
         _logger.LogInformation("Pull für Aufgabe {AufgabeId} durchführen.", aufgabeId);
 
-        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
-            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        var aufgabe = await GetAufgabeMitKlonPfadAsync(aufgabeId, ct);
 
-        if (string.IsNullOrEmpty(aufgabe.LokalerKlonPfad))
-            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
-
-        await _gitPlugin.PullAsync(aufgabe.LokalerKlonPfad, ct);
+        await _gitPlugin.PullAsync(aufgabe.LokalerKlonPfad!, ct);
 
         await _protokollService.AddEintragAsync(
             aufgabeId,
@@ -709,6 +693,17 @@ public sealed class EntwicklungsprozessService
             $"Aufgabe {aufgabe.Id}: kein eindeutiges Repository für den Startkontext ermittelbar.");
     }
 
+    private async Task<Aufgabe> GetAufgabeMitKlonPfadAsync(Guid aufgabeId, CancellationToken ct)
+    {
+        var aufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+
+        if (string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
+            throw new InvalidOperationException($"Aufgabe {aufgabeId} hat keinen lokalen Klonpfad.");
+
+        return aufgabe;
+    }
+
     private static string ErstelleTaskBranchName(Aufgabe aufgabe)
     {
         var titelSlug = ErstelleTitelSlug(aufgabe.Titel);
@@ -749,17 +744,34 @@ public sealed class EntwicklungsprozessService
                 ? "[Keine Anforderungsbeschreibung verfügbar]"
                 : aufgabe.AnforderungsBeschreibung;
 
-            var inhalt = $"""
+            var metaDaten = $"""
                 # Aufgabe: {aufgabe.Titel}
 
                 **Aufgaben-ID:** {aufgabe.Id}
                 **Branch:** {branchName}
                 **Erstellt:** {aufgabe.ErstellungsDatum:yyyy-MM-dd}
+                """;
+
+            var issueAbschnitt = aufgabe.IssueReferenz is { IssueNummer: > 0 } referenz
+                ? $"""
+
+
+                    ## Verknüpftes Issue
+
+                    **Kennung:** #{referenz.IssueNummer}
+                    **Titel:** {referenz.Titel}
+                    """
+                : string.Empty;
+
+            var anforderungsAbschnitt = $"""
+
 
                 ## Anforderung
 
                 {beschreibung}
                 """;
+
+            var inhalt = metaDaten + issueAbschnitt + anforderungsAbschnitt;
 
             var effektivesVerzeichnis = EnsureEffectiveWorkingDirectory(lokalerKlonPfad, startKonfiguration);
 
