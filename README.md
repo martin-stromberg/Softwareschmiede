@@ -1,897 +1,187 @@
 # 🔨 Softwareschmiede
 
-> **KI-gestützter Softwareentwicklungs-Workflow — lokal, strukturiert und erweiterbar**
+> KI-gestützter Softwareentwicklungs-Workflow als lokale Windows-Desktopanwendung.
 
-[![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![WPF](https://img.shields.io/badge/WPF-Desktop-512BD4?logo=dotnet)](https://learn.microsoft.com/dotnet/desktop/wpf/)
-[![SQLite](https://img.shields.io/badge/SQLite-EF%20Core-003B57?logo=sqlite)](https://www.sqlite.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
-[![Release](https://img.shields.io/github/actions/workflow/status/martin-stromberg/Softwareschmiede/release.yml?label=Release)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](#-lizenz)
+[![Pre-Release](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/staging-ci.yml/badge.svg)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/staging-ci.yml)
+[![Release](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml/badge.svg)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[![Release & Publish](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml/badge.svg)](https://github.com/martin-stromberg/Softwareschmiede/actions/workflows/release.yml)
+Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows und KI-CLI-Ausführung in einer nativen WPF-Anwendung. Die Oberfläche läuft lokal unter Windows, speichert Arbeitsdaten in SQLite und lädt SCM-, KI- und IDE-Plugins zur Laufzeit aus dem `plugins/`-Verzeichnis.
 
----
+## Überblick
 
-## Inhaltsverzeichnis
+- **UI:** WPF auf `.NET 10` (`src/Softwareschmiede.App`)
+- **Kernlogik:** Application/Domain/Infrastructure in `src/Softwareschmiede`
+- **Persistenz:** SQLite via EF Core
+- **Logging:** Serilog (Konsole + Rolling File)
+- **Plugin-Modell:** GitHub, BitBucket, Local Directory, GitHub Copilot, Claude CLI, Codex, Devin
+- **Tests:** xUnit, FluentAssertions, Moq, FlaUI-E2E
 
-1. [Projektbeschreibung](#-projektbeschreibung)
-2. [Features](#-features)
-3. [UI-Status](#-ui-status)
-4. [Voraussetzungen](#-voraussetzungen)
-5. [Installation](#-installation)
-6. [Usage](#-usage)
-7. [Konfiguration & Plugin-Setup](#-konfiguration--plugin-setup)
-8. [Projektstruktur](#-projektstruktur)
-9. [Architektur](#-architektur)
-10. [Tests](#-tests)
-11. [Deployment](#-deployment)
-12. [Changelog](#-changelog)
-13. [Dokumentation](#-dokumentation)
-14. [Beitragen](#-beitragen)
-15. [Lizenz](#-lizenz)
-16. [Kontakt](#-kontakt)
+## Kernfunktionen
 
----
+- **Projekt- und Aufgabenverwaltung** mit lokalem Aufgabenstatus, Protokollierung und To-Do-Listen
+- **Plugin-basierte SCM-Integration** für GitHub, BitBucket und lokale Arbeitsverzeichnisse
+- **Plugin-basierte KI-Ausführung** über eingebettete CLI-Sitzungen mit ConPTY
+- **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
+- **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
+- **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Monitoring
+- **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
+- **Programmupdate aus der Anwendung** gegen GitHub-Releases
 
-## 📖 Projektbeschreibung
+## CLI-Rohausgabe exportieren
 
-**Softwareschmiede** ist eine **Einzelnutzer-Anwendung**, die den vollständigen Workflow der **KI-gestützten Softwareentwicklung** in einer einheitlichen Oberfläche verwaltet.
+Die Aufgabendetailansicht kann die protokollierte CLI-Rohausgabe als Datei exportieren:
 
-Die Anwendung läuft vollständig **lokal unter Windows**, erfordert **keinen Login** und verbindet Projektmanagement, Git-Integration, Aufgabenverwaltung und KI-Steuerung an einem zentralen Ort.
+- In der Ribbon-Gruppe **CLI** gibt es den Button **„Rohausgabe exportieren“**.
+- Der Dialogtitel lautet **„CLI-Rohausgabe exportieren“**.
+- Als Vorschlagsname wird `cli-output-{AufgabeId}.raw` verwendet.
+- Exportiert werden ausschließlich persistierte Protokolleinträge vom Typ `ProtokollTyp.CliOutput`.
+- Die Reihenfolge der exportierten Zeilen entspricht der chronologischen Protokollreihenfolge.
+- Das Ziel muss auf `.raw` enden; bei Dialog-Abbruch wird keine Datei geschrieben.
 
-Die Oberfläche ist eine native **WPF-Desktopanwendung** (`src/Softwareschmiede.App`, .NET 10+). 
+Die Implementierung liegt in `TaskDetailViewModel`, `CliRawExportService`, `IDialogService` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TaskDetailViewModelTests_CliRawExport`, `TaskDetailViewTests` und `E2E_CliRawExport`.
 
-### Geschäftsziele
+## Voraussetzungen
 
-| # | Ziel |
-|---|------|
-| Z-1 | Verwaltung mehrerer Softwareprojekte an einem zentralen Ort |
-| Z-2 | Strukturierte Erfassung von Anforderungen je Aufgabe |
-| Z-3 | Automatisierte Umsetzung von Anforderungen durch KI-Plugins |
-| Z-4 | Nachvollziehbarer Verlauf jeder KI-gesteuerten Entwicklungsaufgabe |
-| Z-5 | Erweiterbarkeit für weitere Git-Provider und KI-Systeme ohne Kernänderungen |
+| Komponente | Requirement | Hinweis |
+|------------|-------------|---------|
+| Windows | 10 (Build 17763+) oder 11 | Pflicht für WPF, Windows Credential Store und ConPTY |
+| .NET SDK | 10.0+ | benötigt für Build und Test |
+| Git | aktuell | für Repository-Workflows |
+| GitHub CLI (`gh`) | aktuell | für GitHub-Operationen und Releases |
+| Copilot CLI (`copilot`) | optional | für `Softwareschmiede.Plugin.GitHubCopilot` |
+| Claude CLI (`claude`) | optional | für `Softwareschmiede.Plugin.ClaudeCli` |
+| Codex CLI (`codex`) | optional | für `Softwareschmiede.Plugin.Codex` |
+| Devin CLI (`devin`) | optional | für `Softwareschmiede.Plugin.Devin` |
+| Visual Studio Code (`code`) | optional | IDE-Fallback |
 
----
-
-## 🚀 Features
-
-Softwareschmiede bündelt den kompletten Workflow der KI-gestützten Softwareentwicklung – von der Aufgabenerfassung über den Git-Workflow bis zum fertigen Pull Request – in einer einzigen, lokal laufenden Windows-Anwendung.
-
-Die wichtigsten Features:
-
-- **Projekt- und Aufgabenverwaltung** – Dashboard, getrenntes Aufgaben-/KI-Ausführungsstatusmodell und chronologisches Aufgabenprotokoll
-- **To-Do-Listen für Aufgaben** – Strukturierung von Aufgaben mit To-Do-Elementen, Abhak-Status und Blockierung des Aufgabenabschlusses bei offenen To-Dos; Badge zeigt Anzahl offener To-Dos im Ribbon, aktive Aufgaben im Menü zeigen `0/1/n Todos` und öffnen per Klick einen read-only Dialog mit den offenen To-Dos
-- **Plugin-basierte Git-Integration** – GitHub, BitBucket und lokales Verzeichnis als austauschbare SCM-Provider
-- **Plugin-basierte KI-Steuerung** – GitHub Copilot, Claude CLI, Codex CLI und Devin CLI mit Echtzeit-Streaming der Ausgabe
-- **Plugin-basierte IDE-Integration** – Automatische Erkennung und Auswahl der passenden Entwicklungsumgebung (Visual Studio bei `.sln`/`.slnx`-Dateien, Visual Studio Code als Fallback); konfigurierbare Aktivierung und Priorisierung in den Einstellungen; Split-Button-Muster für direkte Öffnung oder Auswahl-Dialog bei mehreren Einstiegspunkten
-- **Plugin-Aktivierungsverwaltung** – Individuelles Aktivieren/Deaktivieren von SCM-, KI- und IDE-Plugins; deaktivierte Plugins werden aus allen Auswahlfeldern gefiltert; bei einem aktiven Plugin je Kategorie wird die Auswahl automatisch verwendet
-- **ConPTY-Terminal-Integration** – interaktive KI-CLI-Prozesse direkt eingebettet in der Aufgabendetailansicht, inklusive scrollbarer Ausgabe mit Scrollback, Scrollbar/Mausrad und Auto-Follow am Ende; unterstützt robuste Clipboard-Pastes langer mehrzeiliger Inhalte, Alt Gr-Sonderzeichen (z. B. auf deutschem Tastaturlayout: @, {, }, |, ~) und wortweise Cursor-Navigation mit Ctrl+Pfeiltasten
-- **Dateiexplorer mit Diff-Ansicht** – Arbeitsbaum- und commitbezogene Vergleichsansicht geänderter Dateien
-- **Dateisystem-Integration im Ribbon** – Buttons zur direkten Öffnung des Arbeitsverzeichnisses im OS-Dateiexplorer und zum Öffnen von Visual-Studio-Solutions (mit Auswahl-Dialog bei mehreren `.sln`-Dateien); beide Aktionen berücksichtigen konfigurierte Arbeitsverzeichnis-Unterverzeichnisse (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`) und arbeiten damit in Mono-Repos mit räumlich getrennten Subprojekten zuverlässig
-- **Issue-Anlage aus der Aufgabendetailansicht** – neue Issues mit optionalem Provider-Template und KI-Ausfüllhilfe erstellen, anschließend der Aufgabe zuordnen und optional die Aufgabenbeschreibung aktualisieren
-- **GitHub-Code-Scanning-Alerts als Anforderungen** – offene GitHub-Code-Scanning-Alerts erscheinen neben Issues in den offenen Anforderungen und können automatisch in eine Aufgabe mit neu angelegtem GitHub-Issue überführt werden
-- **Pull Requests als Aufgaben** – offene GitHub- und Bitbucket-Pull-Requests erscheinen neben Issues in den offenen Anforderungen und können als Review-Aufgabe angelegt werden; beim Start wird der PR-Quellbranch ausgecheckt statt ein neuer Task-Branch erzeugt
-- **Aufgabenspezifische Branches & Pull Requests** – automatische Branch-Namensbildung, Commit-Verwaltung, PR-Erstellung inkl. Issue-Verknüpfung, persistenter PR-Referenz und GitHub-Actions-Status; konfigurierbarer Basis-Branch pro Repository für Feature-Branch-Erstellung und PR-Ziele
-- **Basis-Branch-Konfiguration** – Repositories können einen konfigurierbaren Basis-Branch speichern, von dem neue Feature-Branches für Aufgaben abgezweigt werden; konfiguriert in Repository-Details, validiert beim Aufgabenstart, als Ziel-Branch für Pull Requests genutzt
-- **PR-Monitoring & automatischer GitHub-Abschluss** – neuer PR-Bereich in Aufgaben mit PR-, Merge-/Monitoring- und Workflow-Run-Status; optionaler automatischer Abschluss nach erfolgreichen Actions
-- **Folgeanweisungen mit Kontextsteuerung** – Kontext mitgeben, ignorieren oder neu beginnen
-- **Autonome Aufgaben (Projektleiter-Agent)** – vollautomatisierte Projektentwicklung: ein Projektleiter-Agent zerlegt die Aufgabe in Teilaufgaben, erzeugt und steuert Unteragenten in eigenen Branches/Klonen mit Governance-Grenzen und bereitet Pull Requests vor; Initialisierungsdialog mit auswählbarem Projektbranch (Dropdown der Remote-Branches mit „+"-Button zur Branch-Neuanlage, Fallback auf freie Texteingabe), auswählbarer Promptvorlage für den Initialprompt, Token-Budget/Laufzeitlimit/Persistenz-Modus/Skill-Autogeneration und Hilfe-Button mit Ablauferklärung; nach erfolgreicher Initialisierung neue Registerkarte „Automatisierung" in der Aufgabendetailansicht mit Tabs für Konfiguration/Plan/Fortschritt/Governance/Skills/Unteragenten, sowie Start-/Stop-/Resume-Buttons ausschließlich im Ribbon-Menü (reguläre Aufgaben-Ribbon-Buttons werden dafür ausgeblendet); „Start" startet einen echten KI-CLI-Prozess und sendet den Initialprompt automatisch an die Session, „Stop" merkt sich einen expliziten Stopp dauerhaft; nicht explizit gestoppte Autonome Aufgaben werden bei einem Programmneustart automatisch mit Weitermachen-Prompt (und Session-Fortsetzung, sofern vom Plugin unterstützt) fortgesetzt; **Feature-Flag „Autonome Aufgaben aktivieren"** in den Einstellungen (Registerkarte „Allgemein", Standard: aktiviert, konfigurierbar über `AutonomAufgaben:Enabled`/`AutonomAufgaben__Enabled`) steuert zentral, ob autonome Aufgaben grundsätzlich verfügbar sind — bei Deaktivierung öffnet „Autonome Aufgabe starten" keinen Dialog mehr und bereits initialisierte Aufgaben blenden die Registerkarte „Automatisierung" aus, während das einfache Starten einer Aufgabe mit direkter CLI-Ausführung unverändert nutzbar bleibt
-- **Repository-Startskripte mit automatischer Portzuweisung** – für lokale Debug-/Run-Konfigurationen je verknüpftem Repository
-- **Repository-Initialisierungsskripte** – Pro Projekt kann ein optionales Skript konfiguriert werden, das nach dem Klonen eines Repositorys automatisch ausgeführt wird (z. B. Git-Hooks, Build-Tools, Umgebungsvariablen-Setup); die Auswahl-ComboBox filtert die Vorschlagsliste live beim Tippen; die Vorschlagsliste wird aus dem konfigurierten Basis-Branch geladen (falls gesetzt), sonst aus dem Remote-Standard-Branch; Fehler werden geloggt, blockieren aber nicht die Aufgabe
-- **Benachrichtigungssystem** – konfigurierbare Toast- und Tonbenachrichtigungen bei abgeschlossenen KI-Läufen (Toast-Banner benötigen für volle Sichtbarkeit eine MSIX-Paketierung und erscheinen bei der Standardauslieferung per `dotnet publish`/`release.zip` ggf. nicht; Ton funktioniert auch unpaketiert zuverlässig)
-- **Programmupdate** – Update-Prüfung gegen GitHub-Releases direkt aus der Anwendung
-
-Details zu den einzelnen Bereichen finden Sie in der [Anwendungsdokumentation](docs/help/index.md).
-
----
-
-## 📸 UI-Status
-
-Aktuell ist kein versionierter Screenshot im Repository abgelegt.  
-Die wichtigsten UI-Abläufe sind in der [Anwendungsdokumentation](docs/help/index.md) beschrieben.
-
----
-
-## ✅ Voraussetzungen
-
-| Voraussetzung | Version | Hinweis |
-|---------------|---------|---------|
-| **Windows** | 10 (Build 17763+) / 11 | Pflicht – Windows Credential Store, WPF und Pseudo Console API (ConPTY) werden benötigt |
-| **.NET SDK** | 10.0+ | [dotnet.microsoft.com](https://dotnet.microsoft.com/download) – WPF-Projekt (`net10.0-windows10.0.17763.0`) erfordert Windows-SDK und Zielversion mindestens Build 17763 |
-| **GitHub CLI** (`gh`) | aktuell | [cli.github.com](https://cli.github.com/) – für GitHub-Operationen, Issue-Erstellung und Code-Scanning-Alert-Abruf |
-| **Git** | aktuell | [git-scm.com](https://git-scm.com/) |
-| **Copilot CLI** (`copilot`) | aktuell | Optional – benötigt für das GitHub-Copilot-Plugin (`copilot --version`) |
-| **Claude CLI** (`claude`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.ClaudeCli` (`claude --version`) |
-| **Codex CLI** (`codex`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.Codex` (`codex --version`) |
-| **Devin CLI** (`devin`) | aktuell | Optional – benötigt für `Softwareschmiede.Plugin.Devin` (`devin --version`); Anmeldung erfolgt über die CLI |
-| **Visual Studio Code** (`code`) | aktuell | Optional – nur für den aktivierbaren IDE-Fallback, wenn im Aufgaben-Arbeitsverzeichnis keine `.sln`-Datei gefunden wird |
-| **GitHub Copilot** | aktives Abo | Optional – nur für Copilot-basierte KI-Läufe |
-| **Anthropic API Key** | vorhanden | Optional – nur für Claude-CLI-Läufe (Credential `Softwareschmiede.ClaudeCli.Token`) |
-
-> Für den Aufgabenstart ist ein **KI-Plugin Pflicht**.
-
-**CLI-Tools prüfen/einrichten:**
-
-```powershell
-# GitHub CLI installieren (z. B. via winget)
-winget install --id GitHub.cli
-
-# Authentifizieren
-gh auth login
-
-# Copilot-CLI prüfen
-copilot --version
-
-# Claude-CLI prüfen
-claude --version
-
-# Devin-CLI prüfen und anmelden
-devin --version
-devin auth login
-```
-
----
-
-## 🛠️ Installation
-
-### 1. Repository klonen
+## Schnellstart
 
 ```powershell
 git clone https://github.com/martin-stromberg/Softwareschmiede.git
 cd Softwareschmiede
-```
 
-### 2. Abhängigkeiten wiederherstellen & bauen
-
-```powershell
-dotnet restore
-dotnet build src/Softwareschmiede.App/Softwareschmiede.App.csproj
-```
-
-Beim Build werden die Plugin-DLLs automatisch nach `bin/<Config>/plugins/` kopiert (MSBuild-Target `CopyPluginsToOutput`).
-
-### 3. Anwendung starten
-
-```powershell
+dotnet restore Softwareschmiede.slnx
+dotnet build src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Debug
 dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj
 ```
 
-Das WPF-Fenster öffnet sich direkt als native Windows-Anwendung.
+Beim Build kopiert `CopyPluginsToOutput` die Plugin-DLLs nach `bin/<Configuration>/plugins/`.
 
-### 4. Erste Schritte
+## Typischer Ablauf
 
-1. **GitHub-Token einrichten** – Credential Manager öffnen und Token speichern (siehe [Konfiguration](#-konfiguration--plugin-setup))
-2. **Optional: Claude-Token einrichten** – Anthropic API Key als Credential speichern (`Softwareschmiede.ClaudeCli.Token`)
-3. **Projekt anlegen** – Auf der Seite *Projekte* ein neues Projekt erstellen und ein SCM-Plugin wählen
-4. **Aufgabe anlegen** – Issue oder GitHub-Code-Scanning-Alert aus dem Repository wählen oder freie Anforderung erfassen
-5. **KI-Plugin wählen (Pflicht)** – Copilot, Claude CLI, Codex CLI oder Devin CLI auswählen (explizit oder via Standardplugin/Fallback)
-6. **KI-Lauf starten** – Prompt eingeben und den Prozess starten
+1. Projekt anlegen und ein SCM-Plugin bzw. Repository zuordnen.
+2. Aufgabe anlegen oder aus externen Quellen übernehmen.
+3. KI-Plugin auswählen und den Entwicklungsprozess starten.
+4. CLI-Ausgabe in der Aufgabendetailansicht verfolgen.
+5. Optional über **„Rohausgabe exportieren“** die bisherige CLI-Ausgabe als `*.raw` sichern.
+6. Änderungen prüfen, To-Dos abschließen und optional einen Pull Request erstellen.
 
----
+## Konfiguration
 
-## 🖥️ Usage
+### Zugangsdaten
 
-### Typischer Ablauf in der Anwendung
+Tokens werden nicht in Dateien gespeichert, sondern über den **Windows Credential Store** gelesen.
 
-1. **Projekt erstellen oder öffnen** und ein Repository verknüpfen.
-2. **Aufgabe anlegen** (frei, aus GitHub-Issue, aus einem offenen Pull Request oder aus einem GitHub-Code-Scanning-Alert).
-   Beim Auswählen eines Alerts erstellt Softwareschmiede automatisch ein GitHub-Issue und speichert die Alert-Herkunft lokal, damit derselbe Alert nicht erneut angeboten wird.
-   Beim Auswählen eines Pull Requests speichert Softwareschmiede den PR als Review-Quelle; der spätere Start arbeitet direkt auf dessen Quellbranch.
-   **Optional:** To-Do-Liste anlegen und verwalten (Aufgabe gliedern, Fortschritt verfolgen, Abhak-Status ändern).
-3. **Optional ein Issue aus der Aufgabendetailansicht anlegen** (Beschreibung bearbeiten, Provider-Template und KI-Ausfüllhilfe nutzen, das erfolgreiche Ergebnis automatisch der Aufgabe zuordnen und bei Bedarf die Aufgabenbeschreibung aktualisieren).
-4. **Entwicklungsprozess starten** (lokaler Klon + Aufgaben-Branch; während der Repository-Vorbereitung zeigt die Fußzeile `Bereit Repository vor...`; bei Issue mit issuebezogenem Branchnamen; optionales Repository-Startskript mit freiem Port wird ausgeführt; KI-Plugin wird über Default/Fallback aufgelöst).
-5. **KI-Lauf ausführen** (Prompt + **KI-Plugin Pflicht**; Standardplugin ist vorausgewählt). Die eingebettete CLI-Konsole zeigt laufende Ausgabe mit vertikaler Scrollbar, Mausrad/Page-/Line-Scroll, 1000-Zeilen-Scrollback und Auto-Follow, solange Sie am Ende der Ausgabe bleiben.
-6. **Ergebnis prüfen**, optional weitere Folge-Prompts senden. Wird die KI-Ausführung gestoppt oder beendet sie sich selbst, bleibt die Aufgabe offen und wird beim erneuten Öffnen nicht automatisch neu gestartet; ein weiterer Lauf erfolgt explizit über **Starten**.
-7. **Commits durchführen**, To-Dos abhaken (falls vorhanden), Aufgabe abschließen und bei Remote-SCM optional einen Pull Request aus der Aufgabendetailansicht erstellen. 
-   **Hinweis:** Aufgaben mit noch offenen To-Dos können nicht abgeschlossen werden — das System blockiert den Abschluss und zeigt die Anzahl offener To-Dos an. 
-   Aktive oder wartende Aufgaben zeigen in Seitenleiste und Dashboard zusätzlich ein anklickbares Todo-Label (`0 Todos`, `1 Todo`, `n Todos`). Der Klick öffnet einen modalen read-only Dialog mit den offenen To-Dos der Aufgabe; bei `0` offenen To-Dos erscheint ein klarer Leerzustand.
-   Bei Aufgaben aus GitHub-Issues ergaenzt der PR-Body automatisch `Closes #<Issue>`, damit GitHub das Issue beim Merge schliesst.
-8. **Pull Request beobachten**. Erstellte GitHub-PRs werden dauerhaft an der Aufgabe gespeichert und im Bereich `PR` mit Status, Merge-/Monitoring-Phase, letzter Prüfung und zugehörigen GitHub-Actions-/Workflow-Runs angezeigt. Je nach GitHub-Plugin-Einstellung kann Softwareschmiede nach erfolgreichen Pre-Merge-Actions einen Abschlussversuch ausführen und anschließend zuordenbare Post-Merge-Actions weiter überwachen. Blockaden durch Berechtigungen, Branch Protection oder GitHub-Fehler werden im PR-Bereich sichtbar.
-9. **Alternativ Aufgabe abbrechen**, wenn der Entwicklungsprozess nicht fortgesetzt werden soll.
+| Schlüssel | Zweck |
+|-----------|-------|
+| `Softwareschmiede.GitHub.Token` | GitHub Personal Access Token |
+| `Softwareschmiede.ClaudeCli.Token` | Anthropic API Key für Claude CLI |
+| `Softwareschmiede.Codex.ExecutablePath` | Optionaler absoluter Pfad zur Codex-CLI |
+| `Softwareschmiede.Codex.CommandLineParameters` | Zusätzliche Codex-CLI-Argumente |
+| `Softwareschmiede.Devin.ExecutablePath` | Optionaler absoluter Pfad zur Devin-CLI |
+| `Softwareschmiede.Devin.CommandLineParameters` | Zusätzliche Devin-CLI-Argumente |
 
-### `start.ps1` für Visual-Studio-Debug (freier HTTP-Port)
-
-- Skript: `.\start.ps1` im Repository-Root ausführen, danach F5 in Visual Studio starten.
-- Das Skript sucht automatisch alle `Properties/launchSettings.json`-Dateien im Repository (außer unter `.git`, `bin`, `obj`, `TestResults`, `node_modules`) und weist jedem gefundenen Projekt automatisch einen freien, eindeutigen HTTP-Port zu. Es gibt **keinen** `-Port`-Parameter und **keine** Umgebungsvariablen-Steuerung — die Portvergabe erfolgt ausschließlich automatisch.
-- Exit-Codes: `0` (Erfolg), `10` (kein launchSettings.json gefunden), `11` (JSON/Profil ungültig), `12` (Port ungültig/nicht verfügbar), `13` (Schreibfehler), `99` (unerwarteter Fehler).
-
-Weiterführende Bedienungshinweise (Arbeitsverzeichnis-Konfiguration für Repository-Startskripte und Ribbon-Aktionen, LocalDirectoryPlugin-Workspace-Modi, KI-Plugin-Auswahl und Standardplugins, Folgeanweisungen mit Kontextsteuerung, Benachrichtigungssystem u. a.) finden Sie in der [Anwendungsdokumentation](docs/help/index.md).
-
-### IDE öffnen mit Plugin-Auswahl und Split-Button-Muster
-
-Die Aktion **IDE öffnen** in der Aufgabendetailansicht nutzt ein erweiterbares IDE-Plugin-System zur automatischen Auswahl der passenden Entwicklungsumgebung mit flexiblem Split-Button-Pattern für mehrere Einstiegspunkte:
-
-**IDE-Plugin-Auswahl (dreistufiger Prozess):**
-1. Das System fragt alle aktivierten IDE-Plugins der Reihe nach ab, ob sie mit dem Repository kompatibel sind
-2. Priorität: Plugins mit expliziter Kompatibilität (z. B. Visual Studio bei `.sln`/`.slnx`-Dateien) werden bevorzugt
-3. Fallback: Ist kein Plugin explizit kompatibel, wird das erste verfügbare Fallback-Plugin verwendet (z. B. Visual Studio Code)
-4. Default: Ist kein Plugin kompatibel, wird das erste registrierte Plugin verwendet
-
-**Split-Button-Muster (UI-Flexibilität bei mehreren Einstiegspunkten):**
-
-Der IDE-öffnen-Button in der Aufgabendetailansicht (Ribbon) wird als Split-Button mit zwei Teilen dargestellt:
-
-- **Haupt-Button:** 
-  - Öffnet immer **direkt** den **ersten (priorisierten) Einstiegspunkt** ohne Dialog
-  - Schnell und unkompliziert für den Standard-Anwendungsfall (1 IDE-Plugin, 1 Einstiegspunkt)
-  - Verhalten identisch mit dem bisherigen Single-Button
-  - Beispiel: Visual Studio öffnet direkt die erste gefundene `.sln`-Datei
-
-- **Dropdown-Button** (nur sichtbar bei ≥2 aggregierten Einstiegspunkten):
-  - Zeigt **nicht nur** die Einstiegspunkte des einen priorisierten Plugins, sondern aggregiert die Einstiegspunkte **aller aktivierten, kompatiblen IDE-Plugins** (sowohl explizit als auch als Fallback kompatibel). Beispiel: Liegt eine `.sln`-Datei vor, sind sowohl Visual Studio (explizit kompatibel) als auch Visual Studio Code (Fallback) gemeinsam im Dropdown wählbar — nicht nur das eine, für den Haupt-Button priorisierte Plugin.
-  - Die Einträge sind zunächst nach Kompatibilität sortiert (alle Explicit-Plugins vor allen Fallback-Plugins) und innerhalb dessen in der konfigurierten Plugin-Reihenfolge.
-  - Klick zeigt einen **Auswahl-Dialog** mit allen verfügbaren Einstiegspunkten, plugin-qualifiziert beschriftet (z. B. „Visual Studio: MyProject.sln", „Visual Studio Code"), damit bei mehreren Plugins erkennbar bleibt, welcher Eintrag zu welcher IDE gehört
-  - Benutzer kann gezielt einen spezifischen Einstiegspunkt wählen (z. B. `backend.sln`, `frontend.sln`, `shared.sln`, oder plugin-übergreifend „Visual Studio Code")
-  - Nach Auswahl öffnet das jeweils zugehörige Plugin den gewählten Einstiegspunkt
-  - Abbruch: Dialog wird geschlossen, nichts wird geöffnet
-
-**Integrierte IDE-Plugins:**
-- **Visual Studio IDE-Plugin** — Prüft auf `.sln` oder `.slnx`-Dateien im Arbeitsverzeichnis; meldet explizite Kompatibilität bei Fund, öffnet die Solution(en) über den Betriebssystem-Standardhandler. Bei mehreren Dateien tragen alle zur aggregierten Einstiegspunkt-Liste des Dropdown-Buttons bei.
-- **Visual Studio Code IDE-Plugin** — Meldet sich immer als Fallback zur Verfügung; öffnet das Arbeitsverzeichnis über den `code`-Befehl. Liefert selbst stets nur einen einzigen Einstiegspunkt, trägt aber ebenfalls zur aggregierten Gesamtanzahl bei — in Kombination mit einem weiteren kompatiblen Plugin (z. B. Visual Studio bei vorhandener `.sln`) kann bereits dieser eine zusätzliche Einstiegspunkt den Dropdown-Button auslösen (1 VS-Solution + 1 VS-Code-Fallback = 2 aggregierte Einstiegspunkte).
-
-**Arbeitsverzeichnis-Auflösung:** Beide Aktionen — Arbeitsverzeichnis öffnen und IDE öffnen — berücksichtigen das konfigurierte Arbeitsunterverzeichnis (`RepositoryStartKonfiguration.WorkingDirectoryRelativePath`). Ist ein Unterverzeichnis konfiguriert (z. B. `src/backend`), wird nur dieses durchsucht und geöffnet, nicht der Repository-Root. Dies ermöglicht zuverlässiges Arbeiten in Mono-Repos, bei denen mehrere räumlich getrennte Subprojekte in verschiedenen Verzeichnissen liegen.
-
-**IDE-Plugin-Verwaltung:** Die Aktivierung und Priorisierung von IDE-Plugins erfolgt über **Einstellungen → Plugins → Integrierte Entwicklungsumgebungen (IDE)**. Hier können Benutzer:
-- Jedes IDE-Plugin unabhängig aktivieren oder deaktivieren (mindestens ein Plugin muss aktiv bleiben)
-- Die Reihenfolge per Up/Down-Buttons anpassen, um die Auswahl-Priorität zu steuern
-- Plugin-spezifische Einstellungen konfigurieren (falls vorhanden)
-
-**ViewModel-Eigenschaften für die Split-Button-Logik:**
-- `KannIdeAuswaehlen` (`bool`, read-only) — Gibt an, ob insgesamt (über alle kompatiblen IDE-Plugins aggregiert) mindestens zwei Einstiegspunkte verfügbar sind; steuert die Sichtbarkeit des Dropdown-Buttons
-- Der Haupt-Button verwendet weiterhin ausschließlich das eine über `PluginSelectionService.ResolveIdePluginAsync` aufgelöste, priorisierte Plugin (unverändertes Verhalten); der Dropdown-Button nutzt zusätzlich `PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync`, um die Einstiegspunkte aller kompatiblen Plugins zu aggregieren
-
----
-
-## ⚙️ Konfiguration & Plugin-Setup
-
-### Plugin-Architektur (kurz)
-
-- **Contracts:** `src/Softwareschmiede.Plugin.Contracts` definiert `IPlugin`, `IGitPlugin`, `IKiPlugin`, `IIdePlugin`, optionale Alert-Verträge wie `IScmAlertProvider`, `PluginType` und `IdePluginCompatibility`
-- **Plugin-Projekte:** liegen als eigenständige Klassenbibliotheken unter `plugins/`
-- **Host-Referenzen:** `src/Softwareschmiede/Softwareschmiede.csproj` referenziert Plugin-Projekte mit `ReferenceOutputAssembly="false"`
-- **Build/Publish-Kopie:** MSBuild-Targets kopieren Plugin-Artefakte nach `$(OutDir)plugins` bzw. `$(PublishDir)plugins`
-- **Discovery zur Laufzeit:** `PluginManager` lädt alle `*.dll` aus `AppContext.BaseDirectory/plugins` und registriert sie nach `PluginType`
-- **Aktuelle KI-Plugins:** `Softwareschmiede.Plugin.GitHubCopilot`, `Softwareschmiede.Plugin.ClaudeCli`, `Softwareschmiede.Plugin.Codex` und `Softwareschmiede.Plugin.Devin`
-- **Integrierte IDE-Plugins:** `VisualStudioIdePlugin` (prüft auf `.sln`/`.slnx`), `VisualStudioCodeIdePlugin` (Fallback)
-
-Die CLI-Plugins starten ihre jeweilige interaktive CLI im Aufgaben-Arbeitsverzeichnis. Laufende Ausgabe und Benutzereingaben werden über die bestehende ConPTY-Terminaloberfläche verarbeitet; beim Devin-Plugin erfolgt die Anmeldung innerhalb der Devin CLI (`devin auth login`).
-
-IDE-Plugins ermitteln ihre Kompatibilität mit einem Repository und werden nach Aktivierungsstatus und Priorisierung automatisch ausgewählt.
-
-### GitHub-Token im Windows Credential Store speichern
-
-Softwareschmiede speichert API-Tokens **ausschließlich im Windows Credential Store** – kein Klartext in Konfigurationsdateien oder der Datenbank.
-
-**Option A – Credential Manager UI:**
-
-1. Startmenü → *Windows-Anmeldeinformationsverwaltung* (Credential Manager) öffnen
-2. *Windows-Anmeldeinformationen* → *Generische Anmeldeinformation hinzufügen*
-3. Felder ausfüllen:
-   - **Internetadresse oder Netzwerkadresse:** `Softwareschmiede.GitHub.Token`
-   - **Benutzername:** *(beliebig, z. B. `github`)*
-   - **Kennwort:** Dein GitHub Personal Access Token (PAT) mit den Scopes `repo`, `read:org` und Zugriff auf Code-Scanning-Alerts des Repositorys
-
-**Option B – Kommandozeile (`cmdkey`):**
+Beispiel für GitHub:
 
 ```powershell
 cmdkey /generic:Softwareschmiede.GitHub.Token /user:github /pass:<DEIN_TOKEN>
 ```
 
-**Token entfernen:**
+### App-Einstellungen
 
-```powershell
-cmdkey /delete:Softwareschmiede.GitHub.Token
-```
+Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im aktuellen Stand sind dort u. a. konfiguriert:
 
-### Credential-Schlüssel (Referenz)
+- `DirectoryStructure:Enabled`
+- `DirectoryStructure:MaxDepth`
+- `DirectoryStructure:CacheDurationSeconds`
+- `AutonomAufgaben:Enabled`
+- `AutonomAufgaben:DefaultTokenBudget`
+- `AutonomAufgaben:DefaultRuntimeLimitMinutes`
+- `AutonomAufgaben:HeartbeatTimeoutSeconds`
+- `AutonomAufgaben:MaxConcurrentUnteragenten`
+- `AutonomAufgaben:SkillAutogenerationEnabled`
+- `AutonomAufgaben:MaxClones`
+- `AutonomAufgaben:MaxFeatureBranches`
 
-| Schlüssel | Inhalt |
-|-----------|--------|
-| `Softwareschmiede.GitHub.Token` | GitHub Personal Access Token |
-| `Softwareschmiede.ClaudeCli.Token` | Anthropic API Key für Claude CLI (`ANTHROPIC_API_KEY`) |
-| `Softwareschmiede.Codex.ExecutablePath` | Optionaler absoluter Pfad zur Codex-CLI |
-| `Softwareschmiede.Codex.CommandLineParameters` | Anwenderdefinierte zusätzliche Codex-CLI-Argumente; keine automatische Default-Übernahme |
-| `Softwareschmiede.Devin.ExecutablePath` | Optionaler absoluter Pfad zur Devin CLI (`devin`); ohne Angabe wird die CLI über `PATH` aufgelöst |
-| `Softwareschmiede.Devin.CommandLineParameters` | Anwenderdefinierte zusätzliche Devin-CLI-Argumente; kein Token/API-Key und keine automatische Default-Übernahme |
+### Datenbank und Logs
 
-Für Devin wird kein Token und kein API-Key in Softwareschmiede gespeichert oder an den Prozess übergeben. Die Authentifizierung erfolgt ausschließlich über `devin auth login` beziehungsweise die weiteren Auth-Befehle der Devin CLI.
+- **Produktive Releases:** `%LocalAppData%\Softwareschmiede\softwareschmiede.db`
+- **RC-/Entwicklungsbuilds:** `{AppContext.BaseDirectory}\softwareschmiede.db`
+- **Test-Override:** `SOFTWARESCHMIEDE_TEST_DB_PATH`
+- **Logs:** `{AppContext.BaseDirectory}\logs\softwareschmiede-<Datum>.log`
 
-### Weitere Plugin-Konfiguration
+### `start.ps1`
 
-Projektbezogene Verknüpfungen werden in der Oberfläche unter *Projekte → Repository verknüpfen* plugin-gesteuert konfiguriert und in der lokalen SQLite-Datenbank gespeichert.  
-Beispiel: Beim GitHub-Plugin sind `RepositoryUrl` und `RepositoryName` Pflichtfelder; beim LocalDirectoryPlugin wird `SourceDirectory` abgefragt.
+`start.ps1` aktualisiert alle `Properties/launchSettings.json`-Dateien im Repository automatisch auf freie lokale HTTP-Ports. Das ist für lokale Debug-Sessions gedacht; das Skript akzeptiert dabei keinen manuellen Portparameter, sondern vergibt Ports selbst.
 
-Für das Claude-CLI-Plugin kann der API-Key alternativ per `cmdkey` gesetzt werden:
+## Projektstruktur
 
-```powershell
-cmdkey /generic:Softwareschmiede.ClaudeCli.Token /user:anthropic /pass:<DEIN_ANTHROPIC_API_KEY>
-```
-
-### GitHub-Plugin: Pull-Request-Abschluss
-
-Das GitHub-Plugin kann Pull Requests, die aus einer Aufgabe heraus erstellt wurden, über `gh` weiter überwachen. Der PR-Bereich einer Aufgabe zeigt die gespeicherten PR-Referenzen, den aktuellen PR- und Merge-Status, die Monitoring-Phase sowie die zugeordneten GitHub-Actions-/Workflow-Runs.
-
-Der automatische Abschluss ist standardmäßig deaktiviert und wird über die Plugin-Einstellungen aktiviert:
-
-| Einstellung | Bedeutung | Default |
-|-------------|-----------|---------|
-| `AutoCompletePullRequests` | Aktiviert automatische Abschlussversuche nach erfolgreichen Pre-Merge-Actions | `false` |
-| `PullRequestCompletionStrategy` | Abschlussweg: `Merge`, `AutoMerge` oder `ApprovalOnly` | `Merge` |
-| `PullRequestMergeMethod` | Merge-Methode für `gh pr merge`: Merge-Commit, Squash oder Rebase | `Squash` |
-| `AllowProtectedBranchBypass` | Erlaubt einen explizit konfigurierten Bypass-Versuch für geschützte Branches, sofern die GitHub-Rechte ausreichen | `false` |
-
-Softwareschmiede führt keinen stillen Schutzregel-Bypass aus. Wenn GitHub Self-Approval, Branch Protection, fehlende Rechte oder andere API-/CLI-Probleme meldet, wird der PR als blockiert oder fehlgeschlagen gespeichert und mit Fehlermeldung in der Aufgabe angezeigt.
-
-### Plugins-Register — Aktivierung und Standardplugins
-
-Das neue **Plugins-Register** in **Einstellungen → Plugins** bietet eine zentralisierte Verwaltung aller Plugins mit zwei Hauptfunktionen:
-
-**Aktivierung/Deaktivierung von Plugins:**
-
-- Linke Spalte zeigt drei gruppierte Auswahllisten (Quellcodeverwaltung, KI und Integrierte Entwicklungsumgebungen) mit Plugin-Namen
-- Nach Auswahl eines Plugins wird der Plugin-Name als Kopfzeile im rechten Einstellungsbereich angezeigt
-- Im rechten Bereich kann das ausgewählte Plugin über die CheckBox „Plugin aktiviert" aktiviert oder deaktiviert werden
-- Deaktivierte Plugins werden automatisch aus allen Plugin-Auswahlflächen gefiltert (Projekt-/Aufgabenbearbeitung, Aufgabenstart, IDE-Öffnen)
-- Neue Plugins sind standardmäßig aktiviert (fehlender Aktivierungsstatus = aktiviert)
-- **Validierungsregel:** Mindestens ein Plugin je Kategorie muss aktiv bleiben; das Deaktivieren des letzten aktiven Plugins einer Kategorie wird verhindert
-
-**Single-Plugin-Verhalten:**
-
-- Ist nur **ein Plugin** einer Kategorie aktiv, wird die Auswahl-UI in den betroffenen Views automatisch ausgeblendet und das Plugin wird direkt verwendet:
-  - In der **Aufgabendetailansicht** wird die KI-Plugin-Auswahl verborgen
-  - Bei der **Aufgabenerstellung** wird der KI-Plugin-Auswahl-Dialog übersprungen
-  - In der **Repository-Zuweisung** wird die SCM-Plugin-Auswahl verborgen
-  - Beim **IDE-Öffnen** wird das aktive IDE-Plugin direkt verwendet (ohne Dialog)
-
-**Standard-Plugins und Einstellungen:**
-
-- Im oberen Bereich des **Plugins-Registers** können Standard-Plugins pro Kategorie (SCM und KI) gewählt werden:
-  - **Standard SCM-Plugin:** z. B. GitHub oder Local Directory
-  - **Standard KI-Plugin:** z. B. GitHub Copilot, Claude CLI, Codex CLI oder Devin CLI
-- Die Auswahl wird persistent in den App-Einstellungen (`DefaultScmPluginKey`, `DefaultKiPluginKey`) gespeichert und beim nächsten Prompt automatisch als Vorauswahl genutzt
-- Nach Plugin-Auswahl (durch Klick auf einen Eintrag in den Aktivierungslisten) können plugin-spezifische Einstellungen in der rechten Spalte konfiguriert werden:
-  - Die verfügbaren Felder werden vom Plugin via `GetSettingGroups()` definiert
-  - Feldtypen (Text, Secret, Integer, Boolean, Enum, FilePath) werden entsprechend gerendert
-  - Einstellungswerte werden über `PluginSettingsService` in der Credential-Datenbank persistiert
-- Für Git-Aktionen gilt: eine projektspezifische Repository-Auswahl (Aufgabe/Projekt) hat Vorrang; das Standardplugin dient als Fallback
-- Ist ein gespeicherter Wert nicht mehr verfügbar, greift automatisch die Fallback-Auflösung auf ein verfügbares Plugin
-
-**IDE-Plugins verwalten:**
-
-- Im **Plugins-Register** unter dem Reiter **Integrierte Entwicklungsumgebungen (IDE)** können aktivierte IDE-Plugins und ihre Priorisierung verwaltet werden
-- Aktivierungs-CheckBox für jedes IDE-Plugin (mindestens eines muss aktiv bleiben)
-- Reihenfolge-Verwaltung per Up/Down-Buttons: Die erste aktivierte IDE in der Reihenfolge wird mit hoher Priorität geprüft; danach Fallback-Plugins in Reihenfolge
-- Gespeicherte Konfiguration wird in der AppEinstellung-Tabelle persistiert (`plugins.enabled.<IdePluginPrefix>` für Aktivierung, `plugins.ide.order` für Reihenfolge)
-
-### Arbeitsverzeichnis für lokale Klone
-
-Das Basis-Arbeitsverzeichnis für lokale Repository-Klone ist in den Einstellungen konfigurierbar und wird als globale App-Einstellung `repositories.workdir` in SQLite gespeichert.  
-Wenn keine Einstellung gesetzt ist oder der konfigurierte Pfad zur Laufzeit nicht nutzbar ist, verwendet die Anwendung automatisch den Fallback auf Basis von `Path.GetTempPath()`.
-
-Der finale Klonpfad wird immer unterhalb von:
-
-`<Basispfad>/softwareschmiede/<aufgabeId>`
-
-gebildet, z. B.:
-
-- Konfiguriert: `D:/Repos` → `D:/Repos/softwareschmiede/<aufgabeId>`
-- Fallback: `Path.GetTempPath()` → `<temp>/softwareschmiede/<aufgabeId>`
-
-### LocalDirectoryPlugin-Konfiguration (Workspace)
-
-LocalDirectoryPlugin-spezifische Einstellungen werden ebenfalls über das Plugin-Settings-Schema `<PluginPrefix>.<Key>` persistiert:
-
-| Schlüssel | Bedeutung | Default |
-|-----------|-----------|---------|
-| `LocalDirectoryPlugin.WorkspaceMode` | Arbeitsmodus (`SeparateWorkingDirectory` oder `InSourceDirectory`) | `SeparateWorkingDirectory` |
-| `LocalDirectoryPlugin.SourceDirectory` | Optionaler Fallback-Quellpfad, wenn kein Repository-Pfad übergeben wurde | leer |
-| `LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory` | Explizite Bestätigung für `git init` im Quellverzeichnis; in `SeparateWorkingDirectory` ausgeblendet | `false` |
-| `LocalDirectoryPlugin.CopyTimeoutSeconds` | Guardrail für Kopierdauer | `600` |
-| `LocalDirectoryPlugin.CopyMaxFiles` | Guardrail für maximale Dateianzahl pro Kopie | `100000` |
-| `LocalDirectoryPlugin.CopyMaxMegabytes` | Guardrail für maximale Datenmenge pro Kopie | `10240` |
-
-Hinweise:
-- Ein plugin-spezifisches `WorkingDirectory`-Setting existiert nicht; der Zielpfad wird aus `repositories.workdir` + `softwareschmiede/<aufgabeId>` gebildet.
-- Bei ungültigem gespeichertem `WorkspaceMode` fällt das Plugin zur Laufzeit auf `SeparateWorkingDirectory` zurück.
-
-### Verzeichnisstruktur-Abruf für Repository-Arbeitsverzeichnisse
-
-Die Verzeichnisstruktur-Abfrage beim Repository-Dialog wird über folgende `appsettings.json`-Einträge gesteuert:
-
-| Schlüssel | Typ | Default | Bedeutung |
-|-----------|-----|---------|-----------|
-| `DirectoryStructureEnabled` | bool | `true` | Aktiviert/deaktiviert die automatische Verzeichnisstruktur-Voraus-Ladung im Repository-Dialog |
-| `DirectoryStructureMaxDepth` | int | `2` | Maximale Verzeichnis-Tiefe beim Abruf (z. B. `2` = Root + 1 Ebene + 1 Ebene) |
-| `DirectoryStructureCacheDurationSeconds` | int | `300` | Cache-Dauer für abgerufene Verzeichnisstrukturen in Sekunden (5 Minuten) |
-
-**Beispiel-Konfiguration in `appsettings.json`:**
-
-```json
-{
-  "DirectoryStructureEnabled": true,
-  "DirectoryStructureMaxDepth": 3,
-  "DirectoryStructureCacheDurationSeconds": 600
-}
-```
-
-**Verhalten:**
-- Falls `DirectoryStructureEnabled = false`: Dialog zeigt nur Root-Verzeichnis `"."` an
-- Der Cache wird pro Plugin, Repository-URL und Abruftiefe gepuffert und nach Ablauf der TTL verworfen
-- Bei fehlgeschlagenem Abruf oder fehlender Strukturunterstützung wird ein manuelles Eingabefeld angezeigt; erfolgreiche leere Repositories bleiben im Auswahlmodus mit Root `"."`
-
-### Git-Workflow-Fallback im separaten Arbeitsverzeichnis
-
-- **Source-Copy-Bootstrap:** Im Modus `SeparateWorkingDirectory` wird die Quelle per Dateikopie übernommen, im Arbeitsverzeichnis `git init` ausgeführt und ein initialer Snapshot-Commit erstellt.
-- **Pull ohne Merge + Nutzerhinweis:** Pull im `LocalDirectoryPlugin` ist ein No-Merge-Sync mit verpflichtendem Hinweistext im Service-Protokoll.
-- **Push als Datei-Sync:** Push synchronisiert den Dateistand `WorkingDirectory -> SourceDirectory`; ein Remote-`git push` wird nicht ausgeführt.
-- **Delete-Sync via Git-Status:** Löschkandidaten werden über `git status --porcelain` im Working Directory ermittelt und beim Push im Source Directory gespiegelt.
-
-### Grenzen, bekannte Einschränkungen und nächste Schritte (LocalDirectoryPlugin)
-
-- **Kein Remote-Provider:** `LocalDirectoryPlugin` unterstützt keine PR-/Issue-/Remote-Branch-Funktionen.
-- **Kein `git push`/`git pull` gegen Remote:** Push/Pull sind lokale Dateisynchronisationen zwischen Workspace und Quelle.
-- **Konfliktbehandlung bei Pull:** Bei uncommitted Changes im Workspace wird Pull aus Sicherheitsgründen abgebrochen.
-- **Nächster Schritt (offen):** UI-seitiger Bestätigungsdialog für Pull in der Aufgabenansicht ist fachlich vorgesehen, aber noch nicht automatisiert getestet.
-
----
-
-## 🗂️ Projektstruktur
-
-```
-Softwareschmiede/                            # Solution Root
+```text
+.
 ├── src/
-│   ├── Softwareschmiede/                    # Domain/Application/Infrastructure (Klassenbibliothek)
-│   │   ├── Application/
-│   │   │   └── Services/                    # EntwicklungsprozessService, ProjektService,
-│   │   │                                    # AufgabeService, ProtokollService,
-│   │   │                                    # AsyncTaskExtensions (SafeFireAndForget), ...
-│   │   ├── Domain/
-│   │   │   ├── Entities/                    # Projekt, Aufgabe, Protokolleintrag, ...
-│   │   │   ├── Interfaces/                  # IPluginManager, ...
-│   │   │   ├── ValueObjects/
-│   │   │   └── Enums/                       # AufgabeStatus, ProtokolleintragTyp, ...
-│   │   ├── Infrastructure/
-│   │   │   ├── Data/                        # EF Core DbContext, Migrations
-│   │   │   ├── Plugins/                     # PluginManager (Discovery/Loading)
-│   │   │   └── Services/                    # CliRunner, WindowsCredentialStore, ...
-│   │   └── Controllers/                     # DiffController (ohne eigenen Web-Host aktuell nicht erreichbar)
-│   ├── Softwareschmiede.App/                # WPF-Desktopanwendung (net10.0-windows) — die Benutzeroberfläche
-│   │   ├── Views/                           # MainWindow, Dashboard-, Projekt-, Aufgaben-, Einstellungs-Views
-│   │   │   ├── ProjectDetailView.xaml       # Projektdetailansicht mit Ribbon-Menü und Kacheln
-│   │   │   ├── RepositoryAssignDialog.xaml # Dialog zur Repository-Zuweisung
-│   │   │   ├── MainWindow.xaml              # Hauptfenster mit Seitenleiste (aktive Aufgaben)
-│   │   │   ├── DashboardView.xaml           # Dashboard mit Aufgabenliste
-│   │   │   └── ...
-│   │   ├── ViewModels/                      # MVVM-ViewModels (ViewModelBase, MainWindowViewModel, ...)
-│   │   │   ├── MainWindowViewModel.cs       # Haupt-ViewModel mit aktiven Aufgaben
-│   │   │   ├── DashboardViewModel.cs        # Dashboard-ViewModel mit Aufgabenliste
-│   │   │   ├── ProjectDetailViewModel.cs    # ViewModel für Projektdetailansicht
-│   │   │   ├── RepositoryAssignViewModel.cs # ViewModel für Repository-Dialog
-│   │   │   └── ...
-│   │   ├── Controls/                        # ProcessWindowHost, StatusIndicatorControl, RecoveryBannerControl
-│   │   ├── Services/                        # DarkModeService, WpfAudioService
-│   │   ├── Themes/                          # DarkTheme.xaml, LightTheme.xaml
-│   │   ├── Converters/                      # AppConverters, KiAusfuehrungsStatusConverter (WPF-Wertkonverter)
-│   ├── Softwareschmiede.IntegrationTests/   # Integrations-Tests
-│   ├── Softwareschmiede.Plugin.Contracts/   # IPlugin, IGitPlugin, IKiPlugin, IScmAlertProvider, PluginType
-│   └── Softwareschmiede.Tests/              # Unit-Tests (xUnit, FluentAssertions, Moq)
-├── plugins/                                 # Plugin-Projekte (separate Klassenbibliotheken)
-│   ├── Softwareschmiede.Plugin.GitHub/      # Git-Provider Plugin
-│   ├── Softwareschmiede.Plugin.BitBucket/   # BitBucket Cloud & Self-Hosted Plugin
-│   ├── Softwareschmiede.Plugin.LocalDirectory/ # Lokales SCM-Plugin (WorkspaceMode)
-│   ├── Softwareschmiede.Plugin.GitHubCopilot/ # KI-Plugin (Copilot CLI)
-│   ├── Softwareschmiede.Plugin.ClaudeCli/   # KI-Plugin (Claude CLI)
-│   ├── Softwareschmiede.Plugin.Codex/       # KI-Plugin (Codex CLI)
-│   └── Softwareschmiede.Plugin.Devin/       # KI-Plugin (Devin CLI)
-├── docs/                                    # Fachliche/technische Dokumentation
-│   ├── help/                                 # Anwendungsdokumentation je Bereich (siehe Kapitel „Dokumentation")
-│   ├── features/                             # Planungsartefakte je Anforderung (branchbezogen, nicht dauerhaft)
-│   └── CI_CD.md                              # Release-Workflow, Semantic Release, Troubleshooting
-└── Softwareschmiede.slnx               # Solution-Datei
+│   ├── Softwareschmiede/                  # Kernlogik, EF Core, Services
+│   ├── Softwareschmiede.App/              # WPF-Desktopanwendung
+│   ├── Softwareschmiede.Plugin.Contracts/ # Plugin-Verträge
+│   ├── Softwareschmiede.Tests/            # Unit-/UI-/E2E-Tests
+│   └── Softwareschmiede.IntegrationTests/ # Integrationstests
+├── plugins/                               # Plugin-Projekte
+├── docs/                                  # Feature-, Hilfe- und CI/CD-Dokumentation
+├── scripts/                               # Build-/Release-Hilfsskripte
+└── Softwareschmiede.slnx
 ```
 
----
+## Tests
 
-## 🏗️ Architektur
-
-Softwareschmiede folgt einer **Clean Architecture** mit vier klar getrennten Schichten:
-
-```mermaid
-flowchart TB
-    subgraph Presentation["Presentation Layer (WPF)"]
-        PRL1["Views (XAML)"]
-        PRL2["ViewModels (MVVM)"]
-        PRL3["ConPTY-Terminal-Integration"]
-    end
-
-    subgraph Application["Application Layer (Services / Use Cases)"]
-        APL1["ProjektService"]
-        APL2["AufgabeService"]
-        APL3["ProtokollService"]
-        APL4["KiAusfuehrungsService"]
-        APL5["GitOrchestrationService"]
-        APL6["PullRequestReferenzService / PullRequestMonitoringService"]
-    end
-
-    subgraph Domain["Domain Layer (Kern - keine aeußeren Abhaengigkeiten)"]
-        DOL1["Entitaeten: Projekt, Aufgabe, Protokolleintrag, PullRequestReferenz"]
-        DOL2["IPlugin + PluginType"]
-        DOL3["IGitPlugin / IKiPlugin"]
-        DOL4["Value Objects, Enums, Domaenenregeln"]
-    end
- 
-    subgraph Infrastructure["Infrastructure Layer"]
-        INL1["EF Core / SQLite"]
-        INL2["PluginManager laedt Plugin-DLLs aus dem plugins-Ordner"]
-        INL3["GitHubPlugin / BitBucketPlugin / LocalDirectoryPlugin / GitHubCopilotPlugin / ClaudeCliPlugin / CodexPlugin / DevinPlugin"]
-        INL4["CLI-Runner fuer gh, copilot, claude, codex und devin"]
-        INL5["Windows Credential Store"]
-    end
-
-    Presentation -->|ruft auf| Application
-    Application -->|verwendet| Domain
-    Application -->|orchestriert| Infrastructure
-    Infrastructure -->|implementiert| Domain
-```
-
-| Schicht | Verantwortung |
-|---------|---------------|
-| **Presentation (WPF)** | Native Windows-UI, MVVM (ViewModelBase), Dark Mode, ConPTY-Terminal-Integration |
-| **Application** | Anwendungsfalllogik, Koordination von Domain und Infrastructure, Plugin-Aufruf |
-| **Domain** | Fachentitäten, Domänenregeln, Plugin-Interfaces – **keine** äußeren Abhängigkeiten |
-| **Infrastructure** | DB-Zugriff, CLI-Prozesse, Credential Store, Dateisystem |
-
-### Plugin-Interfaces
-
-```csharp
-// Basisvertrag für alle Plugins
-public interface IPlugin
-{
-    string PluginName { get; }
-    string PluginPrefix { get; }
-    PluginType PluginType { get; } // SourceCodeManagement | DevelopmentAutomation
-}
-
-public interface IGitPlugin : IPlugin { /* Git operations, PR status, workflow runs, PR completion */ }
-public interface IKiPlugin : IPlugin { /* AI operations */ }
-public interface IScmAlertProvider { /* optional SCM alerts, e.g. GitHub Code Scanning */ }
-```
-
-`IPluginManager` lädt Plugin-DLLs aus `plugins/` dynamisch und ordnet sie über `PluginType` den Kategorien zu.
-
-GitHub-Code-Scanning-Alerts werden über einen optionalen SCM-Alert-Vertrag gelesen und fachlich von normalen Issues getrennt. In der Projektdetailansicht werden beide Quellen als offene Anforderungen angezeigt. Erst beim Auswählen eines Alerts wird ein GitHub-Issue erzeugt; die lokale Aufgabe referenziert dieses Issue und speichert zusätzlich eine `AlertReferenz` mit stabiler `SourceKey`, damit bereits konvertierte Alerts gefiltert bleiben. Nicht-GitHub-Plugins können den Alert-Vertrag ignorieren.
-
-Pull Requests werden providerneutral als `PullRequestReferenz` mit untergeordneten `PullRequestWorkflowRun`-Einträgen gespeichert. `IGitPlugin` enthält dafür optionale Methoden für PR-Status, Workflow-Run-Abfrage und Abschlussversuche (`GetPullRequestStatusAsync`, `GetPullRequestWorkflowRunsAsync`, `CompletePullRequestAsync`). Nicht unterstützende Git-Plugins liefern über die Default-Implementierung ein nachvollziehbares Not-Supported-Ergebnis; das GitHub-Plugin implementiert die Funktionen über `gh pr view`, `gh run list`, `gh pr merge` und `gh pr review`.
-
-### Discovery- und Build-Flow
-
-1. Plugin-Projekte unter `plugins/*` referenzieren nur `Softwareschmiede.Plugin.Contracts`
-2. Das Host-Projekt baut Plugins als Projekt-Referenzen (ohne statisches Linken in den Host)
-3. Nach Build/Publish kopieren MSBuild-Targets die Plugin-DLLs in den `plugins`-Unterordner der Ausgabe
-4. `PluginManager` scannt beim ersten Zugriff den Ordner `AppContext.BaseDirectory/plugins` (`*.dll`, TopDirectoryOnly)
-5. Gefundene Typen werden per `ActivatorUtilities` instanziiert und anhand von `PluginType` als Git- oder KI-Plugin registriert
-
-### Architekturbezug: Branch-Commit-Anzeige + Commit-Diff-Preview
-
-- `GitWorkspaceBrowserService` ermittelt eine Basisreferenz (bevorzugt `origin/HEAD`, sonst Fallback) und berechnet daraus `BranchCommits` relativ zu `HEAD`.
-- Commit-Knoten werden in `AufgabeDetail` über den `CommitTreePresenter` zustandsbasiert expandiert (lazy Laden, Fehlerzustand, Retry).
-- Commit-Dateiknoten tragen `WorkspaceFileNode.CommitSha`; damit wird die Vorschau commit-spezifisch über `LoadCommitPreviewAsync` geladen.
-- Für reguläre Workspace-Dateien bleibt die bestehende Vorschaukette (`LoadPreviewAsync` und dateispezifische Diff-Auflösung) unverändert aktiv.
-
-### Architekturbezug: Pull-Request-Monitoring
-
-- `GitOrchestrationService` persistiert nach erfolgreicher PR-Erstellung die vom Git-Plugin gelieferten PR-Metadaten über `PullRequestReferenzService`.
-- `PullRequestReferenzService` lädt PRs einer Aufgabe inklusive Workflow-Runs und upsertet Status-, Merge-, Monitoring- und Fehlerzustände.
-- `PullRequestMonitoringService` fragt fällige PRs im Hintergrund beim passenden Git-Plugin ab, aktualisiert Workflow-Runs und führt konfigurierte Abschlussversuche erst nach erfolgreichen Pre-Merge-Actions aus.
-- Nach einem bestätigten oder gemergten Abschluss beobachtet das Monitoring zuordenbare Post-Merge-Runs weiter; unsichere Zuordnungen oder fehlende GitHub-Rechte werden als sichtbarer Fehler- oder Blockadezustand gespeichert.
-- Der Aufgabenbereich `PR` wird im `TaskDetailViewModel` über einen eigenen Ladepfad befüllt und zeigt mehrere PRs pro Aufgabe gleichwertig an.
-
-### Architekturbezug: Aktive Aufgaben im Menü (Issue 81)
-
-- `KiAusfuehrungsStatusConverter` (`IValueConverter`, Presentation-Layer) konvertiert `Aufgabe`-Objekte und `AktiveAufgabePanelItem`-Eintraege zu Status-Strings. Der Menue-Status wertet zuerst den persistenten `AusfuehrungsStatus` aus und leitet nur fuer aktive Ausfuehrungen aus `AktiveRunId`, `LastHeartbeatUtc` und `LaufStatus` ab, ob `Laeuft`, `Wartet` oder `Bereit` angezeigt wird.
-- `AufgabeService.GetAktiveAufgabenAsync()` filtert Aufgaben nach Status (`Gestartet`, `Wartend`) und sortiert nach letzter Aktivität (Application-Layer).
-- `MainWindowViewModel` und `DashboardViewModel` nutzen die Service-Methode um `AktiveAufgaben`-Collections zu befüllen und Navigation zwischen Views zu koordinieren.
-- `AufgabeLaufdatenChangedNotifier` meldet erfolgreich persistierte Laufdatenaenderungen aus `CliProcessManager`; `MainWindowViewModel` aktualisiert daraufhin die sichtbare aktive Aufgabenliste zeitnah, damit das Menue nicht bis zum Timer-Fallback auf alten Laufdaten stehen bleibt.
-- `NavigateZuAufgabeCommand` nutzt Callbacks zur fensterübergreifenden Navigation zwischen Projekt- und Aufgabendetail (Presentation-Layer Orchestrierung).
-- `IsDashboardVisible` (computed Property) steuert die Sichtbarkeit der Seitenleisten-Sektion über XAML-Binding mit `InvertedBoolToVisibilityConverter`.
-- `TodoService.GetOpenTodoCountsAsync()` liefert offene Todo-Anzahlen per Bulk-Abfrage für die geladenen aktiven Aufgaben; `MainWindowViewModel` mappt sie auf `AktiveAufgabePanelItem.OffeneTodoLabelText` (`0 Todos`, `1 Todo`, `n Todos`).
-- `ActiveTasksListControl` zeigt das Todo-Label in Seitenleiste und Dashboard als eigenen Button an, damit der Klick den Todo-Dialog öffnet und nicht versehentlich zur Aufgabendetailansicht navigiert.
-- `OpenTodosDialogViewModel` und `OpenTodosDialog` laden ausschließlich offene Todos (`ErledigtAm == null`) und zeigen sie in einem modalen read-only Dialog mit Leerzustand bei `0` offenen Todos.
-
-### Architekturbezug: Automatische CLI-Ausgabeprotokollierung
-
-ConPTY-gestartete KI-CLI-Sitzungen schreiben ihre Ausgabe automatisch in das aufgabenbezogene Protokoll. `PseudoConsoleSession` erfasst den Terminal-Output UI-unabhängig in der Session-Leseschleife; `KiAusfuehrungsService` bindet dafür pro Aufgabe einen `CliOutputProtokollWriter` an. Der Writer rekonstruiert Ausgabezeilen über Chunk-Grenzen hinweg, persistiert sie über den bestehenden `ProtokollService.AddCliOutputAsync`-Pfad als `CliOutput` und entkoppelt Terminal-Rendering und Datenbankzugriff über eine bounded Queue mit Backpressure. Der Abschluss ist mit aktiven Queue-Phasen synchronisiert, damit ein paralleles `CompleteAsync(...)` keine bereits dekodierten Zeilen verwirft.
-
-Die sichtbare CLI-Konsole nutzt denselben Terminal-Buffer mit begrenztem Scrollback: Bis zu 1000 ältere Zeilen bleiben per vertikaler Scrollbar, Mausrad und Page-/Line-Scroll erreichbar. Solange die Ansicht am Ende steht, folgt sie neuer Ausgabe automatisch; nach manuellem Hochscrollen bleibt die Position stabil.
-
-### Architekturbezug: Absturzstabilisierung (Stabilität & Fehlerbehandlung)
-
-- `App.OnStartup()` registriert vor dem Aufruf von `StartupAsync()` drei globale Exception-Handler (`DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`), die ausschließlich über `Log.Logger` protokollieren; `DispatcherUnhandledException` setzt zusätzlich `e.Handled = true`, `UnobservedTaskException` ruft `e.SetObserved()` auf.
-- `AsyncTaskExtensions.SafeFireAndForget(this Task, ILogger, string)` (`src/Softwareschmiede/Application/Services/AsyncTaskExtensions.cs`) kapselt alle bewusst nicht abgewarteten Aufrufe; ein `ContinueWith`-Callback loggt Fehler (`LogError`) bzw. Abbrüche (`LogInformation`), ohne die Exception zum Aufrufer zu propagieren.
-- `CliProcessManager` verwaltet pro Aufgabe ein eigenes `SemaphoreSlim` in einem `ConcurrentDictionary<Guid, SemaphoreSlim>` statt einer einzigen klassenweiten Sperre — Heartbeat-Updates unabhängiger Aufgaben blockieren sich dadurch nicht mehr gegenseitig, überlappende Timer-Ticks derselben Aufgabe werden weiterhin serialisiert.
-- `KiAusfuehrungsService` kapselt die Verarbeitung des `Process.Exited`-Events (klassischer und ConPTY-basierter CLI-Start) in einer zentralen, try-catch-geschützten Methode, damit ein Fehler bei einem Abonnenten nicht die Statusbenachrichtigung der übrigen Abonnenten verhindert.
-- `App.StartupAsync()` sichert `GetRequiredService<CliProcessManager>()` und `mainWindow.Show()` jeweils mit eigenem try-catch ab, sodass ein Fehler in einem der beiden Schritte nicht zum Abbruch des gesamten Anwendungsstarts führt.
-
----
-
-## 🧪 Tests
-
-Das Projekt enthält Unit-Tests im Projekt `Softwareschmiede.Tests` und Integrationstests im Projekt `Softwareschmiede.IntegrationTests`.
-
-### E2E-Test View-Pattern
-
-**E2E-Tests für die WPF-Desktopanwendung werden über ein strukturiertes View-Pattern entwickelt**, das die wiederholte Interaktion mit UI-Elementen über FlaUI abstrahiert und Tests leserlich sowie wartbar macht.
-
-**Klassenhierarchie:**
-
-- **`BaseWindowView`** – Basisklasse für alle View-Helper mit gemeinsamen Methoden:
-  - `IsVisible` – Prüft, ob diese Ansicht gerade aktiv im Fenster sichtbar ist
-  - `ForceShow()` – Navigiert zur Ansicht über UI-Klicks und wartet auf Synchronisation
-  - `ForceClose(bool recurseToDashboard)` – Schließt die Ansicht; optional rekursiv bis zum Dashboard
-  - `Menu` – Property vom Typ `MenuView` für Menü-Navigation
-
-- **Spezialisierte View-Klassen** – Eine Subklasse pro Anwendungsansicht (z. B. `DashboardView`, `ProjectListView`, `ProjectDetailView`, `TaskDetailView`, `SettingsView`, etc.)
-  - Implementieren `IsVisible` mit ansichtsspezifischen Markern (charakteristische UI-Elemente)
-  - Bieten spezialisierte Hilfsmethoden für view-spezifische Interaktionen (z. B. `CreateProject()`, `GetTaskTitle()`)
-
-- **`MenuView`** – Spezialisierte View für Menü-Interaktionen
-  - `NavigateToDashboard()`, `NavigateToProjects()`, `NavigateToSettings()`
-
-- **`DialogView`** – Abstrakte Basisklasse für modale Dialoge
-  - Spezifische Dialog-Subklassen (`RepositoryAssignDialogView`, `PluginSelectionDialogView`, etc.)
-
-- **Erweiterungsmethode `Window.CurrentView()`** – Erkennt automatisch die aktuelle Ansicht anhand ihres UI-Inhalts
-  - Durchsucht das FlaUI-Fenster nach charakteristischen Elementen
-  - Gibt die entsprechende View-Instanz zurück
-  - Wirft `InvalidOperationException` mit aussagekräftiger Diagnose, wenn keine Ansicht erkannt wird
-
-**Verwendungsbeispiel:**
-
-```csharp
-// Test-Setup: Fenster öffnen
-var mainWindow = WaitForMainWindow();
-
-// Aktuelle Ansicht erkennen
-var view = mainWindow.CurrentView();
-// -> gibt DashboardView zurück
-
-// Navigation via View
-var projectListView = new ProjectListView(mainWindow).ForceShow();
-// -> navigiert zur Projektliste und wartet auf charakteristische Elemente
-
-// View-spezifische Hilfsmethoden nutzen
-var projects = projectListView.GetProjectElements();
-
-// Menü-Navigation
-var dashboardView = projectListView.Menu.NavigateToDashboard();
-
-// Schließen mit Rekursion zum Dashboard
-projectListView.ForceClose(recurseToDashboard: true);
-// -> schließt alle dazwischen liegenden Views und navigiert zum Dashboard
-```
-
-**Vorteile:**
-
-- Tests sind lesbarer und wartbarer — UI-Interaktionen sind gekapselt, nicht über FlaUI verstreut
-- Änderungen an der UI erfordern nur Anpassungen in den View-Klassen, nicht in jedem Test
-- Fluent-API ermöglicht Kettenaufrufe für kompakte Test-Logik
-- Automatische View-Erkennung (`CurrentView()`) reduziert explizite Element-Suchen
-
-**View-Klassen und deren Standort:**
-
-Alle View-Klassen befinden sich unter `src/Softwareschmiede.Tests/E2E/Views/` und können direkt in E2E-Testmethoden genutzt oder importiert werden:
-
-```csharp
-using Softwareschmiede.Tests.E2E.Views;
-
-[Fact]
-public void MyE2ETest()
-{
-    var view = mainWindow.CurrentView() as DashboardView;
-    Assert.NotNull(view);
-    // ... weiterer Test
-}
-```
-
----
-
-### Test-Ausführung
-
-Das Projekt enthält Unit-Tests im Projekt `Softwareschmiede.Tests` und Integrationstests im Projekt `Softwareschmiede.IntegrationTests`. E2E-Tests für die WPF-Anwendung verwenden das View-Pattern und erfordern eine grafische Sitzung.
+Reguläre und OS-nahe Tests werden getrennt ausgeführt:
 
 ```powershell
-# Regulaere Unit-/Service-/ViewModel-Tests ohne echte OS-Schnittstellen ausführen
-dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"
+# Reguläre Tests
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface" -c Debug
+dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category!=OsInterface" -c Debug
 
-# Regulaere Integrationstests ohne echte OS-Schnittstellen ausführen
-dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category!=OsInterface"
+# OS-nahe Tests (best effort, inkl. E2E/ConPTY)
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface" -c Debug
+dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category=OsInterface" -c Debug
 
-# OS-Schnittstellen-Tests separat ausführen (einschließlich E2E und ConPTY-Tests)
-dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface"
-dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category=OsInterface"
-
-# E2E-Tests nur ausführen (View-Pattern und FlaUI-basierte Tests)
-dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface&FullyQualifiedName~E2E"
-
-# Tests mit Coverage-Report
-dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface" --collect:"XPlat Code Coverage"
+# Nur E2E-Tests
+dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface&FullyQualifiedName~E2E" -c Debug
 ```
 
-**Hinweis:** ConPTY- und E2E-Tests werden in dieser Sandbox mit `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` übersprungen, da die Child-Prozesse nicht korrekt isoliert werden. Zum manuellen Testen von E2E-Szenarios wird empfohlen, Tests direkt aus Visual Studio oder mit aktivierter grafischer Sitzung auszuführen.
+Für Coverage verwenden die CI-Workflows `XPlat Code Coverage` und erzwingen auf `staging` eine **Line-Coverage von mindestens 70 %** für die regulären Tests.
 
-**Test-Stack:**
-- [xUnit](https://xunit.net/) – Test-Framework
-- [FluentAssertions](https://fluentassertions.com/) – Lesbare Assertions
-- [Moq](https://github.com/moq/moq4) – Mocking von Plugin-Interfaces und Services
+## CI/CD
 
-Tests mit echter Desktop-, ConPTY-, Clipboard-, Prozessstart- oder vergleichbarer OS-Berührung tragen `Category=OsInterface` und werden getrennt vom regulären Testlauf bewertet. In CI laufen `Softwareschmiede.Tests` und `Softwareschmiede.IntegrationTests` jeweils blockierend mit `Category!=OsInterface`; die `Category=OsInterface`-Läufe werden separat als best-effort ausgeführt und getrennt als TRX-Artefakte hochgeladen. Details: [OS-Schnittstellen-Tests](docs/help/stabilitaet/os-interface-tests.md).
+Die Repository-Automation ist branchbasiert aufgebaut:
 
-Feature-spezifische Testartefakte:
-- Service-Tests (Diff-Pipeline/Cache/Algorithmus): `src/Softwareschmiede.Tests/Application/Services/DiffServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffCachingServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/DiffAlgorithmServiceTests.cs`
-- Service-Tests (Changed Artifact Detection: `CodeFiles` + `PlanningDocuments`, Fallback-Pfade): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
-- Service-Tests (Branch-Commit-Baum & Commit-Preview): `src/Softwareschmiede.Tests/Application/Services/GitWorkspaceBrowserServiceTests.cs`
-- Service-Tests (dateispezifische Diff-Auflösung): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
-- Service-Tests (Pluginauswahl/Fallback): `src/Softwareschmiede.Tests/Application/Services/GitOrchestrationServiceTests.cs`
-- Service-/ViewModel-/Plugin-Tests (GitHub-Code-Scanning-Alerts): `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`, `src/Softwareschmiede.Tests/App/ViewModels/ProjectDetailViewModelTests.cs`, `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubPluginTests.cs`
-- Service-/Plugin-Tests (PR-Persistenz, Monitoring, GitHub-PR-Abschluss): `src/Softwareschmiede.Tests/Application/Services/PullRequestReferenzServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PullRequestMonitoringServiceTests.cs`, `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubPluginTests.cs`
-- Service-Tests (Issue 58 Pluginauswahl/Persistenz): `src/Softwareschmiede.Tests/Application/Services/PluginSelectionServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/AufgabeServiceTests.cs`
-- Service-Tests (Startskript/Portreservierung): `src/Softwareschmiede.Tests/Application/Services/RepositoryStartskriptServiceTests.cs`, `src/Softwareschmiede.Tests/Application/Services/PortReservationServiceTests.cs`
-- Unit-Tests: `src/Softwareschmiede.Tests/Infrastructure/Plugins/LocalDirectoryPluginTests.cs`
-- Integrationstests: `src/Softwareschmiede.IntegrationTests/Infrastructure/Plugins/LocalDirectoryPluginIntegrationTests.cs`
-- Compliance-Tests Agentendefinitionen:
-  - Copilot-Plugin Health/CLI/Package-Kompatibilität: `src/Softwareschmiede.Tests/Infrastructure/Plugins/GitHubCopilotPluginTests.cs`
-  - Claude-Plugin Package-/Description-Robustheit: `src/Softwareschmiede.Tests/Infrastructure/Plugins/ClaudeCliPluginTests.cs`
-- Benachrichtigungssystem für abgeschlossene KI-Aufgaben:
-  - Service-Events (Publikation bei Erfolg/Fehler): `src/Softwareschmiede.Tests/Application/Services/EntwicklungsprozessServiceTests.cs`
-  - Einstellungs- und Audio-Validierung/Persistenz: `src/Softwareschmiede.Tests/Application/Services/BenachrichtigungsEinstellungenServiceTests.cs`
-- Issue 205 — Autonome Aufgaben (Projektleiter-Agent-basierte Automatisierung):
-  - Service-Tests (Initialisierung): `AutonomAufgabenInitialisierungsServiceTests` — Erstellung des Arbeitsverzeichnisses, Repository-Klon, state.json/permissions.json-Generierung
-  - ViewModel-Tests: `AutonomAufgabeInitialisierungsDialogViewModelTests` — Formularvalidierung, Service-Aufrufe, Dialog-Management
-  - ViewModel-Tests: `AutonomAufgabeDetailViewModel` — Laden von plan.md/progress.md/governance.md, Agent-Kontrolle (Start/Stop/Resume)
-  - E2E-Tests: `E2E_AutonomAufgabenInitialisierung` — Dialog-Anzeige, Arbeitsverzeichnis-Erstellung, Detail-View-Anzeige
-  - E2E-Tests: `E2E_AutonomAufgabenAgentExecution` — Projektleiter-Agent-Start, Unteragenten-Erzeugung, Session-Pause/Resume bei Budget-Limit, Heartbeat-Monitoring
-  - Feature-Flag „Autonome Aufgaben aktivieren" (Einstellungen, Registerkarte „Allgemein"):
-    - Service-Tests (Guard Clauses bei deaktiviertem Flag): `AutonomAufgabenInitialisierungsServiceTests`, `ProjektleiterAgentServiceTests` (inkl. `_CliIntegration`, `_Fehlerfaelle`), `AutonomAufgabeStartServiceTests` — `InvalidOperationException`/Fehlerergebnis mit `AutonomAufgabenOptions.DisabledErrorMessage` bei deaktiviertem Flag, DB-Wert hat Vorrang vor Deployment-Default
-    - Service-Tests (nicht-autonomer Fallback-Weg bleibt unabhängig vom Flag nutzbar): `EntwicklungsprozessServiceTests` — `WhenFeatureFlagDisabled_ShouldUseFallbackPath()`
-    - ViewModel-Tests (Checkbox-Bindung, Persistenz): `SettingsViewModelTests`
-    - ViewModel-Tests (Sichtbarkeit „Automatisierung"-Tab/Ribbon je nach Flag-Zustand): `TaskDetailViewModelTests` (inkl. `_PluginAktivierung`, `_ZeitgesteuerterPrompt`)
-    - E2E-Tests: `E2E_AutonomAufgabenFeatureFlagDisabled` — Verhalten bei deaktiviertem Flag in Einstellungen und Aufgabendetailansicht
-    - E2E-Tests: `E2E_SettingsFeatureFlags` — Checkbox-Anzeige, Speichern und Wiederherstellung des Werts in der Einstellungsansicht
-- Issue 81 — Aktive Aufgaben im Menü (in Arbeit):
-  - Service-Tests: `AufgabeServiceTests` — `GetAktiveAufgabenAsync()` Filterung nach Status, Sortierung nach Aktivität
-  - Converter-Tests: `KiAusfuehrungsStatusConverterTests` — Status-String-Berechnung (Läuft, Wartet, Fallback)
-  - ViewModel-Tests: `MainWindowViewModelTests` — Properties (`AktiveAufgaben`, `IsDashboardVisible`), `AktiveAufgabenAktualisierenAsync()`, `NavigateZuAufgabeCommand`
-  - ViewModel-Tests: `DashboardViewModelTests` — `AktiveAufgabenListe` Befüllung in `LadenAsync()`
-  - E2E-Tests: Menü-Anzeige, Navigation zu Aufgabendetail, Sichtbarkeits-Toggle (Dashboard-abhängig), Status-Anzeige
-- Offene Todos im Menü:
-  - Service-Tests: `TodoServiceTests` — Bulk-Zählung offener Todos je Aufgabe, erledigte Todos ignorieren, leere/unbekannte IDs
-  - ViewModel-Tests: `MainWindowViewModelTests` — Todo-Anzahl und Todo-Command in aktiven Aufgabenitems
-  - ViewModel-Tests: `OpenTodosDialogViewModelTests` — read-only Ladevorgang, Aufgabenbezug und Leerzustand
-- Absturzstabilisierung (globale Exception-Handler, SafeFireAndForget, Prozess-Handler-Härtung):
-  - Neue Testklasse `AppTests` (`src/Softwareschmiede.Tests/App/AppTests.cs`): `DispatcherUnhandledException_Handler_LogsAndHandlesException()`, `UnhandledException_Handler_Logs()`, `UnobservedTaskException_Handler_LogsAndSetsObserved()`
-  - Neue Testklasse `AsyncTaskExtensionsTests` (`src/Softwareschmiede.Tests/Application/Services/AsyncTaskExtensionsTests.cs`): `SafeFireAndForget_LogsErrorOnTaskException()`, `SafeFireAndForget_LogsInfoOnTaskCancellation()`, `SafeFireAndForget_DoesNotLogErrorOrInfo_OnSuccessfulTask()`
-  - Neue Testklasse `CliProcessManagerTests` (`src/Softwareschmiede.Tests/Application/Services/CliProcessManagerTests.cs`): `AktualisierungAsync_WithConcurrentTimerTicks_Serializes()`, `AktualisierungAsync_WithDifferentAufgaben_DoesNotSerializeAcrossTasks()`
-  - Neue Testklasse `TerminalControlTests` (`src/Softwareschmiede.Tests/App/Controls/TerminalControlTests.cs`): `ReadLoopAsync_WithException_LogsAndDoesNotThrow()`, `OnSessionChanged_StoresReadLoopTask()`, `OnSessionChanged_ReadLoopThrows_LogsErrorViaInjectedLogger()`, `OnTextInput_WriteThrows_LogsWarning()`
-  - Erweiterung `KiAusfuehrungsServiceTests` um `ProcessExited_SubscriberThrows_LogsAndDoesNotCrash()` und `ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash()`
-  - Erweiterung `MainWindowViewModelTests` um `CurrentView_Setter_UsesFireAndForgetSafely()`, `ProjectDetailViewModelTests` um `ProjektId_Setter_UsesFireAndForgetSafely()`, `TaskDetailViewModelTests` um `AufgabeId_Setter_UsesFireAndForgetSafely()`
+- **`pr-staging-ci.yml`** prüft Pull Requests nach `staging` mit Format-Check, Security Scan, Build und Tests.
+- **`staging-ci.yml`** baut auf Push nach `staging`, erzeugt bei Versionsänderungen Pre-Releases und prüft die Coverage-Schwelle.
+- **`staging-to-main-promotion.yml`** erstellt nach erfolgreichem Staging-Lauf einen Draft-PR von `staging` nach `main`.
+- **`verify-pr-source.yml`** erlaubt Pull Requests nach `main` ausschließlich aus `staging`.
+- **`release.yml`** erstellt auf `main`-Pushes oder `v*.*.*`-Tags GitHub-Releases.
+- **`sync-staging-with-main.yml`** erstellt nach einem Release einen automatischen Backmerge-PR von `main` nach `staging`.
+- **`security-scan.yml`** führt zusätzlich einen geplanten Dependency-Sicherheitscheck aus.
 
----
+Die Release-Pipeline nutzt `semantic-release` aus `package.json` sowie die GitHub CLI für Release-Erstellung und Asset-Upload.
 
-## 🚀 Deployment
+## Dokumentation
 
-Softwareschmiede ist für den **lokalen Betrieb unter Windows** ausgelegt.
+- [Anwendungsdokumentation](docs/help/index.md)
+- [CI/CD-Dokumentation](docs/CI_CD.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Änderungsprotokoll](changes.log)
 
-- **Development:** `dotnet run --project src/Softwareschmiede.App/Softwareschmiede.App.csproj`
-- **Publish:** `dotnet publish src/Softwareschmiede.App/Softwareschmiede.App.csproj -c Release`
-- Das Publish-Output enthält automatisch den Ordner `plugins/` mit den Plugin-DLLs.
-- Log-Dateien werden unter `{Programmverzeichnis}/logs` abgelegt (Serilog File-Sink).
+## Lizenz
 
-Für die Inbetriebnahme müssen `gh`, `git` und mindestens eine KI-CLI verfügbar sein (`copilot`, `claude`, `codex` oder `devin`). Für Claude-Läufe ist zusätzlich `ANTHROPIC_API_KEY` als Credential erforderlich; Devin verwendet keinen Token/API-Key, sondern die Anmeldung über `devin auth login`.
-
-**Automatisierte Release-Pipeline:**
-
-Bei jedem Push auf `main` erstellt der GitHub-Actions-Workflow `.github/workflows/release.yml` automatisch eine neue Version (Semantic Release nach Conventional Commits), baut die Anwendung, verpackt den Build als `release.zip` und veröffentlicht ein stabiles GitHub-Release. Ein manueller Git-Tag (`vX.Y.Z`) überschreibt die automatische Versionierung. Commit-Konventionen und Team-Regeln siehe [CONTRIBUTING.md](CONTRIBUTING.md), Workflow-Details und Troubleshooting siehe [docs/CI_CD.md](docs/CI_CD.md).
-
-Das In-App-Update erwartet im GitHub-Release exakt das Asset `release.zip`. Im Root des ZIPs müssen `Softwareschmiede.exe` und `version.json` liegen; `version.json` ist die verbindliche lokale Versionsquelle für den Update-Vergleich. Pre-Releases werden nicht angeboten. Die WPF-App zeigt Update- und Refresh-Aktion im Sidebar-Footer, prüft vor dem Update riskante aktive CLI-Läufe und zeigt Download, Entpacken und Vorbereitung im Fortschrittsdialog. Der finale Dateiaustausch läuft über `{Programmverzeichnis}/updates/update.ps1`, kann bei fehlenden Schreibrechten erhöhte Rechte anfordern und protokolliert nach `{Programmverzeichnis}/updates/update.log`. Ein automatisches Rollback wird nicht durchgeführt.
-
----
-
-## 📝 Changelog
-
-Versionsstände werden automatisiert per Semantic Release aus Conventional Commits erzeugt und in [`CHANGELOG.md`](CHANGELOG.md) festgehalten.
-
----
-
-## 📚 Dokumentation
-
-| Dokument | Beschreibung |
-|----------|-------------|
-| [Anwendungsdokumentation (Index)](docs/help/index.md) | Einstiegspunkt zur fachlichen und technischen Dokumentation je Anwendungsbereich |
-| [E2E-Test View-Pattern](src/Softwareschmiede.Tests/E2E/Views/) | Strukturierte WPF-UI-Interaktion über FlaUI mit View-Klassen-Hierarchie (Klassen unter `Views/`) |
-| [Projekte](docs/help/projekte/index.md) | Projektverwaltung, Repository-Zuweisung und Arbeitsverzeichnis-Konfiguration |
-| [Basis-Branch-Konfiguration](docs/help/projekte/basis-branch-konfiguration.md) | Konfiguration eines Basis-Branches pro Repository für Feature-Branch-Erstellung und Pull-Request-Ziele |
-| [Initialisierungsskript-Konfiguration](docs/help/projekte/initialisierungsskript-konfiguration.md) | Konfiguration eines optionalen Initialisierungsskripts pro Repository, das nach dem Klonen automatisch ausgeführt wird |
-| [Aufgaben](docs/help/aufgaben/index.md) | Aufgabenworkflow, automatische Dokumentation (`issue.md`), Statusmodell, aktive Aufgaben im Menü, Promptvorlagen und zeitgesteuerter Prompt-Versand |
-| [Autonome Aufgaben](docs/help/aufgaben/autonome-aufgaben/index.md) | Projektleiter-Agent-basierte Automatisierung mit Unteragenten-Orchestrierung, Session-Management, Governance-Enforcement und Skills-Lifecycle |
-| [Plugins](docs/help/plugins/index.md) | SCM-/KI-Plugin-Architektur inkl. BitBucket- und Devin-CLI-Plugin |
-| [Entwicklungsumgebungen](docs/help/entwicklungsumgebungen/index.md) | IDE-Plugin-System mit automatischer Erkennung und Auswahl (Visual Studio, Visual Studio Code) |
-| [Einstellungen](docs/help/einstellungen/index.md) | Plugin-Konfiguration, Standardplugins, Credential-Verwaltung und Feature-Flag „Autonome Aufgaben aktivieren" |
-| [Terminal (ConPTY)](docs/help/terminal/index.md) | Interaktive CLI-Integration, VT100-Rendering, robuste Clipboard-Paste, Alt Gr-Sonderzeichen und Ctrl+Pfeiltaste-Navigation |
-| [Dateiexplorer](docs/help/dateiexplorer/index.md) | Arbeitsbaum- und Diff-Ansicht in der Aufgabendetailansicht |
-| [Dateisystem-Integration](docs/help/dateisystem-integration/index.md) | Öffnen des Arbeitsverzeichnisses im OS-Dateiexplorer, von Visual-Studio-Solutions und optional von Visual Studio Code direkt aus dem Ribbon |
-| [Diff-Funktionalität](docs/help/diff/index.md) | Diff-Erzeugung, Persistenz und Viewer-Integration |
-| [Stabilität & Fehlerbehandlung](docs/help/stabilitaet/index.md) | Globale Exception-Handler und Absturzstabilisierung |
-| [Programmupdate](docs/help/programmupdate/index.md) | Update-Prüfung, Sidebar-Update/Refresh und Fortschrittsdialog |
-| [Anwendung (WPF)](docs/help/anwendung/index.md) | Überblick zur WPF-Desktopanwendung |
-| [CI/CD-Pipeline](docs/CI_CD.md) | Release-Workflow, Semantic Release und Troubleshooting |
-
----
-
-## 🤝 Beitragen
-
-Beiträge zum Projekt sind willkommen! Bitte beachte die folgenden Konventionen.
-
-### Branch-Konvention
-
-| Typ | Muster | Beispiel |
-|-----|--------|---------|
-| Neues Feature | `feature/<kurz-beschreibung>` | `feature/gitlab-plugin` |
-| Fehlerbehebung | `bugfix/<id>` | `bugfix/42-stream-timeout` |
-| Refactoring | `refactor/<bereich>` | `refactor/ki-plugin-interface` |
-
-### Commit-Format (Conventional Commits)
-
-Commits folgen dem **[Conventional Commits](https://www.conventionalcommits.org/)**-Standard:
-
-```
-feat:     Neues Feature
-fix:      Fehlerbehebung
-refactor: Code-Umstrukturierung ohne Verhaltensänderung
-test:     Tests hinzufügen oder korrigieren
-docs:     Nur Dokumentationsänderungen
-chore:    Build, Abhängigkeiten, CI-Konfiguration
-```
-
-**Beispiele:**
-```
-feat: GitHub Copilot Streaming-Unterstützung hinzugefügt
-fix: Token-Speicherung im Credential Store repariert
-refactor: KiAusfuehrungsService in kleinere Methoden aufgeteilt
-```
-
-### Pull Requests
-
-- Jeder PR benötigt **mindestens 1 Approver** (Code-Review-Pflicht)
-- Branch muss aktuell mit `main` sein (rebase oder merge vor dem PR)
-- Alle Tests müssen bestehen (`dotnet test`)
-- PR-Beschreibung enthält: Kontext, Änderungen, Testnachweis
-
-### Coding-Guidelines
-
-- **Naming:** PascalCase für Klassen/Methoden, camelCase für Parameter/Variablen, Präfix `I` für Interfaces
-- **Async:** Alle I/O-Operationen konsequent `async`/`await` – keine `.Result`- oder `.Wait()`-Aufrufe
-- **Logging:** `ILogger<T>` in allen Services – strukturiertes Logging mit aussagekräftigen Nachrichten und Parametern
-- **Plugin-Erweiterungen:** Neue Plugins implementieren `IPlugin` + `IGitPlugin`/`IKiPlugin`, setzen `PluginType` und werden als eigenes Projekt unter `plugins/` eingebunden (Discovery via `PluginManager`, keine direkte `AddScoped<...>`-Bindung)
-
----
-
-## 📄 Lizenz
-
-Softwareschmiede steht unter der **MIT-Lizenz** — siehe [`LICENSE`](LICENSE).
-
-Eine Übersicht aller Drittanbieter-Abhängigkeiten und deren Lizenzen findet sich in
-[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). Sicherheitsrelevante Meldungen bitte gemäß
-[`SECURITY.md`](SECURITY.md) über GitHub Private Security Advisories einreichen.
-
----
-
-## 📬 Kontakt
-
-- **Maintainer:** [martin-stromberg](https://github.com/martin-stromberg) (alleiniger Maintainer).
-- Für Rückfragen/Feedback bitte Issues im Repository verwenden.
-- Sicherheitslücken bitte **nicht** öffentlich melden, sondern gemäß [`SECURITY.md`](SECURITY.md).
-
----
-
-*Softwareschmiede – KI-gestützter Entwicklungsworkflow, lokal und unter Ihrer Kontrolle.*
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).

@@ -4,11 +4,13 @@
 
 ## Übersicht
 
-Die Task-Detail-Ansicht exponiert zwei öffentliche Service-Schnittstellen für die Verwaltung von Aufgaben und zeitgesteuerten Prompt-Versänden:
+Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die Verwaltung von Aufgaben, zeitgesteuerten Prompt-Versänden und dem Export der CLI-Rohausgabe:
 
 - `AufgabeService` — Persistente Datenbankoperationen für Aufgaben
 - `PromptZeitVersandService` — Laufzeit-Verwaltung zeitgesteuerter Prompts
 - `ProtokollService` — Persistente Protokolleinträge, einschließlich automatischer CLI-Ausgaben
+- `ICliRawExportService` — Exportiert die gespeicherte CLI-Rohausgabe einer Aufgabe als `.raw`
+- `IDialogService` — UI-Abstraktion für den nativen Speichern-Dialog
 
 ## ProtokollService — CLI-Ausgabeprotokoll
 
@@ -258,6 +260,50 @@ var info = new ScheduledPromptInfo(
 | Ungültige Zeitfelder im ViewModel | `FehlerMeldung` wird gesetzt; Service wird nicht aufgerufen; ViewModel-seitige Validierung |
 
 ---
+
+## CliRawExportService — CLI-Rohausgabe
+
+### `ExportCliRawAsync(Guid aufgabeId, string zielPfad, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Schreibt die protokollierte CLI-Rohausgabe einer Aufgabe in eine `.raw`-Datei.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `aufgabeId` | `Guid` | ID der Aufgabe, deren CLI-Rohausgabe exportiert werden soll. |
+| `zielPfad` | `string` | Zielpfad der zu erzeugenden `.raw`-Datei. |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Verhalten:**
+
+- Lädt die gespeicherten Protokolle über `ProtokollService.GetByAufgabeAsync(...)`.
+- Filtert ausschließlich `ProtokollTyp.CliOutput` und übernimmt nur deren `Inhalt`.
+- Verbindet die Zeilen in vorhandener Reihenfolge mit `Environment.NewLine`.
+- Schreibt die Datei mit UTF-8 ohne BOM.
+- Abbruch und Schreibfehler werden an den Aufrufer weitergereicht.
+
+## IDialogService — Speichern-Dialog
+
+### `ShowSaveFileDialogAsync(string title, string filter, string defaultFileName, string? initialDirectory = null, CancellationToken ct = default) : Task<string?>`
+
+**Beschreibung:** Öffnet einen nativen Speichern-Dialog und gibt den gewählten Dateipfad zurück, oder `null` wenn der Benutzer abbricht.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `title` | `string` | Fenstertitel des Dialogs. |
+| `filter` | `string` | Dateifilter, z. B. `Raw files (*.raw)|*.raw`. |
+| `defaultFileName` | `string` | Vorgeschlagener Dateiname. |
+| `initialDirectory` | `string?` | Optionales Startverzeichnis. |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Verhalten:**
+
+- Wird von `TaskDetailViewModel.ExportCliRawAsync` verwendet, um den Zielpfad für den Export abzufragen.
+- Bei Dialogabbruch wird `null` zurückgegeben; es erfolgt kein Schreibvorgang.
+- Die konkrete WPF-Implementierung öffnet `SaveFileDialog` auf dem UI-Dispatcher.
 
 ## Thread-Sicherheit
 

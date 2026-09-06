@@ -247,6 +247,24 @@
 
 ---
 
+## CLI-Rohausgabe-Export
+
+**Beschreibung:** Die exportierte `.raw`-Datei enthält ausschließlich die bereits gespeicherten CLI-Ausgabezeilen der Aufgabe.
+
+**Bedingungen:**
+- Der Export wird aus der Aufgabendetailansicht gestartet.
+- Eine Aufgabe ist geladen und besitzt gespeicherte `ProtokollTyp.CliOutput`-Einträge.
+
+**Verhalten:**
+- Wenn der Speichern-Dialog abgebrochen wird: kein Export, keine Fehlermeldung.
+- Wenn der Zielpfad nicht auf `.raw` endet: das ViewModel bricht mit einer sichtbaren Fehlermeldung ab.
+- Wenn der Dateischreibvorgang fehlschlägt: der Fehler wird geloggt und dem Benutzer als Exportfehler angezeigt.
+- Andere Protokolltypen wie `Prompt`, `KiAntwort` oder `SystemMeldung` werden nicht exportiert.
+
+**Umsetzung:** `TaskDetailViewModel.ExportCliRawAsync` und `CliRawExportService.ExportCliRawAsync` — das ViewModel steuert Dialog und Validierung, der Service schreibt die gefilterten `CliOutput`-Zeilen in UTF-8 ohne BOM.
+
+---
+
 ## Aufgaben-Recovery
 
 **Beschreibung:** Eine Aufgabe im Status `InBearbeitung` oder `KiAktiv` kann manuell wiederhergestellt werden, wenn der Prozess nicht mehr läuft.

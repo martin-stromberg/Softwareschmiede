@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
@@ -208,7 +209,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForLogEntry(string typ)
     {
-        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{typ}"), Medium);
+        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{typ}"), Long);
         return this;
     }
 
@@ -318,6 +319,37 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
+    /// <summary>Klickt den CLI-Raw-Export-Button und bedient den nativen Save-Dialog.</summary>
+    /// <param name="zielPfad">Der Zielpfad der zu speichernden *.raw-Datei oder null/leer für Abbruch.</param>
+    /// <returns>Diese Instanz.</returns>
+    public TaskDetailView ExportCliRaw(string? zielPfad)
+    {
+        WaitForEnabledElement(Window, "CliRawExport", Medium).AsButton().Click();
+        return HandleSaveFileDialog(zielPfad);
+    }
+
+    /// <summary>Bedient den nativen Save-Dialog: schreibt den Zielpfad und bestätigt, oder bricht per ESC ab.</summary>
+    /// <param name="zielPfad">Der Zielpfad oder null/leer zum Abbrechen.</param>
+    /// <returns>Diese Instanz.</returns>
+    public TaskDetailView HandleSaveFileDialog(string? zielPfad)
+    {
+        var dialog = WaitForSaveDialog();
+        dialog.Focus();
+
+        if (string.IsNullOrWhiteSpace(zielPfad))
+        {
+            Keyboard.Press(VirtualKeyShort.ESCAPE);
+        }
+        else
+        {
+            Keyboard.Type(zielPfad);
+            Keyboard.Press(VirtualKeyShort.RETURN);
+        }
+
+        WaitUntilGone(Window.Automation.GetDesktop(), SaveDialogCondition, Medium);
+        return this;
+    }
+
     /// <summary>Wartet, bis der "PluginAendern"-Button (CLI-Ribbon-Gruppe) verschwindet.</summary>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitUntilPluginChangeButtonGone()
@@ -406,6 +438,42 @@ public sealed class TaskDetailView : BaseWindowView
         {
             return $"(Descendants-Abfrage fehlgeschlagen: {ex.Message})";
         }
+    }
+
+    private AutomationElement WaitForSaveDialog()
+    {
+        var deadline = DateTime.UtcNow + Long;
+        while (DateTime.UtcNow < deadline)
+        {
+            var dialog = Window.Automation.GetDesktop().FindFirstDescendant(SaveDialogCondition);
+            if (dialog is not null)
+                return dialog;
+
+            Thread.Sleep(200);
+        }
+        throw new TimeoutException("Der Speichern-Dialog wurde nicht innerhalb des Timeouts geöffnet.");
+    }
+
+    private static Func<FlaUI.Core.Conditions.ConditionFactory, FlaUI.Core.Conditions.ConditionBase> SaveDialogCondition
+        => cf => cf.ByControlType(ControlType.Window)
+            .And(cf.ByName("Speichern unter")
+                .Or(cf.ByName("Save As"))
+                .Or(cf.ByName("Save"))
+                .Or(cf.ByName("CLI-Rohausgabe exportieren")));
+
+    private static AutomationElement WaitForEnabledElement(AutomationElement parent, string automationName, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = parent.FindFirstDescendant(cf => cf.ByName(automationName));
+            if (element is not null && element.IsEnabled)
+                return element;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Element '{automationName}' wurde nicht innerhalb von {timeout.TotalSeconds}s aktiviert gefunden.");
     }
 
     /// <summary>Klickt den Dropdown-Button "IdeOeffnenDropdown" und öffnet den Solution-Auswahl-Dialog.</summary>

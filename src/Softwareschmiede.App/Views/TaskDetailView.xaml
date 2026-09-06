@@ -89,6 +89,10 @@
                                                         AutomationName="CliStoppen"
                                                         ButtonCommand="{Binding CliStoppenCommand}"
                                                         Visibility="{Binding KannCliStoppen, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="🗎"
+                                                        ButtonText="Rohausgabe exportieren"
+                                                        AutomationName="CliRawExport"
+                                                        ButtonCommand="{Binding ExportCliRawCommand}" />
                             <StackPanel Margin="12,0,0,0"
                                         VerticalAlignment="Center">
                                 <TextBlock Text="Promptvorlage"

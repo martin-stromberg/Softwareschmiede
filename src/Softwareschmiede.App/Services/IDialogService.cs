@@ -46,4 +46,12 @@ public interface IDialogService
     Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
         AutonomAufgabeInitialisierungsDialogViewModel viewModel,
         CancellationToken ct = default);
+
+    /// <summary>Zeigt einen Speichern-Dialog und gibt den gewählten Dateipfad zurück, oder null wenn abgebrochen.</summary>
+    Task<string?> ShowSaveFileDialogAsync(
+        string title,
+        string filter,
+        string defaultFileName,
+        string? initialDirectory = null,
+        CancellationToken ct = default);
 }
