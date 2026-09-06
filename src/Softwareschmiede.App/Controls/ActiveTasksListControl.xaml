@@ -26,6 +26,7 @@
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            TextTrimming="CharacterEllipsis"
                            Visibility="{Binding KiPluginName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                           AutomationProperties.AutomationId="{Binding Titel, StringFormat=AktiveAufgabeKiPlugin_{0}}"
                            Margin="0,1,0,0" />
                 <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
                            FontSize="11"

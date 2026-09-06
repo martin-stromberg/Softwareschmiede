@@ -144,6 +144,17 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
+    /// <summary>
+    /// Klickt den "Starten"-Button, ohne einen Plugin-Auswahl-Dialog zu erwarten.
+    /// Verwendbar, wenn das KI-Plugin bereits persistiert ist und der Start direkt beginnt.
+    /// </summary>
+    /// <returns>Diese Instanz.</returns>
+    public TaskDetailView ClickStarten()
+    {
+        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().Click();
+        return this;
+    }
+
     /// <summary>Wartet, bis die CLI gestartet ist (Stoppen-Button sichtbar und Status "Gestartet" angezeigt).</summary>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForCliRunning()
@@ -403,6 +414,15 @@ public sealed class TaskDetailView : BaseWindowView
         throw new TimeoutException(
             "TerminalConsole zeigte innerhalb des Timeouts keine Prozess-ID (HelpText) an. "
             + $"Vorhandene Descendants von Window: {DescribeDescendants(Window)}");
+    }
+
+    /// <returns>Der in der Fußzeile angezeigte aktive CLI-Name (ohne das Präfix "CLI: ").</returns>
+    public string GetActiveCliName()
+    {
+        var text = WaitForElement(Window, cf => cf.ByAutomationId("AktiverCliName"), Short).Name;
+        return text.StartsWith("CLI: ", StringComparison.Ordinal)
+            ? text.Substring(5)
+            : text;
     }
 
     /// <summary>

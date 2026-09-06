@@ -318,6 +318,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             {
                 _logger.LogWarning("CLI-Prozess für Aufgabe {AufgabeId} antwortet nicht – Kill.", aufgabeId);
                 process.Kill(entireProcessTree: true);
+                await WaitForExitAsync(process, TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -433,8 +434,17 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         {
             // TryRemove ist atomar: gibt false zurück, wenn der Prozess bereits über den
             // HasExited-Check nach dem Start bereinigt wurde. So wird jede Aktion genau einmal ausgeführt.
-            if (!_handles.TryRemove(aufgabeId, out _))
+            if (!_handles.TryRemove(aufgabeId, out var removedHandle))
             {
+                return;
+            }
+
+            // Falls zwischen Prozess-Start und Exited-Event ein neuer Prozess für dieselbe Aufgabe
+            // gestartet wurde (z. B. Plugin-Wechsel), wurde der neue Handle entfernt. Diesen wieder
+            // einsetzen und den alten Exit-Event ignorieren.
+            if (!ReferenceEquals(removedHandle, handle))
+            {
+                _handles.TryAdd(aufgabeId, removedHandle);
                 return;
             }
 
