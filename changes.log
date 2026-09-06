@@ -1,3 +1,9 @@
+## 2026-09-06 — Issue-Referenz in der issue.md
+
+- `EntwicklungsprozessService.CreateIssueFileAsync()` ergänzt die generierte `issue.md` beim Prozessstart um einen optionalen Abschnitt `## Verknüpftes Issue` mit Kennung (`#<IssueNummer>`) und Titel, wenn die Aufgabe eine `IssueReferenz` mit gültiger Nummer (`> 0`) trägt. Ist keine Referenz oder keine gültige Nummer vorhanden, bleibt die Datei unverändert.
+- Der neue Abschnitt erscheint zwischen dem Metadaten-Block (`**Erstellt:**`) und dem bestehenden `## Anforderung`-Abschnitt.
+- Drei neue Integrationstests in `EntwicklungsprozessServiceTests` sichern das Verhalten für alle drei Fälle: Issue mit gültiger Nummer, ohne Referenz und mit Referenz aber ohne gültige Nummer.
+
 ## 2026-09-06 — Export der CLI-Rohausgabe
 
 - Die Aufgabendetailansicht bietet in der CLI-Gruppe jetzt die Aktion **Rohausgabe exportieren**. Der Benutzer wählt den Zielpfad per Speichern-Dialog und speichert die bisher protokollierten CLI-Ausgabezeilen als `.raw`-Datei.

@@ -48,7 +48,22 @@
 
 ---
 
-## Issue-Anlage aus der Aufgabendetailansicht
+## Issue-Referenz in der issue.md
+
+**Beschreibung:** Beim Prozessstart wird die generierte `issue.md` um einen optionalen Abschnitt `## Verknüpftes Issue` ergänzt, wenn die Aufgabe eine Issue-Referenz mit gültiger Nummer trägt.
+
+**Bedingungen:**
+- `aufgabe.IssueReferenz != null`
+- `IssueReferenz.IssueNummer > 0`
+
+**Verhalten:**
+- Wenn beide Bedingungen erfüllt: Der Abschnitt `## Verknüpftes Issue` wird zwischen dem Metadaten-Block (`**Erstellt:**`) und dem Abschnitt `## Anforderung` eingefügt. Inhalt: `**Kennung:** #<IssueNummer>` und `**Titel:** <Titel>`.
+- Wenn `IssueReferenz` `null` ist: Kein Issue-Abschnitt wird ausgegeben; die Datei enthält nur Metadaten und Anforderung.
+- Wenn `IssueNummer` `null` oder ≤ 0 ist: Kein Issue-Abschnitt wird ausgegeben — auch wenn `IssueReferenz` selbst gesetzt ist.
+
+**Umsetzung:** `EntwicklungsprozessService.CreateIssueFileAsync` — wertet `aufgabe.IssueReferenz is { IssueNummer: > 0 }` aus und fügt den Block nur bei positivem Match ein. `IssueReferenz` wird bereits durch Eager Loading in `AufgabeService.GetDetailAsync` vollständig geladen, sodass kein zusätzliches Datenbankzugriff nötig ist.
+
+---
 
 **Beschreibung:** Ein neues Issue kann aus einer Aufgabe angelegt und anschließend genau einmal mit dieser Aufgabe verknüpft werden.
 
