@@ -17,24 +17,35 @@ public partial class End2EndTest
     /// ein Dialog mit einem "Schließen"-Button erscheint, der den Dialog schließt.
     /// </summary>
     protected void CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(Window mainWindow)
-    {
+    {        
         var expectedValue = $"--test-{Guid.NewGuid():N}";
 
         var settings = new SettingsView(mainWindow).ForceShow();
         settings.SelectDefaultKiPlugin("Codex CLI");
 
-        // Wert setzen, speichern, Seite verlassen und erneut betreten - Wert bleibt erhalten
-        settings.SetCommandLineParameters(expectedValue);
-        settings.SaveSettings();
-        settings.Menu.NavigateToDashboard();
+        var oldValue = settings.GetCommandLineParameters();
+        try
+        {
+            // Wert setzen, speichern, Seite verlassen und erneut betreten - Wert bleibt erhalten
+            settings.SetCommandLineParameters(expectedValue);
+            settings.SaveSettings();
+            settings.Menu.NavigateToDashboard();
 
-        var settingsReopened = new SettingsView(mainWindow).ForceShow();
-        settingsReopened.SelectDefaultKiPlugin("Codex CLI");
-        Assert.Equal(expectedValue, settingsReopened.GetCommandLineParameters());
+            var settingsReopened = new SettingsView(mainWindow).ForceShow();
+            settingsReopened.SelectDefaultKiPlugin("Codex CLI");
+            Assert.Equal(expectedValue, settingsReopened.GetCommandLineParameters());
 
-        // Hilfe-Button öffnet Dialog, der über "Schließen" wieder geschlossen werden kann
-        var helpDialog = settingsReopened.OpenCliHelp();
-        Assert.True(helpDialog.IsVisible);
-        helpDialog.Close();
+            // Hilfe-Button öffnet Dialog, der über "Schließen" wieder geschlossen werden kann
+            var helpDialog = settingsReopened.OpenCliHelp();
+            Assert.True(helpDialog.IsVisible);
+            helpDialog.Close();
+        }
+        finally
+        {
+            settings.ForceShow();
+            settings.SetCommandLineParameters(oldValue);
+            settings.SaveSettings();
+            settings.Menu.NavigateToDashboard();
+        }
     }
 }

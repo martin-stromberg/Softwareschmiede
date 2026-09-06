@@ -17,15 +17,26 @@ public partial class End2EndTest
         var codexPath = $@"C:\tools\codex-{Guid.NewGuid():N}.exe";
 
         var settings = new SettingsView(mainWindow).ForceShow();
-        settings.SelectDefaultKiPlugin("Codex CLI");
-        settings.SetExecutablePath(codexPath);
-        settings.SaveSettings();
-        settings.Menu.NavigateToDashboard();
+        var oldValue = settings.GetExecutablePath();
+        try
+        {
+            settings.SelectDefaultKiPlugin("Codex CLI");
+            settings.SetExecutablePath(codexPath);
+            settings.SaveSettings();
+            settings.Menu.NavigateToDashboard();
 
-        var settingsReopened = new SettingsView(mainWindow).ForceShow();
-        settingsReopened.SelectDefaultKiPlugin("Codex CLI");
-        Assert.Equal(codexPath, settingsReopened.GetExecutablePath());
+            var settingsReopened = new SettingsView(mainWindow).ForceShow();
+            settingsReopened.SelectDefaultKiPlugin("Codex CLI");
+            Assert.Equal(codexPath, settingsReopened.GetExecutablePath());
 
-        settingsReopened.Menu.NavigateToDashboard();
+            settingsReopened.Menu.NavigateToDashboard();
+        }
+        finally
+        {
+            settings.ForceShow();
+            settings.SetExecutablePath(oldValue);
+            settings.SaveSettings(); 
+            settings.Menu.NavigateToDashboard();
+        }
     }
 }
