@@ -77,6 +77,24 @@ public sealed class MenuView : BaseWindowView
     }
 
     /// <summary>
+    /// Liest den in der Seitenleiste für die angegebene aktive Aufgabe angezeigten KI-Plugin-Namen
+    /// (Text "KI: {Name}").
+    /// </summary>
+    /// <param name="taskTitle">Der Titel der Aufgabe.</param>
+    /// <returns>Der reine Plugin-Name ohne das "KI: "-Präfix.</returns>
+    public string GetActiveTaskKiPluginName(string taskTitle)
+    {
+        var kiPluginText = WaitForElement(Window, cf => cf.ByAutomationId($"AktiveAufgabeKiPlugin_{taskTitle}"), Short);
+        var name = kiPluginText.Name;
+        if (name is not null && name.StartsWith("KI: ", StringComparison.Ordinal))
+        {
+            return name.Substring(4);
+        }
+
+        throw new InvalidOperationException($"Für Aufgabe '{taskTitle}' wurde kein 'KI: '-Eintrag in der Seitenleiste gefunden. Gesehen: '{name}'.");
+    }
+
+    /// <summary>
     /// Wartet, bis die Status-Kachel der Aufgabe in der Seitenleiste den erwarteten Status-Text als
     /// <c>AutomationProperties.HelpText</c> anzeigt (siehe ActiveTasksListControl.xaml).
     /// </summary>

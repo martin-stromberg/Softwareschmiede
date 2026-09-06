@@ -57,6 +57,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly ICliRawExportService _cliRawExportService;
+    private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
     private readonly Action<Action> _dispatcherInvoke;
 
     private Guid _aufgabeId;
@@ -666,7 +667,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         AppEinstellungService appEinstellungService,
         IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         Action<Action>? dispatcherInvoke = null,
-        ICliRawExportService? cliRawExportService = null)
+        ICliRawExportService? cliRawExportService = null,
+        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
     {
         _aufgabeService = aufgabeService;
         _protokollService = protokollService;
@@ -688,6 +690,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _autonomAufgabenOptions = autonomAufgabenOptions;
         _timeProvider = timeProvider;
         _cliRawExportService = cliRawExportService ?? new CliRawExportService(protokollService, NullLogger<CliRawExportService>.Instance);
+        _laufdatenChangedNotifier = laufdatenChangedNotifier;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
         // Synchroner Default vor dem ersten Laden einer Aufgabe: LadenAsync ermittelt den DB-Wert
         // asynchron und überschreibt dieses Feld danach ggf. (siehe AktualisiereIsAutonomAufgabenEnabledAsync).
@@ -1653,10 +1656,11 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                IsCliRunning = status == CliProcessStatus.Gestartet;
+                var isRunning = _kiService.IsRunning(_aufgabeId);
+                IsCliRunning = isRunning;
                 if (_aufgabe is not null)
                 {
-                    _aufgabe.AusfuehrungsStatus = status == CliProcessStatus.Gestartet
+                    _aufgabe.AusfuehrungsStatus = isRunning
                         ? AufgabeAusfuehrungsStatus.Aktiv
                         : AufgabeAusfuehrungsStatus.Beendet;
                     OnPropertyChanged(nameof(KannCliNeuStarten));
@@ -1665,16 +1669,24 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                     WaehleStandardAnsicht();
                 }
 
-                if (status != CliProcessStatus.Gestartet)
+                if (status == CliProcessStatus.Gestartet)
                 {
-                    AttachCliStatusSession(null);
-                    AktiverCliName = null;
+                    SetAktiverCliName(_aufgabe?.KiPluginPrefix);
+                    CliStatusText = "Gestartet";
+                }
+                else
+                {
+                    if (!isRunning)
+                    {
+                        AttachCliStatusSession(null);
+                        _promptZeitVersandService.CancelScheduledPrompt(aufgabeId);
+                        ScheduledPromptStatus = null;
+                        ScheduledPromptTimeDisplay = null;
+                    }
+
                     CliStatusText = status == CliProcessStatus.Fehler
                         ? "CLI-Status: Fehler"
                         : "CLI inaktiv";
-                    _promptZeitVersandService.CancelScheduledPrompt(aufgabeId);
-                    ScheduledPromptStatus = null;
-                    ScheduledPromptTimeDisplay = null;
                     CliGestoppt?.Invoke();
                 }
             }
@@ -1799,7 +1811,6 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             _dispatcherInvoke(() =>
             {
                 IsCliRunning = false;
-                AktiverCliName = null;
             });
 
             var lokalerKlonPfad = _aufgabe.LokalerKlonPfad ?? string.Empty;
@@ -1862,6 +1873,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             var einzigesPluginPrefix = VerfuegbareKiPlugins[0];
             await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, einzigesPluginPrefix, ct);
+            aufgabe.KiPluginPrefix = einzigesPluginPrefix;
+            SelectedKiPluginPrefix = einzigesPluginPrefix;
+            SetAktiverCliName(einzigesPluginPrefix);
+            _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
             return einzigesPluginPrefix;
         }
 
@@ -1879,6 +1894,10 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         }
 
         await _aufgabeService.UpdateAsync(_aufgabeId, aufgabe.Titel, aufgabe.AnforderungsBeschreibung, dialogResult.SelectedPluginPrefix, ct);
+        aufgabe.KiPluginPrefix = dialogResult.SelectedPluginPrefix;
+        SelectedKiPluginPrefix = dialogResult.SelectedPluginPrefix;
+        SetAktiverCliName(dialogResult.SelectedPluginPrefix);
+        _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
 
         return dialogResult.SelectedPluginPrefix;
     }

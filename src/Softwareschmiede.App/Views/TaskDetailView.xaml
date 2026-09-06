@@ -658,7 +658,7 @@
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            FontSize="12"
                            VerticalAlignment="Center"
-                           AutomationProperties.Name="AktiverCliName"
+                           AutomationProperties.AutomationId="AktiverCliName"
                            Visibility="{Binding AktiverCliName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                 
             </Grid>            
