@@ -45,8 +45,28 @@ Beim Start einer Aufgabe (Repository-Klon) werden automatisch zwei lokale Dateie
   - Aufgaben-ID (eindeutige Kennung)
   - Branch-Name
   - Erstellungsdatum
+  - **Optionaler Abschnitt „Verknüpftes Issue"** — erscheint nur, wenn die Aufgabe eine `IssueReferenz` mit gültiger Issue-Nummer (`> 0`) besitzt. Enthält die Kennung als `#<Nummer>` und den Titel des Issues.
   - Vollständige Anforderungsbeschreibung
-  
+
+  Beispiel für eine Aufgabe mit Issue-Referenz:
+
+  ```markdown
+  # Aufgabe: Anmeldung fehlerhaft beheben
+
+  **Aufgaben-ID:** 3fa85f64-5717-4562-b3fc-2c963f66afa6
+  **Branch:** task/issue-42-3fa85f64…-anmeldung-fehlerhaft-beheben
+  **Erstellt:** 2026-09-06
+
+  ## Verknüpftes Issue
+
+  **Kennung:** #42
+  **Titel:** Anmeldung fehlerhaft
+
+  ## Anforderung
+
+  Die Login-Seite zeigt einen Fehler beim Einloggen mit …
+  ```
+
   Diese Datei dient dem KI-Agenten und dem Entwickler als Referenzmaterial während der Aufgabenbearbeitung.
 
 - **`.gitignore`-Eintrag** — Die `.gitignore`-Datei wird automatisch um den Eintrag `issue.md` erweitert, um sicherzustellen, dass diese lokale, aufgabenspezifische Datei nicht in die Versionskontrolle gelangt. Falls die `.gitignore` nicht vorhanden ist, wird sie automatisch erstellt.

@@ -28,6 +28,31 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases
 
+## Issue-Referenz in der issue.md
+
+Beim Start einer Aufgabe erzeugt `EntwicklungsprozessService.CreateIssueFileAsync()` eine `issue.md` im lokalen Klon-Verzeichnis. Ist an der Aufgabe eine `IssueReferenz` mit gültiger Nummer hinterlegt, wird automatisch ein eigener Abschnitt in die Datei geschrieben:
+
+```markdown
+# Aufgabe: {Titel}
+
+**Aufgaben-ID:** {Id}
+**Branch:** {BranchName}
+**Erstellt:** {ErstellungsDatum:yyyy-MM-dd}
+
+## Verknüpftes Issue
+
+**Kennung:** #{IssueNummer}
+**Titel:** {IssueReferenz.Titel}
+
+## Anforderung
+
+{AnforderungsBeschreibung}
+```
+
+- Der Block `## Verknüpftes Issue` erscheint **nur**, wenn `Aufgabe.IssueReferenz != null` **und** `IssueNummer > 0`.
+- Fehlt die Referenz oder ist die Nummer nicht gesetzt, entfällt der Block; die restliche `issue.md` bleibt unverändert.
+- Keine Datenmodell- oder Datenbankänderung notwendig — die `IssueReferenz` wird per Eager Loading bereits in `AufgabeService.GetDetailAsync()` mitgeladen.
+
 ## CLI-Rohausgabe exportieren
 
 Die Aufgabendetailansicht kann die protokollierte CLI-Rohausgabe als Datei exportieren:
