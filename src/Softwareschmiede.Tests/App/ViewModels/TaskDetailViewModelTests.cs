@@ -1434,6 +1434,75 @@ public sealed class TaskDetailViewModelTests : IDisposable
         zweiteVm.AktiverCliName.Should().Be("Test KI");
     }
 
+    /// <summary>Bei Wechsel der CLI über das Plugin-Dialog wird der neue Name in der Fußzeile angezeigt, auch wenn zuvor ein Projekt-Default aktiv war.</summary>
+    [Fact]
+    public async Task PluginAendernCommand_ZeigtNeuenAktivenCliName_WennVorherProjektDefaultLief()
+    {
+        var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(
+            _projektId,
+            PluginType.DevelopmentAutomation,
+            "Softwareschmiede.TestKi");
+
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut(pluginManager: _pluginManagerMockFuerPluginSelection.Object);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        sut.AktiverCliName.Should().Be("Test KI");
+
+        _dialogServiceMock
+            .SetupSequence(d => d.ShowPluginSelectionDialogAsync(
+                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.ZweitesKi", false))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue();
+        sut.AktiverCliName.Should().Be("Zweites KI");
+
+        var aktualisierteAufgabe = await _aufgabeService.GetByIdAsync(aufgabe.Id);
+        aktualisierteAufgabe!.KiPluginPrefix.Should().Be("Softwareschmiede.ZweitesKi");
+    }
+
+    /// <summary>Nach einem Plugin-Wechsel muss ein manueller CLI-Neustart das geänderte Plugin verwenden, nicht den Projekt-Default.</summary>
+    [Fact]
+    public async Task CliNeustartenCommand_NachPluginWechsel_VerwendetGeaendertesPlugin_NichtProjektDefault()
+    {
+        var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
+        await pluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync(
+            _projektId,
+            PluginType.DevelopmentAutomation,
+            "Softwareschmiede.TestKi");
+
+        var aufgabe = await ErstelleAufgabe(AufgabeStatus.Neu);
+        var sut = CreateSut(pluginManager: _pluginManagerMockFuerPluginSelection.Object);
+        sut.AufgabeId = aufgabe.Id;
+        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+
+        _dialogServiceMock
+            .SetupSequence(d => d.ShowPluginSelectionDialogAsync(
+                It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.ZweitesKi", false))
+            .ReturnsAsync(new PluginSelectionResult("Softwareschmiede.TestKi", false));
+
+        await ((AsyncRelayCommand)sut.StartenCommand).ExecuteAsync();
+        sut.AktiverCliName.Should().Be("Test KI");
+
+        await ((AsyncRelayCommand)sut.PluginAendernCommand).ExecuteAsync();
+        sut.AktiverCliName.Should().Be("Zweites KI");
+
+        await ((AsyncRelayCommand)sut.CliStoppenCommand).ExecuteAsync();
+        sut.IsCliRunning.Should().BeFalse();
+
+        await ((AsyncRelayCommand)sut.CliNeustartenCommand).ExecuteAsync();
+
+        sut.IsCliRunning.Should().BeTrue();
+        sut.AktiverCliName.Should().Be("Zweites KI");
+    }
+
     // --- PluginAendernCommand ---
 
     /// <summary>PluginAendernCommand.CanExecute ist true wenn CLI läuft.</summary>
