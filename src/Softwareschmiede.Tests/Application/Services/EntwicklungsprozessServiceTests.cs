@@ -71,7 +71,8 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
     }
 
     private PluginSelectionService CreatePluginSelectionService(params IKiPlugin[] kiPlugins)
-    {        var pluginManagerMock = new Mock<IPluginManager>();
+    {
+        var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([_gitPluginMock.Object]);
         pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginMock.Object);
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
@@ -1015,7 +1016,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.AtLeastOnce());
 
-            DeleteDirectoryIfExists(uniqueBase);
+        DeleteDirectoryIfExists(uniqueBase);
     }
 
     /// <summary>ProzessStartenAsync setzt den Prozess fort wenn CreateIssueFileAsync fehlschlägt.</summary>
