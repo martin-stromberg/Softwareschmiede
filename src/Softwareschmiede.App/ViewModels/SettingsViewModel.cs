@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.App.Services;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
@@ -16,6 +17,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 {
     private const string CodexPluginPrefix = "Softwareschmiede.Codex";
     private const string CommandLineParametersKey = "CommandLineParameters";
+    private const string UpdateModusAusLabel = "Aus";
+    private const string UpdateModusNurPruefenLabel = "Nur Pruefen";
+    private const string UpdateModusBeiProgrammstartLabel = "Bei Programmstart pruefen und ausfuehren";
 
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
@@ -44,6 +48,29 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private PluginActivationEntry? _selectedIdePlugin;
     private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
     private bool _isAutonomAufgabenEnabled = true;
+    private string _selectedUpdateMode = UpdateModusNurPruefenLabel;
+    private bool _includePrereleases;
+
+    /// <summary>Wird direkt nach erfolgreichem Speichern der Update-Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
+    public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
+
+    /// <summary>Feste Auswahlliste der Update-Modi als Anzeige-Labels (keine Steuerwerte).</summary>
+    public IReadOnlyList<string> UpdateModusOptionen { get; } =
+        [UpdateModusAusLabel, UpdateModusNurPruefenLabel, UpdateModusBeiProgrammstartLabel];
+
+    /// <summary>Aktuell ausgewählter Update-Modus als Anzeige-Label aus <see cref="UpdateModusOptionen"/>.</summary>
+    public string SelectedUpdateMode
+    {
+        get => _selectedUpdateMode;
+        set => SetProperty(ref _selectedUpdateMode, value);
+    }
+
+    /// <summary>Gibt an, ob bei der Update-Prüfung auch Prerelease-Versionen berücksichtigt werden.</summary>
+    public bool IncludePrereleases
+    {
+        get => _includePrereleases;
+        set => SetProperty(ref _includePrereleases, value);
+    }
 
     /// <summary>Arbeitsverzeichnis für Repository-Klone.</summary>
     public string? Arbeitsverzeichnis
@@ -301,6 +328,11 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             await LadePromptVorlagenAsync(ct);
 
             IsAutonomAufgabenEnabled = await _einstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct);
+
+            var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
+            _selectedUpdateMode = UpdateModusLabel(updateSettings.Modus);
+            OnPropertyChanged(nameof(SelectedUpdateMode));
+            IncludePrereleases = updateSettings.IncludePrereleases;
         }
         catch (OperationCanceledException)
         {
@@ -326,6 +358,16 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         {
             if (!ValidierePflichtfelder())
                 return;
+
+            if (!TryParseUpdateModus(SelectedUpdateMode, out var updateModus))
+            {
+                FehlerMeldung = "Der ausgewählte Update-Modus ist ungültig.";
+                return;
+            }
+
+            var updateSettings = new UpdateSettings(updateModus, IncludePrereleases);
+            await _einstellungService.SetUpdateSettingsAsync(updateSettings, ct);
+            UpdateSettingsSaved?.Invoke(this, updateSettings);
 
             foreach (var entry in SourceCodeManagementPlugins.Concat(DevelopmentAutomationPlugins).Concat(DevelopmentEnvironmentPlugins))
                 await _pluginActivationService.SetPluginEnabledAsync(entry.PluginPrefix, entry.IsEnabled, ct);
@@ -371,6 +413,32 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private async Task VerwerfenAsync(CancellationToken ct)
     {
         await LadenAsync(ct);
+    }
+
+    private static string UpdateModusLabel(UpdateMode modus) => modus switch
+    {
+        UpdateMode.Aus => UpdateModusAusLabel,
+        UpdateMode.BeiProgrammstartPruefenUndAusfuehren => UpdateModusBeiProgrammstartLabel,
+        _ => UpdateModusNurPruefenLabel
+    };
+
+    private static bool TryParseUpdateModus(string? label, out UpdateMode modus)
+    {
+        switch (label)
+        {
+            case UpdateModusAusLabel:
+                modus = UpdateMode.Aus;
+                return true;
+            case UpdateModusBeiProgrammstartLabel:
+                modus = UpdateMode.BeiProgrammstartPruefenUndAusfuehren;
+                return true;
+            case UpdateModusNurPruefenLabel:
+                modus = UpdateMode.NurPruefen;
+                return true;
+            default:
+                modus = UpdateMode.NurPruefen;
+                return false;
+        }
     }
 
     private void LoadSelectedPluginSettings(PluginActivationEntry entry)

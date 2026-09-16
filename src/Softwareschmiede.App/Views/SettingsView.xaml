@@ -285,6 +285,30 @@
                                   Content="Autonome Aufgaben aktivieren"
                                   Foreground="{DynamicResource PrimaryTextBrush}" />
                     </StackPanel>
+
+                    <!-- Updates -->
+                    <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
+                        <TextBlock Text="Updates"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,4" />
+                        <ComboBox SelectedValue="{Binding SelectedUpdateMode, UpdateSourceTrigger=PropertyChanged}"
+                                  AutomationProperties.Name="Update-Modus"
+                                  ItemsSource="{Binding UpdateModusOptionen}"
+                                  HorizontalAlignment="Stretch"
+                                  Margin="0,0,0,12"
+                                  Padding="8,6">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <CheckBox IsChecked="{Binding IncludePrereleases, Mode=TwoWay}"
+                                  AutomationProperties.Name="Prerelease-Versionen laden"
+                                  Content="Prerelease-Versionen laden"
+                                  Foreground="{DynamicResource PrimaryTextBrush}" />
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
             <TabItem>

@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
     private readonly DarkModeService _darkModeService;
     private readonly IApplicationVersionProvider _applicationVersionProvider;
     private readonly ILogger<MainWindow> _logger;
+    private readonly MainWindowViewModel _viewModel;
 
     /// <inheritdoc cref="MainWindow"/>
     public MainWindow(
@@ -34,7 +35,19 @@ public sealed partial class MainWindow : Window
         _darkModeService = darkModeService;
         _applicationVersionProvider = applicationVersionProvider;
         _logger = logger;
+        _viewModel = viewModel;
         DataContext = viewModel;
+
+        // Einmaliger Start der Update-Prüfung/-Installation erst nach dem ersten Rendern,
+        // damit Hauptfenster, Dispatcher und Dialog-Owner bereits bereitstehen.
+        ContentRendered += OnContentRendered;
+    }
+
+    private void OnContentRendered(object? sender, EventArgs e)
+    {
+        ContentRendered -= OnContentRendered;
+        _viewModel.InitializeUpdatesAfterWindowReadyAsync()
+            .SafeFireAndForget(_logger, "MainWindow.InitializeUpdatesAfterWindowReadyAsync");
     }
 
     /// <inheritdoc/>

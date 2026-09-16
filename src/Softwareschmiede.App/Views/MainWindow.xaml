@@ -170,6 +170,15 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+
+                    <TextBlock Text="{Binding UpdateHinweis}"
+                               AutomationProperties.Name="UpdateHinweis"
+                               AutomationProperties.AutomationId="UpdateHinweis"
+                               FontSize="11"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="8,4,8,0"
+                               Visibility="{Binding UpdateHinweis, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                 </StackPanel>
             </Grid>
         </Border>

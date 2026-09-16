@@ -17,7 +17,7 @@ public partial class End2EndTest
     /// ein Dialog mit einem "Schließen"-Button erscheint, der den Dialog schließt.
     /// </summary>
     protected void CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(Window mainWindow)
-    {        
+    {
         var expectedValue = $"--test-{Guid.NewGuid():N}";
 
         var settings = new SettingsView(mainWindow).ForceShow();

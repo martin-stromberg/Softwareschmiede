@@ -35,7 +35,7 @@ public partial class End2EndTest
         {
             settings.ForceShow();
             settings.SetExecutablePath(oldValue);
-            settings.SaveSettings(); 
+            settings.SaveSettings();
             settings.Menu.NavigateToDashboard();
         }
     }

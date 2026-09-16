@@ -17,6 +17,7 @@
 
         <TextBlock Grid.Row="0"
                    Text="{Binding PhaseText}"
+                   AutomationProperties.Name="UpdatePhase"
                    FontSize="16"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource TextBrush}"
@@ -24,6 +25,7 @@
 
         <TextBlock Grid.Row="1"
                    Text="{Binding Message}"
+                   AutomationProperties.Name="UpdateFortschrittMeldung"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource SecondaryTextBrush}"
                    Margin="0,0,0,14" />
@@ -32,6 +34,7 @@
                      Height="18"
                      Minimum="0"
                      Maximum="100"
+                     AutomationProperties.Name="UpdateFortschritt"
                      Value="{Binding Percent}"
                      IsIndeterminate="{Binding IsIndeterminate}" />
 
@@ -41,6 +44,7 @@
                     Margin="0,16,0,0">
             <Button Content="Abbrechen"
                     MinWidth="96"
+                    AutomationProperties.Name="UpdateAbbrechen"
                     Command="{Binding CancelCommand}"
                     IsEnabled="{Binding CanCancel}" />
         </StackPanel>

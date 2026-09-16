@@ -134,6 +134,9 @@ public sealed partial class App : System.Windows.Application
         try
         {
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+            // Explizit vor Show() zuweisen, damit Dialoge (z. B. Update-Fortschritt)
+            // schon bei einer sofortigen Start-Updateprüfung einen Owner haben.
+            System.Windows.Application.Current.MainWindow = mainWindow;
             mainWindow.Show();
         }
         catch (Exception ex)
