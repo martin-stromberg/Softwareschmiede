@@ -240,6 +240,7 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<BenachrichtigungsEinstellungenService>();
         services.AddScoped<BenachrichtigungsAuditService>();
         services.AddScoped<AppEinstellungService>();
+        services.AddScoped<KiPluginLimitService>();
         services.AddScoped<ArbeitsverzeichnisSettingsService>();
         services.AddScoped<PluginSettingsService>();
         services.AddScoped<PluginActivationService>();
@@ -324,6 +325,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<TodoListViewModel>();
         services.AddTransient<OpenTodosDialogViewModel>();
         services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
+        services.AddTransient<AufgabePausierenDialogViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

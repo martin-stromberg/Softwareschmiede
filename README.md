@@ -26,6 +26,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
 - **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Monitoring
 - **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
+- **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases
 
 ## Issue-Referenz in der issue.md
@@ -65,6 +66,41 @@ Die Aufgabendetailansicht kann die protokollierte CLI-Rohausgabe als Datei expor
 - Das Ziel muss auf `.raw` enden; bei Dialog-Abbruch wird keine Datei geschrieben.
 
 Die Implementierung liegt in `TaskDetailViewModel`, `CliRawExportService`, `IDialogService` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TaskDetailViewModelTests_CliRawExport`, `TaskDetailViewTests` und `E2E_CliRawExport`.
+
+## Aufgaben pausieren und Session-Limits erkennen
+
+Reguläre Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung Session-Limits in der CLI-Ausgabe und pausiert betroffene Aufgaben automatisch.
+
+### Pause einstellen und aufheben
+
+- In der Ribbon-Gruppe **Aufgabe** der Aufgabendetailansicht öffnet **„Pause einstellen"** (`PauseEinstellen`) den `AufgabePausierenDialog` mit Datum- und Uhrzeit-Eingabe (Vorbelegung: nächste volle Minute).
+- Der Button ist nur sichtbar, wenn die Aufgabe den Status `Neu`, `Gestartet` oder `Wartend` hat und keine Autonome Aufgabe ist.
+- `AufgabeService.SetPauseAsync` persistiert den UTC-Zeitpunkt in `Aufgabe.PausiertBisUtc` und schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag. Über **„Pause aufheben"** im selben Dialog lässt sich eine aktive Pause vorzeitig beenden.
+- Der Pause-Endzeitpunkt muss in der Zukunft liegen. Das Ende der Pause ist rein zeitbasiert — es gibt keine automatische Wiederaufnahme der CLI.
+
+### Anzeige
+
+- Die Kachel in der Seitenleisten-Sektion **„Aktive Aufgaben"** zeigt `⏸ Pausiert (noch hh:mm:ss)` — ab 24 Stunden Restzeit `d.hh:mm:ss` — und wird per `Opacity`-Trigger auf `0,55` abgeschwächt (`KiAusfuehrungsStatusConverter`, `ActiveTasksListControl`).
+- Die Detailansicht blendet im Ribbon zusätzlich `⏸ Pausiert bis dd.MM.yyyy HH:mm` ein.
+
+### Wirkung einer aktiven Pause
+
+- Blockiert: manueller Start (`ProzessStartenAsync`/`ProzessStartenUndCliStartenAsync`), CLI-Neustart (`CliNeustartenAsync`), Wiederherstellung (`AufgabeRecoveryService`) sowie das Senden und Planen von Prompts.
+- Bereits geplante zeitgesteuerte Prompts verschiebt der `PromptZeitVersandService` auf das Pausenende statt sie zu verwerfen.
+- Ein laufender CLI-Prozess wird niemals unterbrochen — die Pause greift nur für neu ausgelöste Aktionen.
+
+### Automatische Pause bei Session-Limit
+
+- Enthält eine CLI-Ausgabezeile den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel, ruft der `CliOutputProtokollWriter` den `KiPluginLimitService`.
+- Der Service persistiert den Reset-Zeitpunkt als `AppEinstellung` unter `plugins.sessionlimit.<KiPluginPrefix>` und pausiert alle aktiv laufenden regulären Aufgaben desselben Plugin-Prefix (pro Aufgabe ein `SystemMeldung`-Eintrag).
+- Eine manuell gesetzte, später endende Pause wird dabei nicht verkürzt (Max-Semantik); ein bereits abgelaufener Zeitpunkt wird zwar persistiert, löst aber keine Pause aus.
+- Marker ohne gültigen Zeitstempel erzeugen weiterhin nur den `ProtokollTyp.RateLimit`-Eintrag.
+
+### Update-Sicherheitsprüfung
+
+- `CliUpdateSafetyService.CheckAsync` wertet Aufgaben, deren KI-Plugin ein zukünftiges Session-Limit gespeichert hat, nicht als Update-Risiko — die sonst übliche Heartbeat-Toleranz entfällt für sie komplett.
+
+Abgedeckt wird das Feature u. a. durch `KiPluginLimitServiceTests`, `AufgabeServiceTests_Pause`, `AufgabePausierenDialogViewModelTests`, `CliUpdateSafetyServiceTests` sowie die E2E-Tests `E2E_AufgabePausieren` und `E2E_SessionLimitPause`.
 
 ## Voraussetzungen
 

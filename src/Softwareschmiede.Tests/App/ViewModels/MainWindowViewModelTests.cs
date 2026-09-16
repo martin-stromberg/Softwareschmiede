@@ -169,6 +169,26 @@ public sealed class MainWindowViewModelTests : IDisposable
         sut.AktiveAufgabenListe.Single(a => a.Id == ohneTodos.Id).OffeneTodoLabelText.Should().Be("0 Todos");
     }
 
+    /// <summary>AktiveAufgabenAktualisierenAsync mappt PausiertBisUtc und das abgeleitete IstPausiert auf das Panel-Item (Issue 151).</summary>
+    [Fact]
+    public async Task AktiveAufgabenAktualisierenAsync_ShouldMapPausiertBisUtc_WhenTaskIsPaused()
+    {
+        // Arrange
+        var pausiertBis = DateTimeOffset.UtcNow.AddHours(2);
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pausierte Aufgabe", null);
+        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/pause", "/tmp/pause");
+        await _aufgabeService.SetPauseAsync(aufgabe.Id, pausiertBis);
+        var sut = CreateSut();
+
+        // Act
+        await sut.AktiveAufgabenAktualisierenAsync();
+
+        // Assert
+        var item = sut.AktiveAufgabenListe.Single(a => a.Id == aufgabe.Id);
+        item.PausiertBisUtc.Should().BeCloseTo(pausiertBis, TimeSpan.FromSeconds(5));
+        item.IstPausiert.Should().BeTrue();
+    }
+
     /// <summary>OffeneTodosAnzeigenCommand öffnet den Dialog für die Aufgabe des aktiven Listen-Items.</summary>
     [Fact]
     public async Task OffeneTodosAnzeigenCommand_ShouldOpenDialogForSelectedTask()

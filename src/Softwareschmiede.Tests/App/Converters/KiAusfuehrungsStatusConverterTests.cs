@@ -201,6 +201,87 @@ public sealed class KiAusfuehrungsStatusConverterTests
         result.Should().Be("✓ Bereit");
     }
 
+    /// <summary>Convert zeigt bei zukünftigem PausiertBisUtc den Pausiert-Countdown — vor allen übrigen Statusanzeigen (Issue 151).</summary>
+    [Fact]
+    public void Convert_ShouldReturnPausiertCountdown_WhenPausiertBisUtcInFuture()
+    {
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Pausierte Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            AktiveRunId = "run-pausiert",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            LaufStatus = AufgabeLaufStatus.Laeuft,
+            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(90)
+        };
+
+        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().BeOfType<string>().Which.Should().StartWith("⏸ Pausiert (noch ");
+    }
+
+    /// <summary>Convert zeigt den Pausiert-Countdown auch für Sidebar-Panel-Items (Issue 151).</summary>
+    [Fact]
+    public void Convert_ShouldReturnPausiertCountdown_WhenPanelItemPausiert()
+    {
+        var item = new AktiveAufgabePanelItem
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Pausierte Sidebar-Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            AktiveRunId = "run-panel-pausiert",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(3)
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().BeOfType<string>().Which.Should().StartWith("⏸ Pausiert (noch ");
+    }
+
+    /// <summary>Convert zeigt bei Pausen >= 24 Stunden das Tag-Format d.hh:mm:ss (Issue 151).</summary>
+    [Fact]
+    public void Convert_ShouldReturnPausiertCountdownMitTagen_WhenPauseUeber24Stunden()
+    {
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Lange pausierte Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            AktiveRunId = "run-lang",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            PausiertBisUtc = DateTimeOffset.UtcNow.AddDays(2)
+        };
+
+        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().BeOfType<string>().Which.Should().MatchRegex(@"^⏸ Pausiert \(noch \d+\.\d{2}:\d{2}:\d{2}\)$");
+    }
+
+    /// <summary>Convert ignoriert einen abgelaufenen PausiertBisUtc-Wert und zeigt den normalen Status (Issue 151).</summary>
+    [Fact]
+    public void Convert_ShouldReturnNormalStatus_WhenPausiertBisUtcAbgelaufen()
+    {
+        var aufgabe = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            Titel = "Aufgabe mit abgelaufener Pause",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            AktiveRunId = "run-abgelaufen",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(-1)
+        };
+
+        var result = _sut.Convert(aufgabe, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("▶ Läuft");
+    }
+
     /// <summary>Convert gibt einen leeren String zurück, wenn kein unterstütztes Objekt übergeben wird.</summary>
     [Fact]
     public void Convert_ShouldReturnEmptyString_WhenValueIsNotAufgabe()

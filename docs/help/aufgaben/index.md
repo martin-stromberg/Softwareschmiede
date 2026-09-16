@@ -8,6 +8,8 @@ Erstellte Pull Requests werden persistent an der Aufgabe gespeichert. Die PR-Ans
 
 Die Navigationsmenü-Seitenleiste zeigt bis zu 20 derzeit aktive Aufgaben als Kacheln mit Titel, KI-Ausführungsstatus und Anzahl offener Todos an, um schnellen Zugriff auf laufende Arbeiten zu ermöglichen. Das Todo-Label ist anklickbar und öffnet einen rein lesenden Dialog mit den offenen Todos der ausgewählten Aufgabe oder einem Leerzustand bei `0 Todos`. Das Dashboard zeigt die gleiche Aufgabenliste an; die Menüsektion wird automatisch verborgen wenn das Dashboard aktiv ist, um Redundanz zu vermeiden.
 
+Reguläre Aufgaben können über **Pause einstellen** bis zu einem frei wählbaren Zeitpunkt pausiert werden; pausierte Kacheln erscheinen abgeblendet mit Countdown („⏸ Pausiert (noch …)"). Meldet ein KI-CLI ein Session-Limit, werden alle aktiv laufenden Aufgaben desselben KI-Plugins automatisch bis zum gemeldeten Zeitpunkt pausiert — laufende Ausführungen werden dabei nicht unterbrochen, und ein automatischer Neustart findet nicht statt.
+
 ## Arten von Aufgaben
 
 ### Reguläre Aufgaben

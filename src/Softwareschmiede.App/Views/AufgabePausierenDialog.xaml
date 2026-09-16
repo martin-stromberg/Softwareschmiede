@@ -1,0 +1,99 @@
+<Window x:Class="Softwareschmiede.App.Views.AufgabePausierenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pause einstellen"
+        Background="{DynamicResource SurfaceBrush}"
+        Width="420"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Titel -->
+        <TextBlock Grid.Row="0"
+                   Text="Pause einstellen"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource PrimaryTextBrush}"
+                   Margin="0,0,0,16" />
+
+        <!-- Aktuell gesetzte Pause -->
+        <TextBlock Grid.Row="1"
+                   Text="{Binding AktuellePauseAnzeige}"
+                   AutomationProperties.Name="AktuellePauseAnzeige"
+                   FontSize="12"
+                   Foreground="{DynamicResource SecondaryTextBrush}"
+                   Margin="0,0,0,12"
+                   Visibility="{Binding AktuellePauseAnzeige, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+
+        <!-- Datum + Uhrzeit -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
+                    Margin="0,0,0,8">
+            <DatePicker SelectedDate="{Binding PausiertDatum, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        AutomationProperties.Name="PausierenDatum"
+                        Width="140" />
+            <TextBlock Text="um"
+                       VerticalAlignment="Center"
+                       Margin="8,0"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBox Text="{Binding PausiertStunde, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="PausierenStunde"
+                     Width="44"
+                     Padding="6,4" />
+            <TextBlock Text=":"
+                       VerticalAlignment="Center"
+                       Margin="4,0"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBox Text="{Binding PausiertMinute, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="PausierenMinute"
+                     Width="44"
+                     Padding="6,4" />
+            <TextBlock Text="Uhr"
+                       VerticalAlignment="Center"
+                       Margin="8,0,0,0"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+        </StackPanel>
+
+        <!-- Validierungshinweis -->
+        <TextBlock Grid.Row="3"
+                   Text="{Binding ValidierungsFehler}"
+                   AutomationProperties.Name="PausierenValidierungsFehler"
+                   FontSize="12"
+                   Foreground="{DynamicResource ErrorBrush}"
+                   Margin="0,0,0,8"
+                   Visibility="{Binding ValidierungsFehler, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+            <Button Content="Abbrechen"
+                    AutomationProperties.Name="PausierenAbbrechen"
+                    Command="{Binding AbbrechenCommand}"
+                    Padding="12,6"
+                    Margin="0,0,8,0" />
+            <Button Content="Pause aufheben"
+                    AutomationProperties.Name="PausierenAufheben"
+                    Command="{Binding AufhebenCommand}"
+                    Padding="12,6"
+                    Margin="0,0,8,0" />
+            <Button Content="Übernehmen"
+                    AutomationProperties.Name="PausierenBestaetigen"
+                    Command="{Binding BestaetigenCommand}"
+                    Padding="12,6"
+                    Background="{DynamicResource AccentBrush}"
+                    Foreground="White"
+                    BorderThickness="0" />
+        </StackPanel>
+    </Grid>
+</Window>

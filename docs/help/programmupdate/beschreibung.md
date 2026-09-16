@@ -23,6 +23,8 @@ Während des gesamten Prozesses wird der Benutzer durch einen modalen Fortschrit
 
 Der Benutzer kann den Update-Prozess während der Vorbereitung durch einen „Abbrechen"-Button unterbrechen. Nach erfolgreicher Vorbereitung startet ein externes Update-Skript und die Anwendung wird beendet.
 
+Vor dem Update prüft die Anwendung, ob aktive KI-Aufgaben laufen, und warnt gegebenenfalls. Aufgaben, deren KI-Plugin ein bekanntes, noch laufendes Session-Limit gemeldet hat, gelten dabei nicht als blockierend — sie können ohnehin erst nach dem Limit-Reset fortgesetzt werden.
+
 ## Benutzer-sichtbare Komponenten
 
 ### Update-Fortschrittsdialog

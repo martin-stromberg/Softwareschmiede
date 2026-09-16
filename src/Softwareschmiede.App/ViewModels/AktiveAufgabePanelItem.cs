@@ -41,6 +41,12 @@ public sealed class AktiveAufgabePanelItem : ViewModelBase
     /// <summary>Zeitstempel des letzten echten CLI-Prozessstarts.</summary>
     public DateTimeOffset? LetzterCliStartUtc { get; init; }
 
+    /// <summary>Optionaler UTC-Zeitpunkt, bis zu dem die Aufgabe pausiert ist (null oder Vergangenheit = nicht pausiert).</summary>
+    public DateTimeOffset? PausiertBisUtc { get; init; }
+
+    /// <summary>Gibt an, ob die Aufgabe aktuell pausiert ist (<see cref="PausiertBisUtc"/> liegt in der Zukunft).</summary>
+    public bool IstPausiert => PausiertBisUtc > DateTimeOffset.UtcNow;
+
     /// <summary>Gibt an, ob für diese Aufgabe aktuell ein zeitgesteuerter Prompt in der Warteschlange steht.</summary>
     public bool HasScheduledPrompt { get; init; }
 
