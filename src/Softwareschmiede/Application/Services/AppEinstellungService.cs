@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Infrastructure.Data;
 
@@ -39,6 +40,15 @@ public sealed class AppEinstellungService
 
     /// <summary>Schlüssel für das Feature-Flag "Autonome Aufgaben aktiviert".</summary>
     public const string AutonomAufgabenEnabledKey = "autonomeaufgaben.enabled";
+
+    /// <summary>Schlüssel für den Update-Modus (<see cref="UpdateMode"/>-Wert als Zahl gespeichert).</summary>
+    public const string UpdateModeKey = "updates.mode";
+
+    /// <summary>Schlüssel für die Prerelease-Auswahl bei Updates.</summary>
+    public const string IncludePrereleasesKey = "updates.includePrereleases";
+
+    /// <summary>Fester EF-Abfragetag der gemeinsamen Update-Einstellungs-Leseabfrage für gezielte Testinterception.</summary>
+    public const string UpdateSettingsReadTag = "UpdateSettings.Read";
 
     private readonly SoftwareschmiededDbContext _db;
     private readonly ILogger<AppEinstellungService> _logger;
@@ -208,6 +218,86 @@ public sealed class AppEinstellungService
 
         await _db.SaveChangesAsync(ct);
         _logger.LogDebug("Fenstergeometrie gespeichert.");
+    }
+
+    /// <summary>
+    /// Liest Update-Modus und Prerelease-Auswahl gemeinsam in einer einzigen Datenbankabfrage
+    /// (Abfragetag <see cref="UpdateSettingsReadTag"/>). Fehlende oder ungültige gespeicherte Werte
+    /// fallen auf die Defaults <see cref="UpdateMode.NurPruefen"/> bzw. <see langword="false"/> zurück;
+    /// Datenbank-Lesefehler werden nicht abgefangen und propagieren an den Aufrufer.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die gelesenen Update-Einstellungen.</returns>
+    public async Task<UpdateSettings> GetUpdateSettingsAsync(CancellationToken ct = default)
+    {
+        var keys = new[] { UpdateModeKey, IncludePrereleasesKey };
+
+        var werte = await _db.AppEinstellungen
+            .AsNoTracking()
+            .TagWith(UpdateSettingsReadTag)
+            .Where(s => keys.Contains(s.Schluessel))
+            .ToDictionaryAsync(s => s.Schluessel, s => s.Wert, ct);
+
+        var modus = UpdateMode.NurPruefen;
+        if (werte.TryGetValue(UpdateModeKey, out var modusWert)
+            && int.TryParse(modusWert, out var modusZahl)
+            && Enum.IsDefined((UpdateMode)modusZahl))
+        {
+            modus = (UpdateMode)modusZahl;
+        }
+
+        var includePrereleases = werte.TryGetValue(IncludePrereleasesKey, out var prereleaseWert)
+            && bool.TryParse(prereleaseWert, out var prereleaseFlag)
+            && prereleaseFlag;
+
+        return new UpdateSettings(modus, includePrereleases);
+    }
+
+    /// <summary>
+    /// Validiert den Update-Modus und schreibt Modus und Prerelease-Auswahl gemeinsam
+    /// in einem einzigen Speichervorgang.
+    /// </summary>
+    /// <param name="settings">Die zu speichernden Update-Einstellungen.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="settings"/> enthält einen nicht definierten <see cref="UpdateMode"/>-Wert.</exception>
+    public async Task SetUpdateSettingsAsync(UpdateSettings settings, CancellationToken ct = default)
+    {
+        if (!Enum.IsDefined(settings.Modus))
+            throw new ArgumentOutOfRangeException(nameof(settings), settings.Modus, "Unbekannter Update-Modus.");
+
+        var updates = new[]
+        {
+            (UpdateModeKey,         ((int)settings.Modus).ToString()),
+            (IncludePrereleasesKey, settings.IncludePrereleases.ToString()),
+        };
+
+        var keys = updates.Select(u => u.Item1).ToArray();
+
+        var bestehende = await _db.AppEinstellungen
+            .Where(s => keys.Contains(s.Schluessel))
+            .ToDictionaryAsync(s => s.Schluessel, ct);
+
+        foreach (var (schluessel, wert) in updates)
+        {
+            if (bestehende.TryGetValue(schluessel, out var einstellung))
+            {
+                einstellung.Wert = wert;
+                einstellung.AktualisiertAm = DateTimeOffset.UtcNow;
+            }
+            else
+            {
+                _db.AppEinstellungen.Add(new AppEinstellung
+                {
+                    Id = Guid.NewGuid(),
+                    Schluessel = schluessel,
+                    Wert = wert,
+                    AktualisiertAm = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+        _logger.LogDebug("Update-Einstellungen gespeichert.");
     }
 }
 

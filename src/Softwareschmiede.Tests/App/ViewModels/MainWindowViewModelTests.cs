@@ -605,7 +605,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task Constructor_ShouldStartUpdateCheckAndExposeAvailableUpdate()
     {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
+        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
         updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
@@ -624,7 +624,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task UpdatePruefenCommand_ShouldHideUpdateButton_WhenNoUpdateIsAvailable()
     {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
+        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
         updateServiceMock.SetupSequence(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update))
@@ -644,7 +644,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task UpdateStartenCommand_ShouldStop_WhenSafetyDialogIsDeclined()
     {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
+        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
         updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
@@ -673,7 +673,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task UpdateStartenCommand_ShouldCancelPrepareUpdate_WhenProgressDialogCancelIsExecuted()
     {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
+        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
         updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
@@ -718,7 +718,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task UpdateStartenCommand_ShouldEnableProgressDialogCloseBeforeStartingPreparedUpdate()
     {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
+        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var preparation = new UpdatePreparationResult("release.zip", "extracted", "update.ps1", "update.log", false);
         var updateServiceMock = new Mock<IUpdateService>();
         updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))

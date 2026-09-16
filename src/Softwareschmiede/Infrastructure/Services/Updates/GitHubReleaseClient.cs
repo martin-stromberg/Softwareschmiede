@@ -56,9 +56,9 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 return null;
             }
 
-            if (!UpdateVersionComparer.TryParse(release.TagName, out _))
+            if (!UpdateVersionComparer.TryParse(release.TagName, out var parsedVersion) || parsedVersion.IsPrerelease)
             {
-                _logger.LogWarning("GitHub-Release {TagName} ist keine gültige Update-Version.", release.TagName);
+                _logger.LogWarning("GitHub-Release {TagName} ist keine gültige stabile Update-Version.", release.TagName);
                 return null;
             }
 
@@ -67,7 +67,8 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 release.TagName,
                 asset.Name,
                 new Uri(asset.BrowserDownloadUrl),
-                release.PublishedAt);
+                release.PublishedAt,
+                IsPrerelease: false);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or UriFormatException)
         {

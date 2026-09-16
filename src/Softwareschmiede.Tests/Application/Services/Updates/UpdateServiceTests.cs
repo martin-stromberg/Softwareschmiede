@@ -12,7 +12,7 @@ public sealed class UpdateServiceTests
     [Fact]
     public async Task CheckForUpdateAsync_ShouldReturnAvailable_WhenRemoteVersionIsNewer()
     {
-        var update = new UpdateInfo("1.2.4", "v1.2.4", "release.zip", new Uri("https://example.invalid/release.zip"), null);
+        var update = new UpdateInfo("1.2.4", "v1.2.4", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var versionProvider = new Mock<IApplicationVersionProvider>();
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));

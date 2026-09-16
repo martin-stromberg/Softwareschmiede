@@ -135,7 +135,7 @@ public sealed class UpdatePackageServiceTests
     }
 
     private static UpdateInfo CreateUpdateInfo()
-        => new("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), DateTimeOffset.UtcNow);
+        => new("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), DateTimeOffset.UtcNow, IsPrerelease: false);
 
     private static byte[] CreateZip(bool includeExe, bool includeVersion)
     {

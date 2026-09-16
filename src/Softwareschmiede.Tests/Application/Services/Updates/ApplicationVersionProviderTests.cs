@@ -29,6 +29,26 @@ public sealed class ApplicationVersionProviderTests
         result.TagName.Should().Be("v1.2.3");
     }
 
+    /// <summary>Prerelease-Suffix und Build-Metadaten aus der version.json bleiben unverändert erhalten.</summary>
+    [Fact]
+    public async Task GetInstalledVersionAsync_PreservesPrerelease()
+    {
+        using var temp = new TempDirectory();
+        await File.WriteAllTextAsync(Path.Combine(temp.Path, "version.json"), """
+{
+  "version": "v1.3.0-rc.1+build.7",
+  "tagName": "v1.3.0-rc.1"
+}
+""");
+        var sut = new ApplicationVersionProvider(temp.Path, NullLogger<ApplicationVersionProvider>.Instance);
+
+        var result = await sut.GetInstalledVersionAsync();
+
+        result.Should().NotBeNull();
+        result!.Version.Should().Be("1.3.0-rc.1+build.7");
+        result.TagName.Should().Be("v1.3.0-rc.1");
+    }
+
     /// <summary>Fehlende und ungültige version.json-Dateien werden als nicht prüfbar behandelt.</summary>
     [Theory]
     [InlineData("")]
