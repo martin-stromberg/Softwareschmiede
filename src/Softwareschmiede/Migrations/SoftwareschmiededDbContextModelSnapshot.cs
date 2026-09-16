@@ -157,6 +157,9 @@ namespace Softwareschmiede.Migrations
                     b.Property<string>("LokalerKlonPfad")
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("PausiertBisUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("ProjektId")
                         .HasColumnType("TEXT");
 

@@ -29,6 +29,8 @@ public partial class End2EndTest : WpfTestBase
         await RepositoryZuweisung(mainWindow);
         Todo_ErstellenAbhakenLoeschenUndAbschlussValidierung_E2E(mainWindow);
         TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
+        await AufgabePausieren_DialogCountdownAbblendungUndAufheben_E2E(mainWindow);
+        await SessionLimit_MarkerPauseProtokollUndUpdateSicherheit_E2E(mainWindow);
         CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);
 
         ViewPatternHappyPath_NavigiertUndErstelltKorrekt_E2E(mainWindow);
@@ -78,18 +80,5 @@ public partial class End2EndTest : WpfTestBase
         await DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E(mainWindow);
 
         app.Close();
-    }
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <returns></returns>
-    [SkippableFact]
-    public async Task RunCurrentTest()
-    {
-        SkipWennConPtyNichtVerfuegbar();
-
-        var app = LaunchApp(true);
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
-        CliRawExport_ErstelltRawDateiMitCliOutput_HappyPath_E2E(mainWindow);
     }
 }

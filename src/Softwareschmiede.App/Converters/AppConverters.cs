@@ -121,14 +121,25 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
     {
         var status = value switch
         {
-            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, false),
-            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.HasScheduledPrompt),
+            Aufgabe aufgabe => new StatusDaten(aufgabe.Status, aufgabe.AusfuehrungsStatus, aufgabe.AktiveRunId, aufgabe.LastHeartbeatUtc, aufgabe.LaufStatus, false, aufgabe.PausiertBisUtc),
+            AktiveAufgabePanelItem item => new StatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.HasScheduledPrompt, item.PausiertBisUtc),
             _ => null
         };
 
         if (status is null)
         {
             return string.Empty;
+        }
+
+        // Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert
+        // den Laufzeitstatus (die Kachel zeigt den Countdown statt "Läuft"/"Prompt in Wartestellung").
+        if (status.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
+        {
+            var restzeit = pausiertBis - DateTimeOffset.UtcNow;
+            var restzeitText = restzeit >= TimeSpan.FromDays(1)
+                ? restzeit.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture)
+                : restzeit.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+            return $"⏸ Pausiert (noch {restzeitText})";
         }
 
         if (status.HasScheduledPrompt)
@@ -169,5 +180,6 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
         string? AktiveRunId,
         DateTimeOffset? LastHeartbeatUtc,
         AufgabeLaufStatus? LaufStatus,
-        bool HasScheduledPrompt);
+        bool HasScheduledPrompt,
+        DateTimeOffset? PausiertBisUtc);
 }

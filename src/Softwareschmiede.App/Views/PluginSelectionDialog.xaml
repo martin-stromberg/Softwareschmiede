@@ -28,7 +28,7 @@
         <ComboBox Grid.Row="1"
                   AutomationProperties.Name="PluginAuswahl"
                   ItemsSource="{Binding VerfuegbarePlugins}"
-                  SelectedItem="{Binding SelectedPluginPrefix, Mode=TwoWay}"
+                  SelectedItem="{Binding SelectedPluginPrefix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                   Background="{DynamicResource BackgroundBrush}"
                   Padding="8,6"
                   Margin="0,0,0,12" />

@@ -51,11 +51,103 @@ public sealed class SimulatedPseudoConsoleProcessLauncher : IPseudoConsoleProces
         var session = new PseudoConsoleSession(
             NullPseudoConsoleHandle.Instance,
             process,
-            process.StandardInput.BaseStream,
+            new CrSubmittingInputStream(process.StandardInput.BaseStream),
             process.StandardOutput.BaseStream,
             _loggerFactory.CreateLogger<PseudoConsoleSession>(),
             outputSink);
 
         return (process, session, IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Übersetzt ein alleinstehendes <c>\r</c> (CR) auf dem Input-Stream in <c>\r\n</c>.
+    /// <see cref="PseudoConsoleSession.WritePromptAsync"/> sendet den abschließenden Submit bewusst als
+    /// nacktes CR, weil ein echtes ConPTY damit einen Tastatur-Enter emuliert. Auf einer umgeleiteten
+    /// STDIN-Pipe terminiert <c>cmd.exe</c> eine Zeile dagegen nur per <c>\r\n</c> — ohne Übersetzung
+    /// bliebe der Prompt unzustellt im Eingabepuffer liegen. Bereits vorhandene <c>\r\n</c>-Sequenzen
+    /// (z. B. der Plugin-Startbefehl aus <c>KiAusfuehrungsService.SendCommandDelayedAsync</c>) werden
+    /// unverändert durchgereicht.
+    /// </summary>
+    private sealed class CrSubmittingInputStream : Stream
+    {
+        private readonly Stream _inner;
+
+        public CrSubmittingInputStream(Stream inner)
+        {
+            _inner = inner;
+        }
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => _inner.CanWrite;
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() => _inner.Flush();
+
+        public override Task FlushAsync(CancellationToken cancellationToken) => _inner.FlushAsync(cancellationToken);
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count)
+            => _inner.Write(Translate(buffer.AsSpan(offset, count)));
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var translated = Translate(buffer.AsSpan(offset, count));
+            return _inner.WriteAsync(translated, 0, translated.Length, cancellationToken);
+        }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+            => _inner.WriteAsync(Translate(buffer.Span), cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private static byte[] Translate(ReadOnlySpan<byte> input)
+        {
+            var extra = 0;
+            for (var i = 0; i < input.Length; i++)
+            {
+                if (input[i] == '\r' && (i + 1 >= input.Length || input[i + 1] != '\n'))
+                {
+                    extra++;
+                }
+            }
+
+            if (extra == 0)
+            {
+                return input.ToArray();
+            }
+
+            var output = new byte[input.Length + extra];
+            var pos = 0;
+            for (var i = 0; i < input.Length; i++)
+            {
+                output[pos++] = input[i];
+                if (input[i] == '\r' && (i + 1 >= input.Length || input[i + 1] != '\n'))
+                {
+                    output[pos++] = (byte)'\n';
+                }
+            }
+
+            return output;
+        }
     }
 }

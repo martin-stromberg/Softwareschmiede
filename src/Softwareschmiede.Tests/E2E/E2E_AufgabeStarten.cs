@@ -65,11 +65,10 @@ public partial class End2EndTest
         // Einstellung korrigieren: ConfirmGitInitInSourceDirectory auf true setzen
         new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
 
-        // Zweiter Versuch: Plugin-Dialog erneut bedienen, diesmal ist die Bestätigung gesetzt
-        taskDetail.Start(pluginName, fuerProjektVerwenden: false);
-
-        // Nach erfolgreichem Start: CLI-Panel sichtbar (Stoppen-Button + Status "Gestartet"), kein Fehler mehr
-        taskDetail.WaitForCliRunning();
+        // Zweiter Versuch: Das Plugin wurde beim ersten Versuch bereits ausgewählt und persistiert,
+        // daher reicht ein erneutes "Starten" ohne Dialog.
+        taskDetail.ClickStarten()
+                  .WaitForCliRunning();
         Assert.False(new ErrorView(mainWindow).IsVisible);
 
         taskDetail.ForceClose(recurseToDashboard: false);

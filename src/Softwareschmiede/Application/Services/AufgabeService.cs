@@ -751,6 +751,64 @@ public sealed class AufgabeService : IAktiveAufgabenService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Setzt oder leert den Pausen-Endzeitpunkt (<see cref="Aufgabe.PausiertBisUtc"/>) einer Aufgabe.
+    /// Erlaubte Stati: <see cref="AufgabeStatus.Neu"/>, <see cref="AufgabeStatus.Gestartet"/> und
+    /// <see cref="AufgabeStatus.Wartend"/>. Beim Setzen muss der Zeitpunkt in der Zukunft liegen;
+    /// <c>null</c> hebt eine bestehende Pause auf. Schreibt einen
+    /// <see cref="ProtokollTyp.SystemMeldung"/>-Eintrag.
+    /// </summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="pausiertBisUtc">UTC-Zeitpunkt, bis zu dem pausiert wird, oder <c>null</c> zum Aufheben.</param>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public async Task SetPauseAsync(Guid aufgabeId, DateTimeOffset? pausiertBisUtc, CancellationToken ct = default)
+    {
+        _logger.LogInformation(
+            "Aufgabe {AufgabeId}: Pause {Aktion} (bis {PausiertBisUtc}).",
+            aufgabeId,
+            pausiertBisUtc.HasValue ? "setzen" : "aufheben",
+            pausiertBisUtc?.ToString("O") ?? "-");
+
+        var aufgabe = await _db.Aufgaben
+            .Include(a => a.AutonomKonfiguration)
+            .FirstOrDefaultAsync(a => a.Id == aufgabeId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+
+        if (aufgabe.IstAutonom())
+        {
+            throw new InvalidOperationException(
+                $"Aufgabe {aufgabeId} ist eine Autonome Aufgabe und kann nicht pausiert werden.");
+        }
+
+        if (aufgabe.Status is not (AufgabeStatus.Neu or AufgabeStatus.Gestartet or AufgabeStatus.Wartend))
+        {
+            throw new InvalidOperationException(
+                $"Aufgabe {aufgabeId} kann im Status {aufgabe.Status} nicht pausiert werden.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (pausiertBisUtc.HasValue && pausiertBisUtc.Value <= now)
+        {
+            throw new InvalidOperationException(
+                "Der Pausen-Endzeitpunkt muss in der Zukunft liegen.");
+        }
+
+        aufgabe.PausiertBisUtc = pausiertBisUtc;
+
+        _db.Protokolleintraege.Add(new Protokolleintrag
+        {
+            Id = Guid.NewGuid(),
+            AufgabeId = aufgabeId,
+            Typ = ProtokollTyp.SystemMeldung,
+            Inhalt = pausiertBisUtc.HasValue
+                ? $"Aufgabe pausiert bis {pausiertBisUtc.Value:O}."
+                : "Pause aufgehoben.",
+            Zeitstempel = now
+        });
+
+        await _db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Schließt eine Aufgabe ab: Status → Beendet, AbschlussDatum setzen, Branch- und Klonpfad-Felder leeren.</summary>
     public async Task AbschliessenAsync(Guid id, CancellationToken ct = default)
     {

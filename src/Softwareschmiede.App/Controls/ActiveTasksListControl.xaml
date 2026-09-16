@@ -26,6 +26,7 @@
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            TextTrimming="CharacterEllipsis"
                            Visibility="{Binding KiPluginName, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
+                           AutomationProperties.AutomationId="{Binding Titel, StringFormat=AktiveAufgabeKiPlugin_{0}}"
                            Margin="0,1,0,0" />
                 <TextBlock Text="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
                            FontSize="11"
@@ -34,6 +35,17 @@
                            AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeStatus:{0}}"
                            AutomationProperties.HelpText="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}"
                            behaviors:StatusUebergangsAnimation.Status="{Binding ., Converter={StaticResource KiAusfuehrungsStatusConverter}}" />
+                <!-- UIA-Anker für die Kachel-Abblendung pausierter Aufgaben: Der umgebende Border
+                     erzeugt keinen AutomationPeer und ist damit für UI-Automation unsichtbar.
+                     Dieses leere TextBlock trägt daher den Pausiert-Marker im HelpText. -->
+                <TextBlock AutomationProperties.Name="{Binding Titel, StringFormat=AufgabeKachel:{0}}">
+                    <AutomationProperties.HelpText>
+                        <MultiBinding StringFormat="Aktiv:{0};Pausiert:{1}">
+                            <Binding Path="IsAktiv" />
+                            <Binding Path="IstPausiert" />
+                        </MultiBinding>
+                    </AutomationProperties.HelpText>
+                </TextBlock>
                 <Button Content="{Binding OffeneTodoLabelText}"
                         Command="{Binding OffeneTodosAnzeigenCommand}"
                         Click="OffeneTodosButton_Click"
@@ -57,8 +69,7 @@
                     CornerRadius="8"
                     Margin="4,4,4,4"
                     Padding="10"
-                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}"
-                    AutomationProperties.HelpText="{Binding IsAktiv, StringFormat=Aktiv:{0}}">
+                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
@@ -66,6 +77,12 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsAktiv}" Value="True">
                                 <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                            <!-- Abblendung pausierter Kacheln; der Pausiert:-Marker für E2E steckt im
+                                 HelpText des 'AufgabeKachel:'-TextBlocks im Inhaltstemplate (der Border
+                                 selbst erzeugt keinen AutomationPeer und ist per UIA unsichtbar). -->
+                            <DataTrigger Binding="{Binding IstPausiert}" Value="True">
+                                <Setter Property="Opacity" Value="0.55" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -100,8 +117,7 @@
                     Margin="0,0,0,12"
                     Padding="16"
                     Cursor="Hand"
-                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}"
-                    AutomationProperties.HelpText="{Binding IsAktiv, StringFormat=Aktiv:{0}}">
+                    AutomationProperties.Name="{Binding Titel, StringFormat=Aufgabe:{0}}">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
@@ -109,6 +125,10 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsAktiv}" Value="True">
                                 <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                            <!-- Abblendung pausierter Kacheln; der Pausiert:-Marker im HelpText ist der E2E-Anker. -->
+                            <DataTrigger Binding="{Binding IstPausiert}" Value="True">
+                                <Setter Property="Opacity" Value="0.55" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

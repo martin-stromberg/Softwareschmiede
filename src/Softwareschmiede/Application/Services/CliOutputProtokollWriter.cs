@@ -208,6 +208,19 @@ public sealed class CliOutputProtokollWriter : ITerminalOutputSink
             await using var scope = _scopeFactory.CreateAsyncScope();
             var protokollService = scope.ServiceProvider.GetRequiredService<ProtokollService>();
             await protokollService.AddCliOutputAsync(_aufgabeId, line).ConfigureAwait(false);
+
+            // Session-Limit-Marker mit gültigem Reset-Zeitpunkt: Plugin-Limit persistieren und
+            // alle aktiv laufenden Aufgaben desselben KiPluginPrefix pausieren (ohne laufende
+            // CLI-Prozesse zu unterbrechen). GetService statt GetRequiredService, damit Scopes
+            // ohne Registrierung (z. B. in Unit-Tests) fehlertolerant bleiben.
+            if (ProtokollService.TryParseRateLimitMarker(line, out var resetUtc) && resetUtc.HasValue)
+            {
+                var limitService = scope.ServiceProvider.GetService<KiPluginLimitService>();
+                if (limitService is not null)
+                {
+                    await limitService.VerarbeiteRateLimitAsync(_aufgabeId, resetUtc.Value).ConfigureAwait(false);
+                }
+            }
         }
         catch (ObjectDisposedException ex)
         {

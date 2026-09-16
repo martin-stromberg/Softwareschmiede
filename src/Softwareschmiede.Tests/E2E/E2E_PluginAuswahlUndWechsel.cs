@@ -69,6 +69,10 @@ public partial class End2EndTest
         // Nach Bestätigung: kombinierter Start-Ablauf läuft weiter, CLI startet
         taskDetail.WaitForCliRunning();
 
+        // Der gestartete Plugin-Name erscheint in der Fußzeile und in der Seitenleiste.
+        Assert.Equal("KI Simulator", taskDetail.GetActiveCliName());
+        Assert.Equal("KI Simulator", new MenuView(mainWindow).GetActiveTaskKiPluginName("Neue Aufgabe"));
+
         return taskDetail;
     }
 
@@ -79,6 +83,7 @@ public partial class End2EndTest
     /// Regressionstest für die Korrektur des Arbeitsablaufs: Während des kurzzeitigen Zwischenstands
     /// (AusfuehrungsStatus wechselt auf "Beendet", bevor der neue Prozess "Aktiv" setzt) darf das
     /// CLI-Panel (CliViewButton, gebunden an ShowCliPanel) nicht verschwinden.
+    /// Zusätzlich wird geprüft, dass die Fußzeile den neuen CLI-Namen anzeigt.
     /// </summary>
     /// <param name="taskDetail">Die Aufgabendetailansicht mit bereits laufender CLI (Softwareschmiede.KiSimulator).</param>
     private void PluginAendernBeiLaufenderCli_StopptUndStartetMitNeuemPlugin_E2E(TaskDetailView taskDetail)
@@ -100,6 +105,12 @@ public partial class End2EndTest
 
         // CLI-Panel bleibt während des gesamten Wechsels sichtbar (kein Verschwinden im Zwischenstand)
         Assert.True(taskDetail.HasCliPanel());
+
+        // Fußzeile muss den neuen CLI-Namen anzeigen, nicht den zuerst gestarteten.
+        Assert.Equal("Claude CLI", taskDetail.GetActiveCliName());
+
+        // Seitenleiste/Programmmenü-Button muss ebenfalls den neuen CLI-Namen anzeigen.
+        Assert.Equal("Claude CLI", new MenuView(taskDetail.Window).GetActiveTaskKiPluginName("Neue Aufgabe"));
 
         Assert.False(new ErrorView(taskDetail.Window).IsVisible);
     }

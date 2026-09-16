@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using Softwareschmiede.Tests.E2E;
 
 namespace Softwareschmiede.Tests.E2E.Views.Dialogs;
 
@@ -38,6 +39,7 @@ public sealed class PluginSelectionDialogView : DialogView
         var dialog = GetDialogWindow();
         var pluginAuswahlBox = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Short);
         SelectComboBoxItemByClick(pluginAuswahlBox, pluginName, Short);
+        ElementWaitHelper.WaitForSelectedComboBoxItem(pluginAuswahlBox, pluginName, Short);
 
         if (fuerProjektVerwenden)
         {

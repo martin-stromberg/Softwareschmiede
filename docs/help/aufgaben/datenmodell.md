@@ -23,11 +23,14 @@
 | `AktiveRunId` | `string?` | Run-ID eines laufenden KI-Prozesses |
 | `LastHeartbeatUtc` | `DateTimeOffset?` | Letzter Heartbeat-Zeitstempel |
 | `LetzterCliStartUtc` | `DateTimeOffset?` | Zeitpunkt des letzten echten CLI-Prozessstarts; dient als stabile Sortiergrundlage fuer aktive Aufgabenlisten |
+| `PausiertBisUtc` | `DateTimeOffset?` | Endzeitpunkt einer aktiven Pause; `null` = keine Pause |
 | `RecoveryVersion` | `int` | Concurrency-Token für Recovery |
 | `VorschlagPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
 | `VorschlagAusfuehrenAbUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
 | `AlertReferenz` | `AlertReferenz?` | Optionale Herkunftsreferenz, wenn die Aufgabe aus einem SCM-Alert erstellt wurde |
 | `PullRequests` | `ICollection<PullRequestReferenz>` | Persistierte Pull Requests, die aus der Aufgabe heraus erstellt wurden |
+
+`PausiertBisUtc` modelliert die Pause als zeitbasiertes Overlay — es gibt **kein** eigenes `AufgabeStatus.Pausiert`. Eine Aufgabe gilt genau dann als pausiert, wenn `PausiertBisUtc > UtcNow` gilt; abgelaufene Werte verbleiben wirkungslos in der Datenbank. Die Spalte wird als nullable Unix-Millisekunden-Wert (`long?`) über `NullableUnixMillisConverter` persistiert (Migration `20260916094502_AddAufgabePausiertBisUtc`).
 
 ### `Protokolleintrag`
 
@@ -159,6 +162,7 @@ erDiagram
         AufgabeAusfuehrungsStatus AusfuehrungsStatus
         string BranchName
         string LokalerKlonPfad
+        DateTimeOffset PausiertBisUtc
     }
     Protokolleintrag {
         Guid Id
@@ -218,4 +222,14 @@ CLI-Ausgaben werden ohne neue Tabelle im bestehenden `Protokolleintrag`-Modell g
 | `Inhalt` | Eine dekodierte Ausgabezeile aus dem Terminal-Output |
 | `Zeitstempel` | Persistenzzeitpunkt des Protokolleintrags |
 
-`ProtokollService.AddCliOutputAsync` ist der zentrale Persistenzpfad. Erkennt die Methode in einer Ausgabezeile einen Rate-Limit-Marker, wird zusätzlich ein `ProtokollTyp.RateLimit`-Eintrag erzeugt.
+`ProtokollService.AddCliOutputAsync` ist der zentrale Persistenzpfad. Erkennt die Methode in einer Ausgabezeile einen Rate-Limit-Marker (`[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`), wird zusätzlich ein `ProtokollTyp.RateLimit`-Eintrag erzeugt.
+
+## Persistiertes Plugin-Session-Limit
+
+Enthält der Rate-Limit-Marker einen gültigen Reset-Zeitpunkt, speichert `KiPluginLimitService` diesen zusätzlich als Key-Value-Eintrag in der `AppEinstellung`-Tabelle:
+
+| Schlüssel | Wert | Zweck |
+|-----------|------|-------|
+| `plugins.sessionlimit.<KiPluginPrefix>` | ISO-8601-Roundtrip-Zeitstempel (UTC) | Letztes bekanntes Session-Limit des KI-Plugins; Grundlage für die automatische Pause aktiver Aufgaben mit demselben Prefix und für die Update-Sicherheitsprüfung |
+
+Dieser Eintrag ist **Laufzeitstatus**, keine Anwender-Konfiguration — er wird ausschließlich vom System geschrieben. Abgelaufene oder ungültige Werte werden beim Lesen (`GetAktiveSessionLimitsAsync`) ignoriert und beim nächsten Marker-Ereignis überschrieben. Details zum `AppEinstellung`-Modell: [Einstellungen — Datenmodell](../einstellungen/datenmodell.md).
