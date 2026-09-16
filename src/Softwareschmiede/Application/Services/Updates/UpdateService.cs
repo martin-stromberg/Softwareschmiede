@@ -12,7 +12,6 @@ public sealed class UpdateService : IUpdateService
     private readonly IApplicationShutdownService _shutdownService;
     private readonly ILogger<UpdateService> _logger;
     private readonly SemaphoreSlim _checkGate = new(1, 1);
-    private UpdateCheckResult? _cachedResult;
 
     /// <inheritdoc cref="UpdateService"/>
     public UpdateService(
@@ -32,30 +31,24 @@ public sealed class UpdateService : IUpdateService
     }
 
     /// <inheritdoc/>
-    public async Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken ct = default)
+    public async Task<UpdateCheckResult> CheckForUpdateAsync(UpdateCheckOptions options, CancellationToken ct = default)
     {
         await _checkGate.WaitAsync(ct);
         try
         {
             var installed = await _versionProvider.GetInstalledVersionAsync(ct);
             if (installed is null)
-            {
-                _cachedResult = UpdateCheckResult.NichtPruefbar("Lokale Version ist nicht prüfbar.");
-                return _cachedResult;
-            }
+                return UpdateCheckResult.NichtPruefbar("Lokale Version ist nicht prüfbar.");
 
-            var latest = await _releaseClient.GetLatestStableReleaseAsync(ct);
-            if (latest is null)
-            {
-                _cachedResult = UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
-                return _cachedResult;
-            }
+            var latest = await _releaseClient.GetLatestReleaseAsync(options, ct);
+            // Defensiver Ausschluss: Ein als Prerelease klassifiziertes Client-Ergebnis wird
+            // bei deaktivierten Prereleases nicht als Update angeboten.
+            if (latest is null || (latest.IsPrerelease && !options.IncludePrereleases))
+                return UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
 
-            _cachedResult = UpdateVersionComparer.IsNewer(installed.Version, latest.Version)
+            return UpdateVersionComparer.IsNewer(installed.Version, latest.Version)
                 ? UpdateCheckResult.UpdateVerfuegbar(latest)
                 : UpdateCheckResult.KeinUpdate();
-
-            return _cachedResult;
         }
         catch (OperationCanceledException)
         {
@@ -64,8 +57,7 @@ public sealed class UpdateService : IUpdateService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Update-Prüfung ist fehlgeschlagen.");
-            _cachedResult = UpdateCheckResult.NichtPruefbar("Update-Prüfung ist fehlgeschlagen.");
-            return _cachedResult;
+            return UpdateCheckResult.NichtPruefbar("Update-Prüfung ist fehlgeschlagen.");
         }
         finally
         {
@@ -86,7 +78,4 @@ public sealed class UpdateService : IUpdateService
         await _scriptService.StartScriptAsync(preparation, ct);
         _shutdownService.Shutdown();
     }
-
-    /// <summary>Gibt das zuletzt gecachte Prüfergebnis zurück.</summary>
-    public UpdateCheckResult? CachedResult => _cachedResult;
 }

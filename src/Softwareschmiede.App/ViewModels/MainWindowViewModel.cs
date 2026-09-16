@@ -412,7 +412,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         UpdateHinweis = null;
         try
         {
-            var result = await _updateService.CheckForUpdateAsync(ct);
+            // Vorläufig stabile Releases; die gespeicherte Einstellung wird in einem Folgeschritt angebunden.
+            var result = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false), ct);
             ApplyUpdateCheckResult(result, isManualRefresh);
         }
         finally
@@ -432,7 +433,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         var progressViewModel = new UpdateProgressViewModel(updateCts.Cancel);
         try
         {
-            var checkResult = await _updateService.CheckForUpdateAsync(updateCts.Token);
+            // Vorläufig stabile Releases; die gespeicherte Einstellung wird in einem Folgeschritt angebunden.
+            var checkResult = await _updateService.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false), updateCts.Token);
             ApplyUpdateCheckResult(checkResult, isManualRefresh: false);
             if (checkResult.Status != UpdateCheckStatus.UpdateVerfuegbar || checkResult.Update is null)
                 return;

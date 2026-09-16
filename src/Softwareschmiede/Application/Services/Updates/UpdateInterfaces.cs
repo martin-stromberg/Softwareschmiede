@@ -7,18 +7,18 @@ public interface IApplicationVersionProvider
     Task<InstalledVersionInfo?> GetInstalledVersionAsync(CancellationToken ct = default);
 }
 
-/// <summary>Ruft die neueste stabile Release-Information ab.</summary>
+/// <summary>Ruft die neueste zulässige Release-Information ab.</summary>
 public interface IUpdateReleaseClient
 {
-    /// <summary>Ruft die neueste stabile Release-Information ab oder gibt <c>null</c> zurück, wenn sie nicht nutzbar ist.</summary>
-    Task<UpdateInfo?> GetLatestStableReleaseAsync(CancellationToken ct = default);
+    /// <summary>Ruft die neueste zulässige Release-Information ab oder gibt <c>null</c> zurück, wenn sie nicht nutzbar ist.</summary>
+    Task<UpdateInfo?> GetLatestReleaseAsync(UpdateCheckOptions options, CancellationToken ct = default);
 }
 
 /// <summary>Orchestriert Update-Prüfung, Vorbereitung und Start des externen Updaters.</summary>
 public interface IUpdateService
 {
     /// <summary>Prüft, ob ein neueres Update verfügbar ist.</summary>
-    Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken ct = default);
+    Task<UpdateCheckResult> CheckForUpdateAsync(UpdateCheckOptions options, CancellationToken ct = default);
 
     /// <summary>Bereitet Download, Entpacken und Skript vor.</summary>
     Task<UpdatePreparationResult> PrepareUpdateAsync(

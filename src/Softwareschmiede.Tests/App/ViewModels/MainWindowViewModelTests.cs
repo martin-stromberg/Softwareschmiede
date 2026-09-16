@@ -607,7 +607,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
+        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
 
         var sut = CreateSut(updateService: updateServiceMock.Object);
@@ -626,7 +626,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.SetupSequence(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
+        updateServiceMock.SetupSequence(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update))
             .ReturnsAsync(UpdateCheckResult.KeinUpdate());
         var sut = CreateSut(updateService: updateServiceMock.Object);
@@ -646,7 +646,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
+        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
         var safetyServiceMock = new Mock<ICliUpdateSafetyService>();
         safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
@@ -675,7 +675,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
+        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
         var prepareSawCanceledToken = false;
         updateServiceMock
@@ -721,7 +721,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var preparation = new UpdatePreparationResult("release.zip", "extracted", "update.ps1", "update.log", false);
         var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
+        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
         updateServiceMock.Setup(s => s.PrepareUpdateAsync(update, It.IsAny<IProgress<UpdatePreparationProgress>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(preparation);
