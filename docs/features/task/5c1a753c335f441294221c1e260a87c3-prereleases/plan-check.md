@@ -1,0 +1,58 @@
+# Plan-Gegenprüfung
+
+## Ergebnis
+
+**Status:** Plan vollständig
+
+Die gezielte Nachplanung adressiert den verbleibenden Befund T-09 aus [plan-check.2.md](plan-check.2.md) vollstaendig: Nicht lesbare Update-Einstellungen sind jetzt als konkreter Ablauf geplant, an allen drei Lesegrenzen (initial, vor Vorbereitung, vor Updaterstart) fuer den automatischen und den manuellen Pfad getestet, ueber einen kontrollierten Fehlerausloeser in der E2E-Fixture ausloesbar und als Pflichtvarianten in den bestehenden Szenarien E-05/E-06 ohne neue dauerhafte FlaUI-Testmethode vorgesehen. Die erneute Gesamtpruefung gegen [requirement.md](requirement.md) ergab keine weiteren Luecken; alle sieben Akzeptanzkriterien sind mit Umsetzung, Testnachweis und – soweit ueber die UI erreichbar – E2E-Nachweis abgedeckt.
+
+## Abgleich Akzeptanzkriterien
+
+| Akzeptanzkriterium | Umsetzung im Plan | Testnachweis im Plan | Status |
+|--------------------|-------------------|----------------------|--------|
+| AK 1: Auswahlbox mit `Aus`, `Nur Pruefen` und `Bei Programmstart pruefen und ausfuehren`. | Einstellungen laden/speichern Schritt 1 (Z. 30): ComboBox mit exakt den drei Labels; `UpdateMode`-Enum mit festen Werten, `SettingsView.xaml` mit Automation-Name `Update-Modus` (Z. 102); U-01/U-04. | `UpdateSettings_SaveLoadAllValues` (Z. 194) fuer alle drei Modi; E-01 (Z. 241) setzt/speichert alle Labels ueber die UI, prueft Wiederanzeige, Verwerfen, Neustart und Lesbarkeit bei minimaler Fenstergroesse. | Abgedeckt |
+| AK 2: `Aus` deaktiviert die Updatepruefung. | Designentscheidung zu `Aus` (Z. 15) sperrt Start-/Hintergrundpruefung, manuellen Pruefbefehl und erneute Pruefung beim manuellen Installationsstart inkl. direkter Aufrufe; gemeinsamer Ablauf Schritt 2 (Z. 62), Command-Zustaende Schritt 5 (Z. 34); U-04/U-05. | `Aus_BlocksBothCommandsAndDirectInvocation` (Z. 208); E-02 (Z. 242) mit UI-Speichern und echtem Neustart, null Releaseabrufe, Pruefen disabled, Installieren verborgen; E-04 (Z. 244) mit Wechsel zu `Aus` und verspaeteter Antwort. | Abgedeckt |
+| AK 3: `Nur Pruefen` prueft ohne automatische Installation. | Startfluss Schritt 4 (Z. 44): einmal pruefen und anbieten, kein Sicherheitsdialog/Download/Updater/Shutdown; ausdrueckliche manuelle Installation bleibt erlaubt (Z. 16); U-05. | E-02 (Z. 242) weist Abruf und sichtbares Angebot bei null Asset-/Start-/Shutdown-Ereignissen nach; E-03 (Z. 243) prueft die anschliessende ausdrueckliche Installation; ViewModel-Modustests. | Abgedeckt |
+| AK 4: Im Startmodus wird beim Programmstart geprueft und ein gefundenes Update automatisch installiert. | Einmaliger `ContentRendered`-Handler nach DB-Initialisierung und Owner-Zuweisung (Z. 22, 41–46), Startkennzeichen, gemeinsames Gate und Installationspfad mit Sicherheitsabfrage, Fortschritt, Vorbereitung, Updaterstart und Shutdown erst nach erfolgreichem Start (Z. 61–68); U-05. | E-02 (Z. 242) echter Neustart ohne Updateklick, sofortige Antwort, echter Dialog-Owner, genau ein Launcher-Erfolg vor genau einem Shutdown; E-03 beide Kanaele automatisch; E-05/E-06 Negativpfade; E-07 Einmaligkeit/Parallelitaet; `WindowReady_StartsOnceWithImmediateResult` u. a. ViewModel-/Servicetests. | Abgedeckt |
+| AK 5: Checkbox aktiviert das Laden von Prereleases. | Persistentes Boolean `IncludePrereleasesKey` mit Default `false` (Z. 13–14, 100, 142); `SettingsViewModel.IncludePrereleases`, CheckBox mit Automation-Name `Prerelease-Versionen laden` (Z. 101–102); U-01/U-04. | `UpdateSettings_SaveLoadAllValues` (Z. 194), `UpdateSettings_PersistsAcrossScopes` mit echter SQLite-DB (Z. 195), E-01 (Z. 241) mit beiden Checkboxzustaenden, Verwerfen, Wiederanzeigen und Neustart. | Abgedeckt |
+| AK 6: Prereleases werden nur bei aktivierter Checkbox beruecksichtigt. | Gemeinsame `UpdateCheckOptions`; Filter nach GitHub-Flag `prerelease` ODER SemVer-Suffix, bei `IncludePrereleases = false` beide ausgeschlossen (Z. 53); paginierte Releaseauswahl mit hoechstem zulaessigem Kandidaten (Z. 51–54); suffixerhaltende lokale/entfernte Normalisierung ueber `SemanticUpdateVersion` (Z. 55–57); defensive Servicepruefung (Z. 108); U-02/U-03. | `GetLatestReleaseAsync_FiltersByOptions`, `GetLatestReleaseAsync_SelectsHighestAcrossPages`, `GetLatestReleaseAsync_LaterPageFailureDiscardsCandidate` (Z. 203–205), `CheckForUpdateAsync_FromInstalledPrerelease` (Z. 202), Normalisierungs-/Provider-/Client-Tests (Z. 199–201); E-03 (Z. 243) verbindet die UI-Checkbox mit konkretem Angebot, Asset-Download-URL, entpackter `version.json` und Skriptziel, manuell und automatisch. | Abgedeckt |
+| AK 7: Einstellungen werden bei Pruefung und automatischer Installation konsistent beruecksichtigt. | Gemeinsames Speichern mit `UpdateSettingsSaved`-Snapshot, frische DI-Scopes vor jeder Pruefung/Installation (Z. 17, 31–35), Generation/Cancellation und erneutes Lesen vor Vorbereitung und unmittelbar vor Updaterstart (Z. 63–64); eigener Ablauf fuer nicht lesbare Einstellungen (Z. 70–76) ohne Default-/Snapshot-/Cache-Ersatz; U-01/U-03/U-04/U-05. | SQLite-/Options-/Invalidierungs-/Nebenlaeufigkeitstests (Z. 195–213); T-09 vollstaendig: `GetUpdateSettingsAsync_ReadFailureDoesNotReturnDefaults` (Z. 196), `UpdateSettingsReadFailure_InitialStopsBeforeReleaseRequest` (Z. 197), `..._BeforePreparationStopsInstall`/`..._BeforeUpdaterStartStopsInstall` je automatisch und manuell (Z. 198); E-01 bis E-07 inkl. Pflichtvarianten in E-05/E-06 laut U-07 (Z. 183). | Abgedeckt |
+
+## Fehlende oder unvollständige Testanforderungen
+
+Keine. Der zuvor offene Befund T-09 ist durch die neuen Logiktests an allen drei Lesegrenzen (initial, `BeforePreparation`, `BeforeUpdaterStart`), je fuer Startautomatik und manuellen Pfad, den kontrollierten `UpdateSettingsReadFailureInterceptor` (Testvoraussetzungen 11–13, Z. 159–161), den Fixture-Smoke `Fixture_SettingsReadFailureTargetsPhaseAfterDatabaseInitialization` (Z. 215) und die in U-07 (Z. 183) verbindlich geforderten FlaUI-Varianten in E-05/E-06 abgedeckt.
+
+## E2E-Abdeckung
+
+| Benutzerfluss / Akzeptanzkriterium | Geplanter E2E-Test | Status |
+|------------------------------------|--------------------|--------|
+| Einstellungen oeffnen, alle Modi und Checkboxzustaende speichern, wiederanzeigen, verwerfen und ueber Neustart erhalten (AK 1, 5, 7). | E-01 `Settings_AllModesAndPrereleasesPersist` (Z. 241), echte DB und mindestens ein echter Neustart. | Abgedeckt |
+| `Aus` speichern, neu starten und ausbleibende Pruefung sowie deaktivierte/verborgene Updateaktionen kontrollieren (AK 2). | E-02 (Z. 242): nach `StartupUpdateCompleted` null Release/Asset/Start/Shutdown, Pruefen disabled, Installieren verborgen. | Abgedeckt |
+| `Nur Pruefen` speichern, neu starten, Updateangebot sehen, ohne dass automatisch installiert wird (AK 3). | E-02 (Z. 242): sichtbares Angebot `1.2.1` im Tooltip, null Asset-/Start-/Shutdown-Ereignisse. | Abgedeckt |
+| Startmodus speichern und nach echtem Neustart ohne Updateklick Fortschritt, Paketvorbereitung und Updateruebergabe beobachten (AK 4). | E-02 (Z. 242) mit sofortiger Antwort, blockiertem/freigegebenem Download und echtem Dialog-Owner; E-07 (Z. 247) fuer Einmaligkeit. | Abgedeckt |
+| Checkbox ueber die UI aendern und tatsaechliche Stable-/Prerelease-Auswahl bis zum passenden Asset pruefen (AK 6, 7). | E-03 `PrereleaseCheckbox_SelectsMatchingAsset` (Z. 243), beide Zustaende manuell und mit Startmodus-Neustart. | Abgedeckt |
+| Nach RC-Fund Checkbox deaktivieren oder `Aus` speichern; altes Angebot und verspaetete Antwort duerfen keine Installation ausloesen (AK 2, 6, 7). | E-04 `SavedChangesInvalidatePreviousOffer` (Z. 244) inkl. blockiertem Request und DB-erhaltendem Neustart. | Abgedeckt |
+| Ohne neueres Release bzw. bei ungueltiger lokaler Version oder Releasefehler bedienbar bleiben (AK 4, 7). | E-05 `Startup_NoUpdateOrUncheckableRemainsUsable` (Z. 245), sichtbarer Hinweis und ausbleibende Folgeschritte. | Abgedeckt |
+| Sicherheitsdialog ablehnen/bestaetigen, Download abbrechen sowie Vorbereitungs- und Launcherfehler behandeln (AK 4, 7). | E-06 `Startup_SafetyCancelAndErrorsRemainUsable` (Z. 246), echte Dialoginteraktionen, sichtbare Fehler, kein Shutdown. | Abgedeckt |
+| Waehrend Startpruefung/Vorbereitung Updateaktionen versuchen und Doppelinstallation ausschliessen (AK 4, 7). | E-07 `Startup_IsOnceAndCommandsStayBlocked` (Z. 247), kontrollierte Blockierung, UI-Zustaende, Ereigniszaehler. | Abgedeckt |
+| Nicht lesbare Update-Einstellungen beim Start oder bei letzter Aktualitaetspruefung sichtbar behandeln und Installation unterbinden (AK 7, T-09). | Pflichtvarianten in E-05/E-06 laut U-07 (Z. 183): Startmodus per UI speichern, DB-erhaltender Neustart, gezielter Settings-Lesefehler erst nach `DatabaseInitializationCompleted` sowie spaeter Fehler nach `PreparationCompleted` (Testvoraussetzungen 11–13, Z. 159–161); sichtbarer Hinweis, null Updaterstart/Shutdown, Bedienbarkeit und echte Folgepruefung nach Deaktivierung. Keine neue dauerhafte FlaUI-Testmethode. | Abgedeckt |
+| Rollen-/Berechtigungsregeln. | Keine neuen Rollen- oder Berechtigungsanforderungen; modusabhaengige Sichtbarkeit und CLI-Sicherheitsbestaetigung sind separat erfasst. | Nicht erforderlich mit Begründung |
+
+## Fehlende oder unvollständige Planbestandteile
+
+Keine. Die bisherigen Befunde P-01 bis P-04 und T-01 bis T-08 bleiben wie in [plan-check.2.md](plan-check.2.md) bewertet adressiert; T-09 ist durch die Nachplanung vollstaendig abgedeckt (siehe Hinweise).
+
+## Hinweise
+
+Pruefbasis waren [requirement.md](requirement.md), [inventory.md](inventory.md), alle vier Detaildokumente ([Einstellungen](inventory/settings.md), [Updatepipeline](inventory/update-pipeline.md), [Startfluss](inventory/startup-flow.md), [Tests](inventory/tests.md)), der vollstaendige [plan.md](plan.md) sowie zum Abgleich der Nachplanung [plan-check.1.md](plan-check.1.md) und [plan-check.2.md](plan-check.2.md).
+
+| Bisheriger Befund | Bewertung der Nachplanung |
+|---|---|
+| T-09: Nicht lesbare Update-Einstellungen bis zur Installationsgrenze nachweisen (AK 7) | Adressiert: eigener Ablaufabschnitt (Z. 70–76), EF-Abfragetag `UpdateSettings.Read` mit propagierter Exception ohne Default-Rueckgabe (Z. 100), `UpdateSettingsReadFailureInterceptor` als kontrollierbarer Ausloeser (Z. 93, 159–161), Logiktests an allen drei Lesegrenzen fuer automatischen und manuellen Pfad (Z. 196–198), Fixture-Smoke (Z. 215) und Pflichtvarianten in E-05/E-06 ohne neue dauerhafte FlaUI-Testmethode (Z. 182–183). |
+| P-01 bis P-04, T-01 bis T-08 | Unveraendert adressiert; die Nachplanung hat die bisherigen Absicherungen nicht aufgeweicht (Nachverfolgungstabelle Z. 262–275). |
+
+Redaktioneller Hinweis ohne Befundcharakter: Die Szenariobeschreibungen von E-05/E-06 in der E2E-Tabelle (Z. 245–246) nennen die Settings-Lesefehler-Varianten nicht explizit; sie sind jedoch ueber U-07 als Pflichtvarianten und die Testvoraussetzungen 11–13 konkret und verbindlich festgelegt. Bei der Umsetzung ist darauf zu achten, dass diese Varianten tatsaechlich in E-05/E-06 integriert werden.
+
+Die kontrollierte Prozess-/Shutdown-Grenze bleibt als Begrenzung des E2E-Nachweises dokumentiert; eine tatsaechliche Installation und Betriebssystembeendigung werden nicht als getestet behauptet. Die spaetere Abnahme fordert vollen Build, getrennte regulaere und OS-Testlaeufe sowie alle Pflicht-E2Es; nicht ausgefuehrte Pflichtszenarien duerfen nicht durch Unit-Tests ersetzt werden.
+
+`/plan-check` wurde gemaess dem lokalen Lifecycle-Workflow direkt ausgefuehrt. Es wurde ausschliesslich `plan-check.md` neu erstellt; Anforderung, Bestandsaufnahme, Plan, fruehere Gegenpruefungen und Todo wurden nicht geaendert. Build und Tests wurden fuer diese Dokumentpruefung nicht ausgefuehrt.
