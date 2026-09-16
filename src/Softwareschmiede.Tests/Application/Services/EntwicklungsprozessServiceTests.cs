@@ -450,6 +450,72 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
+    /// <summary>ProzessStartenAsync lehnt eine aktiv pausierte Aufgabe ab, ohne das Repository zu klonen (Issue 151).</summary>
+    [Fact]
+    public async Task ProzessStartenAsync_ShouldThrow_WhenAufgabePausiert()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pausierte Aufgabe", null);
+        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        tracked!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1);
+        await _db.SaveChangesAsync();
+        SetupCloneMocks();
+
+        // Act
+        var act = () => _sut.ProzessStartenAsync(aufgabe.Id, "https://github.com/test/repo");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*pausiert*");
+        _gitPluginMock.Verify(
+            g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>ProzessStartenUndCliStartenAsync lehnt eine pausierte Aufgabe ab, ohne den Rollback-Pfad auszulösen (Issue 151).</summary>
+    [Fact]
+    public async Task ProzessStartenUndCliStartenAsync_ShouldThrowWithoutRollback_WhenAufgabePausiert()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pausierte Aufgabe", null);
+        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        tracked!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1);
+        await _db.SaveChangesAsync();
+        SetupCloneMocks();
+
+        // Act
+        var act = () => _sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, "https://github.com/test/repo", null, "Softwareschmiede.TestKi");
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*pausiert*");
+        (await _db.Aufgaben.FindAsync(aufgabe.Id))!.Status.Should().Be(AufgabeStatus.Neu,
+            "die Pausen-Prüfung läuft vor dem try-Block und darf keinen Status-Rollback auslösen");
+        _gitPluginMock.Verify(
+            g => g.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>CliNeustartenAsync lehnt eine aktiv pausierte Aufgabe ab (Issue 151).</summary>
+    [Fact]
+    public async Task CliNeustartenAsync_ShouldThrow_WhenAufgabePausiert()
+    {
+        // Arrange
+        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Pausierte Aufgabe", null);
+        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        tracked!.Status = AufgabeStatus.Gestartet;
+        tracked.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1);
+        tracked.LokalerKlonPfad = @"C:\repos\task-pausiert";
+        await _db.SaveChangesAsync();
+
+        // Act
+        var act = () => _sut.CliNeustartenAsync(aufgabe.Id, "Softwareschmiede.TestKi", null);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*pausiert*");
+    }
+
     /// <summary>AbschliessenAsync setzt den Status auf Beendet und fügt einen Statusübergang ins Protokoll ein.</summary>
     [Fact]
     public async Task AbschliessenAsync_ShouldSetStatusAbgeschlossenAndAddProtokoll_WhenAufgabeExists()

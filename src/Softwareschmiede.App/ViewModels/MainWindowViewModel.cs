@@ -333,6 +333,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             LastHeartbeatUtc = aufgabe.LastHeartbeatUtc,
             LaufStatus = aufgabe.LaufStatus,
             LetzterCliStartUtc = aufgabe.LetzterCliStartUtc,
+            PausiertBisUtc = aufgabe.PausiertBisUtc,
             IsAktiv = GetAktiveAufgabeId() == aufgabe.Id,
             HasScheduledPrompt = _promptZeitVersandService.GetScheduledPromptStatus(aufgabe.Id) is not null,
             OffeneTodoCount = offeneTodoCount,

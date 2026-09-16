@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Infrastructure.Terminal;
 
@@ -19,15 +20,21 @@ public sealed class PromptZeitVersandService
     private readonly KiAusfuehrungsService _kiService;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<PromptZeitVersandService> _logger;
+    private readonly IServiceScopeFactory? _scopeFactory;
     private readonly Dictionary<Guid, ScheduledPromptEntry> _scheduledPrompts = new();
     private readonly object _lock = new();
 
     /// <inheritdoc cref="PromptZeitVersandService"/>
-    public PromptZeitVersandService(KiAusfuehrungsService kiService, TimeProvider timeProvider, ILogger<PromptZeitVersandService> logger)
+    /// <param name="kiService">Der KI-Ausführungsservice, über den der Prompt an die laufende CLI-Session gesendet wird.</param>
+    /// <param name="timeProvider">Zeitquelle für Timer und Zeitpunktvergleiche.</param>
+    /// <param name="logger">Logger.</param>
+    /// <param name="scopeFactory">Optionale Scope-Factory zum Laden des aktuellen <c>PausiertBisUtc</c>-Werts der Aufgabe vor dem Versand. Ohne Registrierung (z. B. Unit-Tests) entfällt die Pausenprüfung.</param>
+    public PromptZeitVersandService(KiAusfuehrungsService kiService, TimeProvider timeProvider, ILogger<PromptZeitVersandService> logger, IServiceScopeFactory? scopeFactory = null)
     {
         _kiService = kiService;
         _timeProvider = timeProvider;
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
     /// <summary>Wird ausgelöst, nachdem ein zeitgesteuerter Prompt erfolgreich an die CLI-Session versendet wurde.</summary>
@@ -44,6 +51,15 @@ public sealed class PromptZeitVersandService
     public async Task SchedulePromptAsync(Guid aufgabeId, string promptText, DateTimeOffset targetTime)
     {
         var now = _timeProvider.GetUtcNow();
+
+        // Aktive Pause: Der Versand wird auf das Pausenende verschoben statt sofort/zur Zielzeit
+        // zu senden — der Prompt geht nicht verloren.
+        var pausiertBis = await GetPausiertBisUtcAsync(aufgabeId);
+        if (pausiertBis is { } bis && bis > now && bis > targetTime)
+        {
+            targetTime = bis;
+        }
+
         if (targetTime <= now)
         {
             RemoveEntry(aufgabeId)?.Dispose();
@@ -101,16 +117,77 @@ public sealed class PromptZeitVersandService
 
     private async Task HandleTimerElapsedAsync(Guid aufgabeId)
     {
-        ScheduledPromptInfo? info;
+        ScheduledPromptEntry entry;
         lock (_lock)
         {
-            if (!_scheduledPrompts.Remove(aufgabeId, out var entry))
+            if (!_scheduledPrompts.Remove(aufgabeId, out var removed))
                 return;
-            info = entry.Info;
-            entry.Timer.Dispose();
+            entry = removed;
         }
 
-        await SendPromptAsync(aufgabeId, info.PromptText);
+        // Pause kann NACH dem Planen gesetzt worden sein: aktuellen PausiertBisUtc-Wert laden und
+        // bei aktiver Pause den Timer auf das Pausenende neu scharf machen statt zu senden.
+        var pausiertBis = await GetPausiertBisUtcAsync(aufgabeId);
+        var now = _timeProvider.GetUtcNow();
+        if (pausiertBis is { } bis && bis > now)
+        {
+            var neuEingeplant = false;
+            lock (_lock)
+            {
+                // Nur zurücklegen, wenn nicht zwischenzeitlich ein neuer Prompt geplant wurde.
+                if (!_scheduledPrompts.ContainsKey(aufgabeId))
+                {
+                    // TargetTime auf das Pausenende aktualisieren, damit GetScheduledPromptStatus
+                    // die tatsächliche neue Zielzeit meldet statt des verstrichenen Zeitpunkts.
+                    _scheduledPrompts[aufgabeId] = new ScheduledPromptEntry
+                    {
+                        Info = new ScheduledPromptInfo(aufgabeId, entry.Info.PromptText, bis),
+                        Timer = entry.Timer
+                    };
+                    entry.Timer.Change(bis - now, Timeout.InfiniteTimeSpan);
+                    neuEingeplant = true;
+                }
+            }
+
+            if (neuEingeplant)
+            {
+                _logger.LogInformation(
+                    "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} auf das Pausenende {PausiertBisUtc} verschoben.",
+                    aufgabeId,
+                    bis);
+            }
+            else
+            {
+                entry.Timer.Dispose();
+            }
+
+            return;
+        }
+
+        entry.Timer.Dispose();
+        await SendPromptAsync(aufgabeId, entry.Info.PromptText);
+    }
+
+    private async Task<DateTimeOffset?> GetPausiertBisUtcAsync(Guid aufgabeId)
+    {
+        if (_scopeFactory is null)
+            return null;
+
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
+            var aufgabe = await aufgabeService.GetByIdAsync(aufgabeId);
+            return aufgabe?.PausiertBisUtc;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Pausenstatus für Aufgabe {AufgabeId} konnte nicht geladen werden — Versand wird nicht verschoben.",
+                aufgabeId);
+            return null;
+        }
     }
 
     private async Task SendPromptAsync(Guid aufgabeId, string promptText)

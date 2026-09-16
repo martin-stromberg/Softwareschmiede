@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
@@ -43,6 +44,13 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
     private Task<Guid> StartCliSessionAsync()
     {
         var aufgabeId = Guid.NewGuid();
+        RegisterSession(aufgabeId);
+        return Task.FromResult(aufgabeId);
+    }
+
+    /// <summary>Registriert eine Pseudo-Console-Session für die übergebene Aufgaben-ID (mit vorgegebener ID, damit die Aufgabe zusätzlich in einer Test-DB seeded werden kann).</summary>
+    private void RegisterSession(Guid aufgabeId)
+    {
         var session = TestPseudoConsoleSessionFactory.Create(new MemoryStream(), new MemoryStream());
         var handle = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess())
         {
@@ -52,8 +60,45 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
         var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
         handles[aufgabeId] = handle;
+    }
 
-        return Task.FromResult(aufgabeId);
+    /// <summary>Erstellt einen ServiceProvider mit InMemory-DbContext und seedet eine Aufgabe mit dem übergebenen PausiertBisUtc-Wert.</summary>
+    private async Task<ServiceProvider> CreatePausedTaskProviderAsync(DateTimeOffset? pausiertBisUtc, Guid aufgabeId)
+    {
+        // Der Datenbankname muss AUSSERHALB des Options-Lambdas erzeugt werden: AddDbContext führt
+        // die Options-Action bei jeder Context-Auflösung erneut aus — ein Guid.NewGuid() im Lambda
+        // ergäbe pro Scope eine andere (leere) InMemory-Datenbank.
+        var databaseName = Guid.NewGuid().ToString();
+        var provider = new ServiceCollection()
+            .AddDbContext<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>(options =>
+                options.UseInMemoryDatabase(databaseName))
+            .AddScoped<TodoService>()
+            .AddScoped<AufgabeService>()
+            .AddSingleton<Microsoft.Extensions.Logging.ILogger<TodoService>>(NullLogger<TodoService>.Instance)
+            .AddSingleton<Microsoft.Extensions.Logging.ILogger<AufgabeService>>(NullLogger<AufgabeService>.Instance)
+            .BuildServiceProvider();
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
+        var projektId = Guid.NewGuid();
+        db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        {
+            Id = projektId,
+            Name = "Prompt-Testprojekt",
+            ErstellungsDatum = DateTimeOffset.UtcNow,
+            Status = Softwareschmiede.Domain.Enums.ProjektStatus.Aktiv
+        });
+        db.Aufgaben.Add(new Softwareschmiede.Domain.Entities.Aufgabe
+        {
+            Id = aufgabeId,
+            ProjektId = projektId,
+            Titel = "Pausierte Aufgabe",
+            Status = Softwareschmiede.Domain.Enums.AufgabeStatus.Gestartet,
+            PausiertBisUtc = pausiertBisUtc,
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+        return provider;
     }
 
     /// <summary>Liegt die Zielzeit in der Vergangenheit, wird der Prompt sofort versendet und es bleibt kein Eintrag in der Warteschlange.</summary>
@@ -163,5 +208,71 @@ public sealed class PromptZeitVersandServiceTests : IDisposable
 
         versendet.Should().BeFalse("ohne aktive CLI-Session darf kein PromptSent-Event gefeuert werden");
         _sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull("der Eintrag muss trotz stillem Verwerfen entfernt werden");
+    }
+
+    /// <summary>Ist die Aufgabe zum Planungszeitpunkt bereits pausiert, wird die Zielzeit auf das Pausenende verschoben statt sofort zu senden (Issue 151).</summary>
+    [Fact]
+    public async Task SchedulePromptAsync_AktivePause_VerschiebtZielzeitAufPausenende()
+    {
+        var aufgabeId = Guid.NewGuid();
+        var pausiertBis = _timeProvider.GetUtcNow().AddHours(2);
+        await using var provider = await CreatePausedTaskProviderAsync(pausiertBis, aufgabeId);
+        var sut = new PromptZeitVersandService(
+            _kiService,
+            _timeProvider,
+            NullLogger<PromptZeitVersandService>.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>());
+
+        await sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(5));
+
+        var status = sut.GetScheduledPromptStatus(aufgabeId);
+        status.Should().NotBeNull("der Prompt muss gepuffert statt sofort versendet werden");
+        // BeCloseTo statt Be: PausiertBisUtc läuft durch den Unix-Millisekunden-Converter und
+        // verliert dabei Sub-Millisekunden-Genauigkeit.
+        status!.TargetTime.Should().BeCloseTo(pausiertBis, TimeSpan.FromSeconds(1), "die Zielzeit wird auf das Pausenende verschoben");
+    }
+
+    /// <summary>Wird die Pause NACH dem Planen gesetzt, plant der Timer-Callback den Versand auf das Pausenende um und versendet erst danach (Issue 151).</summary>
+    [Fact]
+    public async Task Timer_BeiNachPlanungGesetzterPause_VerschiebtVersandAufPausenende()
+    {
+        var aufgabeId = Guid.NewGuid();
+        await using var provider = await CreatePausedTaskProviderAsync(null, aufgabeId);
+        var sut = new PromptZeitVersandService(
+            _kiService,
+            _timeProvider,
+            NullLogger<PromptZeitVersandService>.Instance,
+            provider.GetRequiredService<IServiceScopeFactory>());
+        RegisterSession(aufgabeId);
+        var versendet = new TaskCompletionSource<Guid>();
+        sut.PromptSent += id => versendet.TrySetResult(id);
+
+        await sut.SchedulePromptAsync(aufgabeId, "Testprompt", _timeProvider.GetUtcNow().AddMinutes(5));
+
+        // Pause erst nach dem Planen setzen — der Timer-Callback muss sie beim Feuern erkennen.
+        var pausiertBis = _timeProvider.GetUtcNow().AddHours(1);
+        using (var scope = provider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext>();
+            (await db.Aufgaben.FindAsync(aufgabeId))!.PausiertBisUtc = pausiertBis;
+            await db.SaveChangesAsync();
+        }
+
+        _timeProvider.Advance(TimeSpan.FromMinutes(6));
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        versendet.Task.IsCompleted.Should().BeFalse("während einer aktiven Pause darf der Prompt nicht versendet werden");
+        var status = sut.GetScheduledPromptStatus(aufgabeId);
+        status.Should().NotBeNull("der Prompt muss auf das Pausenende umgeplant werden");
+        // BeCloseTo statt Be: PausiertBisUtc läuft durch den Unix-Millisekunden-Converter und
+        // verliert dabei Sub-Millisekunden-Genauigkeit.
+        status!.TargetTime.Should().BeCloseTo(pausiertBis, TimeSpan.FromSeconds(1),
+            "die gemeldete Zielzeit muss dem Pausenende entsprechen, nicht dem verstrichenen ursprünglichen Zeitpunkt");
+
+        _timeProvider.Advance(TimeSpan.FromHours(1));
+
+        var finished = await Task.WhenAny(versendet.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        finished.Should().Be(versendet.Task, "nach dem Pausenende muss der gepufferte Prompt versendet werden");
+        sut.GetScheduledPromptStatus(aufgabeId).Should().BeNull();
     }
 }

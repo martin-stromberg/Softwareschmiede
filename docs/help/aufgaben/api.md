@@ -4,13 +4,14 @@
 
 ## Übersicht
 
-Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die Verwaltung von Aufgaben, zeitgesteuerten Prompt-Versänden und dem Export der CLI-Rohausgabe:
+Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die Verwaltung von Aufgaben, zeitgesteuerten Prompt-Versänden, Aufgaben-Pausen und dem Export der CLI-Rohausgabe:
 
-- `AufgabeService` — Persistente Datenbankoperationen für Aufgaben
-- `PromptZeitVersandService` — Laufzeit-Verwaltung zeitgesteuerter Prompts
-- `ProtokollService` — Persistente Protokolleinträge, einschließlich automatischer CLI-Ausgaben
+- `AufgabeService` — Persistente Datenbankoperationen für Aufgaben, einschließlich `SetPauseAsync`
+- `KiPluginLimitService` — Persistenz und Anwendung von KI-Plugin-Session-Limits
+- `PromptZeitVersandService` — Laufzeit-Verwaltung zeitgesteuerter Prompts (inkl. Pausen-Verschiebung)
+- `ProtokollService` — Persistente Protokolleinträge, einschließlich automatischer CLI-Ausgaben und Rate-Limit-Marker
 - `ICliRawExportService` — Exportiert die gespeicherte CLI-Rohausgabe einer Aufgabe als `.raw`
-- `IDialogService` — UI-Abstraktion für den nativen Speichern-Dialog
+- `IDialogService` — UI-Abstraktion für Dialoge (Speichern-Dialog, Pause-Dialog)
 
 ## ProtokollService — CLI-Ausgabeprotokoll
 
@@ -30,8 +31,83 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 - Erstellt einen `Protokolleintrag` mit `Typ = ProtokollTyp.CliOutput`.
 - Wird im ConPTY-Pfad automatisch durch `CliOutputProtokollWriter` aufgerufen.
-- Erkennt Rate-Limit-Marker in der Ausgabezeile und speichert dann zusätzlich einen `ProtokollTyp.RateLimit`-Eintrag.
+- Erkennt Rate-Limit-Marker in der Ausgabezeile und speichert dann zusätzlich einen `ProtokollTyp.RateLimit`-Eintrag (`"Rate-Limit erkannt. Weiter ab: …"` bzw. `"(kein Zeitstempel)"`).
 - Speichert pro Aufruf eine Zeile.
+- Der Aufrufer `CliOutputProtokollWriter` reicht Marker mit gültigem Zeitstempel anschließend an `KiPluginLimitService.VerarbeiteRateLimitAsync` weiter.
+
+### `TryParseRateLimitMarker(string outputLine, out DateTimeOffset? resetUtc) : bool` (statisch)
+
+**Beschreibung:** Parst den Session-Limit-Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` aus einer CLI-Ausgabezeile.
+
+**Verhalten:**
+
+- Gibt `true` zurück, wenn das Marker-Präfix und die schließende `]]`-Klammer gefunden werden — auch ohne gültigen Zeitstempel (`resetUtc = null`).
+- Der Marker darf auch eingebettet in einer längeren Zeile vorkommen.
+- Ein gültiger ISO-8601-Zeitstempel wird als `DateTimeOffset` in `resetUtc` geliefert.
+
+### `ParseRateLimitMarker(string outputLine) : (bool Found, string? Prompt, DateTimeOffset? ResetUtc)` (statisch)
+
+**Beschreibung:** Kompatibilitäts-Wrapper um `TryParseRateLimitMarker`; liefert ein Tuple. `Prompt` ist aktuell immer `null`.
+
+## AufgabeService — Pause
+
+### `SetPauseAsync(Guid aufgabeId, DateTimeOffset? pausiertBisUtc, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Setzt oder leert den Pausen-Endzeitpunkt (`Aufgabe.PausiertBisUtc`) einer regulären Aufgabe.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `aufgabeId` | `Guid` | ID der Aufgabe. |
+| `pausiertBisUtc` | `DateTimeOffset?` | UTC-Zeitpunkt, bis zu dem pausiert wird; `null` hebt eine bestehende Pause auf. |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Verhalten:**
+
+- Erlaubte Stati: `Neu`, `Gestartet`, `Wartend` — andere Stati sowie Autonome Aufgaben werden mit `InvalidOperationException` abgelehnt.
+- Beim Setzen muss `pausiertBisUtc` in der Zukunft liegen; andernfalls `InvalidOperationException`.
+- Schreibt pro Aufruf einen `ProtokollTyp.SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben").
+- Wirft `InvalidOperationException`, wenn die Aufgabe nicht gefunden wird.
+
+## KiPluginLimitService — Plugin-Session-Limits
+
+**Registrierung:** Scoped in DI; Abhängigkeiten: `SoftwareschmiededDbContext`, `AppEinstellungService`, `AufgabeLaufdatenChangedNotifier`.
+
+**Konstante:** `KiPluginLimitService.SessionLimitKeyPrefix = "plugins.sessionlimit."` — Schlüsselpräfix für persistierte Reset-Zeitpunkte in `AppEinstellung`.
+
+### `VerarbeiteRateLimitAsync(Guid aufgabeId, DateTimeOffset resetUtc, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Verarbeitet einen erkannten Session-Limit-Marker: persistiert den Reset-Zeitpunkt unter `plugins.sessionlimit.<KiPluginPrefix>` der auslösenden Aufgabe und pausiert bei zukünftigem Zeitpunkt alle aktiv laufenden regulären Aufgaben mit demselben Prefix.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `aufgabeId` | `Guid` | ID der Aufgabe, in deren CLI-Ausgabe der Marker erkannt wurde. |
+| `resetUtc` | `DateTimeOffset` | Gemeldeter Reset-Zeitpunkt des Session-Limits. |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Verhalten:**
+
+- Aufgabe nicht gefunden oder `KiPluginPrefix` leer: `LogWarning`, keine Persistenz, keine Pause.
+- Persistiert `resetUtc` (normalisiert auf UTC) als ISO-8601-Roundtrip-String (`"O"`) in `AppEinstellung`.
+- Liegt `resetUtc` in der Vergangenheit: Persistenz erfolgt, aber es wird keine Pause gesetzt.
+- Kandidaten: Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, ohne `AutonomKonfiguration`, Prefix-Vergleich `OrdinalIgnoreCase`.
+- Max-Semantik: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — längere manuelle Pausen werden nicht verkürzt.
+- Pro pausierter Aufgabe wird ein `ProtokollTyp.SystemMeldung`-Eintrag geschrieben; nach dem Speichern wird `AufgabeLaufdatenChangedNotifier.NotifyLaufdatenChanged` je Aufgabe ausgelöst.
+- Laufende CLI-Prozesse werden nicht angefasst.
+
+### `GetAktiveSessionLimitsAsync(IReadOnlyCollection<string> prefixes, CancellationToken ct = default) : Task<IReadOnlyDictionary<string, DateTimeOffset>>`
+
+**Beschreibung:** Liest die persistierten Session-Limits mehrerer Plugin-Prefixe in einer Abfrage (Batch-Lookup, z. B. für `CliUpdateSafetyService`).
+
+**Verhalten:**
+
+- Übersetzt jedes Prefix auf den Schlüssel `plugins.sessionlimit.<Prefix>` und lädt die Werte über `AppEinstellungService.GetSettingsAsync`.
+- Gibt nur zukünftige, gültig geparste (`DateTimeStyles.AssumeUniversal | AdjustToUniversal`) Zeitpunkte zurück; abgelaufene oder ungültige Werte werden ignoriert.
+- Das zurückgegebene Dictionary verwendet `OrdinalIgnoreCase`-Schlüsselvergleich.
+- Leere Prefix-Liste oder ausschließlich leere Prefixe: leeres Dictionary.
 
 ## PromptZeitVersandService — Zeitgesteuerte Prompt-Versendung
 
@@ -57,6 +133,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 - Liegt `targetTime` in der Vergangenheit oder Gegenwart: Prompt wird sofort an die Session geschrieben (kein Eintrag in der Warteschlange).
 - Liegt `targetTime` in der Zukunft: `ScheduledPromptInfo`-Eintrag wird im internen Dictionary abgelegt; ein `ITimer` wird mit der Restlaufzeit gestartet.
+- **Pausen-Berücksichtigung:** Über die optionale `IServiceScopeFactory` wird der aktuelle `Aufgabe.PausiertBisUtc`-Wert geladen. Endet eine aktive Pause später als `targetTime`, wird die Zielzeit auf das Pausenende verschoben statt verworfen — sowohl bei der Planung als auch erneut im Timer-Callback (`HandleTimerElapsedAsync`), falls die Pause nachträglich gesetzt wurde. Ohne registrierte Scope-Factory (z. B. Unit-Tests) entfällt die Prüfung.
 - Ein bereits geplanter Prompt für dieselbe `aufgabeId` wird ersetzt (Timer wird abgebrochen).
 - Bei Erfolg wird kein Event ausgelöst, solange die Planung (nicht der Versand) stattfindet.
 
@@ -258,6 +335,7 @@ var info = new ScheduledPromptInfo(
 | Session disposed zwischen Planung und Versand | `ObjectDisposedException` wird geloggt; Prompt verworfen; **kein** Event |
 | Schreiboperation auf InputStream schlägt fehl | Exception wird geloggt; kein UI-Feedback; `PromptSent`-Event wird **nicht** ausgelöst |
 | Ungültige Zeitfelder im ViewModel | `FehlerMeldung` wird gesetzt; Service wird nicht aufgerufen; ViewModel-seitige Validierung |
+| Aktive Pause bei Planung oder Fälligkeit | Zielzeit/Timer werden auf das Pausenende verschoben; Eintrag in `ScheduledPromptInfo` bleibt bestehen; **kein** `PromptSent`-Event vor dem Pausenende |
 
 ---
 
@@ -283,7 +361,33 @@ var info = new ScheduledPromptInfo(
 - Schreibt die Datei mit UTF-8 ohne BOM.
 - Abbruch und Schreibfehler werden an den Aufrufer weitergereicht.
 
-## IDialogService — Speichern-Dialog
+## IDialogService — Dialoge
+
+### `ShowAufgabePausierenDialogAsync(AufgabePausierenDialogViewModel viewModel, CancellationToken ct = default) : Task<AufgabePausierenErgebnis?>`
+
+**Beschreibung:** Zeigt den modalen Dialog **Pause einstellen** zum Setzen oder Aufheben einer Aufgaben-Pause.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `viewModel` | `AufgabePausierenDialogViewModel` | Vorbefülltes Dialog-ViewModel (Vorbelegung: nächste volle Minute; bei bestehender Pause deren Endzeitpunkt). |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Rückgabe:** `AufgabePausierenErgebnis?` — `null` bei Abbruch; `Aufheben = true` zum Aufheben; andernfalls `PausiertBisUtc` mit dem gewählten UTC-Zeitpunkt.
+
+**`AufgabePausierenErgebnis` (Record):**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `PausiertBisUtc` | `DateTimeOffset?` | Gewählter Pausen-Endzeitpunkt (bereits nach UTC normalisiert). |
+| `Aufheben` | `bool` | `true`, wenn der Anwender **Pause aufheben** gewählt hat. |
+
+**Verhalten:**
+
+- `WpfDialogService` zeigt `AufgabePausierenDialog` modal über `ShowDialogAsync`.
+- Die Validierung läuft im ViewModel (`KannBestaetigen`, `ValidierungsFehler`): Datum gesetzt, Stunde 0–23, Minute 0–59, Zeitpunkt in der Zukunft.
+- `TaskDetailViewModel.PauseEinstellenAsync` ruft anschließend `AufgabeService.SetPauseAsync` auf (`null` bei `Aufheben`).
 
 ### `ShowSaveFileDialogAsync(string title, string filter, string defaultFileName, string? initialDirectory = null, CancellationToken ct = default) : Task<string?>`
 

@@ -162,10 +162,98 @@ public sealed class CliOutputProtokollWriterTests
         persistedLines.Should().Equal(expectedLines);
     }
 
+    /// <summary>
+    /// Ein gültiger Rate-Limit-Marker in der CLI-Ausgabe persistiert das Plugin-Session-Limit
+    /// unter <c>plugins.sessionlimit.&lt;Prefix&gt;</c> und pausiert die auslösende Aufgabe (Issue 151).
+    /// </summary>
+    [Fact]
+    public async Task RateLimitMarker_PersistiertSessionLimit_UndPausiertAufgabe()
+    {
+        await using var provider = CreateCliOutputServiceProvider(mitLimitService: true);
+        var aufgabeId = await SeedLaufendeAufgabeAsync(provider);
+        var sut = new CliOutputProtokollWriter(
+            aufgabeId,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<CliOutputProtokollWriter>.Instance);
+
+        var resetUtc = DateTimeOffset.UtcNow.AddHours(2);
+        sut.OnOutputChunk(Encoding.UTF8.GetBytes($"[[SOFTWARESCHMIEDE_RATE_LIMIT:{resetUtc:O}]]\n"));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(5));
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+
+        var einstellung = db.AppEinstellungen
+            .AsNoTracking()
+            .SingleOrDefault(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + "Softwareschmiede.TestKi");
+        einstellung.Should().NotBeNull("der Marker muss das Session-Limit des Plugin-Prefix persistieren");
+
+        var aufgabe = db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId);
+        aufgabe.PausiertBisUtc.Should().NotBeNull("die Aufgabe muss bei zukünftigem Limit pausiert werden");
+
+        db.Protokolleintraege
+            .AsNoTracking()
+            .Any(e => e.AufgabeId == aufgabeId && e.Typ == ProtokollTyp.RateLimit)
+            .Should().BeTrue("der Marker erzeugt weiterhin den RateLimit-Protokolleintrag");
+    }
+
+    /// <summary>Ausgabe ohne Marker verändert weder Session-Limits noch den Pausenzustand der Aufgabe.</summary>
+    [Fact]
+    public async Task MarkerfreieZeile_LoestKeineLimitVerarbeitungAus()
+    {
+        await using var provider = CreateCliOutputServiceProvider(mitLimitService: true);
+        var aufgabeId = await SeedLaufendeAufgabeAsync(provider);
+        var sut = new CliOutputProtokollWriter(
+            aufgabeId,
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<CliOutputProtokollWriter>.Instance);
+
+        sut.OnOutputChunk(Encoding.UTF8.GetBytes("normale ausgabe\n"));
+        await sut.CompleteAsync(TimeSpan.FromSeconds(5));
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+
+        db.AppEinstellungen.AsNoTracking().Any(e => e.Schluessel.StartsWith(KiPluginLimitService.SessionLimitKeyPrefix))
+            .Should().BeFalse("ohne Marker darf kein Session-Limit persistiert werden");
+        db.Aufgaben.AsNoTracking().Single(a => a.Id == aufgabeId).PausiertBisUtc.Should().BeNull();
+    }
+
+    private static async Task<Guid> SeedLaufendeAufgabeAsync(ServiceProvider provider)
+    {
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var projektId = Guid.NewGuid();
+        db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+        {
+            Id = projektId,
+            Name = "Writer-Testprojekt",
+            ErstellungsDatum = DateTimeOffset.UtcNow,
+            Status = ProjektStatus.Aktiv
+        });
+        var aufgabe = new Softwareschmiede.Domain.Entities.Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = projektId,
+            Titel = "Laufende Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            AktiveRunId = Guid.NewGuid().ToString("N"),
+            KiPluginPrefix = "Softwareschmiede.TestKi",
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+        db.Aufgaben.Add(aufgabe);
+        await db.SaveChangesAsync();
+        return aufgabe.Id;
+    }
+
     private static ServiceProvider CreateCliOutputServiceProvider(params IInterceptor[] interceptors)
+        => CreateCliOutputServiceProvider(mitLimitService: false, interceptors);
+
+    private static ServiceProvider CreateCliOutputServiceProvider(bool mitLimitService, params IInterceptor[] interceptors)
     {
         var databaseName = Guid.NewGuid().ToString();
-        return new ServiceCollection()
+        var services = new ServiceCollection()
             .AddDbContext<SoftwareschmiededDbContext>(options =>
             {
                 options.UseInMemoryDatabase(databaseName);
@@ -173,8 +261,19 @@ public sealed class CliOutputProtokollWriterTests
                     options.AddInterceptors(interceptors);
             })
             .AddScoped<ProtokollService>()
-            .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance)
-            .BuildServiceProvider();
+            .AddSingleton<ILogger<ProtokollService>>(NullLogger<ProtokollService>.Instance);
+
+        if (mitLimitService)
+        {
+            services
+                .AddScoped<AppEinstellungService>()
+                .AddScoped<KiPluginLimitService>()
+                .AddSingleton<AufgabeLaufdatenChangedNotifier>()
+                .AddSingleton<ILogger<AppEinstellungService>>(NullLogger<AppEinstellungService>.Instance)
+                .AddSingleton<ILogger<KiPluginLimitService>>(NullLogger<KiPluginLimitService>.Instance);
+        }
+
+        return services.BuildServiceProvider();
     }
 
     private sealed class BlockingSaveChangesInterceptor : SaveChangesInterceptor

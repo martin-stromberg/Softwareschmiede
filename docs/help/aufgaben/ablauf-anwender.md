@@ -12,6 +12,7 @@
 
 In der linken Navigationsseitenleiste findest du eine Sektion „Aktive Aufgaben", die bis zu 20 derzeit laufende Aufgaben (Status: Gestartet oder Wartend) anzeigt. Jede Aufgabe wird als gerahmte Kachel mit Titel und aktuellem KI-Ausführungsstatus dargestellt:
 
+- `⏸ Pausiert (noch hh:mm:ss)` — Die Aufgabe ist bis zum angezeigten Zeitpunkt pausiert; die Kachel ist abgeblendet
 - `▶ Läuft` — Die KI arbeitet gerade an der Aufgabe
 - `⏸ Wartet` — Die laufende CLI wartet auf Eingabe oder die Aufgabe hat ein Rate-Limit erreicht
 - `✓ Bereit` — Keine aktive Ausführung erkannt
@@ -175,6 +176,19 @@ Wenn du die bisherige Ausgabe der CLI als Datei sichern möchtest:
 
 > **Hinweis:** Wenn du den Dialog abbrichst, wird keine Datei angelegt. Bereits gespeicherte andere Protokolleinträge werden nicht mit exportiert.
 
+### 6c. Aufgabe pausieren (optional)
+
+Du kannst eine reguläre Aufgabe (Status **Neu**, **Gestartet** oder **Wartend**) bis zu einem bestimmten Zeitpunkt pausieren — etwa um ein ausgeschöpftes Session-Limit des KI-Plugins abzuwarten:
+
+1. Klicke im Ribbon (Gruppe „Aufgabe") auf **Pause einstellen**.
+2. Im Dialog **Pause einstellen** sind Datum und Uhrzeit bereits mit der nächsten vollen Minute vorbelegt. Passe die Werte bei Bedarf an.
+3. Klicke auf **Übernehmen**. Der gewählte Zeitpunkt muss in der Zukunft liegen; sonst zeigt der Dialog einen Hinweis und lässt keine Bestätigung zu.
+4. Die Aufgabe gilt nun als pausiert: Die Kachel in der Seitenleiste zeigt „⏸ Pausiert (noch …)" mit Countdown und ist abgeblendet; im Ribbon erscheint „⏸ Pausiert bis …". Während der Pause sind **Starten**, **CLI neu starten**, die Wiederherstellung und das Senden oder Planen von Prompts gesperrt.
+
+> **Hinweis:** Ein laufender CLI-Prozess wird durch die Pause nicht gestoppt — die Pause wirkt nur auf neue Aktionen. Autonome Aufgaben können nicht über diesen Dialog pausiert werden.
+
+**Pause vorzeitig aufheben:** Öffne **Pause einstellen** erneut — der Dialog zeigt die aktuell gesetzte Pause an — und klicke auf **Pause aufheben**. Ohne Aufheben endet die Pause automatisch zum eingestellten Zeitpunkt; eine automatische Wiederaufnahme findet nicht statt.
+
 ### 7. KI-Ausführung beenden
 
 Beendet sich das CLI-Programm selbst, aktualisiert die Ansicht automatisch. Alternativ kannst du im Ribbon (Gruppe „CLI") auf **Stoppen** klicken (graceful shutdown: 5 s Wartezeit, dann Kill).
@@ -236,8 +250,8 @@ Die **Todos-Ansicht** ermöglicht es, Aufgaben in kleinere Arbeitsschritte zu un
 
 ## Sonderfälle
 
-- **Rate-Limit (Status Wartend):** Das CLI gibt einen Rate-Limit-Marker aus; Status wechselt auf „Wartend". Ein Prompt-Vorschlag wird gespeichert. Über „Wiederherstellen" (Recovery-Banner auf dem Dashboard) kann die Aufgabe auf „Gestartet" zurückgesetzt und das CLI erneut gestartet werden.
-- **Aufgabe wiederherstellen:** Erscheint auf dem Dashboard das Banner „X Aufgabe(n) benötigen Wiederherstellung", kann durch Klick auf **Wiederherstellen** der Status zurückgesetzt werden. Voraussetzung: kein aktiver CLI-Prozess und Heartbeat älter als 5 Minuten.
+- **Rate-Limit / Session-Limit der KI-CLI:** Gibt das CLI einen Rate-Limit-Marker mit Zeitpunkt aus, wird dies im Protokoll der auslösenden Aufgabe festgehalten. Zusätzlich werden alle gerade laufenden regulären Aufgaben, die dasselbe KI-Plugin verwenden, automatisch bis zum gemeldeten Zeitpunkt pausiert („⏸ Pausiert (noch …)" in der Seitenleiste). Laufende Ausführungen bleiben dabei unangetastet. Nach Ablauf des Limits kannst du die Aufgaben über **Starten** wieder aufnehmen.
+- **Aufgabe wiederherstellen:** Erscheint auf dem Dashboard das Banner „X Aufgabe(n) benötigen Wiederherstellung", kann durch Klick auf **Wiederherstellen** der Status zurückgesetzt werden. Voraussetzung: kein aktiver CLI-Prozess, Heartbeat älter als 5 Minuten und keine aktive Pause — pausierte Aufgaben werden nicht als Wiederherstellungskandidaten angeboten.
 - **Aufgabe mit offenen To-Dos beenden:** Wenn noch To-Dos vorhanden sind, wird das Beenden blockiert. Alle To-Dos müssen erledigt sein, bevor die Aufgabe auf „Beendet" gesetzt werden kann.
 
 ## Barrierefreiheit

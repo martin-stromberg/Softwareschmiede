@@ -15,15 +15,16 @@ Vor dem Start des Update-Prozesses wird überprüft, ob aktive CLI-Aufgaben das 
 Beteiligte Komponenten:
 - `ICliUpdateSafetyService.CheckAsync()` — Ermittelt blockierende Aufgaben
 - `AufgabeService.GetAktiveAufgabenAsync()` — Lädt aktive Aufgaben (Status `Gestartet` oder `Wartend`, max. 20)
-- `Aufgabe.LaufStatus` — Gibt den Laufzeit-Substatus an
+- `KiPluginLimitService.GetAktiveSessionLimitsAsync()` — Lädt die persistierten, noch zukünftigen Session-Limits aller verwendeten `KiPluginPrefix`-Werte in einer Abfrage
+- `AufgabeLaufAktivitaet.IstAktiv()` — Heartbeat-basierte Aktivitätsprüfung
 
-**Filterlogik:** Eine Aufgabe blockiert das Update nur dann, wenn beide Bedingungen erfüllt sind:
+**Filterlogik:** Eine Aufgabe blockiert das Update nur dann, wenn `AufgabeLaufAktivitaet.IstAktiv(a.AktiveRunId, a.LastHeartbeatUtc, now)` liefert, d. h.:
 1. `AktiveRunId is not null` — Die Aufgabe hat eine aktive CLI-Session
-2. `LaufStatus == AufgabeLaufStatus.Laeuft` — Der CLI-Prozess läuft aktiv (nicht bloß "wartet" oder "bereit")
+2. `LastHeartbeatUtc` ist gesetzt und jünger als `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (5 Minuten) — der CLI-Prozess meldet sich noch aktiv
 
 **Nicht blockierende Zustände:**
-- `LaufStatus == null` — Aufgabe ist bereit oder noch nicht klassifiziert; kein CLI-Prozess läuft
-- `LaufStatus == AufgabeLaufStatus.WartetAufEingabe` — CLI läuft, wartet aber auf Benutzer; ist bereits eingeplant und benötigt nicht zu unterbrechen
+- Kein `AktiveRunId` oder abgelaufener Heartbeat — die Aufgabe gilt nicht als laufend.
+- **Plugin-Session-Limit aktiv:** Hat das `KiPluginPrefix` der Aufgabe ein persistiertes, noch zukünftiges Session-Limit (`AppEinstellung`-Schlüssel `plugins.sessionlimit.<Prefix>`), gilt die Aufgabe als nicht riskant — **auch bei frischem Heartbeat**, da das Plugin ohnehin nicht weiterarbeiten kann. Für diese Aufgaben entfällt die Heartbeat-Toleranz komplett.
 
 **Ergebnis:** `CliUpdateSafetyResult` enthält die Anzahl riskanter Aufgaben und deren Titel/ID. Falls `RiskyTaskCount > 0`, wird `RequiresConfirmation = true` gesetzt, und der Benutzer erhält eine Warnung mit Optionen.
 
@@ -65,7 +66,8 @@ Nach erfolgreicher Vorbereitung wird `UpdateProgressViewModel.MarkUpdaterStartin
 flowchart TD
     A["Update-Benutzer löst aus"] --> B["CliUpdateSafetyService.CheckAsync aufrufen"]
     B --> C["Aktive Aufgaben laden"]
-    C --> D{"Laufende CLI-Prozesse?<br/>(LaufStatus == Laeuft)"}
+    C --> C2["Session-Limits laden<br/>(KiPluginLimitService)"]
+    C2 --> D{"Riskante Aufgabe?<br/>(aktiver Heartbeat und kein<br/>zukünftiges Plugin-Limit)"}
     D -- Ja --> E["Warnung anzeigen<br/>RequiresConfirmation = true"]
     E --> F{"Benutzer bestätigt?"}
     F -- Nein --> G["Abbruch"]

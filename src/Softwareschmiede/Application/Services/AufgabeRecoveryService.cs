@@ -38,14 +38,19 @@ public sealed class AufgabeRecoveryService
     /// </summary>
     public async Task<IEnumerable<Guid>> ScanForRecoveryCandidatesAsync(CancellationToken ct = default)
     {
-        var cutoff = DateTimeOffset.UtcNow.AddMinutes(-HeartbeatTimeoutMinutes);
+        var now = DateTimeOffset.UtcNow;
+        var cutoff = now.AddMinutes(-HeartbeatTimeoutMinutes);
 
+        // Pausierte Aufgaben (PausiertBisUtc in der Zukunft) sind keine „festhängenden" Kandidaten:
+        // sie wurden bewusst bis zu einem bekannten Zeitpunkt angehalten (z. B. Session-Limit des
+        // KI-Plugins) und tauchen nach Pausenende bei weiterhin abgelaufenem Heartbeat wieder auf.
         var kandidaten = await _db.Aufgaben
             .AsNoTracking()
             .Where(a => AufgabeStatusExtensions.AktivOderWartendStatus.Contains(a.Status)
                 && a.AusfuehrungsStatus == AufgabeAusfuehrungsStatus.Aktiv
                 && a.LastHeartbeatUtc != null
                 && a.LastHeartbeatUtc < cutoff
+                && (a.PausiertBisUtc == null || a.PausiertBisUtc <= now)
                 && a.AutonomKonfiguration == null)
             .Select(a => a.Id)
             .ToListAsync(ct);
@@ -80,6 +85,13 @@ public sealed class AufgabeRecoveryService
         {
             LogRejected(correlationId, aufgabeId, "InvalidState");
             throw new InvalidOperationException("Wiederherstellung für aktuellen Status nicht verfügbar.");
+        }
+
+        if (aufgabe.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
+        {
+            LogRejected(correlationId, aufgabeId, "Paused");
+            throw new InvalidOperationException(
+                $"Wiederherstellung nicht möglich, die Aufgabe ist bis {pausiertBis.ToLocalTime():dd.MM.yyyy HH:mm:ss} pausiert.");
         }
 
         bool isRunning;

@@ -294,6 +294,62 @@ public sealed class AufgabeRecoveryServiceTests : IDisposable
         kandidaten.Should().BeEmpty();
     }
 
+    /// <summary>ScanForRecoveryCandidatesAsync ignoriert pausierte Aufgaben (PausiertBisUtc in der Zukunft), auch bei abgelaufenem Heartbeat (Issue 151).</summary>
+    [Fact]
+    public async Task ScanForRecoveryCandidates_ShouldExcludePausedTasks()
+    {
+        var pausiert = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Pausierte Aufgabe",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(2),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+        var abgelaufenePause = new Aufgabe
+        {
+            Id = Guid.NewGuid(),
+            ProjektId = _projektId,
+            Titel = "Aufgabe mit abgelaufener Pause",
+            Status = AufgabeStatus.Gestartet,
+            AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            PausiertBisUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            ErstellungsDatum = DateTimeOffset.UtcNow
+        };
+        _db.Aufgaben.AddRange(pausiert, abgelaufenePause);
+        await _db.SaveChangesAsync();
+
+        var running = new FakeRunningAutomationStatusSource(false);
+        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+
+        var kandidaten = (await sut.ScanForRecoveryCandidatesAsync()).ToList();
+
+        kandidaten.Should().NotContain(pausiert.Id, "eine aktiv pausierte Aufgabe ist kein Recovery-Kandidat");
+        kandidaten.Should().Contain(abgelaufenePause.Id, "eine abgelaufene Pause darf die Recovery-Erkennung nicht blockieren");
+    }
+
+    /// <summary>RecoverManuellAsync lehnt eine aktiv pausierte Aufgabe mit InvalidOperationException ab (Issue 151).</summary>
+    [Fact]
+    public async Task RecoverManuellAsync_ShouldThrow_WhenTaskIsPaused()
+    {
+        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
+        tracked!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1);
+        await _db.SaveChangesAsync();
+
+        var running = new FakeRunningAutomationStatusSource(false);
+        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+
+        var act = () => sut.RecoverManuellAsync(aufgabe.Id);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*pausiert*");
+    }
+
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 

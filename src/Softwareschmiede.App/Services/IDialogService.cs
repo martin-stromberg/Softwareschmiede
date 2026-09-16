@@ -42,6 +42,11 @@ public interface IDialogService
         IReadOnlyList<string> solutionPfade,
         CancellationToken ct = default);
 
+    /// <summary>Zeigt den Dialog zum Einstellen oder Aufheben einer Aufgaben-Pause und gibt das Ergebnis zurück, oder null wenn abgebrochen.</summary>
+    Task<AufgabePausierenErgebnis?> ShowAufgabePausierenDialogAsync(
+        AufgabePausierenDialogViewModel viewModel,
+        CancellationToken ct = default);
+
     /// <summary>Zeigt den Initialisierungsdialog für eine Autonome Aufgabe und gibt die erstellte Konfiguration zurück, oder null wenn abgebrochen.</summary>
     Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
         AutonomAufgabeInitialisierungsDialogViewModel viewModel,

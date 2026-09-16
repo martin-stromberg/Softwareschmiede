@@ -127,6 +127,17 @@ public sealed class WpfDialogService : IDialogService
     }
 
     /// <inheritdoc/>
+    public Task<AufgabePausierenErgebnis?> ShowAufgabePausierenDialogAsync(
+        AufgabePausierenDialogViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return ShowDialogAsync(
+            () => new AufgabePausierenDialog(viewModel),
+            () => viewModel.Ergebnis);
+    }
+
+    /// <inheritdoc/>
     public Task<AutonomAufgabeKonfiguration?> ShowAutonomAufgabeInitialisierungsDialogAsync(
         AutonomAufgabeInitialisierungsDialogViewModel viewModel,
         CancellationToken ct = default)

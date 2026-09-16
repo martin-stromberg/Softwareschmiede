@@ -66,6 +66,39 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
         }
     }
 
+    /// <summary>Ein über <see cref="Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession.WritePromptAsync"/>
+    /// gesendeter Prompt (abschließendes nacktes <c>\r</c> als Submit — Semantik eines echten ConPTY-Enter) muss
+    /// ebenfalls vom interaktiven <c>cmd.exe</c> ausgeführt werden: Die Pipe-Übertragung braucht <c>\r\n</c> als
+    /// Zeilenende, weshalb der Launcher den Input-Stream entsprechend übersetzt.</summary>
+    [OsInterfaceFact]
+    public async Task Start_UeberWritePromptAsyncGesendeterPromptWirdAusgefuehrt()
+    {
+        var (process, session, _) = _sut.Start(Guid.NewGuid(), Path.GetTempPath(), "echo simuliert");
+        try
+        {
+            await session.WritePromptAsync("echo MARKER_PROMPT_TEXT", CancellationToken.None);
+
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            var found = false;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (GetBufferText(session).Contains("MARKER_PROMPT_TEXT", StringComparison.Ordinal))
+                {
+                    found = true;
+                    break;
+                }
+                await Task.Delay(100);
+            }
+
+            found.Should().BeTrue("ein per WritePromptAsync gesendeter Prompt (nacktes CR als Submit) muss auf der simulierten Pipe ausgeführt werden und im Buffer erscheinen");
+        }
+        finally
+        {
+            session.Dispose();
+            KillIfRunning(process);
+        }
+    }
+
     /// <summary>Nach <see cref="System.Diagnostics.Process.Kill(bool)"/> mit <c>entireProcessTree: true</c> muss
     /// der Prozess innerhalb kurzer Zeit als beendet erkennbar sein — bestätigt Kompatibilität mit
     /// <c>KiAusfuehrungsService.StopCliAsync</c>, das denselben Aufruf für den Stop-Fallback nutzt.</summary>
