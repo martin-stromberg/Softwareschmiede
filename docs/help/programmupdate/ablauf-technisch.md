@@ -4,7 +4,7 @@
 
 ## Übersicht
 
-Der Update-Ablauf wird vom `MainWindowViewModel` orchestriert. Drei Einstiegspunkte — die einmalige Startautomatik, der manuelle Prüfbefehl (`UpdatePruefenCommand`) und der manuelle Installationsbefehl (`UpdateStartenCommand`) — laufen über dasselbe nicht wartende Gate (`_updateGate`) und lesen die gespeicherten Update-Einstellungen jeweils frisch aus der Datenbank. Der `UpdateService` führt Prüfung, Paketvorbereitung und Updater-Start aus; `GitHubReleaseClient`, `UpdatePackageService` und `UpdateScriptService` übernehmen die konkreten Teilschritte.
+Der Update-Ablauf wird vom `MainWindowUpdateFlow` orchestriert; das `MainWindowViewModel` delegiert Commands, Zustands-Properties und den Start-Einstieg an ihn. Drei Einstiegspunkte — die einmalige Startautomatik, der manuelle Prüfbefehl (`UpdatePruefenCommand`) und der manuelle Installationsbefehl (`UpdateStartenCommand`) — laufen über dasselbe nicht wartende Gate (`_updateGate`) und lesen die gespeicherten Update-Einstellungen jeweils frisch aus der Datenbank. Der `UpdateService` führt Prüfung, Paketvorbereitung und Updater-Start aus; `GitHubReleaseClient`, `UpdatePackageService` und `UpdateScriptService` übernehmen die konkreten Teilschritte.
 
 ## Update-Einstellungen laden und speichern
 
@@ -14,15 +14,15 @@ Der Update-Ablauf wird vom `MainWindowViewModel` orchestriert. Drei Einstiegspun
 
 - Fehlender oder ungültiger `updates.mode`-Wert → Default `UpdateMode.NurPruefen`
 - Fehlender oder ungültiger `updates.includePrereleases`-Wert → Default `false`
-- Datenbank-Lesefehler werden **nicht** abgefangen und propagieren an den Aufrufer. Der Aufrufer (`MainWindowViewModel.LeseUpdateSettingsAsync`) bildet daraus `null` und zeigt den Nicht-prüfbar-Hinweis — es erfolgt keine Ersatzfreigabe durch Defaults, Snapshots oder Caches.
+- Datenbank-Lesefehler werden **nicht** abgefangen und propagieren an den Aufrufer. Der Aufrufer (`MainWindowUpdateFlow.LeseUpdateSettingsAsync`) bildet daraus `null` und zeigt den Nicht-prüfbar-Hinweis — es erfolgt keine Ersatzfreigabe durch Defaults, Snapshots oder Caches.
 
-Im `MainWindowViewModel` werden die Werte immer in einem frischen DI-Scope gelesen (`_serviceProvider.CreateScope()`), da der `AppEinstellungService` einen scoped `DbContext` nutzt, der Update-Service selbst aber ein Singleton ist.
+Im `MainWindowUpdateFlow` werden die Werte immer in einem frischen DI-Scope gelesen (`_serviceProvider.CreateScope()`), da der `AppEinstellungService` einen scoped `DbContext` nutzt, der Update-Service selbst aber ein Singleton ist.
 
 ### Speichern und Wirksamwerden
 
-`SettingsViewModel.SpeichernAsync` validiert das ausgewählte Label (`TryParseUpdateModus`), schreibt beide Werte gemeinsam über `SetUpdateSettingsAsync` in einem `SaveChangesAsync` und löst direkt danach das Event `UpdateSettingsSaved` mit dem gespeicherten Snapshot aus — auch wenn ein späterer Einstellungsschritt fehlschlägt.
+`SettingsViewModel.SpeichernAsync` verwendet die typisierte Auswahl `SelectedUpdateMode` (`UpdateModusOption` aus `UpdateModusOption.Alle`; die Anzeige-Labels liegen zentral in `UpdateModusTexte`), schreibt beide Werte gemeinsam über `SetUpdateSettingsAsync` in einem `SaveChangesAsync` und löst direkt danach das Event `UpdateSettingsSaved` mit dem gespeicherten Snapshot aus — auch wenn ein späterer Einstellungsschritt fehlschlägt.
 
-Der `MainWindowViewModel` hat das Event beim ersten `NavigateToSettings` auf das gecachte `SettingsViewModel` abonniert. Der Handler `ApplyGespeicherteUpdateSettings`:
+Der `MainWindowViewModel` hat das Event beim ersten `NavigateToSettings` auf das gecachte `SettingsViewModel` abonniert und leitet es an `MainWindowUpdateFlow.ApplyGespeicherteUpdateSettings` weiter. Der Handler:
 
 - speichert den neuen Snapshot in `_aktuelleUpdateEinstellungen`,
 - erhöht bei geänderten Werten die Einstellungs-Generation (`_updateSettingsGeneration`),
@@ -35,8 +35,8 @@ Speichern startet weder eine Prüfung noch eine Installation. Vor dem ersten erf
 ## Einmalige Startautomatik
 
 1. `App.StartupAsync` führt die DB-Migration und Startinitialisierung aus, erzeugt das `MainWindow`, weist es **vor** `Show()` explizit `Application.MainWindow` zu (Dialog-Owner) und zeigt es an.
-2. Der `MainWindow`-Konstruktor registriert den `ContentRendered`-Handler. Beim ersten Rendern meldet sich der Handler ab (`ContentRendered -= OnContentRendered`) und ruft `MainWindowViewModel.InitializeUpdatesAfterWindowReadyAsync()` via `SafeFireAndForget` auf.
-3. `InitializeUpdatesAfterWindowReadyAsync` setzt das Einmalkennzeichen `_startInitialisierungErfolgt` per `Interlocked.Exchange` **vor** dem ersten `await`; weitere Aufrufe sind wirkungslos. Anschließend wird das `_updateGate` nicht wartend erworben.
+2. Der `MainWindow`-Konstruktor registriert den `ContentRendered`-Handler. Beim ersten Rendern meldet sich der Handler ab (`ContentRendered -= OnContentRendered`) und ruft `MainWindowViewModel.InitializeUpdatesAfterWindowReadyAsync()` via `SafeFireAndForget` auf, die an `MainWindowUpdateFlow.InitializeAfterWindowReadyAsync` delegiert.
+3. `InitializeAfterWindowReadyAsync` setzt das Einmalkennzeichen `_startInitialisierungErfolgt` per `Interlocked.Exchange` **vor** dem ersten `await`; weitere Aufrufe sind wirkungslos. Anschließend wird das `_updateGate` nicht wartend erworben.
 4. Je nach gelesenem Modus:
    - `UpdateMode.Aus` → kein Releaseabruf.
    - `UpdateMode.NurPruefen` → einmal `CheckForUpdateAsync`; bei `UpdateVerfuegbar` wird das Angebot angezeigt, sonst nichts.
@@ -73,7 +73,7 @@ Serialisiert über ein eigenes `SemaphoreSlim` (`_checkGate`):
 
 ## Gemeinsamer Installationspfad
 
-Manueller Start (`UpdateStartenAsync`), Startautomatik und der Kern `InstalliereUpdateAsync` teilen denselben Ablauf:
+Manueller Start (`StartenAsync`), Startautomatik und der Kern `InstalliereUpdateAsync` teilen denselben Ablauf (eingebettet in `FuehreUpdateVersuchAsync` mit Gate, Settings-Read und Generationsprüfung):
 
 1. **Gate:** `_updateGate.WaitAsync(0)` — weitere Eintritte während eines laufenden Vorgangs werden verworfen. Zusätzlich prüfen die Methodenrümpfe Modus/Status auch bei umgangenem `CanExecute`.
 2. **Einstellungen lesen:** `LeseUpdateSettingsAsync` in frischem Scope. `null` (Lesefehler) → `UpdateEinstellungenLesefehlerAnzeigen` (Angebot entfernt, `UpdateHinweis` = „Die Update-Einstellungen konnten nicht gelesen werden. Eine Update-Prüfung ist nicht möglich."), kein Releaseabruf.
@@ -97,6 +97,7 @@ Der `UpdateProgressDialog` (Titel „Update vorbereiten") bindet `UpdateProgress
 | `TextBlock` (Meldung) | `Message` | Fortschritts- oder Fehlermeldung |
 | `ProgressBar.Value` / `IsIndeterminate` | `Percent` / `IsIndeterminate` | Prozentwert beim Download, sonst unbestimmt |
 | `Button` „Abbrechen" | `CancelCommand` + `CanCancel` | Löst `RequestCancel()` → `_cancelAction` (canceln des verknüpften `CancellationTokenSource`) aus |
+| `Button` „Schließen" | `CanClose` | Sichtbar in Fehler-/Abschlusszuständen; schließt den Dialog explizit, ohne auf die Fenster-Schaltfläche angewiesen zu sein |
 
 `UpdateProgressViewModel.Apply(UpdatePreparationProgress)` übernimmt Meldungen; nachträglich eintreffende Reports werden verworfen, sobald ein Terminalzustand (`HasError` oder `!CanCancel`) erreicht ist. `SetError(message)` zeigt den Fehler, deaktiviert Abbrechen und erlaubt das Schließen (`CanClose`). `MarkUpdaterStarting()` meldet „Update wird gestartet. Die Anwendung wird beendet." Alle Properties haben öffentliche Setter, da die WPF-Binding-Engine Setter auch bei OneWay-Bindings validiert.
 
@@ -149,4 +150,4 @@ flowchart TD
 | Vorbereitungs-/Startfehler | `SetError` im Dialog + `UpdateHinweis` „Update konnte nicht vorbereitet werden."; kein Shutdown |
 | InvalidOperationException beim Binding-Aufbau | Alle Properties des `UpdateProgressViewModel` haben öffentliche Setter — siehe Binding-Tabelle oben |
 
-Beim Schließen des Hauptfensters wird ein laufender Vorgang über `Dispose` → `CancelLaufendenUpdateAblauf` gecancelt.
+Beim Schließen des Hauptfensters wird ein laufender Vorgang über `MainWindowViewModel.Dispose` → `MainWindowUpdateFlow.CancelLaufendenUpdateAblauf` gecancelt.

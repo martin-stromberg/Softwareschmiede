@@ -119,13 +119,14 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
             promptZeitVersand,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
-            action => action(),
-            _dialogServiceMock.Object,
-            updateDienste: new MainWindowUpdateDienste(
-                _updateServiceMock.Object,
-                _safetyServiceMock.Object,
-                _progressDialogMock.Object,
-                VersuchProtokoll: null));
+            new MainWindowOptionaleDienste(
+                DispatcherInvoke: action => action(),
+                DialogService: _dialogServiceMock.Object,
+                UpdateDienste: new MainWindowUpdateDienste(
+                    _updateServiceMock.Object,
+                    _safetyServiceMock.Object,
+                    _progressDialogMock.Object,
+                    VersuchProtokoll: null)));
     }
 
     /// <summary>Speichert Update-Einstellungen über den echten AppEinstellungService.</summary>
@@ -141,12 +142,12 @@ public abstract class MainWindowViewModelUpdateTestBase : IDisposable
     /// sodass das UpdateSettingsSaved-Ereignis im MainWindowViewModel ausgelöst wird.
     /// </summary>
     protected async Task SpeichereUpdateEinstellungenUeberUiAsync(
-        MainWindowViewModel sut, string modusLabel, bool includePrereleases)
+        MainWindowViewModel sut, UpdateModusOption modus, bool includePrereleases)
     {
         sut.NavigateToSettingsCommand.Execute(null);
         var settingsViewModel = sut.CurrentView.Should().BeOfType<SettingsViewModel>().Subject;
         await ((AsyncRelayCommand)settingsViewModel.LadenCommand).ExecuteAsync();
-        settingsViewModel.SelectedUpdateMode = modusLabel;
+        settingsViewModel.SelectedUpdateMode = modus;
         settingsViewModel.IncludePrereleases = includePrereleases;
         await ((AsyncRelayCommand)settingsViewModel.SpeichernCommand).ExecuteAsync();
         settingsViewModel.FehlerMeldung.Should().BeNull(

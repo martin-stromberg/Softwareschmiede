@@ -375,7 +375,23 @@ public sealed class MenuView : BaseWindowView
             Thread.Sleep(200);
         }
 
-        throw new TimeoutException($"Navigations-Button wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden. Gesucht: {string.Join(", ", names)}");
+        var fensterTitel = string.Empty;
+        var kinder = string.Empty;
+        try
+        {
+            fensterTitel = Window.Title;
+            kinder = string.Join(" | ", Window.FindAllChildren()
+                .Select(k => $"{k.ControlType}:{k.Name}")
+                .Take(20));
+        }
+        catch (Exception ex)
+        {
+            fensterTitel = $"<Fehler: {ex.GetType().Name}: {ex.Message}>";
+        }
+
+        throw new TimeoutException(
+            $"Navigations-Button wurde nicht innerhalb von {timeout.TotalSeconds}s gefunden. Gesucht: {string.Join(", ", names)}. " +
+            $"Fenster: '{fensterTitel}'. Kinder: {kinder}");
     }
 
     private AutomationElement? TryFindNavigationButton(IReadOnlyList<string> names)

@@ -24,6 +24,17 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// </summary>
 public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWindowViewModelUpdateTestBase
 {
+    /// <summary>Einstiegspunkt, über den ein Updateversuch mit aktivem Lesefehler gestartet wird.</summary>
+    public enum UpdateEinstieg
+    {
+        /// <summary>Einmalige Startautomatik nach Fensterbereitschaft.</summary>
+        Startautomatik,
+        /// <summary>Manuelle Prüfung über UpdatePruefenCommand.</summary>
+        ManuellPruefen,
+        /// <summary>Manueller Installationsstart über UpdateStartenCommand.</summary>
+        ManuellInstallieren
+    }
+
     private readonly UpdateSettingsReadFailureInterceptor _interceptor = new();
 
     /// <summary>Registriert den Fehler-Interceptor am DbContext.</summary>
@@ -36,10 +47,10 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     /// Es gibt keinen internen Retry; über die Settings-UI ist eine Wiederherstellung möglich.
     /// </summary>
     [Theory]
-    [InlineData("startautomatik")]
-    [InlineData("manuellPruefen")]
-    [InlineData("manuellInstallieren")]
-    public async Task UpdateSettingsReadFailure_InitialStopsBeforeReleaseRequest(string einstieg)
+    [InlineData(UpdateEinstieg.Startautomatik)]
+    [InlineData(UpdateEinstieg.ManuellPruefen)]
+    [InlineData(UpdateEinstieg.ManuellInstallieren)]
+    public async Task UpdateSettingsReadFailure_InitialStopsBeforeReleaseRequest(UpdateEinstieg einstieg)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, false));
         _updateServiceMock
@@ -51,7 +62,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         var sut = CreateSut();
 
         var erwartetePruefungen = 0;
-        if (einstieg == "manuellInstallieren")
+        if (einstieg == UpdateEinstieg.ManuellInstallieren)
         {
             // Zuvor ein sichtbares Angebot herstellen, damit der Installationspfad getestet wird
             await sut.InitializeUpdatesAfterWindowReadyAsync();
@@ -64,15 +75,17 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
 
         switch (einstieg)
         {
-            case "startautomatik":
+            case UpdateEinstieg.Startautomatik:
                 await sut.InitializeUpdatesAfterWindowReadyAsync();
                 break;
-            case "manuellPruefen":
+            case UpdateEinstieg.ManuellPruefen:
                 await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
                 break;
-            case "manuellInstallieren":
+            case UpdateEinstieg.ManuellInstallieren:
                 await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(einstieg), einstieg, "Unbekannter Update-Einstieg.");
         }
 
         _interceptor.SettingsReadCount.Should().Be(readsBefore + 1,
@@ -99,7 +112,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         // Wiederherstellung: Fehler deaktivieren, Einstellungen über die UI neu laden und speichern
         _interceptor.DeactivateFailure();
         await SpeichereUpdateEinstellungenUeberUiAsync(
-            sut, "Bei Programmstart pruefen und ausfuehren", true);
+            sut, UpdateModusOption.FuerModus(UpdateMode.BeiProgrammstartPruefenUndAusfuehren), true);
 
         sut.UpdatePruefenCommand.CanExecute(null).Should().BeTrue(
             "nach erfolgreichem Speichern muss die Prüfung wieder verfügbar sein");
@@ -175,7 +188,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
         var checksVorWiederherstellung = checkCalls;
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, "Nur Pruefen", false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), false);
         await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
@@ -240,7 +253,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
 
         // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, "Nur Pruefen", false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), false);
         await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
 
         sut.UpdateVerfuegbar.Should().BeTrue();

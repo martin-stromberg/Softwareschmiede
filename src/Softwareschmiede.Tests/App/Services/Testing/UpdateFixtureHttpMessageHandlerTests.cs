@@ -39,7 +39,10 @@ public sealed class UpdateFixtureHttpMessageHandlerTests : IDisposable
     public void Dispose()
     {
         _client.Dispose();
-        try { Directory.Delete(_wurzel, recursive: true); } catch (IOException) { }
+        // Best-effort: Temp-Dateien können noch von einem noch nicht freigegebenen
+        // Handle gehalten oder gesperrt sein (IOException/UnauthorizedAccessException).
+        try { Directory.Delete(_wurzel, recursive: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>Eine exakt passende URL liefert Status, Header (Link) und Inline-Body der Konfiguration.</summary>

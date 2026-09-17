@@ -8,8 +8,8 @@
 2. Wechseln Sie zur Registerkarte **Allgemein** und scrollen Sie zum Abschnitt **Updates**.
 3. Wählen Sie in der Auswahlbox den gewünschten Modus:
    - **Aus** — keine Update-Prüfung (die Schaltfläche „⟳ Prüfen" ist deaktiviert)
-   - **Nur Pruefen** — prüfen und Update anbieten, aber nie automatisch installieren
-   - **Bei Programmstart pruefen und ausfuehren** — beim Programmstart prüfen und ein gefundenes Update automatisch installieren
+   - **Nur prüfen** — prüfen und Update anbieten, aber nie automatisch installieren
+   - **Bei Programmstart prüfen und ausführen** — beim Programmstart prüfen und ein gefundenes Update automatisch installieren
 4. Aktivieren Sie bei Bedarf die Checkbox **„Prerelease-Versionen laden"**, wenn auch Vorabversionen als Update angeboten werden sollen.
 5. Klicken Sie auf **Speichern**. Die Meldung „Einstellungen gespeichert." bestätigt die Übernahme.
 
@@ -45,7 +45,7 @@
 
 ## Automatische Installation beim Programmstart
 
-Ist der Modus **Bei Programmstart pruefen und ausfuehren** gespeichert, prüft die Anwendung einmalig kurz nach dem Programmstart:
+Ist der Modus **Bei Programmstart prüfen und ausführen** gespeichert, prüft die Anwendung einmalig kurz nach dem Programmstart:
 
 - Ist kein Update verfügbar oder kann nicht geprüft werden, passiert nichts weiter — die Anwendung ist normal bedienbar.
 - Ist ein Update verfügbar, beginnt der Update-Vorgang ohne weiteren Klick. Laufen riskante CLI-Aufgaben, wird zuvor die Sicherheitsabfrage „Update starten?" gezeigt — die Automatik umgeht diese Entscheidung nicht.

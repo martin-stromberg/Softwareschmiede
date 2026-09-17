@@ -292,7 +292,11 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource PrimaryTextBrush}"
                                    Margin="0,0,0,4" />
-                        <ComboBox SelectedValue="{Binding SelectedUpdateMode, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBlock Text="Legt fest, ob und wie nach Programmupdates gesucht wird. Bei „Nur prüfen“ wird ein gefundenes Update nur angezeigt, nicht installiert."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,8" />
+                        <ComboBox SelectedItem="{Binding SelectedUpdateMode, UpdateSourceTrigger=PropertyChanged}"
                                   AutomationProperties.Name="Update-Modus"
                                   ItemsSource="{Binding UpdateModusOptionen}"
                                   HorizontalAlignment="Stretch"
@@ -300,7 +304,7 @@
                                   Padding="8,6">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -308,6 +312,10 @@
                                   AutomationProperties.Name="Prerelease-Versionen laden"
                                   Content="Prerelease-Versionen laden"
                                   Foreground="{DynamicResource PrimaryTextBrush}" />
+                        <TextBlock Text="Berücksichtigt auch Vorabversionen (z. B. Beta-Versionen oder Release-Kandidaten) bei der Update-Prüfung. Diese können noch Fehler enthalten."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="22,4,0,0" />
                     </StackPanel>
                 </StackPanel>
             </TabItem>

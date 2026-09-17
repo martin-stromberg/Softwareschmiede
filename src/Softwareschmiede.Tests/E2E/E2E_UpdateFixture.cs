@@ -26,7 +26,7 @@ public partial class End2EndTest
         var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
         try
         {
-            var mainWindow = app.GetMainWindow(Automation, Long)!;
+            var mainWindow = WarteAufEchtesHauptfenster(app);
             var menu = new MenuView(mainWindow);
 
             // Startautomatik bis zur kontrollierten Updater-Prozessgrenze abwarten.
@@ -129,7 +129,7 @@ public partial class End2EndTest
         fixture.AktiviereLesefehler("Initial", versuch: "startup");
 
         var app = LaunchApp(ensureDatabaseDeleted: false, fixture.ErzeugeStartUmgebung());
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        var mainWindow = WarteAufEchtesHauptfenster(app);
         var menu = new MenuView(mainWindow);
 
         try
@@ -249,7 +249,7 @@ public partial class End2EndTest
             // Fehlersteuerung und Gates auch bei Testabbruch zurücksetzen - jeder Schritt
             // einzeln geschützt, damit ein Fehler nicht die Original-Assertion maskiert.
             try { fixture.DeaktiviereLesefehler(); } catch { /* Testwurzel evtl. schon entfernt. */ }
-            try { fixture.SetzeGateZurueck(UpdateE2ETestKontext.LesefehlerGateName); } catch { }
+            try { fixture.SetzeGateZurueck(UpdateE2ETestKontext.LesefehlerGateName); } catch { /* Testwurzel evtl. schon entfernt. */ }
             SchliesseFixtureApp();
         }
     }

@@ -28,9 +28,9 @@ Branch: `task/5c1a753c335f441294221c1e260a87c3-prereleases`
 | [x] | 10 | Tests ausgefuehrt und dokumentiert — regulaere Spur gruen (1629/0 Fehler); OsInterface-Spur: 47/50 gruen, RunGeneralTests komplett durchgelaufen (alle Update-Szenarien), einziger Fehler feature-unabhaengiger Clipboard-Ressourcenkonflikt | `test-results.md` |
 | [x] | - | Iteration oder Abschluss entscheiden — Iterationszaehler = 3 erreicht: Schleifenabbruch, offene Punkte in continue.md | - |
 | [x] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) — 9 Code- + 5 Usability-Befunde + 1 Umgebungs-Testfehler | `continue.md` |
-| [ ] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
-| [ ] | 12b | README aktualisieren (Unteragent) | `README.md` |
-| [ ] | 12c | Release Notes aktualisieren (Unteragent) | `docs/RELEASE_NOTES.md` |
-| [ ] | 13 | Nacharbeiten abschliessen (offene Punkte aus `continue.md`) | `continue-done.md` |
-| [ ] | - | Feature-Verzeichnis loeschen | - |
-| [ ] | - | Commit durchfuehren | - |
+| [x] | 12 | Dokumentation erstellt/aktualisiert (Unteragent, committed d940494) | `docs/help/` |
+| [x] | 12b | README aktualisiert (Unteragent, committed d940494) | `README.md` |
+| [x] | 12c | Release Notes aktualisiert (Unteragent, committed d940494) | `docs/RELEASE_NOTES.md` |
+| [x] | 13 | Nacharbeiten abgeschlossen — alle continue.md-Eintraege erledigt und verifiziert (regulaere Spur 1629/0, OsInterface 48/0, Format sauber) | `continue-done.md` |
+| [x] | - | Feature-Verzeichnis loeschen — entfaellt: `continue-done.md` bleibt als Nachweis bestehen (Loeschung nur ohne continue-Artefakt) | - |
+| [x] | - | Commit durchfuehren | - |

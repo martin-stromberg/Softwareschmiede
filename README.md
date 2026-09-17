@@ -79,8 +79,8 @@ Der Update-Modus ist in den **Einstellungen** im Tab **„Allgemein"** unter **�
 | Option | Wirkung |
 |--------|---------|
 | `Aus` | Update-Prüfung und -Installation sind deaktiviert; der Prüf-Button bleibt sichtbar, aber deaktiviert. |
-| `Nur Pruefen` (Standard) | Die Prüfung läuft; ein gefundenes Update wird angeboten, aber nie automatisch installiert. |
-| `Bei Programmstart pruefen und ausfuehren` | Einmalig nach dem ersten Rendern des Hauptfensters wird geprüft und ein gefundenes Update automatisch installiert. |
+| `Nur prüfen` (Standard) | Die Prüfung läuft; ein gefundenes Update wird angeboten, aber nie automatisch installiert. |
+| `Bei Programmstart prüfen und ausführen` | Einmalig nach dem ersten Rendern des Hauptfensters wird geprüft und ein gefundenes Update automatisch installiert. |
 
 Zusätzlich aktiviert die Checkbox **„Prerelease-Versionen laden"** die Berücksichtigung von Vorabversionen. Ein Release gilt als Prerelease, wenn das GitHub-Flag `prerelease` gesetzt ist oder der Tag ein SemVer-Prerelease-Suffix (z. B. `-rc.1`) trägt; ist die Option deaktiviert, werden beide Fälle ausgeschlossen. `GitHubReleaseClient` fragt die Releases paginiert ab (`?per_page=100`, `Link`-Header mit `rel=next`), überspringt Drafts, ungültige Tags und Einträge ohne `release.zip`-Asset und wählt die höchste zulässige SemVer-Version über alle Seiten.
 

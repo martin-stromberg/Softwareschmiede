@@ -275,12 +275,12 @@ public sealed class SettingsView : BaseWindowView
     }
 
     /// <summary>Liest das aktuell ausgewählte Label der "Update-Modus"-ComboBox im "Allgemein"-Tab.</summary>
-    /// <returns>Das Anzeige-Label des gewählten Update-Modus (z. B. "Nur Pruefen").</returns>
+    /// <returns>Das Anzeige-Label des gewählten Update-Modus (siehe <c>UpdateModusTexte</c>).</returns>
     public string GetUpdateMode()
         => WaitForElement(Window, cf => cf.ByName("Update-Modus"), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
 
     /// <summary>Wählt einen Eintrag der "Update-Modus"-ComboBox und wartet, bis er übernommen wurde.</summary>
-    /// <param name="label">Das Anzeige-Label ("Aus", "Nur Pruefen" oder "Bei Programmstart pruefen und ausfuehren").</param>
+    /// <param name="label">Das Anzeige-Label (aus <c>UpdateModusTexte</c>: "Aus", "Nur prüfen" oder "Bei Programmstart prüfen und ausführen").</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetUpdateMode(string label)
     {

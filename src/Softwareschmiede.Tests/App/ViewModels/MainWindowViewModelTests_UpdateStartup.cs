@@ -133,7 +133,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         sut2.UpdatePruefenCommand.CanExecute(null).Should().BeTrue();
         sut2.UpdateStartenCommand.CanExecute(null).Should().BeTrue();
 
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, "Aus", false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Aus), false);
 
         sut2.UpdateVerfuegbar.Should().BeFalse("ein Moduswechsel auf Aus muss das Angebot verwerfen");
         sut2.VerfuegbaresUpdate.Should().BeNull();
@@ -186,7 +186,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
         // a) Verzögertes Check-Ergebnis wird nach Kanalwechsel verworfen
         var laufendePruefung = ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, "Nur Pruefen", false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), false);
 
         verzoegertesErgebnis.SetResult(UpdateCheckResult.UpdateVerfuegbar(ReleaseCandidateUpdate));
         await laufendePruefung.WaitAsync(TimeSpan.FromSeconds(10));
@@ -223,7 +223,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         var startTask = sut2.InitializeUpdatesAfterWindowReadyAsync();
         await vorbereitungGestartet.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, "Aus", false);
+        await SpeichereUpdateEinstellungenUeberUiAsync(sut2, UpdateModusOption.FuerModus(UpdateMode.Aus), false);
         vorbereitungFreigabe.SetResult(FertigeVorbereitung);
         await startTask.WaitAsync(TimeSpan.FromSeconds(10));
 

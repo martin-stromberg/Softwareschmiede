@@ -17,9 +17,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 {
     private const string CodexPluginPrefix = "Softwareschmiede.Codex";
     private const string CommandLineParametersKey = "CommandLineParameters";
-    private const string UpdateModusAusLabel = "Aus";
-    private const string UpdateModusNurPruefenLabel = "Nur Pruefen";
-    private const string UpdateModusBeiProgrammstartLabel = "Bei Programmstart pruefen und ausfuehren";
 
     private readonly AppEinstellungService _einstellungService;
     private readonly ArbeitsverzeichnisSettingsService _arbeitsverzeichnisService;
@@ -48,18 +45,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private PluginActivationEntry? _selectedIdePlugin;
     private IReadOnlyList<PluginSettingGroupEntry>? _selectedIdePluginSettings;
     private bool _isAutonomAufgabenEnabled = true;
-    private string _selectedUpdateMode = UpdateModusNurPruefenLabel;
+    private UpdateModusOption? _selectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.NurPruefen);
     private bool _includePrereleases;
 
     /// <summary>Wird direkt nach erfolgreichem Speichern der Update-Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
 
-    /// <summary>Feste Auswahlliste der Update-Modi als Anzeige-Labels (keine Steuerwerte).</summary>
-    public IReadOnlyList<string> UpdateModusOptionen { get; } =
-        [UpdateModusAusLabel, UpdateModusNurPruefenLabel, UpdateModusBeiProgrammstartLabel];
+    /// <summary>Feste Auswahlliste der Update-Modi (Steuerwert + Anzeige-Label).</summary>
+    public IReadOnlyList<UpdateModusOption> UpdateModusOptionen => UpdateModusOption.Alle;
 
-    /// <summary>Aktuell ausgewählter Update-Modus als Anzeige-Label aus <see cref="UpdateModusOptionen"/>.</summary>
-    public string SelectedUpdateMode
+    /// <summary>Aktuell ausgewählte Update-Modus-Option aus <see cref="UpdateModusOptionen"/>.</summary>
+    public UpdateModusOption? SelectedUpdateMode
     {
         get => _selectedUpdateMode;
         set => SetProperty(ref _selectedUpdateMode, value);
@@ -330,7 +326,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             IsAutonomAufgabenEnabled = await _einstellungService.GetAutonomAufgabenEnabledAsync(_autonomAufgabenOptions.Value.Enabled, ct);
 
             var updateSettings = await _einstellungService.GetUpdateSettingsAsync(ct);
-            _selectedUpdateMode = UpdateModusLabel(updateSettings.Modus);
+            _selectedUpdateMode = UpdateModusOption.FuerModus(updateSettings.Modus);
             OnPropertyChanged(nameof(SelectedUpdateMode));
             IncludePrereleases = updateSettings.IncludePrereleases;
         }
@@ -359,7 +355,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
             if (!ValidierePflichtfelder())
                 return;
 
-            if (!TryParseUpdateModus(SelectedUpdateMode, out var updateModus))
+            if (SelectedUpdateMode is not { Modus: var updateModus })
             {
                 FehlerMeldung = "Der ausgewählte Update-Modus ist ungültig.";
                 return;
@@ -413,32 +409,6 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private async Task VerwerfenAsync(CancellationToken ct)
     {
         await LadenAsync(ct);
-    }
-
-    private static string UpdateModusLabel(UpdateMode modus) => modus switch
-    {
-        UpdateMode.Aus => UpdateModusAusLabel,
-        UpdateMode.BeiProgrammstartPruefenUndAusfuehren => UpdateModusBeiProgrammstartLabel,
-        _ => UpdateModusNurPruefenLabel
-    };
-
-    private static bool TryParseUpdateModus(string? label, out UpdateMode modus)
-    {
-        switch (label)
-        {
-            case UpdateModusAusLabel:
-                modus = UpdateMode.Aus;
-                return true;
-            case UpdateModusBeiProgrammstartLabel:
-                modus = UpdateMode.BeiProgrammstartPruefenUndAusfuehren;
-                return true;
-            case UpdateModusNurPruefenLabel:
-                modus = UpdateMode.NurPruefen;
-                return true;
-            default:
-                modus = UpdateMode.NurPruefen;
-                return false;
-        }
     }
 
     private void LoadSelectedPluginSettings(PluginActivationEntry entry)

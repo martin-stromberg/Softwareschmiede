@@ -11,7 +11,7 @@ Die Einstellungsseite ermöglicht die zentrale Konfiguration der Anwendung ohne 
 5. **Erscheinungsbild** — Dark Mode ein-/ausschalten
 6. **Promptvorlagen** — Wiederkehrende CLI-Prompts zentral verwalten
 7. **Automatisierung** — Autonome Aufgaben aktivieren oder deaktivieren
-8. **Updates** — Update-Modus (Aus / Nur Pruefen / Bei Programmstart pruefen und ausfuehren) und optionale Prerelease-Berücksichtigung
+8. **Updates** — Update-Modus (Aus / Nur prüfen / Bei Programmstart prüfen und ausführen) und optionale Prerelease-Berücksichtigung
 
 ## Funktionsweise
 
@@ -75,8 +75,8 @@ Die Checkbox wird erst nach einem Klick auf „Speichern" übernommen.
 Im Abschnitt **Updates** der Registerkarte „Allgemein" steuert eine Auswahlbox das Update-Verhalten der Anwendung:
 
 - **Aus** — Update-Prüfung deaktiviert; die Schaltfläche „⟳ Prüfen" in der Seitenleiste ist gesperrt
-- **Nur Pruefen** — (Standard) beim Programmstart und auf manuellen Klick wird geprüft; ein gefundenes Update wird angeboten, aber nie automatisch installiert
-- **Bei Programmstart pruefen und ausfuehren** — beim Programmstart wird geprüft und ein gefundenes Update automatisch installiert
+- **Nur prüfen** — (Standard) beim Programmstart und auf manuellen Klick wird geprüft; ein gefundenes Update wird angeboten, aber nie automatisch installiert
+- **Bei Programmstart prüfen und ausführen** — beim Programmstart wird geprüft und ein gefundenes Update automatisch installiert
 
 Die Checkbox **„Prerelease-Versionen laden"** legt fest, ob bei der Prüfung auch Vorabversionen berücksichtigt werden. Beide Werte werden persistent gespeichert und erst mit **Speichern** wirksam. Details zum Update-Ablauf siehe [Programmupdate](../programmupdate/index.md).
 

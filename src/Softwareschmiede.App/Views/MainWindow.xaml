@@ -156,7 +156,8 @@
 
                     <Button Command="{Binding UpdatePruefenCommand}"
                             AutomationProperties.Name="Programmupdate prüfen"
-                            ToolTip="Auf Programmupdate prüfen"
+                            ToolTip="{Binding UpdatePruefenTooltip}"
+                            ToolTipService.ShowOnDisabled="True"
                             Margin="0,2"
                             Padding="8,8"
                             Background="Transparent"

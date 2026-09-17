@@ -41,8 +41,8 @@
 1. Öffnen Sie die Registerkarte **Allgemein**
 2. Wählen Sie im Abschnitt **Updates** in der Auswahlbox einen Modus:
    - **Aus** — keine Update-Prüfung
-   - **Nur Pruefen** — prüfen und Update anbieten (Standard)
-   - **Bei Programmstart pruefen und ausfuehren** — beim Programmstart prüfen und ein gefundenes Update automatisch installieren
+   - **Nur prüfen** — prüfen und Update anbieten (Standard)
+   - **Bei Programmstart prüfen und ausführen** — beim Programmstart prüfen und ein gefundenes Update automatisch installieren
 3. Aktivieren Sie bei Bedarf die Checkbox **„Prerelease-Versionen laden"**, um auch Vorabversionen zu berücksichtigen
 4. Klicken Sie **Speichern**
 

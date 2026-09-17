@@ -95,10 +95,11 @@ public sealed class MainWindowViewModelTests : IDisposable
             promptZeitVersandService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
-            action => action(),
-            dialogService,
-            versionProvider,
-            laufdatenChangedNotifier);
+            new MainWindowOptionaleDienste(
+                DispatcherInvoke: action => action(),
+                DialogService: dialogService,
+                VersionProvider: versionProvider,
+                LaufdatenChangedNotifier: laufdatenChangedNotifier));
     }
 
     private ProjectListViewModel CreateProjectListViewModel(ProjektService projektService)

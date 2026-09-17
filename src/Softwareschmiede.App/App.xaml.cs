@@ -324,6 +324,11 @@ public sealed partial class App : System.Windows.Application
             sp.GetService<ICliUpdateSafetyService>(),
             sp.GetService<IUpdateProgressDialogService>(),
             sp.GetService<IUpdateVersuchProtokoll>()));
+        services.AddTransient(sp => new MainWindowOptionaleDienste(
+            DialogService: sp.GetService<IDialogService>(),
+            VersionProvider: sp.GetService<IApplicationVersionProvider>(),
+            LaufdatenChangedNotifier: sp.GetService<AufgabeLaufdatenChangedNotifier>(),
+            UpdateDienste: sp.GetService<MainWindowUpdateDienste>()));
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();

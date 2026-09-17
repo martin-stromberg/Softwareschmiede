@@ -554,10 +554,10 @@ public sealed class SettingsViewModelTests : IDisposable
         _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
         var sut = CreateSut();
 
-        // Fehlende Werte -> Defaults (Nur Pruefen / Prereleases aus)
+        // Fehlende Werte -> Defaults (Nur prüfen / Prereleases aus)
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedUpdateMode.Should().Be("Nur Pruefen");
+        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.NurPruefen));
         sut.IncludePrereleases.Should().BeFalse();
 
         // Unbekannte gespeicherte Werte -> Defaults
@@ -565,16 +565,16 @@ public sealed class SettingsViewModelTests : IDisposable
         await _einstellungService.SetSettingAsync(AppEinstellungService.IncludePrereleasesKey, "kein-bool");
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
 
-        sut.SelectedUpdateMode.Should().Be("Nur Pruefen");
+        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.NurPruefen));
         sut.IncludePrereleases.Should().BeFalse();
 
-        // Ein ungültiges Label (kein Eintrag aus UpdateModusOptionen) wird nicht gespeichert.
+        // Eine fehlende Auswahl (kein Eintrag aus UpdateModusOptionen) wird nicht gespeichert.
         UpdateSettings? published = null;
         sut.UpdateSettingsSaved += (_, s) => published = s;
-        sut.SelectedUpdateMode = "Beliebiger Text";
+        sut.SelectedUpdateMode = null;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
-        published.Should().BeNull("ein ungültiges Anzeige-Label darf nicht gespeichert werden");
+        published.Should().BeNull("eine fehlende Modus-Auswahl darf nicht gespeichert werden");
         sut.FehlerMeldung.Should().NotBeNullOrEmpty();
         (await _einstellungService.GetUpdateSettingsAsync())
             .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false));
@@ -598,12 +598,7 @@ public sealed class SettingsViewModelTests : IDisposable
         UpdateSettings? published = null;
         sut.UpdateSettingsSaved += (_, s) => published = s;
 
-        sut.SelectedUpdateMode = modus switch
-        {
-            UpdateMode.Aus => "Aus",
-            UpdateMode.BeiProgrammstartPruefenUndAusfuehren => "Bei Programmstart pruefen und ausfuehren",
-            _ => "Nur Pruefen"
-        };
+        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(modus);
         sut.IncludePrereleases = includePrereleases;
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
 
@@ -616,13 +611,7 @@ public sealed class SettingsViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
         sut.IncludePrereleases.Should().Be(includePrereleases);
-        var erwartetesLabel = modus switch
-        {
-            UpdateMode.Aus => "Aus",
-            UpdateMode.BeiProgrammstartPruefenUndAusfuehren => "Bei Programmstart pruefen und ausfuehren",
-            _ => "Nur Pruefen"
-        };
-        sut.SelectedUpdateMode.Should().Be(erwartetesLabel);
+        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(modus));
     }
 
     /// <summary>Das UpdateSettingsSaved-Event wird direkt nach dem Update-Speichern ausgelöst – auch wenn ein späterer Speicherschritt fehlschlägt.</summary>
@@ -642,7 +631,7 @@ public sealed class SettingsViewModelTests : IDisposable
             published = s;
         };
 
-        sut.SelectedUpdateMode = "Aus";
+        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.Aus);
         // Relativer Pfad -> der spätere Arbeitsverzeichnis-Speicherschritt schlägt fehl.
         sut.Arbeitsverzeichnis = "relativer-pfad-ohne-root";
         await ((AsyncRelayCommand)sut.SpeichernCommand).ExecuteAsync();
@@ -668,12 +657,12 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.UpdateSettingsSaved += (_, _) => eventCount++;
 
         // Ungespeicherte Änderungen -> Verwerfen lädt neu, ohne zu publizieren
-        sut.SelectedUpdateMode = "Aus";
+        sut.SelectedUpdateMode = UpdateModusOption.FuerModus(UpdateMode.Aus);
         sut.IncludePrereleases = true;
         await ((AsyncRelayCommand)sut.VerwerfenCommand).ExecuteAsync();
 
         eventCount.Should().Be(0, "Verwerfen darf kein UpdateSettingsSaved-Ereignis auslösen");
-        sut.SelectedUpdateMode.Should().Be("Nur Pruefen");
+        sut.SelectedUpdateMode.Should().Be(UpdateModusOption.FuerModus(UpdateMode.NurPruefen));
         sut.IncludePrereleases.Should().BeFalse();
         (await _einstellungService.GetUpdateSettingsAsync())
             .Should().Be(new UpdateSettings(UpdateMode.NurPruefen, false),

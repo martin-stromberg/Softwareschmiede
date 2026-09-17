@@ -247,7 +247,7 @@ public abstract class WpfTestBase : IDisposable
     protected Window LaunchAppAndGetMainWindow()
     {
         var app = LaunchApp();
-        return app.GetMainWindow(Automation, Long)!;
+        return WarteAufEchtesHauptfenster(app);
     }
 
     /// <summary>
@@ -278,7 +278,50 @@ public abstract class WpfTestBase : IDisposable
         _application = null;
 
         LaunchApp(ensureDatabaseDeleted: false, umgebungsVariablen ?? _letzteLaunchUmgebungsVariablen);
-        return FlaUiApp.GetMainWindow(Automation, Long)!;
+        return WarteAufEchtesHauptfenster(FlaUiApp);
+    }
+
+    /// <summary>
+    /// Liefert das Hauptfenster der Anwendung und wiederholt die Abfrage, solange
+    /// <c>GetMainWindow</c> ein fremdes Top-Level-Fenster desselben Prozesses zurückgibt.
+    /// WPF-Popup-Roots (z. B. ein ToolTip über dem Update-Button, auf dem der Mauszeiger
+    /// nach einem echten Klick liegen bleibt) sind unowned Top-Level-Fenster und können
+    /// die <c>Process.MainWindowHandle</c>-Heuristik kurzzeitig gewinnen - sie verschwinden
+    /// nach wenigen Sekunden von selbst. Erkannt werden sie am fehlenden Fenstertitel.
+    /// </summary>
+    /// <param name="app">Der gestartete Anwendungsprozess.</param>
+    /// <returns>Das echte Hauptfenster (Titel beginnt mit "Softwareschmiede").</returns>
+    /// <exception cref="TimeoutException">Innerhalb von <see cref="Long"/> kam nur ein fremdes Fenster.</exception>
+    protected Window WarteAufEchtesHauptfenster(FlaUI.Core.Application app)
+    {
+        var deadline = DateTime.UtcNow + Long;
+        var gesehen = string.Empty;
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                // Nicht GetMainWindow/MainWindowHandle: WPF-Popup-Roots (z. B. ein ToolTip
+                // über dem Update-Button, auf dem der Mauszeiger nach einem echten Klick
+                // liegen bleibt) sind unowned Top-Level-Fenster und können die Heuristik
+                // gewinnen. Stattdessen alle Top-Level-Fenster des Prozesses enumerieren
+                // und anhand des Titels wählen.
+                var fenster = app.GetAllTopLevelWindows(Automation);
+                gesehen = string.Join(" | ", fenster.Select(f => $"'{f.Title}'"));
+                var mainWindow = fenster.FirstOrDefault(
+                    f => f.Title.StartsWith("Softwareschmiede", StringComparison.Ordinal));
+                if (mainWindow is not null)
+                    return mainWindow;
+            }
+            catch (FlaUI.Core.Exceptions.FlaUIException)
+            {
+                // Fenster können zwischen Enumeration und Element-Erzeugung verschwinden.
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"Das Hauptfenster der Testanwendung wurde nicht gefunden (Top-Level-Fenster: {gesehen}).");
     }
 
     private static void WaitForProcessExitOrThrow(int processId, TimeSpan timeout)
@@ -546,7 +589,7 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement StartAndNavigateToProjects(string? projektName = null)
     {
         var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        var mainWindow = WarteAufEchtesHauptfenster(app);
         NavigateToProjects(mainWindow);
 
         if (projektName is not null)

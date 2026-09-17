@@ -1,4 +1,6 @@
-# Test-Ergebnisse — Iteration 3
+# Test-Ergebnisse — Nacharbeiten-Lauf (continue.md)
+
+Aktueller Stand nach den Nacharbeiten aus `continue.md` (jetzt `continue-done.md`).
 
 ## Build
 
@@ -6,6 +8,48 @@
 |---------|--------|----------|-----------|
 | Softwareschmiede.slnx (gesamt) | `dotnet build` | erfolgreich | 0 Warnungen, 0 Fehler |
 | Softwareschmiede.slnx | `dotnet format --verify-no-changes` | sauber | — |
+
+## Testläufe (Nacharbeiten-Lauf)
+
+| Projekt | Befehl | Ergebnis | Fehlgeschlagene Tests |
+|---------|--------|----------|----------------------|
+| Softwareschmiede.Tests | `dotnet test` (reguläre Spur, `Category!=OsInterface`) | 1629 bestanden, 0 fehlgeschlagen, 1 übersprungen | — |
+| Softwareschmiede.Tests | `dotnet test --filter "Category=OsInterface"` (finaler Lauf) | **48 bestanden, 0 fehlgeschlagen, 2 übersprungen** | — |
+| Softwareschmiede.Tests | Fokussierter Update-E2E-Runner (temporär, inzwischen entfernt) | `Startup_SafetyCancelAndErrorsRemainUsable` bestanden (~1 m) | — |
+
+`SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` war gesetzt (übersprungen: ConPTY-Runner + bedingter Repository-Initialisierungstest).
+
+Im finalen OsInterface-Lauf lief `End2EndTest.RunGeneralTests` vollständig durch — alle
+Update-E2E-Szenarien (E-01 bis E-07) inkl. T-09-Lesefehler-Grenzen grün. Auch der
+zuvor intermittierende Clipboard-Test (`CLIPBRD_E_CANT_OPEN`) lief fehlerfrei.
+
+## In diesem Lauf behobene Nacharbeiten-Befunde
+
+Alle Einträge aus `continue.md` sind abgearbeitet (Details dort):
+
+- `MainWindowOptionaleDienste`-Bundle + `MainWindowUpdateFlow`-Extraktion
+  (`FuehreUpdateVersuchAsync`, `PruefeSettingsAktualitaetAsync`; `MainWindowViewModel`
+  814 → ~431 Zeilen).
+- Typisierte Update-Modus-Auswahl (`UpdateModusOption`, `UpdateModusTexte` mit
+  Umlaut-Labels als einziger Quelle für UI und Tests).
+- Settings-UI: sichtbare Feldbezeichnung, Modus-/Prerelease-Erläuterungen;
+  deaktivierter „Prüfen"-Button mit begründendem Tooltip (`ShowOnDisabled`);
+  Fortschrittsdialog mit „Schließen"-Schaltfläche im Endzustand.
+- E2E: God-Methode in benannte Phasen zerlegt, Label-Konstanten auf
+  `UpdateModusTexte` umgestellt, Alias entfernt, Cleanup-Catches begründet.
+- Zusätzliche E2E-Rootcause behoben: `GetMainWindow`/`MainWindowHandle` kann ein
+  unowned WPF-ToolTip-Popup als Hauptfenster liefern — `WarteAufEchtesHauptfenster`
+  enumeriert jetzt alle Top-Level-Fenster des Prozesses und wählt per Titel.
+- Konsolidierungs-Regression in `T09StartupPhaseAsync` behoben: Asset-/Preparation-
+  Nachweise berücksichtigen `erwarteVorbereitung` (BeforeUpdaterStart läuft die
+  Vorbereitung bewusst vollständig).
+
+## Iteration-3-Ergebnisse (Vorlauf, ersetzt durch obige Tabelle)
+
+- Reguläre Spur: 1629 bestanden, 0 fehlgeschlagen, 1 übersprungen.
+- OsInterface-Spur: 47 bestanden, 1 fehlgeschlagen (feature-unabhängiger
+  Clipboard-Ressourcenkonflikt, siehe `continue-done.md`), 2 übersprungen.
+- Fokussierter Update-E2E-Runner: alle Update-Szenarien bestanden (~3 m 50 s).
 
 ## Testläufe (Iteration 3)
 

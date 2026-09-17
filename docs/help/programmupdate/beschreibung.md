@@ -14,8 +14,8 @@ Auf der Registerkarte **Allgemein** der Einstellungsseite befindet sich der Absc
 
 - **Auswahlbox (Update-Modus)** mit den Optionen:
   - **Aus** — die Update-Prüfung ist deaktiviert. Es findet weder eine Prüfung beim Programmstart noch eine manuelle Prüfung statt; die Schaltfläche „⟳ Prüfen" ist deaktiviert.
-  - **Nur Pruefen** — (Standard) die Anwendung prüft beim Programmstart einmalig und auf manuellen Klick, ob ein Update verfügbar ist. Ein gefundenes Update wird angeboten, aber nie automatisch installiert.
-  - **Bei Programmstart pruefen und ausfuehren** — die Anwendung prüft einmalig beim Programmstart und installiert ein gefundenes Update automatisch. Nach dem Start können weiterhin manuell Prüfungen ausgelöst und angebotene Updates per Klick installiert werden.
+  - **Nur prüfen** — (Standard) die Anwendung prüft beim Programmstart einmalig und auf manuellen Klick, ob ein Update verfügbar ist. Ein gefundenes Update wird angeboten, aber nie automatisch installiert.
+  - **Bei Programmstart prüfen und ausführen** — die Anwendung prüft einmalig beim Programmstart und installiert ein gefundenes Update automatisch. Nach dem Start können weiterhin manuell Prüfungen ausgelöst und angebotene Updates per Klick installiert werden.
 - **Checkbox „Prerelease-Versionen laden"** — ist sie aktiviert, werden bei der Update-Prüfung auch Vorabversionen (z. B. Release Candidates) berücksichtigt. Ist sie deaktiviert, werden nur stabile Versionen als Update angeboten.
 
 Beide Werte werden erst mit einem Klick auf **Speichern** wirksam; die Erfolgsmeldung „Einstellungen gespeichert." bestätigt die Übernahme. Werden die Update-Einstellungen geändert, während ein Update-Angebot angezeigt wird oder ein Update-Vorgang läuft, wird das Angebot zurückgenommen bzw. der laufende Vorgang abgebrochen.
@@ -26,7 +26,7 @@ Beide Werte werden erst mit einem Klick auf **Speichern** wirksam; die Erfolgsme
 
 Am Fuß der Navigations-Seitenleiste — unterhalb der Versionsanzeige — stehen zwei Schaltflächen:
 
-- **⟳ Prüfen** (Tooltip „Auf Programmupdate prüfen") — startet eine manuelle Update-Prüfung. Die Schaltfläche ist deaktiviert, solange der Update-Modus auf **Aus** steht oder ein Update-Vorgang läuft.
+- **⟳ Prüfen** (Tooltip „Auf Programmupdate prüfen") — startet eine manuelle Update-Prüfung. Die Schaltfläche ist deaktiviert, solange der Update-Modus auf **Aus** steht oder ein Update-Vorgang läuft; der Tooltip bleibt im deaktivierten Zustand sichtbar und erklärt den Grund (z. B. „Update-Prüfung ist in den Einstellungen deaktiviert.").
 - **⇧ Update** (Tooltip „Update auf Version … vorbereiten") — erscheint nur, wenn eine Prüfung eine neuere Version gefunden hat. Ein Klick startet den Update-Ablauf.
 
 Unter den Schaltflächen kann ein Hinweistext erscheinen, der das Ergebnis der letzten Prüfung anzeigt (z. B. „Kein Update verfügbar. Die installierte Version ist aktuell.") oder auf Fehler hinweist.
@@ -43,8 +43,9 @@ Während der Vorbereitung wird ein modaler Dialog mit dem Titel **„Update vorb
 - **Fortschrittsbalken** — prozentualer Fortschritt beim Download (0–100 %) bzw. eine unbestimmte Fortschrittsanzeige in den übrigen Phasen.
 - **Meldungstext** — eine aussagekräftige Meldung zum aktuellen Zustand (z. B. „Update wird heruntergeladen.").
 - **Abbrechen-Schaltfläche** — unterbricht die laufende Vorbereitung. Sie ist deaktiviert, sobald die Vorbereitung abgeschlossen ist oder ein Fehlerzustand angezeigt wird.
+- **Schließen-Schaltfläche** — erscheint in Fehler- und Abschlusszuständen und schließt den Dialog explizit.
 
-Bei einem Fehler wird die Fehlermeldung im Dialog angezeigt und der Dialog kann geschlossen werden. Nach erfolgreicher Vorbereitung zeigt der Dialog „Update wird gestartet. Die Anwendung wird beendet." — anschließend startet das externe Update-Skript und die Anwendung wird beendet.
+Bei einem Fehler wird die Fehlermeldung im Dialog angezeigt und der Dialog kann über „Schließen" geschlossen werden. Nach erfolgreicher Vorbereitung zeigt der Dialog „Update wird gestartet. Die Anwendung wird beendet." — anschließend startet das externe Update-Skript und die Anwendung wird beendet.
 
 ## Funktionsweise
 
@@ -60,7 +61,7 @@ Der Update-Vorgang läuft in mehreren Phasen ab:
 ## Einschränkungen
 
 - Die eigentliche Installation erfolgt durch ein externes Skript nach Beendigung der Anwendung; die Anwendung selbst bereitet das Update nur vor.
-- Die automatische Installation findet ausschließlich einmalig beim Programmstart statt — nur im Modus „Bei Programmstart pruefen und ausfuehren". Spätere manuelle Prüfungen bieten ein gefundenes Update lediglich an.
+- Die automatische Installation findet ausschließlich einmalig beim Programmstart statt — nur im Modus „Bei Programmstart prüfen und ausführen". Spätere manuelle Prüfungen bieten ein gefundenes Update lediglich an.
 - Der Update-Vorgang kann nicht pausiert werden, nur abgebrochen.
 - Während der Update-Vorbereitung können keine anderen Operationen in der Anwendung ausgeführt werden (modaler Dialog).
 - Kann der Update-Server nicht erreicht werden oder sind die Update-Einstellungen nicht lesbar, wird ein Hinweistext statt eines Update-Angebots angezeigt; es findet dann keine Installation statt.
