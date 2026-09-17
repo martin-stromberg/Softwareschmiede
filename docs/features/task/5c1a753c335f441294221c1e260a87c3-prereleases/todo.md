@@ -21,7 +21,7 @@ Branch: `task/5c1a753c335f441294221c1e260a87c3-prereleases`
 | [~] | 7 (It. 2) | Plan-Review erneut (Unteragent) — laeuft | `review.md` |
 | [~] | 8 (It. 2) | Usability-Review erneut (Unteragent) — laeuft | `review-usability.md` |
 | [~] | 9 (It. 2) | Code-Review erneut (Unteragent) — laeuft | `review-code.md` |
-| [~] | 10 | Tests ausfuehren — reguläre Spur gruen (1627/0 Fehler); OsInterface-Spur gegen Shadow-Build: 47/48 gruen, 1 feature-unabhaengiger Flake (isoliert gruen) | `test-results.md` |
+| [x] | 10 | Tests ausgefuehrt und dokumentiert — regulaere Spur gruen (1627/0 Fehler); OsInterface-Spur: 47/48 gruen, verbleibende Fehler feature-unabhaengige Timing-Flakes (isoliert gruen) | `test-results.md` |
 | [ ] | - | Iteration oder Abschluss entscheiden | - |
 | [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
 | [ ] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
