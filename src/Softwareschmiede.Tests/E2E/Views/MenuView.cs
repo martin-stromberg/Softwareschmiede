@@ -6,6 +6,7 @@ namespace Softwareschmiede.Tests.E2E.Views;
 /// <summary>View für das persistente Navigationsmenü der Anwendung (Dashboard/Projekte/Einstellungen).</summary>
 public sealed class MenuView : BaseWindowView
 {
+    private static readonly string[] DashboardButtonNamen = ["Dashboard"];
     private static readonly string[] ProjekteButtonNamen = [" Projekte", "Projekte"];
     private static readonly string[] EinstellungenButtonNamen = [" Einstellungen", "Einstellungen"];
 
@@ -30,11 +31,11 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Dashboard-Ansicht.</returns>
     public DashboardView NavigateToDashboard()
     {
-        WaitForElement(Window, cf => cf.ByName("Dashboard"), Short).AsButton().Click();
-        WaitForElement(Window, cf => cf.ByName("Dashboard").And(cf.ByControlType(ControlType.Text)), Medium);
-
         var dashboard = new DashboardView(Window);
-        Assert.True(dashboard.IsVisible, "Dashboard sollte nach Klick auf 'Dashboard' sichtbar sein.");
+        NavigiereBisSichtbar(
+            DashboardButtonNamen,
+            () => dashboard.IsVisible,
+            "Dashboard sollte nach Klick auf 'Dashboard' sichtbar sein.");
         return dashboard;
     }
 
@@ -42,10 +43,11 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Projektlisten-Ansicht.</returns>
     public ProjectListView NavigateToProjects()
     {
-        WaitForNavigationButton(ProjekteButtonNamen, Short).AsButton().Click();
-        WaitForElement(Window, cf => cf.ByName("Neu"), Medium);
         var projectList = new ProjectListView(Window);
-        Assert.True(projectList.IsVisible, "Projektliste sollte nach Klick auf 'Projekte' sichtbar sein.");
+        NavigiereBisSichtbar(
+            ProjekteButtonNamen,
+            () => projectList.IsVisible,
+            "Projektliste sollte nach Klick auf 'Projekte' sichtbar sein.");
         return projectList;
     }
 
@@ -53,11 +55,11 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Einstellungen-Ansicht.</returns>
     public SettingsView NavigateToSettings()
     {
-        WaitForNavigationButton(EinstellungenButtonNamen, Short).AsButton().Click();
-        WaitForElement(Window, cf => cf.ByName("Plugins"), Medium);
-
         var settings = new SettingsView(Window);
-        Assert.True(settings.IsVisible, "Einstellungen sollten nach Klick auf 'Einstellungen' sichtbar sein.");
+        NavigiereBisSichtbar(
+            EinstellungenButtonNamen,
+            () => settings.IsVisible,
+            "Einstellungen sollten nach Klick auf 'Einstellungen' sichtbar sein.");
         return settings;
     }
 
@@ -247,6 +249,62 @@ public sealed class MenuView : BaseWindowView
 
         throw new TimeoutException(
             $"Statuskachel zeigte innerhalb von {timeout.TotalSeconds}s nicht den erwarteten Status '{expectedStatus}' an. Zuletzt gesehen: '{lastStatus}'.");
+    }
+
+    /// <summary>
+    /// Klickt einen Navigations-Button und wartet, bis die Zielansicht sichtbar ist. Unter
+    /// Systemlast kann ein einzelner Invoke-Klick ohne Reaktion bleiben (Element im UIA-Baum
+    /// gefunden, die Command-Auslösung führte jedoch nicht zum Ansichtswechsel) - der Klick
+    /// wird deshalb innerhalb des Gesamtzeitfensters in Intervallen wiederholt. Das ist für
+    /// alle drei Navigationsziele idempotent (erneuter <c>CurrentView</c>-Wechsel auf dieselbe
+    /// Ansicht; bei "Projekte" schließt ein Wiederholungsklick lediglich ein ggf. offenes
+    /// Detail). Das Fehlerbanner-Fail-Fast ("FehlerMeldung") bleibt während des Wartens aktiv.
+    /// </summary>
+    /// <param name="buttonNamen">Akzeptierte UIA-Namen des Navigations-Buttons.</param>
+    /// <param name="zielSichtbar">Prädikat für die sichtbare Zielansicht.</param>
+    /// <param name="fehlertext">Assert-Meldung bei ausbleibender Zielansicht.</param>
+    private void NavigiereBisSichtbar(
+        IReadOnlyList<string> buttonNamen,
+        Func<bool> zielSichtbar,
+        string fehlertext)
+    {
+        // Erst auf den Button warten - fehlt er ganz, ist das eine andere Fehlerart als ein
+        // verschluckter Klick und soll weiterhin mit eigenem Timeout diagnostiziert werden.
+        WaitForNavigationButton(buttonNamen, Short);
+
+        var deadline = DateTime.UtcNow + Medium;
+        var naechsterKlick = DateTime.UtcNow;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (zielSichtbar())
+                return;
+
+            var fehlerMeldung = Window.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
+            if (fehlerMeldung is not null && !fehlerMeldung.IsOffscreen)
+            {
+                throw new InvalidOperationException(
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
+            }
+
+            if (DateTime.UtcNow >= naechsterKlick)
+            {
+                try
+                {
+                    TryFindNavigationButton(buttonNamen)?.AsButton().Click();
+                }
+                catch (FlaUI.Core.Exceptions.FlaUIException)
+                {
+                    // Das Element kann zwischen Fund und Klick ersetzt werden - der nächste
+                    // Schleifendurchlauf versucht erneut.
+                }
+
+                naechsterKlick = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+            }
+
+            Thread.Sleep(200);
+        }
+
+        Assert.True(zielSichtbar(), fehlertext);
     }
 
     private AutomationElement WaitForNavigationButton(IReadOnlyList<string> names, TimeSpan timeout)

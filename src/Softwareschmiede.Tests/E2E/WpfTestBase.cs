@@ -897,6 +897,19 @@ public abstract class WpfTestBase : IDisposable
 
     private static string ResolveAppExePath()
     {
+        // Test-only override: erlaubt E2E-Läufe gegen ein App-Build außerhalb des Repo-bin,
+        // z. B. wenn das bin-Verzeichnis durch eine laufende (Self-Hosting-)Instanz gesperrt ist.
+        var envOverride = Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_E2E_APP_PATH");
+        if (!string.IsNullOrWhiteSpace(envOverride))
+        {
+            var overridePath = Path.GetFullPath(envOverride);
+            if (File.Exists(overridePath))
+                return overridePath;
+
+            throw new FileNotFoundException(
+                $"SOFTWARESCHMIEDE_E2E_APP_PATH zeigt auf eine nicht vorhandene Datei: {overridePath}");
+        }
+
         var baseDir = AppContext.BaseDirectory;
 
         // Bei Tests läuft das Test-Binary in src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\;
