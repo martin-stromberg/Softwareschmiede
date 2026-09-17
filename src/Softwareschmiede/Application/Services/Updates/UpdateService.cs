@@ -48,7 +48,7 @@ public sealed class UpdateService : IUpdateService
 
             return UpdateVersionComparer.IsNewer(installed.Version, latest.Version)
                 ? UpdateCheckResult.UpdateVerfuegbar(latest)
-                : UpdateCheckResult.KeinUpdate();
+                : UpdateCheckResult.KeinUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
         }
         catch (OperationCanceledException)
         {

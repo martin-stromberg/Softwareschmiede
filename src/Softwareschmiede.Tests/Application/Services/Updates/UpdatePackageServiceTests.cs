@@ -31,6 +31,21 @@ public sealed class UpdatePackageServiceTests
         progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.UpdateVorbereiten);
     }
 
+    /// <summary>Ein Prerelease-Paket wird unter seinem vollständigen SemVer-Pfad (inkl. Suffix) entpackt.</summary>
+    [Fact]
+    public async Task PreparePackageAsync_ShouldUsePrereleaseVersionPath_WhenPackageIsValid()
+    {
+        using var temp = new TempDirectory();
+        var zipBytes = CreateZip(includeExe: true, includeVersion: true, version: "1.4.0-rc.1");
+        var sut = CreateSut(temp.Path, zipBytes);
+
+        var result = await sut.PreparePackageAsync(CreateUpdateInfo("1.4.0-rc.1", isPrerelease: true), null);
+
+        result.ExtractedDirectory.Should().Be(Path.Combine(temp.Path, "updates", "extracted", "1.4.0-rc.1"));
+        File.Exists(Path.Combine(result.ExtractedDirectory, "version.json")).Should().BeTrue();
+        File.Exists(result.ScriptPath).Should().BeTrue();
+    }
+
     /// <summary>Pfade mit Leerzeichen werden ohne Shell- oder Pfadverkürzung vorbereitet.</summary>
     [Fact]
     public async Task PreparePackageAsync_ShouldHandleBaseDirectoryWithSpaces()
@@ -134,10 +149,10 @@ public sealed class UpdatePackageServiceTests
             baseDirectory);
     }
 
-    private static UpdateInfo CreateUpdateInfo()
-        => new("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), DateTimeOffset.UtcNow, IsPrerelease: false);
+    private static UpdateInfo CreateUpdateInfo(string version = "1.2.3", bool isPrerelease = false)
+        => new(version, $"v{version}", "release.zip", new Uri("https://example.invalid/release.zip"), DateTimeOffset.UtcNow, IsPrerelease: isPrerelease);
 
-    private static byte[] CreateZip(bool includeExe, bool includeVersion)
+    private static byte[] CreateZip(bool includeExe, bool includeVersion, string version = "1.2.3")
     {
         using var memory = new MemoryStream();
         using (var archive = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
@@ -153,7 +168,7 @@ public sealed class UpdatePackageServiceTests
             {
                 var entry = archive.CreateEntry("version.json");
                 using var writer = new StreamWriter(entry.Open());
-                writer.Write("{\"version\":\"1.2.3\"}");
+                writer.Write($"{{\"version\":\"{version}\"}}");
             }
         }
 

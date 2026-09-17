@@ -212,7 +212,14 @@ public sealed class UpdateFixtureHttpMessageHandler : HttpMessageHandler
             _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestBlocked, new { gate = _gate });
             var freigegeben = await _kontext.WarteAufGateAsync(_gate, ct, StandardGateTimeout);
             if (!freigegeben)
-                throw new OperationCanceledException(ct);
+            {
+                // Echten Aufrufer-Abbruch von Runner-Abbruch (.cancel-Datei) und Timeout trennen:
+                // Letztere sind keine Benutzer-Cancellation und müssen als Fehler sichtbar bleiben.
+                ct.ThrowIfCancellationRequested();
+                var abgebrochen = _kontext.PruefeGate(_gate) == false;
+                throw new HttpRequestException(
+                    $"Update-E2E-Stream-Gate '{_gate}' wurde {(abgebrochen ? "abgebrochen" : "nicht rechtzeitig freigegeben")}.");
+            }
 
             _gateErfuellt = true;
             _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.HttpRequestReleased, new { gate = _gate });

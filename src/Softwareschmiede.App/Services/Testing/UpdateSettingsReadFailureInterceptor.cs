@@ -107,9 +107,9 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
             return null;
         }
 
-        // Ordinalzählung und Versuchszuordnung liegen im Singleton-Kontext, weil je Scoped-
-        // DbContext eine neue Interceptor-Instanz erzeugt wird - instanzbezogene Zähler würden
-        // jeden Read als ordinal=1 sehen.
+        // Ordinalzählung und Versuchszuordnung liegen im Singleton-Kontext, damit sie
+        // unabhängig davon gelten, ob derselbe Interceptor oder eine neue Instanz je
+        // Scoped-DbContext läuft - instanzbezogene Zähler könnten Reads verscopen.
         var ordinal = _kontext.NaechsterMarkierterReadOrdinal();
         var versuch = _kontext.AktuellerVersuch;
         var versuchIndex = _kontext.AktuellerVersuchIndex;

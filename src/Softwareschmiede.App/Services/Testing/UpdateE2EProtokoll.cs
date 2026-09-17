@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 
 namespace Softwareschmiede.App.Services.Testing;
 
@@ -132,7 +133,7 @@ public sealed class UpdateE2EProtokoll
                 Quelle = _quelle
             };
 
-            File.AppendAllText(
+            AppendAllTextMitRetry(
                 _dateiPfad,
                 JsonSerializer.Serialize(eintrag, SerializerOptions) + Environment.NewLine);
         }
@@ -161,9 +162,28 @@ public sealed class UpdateE2EProtokoll
             Quelle = quelle
         };
 
-        File.AppendAllText(
+        AppendAllTextMitRetry(
             dateiPfad,
             JsonSerializer.Serialize(eintrag, SerializerOptions) + Environment.NewLine);
+    }
+
+    // App- und Runner-Prozess schreiben in dieselbe Datei; ein kurzer Retry fängt die
+    // übliche Sharing-Verletzung bei zeitgleichem Append ab.
+    private static void AppendAllTextMitRetry(string dateiPfad, string zeile)
+    {
+        const int versuche = 5;
+        for (var i = 1; ; i++)
+        {
+            try
+            {
+                File.AppendAllText(dateiPfad, zeile);
+                return;
+            }
+            catch (IOException) when (i < versuche)
+            {
+                Thread.Sleep(50 * i);
+            }
+        }
     }
 
     private static long ZaehleVorhandeneEintraege(string dateiPfad, string quelle)

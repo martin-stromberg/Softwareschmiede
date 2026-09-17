@@ -306,9 +306,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         {
             _updateAblaufCts?.Cancel();
         }
-        catch (ObjectDisposedException)
+        catch (Exception ex)
         {
-            // Der Ablauf-Token kann bereits entsorgt sein, wenn der Vorgang gerade endet.
+            // Der Ablauf-Token kann bereits entsorgt sein, oder ein Token-Callback wirft
+            // (Cancel aggregiert Callback-Exceptions). Beides darf den Aufrufer nicht treffen.
+            _logger.LogDebug(ex, "Abbruch des laufenden Update-Ablaufs ist fehlgeschlagen.");
         }
     }
 

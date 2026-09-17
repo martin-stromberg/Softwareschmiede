@@ -35,11 +35,18 @@ public partial class End2EndTest
         }
         finally
         {
-            settings.ForceShow();
-            settings.SelectDefaultKiPlugin("Codex CLI");
-            settings.SetExecutablePath(oldValue);
-            settings.SaveSettings();
-            settings.Menu.NavigateToDashboard();
+            try
+            {
+                settings.ForceShow();
+                settings.SelectDefaultKiPlugin("Codex CLI");
+                settings.SetExecutablePath(oldValue);
+                settings.SaveSettings();
+                settings.Menu.NavigateToDashboard();
+            }
+            catch
+            {
+                // Cleanup-Fehler dürfen einen bestehenden Testfehler nicht maskieren.
+            }
         }
     }
 }

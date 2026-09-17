@@ -122,7 +122,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
 
         var asset = release.Assets.FirstOrDefault(a =>
             string.Equals(a.Name, _options.AssetName, StringComparison.OrdinalIgnoreCase)
-            && IsAbsoluteHttpUrl(a.BrowserDownloadUrl));
+            && IsAbsoluteHttpsUrl(a.BrowserDownloadUrl));
         if (asset is null)
         {
             _logger.LogWarning("GitHub-Release {TagName} enthält kein nutzbares Asset {AssetName}.", release.TagName, _options.AssetName);
@@ -187,9 +187,9 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         return true;
     }
 
-    private static bool IsAbsoluteHttpUrl(string url)
+    private static bool IsAbsoluteHttpsUrl(string url)
         => Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+            && uri.Scheme == Uri.UriSchemeHttps;
 
     private sealed class GitHubRelease
     {

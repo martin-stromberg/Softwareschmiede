@@ -41,13 +41,20 @@ public sealed class UpdateE2ETestKontext
     public int AktuellerVersuchIndex => Volatile.Read(ref _versuchIndex);
 
     /// <summary>Art des aktuell laufenden Updateversuchs (<c>startup</c>, <c>pruefen</c>, <c>starten</c>) oder <c>null</c>.</summary>
-    public string? AktuellerVersuch => _aktuellerVersuch;
+    public string? AktuellerVersuch
+    {
+        get
+        {
+            lock (_ordinalLock)
+                return _aktuellerVersuch;
+        }
+    }
 
     /// <summary>
     /// Liefert die laufende Ordnungszahl eines markierten Settings-Reads innerhalb des aktuellen
     /// Versuchs. Reads ohne aktiven Versuch liefern 0 und verbrauchen keine Ordnungszahl, damit
     /// z. B. Settings-UI-Reads die Grenzzählung nicht verschieben. Der Zähler lebt im Kontext
-    /// (Singleton), weil je Scoped-DbContext eine neue Interceptor-Instanz entsteht.
+    /// (Singleton), damit er unabhängig von der Lebensdauer der Interceptor-/DbContext-Instanzen gilt.
     /// </summary>
     /// <returns>Die 1-basierte Ordnungszahl innerhalb des Versuchs, oder 0 außerhalb eines Versuchs.</returns>
     public int NaechsterMarkierterReadOrdinal()
@@ -75,8 +82,12 @@ public sealed class UpdateE2ETestKontext
     /// <param name="art">Die Versuchsart (<c>startup</c>, <c>pruefen</c>, <c>starten</c>).</param>
     public void BeginneVersuch(string art)
     {
-        var index = Interlocked.Increment(ref _versuchIndex);
-        _aktuellerVersuch = art;
+        int index;
+        lock (_ordinalLock)
+        {
+            index = ++_versuchIndex;
+            _aktuellerVersuch = art;
+        }
         Protokoll.Schreibe(UpdateE2EEreignisse.UpdateAttemptStarted, new { versuch = art, versuchIndex = index });
     }
 
@@ -90,8 +101,12 @@ public sealed class UpdateE2ETestKontext
     /// <param name="hinweis">Der aktuell angezeigte Update-Hinweis, falls vorhanden.</param>
     public void BeendeVersuch(string art, bool updateVerfuegbar, string? hinweis)
     {
-        var index = AktuellerVersuchIndex;
-        _aktuellerVersuch = null;
+        int index;
+        lock (_ordinalLock)
+        {
+            index = _versuchIndex;
+            _aktuellerVersuch = null;
+        }
         Protokoll.Schreibe(
             UpdateE2EEreignisse.UpdateAttemptCompleted,
             new { versuch = art, versuchIndex = index, updateVerfuegbar, hinweis });
