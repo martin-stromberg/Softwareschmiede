@@ -42,6 +42,13 @@ public partial class End2EndTest : WpfTestBase
         await FehlerAnsichtErkennung_ZeigtFehlermeldung_E2E(mainWindow);
 
         app.Close();
+
+        // Update-Prerelease-Feature (U-06): Fixture-Smoke mit eigener isolierter
+        // Testinfrastruktur (Temp-Wurzel, SQLite, JSON/ZIP-Antworten, Gates, JSONL-Protokoll)
+        // - nach dem allgemeinen Testfenster, damit Fixture-Fehler die allgemeinen Tests
+        // nicht beeinflussen und umgekehrt.
+        await Fixture_UsesIsolatedRealUpdatePipeline();
+        await Fixture_SettingsReadFailureTargetsPhaseAfterDatabaseInitialization();
     }
 
     /// <summary>

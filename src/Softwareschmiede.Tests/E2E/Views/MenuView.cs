@@ -64,6 +64,134 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Der in der Fußzeile der Navigations-Seitenleiste angezeigte Versionstext ("AppVersionText").</returns>
     public string GetVersionText() => WaitForElement(Window, cf => cf.ByAutomationId("AppVersionText"), Short).Name;
 
+    /// <summary>Klickt den "Programmupdate prüfen"-Button der Seitenleiste.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public MenuView ClickUpdatePruefen()
+    {
+        WaitForElement(Window, cf => cf.ByName("Programmupdate prüfen"), Short).AsButton().Click();
+        return this;
+    }
+
+    /// <summary>Klickt den "Programmupdate starten"-Button der Seitenleiste (nur bei Updateangebot sichtbar).</summary>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Der Button ist nicht sichtbar, weil kein Update angeboten wird.</exception>
+    public MenuView ClickUpdateStarten()
+    {
+        WaitForElement(Window, cf => cf.ByName("Programmupdate starten"), Medium).AsButton().Click();
+        return this;
+    }
+
+    /// <summary>Gibt an, ob der "Programmupdate starten"-Button aktuell sichtbar ist (Updateangebot liegt an).</summary>
+    /// <returns><c>true</c>, wenn der Button im Automation-Baum vorhanden und nicht ausgeblendet ist.</returns>
+    public bool IsUpdateStartButtonVisible()
+    {
+        var button = Window.FindFirstDescendant(
+            cf => cf.ByName("Programmupdate starten").And(cf.ByControlType(ControlType.Button)));
+        return button is not null && !button.IsOffscreen;
+    }
+
+    /// <summary>Gibt an, ob der "Programmupdate starten"-Button sichtbar und aktiviert ist.</summary>
+    /// <returns><c>true</c>, wenn der Button sichtbar und klickbar ist.</returns>
+    public bool IsUpdateStartButtonEnabled()
+    {
+        var button = Window.FindFirstDescendant(
+            cf => cf.ByName("Programmupdate starten").And(cf.ByControlType(ControlType.Button)));
+        return button is not null && !button.IsOffscreen && button.IsEnabled;
+    }
+
+    /// <summary>Gibt an, ob der "Programmupdate prüfen"-Button aktuell aktiviert ist.</summary>
+    /// <returns><c>true</c>, wenn der Button klickbar ist.</returns>
+    public bool IsUpdatePruefenButtonEnabled()
+    {
+        var button = Window.FindFirstDescendant(
+            cf => cf.ByName("Programmupdate prüfen").And(cf.ByControlType(ControlType.Button)));
+        return button is not null && button.IsEnabled;
+    }
+
+    /// <summary>
+    /// Liest die angebotene Update-Version aus dem ToolTip des "Programmupdate starten"-Buttons
+    /// ("Update auf Version {0} vorbereiten"). WPF bildet <c>ToolTip</c> auf die UIA-Eigenschaft
+    /// <c>HelpText</c> ab.
+    /// </summary>
+    /// <returns>Die angebotene Versionszeichenkette oder <c>null</c>, wenn kein Update angeboten wird.</returns>
+    public string? GetOfferedUpdateVersion()
+    {
+        var button = Window.FindFirstDescendant(
+            cf => cf.ByName("Programmupdate starten").And(cf.ByControlType(ControlType.Button)));
+        if (button is null || button.IsOffscreen)
+            return null;
+
+        var helpText = button.HelpText;
+        const string prefix = "Update auf Version ";
+        const string suffix = " vorbereiten";
+        if (helpText is not null
+            && helpText.StartsWith(prefix, StringComparison.Ordinal)
+            && helpText.EndsWith(suffix, StringComparison.Ordinal))
+        {
+            return helpText[prefix.Length..^suffix.Length];
+        }
+
+        return helpText;
+    }
+
+    /// <summary>
+    /// Wartet, bis der "Programmupdate starten"-Button erscheint, und liefert die angebotene Version.
+    /// </summary>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Die angebotene Versionszeichenkette.</returns>
+    /// <exception cref="TimeoutException">Es wurde kein Update angeboten.</exception>
+    public string WaitForOfferedUpdateVersion(TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var version = GetOfferedUpdateVersion();
+            if (version is not null)
+                return version;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException($"Innerhalb von {timeout.TotalSeconds}s wurde kein Updateangebot angezeigt.");
+    }
+
+    /// <summary>Liest den aktuellen "UpdateHinweis"-Text der Seitenleiste.</summary>
+    /// <returns>Der Hinweistext oder <c>null</c>, wenn kein Hinweis angezeigt wird.</returns>
+    /// <remarks>
+    /// Das Element trägt kein <c>AutomationProperties.Name</c> - der gebundene Hinweistext ist
+    /// daher als UIA-Name des TextBlocks lesbar.
+    /// </remarks>
+    public string? GetUpdateHinweis()
+    {
+        var element = Window.FindFirstDescendant(cf => cf.ByAutomationId("UpdateHinweis"));
+        if (element is null || element.IsOffscreen)
+            return null;
+
+        return element.Name;
+    }
+
+    /// <summary>Wartet, bis der "UpdateHinweis" einen Text enthält, der <paramref name="teilText"/> umfasst.</summary>
+    /// <param name="teilText">Der erwartete Teiltext.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Der vollständige Hinweistext.</returns>
+    /// <exception cref="TimeoutException">Der Hinweis erschien nicht rechtzeitig.</exception>
+    public string WaitForUpdateHinweis(string teilText, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        string? zuletzt = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            zuletzt = GetUpdateHinweis();
+            if (zuletzt is not null && zuletzt.Contains(teilText, StringComparison.Ordinal))
+                return zuletzt;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"UpdateHinweis enthielt nicht innerhalb von {timeout.TotalSeconds}s '{teilText}'. Zuletzt gesehen: '{zuletzt}'.");
+    }
+
     /// <summary>
     /// Wechselt über die Aufgabenliste in der Seitenleiste ("Aktive Aufgaben") direkt zur angegebenen
     /// Aufgabe, ohne über "Zurück" zu navigieren.

@@ -171,8 +171,9 @@
                         </StackPanel>
                     </Button>
 
+                    <!-- Kein AutomationProperties.Name: Für E2E-Tests muss der gebundene Hinweistext
+                         als UIA-Name lesbar bleiben; die Adressierung läuft über die AutomationId. -->
                     <TextBlock Text="{Binding UpdateHinweis}"
-                               AutomationProperties.Name="UpdateHinweis"
                                AutomationProperties.AutomationId="UpdateHinweis"
                                FontSize="11"
                                Foreground="{DynamicResource SecondaryTextBrush}"

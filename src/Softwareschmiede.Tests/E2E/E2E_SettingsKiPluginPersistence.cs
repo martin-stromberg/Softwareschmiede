@@ -17,10 +17,12 @@ public partial class End2EndTest
         var codexPath = $@"C:\tools\codex-{Guid.NewGuid():N}.exe";
 
         var settings = new SettingsView(mainWindow).ForceShow();
+        // Das Codex-Einstellungspanel mit "ExecutablePath" existiert erst, nachdem Codex CLI als
+        // Standard-KI-Plugin gewählt wurde (SelectedPluginSettings wird erst dann befüllt).
+        settings.SelectDefaultKiPlugin("Codex CLI");
         var oldValue = settings.GetExecutablePath();
         try
         {
-            settings.SelectDefaultKiPlugin("Codex CLI");
             settings.SetExecutablePath(codexPath);
             settings.SaveSettings();
             settings.Menu.NavigateToDashboard();
@@ -34,6 +36,7 @@ public partial class End2EndTest
         finally
         {
             settings.ForceShow();
+            settings.SelectDefaultKiPlugin("Codex CLI");
             settings.SetExecutablePath(oldValue);
             settings.SaveSettings();
             settings.Menu.NavigateToDashboard();

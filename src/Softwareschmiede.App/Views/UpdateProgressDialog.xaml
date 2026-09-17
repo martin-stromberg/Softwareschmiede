@@ -15,9 +15,11 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- Kein AutomationProperties.Name auf den TextBlocks: Der gebundene Text muss für
+             E2E-Tests als UIA-Name lesbar bleiben; Adressierung läuft über die AutomationId. -->
         <TextBlock Grid.Row="0"
                    Text="{Binding PhaseText}"
-                   AutomationProperties.Name="UpdatePhase"
+                   AutomationProperties.AutomationId="UpdatePhase"
                    FontSize="16"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource TextBrush}"
@@ -25,7 +27,7 @@
 
         <TextBlock Grid.Row="1"
                    Text="{Binding Message}"
-                   AutomationProperties.Name="UpdateFortschrittMeldung"
+                   AutomationProperties.AutomationId="UpdateFortschrittMeldung"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource SecondaryTextBrush}"
                    Margin="0,0,0,14" />

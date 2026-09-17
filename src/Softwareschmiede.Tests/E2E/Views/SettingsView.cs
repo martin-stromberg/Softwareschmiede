@@ -100,11 +100,29 @@ public sealed class SettingsView : BaseWindowView
     /// <summary>Wählt im "Plugins"-Tab das angegebene KI-Plugin als Standard-Plugin (DefaultKiPlugin) aus.</summary>
     /// <param name="pluginDisplayName">Der Anzeigename des Plugins (z. B. "Codex CLI").</param>
     /// <returns>Diese Instanz.</returns>
+    /// <remarks>
+    /// Ist der Eintrag bereits selektiert (z. B. weil er als persistierter Standard beim Öffnen
+    /// automatisch gesetzt wurde), löst ein erneuter Klick kein SelectionChanged aus - das
+    /// Plugin-Einstellungspanel würde nicht geladen. In dem Fall wird vorab ein anderes Plugin
+    /// gewählt, um die Selektion anschließend erneut auslösen zu können.
+    /// </remarks>
     public SettingsView SelectDefaultKiPlugin(string pluginDisplayName)
     {
         SwitchTab("Plugins");
 
         var kiPluginBox = WaitForElement(Window, cf => cf.ByName("DefaultKiPlugin"), Short);
+        var comboBox = kiPluginBox.AsComboBox();
+
+        if (string.Equals(comboBox.SelectedItem?.Name, pluginDisplayName, StringComparison.Ordinal))
+        {
+            var otherItemName = comboBox.Items
+                .Select(item => item.Name)
+                .FirstOrDefault(name => !string.Equals(name, pluginDisplayName, StringComparison.Ordinal));
+
+            if (otherItemName is not null)
+                SelectComboBoxItemByClick(kiPluginBox, otherItemName, Short);
+        }
+
         SelectComboBoxItemByClick(kiPluginBox, pluginDisplayName, Short);
 
         return this;
@@ -253,6 +271,60 @@ public sealed class SettingsView : BaseWindowView
     public SettingsView SetAutonomAufgabenEnabled(bool enabled)
     {
         WaitForElement(Window, cf => cf.ByName("IsAutonomAufgabenEnabled"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <summary>Liest das aktuell ausgewählte Label der "Update-Modus"-ComboBox im "Allgemein"-Tab.</summary>
+    /// <returns>Das Anzeige-Label des gewählten Update-Modus (z. B. "Nur Pruefen").</returns>
+    public string GetUpdateMode()
+        => WaitForElement(Window, cf => cf.ByName("Update-Modus"), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
+
+    /// <summary>Wählt einen Eintrag der "Update-Modus"-ComboBox und wartet, bis er übernommen wurde.</summary>
+    /// <param name="label">Das Anzeige-Label ("Aus", "Nur Pruefen" oder "Bei Programmstart pruefen und ausfuehren").</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetUpdateMode(string label)
+    {
+        var box = WaitForElement(Window, cf => cf.ByName("Update-Modus"), Short);
+        SelectComboBoxItemByClick(box, label, Short);
+        WaitForUpdateMode(label, Short);
+        return this;
+    }
+
+    /// <summary>
+    /// Wartet, bis die "Update-Modus"-ComboBox das erwartete Label anzeigt. Dient als echtes
+    /// Synchronisationssignal für das Neuladen der persistierten Einstellungen.
+    /// </summary>
+    /// <param name="label">Das erwartete Anzeige-Label.</param>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Das Label wurde nicht rechtzeitig angezeigt.</exception>
+    public SettingsView WaitForUpdateMode(string label, TimeSpan timeout)
+    {
+        ElementWaitHelper.WaitForSelectedComboBoxItem(
+            WaitForElement(Window, cf => cf.ByName("Update-Modus"), timeout), label, timeout);
+        return this;
+    }
+
+    /// <summary>Liest den Status der "Prerelease-Versionen laden"-CheckBox im "Allgemein"-Tab.</summary>
+    /// <returns><c>true</c>, wenn Prerelease-Versionen aktuell geladen werden.</returns>
+    public bool GetIncludePrereleases()
+        => WaitForElement(Window, cf => cf.ByName("Prerelease-Versionen laden"), Short).AsCheckBox().IsChecked ?? false;
+
+    /// <summary>Setzt den Status der "Prerelease-Versionen laden"-CheckBox im "Allgemein"-Tab.</summary>
+    /// <param name="enabled">Der gewünschte Status.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetIncludePrereleases(bool enabled)
+    {
+        WaitForElement(Window, cf => cf.ByName("Prerelease-Versionen laden"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <summary>Wartet auf die Speicher-Bestätigung "Einstellungen gespeichert.".</summary>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Die Bestätigung erschien nicht rechtzeitig.</exception>
+    public SettingsView WaitForSettingsSaved()
+    {
+        WaitForElement(Window, cf => cf.ByName("Einstellungen gespeichert."), Medium);
         return this;
     }
 }

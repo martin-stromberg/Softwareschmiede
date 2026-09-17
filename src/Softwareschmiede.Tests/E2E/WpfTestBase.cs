@@ -52,10 +52,11 @@ public abstract class WpfTestBase : IDisposable
 
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
-    private readonly string _testDbPath;
+    private string _testDbPath;
     private readonly CredentialStoreSnapshot _credentialSnapshot;
     private string? _appLogDirectory;
     private LogSnapshot _appLogSnapshot;
+    private IReadOnlyDictionary<string, string?>? _letzteLaunchUmgebungsVariablen;
 
     /// <summary>
     /// Pfad zur SQLite-Testdatenbank des laufenden App-Prozesses. Ermöglicht Tests, Vorbedingungen
@@ -160,14 +161,33 @@ public abstract class WpfTestBase : IDisposable
     /// Wartet, bis das Hauptfenster sichtbar ist.
     /// </summary>
     /// <param name="ensureDatabaseDeleted">Gibt an, ob die Testdatenbank vor dem Start gelöscht werden soll. Sollte normalerweise auf true gesetzt werden, um sicherzustellen, dass jeder Test mit einer frischen Datenbank beginnt.</param>
-    protected FlaUI.Core.Application LaunchApp(bool ensureDatabaseDeleted = true)
+    /// <param name="umgebungsVariablen">
+    /// Zusätzliche prozessbezogene Umgebungsvariablen für den gestarteten App-Prozess
+    /// (z. B. <c>SOFTWARESCHMIEDE_UPDATE_TEST_CONFIG</c>). Werte von <c>null</c> entfernen die
+    /// Variable im Kindprozess. Die Variablen werden ausschließlich über <see cref="ProcessStartInfo.Environment"/>
+    /// gesetzt und beeinflussen den Testprozess selbst nicht.
+    /// </param>
+    protected FlaUI.Core.Application LaunchApp(
+        bool ensureDatabaseDeleted = true,
+        IReadOnlyDictionary<string, string?>? umgebungsVariablen = null)
     {
+        // Ein expliziter Datenbankpfad in den prozessbezogenen Umgebungsvariablen (z. B. der
+        // fixture-eigene DB-Pfad der Update-E2E-Umgebung) wird zum effektiven Test-DB-Pfad, damit
+        // DeleteTestDatabase/OpenTestDbContext/ResolveProzessStartLogPfad konsistent bleiben.
+        if (umgebungsVariablen is not null
+            && umgebungsVariablen.TryGetValue("SOFTWARESCHMIEDE_TEST_DB_PATH", out var dbPfadOverride)
+            && !string.IsNullOrWhiteSpace(dbPfadOverride))
+        {
+            _testDbPath = dbPfadOverride;
+        }
+
         if (ensureDatabaseDeleted)
         {
             DeleteTestDatabase();
         }
 
         DeleteProzessStartLog();
+        _letzteLaunchUmgebungsVariablen = umgebungsVariablen;
 
         var appPath = ResolveAppExePath();
 
@@ -179,8 +199,25 @@ public abstract class WpfTestBase : IDisposable
         _appLogDirectory = ResolveAppLogDirectory(appPath);
         _appLogSnapshot = AppStartupLogInspector.Snapshot(_appLogDirectory);
 
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = appPath,
+            UseShellExecute = false
+        };
+        startInfo.Environment["SOFTWARESCHMIEDE_TEST_DB_PATH"] = _testDbPath;
+        if (umgebungsVariablen is not null)
+        {
+            foreach (var (name, wert) in umgebungsVariablen)
+            {
+                if (wert is null)
+                    startInfo.Environment.Remove(name);
+                else
+                    startInfo.Environment[name] = wert;
+            }
+        }
+
         _automation = new UIA3Automation();
-        _application = FlaUI.Core.Application.Launch(appPath);
+        _application = FlaUI.Core.Application.Launch(startInfo);
         _application.WaitWhileMainHandleIsMissing(Long);
 
         if (_application.HasExited || _application.MainWindowHandle == IntPtr.Zero)
@@ -211,6 +248,54 @@ public abstract class WpfTestBase : IDisposable
     {
         var app = LaunchApp();
         return app.GetMainWindow(Automation, Long)!;
+    }
+
+    /// <summary>
+    /// Startet die Anwendung unter Beibehaltung der bestehenden Testdatenbank neu: Das testeigene
+    /// Fenster wird regulär geschlossen, der Prozess-Exit abgewartet, die UI-Automation-Handles neu
+    /// aufgebaut und die App mit denselben prozessbezogenen Umgebungsvariablen wie beim letzten
+    /// <see cref="LaunchApp"/>-Aufruf erneut gestartet (<c>ensureDatabaseDeleted: false</c>).
+    /// Gespeicherte Einstellungen bleiben erhalten; es werden weder fremde Prozesse berührt noch
+    /// Build-Artefakte wie <c>version.json</c> verändert.
+    /// </summary>
+    /// <param name="umgebungsVariablen">
+    /// Optionale neue Umgebungsvariablen für den Neustart. Bei <c>null</c> werden die Variablen des
+    /// letzten <see cref="LaunchApp"/>-Aufrufs wiederverwendet.
+    /// </param>
+    /// <returns>Das Hauptfenster der neu gestarteten Anwendung.</returns>
+    /// <exception cref="TimeoutException">Der zu schließende Testprozess ist nicht rechtzeitig beendet worden.</exception>
+    protected Window RestartAppPreservingDatabase(IReadOnlyDictionary<string, string?>? umgebungsVariablen = null)
+    {
+        var processId = _application?.ProcessId
+            ?? throw new InvalidOperationException("RestartAppPreservingDatabase erfordert einen zuvor per LaunchApp gestarteten Prozess.");
+
+        // Nur das testeigene Fenster normal schließen; kein Kill, keine fremden Prozesse.
+        _application!.Close();
+        WaitForProcessExitOrThrow(processId, TimeSpan.FromSeconds(30));
+
+        _automation?.Dispose();
+        _automation = null;
+        _application = null;
+
+        LaunchApp(ensureDatabaseDeleted: false, umgebungsVariablen ?? _letzteLaunchUmgebungsVariablen);
+        return FlaUiApp.GetMainWindow(Automation, Long)!;
+    }
+
+    private static void WaitForProcessExitOrThrow(int processId, TimeSpan timeout)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            if (!process.WaitForExit((int)timeout.TotalMilliseconds))
+            {
+                throw new TimeoutException(
+                    $"Der Test-App-Prozess {processId} wurde nach dem regulären Schließen nicht innerhalb von {timeout.TotalSeconds}s beendet. Der Prozess bleibt unberührt.");
+            }
+        }
+        catch (ArgumentException)
+        {
+            // Prozess ist bereits beendet.
+        }
     }
 
     /// <summary>

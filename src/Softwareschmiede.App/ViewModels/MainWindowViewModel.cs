@@ -36,6 +36,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IUpdateProgressDialogService? _updateProgressDialogService;
     private readonly IDialogService? _dialogService;
     private readonly IApplicationVersionProvider? _versionProvider;
+    private readonly Services.Testing.UpdateE2ETestKontext? _updateE2ETestKontext;
     private readonly IPluginManager? _pluginManager;
     private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
     private readonly Action<Action> _dispatcherInvoke;
@@ -170,7 +171,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         IUpdateProgressDialogService? updateProgressDialogService = null,
         IDialogService? dialogService = null,
         IApplicationVersionProvider? versionProvider = null,
-        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
+        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null,
+        Services.Testing.UpdateE2ETestKontext? updateE2ETestKontext = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
@@ -185,6 +187,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _dialogService = dialogService;
         _versionProvider = versionProvider;
         _laufdatenChangedNotifier = laufdatenChangedNotifier;
+        _updateE2ETestKontext = updateE2ETestKontext;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -447,12 +450,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (Interlocked.Exchange(ref _startInitialisierungErfolgt, 1) != 0)
             return;
 
+        _updateE2ETestKontext?.Protokoll.Schreibe(Services.Testing.UpdateE2EEreignisse.WindowReady);
+
         if (_updateService is null)
             return;
 
         if (!await _updateGate.WaitAsync(0))
             return;
 
+        _updateE2ETestKontext?.BeginneVersuch("startup");
         UpdateCheckLaeuft = true;
         var generation = Volatile.Read(ref _updateSettingsGeneration);
         try
@@ -488,6 +494,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             UpdateCheckLaeuft = false;
+            // BeendeVersuch muss vor der Gate-Freigabe liegen: Sonst kann der nächste Versuch
+            // beginnen, bevor dieser Versuch AktuellerVersuch zurückgesetzt hat.
+            _updateE2ETestKontext?.BeendeVersuch("startup", UpdateVerfuegbar, UpdateHinweis);
             _updateGate.Release();
         }
     }
@@ -500,6 +509,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (!await _updateGate.WaitAsync(0))
             return;
 
+        _updateE2ETestKontext?.BeginneVersuch("pruefen");
         UpdateCheckLaeuft = true;
         UpdateHinweis = null;
         var generation = Volatile.Read(ref _updateSettingsGeneration);
@@ -532,6 +542,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             UpdateCheckLaeuft = false;
+            _updateE2ETestKontext?.BeendeVersuch("pruefen", UpdateVerfuegbar, UpdateHinweis);
             _updateGate.Release();
         }
     }
@@ -544,6 +555,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (!await _updateGate.WaitAsync(0))
             return;
 
+        _updateE2ETestKontext?.BeginneVersuch("starten");
         UpdateWirdVorbereitet = true;
         UpdateHinweis = null;
         var generation = Volatile.Read(ref _updateSettingsGeneration);
@@ -582,6 +594,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             UpdateWirdVorbereitet = false;
+            _updateE2ETestKontext?.BeendeVersuch("starten", UpdateVerfuegbar, UpdateHinweis);
             _updateGate.Release();
         }
     }
