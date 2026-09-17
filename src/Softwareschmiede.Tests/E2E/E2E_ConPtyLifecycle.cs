@@ -108,7 +108,7 @@ public partial class End2EndTest
     {
         // Klick auf das Hauptfenster setzt den Fokus; anschließende Tastatureingabe
         // landet im fokussierten TerminalControl und wird via InputStream weitergeleitet.
-        mainWindow.Click();
+        mainWindow.ClickInForeground();
         Keyboard.Type("hello");
 
         // Alt Gr-Sonderzeichen (deutsches Layout): "{", "}", "@", "~".

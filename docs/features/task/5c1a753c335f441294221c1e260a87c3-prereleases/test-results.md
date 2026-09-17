@@ -1,47 +1,44 @@
-# Test-Ergebnisse — Iteration 2
+# Test-Ergebnisse — Iteration 3
 
 ## Build
 
 | Projekt | Befehl | Ergebnis | Warnungen |
 |---------|--------|----------|-----------|
 | Softwareschmiede.slnx (gesamt) | `dotnet build` | erfolgreich | 0 Warnungen, 0 Fehler |
+| Softwareschmiede.slnx | `dotnet format --verify-no-changes` | sauber | — |
 
-Hinweis: Eine laufende `Softwareschmiede.App.exe` (PID 11656) sperrt das App-`bin`-Verzeichnis. Der Subagent hat daher das App-Projekt mit Shadow-Output (`-p:OutDir=D:\temp\ss-verify-iter1\appout\`) gebaut; das Tests-Projekt wurde normal gebaut und die frischen App-/Domain-/Infrastructure-DLLs in das Tests-`bin` kopiert. Der reguläre Testlauf erfolgte per `dotnet vstest` auf den neuen Assemblies — die ausgeführten Binärdateien enthalten also den aktuellen Stand. Ergebnis: **1627 bestanden, 0 fehlgeschlagen, 1 übersprungen.**
-
-## Testläufe (Iteration 2)
+## Testläufe (Iteration 3)
 
 | Projekt | Befehl | Ergebnis | Fehlgeschlagene Tests |
 |---------|--------|----------|----------------------|
-| Softwareschmiede.Tests | `dotnet test` (reguläre Spur, `Category!=OsInterface`) | 1627 bestanden, 0 fehlgeschlagen, 1 übersprungen | — |
-| Softwareschmiede.Tests | `dotnet test --filter "Category=OsInterface"` (Spur 2, Lauf 1) | 47 bestanden, **1 fehlgeschlagen**, 2 übersprungen | `E2E_RepositoryInitialisierungConfigTests.InitialisierungsskriptKonfiguration` (siehe unten) |
-| Softwareschmiede.Tests | `dotnet test --filter "Category=OsInterface"` (Spur 2, Lauf 2, nach Robustheitsfix) | lief noch / Fehleranalyse siehe unten | siehe unten |
+| Softwareschmiede.Tests | `dotnet test` (reguläre Spur, `Category!=OsInterface`) | 1629 bestanden, 0 fehlgeschlagen, 1 übersprungen | — |
+| Softwareschmiede.Tests | `dotnet test --filter "Category=OsInterface"` (Spur 2, finaler Lauf) | 47 bestanden, 1 fehlgeschlagen, 2 übersprungen | `TerminalControlTests.ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes` (siehe unten) |
+| Softwareschmiede.Tests | Fokussierter Update-E2E-Runner (temporär, inzwischen entfernt) | alle Update-Szenarien bestanden (~3 m 50 s) | — |
 
-Hinweis zur Durchführung: `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` war gesetzt (2 Übersprungene = ConPTY-Tests).
+Hinweis zur Durchführung: `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` war gesetzt (Übersprungene = ConPTY-Tests bzw. ein bedingter Repository-Initialisierungstest).
 
-## Fehlgeschlagene Tests — Einzelanalyse
+`End2EndTest.RunGeneralTests` lief im finalen Spur-2-Lauf **vollständig durch** — alle Update-E2E-Szenarien (E-01 bis E-07) sowie die Fixture-Smoke-Tests wurden in der kanonischen konsolidierten Struktur grün ausgeführt.
 
-### `Softwareschmiede.Tests.E2E.E2E_RepositoryInitialisierungConfigTests.InitialisierungsskriptKonfiguration`
+## Fehlgeschlagener Test — Einzelanalyse
 
-- **Fehlerbild:** Nach Klick auf den Skript-Pfad-Eintrag blieb die Ziel-ComboBox leer (`Expected: "scripts/init.ps1", Actual: ""`).
-- **Ursache:** UI-Timing-Flake — der `clickItem`-Klick traf die ComboBox nicht. Der Test **ist im Isolationslauf sofort grün gelaufen** (`dotnet test --filter "Name~InitialisierungsskriptKonfiguration"`: 1 bestanden in 9 s).
-- **Feature-Bezug:** keiner — der Test gehört zur Repository-Initialisierungskonfiguration, nicht zum Update-Feature. Er schlug auch in Iteration 1 sporadisch fehl und ist ein bekanntes Umfeld-Phänomen der OS-Interface-Spur (FlaUI-Klick vs. `Mouse.Click` vs. Fokus-Fenster).
-- **Status:** dokumentiert als Umgebungs-/Timing-Flake; kein Handlungsbedarf für dieses Feature.
+### `Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes`
 
-### `Softwareschmiede.Tests.E2E.RunGeneralTests` (Lauf 1 und Lauf 2, verschiedene Fehlerstellen)
+- **Fehlerbild:** `System.Runtime.InteropServices.COMException: OpenClipboard fehlgeschlagen (0x800401D0, CLIPBRD_E_CANT_OPEN)` — der Test kann die Windows-Zwischenablage nicht öffnen, obwohl er 15 s lang mit Retry versucht.
+- **Reproduktion:** Der Test schlägt **auch im Isolationslauf** fehl; eine direkt anschließende Clipboard-Probe meldet „Clipboard frei". Damit liegt eine **intermittierende Ressourcenkonkurrenz** um die Zwischenablage vor (ein anderer Prozess hält sie phasenweise offen), kein deterministischer Anwendungsdefekt.
+- **Feature-Bezug:** keiner — der Test gehört zur Terminal-Steuerung, nicht zum Update-Feature. Er verwendet keinerlei Update-Code.
+- **Status:** dokumentiert als Umgebungs-/Ressourcenproblem dieser Sandbox; kein Handlungsbedarf für dieses Feature. Bei Bedarf separater Follow-up (Clipboard-Retry-Härtung im Produktivcode bzw. Test).
 
-- **Lauf 1:** `AssertEx.ElementIsVisible(TitelSettings)` Timeout nach `MenuView.NavigateToSettings()` im E-06-Pfad (`NachLesefehlerFortsetzenAsync`).
-- **Lauf 2:** `AssertEx.ElementIsVisible(PluginsTab)` Timeout in `Startup_IsOnceAndCommandsStayBlocked` (E-07-Pfad) — **andere Fehlerstelle**, gleiches Muster.
-- **Ursache:** Der erste Nav-Klick wird unter Last des vollständigen E2E-Laufs (mehrere App-Restarts, parallele STA-Tests) gelegentlich verschluckt oder trifft die View bevor sie fokussiert ist. Kein App-Crash — die App-Logs zeigen sauberen Start und keinerlei Exceptions.
-- **Behebung:** `MenuView.NavigateToProjects()` und `NavigateToSettings()` poll-basiert umgebaut (Klick → Sichtbarkeits-Poll → ggf. Re-Klick, 15 s Budget). Zusätzlich `SaveSettings()` in `finally`-Blöcke der Settings-E2Es verschoben und `WpfTestBase` um `SOFTWARESCHMIEDE_E2E_APP_PATH`-Override erweitert.
-- **Nach dem Fix:** `E2E_RepositoryInitialisierungConfigTests` (verwandte Gruppe) läuft isoliert durch; der vollständige Spur-2-Lauf 2 zeigte keine Update-Feature-Fehler mehr. Die oben genannten `RunGeneralTests`-Stellen traten in Lauf 2 nicht erneut auf.
+## Iteration-3-Fixes und ihre Verifikation
 
-### Clipboard-Tests (in einem früheren OsInterface-Lauf)
+Die 10 Befunde aus `review-code.2.md` wurden behoben und sind durch die grünen Läufe abgedeckt:
 
-- `TerminalControlTests.ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes` und `OnPreviewKeyDown_CtrlV_CallsReadClipboardAndInsertAsync`: `CLIPBRD_E_CANT_OPEN (0x800401D0)` — klassischer Windows-Clipboard-Konflikt, wenn mehrere Prozesse/Tests gleichzeitig die Zwischenablage öffnen. Feature-unabhängig, dokumentiert.
+- `IUpdateVersuchProtokoll` + `MainWindowUpdateDienste`-Bundle: Konstruktor-Parameterliste des ViewModels reduziert, Test-Kopplung hinter Schnittstelle gekapselt.
+- `UpdateReleaseLookupResult`: Client-Vertrag unterscheidet jetzt Erfolg-mit-Release / Erfolg-ohne-Release / Fehler — die „nicht prüfbar"-Fehlmeldung im Erfolgsfall ist beseitigt (Unit-Tests in `GitHubReleaseClientTests_*`, `UpdateServiceTests*`).
+- Geteilte Test-Helpers (`RoutingHttpHandler`, `StaticHttpHandler`, `TempDirectory`, `TestDbContextFactory.CreateSqlite`), Basisklasse `MainWindowViewModelUpdateTestBase`, deduplizierte Gate-Wartelogik, gehärtetes Fixture-Cleanup.
 
-### `E2E_WpfBasisSzenarien` (früherer Einzelbefund)
+Zusätzlich wurde ein **flaUI-Klick-Rootcause** behoben, der die OsInterface-Spur über alle Iterationen hinweg sporadisch destabilisierte: `Click()` führt echte Mausklicks an Bildschirmkoordinaten aus — trifft ein verdeckendes Fremdfenster (z. B. eine parallel laufende App-Instanz) die Klickposition, versandet der Klick. `ElementWaitHelper.ClickInForeground`/`DoubleClickInForeground` bringen das Zielfenster in den Vordergrund, prüfen auf Occlusion und fehlende klickbare Punkte und fallen positionsunabhängig auf UIA-`Invoke` zurück. Der Sweep umfasste alle ~120 Klickstellen der E2E-Views; die Update-Buttons in `MenuView` pollen zusätzlich auf Sichtbarkeit/Aktivierung und wiederholen bei transienten FlaUI-Fehlern.
 
-- Schlug im OsInterface-Gesamtlauf fehl (`NavigateToProjects`-Timeout), lief **isoliert sofort grün** (2/2 bestanden, ~25 s). Bestätigt als Umgebungs-Flake unter Lane-Last, feature-unabhängig.
+Korrektur eines Review-Artefakts: Befund 10 aus `review-code.2.md` (Rohwert statt `null` bei `HelpText`-Formatmismatch) beruhte auf einer falschen Annahme — UIA liefert für den formatierten Tooltip nur die rohe Version (`HelpText='1.3.0'`), nie die Maske. `GetOfferedUpdateVersion` akzeptiert daher beide Formen; die ursprüngliche Verschärfung wurde als Regression erkannt und korrigiert.
 
 ## E2E-Abdeckung (gegen plan.md)
 
@@ -52,10 +49,10 @@ Hinweis zur Durchführung: `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1` war gesetzt (2
 | E-03 `UpdateDialog_CheckNow` | ja | bestanden |
 | E-04 `UpdateSettingsStartup_DisabledAndInstall` | ja | bestanden |
 | E-05 `UpdateInstall_EndToEnd` | ja | bestanden |
-| E-06 `UpdateSettingsReadFailure_SkipCheck` | ja (Flake in Lauf 1 durch Nav-Timing, siehe oben; Logik fehlerfrei) | bestanden nach Robustheitsfix |
+| E-06 `UpdateSettingsReadFailure_SkipCheck` | ja | bestanden |
 | E-07 `Startup_IsOnceAndCommandsStayBlocked` | ja | bestanden |
 
-Zusätzlich grün: `End2EndTest.FixtureModesRespond` (3 Modi: FoundNewer / None / Failure) und `End2EndTest.FixtureDownloadGateControlsRelease`.
+Zusätzlich grün: `End2EndTest.FixtureModesRespond` (3 Modi: FoundNewer / None / Failure), `End2EndTest.FixtureDownloadGateControlsRelease` und `Fixture_SettingsReadFailureTargetsPhaseAfterDatabaseInitialization`.
 
 ## Coverage
 
@@ -67,17 +64,18 @@ Nicht messbar — kein Coverage-Instrumentierung verfügbar (kein `coverlet`/VS-
 |---------------------|---------------------|
 | `SemanticUpdateVersion.cs` | `UpdateVersionComparerTests_SemVer.cs` (direkt), `UpdateServiceTests_PrereleaseChain.cs` |
 | `UpdateVersionComparer.cs` (erweitert) | `UpdateVersionComparerTests_SemVer.cs` |
-| `GitHubReleaseClient.cs` (Pagination/Filter) | `GitHubReleaseClientTests_Pagination.cs`, `GitHubReleaseClientTests_Filters.cs` |
-| `UpdateService.cs` (Options/Install) | `UpdateServiceTests_Options.cs`, `UpdateServiceTests_PrereleaseChain.cs`, `UpdateServiceTests.cs` |
-| `UpdateModels.cs` / `UpdateInterfaces.cs` | indirekt über o. g. + `UpdateProgressViewModelTests.cs` |
+| `GitHubReleaseClient.cs` (Pagination/Filter/LookupResult) | `GitHubReleaseClientTests_Pagination.cs`, `GitHubReleaseClientTests_Filters.cs`, `GitHubReleaseClientTests.cs` |
+| `UpdateService.cs` (Options/Install/LookupResult) | `UpdateServiceTests_Options.cs`, `UpdateServiceTests_PrereleaseChain.cs`, `UpdateServiceTests.cs` |
+| `UpdateModels.cs` / `UpdateInterfaces.cs` (`UpdateReleaseLookupResult`) | indirekt über o. g. + `UpdateProgressViewModelTests.cs` |
 | `AppEinstellungService.cs` (Update-Keys) | `AppEinstellungServiceTests_UpdateSettings.cs` |
-| `MainWindowViewModel.cs` (Startfluss/Feedback) | `MainWindowViewModelTests_UpdateStartup.cs`, `MainWindowViewModelTests_UpdateSettingsReadFailure.cs` |
+| `MainWindowViewModel.cs` / `MainWindowUpdateDienste.cs` / `IUpdateVersuchProtokoll.cs` | `MainWindowViewModelTests_UpdateStartup.cs`, `MainWindowViewModelTests_UpdateSettingsReadFailure.cs` (über `MainWindowViewModelUpdateTestBase`) |
 | `SettingsViewModel.cs` / `SettingsView.xaml` | E2E: `E2E_UpdateSettings.cs` (E-01..E-07), `E2E_SettingsUi` |
 | `UpdateProgressViewModel.cs` / Dialog | `UpdateProgressViewModelTests.cs`, E2E E-05 |
 | Testing-Infrastruktur (`Services/Testing/*`) | `UpdateFixtureHttpMessageHandlerTests.cs`, E2E-Fixture-Smoke-Tests |
-| `E2E_UpdateSettings.cs` / `UpdateE2EFixture.cs` / Views | selbst Tests bzw. Test-Infrastruktur |
+| `E2E_UpdateSettings.cs` / `UpdateE2EFixture.cs` / `ElementWaitHelper.cs` / Views | selbst Tests bzw. Test-Infrastruktur |
 
 ## Hinweise
 
-- Das bekannte E2E-Phänomen (verschluckte erste Nav-Klicks unter Lane-Last) ist in `MenuView` jetzt poll-/retry-fest; die verbleibenden sporadischen Fehler (`InitialisierungsskriptKonfiguration`, Clipboard) sind feature-unabhängig und reproduzierbar grün im Isolationslauf.
-- Die Blockade durch die laufende App-Instanz (PID 11656) wurde per Shadow-Output umgangen; keine Prozesse wurden beendet.
+- Der temporäre fokussierte Update-E2E-Runner wurde nach erfolgreicher Verifikation wieder entfernt; die kanonische Ausführung bleibt `End2EndTest.RunGeneralTests`.
+- Der einzige verbleibende Spur-2-Fehler (Clipboard) ist feature-unabhängig und in dieser Sandbox intermittierend.
+- Frühere Iterationsstände: siehe Umbenennungshistorie der Review-Artefakte (`review.1.md`, `review-code.1.md`/`review-code.2.md`, `review-usability.1.md`/`review-usability.2.md`).

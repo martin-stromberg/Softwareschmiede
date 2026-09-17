@@ -40,10 +40,17 @@ public sealed class UpdateService : IUpdateService
             if (installed is null)
                 return UpdateCheckResult.NichtPruefbar("Lokale Version ist nicht prüfbar.");
 
-            var latest = await _releaseClient.GetLatestReleaseAsync(options, ct);
-            // Defensiver Ausschluss: Ein als Prerelease klassifiziertes Client-Ergebnis wird
-            // bei deaktivierten Prereleases nicht als Update angeboten.
-            if (latest is null || (latest.IsPrerelease && !options.IncludePrereleases))
+            var lookup = await _releaseClient.GetLatestReleaseAsync(options, ct);
+            if (!lookup.Erfolg)
+                return UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
+
+            var latest = lookup.Release;
+            if (latest is null)
+                return UpdateCheckResult.KeinUpdate("Kein Update verfügbar. Die installierte Version ist aktuell.");
+
+            // Defensiver Ausschluss: Ein als Prerelease klassifiziertes Client-Ergebnis trotz
+            // deaktivierter Prereleases ist eine Vertragsverletzung und wird nicht angeboten.
+            if (latest.IsPrerelease && !options.IncludePrereleases)
                 return UpdateCheckResult.NichtPruefbar("GitHub-Release ist nicht prüfbar.");
 
             return UpdateVersionComparer.IsNewer(installed.Version, latest.Version)

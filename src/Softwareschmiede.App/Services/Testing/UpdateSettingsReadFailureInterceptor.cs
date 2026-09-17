@@ -145,9 +145,8 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
         var grund = "sofort";
         if (fehlerfall.Lesefehler.AufFreigabeWarten)
         {
-            var timeout = TimeSpan.FromSeconds(Math.Max(1, fehlerfall.Lesefehler.WartezeitSekunden));
             var freigegeben = _kontext!.WarteAufGate(
-                UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, timeout);
+                UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, WarteTimeout(fehlerfall));
             grund = ErmittleWarteGrund(freigegeben);
         }
 
@@ -159,12 +158,11 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
         var grund = "sofort";
         if (fehlerfall.Lesefehler.AufFreigabeWarten)
         {
-            var timeout = TimeSpan.FromSeconds(Math.Max(1, fehlerfall.Lesefehler.WartezeitSekunden));
             bool freigegeben;
             try
             {
                 freigegeben = await _kontext!.WarteAufGateAsync(
-                    UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, timeout);
+                    UpdateE2ETestKontext.LesefehlerGateName, cancellationToken, WarteTimeout(fehlerfall));
             }
             catch (OperationCanceledException)
             {
@@ -175,6 +173,10 @@ public sealed class UpdateSettingsReadFailureInterceptor : DbCommandInterceptor
 
         ProtokolliereFehlerUndWirf(fehlerfall, grund);
     }
+
+    /// <summary>Die konfigurierte Wartezeit des Lesefehlers, mindestens eine Sekunde.</summary>
+    private static TimeSpan WarteTimeout(Fehlerfall fehlerfall)
+        => TimeSpan.FromSeconds(Math.Max(1, fehlerfall.Lesefehler.WartezeitSekunden));
 
     /// <summary>
     /// WarteAufGate liefert bei Abbruch und Timeout beide <c>false</c> - die Abbruch-Datei

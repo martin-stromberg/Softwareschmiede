@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Softwareschmiede.Infrastructure.Data;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Data;
 
@@ -112,14 +113,5 @@ public sealed class DatenbankPfadResolverTests
               "createdAtUtc": "2026-07-14T00:00:00Z"
             }
             """);
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-
-        public TempDirectory() => Directory.CreateDirectory(Path);
-
-        public void Dispose() => Directory.Delete(Path, recursive: true);
     }
 }

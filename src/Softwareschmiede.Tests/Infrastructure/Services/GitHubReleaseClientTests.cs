@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Infrastructure.Services.Updates;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Services;
 
@@ -32,27 +33,29 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: false));
 
-        result.Should().NotBeNull();
-        result!.Version.Should().Be("1.2.3");
-        result.IsPrerelease.Should().BeFalse();
-        result.DownloadUrl.Should().Be("https://example.invalid/release.zip");
+        result.Erfolg.Should().BeTrue();
+        result.Release.Should().NotBeNull();
+        result.Release!.Version.Should().Be("1.2.3");
+        result.Release.IsPrerelease.Should().BeFalse();
+        result.Release.DownloadUrl.Should().Be("https://example.invalid/release.zip");
     }
 
-    /// <summary>Leere Listen, unbrauchbare Einträge und HTTP-Fehler werden ignoriert.</summary>
+    /// <summary>Leere Listen und unbrauchbare Einträge gelten als erfolgreiche Abfrage ohne Kandidaten; HTTP-Fehler als fehlgeschlagene Abfrage.</summary>
     [Theory]
-    [InlineData(HttpStatusCode.OK, "[]")]
-    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"v1.2.3\", \"prerelease\": true, \"assets\": [] } ]")]
-    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"v1.2.3\", \"prerelease\": false, \"assets\": [] } ]")]
-    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"v1.2.3-beta.1\", \"prerelease\": false, \"assets\": [{ \"name\": \"release.zip\", \"browser_download_url\": \"https://example.invalid/release.zip\" }] } ]")]
-    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"ungueltig\", \"prerelease\": false, \"assets\": [{ \"name\": \"release.zip\", \"browser_download_url\": \"https://example.invalid/release.zip\" }] } ]")]
-    [InlineData(HttpStatusCode.InternalServerError, "[]")]
-    public async Task GetLatestReleaseAsync_ShouldReturnNull_WhenReleaseIsNotUsable(HttpStatusCode statusCode, string body)
+    [InlineData(HttpStatusCode.OK, "[]", false)]
+    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"v1.2.3\", \"prerelease\": true, \"assets\": [] } ]", false)]
+    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"v1.2.3\", \"prerelease\": false, \"assets\": [] } ]", false)]
+    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"v1.2.3-beta.1\", \"prerelease\": false, \"assets\": [{ \"name\": \"release.zip\", \"browser_download_url\": \"https://example.invalid/release.zip\" }] } ]", false)]
+    [InlineData(HttpStatusCode.OK, "[ { \"tag_name\": \"ungueltig\", \"prerelease\": false, \"assets\": [{ \"name\": \"release.zip\", \"browser_download_url\": \"https://example.invalid/release.zip\" }] } ]", false)]
+    [InlineData(HttpStatusCode.InternalServerError, "[]", true)]
+    public async Task GetLatestReleaseAsync_ShouldReturnNull_WhenReleaseIsNotUsable(HttpStatusCode statusCode, string body, bool expectFailure)
     {
         var sut = CreateSut(new HttpClient(new StaticHttpHandler(statusCode, body)));
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: false));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().Be(!expectFailure);
+        result.Release.Should().BeNull();
     }
 
     /// <summary>Antworten ohne JSON-Liste (Einzelelement oder ungültiges JSON) gelten als nicht prüfbar.</summary>
@@ -65,7 +68,8 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: false));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().BeFalse();
+        result.Release.Should().BeNull();
     }
 
     /// <summary>Ein Timeout der Release-Abfrage liefert kein Teilergebnis.</summary>
@@ -77,7 +81,8 @@ public sealed class GitHubReleaseClientTests
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: false));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().BeFalse();
+        result.Release.Should().BeNull();
     }
 
     private static GitHubReleaseClient CreateSut(HttpClient httpClient, UpdateOptions? options = null)
@@ -86,26 +91,6 @@ public sealed class GitHubReleaseClientTests
             httpClient,
             Options.Create(options ?? new UpdateOptions()),
             NullLogger<GitHubReleaseClient>.Instance);
-    }
-
-    private sealed class StaticHttpHandler : HttpMessageHandler
-    {
-        private readonly HttpStatusCode _statusCode;
-        private readonly string _body;
-
-        public StaticHttpHandler(HttpStatusCode statusCode, string body)
-        {
-            _statusCode = statusCode;
-            _body = body;
-        }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new HttpResponseMessage(_statusCode)
-            {
-                Content = new StringContent(_body)
-            });
-        }
     }
 
     private sealed class DelayingHttpHandler : HttpMessageHandler

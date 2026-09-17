@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Infrastructure.Services.Updates;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Infrastructure.Services;
 
@@ -81,9 +82,10 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(includePrereleases));
 
-        result.Should().NotBeNull();
-        result!.Version.Should().Be(expectedVersion);
-        result.IsPrerelease.Should().Be(expectedIsPrerelease);
+        result.Erfolg.Should().BeTrue();
+        result.Release.Should().NotBeNull();
+        result.Release!.Version.Should().Be(expectedVersion);
+        result.Release.IsPrerelease.Should().Be(expectedIsPrerelease);
         handler.RequestedUrls.Should().Equal(Page1Url, Page2Url);
     }
 
@@ -98,7 +100,8 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().BeFalse();
+        result.Release.Should().BeNull();
         handler.RequestedUrls.Should().Equal(Page1Url, Page2Url);
     }
 
@@ -113,7 +116,8 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().BeFalse();
+        result.Release.Should().BeNull();
     }
 
     /// <summary>Ein Timeout auf einer Folgeseite verwirft auch gültige frühere Funde.</summary>
@@ -131,7 +135,8 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().BeFalse();
+        result.Release.Should().BeNull();
     }
 
     /// <summary>Eine Folge-URL zurück auf eine bereits besuchte Seite (Pagination-Zyklus) ist ein Fehler.</summary>
@@ -145,7 +150,8 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().BeFalse();
+        result.Release.Should().BeNull();
     }
 
     /// <summary>Folge-URLs außerhalb der GitHub-API oder des Repository-Releases-Pfades sind ein Fehler.</summary>
@@ -162,7 +168,8 @@ public sealed class GitHubReleaseClientTests_Pagination
 
         var result = await sut.GetLatestReleaseAsync(new UpdateCheckOptions(IncludePrereleases: true));
 
-        result.Should().BeNull();
+        result.Erfolg.Should().BeFalse();
+        result.Release.Should().BeNull();
         handler.RequestedUrls.Should().Equal(Page1Url);
     }
 
@@ -199,42 +206,5 @@ public sealed class GitHubReleaseClientTests_Pagination
             httpClient,
             Options.Create(options ?? new UpdateOptions()),
             NullLogger<GitHubReleaseClient>.Instance);
-    }
-
-    private sealed class RoutingHttpHandler : HttpMessageHandler
-    {
-        private readonly Dictionary<string, Func<CancellationToken, Task<HttpResponseMessage>>> _routes = new(StringComparer.OrdinalIgnoreCase);
-        private readonly List<string> _requestedUrls = [];
-
-        public IReadOnlyList<string> RequestedUrls => _requestedUrls;
-
-        public void AddPage(string url, string body, string? nextUrl = null, HttpStatusCode statusCode = HttpStatusCode.OK)
-        {
-            _routes[url] = _ =>
-            {
-                var response = new HttpResponseMessage(statusCode)
-                {
-                    Content = new StringContent(body)
-                };
-                if (nextUrl is not null)
-                    response.Headers.TryAddWithoutValidation("Link", $"<{nextUrl}>; rel=\"next\"");
-
-                return Task.FromResult(response);
-            };
-        }
-
-        public void AddHandler(string url, Func<CancellationToken, Task<HttpResponseMessage>> handler)
-            => _routes[url] = handler;
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            _requestedUrls.Add(request.RequestUri!.AbsoluteUri);
-            return _routes.TryGetValue(request.RequestUri!.AbsoluteUri, out var handler)
-                ? handler(cancellationToken)
-                : Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
-                {
-                    Content = new StringContent("[]")
-                });
-        }
     }
 }

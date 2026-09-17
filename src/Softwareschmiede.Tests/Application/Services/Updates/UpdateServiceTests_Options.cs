@@ -19,9 +19,9 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => o.IncludePrereleases), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(prerelease);
+            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(prerelease));
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.Is<UpdateCheckOptions>(o => !o.IncludePrereleases), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(stable);
+            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(stable));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var withPrereleases = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: true));
@@ -46,7 +46,7 @@ public sealed class UpdateServiceTests_Options
             .ReturnsAsync(new InstalledVersionInfo("1.2.0", "v1.2.0", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(prerelease);
+            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(prerelease));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));

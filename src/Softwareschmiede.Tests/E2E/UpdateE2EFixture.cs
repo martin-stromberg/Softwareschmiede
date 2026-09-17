@@ -382,6 +382,11 @@ public sealed class UpdateE2EFixture : IDisposable
         // Fehlersteuerung sicher zurücksetzen, auch wenn der Test mittendrin abbricht.
         try { DeaktiviereLesefehler(); } catch { /* Testwurzel evtl. schon entfernt. */ }
 
+        // Diagnose-Fluchtventil: Mit SOFTWARESCHMIEDE_UPDATE_E2E_KEEP=1 bleibt die Testwurzel
+        // (Szenario, Gates, JSONL-Protokoll) zur Fehleranalyse erhalten.
+        if (Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_UPDATE_E2E_KEEP") == "1")
+            return;
+
         for (var versuch = 0; versuch < 5; versuch++)
         {
             try

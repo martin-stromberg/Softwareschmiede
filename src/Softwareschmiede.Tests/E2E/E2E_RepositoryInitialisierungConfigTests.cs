@@ -69,7 +69,7 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         AssignLocalDirectoryRepository(mainWindow);
 
         var ladenButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptLaden"), Short);
-        ladenButton.AsButton().Click();
+        ladenButton.AsButton().ClickInForeground();
 
         var auswahlBox = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptAuswahlComboBox"), Short);
 
@@ -77,7 +77,7 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         // und ein Klick auf einen Vorschlag übernimmt ihn als ausgewähltes Skript.
         auswahlBox.Patterns.ExpandCollapse.Pattern.Expand();
         var vorschlag = WaitForElement(auswahlBox, cf => cf.ByName(VorgeschlagenesSkript), Short);
-        vorschlag.Click();
+        vorschlag.ClickInForeground();
         Assert.Equal(VorgeschlagenesSkript, auswahlBox.AsComboBox().EditableText);
 
         // (2) Live-Filter: Freitexteingabe engt die (erneut geöffnete) Vorschlagsliste auf passende Einträge ein.
@@ -96,7 +96,7 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         auswahlBox.Patterns.ExpandCollapse.Pattern.Collapse();
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptSpeichern"), Short);
-        speichernButton.AsButton().Click();
+        speichernButton.AsButton().ClickInForeground();
 
         var saved = await WaitForSavedInitialisierungsskriptAsync(RepoFolderName, UnbekanntesSkript);
         Assert.Equal(UnbekanntesSkript, saved);
@@ -115,13 +115,13 @@ public sealed class E2E_RepositoryInitialisierungConfigTests : WpfTestBase
         const string geaenderterSkript = "scripts/changed.ps1";
 
         var ladenButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptLaden"), Short);
-        ladenButton.AsButton().Click();
+        ladenButton.AsButton().ClickInForeground();
 
         var auswahlBox = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptAuswahlComboBox"), Short);
         auswahlBox.AsComboBox().EditableText = geaenderterSkript;
 
         var abbrechenButton = WaitForElement(mainWindow, cf => cf.ByName("InitialisierungsskriptAbbrechen"), Short);
-        abbrechenButton.AsButton().Click();
+        abbrechenButton.AsButton().ClickInForeground();
 
         var anzeige = WaitForElement(mainWindow, cf => cf.ByAutomationId("InitialisierungsskriptAnzeige"), Short);
         Assert.Equal(UnbekanntesSkript, anzeige.Name);

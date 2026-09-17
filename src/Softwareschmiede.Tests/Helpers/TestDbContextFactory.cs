@@ -19,19 +19,21 @@ public static class TestDbContextFactory
         return context;
     }
 
-    /// <summary>Erstellt einen neuen DbContext auf einer echten SQLite-Dateidatenbank, optional mit EF-Interceptoren (z. B. für gezielte Lesefehler).</summary>
-    /// <param name="dbPath">Dateipfad der SQLite-Datenbank.</param>
+    /// <summary>
+    /// Erstellt einen neuen DbContext auf einer echten SQLite-Datenbank, optional mit
+    /// EF-Interceptoren (z. B. für gezielte Lesefehler). Das Schema legt der Aufrufer
+    /// selbst an (EnsureCreated/Migrate), damit auch Locking-Szenarien testbar bleiben.
+    /// </summary>
+    /// <param name="connectionString">Der SQLite-Connection-String (z. B. <c>Data Source=...</c>).</param>
     /// <param name="interceptors">Optionale Interceptoren, die am Context registriert werden.</param>
-    public static SoftwareschmiededDbContext CreateSqlite(string dbPath, params IInterceptor[] interceptors)
+    public static SoftwareschmiededDbContext CreateSqlite(string connectionString, params IInterceptor[] interceptors)
     {
         var builder = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
-            .UseSqlite($"Data Source={dbPath}");
+            .UseSqlite(connectionString);
 
         if (interceptors.Length > 0)
             builder.AddInterceptors(interceptors);
 
-        var context = new SoftwareschmiededDbContext(builder.Options);
-        context.Database.EnsureCreated();
-        return context;
+        return new SoftwareschmiededDbContext(builder.Options);
     }
 }

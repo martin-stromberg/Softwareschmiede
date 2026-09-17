@@ -932,10 +932,10 @@ public partial class End2EndTest
             // Versuchte UI-Aktivierung erzeugt keinen zweiten Ablauf und keinen Shutdown.
             var pruefenButton = mainWindow.FindFirstDescendant(
                 cf => cf.ByName("Programmupdate prüfen").And(cf.ByControlType(ControlType.Button)));
-            pruefenButton?.AsButton().Click();
+            pruefenButton?.AsButton().ClickInForeground();
             var startenButton = mainWindow.FindFirstDescendant(
                 cf => cf.ByName("Programmupdate starten").And(cf.ByControlType(ControlType.Button)));
-            startenButton?.AsButton().Click();
+            startenButton?.AsButton().ClickInForeground();
             Assert.Equal(1, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.UpdateAttemptStarted));
             Assert.Equal(0, ZaehleEreignisSeit(fixture, basis, UpdateE2EEreignisse.ShutdownRequested));
 

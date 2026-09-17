@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Application.Services.Updates;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services.Updates;
 
@@ -63,14 +64,5 @@ public sealed class ApplicationVersionProviderTests
         var result = await sut.GetInstalledVersionAsync();
 
         result.Should().BeNull();
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-
-        public TempDirectory() => Directory.CreateDirectory(Path);
-
-        public void Dispose() => Directory.Delete(Path, recursive: true);
     }
 }

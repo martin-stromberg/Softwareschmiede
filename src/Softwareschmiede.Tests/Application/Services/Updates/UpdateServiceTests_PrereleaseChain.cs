@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Infrastructure.Services.Updates;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services.Updates;
 
@@ -103,57 +104,5 @@ public sealed class UpdateServiceTests_PrereleaseChain
 }
 """);
         return $"[{string.Join(",", entries)}]";
-    }
-
-    private sealed class RoutingHttpHandler : HttpMessageHandler
-    {
-        private readonly Dictionary<string, Func<CancellationToken, Task<HttpResponseMessage>>> _routes = new(StringComparer.OrdinalIgnoreCase);
-        private readonly List<string> _requestedUrls = [];
-
-        public RoutingHttpHandler()
-        {
-        }
-
-        public RoutingHttpHandler(string url, string body)
-        {
-            AddPage(url, body);
-        }
-
-        public IReadOnlyList<string> RequestedUrls => _requestedUrls;
-
-        public void AddPage(string url, string body, string? nextUrl = null, HttpStatusCode statusCode = HttpStatusCode.OK)
-        {
-            _routes[url] = _ =>
-            {
-                var response = new HttpResponseMessage(statusCode)
-                {
-                    Content = new StringContent(body)
-                };
-                if (nextUrl is not null)
-                    response.Headers.TryAddWithoutValidation("Link", $"<{nextUrl}>; rel=\"next\"");
-
-                return Task.FromResult(response);
-            };
-        }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            _requestedUrls.Add(request.RequestUri!.AbsoluteUri);
-            return _routes.TryGetValue(request.RequestUri!.AbsoluteUri, out var handler)
-                ? handler(cancellationToken)
-                : Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
-                {
-                    Content = new StringContent("[]")
-                });
-        }
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-
-        public TempDirectory() => Directory.CreateDirectory(Path);
-
-        public void Dispose() => Directory.Delete(Path, recursive: true);
     }
 }

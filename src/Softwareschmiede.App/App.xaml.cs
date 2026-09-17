@@ -222,7 +222,10 @@ public sealed partial class App : System.Windows.Application
         });
 
         if (updateTestKontext is not null)
+        {
             services.AddSingleton(updateTestKontext);
+            services.AddSingleton<IUpdateVersuchProtokoll>(updateTestKontext);
+        }
 
         services.AddMemoryCache();
         services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
@@ -316,6 +319,11 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IUpdatePackageService, UpdatePackageService>();
         services.AddSingleton<IUpdateScriptService, UpdateScriptService>();
         services.AddSingleton<IUpdateProcessLauncher, UpdateProcessLauncher>();
+        services.AddTransient(sp => new MainWindowUpdateDienste(
+            sp.GetService<IUpdateService>(),
+            sp.GetService<ICliUpdateSafetyService>(),
+            sp.GetService<IUpdateProgressDialogService>(),
+            sp.GetService<IUpdateVersuchProtokoll>()));
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Infrastructure.Services.Updates;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services.Updates;
 
@@ -205,23 +206,5 @@ public sealed class UpdatePackageServiceTests
                 Content = new ByteArrayContent(_bytes)
             });
         }
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        public string Path { get; }
-
-        public TempDirectory()
-            : this(System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N")))
-        {
-        }
-
-        public TempDirectory(string path)
-        {
-            Path = path;
-            Directory.CreateDirectory(Path);
-        }
-
-        public void Dispose() => Directory.Delete(Path, recursive: true);
     }
 }

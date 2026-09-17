@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Infrastructure.Services.Updates;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services.Updates;
 
@@ -141,14 +142,5 @@ public sealed class UpdateScriptServiceTests
     private sealed class FailingLauncher : IUpdateProcessLauncher
     {
         public bool Start(string fileName, IEnumerable<string> arguments, string workingDirectory, bool runElevated) => false;
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-
-        public TempDirectory() => Directory.CreateDirectory(Path);
-
-        public void Dispose() => Directory.Delete(Path, recursive: true);
     }
 }

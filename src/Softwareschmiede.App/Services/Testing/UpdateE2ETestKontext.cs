@@ -11,7 +11,7 @@ namespace Softwareschmiede.App.Services.Testing;
 /// Zählung der Updateversuche, damit markierte Settings-Reads der richtigen Lesegrenze zugeordnet
 /// werden können.
 /// </summary>
-public sealed class UpdateE2ETestKontext
+public sealed class UpdateE2ETestKontext : IUpdateVersuchProtokoll
 {
     /// <summary>Name des Gates für die kontrollierte Settings-Lesefehler-Freigabe.</summary>
     public const string LesefehlerGateName = "settingsReadFailure";
@@ -74,6 +74,10 @@ public sealed class UpdateE2ETestKontext
             return ++_ordinalImVersuch;
         }
     }
+
+    /// <inheritdoc/>
+    public void ProtokolliereWindowReady()
+        => Protokoll.Schreibe(UpdateE2EEreignisse.WindowReady);
 
     /// <summary>
     /// Meldet den Beginn eines Updateversuchs und schreibt <see cref="UpdateE2EEreignisse.UpdateAttemptStarted"/>.
@@ -154,7 +158,10 @@ public sealed class UpdateE2ETestKontext
             if (ergebnis is not null)
                 return ergebnis.Value;
 
-            await Task.Delay(100, ct);
+            // ConfigureAwait(false): Die synchrone Variante blockiert denselben Ablauf über
+            // GetAwaiter().GetResult() - ohne Kontextbefreiung könnte ein Aufrufer mit
+            // SynchronizationContext (z. B. UI-Thread) hier deadlocks auslösen.
+            await Task.Delay(100, ct).ConfigureAwait(false);
         }
 
         return false;
@@ -167,20 +174,14 @@ public sealed class UpdateE2ETestKontext
     /// <returns><c>true</c> bei Freigabe, <c>false</c> bei Abbruch oder Timeout.</returns>
     public bool WarteAufGate(string gate, CancellationToken ct, TimeSpan timeout)
     {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
+        try
         {
-            if (ct.IsCancellationRequested)
-                return false;
-
-            var ergebnis = PruefeGate(gate);
-            if (ergebnis is not null)
-                return ergebnis.Value;
-
-            Thread.Sleep(100);
+            return WarteAufGateAsync(gate, ct, timeout).ConfigureAwait(false).GetAwaiter().GetResult();
         }
-
-        return false;
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Liefert <c>true</c> bei vorhandener Freigabe-Datei, <c>false</c> bei Abbruch-Datei, sonst <c>null</c>.</summary>

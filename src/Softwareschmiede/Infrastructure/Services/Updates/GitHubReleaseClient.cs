@@ -23,7 +23,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
     }
 
     /// <inheritdoc/>
-    public async Task<UpdateInfo?> GetLatestReleaseAsync(UpdateCheckOptions options, CancellationToken ct = default)
+    public async Task<UpdateReleaseLookupResult> GetLatestReleaseAsync(UpdateCheckOptions options, CancellationToken ct = default)
     {
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(_options.CheckTimeout);
@@ -41,7 +41,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (!visitedUris.Add(requestUri))
                 {
                     _logger.LogWarning("GitHub-Release-Pagination verweist erneut auf {Uri}.", requestUri);
-                    return null;
+                    return UpdateReleaseLookupResult.Fehlgeschlagen;
                 }
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
@@ -52,7 +52,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogWarning("GitHub-Release-Prüfung lieferte HTTP {StatusCode}.", (int)response.StatusCode);
-                    return null;
+                    return UpdateReleaseLookupResult.Fehlgeschlagen;
                 }
 
                 await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
@@ -60,7 +60,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (releases is null)
                 {
                     _logger.LogWarning("GitHub-Release-Prüfung lieferte keine Release-Liste.");
-                    return null;
+                    return UpdateReleaseLookupResult.Fehlgeschlagen;
                 }
 
                 foreach (var release in releases)
@@ -79,19 +79,21 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
                 if (!TryGetNextPageUri(response, out var nextUri))
                 {
                     _logger.LogWarning("GitHub-Release-Pagination enthält eine ungültige Folge-URL.");
-                    return null;
+                    return UpdateReleaseLookupResult.Fehlgeschlagen;
                 }
 
                 if (nextUri is not null && !IsAllowedFollowUpUri(nextUri))
                 {
                     _logger.LogWarning("GitHub-Release-Pagination verweist auf eine unzulässige Folge-URL {Uri}.", nextUri);
-                    return null;
+                    return UpdateReleaseLookupResult.Fehlgeschlagen;
                 }
 
                 requestUri = nextUri?.AbsoluteUri;
             }
 
-            return best;
+            return best is null
+                ? UpdateReleaseLookupResult.KeinTreffer
+                : UpdateReleaseLookupResult.Gefunden(best);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -100,7 +102,7 @@ public sealed class GitHubReleaseClient : IUpdateReleaseClient
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or UriFormatException)
         {
             _logger.LogWarning(ex, "GitHub-Release-Prüfung ist fehlgeschlagen.");
-            return null;
+            return UpdateReleaseLookupResult.Fehlgeschlagen;
         }
     }
 

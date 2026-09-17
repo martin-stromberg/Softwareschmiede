@@ -20,72 +20,11 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// Konstruktor ohne Seiteneffekte, einmalige Startprüfung nach Fensterbereitschaft,
 /// Modus-Aus, Einstellungsänderungen, Sicherheitsdialog und Gleichzeitigkeitsschutz.
 /// </summary>
-public sealed class MainWindowViewModelTests_UpdateStartup : IDisposable
+public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModelUpdateTestBase
 {
-    private static readonly UpdateInfo NeuesUpdate = new(
-        "1.2.3", "v1.2.3", "release.zip",
-        new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
-
     private static readonly UpdateInfo ReleaseCandidateUpdate = new(
         "1.2.3-rc.1", "v1.2.3-rc.1", "release.zip",
         new Uri("https://example.invalid/release.zip"), null, IsPrerelease: true);
-
-    private static readonly UpdatePreparationResult FertigeVorbereitung = new(
-        "release.zip", "extracted", "update.ps1", "update.log", false);
-
-    private readonly string _dbPath = Path.Combine(
-        Path.GetTempPath(), $"sw-mwvm-update-{Guid.NewGuid():N}.db");
-    private readonly ServiceProvider _provider;
-    private readonly Mock<IRunningAutomationStatusSource> _runningStatusSourceMock = new();
-    private readonly Mock<IPluginManager> _pluginManagerMock = new();
-    private readonly Mock<IUpdateService> _updateServiceMock = new();
-    private readonly Mock<ICliUpdateSafetyService> _safetyServiceMock = new();
-    private readonly Mock<IUpdateProgressDialogService> _progressDialogMock = new();
-    private readonly Mock<IDialogService> _dialogServiceMock = new();
-
-    /// <summary>Initialisiert den DI-Container mit echter SQLite-Datenbank (In-Memory-Datei).</summary>
-    public MainWindowViewModelTests_UpdateStartup()
-    {
-        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        _pluginManagerMock.Setup(m => m.GetIdePlugins()).Returns([]);
-
-        var services = new ServiceCollection();
-        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddDbContext<SoftwareschmiededDbContext>(o =>
-            o.UseSqlite($"Data Source={_dbPath}"));
-        services.AddScoped<AppEinstellungService>();
-        services.AddScoped<ArbeitsverzeichnisSettingsService>();
-        services.AddScoped<PluginActivationService>();
-        services.AddScoped<PluginSettingsService>();
-        services.AddScoped<PromptVorlagenService>();
-        services.AddScoped<TodoService>();
-        services.AddScoped<AufgabeService>();
-        services.AddScoped<IAktiveAufgabenService>(sp => sp.GetRequiredService<AufgabeService>());
-        services.AddScoped<ProjektService>();
-        services.AddScoped<AufgabeRecoveryService>();
-        services.AddScoped<DashboardViewModel>();
-        services.AddTransient<SettingsViewModel>();
-        services.AddSingleton<DarkModeService>();
-        services.AddSingleton(_runningStatusSourceMock.Object);
-        services.AddSingleton(_pluginManagerMock.Object);
-        services.AddSingleton<ICredentialStore>(new InMemoryCredentialStoreForSettings());
-        services.AddSingleton(Options.Create(new AutonomAufgabenOptions()));
-        services.AddSingleton(TimeProvider.System);
-        _provider = services.BuildServiceProvider();
-
-        using var scope = _provider.CreateScope();
-        scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Database.EnsureCreated();
-    }
-
-    /// <summary>Gibt den DI-Container und die SQLite-Datei frei.</summary>
-    public void Dispose()
-    {
-        _provider.Dispose();
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        if (File.Exists(_dbPath))
-            File.Delete(_dbPath);
-    }
 
     /// <summary>Der Konstruktor darf keine Update-Prüfung starten; beide Update-Commands bleiben gesperrt.</summary>
     [Fact]
@@ -545,51 +484,5 @@ public sealed class MainWindowViewModelTests_UpdateStartup : IDisposable
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
             Times.Once);
-    }
-
-    /// <summary>Erstellt ein MainWindowViewModel mit den konfigurierten Update-Mocks.</summary>
-    private MainWindowViewModel CreateSut()
-    {
-        var kiService = TestKiAusfuehrungsServiceFactory.Create();
-        var promptZeitVersand = new PromptZeitVersandService(
-            kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
-        return new MainWindowViewModel(
-            _provider.GetRequiredService<DarkModeService>(),
-            _provider,
-            _provider.GetRequiredService<IAktiveAufgabenService>(),
-            _provider.GetRequiredService<TodoService>(),
-            promptZeitVersand,
-            NullLogger<MainWindowViewModel>.Instance,
-            _runningStatusSourceMock.Object,
-            action => action(),
-            _updateServiceMock.Object,
-            _safetyServiceMock.Object,
-            _progressDialogMock.Object,
-            _dialogServiceMock.Object);
-    }
-
-    /// <summary>Speichert Update-Einstellungen über den echten AppEinstellungService.</summary>
-    private async Task SetUpdateSettingsAsync(UpdateSettings settings)
-    {
-        using var scope = _provider.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-            .SetUpdateSettingsAsync(settings);
-    }
-
-    /// <summary>
-    /// Speichert Update-Einstellungen über die echte Settings-UI (gleicher Pfad wie in der Anwendung),
-    /// sodass das UpdateSettingsSaved-Ereignis im MainWindowViewModel ausgelöst wird.
-    /// </summary>
-    private async Task SpeichereUpdateEinstellungenUeberUiAsync(
-        MainWindowViewModel sut, string modusLabel, bool includePrereleases)
-    {
-        sut.NavigateToSettingsCommand.Execute(null);
-        var settingsViewModel = sut.CurrentView.Should().BeOfType<SettingsViewModel>().Subject;
-        await ((AsyncRelayCommand)settingsViewModel.LadenCommand).ExecuteAsync();
-        settingsViewModel.SelectedUpdateMode = modusLabel;
-        settingsViewModel.IncludePrereleases = includePrereleases;
-        await ((AsyncRelayCommand)settingsViewModel.SpeichernCommand).ExecuteAsync();
-        settingsViewModel.FehlerMeldung.Should().BeNull(
-            "das Speichern der Update-Einstellungen muss im Test erfolgreich sein");
     }
 }

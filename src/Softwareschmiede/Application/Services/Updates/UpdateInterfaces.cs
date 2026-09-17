@@ -10,8 +10,11 @@ public interface IApplicationVersionProvider
 /// <summary>Ruft die neueste zulässige Release-Information ab.</summary>
 public interface IUpdateReleaseClient
 {
-    /// <summary>Ruft die neueste zulässige Release-Information ab oder gibt <c>null</c> zurück, wenn sie nicht nutzbar ist.</summary>
-    Task<UpdateInfo?> GetLatestReleaseAsync(UpdateCheckOptions options, CancellationToken ct = default);
+    /// <summary>
+    /// Ruft die neueste zulässige Release-Information ab. Das Ergebnis unterscheidet eine
+    /// fehlgeschlagene Abfrage von einer erfolgreichen Abfrage ohne passenden Kandidaten.
+    /// </summary>
+    Task<UpdateReleaseLookupResult> GetLatestReleaseAsync(UpdateCheckOptions options, CancellationToken ct = default);
 }
 
 /// <summary>Orchestriert Update-Prüfung, Vorbereitung und Start des externen Updaters.</summary>

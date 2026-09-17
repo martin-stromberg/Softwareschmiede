@@ -36,7 +36,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IUpdateProgressDialogService? _updateProgressDialogService;
     private readonly IDialogService? _dialogService;
     private readonly IApplicationVersionProvider? _versionProvider;
-    private readonly Services.Testing.UpdateE2ETestKontext? _updateE2ETestKontext;
+    private readonly IUpdateVersuchProtokoll? _updateVersuchProtokoll;
     private readonly IPluginManager? _pluginManager;
     private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
     private readonly Action<Action> _dispatcherInvoke;
@@ -166,13 +166,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
         Action<Action>? dispatcherInvoke = null,
-        IUpdateService? updateService = null,
-        ICliUpdateSafetyService? cliUpdateSafetyService = null,
-        IUpdateProgressDialogService? updateProgressDialogService = null,
         IDialogService? dialogService = null,
         IApplicationVersionProvider? versionProvider = null,
         AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null,
-        Services.Testing.UpdateE2ETestKontext? updateE2ETestKontext = null)
+        MainWindowUpdateDienste? updateDienste = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
@@ -181,13 +178,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _promptZeitVersandService = promptZeitVersandService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
-        _updateService = updateService;
-        _cliUpdateSafetyService = cliUpdateSafetyService;
-        _updateProgressDialogService = updateProgressDialogService;
+        _updateService = updateDienste?.UpdateService;
+        _cliUpdateSafetyService = updateDienste?.CliUpdateSafetyService;
+        _updateProgressDialogService = updateDienste?.UpdateProgressDialogService;
         _dialogService = dialogService;
         _versionProvider = versionProvider;
         _laufdatenChangedNotifier = laufdatenChangedNotifier;
-        _updateE2ETestKontext = updateE2ETestKontext;
+        _updateVersuchProtokoll = updateDienste?.VersuchProtokoll;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
@@ -452,7 +449,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (Interlocked.Exchange(ref _startInitialisierungErfolgt, 1) != 0)
             return;
 
-        _updateE2ETestKontext?.Protokoll.Schreibe(Services.Testing.UpdateE2EEreignisse.WindowReady);
+        _updateVersuchProtokoll?.ProtokolliereWindowReady();
 
         if (_updateService is null)
             return;
@@ -460,7 +457,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (!await _updateGate.WaitAsync(0))
             return;
 
-        _updateE2ETestKontext?.BeginneVersuch("startup");
+        _updateVersuchProtokoll?.BeginneVersuch("startup");
         UpdateCheckLaeuft = true;
         var generation = Volatile.Read(ref _updateSettingsGeneration);
         try
@@ -498,7 +495,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             UpdateCheckLaeuft = false;
             // BeendeVersuch muss vor der Gate-Freigabe liegen: Sonst kann der nächste Versuch
             // beginnen, bevor dieser Versuch AktuellerVersuch zurückgesetzt hat.
-            _updateE2ETestKontext?.BeendeVersuch("startup", UpdateVerfuegbar, UpdateHinweis);
+            _updateVersuchProtokoll?.BeendeVersuch("startup", UpdateVerfuegbar, UpdateHinweis);
             _updateGate.Release();
         }
     }
@@ -511,7 +508,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (!await _updateGate.WaitAsync(0))
             return;
 
-        _updateE2ETestKontext?.BeginneVersuch("pruefen");
+        _updateVersuchProtokoll?.BeginneVersuch("pruefen");
         UpdateCheckLaeuft = true;
         UpdateHinweis = null;
         var generation = Volatile.Read(ref _updateSettingsGeneration);
@@ -544,7 +541,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             UpdateCheckLaeuft = false;
-            _updateE2ETestKontext?.BeendeVersuch("pruefen", UpdateVerfuegbar, UpdateHinweis);
+            _updateVersuchProtokoll?.BeendeVersuch("pruefen", UpdateVerfuegbar, UpdateHinweis);
             _updateGate.Release();
         }
     }
@@ -557,7 +554,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         if (!await _updateGate.WaitAsync(0))
             return;
 
-        _updateE2ETestKontext?.BeginneVersuch("starten");
+        _updateVersuchProtokoll?.BeginneVersuch("starten");
         UpdateWirdVorbereitet = true;
         UpdateHinweis = null;
         var generation = Volatile.Read(ref _updateSettingsGeneration);
@@ -596,7 +593,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             UpdateWirdVorbereitet = false;
-            _updateE2ETestKontext?.BeendeVersuch("starten", UpdateVerfuegbar, UpdateHinweis);
+            _updateVersuchProtokoll?.BeendeVersuch("starten", UpdateVerfuegbar, UpdateHinweis);
             _updateGate.Release();
         }
     }

@@ -60,12 +60,12 @@ public partial class End2EndTest
         }
 
         var initialisierenButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short);
-        initialisierenButton.AsButton().Click();
+        initialisierenButton.AsButton().ClickInForeground();
 
         var initDialog = WaitForWindow("Autonome Aufgabe initialisieren", Medium);
         var promptBox = WaitForElement(initDialog, cf => cf.ByName("AutonomAufgabeInitialPrompt"), Short);
         promptBox.AsTextBox().Text = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
-        WaitForElement(initDialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().Click();
+        WaitForElement(initDialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().ClickInForeground();
 
         // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
         // wechselt selbst zur "Automatisierung"-Registerkarte (identifiziert über deren TabControl
@@ -76,7 +76,7 @@ public partial class End2EndTest
         // Phase 1: Projektleiter-Agent-Start über echte UI-Interaktion — über den Ribbon-Button
         // "Start" (Gruppe "Autonome Aufgabe").
         var startButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStartAgent"), Long);
-        startButton.AsButton().Click();
+        startButton.AsButton().ClickInForeground();
 
         await WartenBisAsync(async () =>
         {
@@ -205,7 +205,7 @@ public partial class End2EndTest
         // "AutonomAufgabeStopAgent") setzt ExplizitGestoppt und stoppt den laufenden Projektleiter-Agent-CLI-Prozess
         // — verhindert einen automatischen Wiederstart durch App-Startup-Recovery.
         var stopButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeStopAgent"), Short);
-        stopButton.AsButton().Click();
+        stopButton.AsButton().ClickInForeground();
 
         await WartenBisAsync(async () =>
         {

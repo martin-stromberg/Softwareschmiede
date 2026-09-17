@@ -7,6 +7,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Infrastructure.Data;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
@@ -172,13 +173,9 @@ public sealed class AppEinstellungServiceTests_UpdateSettings : IDisposable
             ? $"Data Source={_dbPath};Default Timeout={timeout}"
             : $"Data Source={_dbPath}";
 
-        var builder = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
-            .UseSqlite(connectionString);
-
-        if (interceptor is not null)
-            builder.AddInterceptors(interceptor);
-
-        return new SoftwareschmiededDbContext(builder.Options);
+        return TestDbContextFactory.CreateSqlite(
+            connectionString,
+            interceptor is not null ? [interceptor] : []);
     }
 
     private static AppEinstellungService CreateService(SoftwareschmiededDbContext db)

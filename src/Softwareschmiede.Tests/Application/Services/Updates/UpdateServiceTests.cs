@@ -18,13 +18,49 @@ public sealed class UpdateServiceTests
             .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
         releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(update);
+            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
         var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
 
         result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         result.Update.Should().Be(update);
+    }
+
+    /// <summary>Eine erfolgreiche Release-Abfrage ohne passenden Kandidaten meldet KeinUpdate.</summary>
+    [Fact]
+    public async Task CheckForUpdateAsync_ShouldReturnNoUpdate_WhenLookupFindsNoCandidate()
+    {
+        var versionProvider = new Mock<IApplicationVersionProvider>();
+        versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
+        var releaseClient = new Mock<IUpdateReleaseClient>();
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UpdateReleaseLookupResult.KeinTreffer);
+        var sut = CreateSut(versionProvider.Object, releaseClient.Object);
+
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+
+        result.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
+        result.Update.Should().BeNull();
+    }
+
+    /// <summary>Ein technisch fehlgeschlagener Release-Abruf meldet NichtPruefbar statt KeinUpdate.</summary>
+    [Fact]
+    public async Task CheckForUpdateAsync_ShouldReturnNotCheckable_WhenLookupFails()
+    {
+        var versionProvider = new Mock<IApplicationVersionProvider>();
+        versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
+        var releaseClient = new Mock<IUpdateReleaseClient>();
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UpdateReleaseLookupResult.Fehlgeschlagen);
+        var sut = CreateSut(versionProvider.Object, releaseClient.Object);
+
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+
+        result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
+        result.Update.Should().BeNull();
     }
 
     /// <summary>Gleiche oder nicht prüfbare Versionen zeigen kein verfügbares Update an.</summary>

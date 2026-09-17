@@ -37,7 +37,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <inheritdoc/>
     public override ProjectDetailView ForceClose(bool recurseToDashboard)
     {
-        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("Neu"), Medium);
 
         if (recurseToDashboard)
@@ -53,7 +53,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Die Aufgabendetailansicht der neu angelegten Aufgabe.</returns>
     public TaskDetailView CreateTask()
     {
-        WaitForElement(Window, cf => cf.ByName("AufgabeNeu"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("AufgabeNeu"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("EditTitel"), Short);
 
         return new TaskDetailView(Window);
@@ -65,7 +65,7 @@ public sealed class ProjectDetailView : BaseWindowView
     {
         WaitForElement(Window, cf => cf.ByName("AufgabeNeu"), Short);
 
-        WaitForElement(Window, cf => cf.ByName("Löschen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Löschen"), Short).AsButton().ClickInForeground();
         new DeleteConfirmationDialogView(Window).Confirm();
 
         WaitUntilGone(Window, cf => cf.ByName("Speichern"), Short);
@@ -89,7 +89,7 @@ public sealed class ProjectDetailView : BaseWindowView
         if (items.Length == 0)
             throw new InvalidOperationException("OffeneAufgabenListe enthielt kein Element.");
 
-        items[0].DoubleClick();
+        items[0].DoubleClickInForeground();
         WaitForElement(Window, cf => cf.ByName("Zurück"), Short);
 
         return new TaskDetailView(Window);
@@ -100,7 +100,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Die Aufgabendetailansicht der geöffneten Aufgabe.</returns>
     public TaskDetailView OpenTask(string title)
     {
-        WaitForElement(Window, cf => cf.ByName(title).And(cf.ByControlType(ControlType.ListItem)), Medium).DoubleClick();
+        WaitForElement(Window, cf => cf.ByName(title).And(cf.ByControlType(ControlType.ListItem)), Medium).DoubleClickInForeground();
         WaitForElement(Window, cf => cf.ByName("Zurück"), Short);
 
         return new TaskDetailView(Window);
@@ -135,7 +135,7 @@ public sealed class ProjectDetailView : BaseWindowView
     public void SetProjectName(string name)
     {
         var nameBox = WaitForElement(Window, cf => cf.ByName("ProjektName"), Short);
-        nameBox.Click();
+        nameBox.ClickInForeground();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         Keyboard.Type(name);
     }
@@ -158,7 +158,7 @@ public sealed class ProjectDetailView : BaseWindowView
     {
         var expectedName = GetProjectName().Trim();
 
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
 
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
@@ -185,7 +185,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView EditBaseBranch()
     {
-        WaitForElement(Window, cf => cf.ByName("BasisBranchBearbeiten"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("BasisBranchBearbeiten"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -202,7 +202,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView SaveBaseBranch()
     {
-        WaitForElement(Window, cf => cf.ByName("BasisBranchSpeichern"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("BasisBranchSpeichern"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -213,7 +213,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView OpenFilter()
     {
-        WaitForElement(Window, cf => cf.ByName("Filter"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Filter"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("Aufgaben filtern"), Short);
         return this;
     }
@@ -223,7 +223,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView SelectFilterOption(string optionName)
     {
-        WaitForElement(Window, cf => cf.ByName(optionName).And(cf.ByControlType(ControlType.RadioButton)), Short).Click();
+        WaitForElement(Window, cf => cf.ByName(optionName).And(cf.ByControlType(ControlType.RadioButton)), Short).ClickInForeground();
         return this;
     }
 
@@ -231,7 +231,7 @@ public sealed class ProjectDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ProjectDetailView CloseFilter()
     {
-        WaitForElement(Window, cf => cf.ByName("Filter"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Filter"), Short).AsButton().ClickInForeground();
         WaitUntilGone(Window, cf => cf.ByName("Aufgaben filtern"), Short);
         return this;
     }

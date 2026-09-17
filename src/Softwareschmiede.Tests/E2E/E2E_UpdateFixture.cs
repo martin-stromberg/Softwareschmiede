@@ -246,9 +246,10 @@ public partial class End2EndTest
         }
         finally
         {
-            // Fehlersteuerung und Gates auch bei Testabbruch zurücksetzen.
-            fixture.DeaktiviereLesefehler();
-            fixture.SetzeGateZurueck(UpdateE2ETestKontext.LesefehlerGateName);
+            // Fehlersteuerung und Gates auch bei Testabbruch zurücksetzen - jeder Schritt
+            // einzeln geschützt, damit ein Fehler nicht die Original-Assertion maskiert.
+            try { fixture.DeaktiviereLesefehler(); } catch { /* Testwurzel evtl. schon entfernt. */ }
+            try { fixture.SetzeGateZurueck(UpdateE2ETestKontext.LesefehlerGateName); } catch { }
             SchliesseFixtureApp();
         }
     }

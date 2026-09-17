@@ -48,6 +48,36 @@ public sealed record UpdateSettings(UpdateMode Modus, bool IncludePrereleases);
 /// <param name="IncludePrereleases">Gibt an, ob Prerelease-Versionen bei der Release-Auswahl berücksichtigt werden.</param>
 public sealed record UpdateCheckOptions(bool IncludePrereleases);
 
+/// <summary>
+/// Ergebnis der Release-Abfrage eines <see cref="IUpdateReleaseClient"/>. Unterscheidet eine
+/// fehlgeschlagene Abfrage (HTTP-Fehler, Timeout, ungültige Antwort) von einer erfolgreichen
+/// Abfrage ohne passenden Release-Kandidaten.
+/// </summary>
+public sealed record UpdateReleaseLookupResult
+{
+    private UpdateReleaseLookupResult(bool erfolg, UpdateInfo? release)
+    {
+        Erfolg = erfolg;
+        Release = release;
+    }
+
+    /// <summary>Gibt an, ob die Release-Abfrage technisch erfolgreich war.</summary>
+    public bool Erfolg { get; }
+
+    /// <summary>Das neueste zulässige Release oder <c>null</c>, wenn kein Kandidat gefunden wurde.</summary>
+    public UpdateInfo? Release { get; }
+
+    /// <summary>Die Release-Abfrage ist fehlgeschlagen.</summary>
+    public static UpdateReleaseLookupResult Fehlgeschlagen { get; } = new(false, null);
+
+    /// <summary>Die Release-Abfrage war erfolgreich, lieferte aber keinen passenden Kandidaten.</summary>
+    public static UpdateReleaseLookupResult KeinTreffer { get; } = new(true, null);
+
+    /// <summary>Erzeugt ein erfolgreiches Ergebnis mit dem gefundenen Release.</summary>
+    /// <param name="release">Das neueste zulässige Release.</param>
+    public static UpdateReleaseLookupResult Gefunden(UpdateInfo release) => new(true, release);
+}
+
 /// <summary>Status einer Update-Prüfung.</summary>
 public enum UpdateCheckStatus
 {

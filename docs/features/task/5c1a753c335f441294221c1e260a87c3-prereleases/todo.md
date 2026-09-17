@@ -18,11 +18,15 @@ Branch: `task/5c1a753c335f441294221c1e260a87c3-prereleases`
 | [x] | 8 (It. 1) | Usability-Review (Unteragent, UI-Aenderungen vorhanden) — 1 Befund (kein sichtbares Feedback bei manueller Pruefung ohne Update) | `review-usability.1.md` |
 | [x] | 9 (It. 1) | Code-Review (Unteragent) — 6 Befunde (alle niedrig) | `review-code.1.md` |
 | [x] | 6 (It. 2) | Review-Befunde behoben: Feedback-Text bei manueller Pruefung, HTTPS-Asset-URLs, Race-sicherer Fortschritts-Endzustand, E2E-Robustheit (Cleanup, Nav-Wiederholung, Stream-Gate-Timeout), RC-Paketpfad-Unit-Test — committed (1714e2a + Folgecommit) | Codeaenderungen |
-| [~] | 7 (It. 2) | Plan-Review erneut (Unteragent) — laeuft | `review.md` |
-| [~] | 8 (It. 2) | Usability-Review erneut (Unteragent) — laeuft | `review-usability.md` |
-| [~] | 9 (It. 2) | Code-Review erneut (Unteragent) — laeuft | `review-code.md` |
-| [x] | 10 | Tests ausgefuehrt und dokumentiert — regulaere Spur gruen (1627/0 Fehler); OsInterface-Spur: 47/48 gruen, verbleibende Fehler feature-unabhaengige Timing-Flakes (isoliert gruen) | `test-results.md` |
-| [ ] | - | Iteration oder Abschluss entscheiden | - |
+| [x] | 7 (It. 2) | Plan-Review erneut (Unteragent) — Status: Vollstaendig umgesetzt | `review.md` |
+| [x] | 8 (It. 2) | Usability-Review erneut (Unteragent) — Keine Befunde | `review-usability.md` |
+| [x] | 9 (It. 2) | Code-Review erneut (Unteragent) — 10 Befunde (alle niedrig) | `review-code.2.md` |
+| [x] | 6 (It. 3) | Review-Befunde behoben: IUpdateVersuchProtokoll + MainWindowUpdateDienste-Bundle, UpdateReleaseLookupResult-Vertrag, TestDbContextFactory.CreateSqlite, CreateSut-Bereinigung, MainWindowViewModelUpdateTestBase, geteilte Test-Helpers, Gate-Warte-Dedup, E2E-Cleanup, GetOfferedUpdateVersion (Rohwert korrekt — Befund 10 basierte auf falscher UIA-Annahme), FlaUI-Klick-Occlusion-Fix (ClickInForeground-Sweep ueber ~120 Stellen) | Codeaenderungen |
+| [x] | 7 (It. 3) | Plan-Review uebersprungen — `review.md` traegt bereits `Vollstaendig umgesetzt` | `review.md` |
+| [~] | 8 (It. 3) | Usability-Review erneut (Unteragent) — ausstehend | `review-usability.md` |
+| [~] | 9 (It. 3) | Code-Review erneut (Unteragent) — ausstehend | `review-code.md` |
+| [x] | 10 | Tests ausgefuehrt und dokumentiert — regulaere Spur gruen (1629/0 Fehler); OsInterface-Spur: 47/50 gruen, RunGeneralTests komplett durchgelaufen (alle Update-Szenarien), einziger Fehler feature-unabhaengiger Clipboard-Ressourcenkonflikt | `test-results.md` |
+| [~] | - | Iteration oder Abschluss entscheiden — wartet auf It.-3-Reviews | - |
 | [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
 | [ ] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [ ] | 12b | README aktualisieren (Unteragent) | `README.md` |

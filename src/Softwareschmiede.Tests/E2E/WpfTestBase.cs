@@ -358,7 +358,7 @@ public abstract class WpfTestBase : IDisposable
     protected void WechsleAufgabenansicht(Window mainWindow, string viewButtonName)
     {
         var infoButton = WaitForElement(mainWindow, cf => cf.ByName(viewButtonName), Short);
-        infoButton.AsButton().Click();
+        infoButton.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -418,7 +418,7 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjects(AutomationElement mainWindow)
     {
-        WaitForNavigationButton(mainWindow, ProjekteButtonNamen, Short).AsButton().Click();
+        WaitForNavigationButton(mainWindow, ProjekteButtonNamen, Short).AsButton().ClickInForeground();
     }
     /// <summary>
     /// Navigiert von der Projekt-Kachel zurück zur Projektliste. Wird benötigt, wenn ein Test nach dem Öffnen eines Projekts wieder zur Projektliste zurückkehren muss.
@@ -427,7 +427,7 @@ public abstract class WpfTestBase : IDisposable
     protected void NavigateBackFromProjectCardToProjectsList(AutomationElement mainWindow)
     {
         var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        button.AsButton().Click();
+        button.AsButton().ClickInForeground();
     }
     /// <summary>
     /// Navigiert von einer geöffneten Aufgabendetailansicht zurück zur Projektdetailansicht.
@@ -436,7 +436,7 @@ public abstract class WpfTestBase : IDisposable
     protected void NavigateBackFromTaskToProject(Window mainWindow)
     {
         var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        button.AsButton().Click();
+        button.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -446,7 +446,7 @@ public abstract class WpfTestBase : IDisposable
     protected void NavigateBackToDashboard(AutomationElement mainWindow)
     {
         var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
+        dashboardButton.AsButton().ClickInForeground();
     }
 
     /// <summary>Navigiert zur Einstellungsseite und wartet, bis die Settings-Tabs geladen sind.</summary>
@@ -459,7 +459,7 @@ public abstract class WpfTestBase : IDisposable
 
             var button = FindNavigationButton(mainWindow, EinstellungenButtonNamen);
             if (button is not null)
-                button.AsButton().Click();
+                button.AsButton().ClickInForeground();
 
             var settingsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Plugins"));
             if (settingsTab is not null)
@@ -725,12 +725,12 @@ public abstract class WpfTestBase : IDisposable
         NavigateToSettings(mainWindow);
 
         var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
-        pluginsTab.Click();
+        pluginsTab.ClickInForeground();
 
         // Klickt gezielt auf das Namens-Label (nicht die Aktivierungs-CheckBox selbst), damit nur
         // der Listeneintrag ausgewählt wird, ohne den Aktivierungsstatus des Plugins zu verändern.
         var localDirectoryPluginEntry = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
-        localDirectoryPluginEntry.Click();
+        localDirectoryPluginEntry.ClickInForeground();
 
         var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), Short);
         var workspaceMode = useInSourceDirectoryMode ? "InSourceDirectory" : "SeparateWorkingDirectory";
@@ -740,12 +740,12 @@ public abstract class WpfTestBase : IDisposable
         sourceDirectoryBox.AsTextBox().Text = sourceDirectory;
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        speichernButton.AsButton().ClickInForeground();
 
         WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
 
         var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
+        dashboardButton.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -755,7 +755,7 @@ public abstract class WpfTestBase : IDisposable
     protected void AssignLocalDirectoryRepository(AutomationElement mainWindow)
     {
         var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
+        zuweisenButton.AsButton().ClickInForeground();
 
         var dialog = WaitForWindow("Repository zuweisen", Short);
 
@@ -776,10 +776,10 @@ public abstract class WpfTestBase : IDisposable
         if (items.Length == 0)
             throw new TimeoutException("Repository-Liste im Zuweisungsdialog enthielt kein Element innerhalb des Timeouts.");
 
-        items[0].Click();
+        items[0].ClickInForeground();
 
         var zuweisenBestaetigenButton = WaitForElement(dialog, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenBestaetigenButton.AsButton().Click();
+        zuweisenBestaetigenButton.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -789,7 +789,7 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement OpenRepositoryAssignDialog(AutomationElement mainWindow)
     {
         var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
+        zuweisenButton.AsButton().ClickInForeground();
         return WaitForWindow("Repository zuweisen", Short);
     }
 
@@ -987,7 +987,7 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement NeueAufgabeAnlegen(AutomationElement mainWindow)
     {
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
+        aufgabeNeuButton.AsButton().ClickInForeground();
 
         return WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
     }
@@ -1009,7 +1009,7 @@ public abstract class WpfTestBase : IDisposable
     protected void AufgabeDetailSpeichern(AutomationElement mainWindow, bool navigateBackToProject)
     {
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        speichernButton.AsButton().ClickInForeground();
         if (navigateBackToProject)
         {
             NavigateBackFromTaskToProject((Window)mainWindow);
@@ -1069,7 +1069,7 @@ public abstract class WpfTestBase : IDisposable
                 "ErsteOffeneAufgabeOeffnen wurde mit einer leeren Aufgabenliste aufgerufen. " +
                 "Aufrufer müssen zuvor sicherstellen, dass OffeneAufgabenItems mindestens ein Element liefert.");
 
-        items[0].DoubleClick();
+        items[0].DoubleClickInForeground();
     }
 
     /// <summary>
@@ -1082,7 +1082,7 @@ public abstract class WpfTestBase : IDisposable
             mainWindow,
             cf => cf.ByName(titel).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
             Medium);
-        listenEintrag.DoubleClick();
+        listenEintrag.DoubleClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
     }
 
@@ -1103,7 +1103,7 @@ public abstract class WpfTestBase : IDisposable
         FeldInhaltErsetzen(nameBox, neuerName);
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        speichernButton.AsButton().ClickInForeground();
 
         WaitForTextBoxText(mainWindow, "ProjektName", neuerName.Trim(), Medium);
     }
@@ -1143,7 +1143,7 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     private static void FeldInhaltErsetzen(AutomationElement box, string text)
     {
-        box.Click();
+        box.ClickInForeground();
         Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
         Keyboard.Type(text);
     }

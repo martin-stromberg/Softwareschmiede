@@ -79,9 +79,6 @@ public sealed class MainWindowViewModelTests : IDisposable
 
     private MainWindowViewModel CreateSut(
         IAktiveAufgabenService? aufgabeService = null,
-        IUpdateService? updateService = null,
-        ICliUpdateSafetyService? cliUpdateSafetyService = null,
-        IUpdateProgressDialogService? updateProgressDialogService = null,
         IDialogService? dialogService = null,
         IApplicationVersionProvider? versionProvider = null,
         AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
@@ -99,9 +96,6 @@ public sealed class MainWindowViewModelTests : IDisposable
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
             action => action(),
-            updateService,
-            cliUpdateSafetyService,
-            updateProgressDialogService,
             dialogService,
             versionProvider,
             laufdatenChangedNotifier);

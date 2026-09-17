@@ -66,12 +66,37 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Der in der Fußzeile der Navigations-Seitenleiste angezeigte Versionstext ("AppVersionText").</returns>
     public string GetVersionText() => WaitForElement(Window, cf => cf.ByAutomationId("AppVersionText"), Short).Name;
 
-    /// <summary>Klickt den "Programmupdate prüfen"-Button der Seitenleiste.</summary>
+    /// <summary>
+    /// Klickt den "Programmupdate prüfen"-Button der Seitenleiste. Der Button ist erst nach dem
+    /// Laden der Update-Einstellungen aktiviert - der Klick wartet daher begrenzt auf die
+    /// Aktivierung, damit ein Klick nicht wirkungslos auf einen noch gesperrten Button trifft.
+    /// </summary>
     /// <returns>Diese Instanz.</returns>
     public MenuView ClickUpdatePruefen()
     {
-        WaitForElement(Window, cf => cf.ByName("Programmupdate prüfen"), Short).AsButton().Click();
-        return this;
+        var deadline = DateTime.UtcNow + Medium;
+        while (DateTime.UtcNow < deadline)
+        {
+            var button = Window.FindFirstDescendant(
+                cf => cf.ByName("Programmupdate prüfen").And(cf.ByControlType(ControlType.Button)));
+            if (button is not null && !button.IsOffscreen && button.IsEnabled)
+            {
+                try
+                {
+                    button.ClickInForeground();
+                    return this;
+                }
+                catch (FlaUI.Core.Exceptions.FlaUIException)
+                {
+                    // Element kann zwischen Prüfung und Klick kurzzeitig keinen klickbaren
+                    // Punkt haben (Layout-Umbau) - nächster Schleifendurchlauf versucht erneut.
+                }
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException("Der 'Programmupdate prüfen'-Button wurde nicht rechtzeitig aktiviert.");
     }
 
     /// <summary>Klickt den "Programmupdate starten"-Button der Seitenleiste (nur bei Updateangebot sichtbar).</summary>
@@ -79,8 +104,29 @@ public sealed class MenuView : BaseWindowView
     /// <exception cref="TimeoutException">Der Button ist nicht sichtbar, weil kein Update angeboten wird.</exception>
     public MenuView ClickUpdateStarten()
     {
-        WaitForElement(Window, cf => cf.ByName("Programmupdate starten"), Medium).AsButton().Click();
-        return this;
+        var deadline = DateTime.UtcNow + Medium;
+        while (DateTime.UtcNow < deadline)
+        {
+            var button = Window.FindFirstDescendant(
+                cf => cf.ByName("Programmupdate starten").And(cf.ByControlType(ControlType.Button)));
+            if (button is not null && !button.IsOffscreen)
+            {
+                try
+                {
+                    button.ClickInForeground();
+                    return this;
+                }
+                catch (FlaUI.Core.Exceptions.FlaUIException)
+                {
+                    // Element kann zwischen Prüfung und Klick kurzzeitig keinen klickbaren
+                    // Punkt haben (Layout-Umbau) - nächster Schleifendurchlauf versucht erneut.
+                }
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException("Der 'Programmupdate starten'-Button wurde nicht rechtzeitig sichtbar.");
     }
 
     /// <summary>Gibt an, ob der "Programmupdate starten"-Button aktuell sichtbar ist (Updateangebot liegt an).</summary>
@@ -111,9 +157,10 @@ public sealed class MenuView : BaseWindowView
     }
 
     /// <summary>
-    /// Liest die angebotene Update-Version aus dem ToolTip des "Programmupdate starten"-Buttons
-    /// ("Update auf Version {0} vorbereiten"). WPF bildet <c>ToolTip</c> auf die UIA-Eigenschaft
-    /// <c>HelpText</c> ab.
+    /// Liest die angebotene Update-Version aus dem ToolTip des "Programmupdate starten"-Buttons.
+    /// WPF bildet <c>ToolTip</c> auf die UIA-Eigenschaft <c>HelpText</c> ab; diese enthält den
+    /// gebundenen Rohwert (die Versionszeichenkette), nicht die StringFormat-Maske
+    /// ("Update auf Version {0} vorbereiten"). Beide Formen werden akzeptiert.
     /// </summary>
     /// <returns>Die angebotene Versionszeichenkette oder <c>null</c>, wenn kein Update angeboten wird.</returns>
     public string? GetOfferedUpdateVersion()
@@ -133,7 +180,9 @@ public sealed class MenuView : BaseWindowView
             return helpText[prefix.Length..^suffix.Length];
         }
 
-        return helpText;
+        // UIA liefert in HelpText den gebundenen Rohwert (die Version), nicht die
+        // StringFormat-Maske - der nicht maskierte Text ist das Updateangebot.
+        return string.IsNullOrEmpty(helpText) ? null : helpText;
     }
 
     /// <summary>
@@ -154,7 +203,12 @@ public sealed class MenuView : BaseWindowView
             Thread.Sleep(200);
         }
 
-        throw new TimeoutException($"Innerhalb von {timeout.TotalSeconds}s wurde kein Updateangebot angezeigt.");
+        var button = Window.FindFirstDescendant(
+            cf => cf.ByName("Programmupdate starten").And(cf.ByControlType(ControlType.Button)));
+        throw new TimeoutException(
+            $"Innerhalb von {timeout.TotalSeconds}s wurde kein Updateangebot angezeigt. " +
+            $"Diagnose: Button={(button is null ? "nicht gefunden" : $"gefunden, IsOffscreen={button.IsOffscreen}, HelpText='{button.HelpText}'")}, " +
+            $"Hinweis='{GetUpdateHinweis()}'");
     }
 
     /// <summary>Liest den aktuellen "UpdateHinweis"-Text der Seitenleiste.</summary>
@@ -202,7 +256,7 @@ public sealed class MenuView : BaseWindowView
     /// <returns>Die Aufgabendetailansicht der Zielaufgabe.</returns>
     public TaskDetailView NavigateToTask(string taskTitle)
     {
-        WaitForElement(Window, cf => cf.ByName($"AufgabeNavigieren:{taskTitle}"), Medium).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName($"AufgabeNavigieren:{taskTitle}"), Medium).AsButton().ClickInForeground();
         return new TaskDetailView(Window);
     }
 
@@ -290,7 +344,9 @@ public sealed class MenuView : BaseWindowView
             {
                 try
                 {
-                    TryFindNavigationButton(buttonNamen)?.AsButton().Click();
+                    var button = TryFindNavigationButton(buttonNamen);
+                    if (button is not null)
+                        button.ClickInForeground();
                 }
                 catch (FlaUI.Core.Exceptions.FlaUIException)
                 {

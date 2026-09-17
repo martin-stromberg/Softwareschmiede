@@ -54,7 +54,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView SwitchTab(string tabName)
     {
-        WaitForElement(Window, cf => cf.ByName(tabName), Short).Click();
+        WaitForElement(Window, cf => cf.ByName(tabName), Short).ClickInForeground();
         return this;
     }
 
@@ -62,7 +62,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView SaveSettings()
     {
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("Einstellungen gespeichert."), Short);
 
         return this;
@@ -83,7 +83,7 @@ public sealed class SettingsView : BaseWindowView
         // Klickt gezielt auf das Namens-Label (nicht die Aktivierungs-CheckBox selbst), damit nur
         // der Listeneintrag ausgewählt wird, ohne den Aktivierungsstatus des Plugins zu verändern.
         var localDirectoryPluginEntry = WaitForElement(Window, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
-        localDirectoryPluginEntry.Click();
+        localDirectoryPluginEntry.ClickInForeground();
 
         var workspaceModeBox = WaitForElement(Window, cf => cf.ByName("WorkspaceMode"), Short);
         var workspaceMode = useInSourceDirectoryMode ? "InSourceDirectory" : "SeparateWorkingDirectory";
@@ -154,7 +154,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Der geöffnete Hilfetext-Dialog.</returns>
     public HelpTextDialogView OpenCliHelp()
     {
-        WaitForElement(Window, cf => cf.ByName("CliHilfeButton"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("CliHilfeButton"), Short).AsButton().ClickInForeground();
 
         var dialog = new HelpTextDialogView(Window);
         dialog.ForceShow();
@@ -166,7 +166,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns><c>true</c>, wenn das Plugin aktuell aktiviert ist.</returns>
     public bool IsIdePluginEnabled(string pluginPrefix)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).Click();
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
         return WaitForElement(Window, cf => cf.ByName("IdePluginAktiviert"), Short).AsCheckBox().IsChecked ?? false;
     }
 
@@ -176,7 +176,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetIdePluginEnabled(string pluginPrefix, bool enabled)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).Click();
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("IdePluginAktiviert"), Short).AsCheckBox().IsChecked = enabled;
         return this;
     }
@@ -186,7 +186,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView MoveIdePluginUp(string pluginPrefix)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.NachOben"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.NachOben"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -208,7 +208,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns><c>true</c>, wenn das Plugin aktuell aktiviert ist.</returns>
     public bool IsPluginEnabled(string pluginPrefix)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).Click();
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
         return WaitForElement(Window, cf => cf.ByName("PluginAktiviert"), Short).AsCheckBox().IsChecked ?? false;
     }
 
@@ -218,7 +218,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetPluginEnabled(string pluginPrefix, bool enabled)
     {
-        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).Click();
+        WaitForElement(Window, cf => cf.ByName($"{pluginPrefix}.Eintrag"), Short).ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("PluginAktiviert"), Short).AsCheckBox().IsChecked = enabled;
         return this;
     }
@@ -227,7 +227,7 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView DiscardChanges()
     {
-        WaitForElement(Window, cf => cf.ByName("Verwerfen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Verwerfen"), Short).AsButton().ClickInForeground();
         WaitUntilGone(Window, cf => cf.ByName("FehlerMeldung"), Short);
         return this;
     }

@@ -55,7 +55,7 @@ public sealed class UpdateProgressDialogView : DialogView
         if (!button.IsEnabled)
             throw new InvalidOperationException("Der Abbrechen-Button des Update-Dialogs ist deaktiviert.");
 
-        button.Click();
+        button.ClickInForeground();
         return this;
     }
 
