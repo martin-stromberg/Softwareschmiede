@@ -52,13 +52,12 @@ public sealed class ProtokollierenderUpdateService : IUpdateService
         IProgress<UpdatePreparationProgress>? progress,
         CancellationToken ct = default)
     {
-        var protokollFortschritt = new Progress<UpdatePreparationProgress>(p =>
-        {
-            progress?.Report(p);
-            _kontext.Protokoll.Schreibe(
-                UpdateE2EEreignisse.PreparationPhase,
-                new { phase = p.Phase.ToString(), percent = p.Percent, message = p.Message });
-        });
+        // Synchroner IProgress-Passthrough statt Progress<T>: Progress<T> würde den Report
+        // erneut auf den erfassten SynchronizationContext posten. Der doppelte Dispatcher-Hop
+        // lieferte die Fortschrittsmeldung erst NACH einem fehlschlagenden await (SetError) zu
+        // und könnte den Terminalzustand des Fortschrittsdialogs überschreiben - der Beobachter
+        // würde so das zu beobachtende Verhalten verändern.
+        var protokollFortschritt = new ProtokollierenderFortschritt(progress, _kontext);
 
         try
         {
@@ -97,6 +96,26 @@ public sealed class ProtokollierenderUpdateService : IUpdateService
         {
             _kontext.Protokoll.Schreibe(UpdateE2EEreignisse.UpdateStartFailed, new { error = ex.Message });
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Synchroner <see cref="IProgress{T}"/>-Passthrough: leitet den Report sofort an den
+    /// Aufrufer-Fortschritt weiter (dessen eigene Zustellung übernimmt <see cref="Progress{T}"/>)
+    /// und schreibt anschließend das Phasen-Ereignis ins Protokoll. <c>Protokoll.Schreibe</c> ist
+    /// thread-sicher und darf daher vom aufrufenden Thread aus erfolgen.
+    /// </summary>
+    private sealed class ProtokollierenderFortschritt(
+        IProgress<UpdatePreparationProgress>? inner,
+        UpdateE2ETestKontext kontext) : IProgress<UpdatePreparationProgress>
+    {
+        /// <inheritdoc/>
+        public void Report(UpdatePreparationProgress value)
+        {
+            inner?.Report(value);
+            kontext.Protokoll.Schreibe(
+                UpdateE2EEreignisse.PreparationPhase,
+                new { phase = value.Phase.ToString(), percent = value.Percent, message = value.Message });
         }
     }
 }

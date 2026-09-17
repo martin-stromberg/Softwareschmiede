@@ -49,6 +49,17 @@ public partial class End2EndTest : WpfTestBase
         // nicht beeinflussen und umgekehrt.
         await Fixture_UsesIsolatedRealUpdatePipeline();
         await Fixture_SettingsReadFailureTargetsPhaseAfterDatabaseInitialization();
+
+        // Update-Prerelease-Feature (U-07): die sieben Pflicht-E2E-Szenarien E-01 bis E-07.
+        // Jedes Szenario besitzt eine eigene isolierte Fixture (Temp-Wurzel, SQLite,
+        // JSON/ZIP-Antworten, Gates, JSONL-Protokoll) und startet eigene App-Instanzen.
+        await Settings_AllModesAndPrereleasesPersist();
+        await Startup_ModesDriveUpdatePipeline();
+        await PrereleaseCheckbox_SelectsMatchingAsset();
+        await SavedChangesInvalidatePreviousOffer();
+        await Startup_NoUpdateOrUncheckableRemainsUsable();
+        await Startup_SafetyCancelAndErrorsRemainUsable();
+        await Startup_IsOnceAndCommandsStayBlocked();
     }
 
     /// <summary>
