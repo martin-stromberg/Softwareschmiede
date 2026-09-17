@@ -21,7 +21,7 @@ public sealed class RepositoryAssignDialogView : DialogView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("Zuweisen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Zuweisen"), Short).AsButton().ClickInForeground();
         GetDialogWindow();
 
         return this;
@@ -35,7 +35,7 @@ public sealed class RepositoryAssignDialogView : DialogView
     /// <exception cref="TimeoutException">Wird geworfen, wenn die Liste innerhalb des Timeouts kein Element enthält.</exception>
     public RepositoryAssignDialogView SelectFirstRepository()
     {
-        WaitForFirstRepositoryItem().Click();
+        WaitForFirstRepositoryItem().ClickInForeground();
         return this;
     }
 
@@ -96,7 +96,7 @@ public sealed class RepositoryAssignDialogView : DialogView
     public ProjectDetailView Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Zuweisen"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("Zuweisen"), Short).AsButton().ClickInForeground();
 
         return new ProjectDetailView(Window);
     }
@@ -125,7 +125,7 @@ public sealed class RepositoryAssignDialogView : DialogView
     public void Cancel()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().ClickInForeground();
     }
 
     private static AutomationElement WaitForEnabledElement(AutomationElement parent, string automationName, TimeSpan timeout)

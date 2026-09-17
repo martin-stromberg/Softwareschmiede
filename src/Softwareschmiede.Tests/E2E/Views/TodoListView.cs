@@ -24,7 +24,7 @@ public sealed class TodoListView : BaseWindowView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("TodoViewButton"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("TodoViewButton"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("TodosList"), Medium);
 
         return this;
@@ -57,10 +57,10 @@ public sealed class TodoListView : BaseWindowView
     public TodoListView CreateTodo(string description)
     {
         var eingabeFeld = WaitForElement(Window, cf => cf.ByName("NeuesTodoBeschreibung"), Short);
-        eingabeFeld.Click();
+        eingabeFeld.ClickInForeground();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         Keyboard.Type(description);
-        WaitForElement(Window, cf => cf.ByName("TodoHinzufuegen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("TodoHinzufuegen"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -74,7 +74,7 @@ public sealed class TodoListView : BaseWindowView
         var container = eintrag.Parent;
         var checkbox = container?.FindFirstDescendant(cf => cf.ByName("TodoErledigtCheckbox"))
             ?? throw new InvalidOperationException($"Checkbox für To-Do '{description}' nicht gefunden.");
-        checkbox.AsCheckBox().Click();
+        checkbox.AsCheckBox().ClickInForeground();
         return this;
     }
 
@@ -88,7 +88,7 @@ public sealed class TodoListView : BaseWindowView
         var container = eintrag.Parent;
         var loeschenButton = container?.FindFirstDescendant(cf => cf.ByName("TodoLoeschen"))
             ?? throw new InvalidOperationException($"Löschen-Button für To-Do '{description}' nicht gefunden.");
-        loeschenButton.AsButton().Click();
+        loeschenButton.AsButton().ClickInForeground();
         return this;
     }
 

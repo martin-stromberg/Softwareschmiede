@@ -77,6 +77,13 @@ public sealed class UpdateProgressViewModel : ViewModelBase
     /// <summary>Übernimmt eine Fortschrittsmeldung aus dem Update-Service.</summary>
     public void Apply(UpdatePreparationProgress progress)
     {
+        // Nachträglich eintreffende Fortschrittsreports dürfen den Terminalzustand
+        // (Fehler/Abbruch/Updater-Start) nicht mehr überschreiben: IProgress-Callbacks
+        // können gegenüber SetError/RequestCancel/MarkUpdaterStarting verzögert
+        // zugestellt werden (z. B. über doppelt verschachtelte Progress-Postings).
+        if (HasError || !CanCancel)
+            return;
+
         PhaseText = progress.Phase switch
         {
             UpdatePreparationPhase.Download => "Download",

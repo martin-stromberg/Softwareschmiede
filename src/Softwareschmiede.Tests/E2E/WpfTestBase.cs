@@ -52,10 +52,11 @@ public abstract class WpfTestBase : IDisposable
 
     private FlaUI.Core.Application? _application;
     private UIA3Automation? _automation;
-    private readonly string _testDbPath;
+    private string _testDbPath;
     private readonly CredentialStoreSnapshot _credentialSnapshot;
     private string? _appLogDirectory;
     private LogSnapshot _appLogSnapshot;
+    private IReadOnlyDictionary<string, string?>? _letzteLaunchUmgebungsVariablen;
 
     /// <summary>
     /// Pfad zur SQLite-Testdatenbank des laufenden App-Prozesses. Ermöglicht Tests, Vorbedingungen
@@ -160,14 +161,33 @@ public abstract class WpfTestBase : IDisposable
     /// Wartet, bis das Hauptfenster sichtbar ist.
     /// </summary>
     /// <param name="ensureDatabaseDeleted">Gibt an, ob die Testdatenbank vor dem Start gelöscht werden soll. Sollte normalerweise auf true gesetzt werden, um sicherzustellen, dass jeder Test mit einer frischen Datenbank beginnt.</param>
-    protected FlaUI.Core.Application LaunchApp(bool ensureDatabaseDeleted = true)
+    /// <param name="umgebungsVariablen">
+    /// Zusätzliche prozessbezogene Umgebungsvariablen für den gestarteten App-Prozess
+    /// (z. B. <c>SOFTWARESCHMIEDE_UPDATE_TEST_CONFIG</c>). Werte von <c>null</c> entfernen die
+    /// Variable im Kindprozess. Die Variablen werden ausschließlich über <see cref="ProcessStartInfo.Environment"/>
+    /// gesetzt und beeinflussen den Testprozess selbst nicht.
+    /// </param>
+    protected FlaUI.Core.Application LaunchApp(
+        bool ensureDatabaseDeleted = true,
+        IReadOnlyDictionary<string, string?>? umgebungsVariablen = null)
     {
+        // Ein expliziter Datenbankpfad in den prozessbezogenen Umgebungsvariablen (z. B. der
+        // fixture-eigene DB-Pfad der Update-E2E-Umgebung) wird zum effektiven Test-DB-Pfad, damit
+        // DeleteTestDatabase/OpenTestDbContext/ResolveProzessStartLogPfad konsistent bleiben.
+        if (umgebungsVariablen is not null
+            && umgebungsVariablen.TryGetValue("SOFTWARESCHMIEDE_TEST_DB_PATH", out var dbPfadOverride)
+            && !string.IsNullOrWhiteSpace(dbPfadOverride))
+        {
+            _testDbPath = dbPfadOverride;
+        }
+
         if (ensureDatabaseDeleted)
         {
             DeleteTestDatabase();
         }
 
         DeleteProzessStartLog();
+        _letzteLaunchUmgebungsVariablen = umgebungsVariablen;
 
         var appPath = ResolveAppExePath();
 
@@ -179,8 +199,25 @@ public abstract class WpfTestBase : IDisposable
         _appLogDirectory = ResolveAppLogDirectory(appPath);
         _appLogSnapshot = AppStartupLogInspector.Snapshot(_appLogDirectory);
 
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = appPath,
+            UseShellExecute = false
+        };
+        startInfo.Environment["SOFTWARESCHMIEDE_TEST_DB_PATH"] = _testDbPath;
+        if (umgebungsVariablen is not null)
+        {
+            foreach (var (name, wert) in umgebungsVariablen)
+            {
+                if (wert is null)
+                    startInfo.Environment.Remove(name);
+                else
+                    startInfo.Environment[name] = wert;
+            }
+        }
+
         _automation = new UIA3Automation();
-        _application = FlaUI.Core.Application.Launch(appPath);
+        _application = FlaUI.Core.Application.Launch(startInfo);
         _application.WaitWhileMainHandleIsMissing(Long);
 
         if (_application.HasExited || _application.MainWindowHandle == IntPtr.Zero)
@@ -210,7 +247,98 @@ public abstract class WpfTestBase : IDisposable
     protected Window LaunchAppAndGetMainWindow()
     {
         var app = LaunchApp();
-        return app.GetMainWindow(Automation, Long)!;
+        return WarteAufEchtesHauptfenster(app);
+    }
+
+    /// <summary>
+    /// Startet die Anwendung unter Beibehaltung der bestehenden Testdatenbank neu: Das testeigene
+    /// Fenster wird regulär geschlossen, der Prozess-Exit abgewartet, die UI-Automation-Handles neu
+    /// aufgebaut und die App mit denselben prozessbezogenen Umgebungsvariablen wie beim letzten
+    /// <see cref="LaunchApp"/>-Aufruf erneut gestartet (<c>ensureDatabaseDeleted: false</c>).
+    /// Gespeicherte Einstellungen bleiben erhalten; es werden weder fremde Prozesse berührt noch
+    /// Build-Artefakte wie <c>version.json</c> verändert.
+    /// </summary>
+    /// <param name="umgebungsVariablen">
+    /// Optionale neue Umgebungsvariablen für den Neustart. Bei <c>null</c> werden die Variablen des
+    /// letzten <see cref="LaunchApp"/>-Aufrufs wiederverwendet.
+    /// </param>
+    /// <returns>Das Hauptfenster der neu gestarteten Anwendung.</returns>
+    /// <exception cref="TimeoutException">Der zu schließende Testprozess ist nicht rechtzeitig beendet worden.</exception>
+    protected Window RestartAppPreservingDatabase(IReadOnlyDictionary<string, string?>? umgebungsVariablen = null)
+    {
+        var processId = _application?.ProcessId
+            ?? throw new InvalidOperationException("RestartAppPreservingDatabase erfordert einen zuvor per LaunchApp gestarteten Prozess.");
+
+        // Nur das testeigene Fenster normal schließen; kein Kill, keine fremden Prozesse.
+        _application!.Close();
+        WaitForProcessExitOrThrow(processId, TimeSpan.FromSeconds(30));
+
+        _automation?.Dispose();
+        _automation = null;
+        _application = null;
+
+        LaunchApp(ensureDatabaseDeleted: false, umgebungsVariablen ?? _letzteLaunchUmgebungsVariablen);
+        return WarteAufEchtesHauptfenster(FlaUiApp);
+    }
+
+    /// <summary>
+    /// Liefert das Hauptfenster der Anwendung und wiederholt die Abfrage, solange
+    /// <c>GetMainWindow</c> ein fremdes Top-Level-Fenster desselben Prozesses zurückgibt.
+    /// WPF-Popup-Roots (z. B. ein ToolTip über dem Update-Button, auf dem der Mauszeiger
+    /// nach einem echten Klick liegen bleibt) sind unowned Top-Level-Fenster und können
+    /// die <c>Process.MainWindowHandle</c>-Heuristik kurzzeitig gewinnen - sie verschwinden
+    /// nach wenigen Sekunden von selbst. Erkannt werden sie am fehlenden Fenstertitel.
+    /// </summary>
+    /// <param name="app">Der gestartete Anwendungsprozess.</param>
+    /// <returns>Das echte Hauptfenster (Titel beginnt mit "Softwareschmiede").</returns>
+    /// <exception cref="TimeoutException">Innerhalb von <see cref="Long"/> kam nur ein fremdes Fenster.</exception>
+    protected Window WarteAufEchtesHauptfenster(FlaUI.Core.Application app)
+    {
+        var deadline = DateTime.UtcNow + Long;
+        var gesehen = string.Empty;
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                // Nicht GetMainWindow/MainWindowHandle: WPF-Popup-Roots (z. B. ein ToolTip
+                // über dem Update-Button, auf dem der Mauszeiger nach einem echten Klick
+                // liegen bleibt) sind unowned Top-Level-Fenster und können die Heuristik
+                // gewinnen. Stattdessen alle Top-Level-Fenster des Prozesses enumerieren
+                // und anhand des Titels wählen.
+                var fenster = app.GetAllTopLevelWindows(Automation);
+                gesehen = string.Join(" | ", fenster.Select(f => $"'{f.Title}'"));
+                var mainWindow = fenster.FirstOrDefault(
+                    f => f.Title.StartsWith("Softwareschmiede", StringComparison.Ordinal));
+                if (mainWindow is not null)
+                    return mainWindow;
+            }
+            catch (FlaUI.Core.Exceptions.FlaUIException)
+            {
+                // Fenster können zwischen Enumeration und Element-Erzeugung verschwinden.
+            }
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException(
+            $"Das Hauptfenster der Testanwendung wurde nicht gefunden (Top-Level-Fenster: {gesehen}).");
+    }
+
+    private static void WaitForProcessExitOrThrow(int processId, TimeSpan timeout)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            if (!process.WaitForExit((int)timeout.TotalMilliseconds))
+            {
+                throw new TimeoutException(
+                    $"Der Test-App-Prozess {processId} wurde nach dem regulären Schließen nicht innerhalb von {timeout.TotalSeconds}s beendet. Der Prozess bleibt unberührt.");
+            }
+        }
+        catch (ArgumentException)
+        {
+            // Prozess ist bereits beendet.
+        }
     }
 
     /// <summary>
@@ -273,7 +401,7 @@ public abstract class WpfTestBase : IDisposable
     protected void WechsleAufgabenansicht(Window mainWindow, string viewButtonName)
     {
         var infoButton = WaitForElement(mainWindow, cf => cf.ByName(viewButtonName), Short);
-        infoButton.AsButton().Click();
+        infoButton.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -333,7 +461,7 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>Navigiert zur Projektliste.</summary>
     protected void NavigateToProjects(AutomationElement mainWindow)
     {
-        WaitForNavigationButton(mainWindow, ProjekteButtonNamen, Short).AsButton().Click();
+        WaitForNavigationButton(mainWindow, ProjekteButtonNamen, Short).AsButton().ClickInForeground();
     }
     /// <summary>
     /// Navigiert von der Projekt-Kachel zurück zur Projektliste. Wird benötigt, wenn ein Test nach dem Öffnen eines Projekts wieder zur Projektliste zurückkehren muss.
@@ -342,7 +470,7 @@ public abstract class WpfTestBase : IDisposable
     protected void NavigateBackFromProjectCardToProjectsList(AutomationElement mainWindow)
     {
         var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        button.AsButton().Click();
+        button.AsButton().ClickInForeground();
     }
     /// <summary>
     /// Navigiert von einer geöffneten Aufgabendetailansicht zurück zur Projektdetailansicht.
@@ -351,7 +479,7 @@ public abstract class WpfTestBase : IDisposable
     protected void NavigateBackFromTaskToProject(Window mainWindow)
     {
         var button = WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
-        button.AsButton().Click();
+        button.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -361,7 +489,7 @@ public abstract class WpfTestBase : IDisposable
     protected void NavigateBackToDashboard(AutomationElement mainWindow)
     {
         var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
+        dashboardButton.AsButton().ClickInForeground();
     }
 
     /// <summary>Navigiert zur Einstellungsseite und wartet, bis die Settings-Tabs geladen sind.</summary>
@@ -374,7 +502,7 @@ public abstract class WpfTestBase : IDisposable
 
             var button = FindNavigationButton(mainWindow, EinstellungenButtonNamen);
             if (button is not null)
-                button.AsButton().Click();
+                button.AsButton().ClickInForeground();
 
             var settingsTab = mainWindow.FindFirstDescendant(cf => cf.ByName("Plugins"));
             if (settingsTab is not null)
@@ -461,7 +589,7 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement StartAndNavigateToProjects(string? projektName = null)
     {
         var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        var mainWindow = WarteAufEchtesHauptfenster(app);
         NavigateToProjects(mainWindow);
 
         if (projektName is not null)
@@ -640,12 +768,12 @@ public abstract class WpfTestBase : IDisposable
         NavigateToSettings(mainWindow);
 
         var pluginsTab = WaitForElement(mainWindow, cf => cf.ByName("Plugins"), Short);
-        pluginsTab.Click();
+        pluginsTab.ClickInForeground();
 
         // Klickt gezielt auf das Namens-Label (nicht die Aktivierungs-CheckBox selbst), damit nur
         // der Listeneintrag ausgewählt wird, ohne den Aktivierungsstatus des Plugins zu verändern.
         var localDirectoryPluginEntry = WaitForElement(mainWindow, cf => cf.ByName("LocalDirectoryPlugin.Eintrag"), Short);
-        localDirectoryPluginEntry.Click();
+        localDirectoryPluginEntry.ClickInForeground();
 
         var workspaceModeBox = WaitForElement(mainWindow, cf => cf.ByName("WorkspaceMode"), Short);
         var workspaceMode = useInSourceDirectoryMode ? "InSourceDirectory" : "SeparateWorkingDirectory";
@@ -655,12 +783,12 @@ public abstract class WpfTestBase : IDisposable
         sourceDirectoryBox.AsTextBox().Text = sourceDirectory;
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        speichernButton.AsButton().ClickInForeground();
 
         WaitForElement(mainWindow, cf => cf.ByName("Einstellungen gespeichert."), Short);
 
         var dashboardButton = WaitForElement(mainWindow, cf => cf.ByName("Dashboard"), Short);
-        dashboardButton.AsButton().Click();
+        dashboardButton.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -670,7 +798,7 @@ public abstract class WpfTestBase : IDisposable
     protected void AssignLocalDirectoryRepository(AutomationElement mainWindow)
     {
         var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
+        zuweisenButton.AsButton().ClickInForeground();
 
         var dialog = WaitForWindow("Repository zuweisen", Short);
 
@@ -691,10 +819,10 @@ public abstract class WpfTestBase : IDisposable
         if (items.Length == 0)
             throw new TimeoutException("Repository-Liste im Zuweisungsdialog enthielt kein Element innerhalb des Timeouts.");
 
-        items[0].Click();
+        items[0].ClickInForeground();
 
         var zuweisenBestaetigenButton = WaitForElement(dialog, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenBestaetigenButton.AsButton().Click();
+        zuweisenBestaetigenButton.AsButton().ClickInForeground();
     }
 
     /// <summary>
@@ -704,7 +832,7 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement OpenRepositoryAssignDialog(AutomationElement mainWindow)
     {
         var zuweisenButton = WaitForElement(mainWindow, cf => cf.ByName("Zuweisen"), Short);
-        zuweisenButton.AsButton().Click();
+        zuweisenButton.AsButton().ClickInForeground();
         return WaitForWindow("Repository zuweisen", Short);
     }
 
@@ -812,6 +940,19 @@ public abstract class WpfTestBase : IDisposable
 
     private static string ResolveAppExePath()
     {
+        // Test-only override: erlaubt E2E-Läufe gegen ein App-Build außerhalb des Repo-bin,
+        // z. B. wenn das bin-Verzeichnis durch eine laufende (Self-Hosting-)Instanz gesperrt ist.
+        var envOverride = Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_E2E_APP_PATH");
+        if (!string.IsNullOrWhiteSpace(envOverride))
+        {
+            var overridePath = Path.GetFullPath(envOverride);
+            if (File.Exists(overridePath))
+                return overridePath;
+
+            throw new FileNotFoundException(
+                $"SOFTWARESCHMIEDE_E2E_APP_PATH zeigt auf eine nicht vorhandene Datei: {overridePath}");
+        }
+
         var baseDir = AppContext.BaseDirectory;
 
         // Bei Tests läuft das Test-Binary in src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\;
@@ -889,7 +1030,7 @@ public abstract class WpfTestBase : IDisposable
     protected AutomationElement NeueAufgabeAnlegen(AutomationElement mainWindow)
     {
         var aufgabeNeuButton = WaitForElement(mainWindow, cf => cf.ByName("AufgabeNeu"), Short);
-        aufgabeNeuButton.AsButton().Click();
+        aufgabeNeuButton.AsButton().ClickInForeground();
 
         return WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
     }
@@ -911,7 +1052,7 @@ public abstract class WpfTestBase : IDisposable
     protected void AufgabeDetailSpeichern(AutomationElement mainWindow, bool navigateBackToProject)
     {
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        speichernButton.AsButton().ClickInForeground();
         if (navigateBackToProject)
         {
             NavigateBackFromTaskToProject((Window)mainWindow);
@@ -971,7 +1112,7 @@ public abstract class WpfTestBase : IDisposable
                 "ErsteOffeneAufgabeOeffnen wurde mit einer leeren Aufgabenliste aufgerufen. " +
                 "Aufrufer müssen zuvor sicherstellen, dass OffeneAufgabenItems mindestens ein Element liefert.");
 
-        items[0].DoubleClick();
+        items[0].DoubleClickInForeground();
     }
 
     /// <summary>
@@ -984,7 +1125,7 @@ public abstract class WpfTestBase : IDisposable
             mainWindow,
             cf => cf.ByName(titel).And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.ListItem)),
             Medium);
-        listenEintrag.DoubleClick();
+        listenEintrag.DoubleClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("Zurück"), Short);
     }
 
@@ -1005,7 +1146,7 @@ public abstract class WpfTestBase : IDisposable
         FeldInhaltErsetzen(nameBox, neuerName);
 
         var speichernButton = WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
-        speichernButton.AsButton().Click();
+        speichernButton.AsButton().ClickInForeground();
 
         WaitForTextBoxText(mainWindow, "ProjektName", neuerName.Trim(), Medium);
     }
@@ -1045,7 +1186,7 @@ public abstract class WpfTestBase : IDisposable
     /// </summary>
     private static void FeldInhaltErsetzen(AutomationElement box, string text)
     {
-        box.Click();
+        box.ClickInForeground();
         Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_A);
         Keyboard.Type(text);
     }

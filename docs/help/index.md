@@ -13,7 +13,7 @@ Eigenschaften und Präsentation der Softwareschmiede Desktopanwendung.
 
 - [Programmsymbol](anwendung/index.md) — Visuelles Markenidentitäts-Symbol (Hammer-/Spitzhacken) der Softwareschmiede, angezeigt im Windows-Explorer, in der Taskleiste und im Fenster-Titel.
 - [Versionsanzeige](anwendung/versions-anzeige.md) — Zeigt die aktuell installierte Programmversion dauerhaft in der Fußzeile der Navigations-Seitenleiste an, sodass Benutzer die Version auf einen Blick erkennen.
-- [Programmupdate](programmupdate/index.md) — Aktualisiert die Anwendung über das GUI mit Sicherheitsprüfung und Fortschrittsanzeige. Vor dem Update wird überprüft, ob laufende CLI-Aufgaben das Update blockieren würden; der Benutzer wird ggf. gewarnt. Aufgaben mit bekanntem, noch laufendem Plugin-Session-Limit gelten dabei nicht als blockierend. Der Fortschrittsdialog zeigt den Status der Update-Vorbereitung (Download, Entpacken, Validierung) an und erlaubt dem Benutzer, den Prozess abzubrechen.
+- [Programmupdate](programmupdate/index.md) — Aktualisiert die Anwendung über das GUI mit konfigurierbarem Update-Modus, Sicherheitsprüfung und Fortschrittsanzeige. In den Einstellungen legt der Benutzer fest, ob Updates deaktiviert sind, nur geprüft oder beim Programmstart geprüft und automatisch installiert werden; optional werden auch Prerelease-Versionen berücksichtigt. Vor dem Update wird überprüft, ob laufende CLI-Aufgaben das Update blockieren würden; der Benutzer wird ggf. gewarnt. Aufgaben mit bekanntem, noch laufendem Plugin-Session-Limit gelten dabei nicht als blockierend. Der Fortschrittsdialog zeigt den Status der Update-Vorbereitung (Download, Entpacken, Validierung) an und erlaubt dem Benutzer, den Prozess abzubrechen.
 
 ## Benutzeroberfläche
 

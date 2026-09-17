@@ -18,7 +18,7 @@ public partial class End2EndTest : WpfTestBase
     public async Task RunGeneralTests()
     {
         var app = LaunchApp(true);
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        var mainWindow = WarteAufEchtesHauptfenster(app);
 
         AppStarten_ZeigtVersionsTextInFusszeile_E2E(mainWindow);
         await AutonomAufgabeInitialisierung_DialogErstelltArbeitsverzeichnisUndZeigtDetailAnsicht_E2E(mainWindow);
@@ -44,6 +44,24 @@ public partial class End2EndTest : WpfTestBase
         await FehlerAnsichtErkennung_ZeigtFehlermeldung_E2E(mainWindow);
 
         app.Close();
+
+        // Update-Prerelease-Feature (U-06): Fixture-Smoke mit eigener isolierter
+        // Testinfrastruktur (Temp-Wurzel, SQLite, JSON/ZIP-Antworten, Gates, JSONL-Protokoll)
+        // - nach dem allgemeinen Testfenster, damit Fixture-Fehler die allgemeinen Tests
+        // nicht beeinflussen und umgekehrt.
+        await Fixture_UsesIsolatedRealUpdatePipeline();
+        await Fixture_SettingsReadFailureTargetsPhaseAfterDatabaseInitialization();
+
+        // Update-Prerelease-Feature (U-07): die sieben Pflicht-E2E-Szenarien E-01 bis E-07.
+        // Jedes Szenario besitzt eine eigene isolierte Fixture (Temp-Wurzel, SQLite,
+        // JSON/ZIP-Antworten, Gates, JSONL-Protokoll) und startet eigene App-Instanzen.
+        await Settings_AllModesAndPrereleasesPersist();
+        await Startup_ModesDriveUpdatePipeline();
+        await PrereleaseCheckbox_SelectsMatchingAsset();
+        await SavedChangesInvalidatePreviousOffer();
+        await Startup_NoUpdateOrUncheckableRemainsUsable();
+        await Startup_SafetyCancelAndErrorsRemainUsable();
+        await Startup_IsOnceAndCommandsStayBlocked();
     }
 
     /// <summary>
@@ -55,7 +73,7 @@ public partial class End2EndTest : WpfTestBase
         SkipWennConPtyNichtVerfuegbar();
 
         var app = LaunchApp(true);
-        var mainWindow = app.GetMainWindow(Automation, Long)!;
+        var mainWindow = WarteAufEchtesHauptfenster(app);
 
         ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(mainWindow);
         await AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E(mainWindow);

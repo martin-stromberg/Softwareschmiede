@@ -163,7 +163,7 @@ public partial class End2EndTest
 
         // Prüft den Abbrechen-Pfad des nativen Löschdialogs: Aufgabe bleibt erhalten, wenn der
         // Bestätigungsdialog über "Nein" (DeleteConfirmationDialogView.Cancel()) verlassen wird.
-        WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short).AsButton().Click();
+        WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short).AsButton().ClickInForeground();
         new DeleteConfirmationDialogView(mainWindow).Cancel();
         Assert.IsType<TaskDetailView>(mainWindow.CurrentView());
 
@@ -202,7 +202,7 @@ public partial class End2EndTest
 
             // Native MessageBox unterstützt WindowPattern.Close() nicht (FlaUI.Core.Exceptions.
             // MethodNotSupportedException) - stattdessen über den Standard-"OK"-Button schließen.
-            WaitForElement(msgBoxWindow, cf => cf.ByName("OK"), Short).AsButton().Click();
+            WaitForElement(msgBoxWindow, cf => cf.ByName("OK"), Short).AsButton().ClickInForeground();
         }
         finally
         {

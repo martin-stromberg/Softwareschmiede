@@ -66,7 +66,7 @@ public sealed class ProjectDetailE2ETests : WpfTestBase
 
         // Neuanlage starten und über Zurück abbrechen (kein Speichern, direkter ForceClose reicht als "Abbrechen")
         var neuButton = WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
-        neuButton.AsButton().Click();
+        neuButton.AsButton().ClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("Speichern"), Short);
 
         // ForceClose(false) gibt laut Vertrag stets die ursprüngliche Instanz zurück (siehe

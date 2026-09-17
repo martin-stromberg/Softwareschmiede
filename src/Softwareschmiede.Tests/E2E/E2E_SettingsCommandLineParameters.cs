@@ -23,18 +23,36 @@ public partial class End2EndTest
         var settings = new SettingsView(mainWindow).ForceShow();
         settings.SelectDefaultKiPlugin("Codex CLI");
 
-        // Wert setzen, speichern, Seite verlassen und erneut betreten - Wert bleibt erhalten
-        settings.SetCommandLineParameters(expectedValue);
-        settings.SaveSettings();
-        settings.Menu.NavigateToDashboard();
+        var oldValue = settings.GetCommandLineParameters();
+        try
+        {
+            // Wert setzen, speichern, Seite verlassen und erneut betreten - Wert bleibt erhalten
+            settings.SetCommandLineParameters(expectedValue);
+            settings.SaveSettings();
+            settings.Menu.NavigateToDashboard();
 
-        var settingsReopened = new SettingsView(mainWindow).ForceShow();
-        settingsReopened.SelectDefaultKiPlugin("Codex CLI");
-        Assert.Equal(expectedValue, settingsReopened.GetCommandLineParameters());
+            var settingsReopened = new SettingsView(mainWindow).ForceShow();
+            settingsReopened.SelectDefaultKiPlugin("Codex CLI");
+            Assert.Equal(expectedValue, settingsReopened.GetCommandLineParameters());
 
-        // Hilfe-Button öffnet Dialog, der über "Schließen" wieder geschlossen werden kann
-        var helpDialog = settingsReopened.OpenCliHelp();
-        Assert.True(helpDialog.IsVisible);
-        helpDialog.Close();
+            // Hilfe-Button öffnet Dialog, der über "Schließen" wieder geschlossen werden kann
+            var helpDialog = settingsReopened.OpenCliHelp();
+            Assert.True(helpDialog.IsVisible);
+            helpDialog.Close();
+        }
+        finally
+        {
+            try
+            {
+                settings.ForceShow();
+                settings.SetCommandLineParameters(oldValue);
+                settings.SaveSettings();
+                settings.Menu.NavigateToDashboard();
+            }
+            catch
+            {
+                // Cleanup-Fehler dürfen einen bestehenden Testfehler nicht maskieren.
+            }
+        }
     }
 }

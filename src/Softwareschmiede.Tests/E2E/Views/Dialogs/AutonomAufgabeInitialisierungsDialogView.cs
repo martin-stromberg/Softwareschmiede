@@ -20,7 +20,7 @@ public sealed class AutonomAufgabeInitialisierungsDialogView : DialogView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short).AsButton().ClickInForeground();
         GetDialogWindow();
 
         return this;
@@ -57,7 +57,7 @@ public sealed class AutonomAufgabeInitialisierungsDialogView : DialogView
     public AutonomAufgabeDetailView Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().ClickInForeground();
 
         WaitForElement(Window, cf => cf.ByName("AutonomAufgabeDetailTabs"), Long);
         return new AutonomAufgabeDetailView(Window);

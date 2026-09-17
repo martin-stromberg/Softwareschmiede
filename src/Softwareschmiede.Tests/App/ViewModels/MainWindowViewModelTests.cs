@@ -79,9 +79,6 @@ public sealed class MainWindowViewModelTests : IDisposable
 
     private MainWindowViewModel CreateSut(
         IAktiveAufgabenService? aufgabeService = null,
-        IUpdateService? updateService = null,
-        ICliUpdateSafetyService? cliUpdateSafetyService = null,
-        IUpdateProgressDialogService? updateProgressDialogService = null,
         IDialogService? dialogService = null,
         IApplicationVersionProvider? versionProvider = null,
         AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
@@ -98,13 +95,11 @@ public sealed class MainWindowViewModelTests : IDisposable
             promptZeitVersandService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
-            action => action(),
-            updateService,
-            cliUpdateSafetyService,
-            updateProgressDialogService,
-            dialogService,
-            versionProvider,
-            laufdatenChangedNotifier);
+            new MainWindowOptionaleDienste(
+                DispatcherInvoke: action => action(),
+                DialogService: dialogService,
+                VersionProvider: versionProvider,
+                LaufdatenChangedNotifier: laufdatenChangedNotifier));
     }
 
     private ProjectListViewModel CreateProjectListViewModel(ProjektService projektService)
@@ -619,157 +614,6 @@ public sealed class MainWindowViewModelTests : IDisposable
         refreshedItem.LaufStatus.Should().Be(AufgabeLaufStatus.Laeuft);
         converter.Convert(refreshedItem, typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture)
             .Should().Be("▶ Läuft");
-    }
-
-    /// <summary>Der automatische Start-Check zeigt den Update-Button bei verfügbarer neuer Version.</summary>
-    [Fact]
-    public async Task Constructor_ShouldStartUpdateCheckAndExposeAvailableUpdate()
-    {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
-        var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
-
-        var sut = CreateSut(updateService: updateServiceMock.Object);
-
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (DateTime.UtcNow < deadline && !sut.UpdateVerfuegbar)
-            await Task.Delay(50);
-
-        sut.UpdateVerfuegbar.Should().BeTrue();
-        sut.VerfuegbaresUpdate.Should().Be(update);
-    }
-
-    /// <summary>Der Refresh-Command blendet den Update-Button aus, wenn kein Update verfügbar ist.</summary>
-    [Fact]
-    public async Task UpdatePruefenCommand_ShouldHideUpdateButton_WhenNoUpdateIsAvailable()
-    {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
-        var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.SetupSequence(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update))
-            .ReturnsAsync(UpdateCheckResult.KeinUpdate());
-        var sut = CreateSut(updateService: updateServiceMock.Object);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (DateTime.UtcNow < deadline && !sut.UpdateVerfuegbar)
-            await Task.Delay(50);
-
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
-
-        sut.UpdateVerfuegbar.Should().BeFalse();
-        sut.VerfuegbaresUpdate.Should().BeNull();
-    }
-
-    /// <summary>Der Update-Start bricht ab, wenn riskante CLI-Aufgaben nicht bestätigt werden.</summary>
-    [Fact]
-    public async Task UpdateStartenCommand_ShouldStop_WhenSafetyDialogIsDeclined()
-    {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
-        var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
-        var safetyServiceMock = new Mock<ICliUpdateSafetyService>();
-        safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliUpdateSafetyResult(1, ["Riskante Aufgabe"]));
-        var progressDialogMock = new Mock<IUpdateProgressDialogService>();
-        _dialogServiceMock.Setup(d => d.BestaetigenDialog(It.IsAny<string>(), It.IsAny<string>()))
-            .Returns(false);
-        var sut = CreateSut(
-            updateService: updateServiceMock.Object,
-            cliUpdateSafetyService: safetyServiceMock.Object,
-            updateProgressDialogService: progressDialogMock.Object,
-            dialogService: _dialogServiceMock.Object);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (DateTime.UtcNow < deadline && !sut.UpdateVerfuegbar)
-            await Task.Delay(50);
-
-        await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
-
-        updateServiceMock.Verify(s => s.PrepareUpdateAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<UpdatePreparationProgress>>(), It.IsAny<CancellationToken>()), Times.Never);
-        progressDialogMock.Verify(d => d.Show(It.IsAny<UpdateProgressViewModel>()), Times.Never);
-    }
-
-    /// <summary>Der Abbrechen-Button im Fortschrittsdialog bricht die Update-Vorbereitung über denselben CancellationToken ab.</summary>
-    [Fact]
-    public async Task UpdateStartenCommand_ShouldCancelPrepareUpdate_WhenProgressDialogCancelIsExecuted()
-    {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
-        var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
-        var prepareSawCanceledToken = false;
-        updateServiceMock
-            .Setup(s => s.PrepareUpdateAsync(update, It.IsAny<IProgress<UpdatePreparationProgress>>(), It.IsAny<CancellationToken>()))
-            .Returns<UpdateInfo, IProgress<UpdatePreparationProgress>?, CancellationToken>(async (_, _, token) =>
-            {
-                prepareSawCanceledToken = token.IsCancellationRequested;
-                await Task.Delay(Timeout.InfiniteTimeSpan, token);
-                return new UpdatePreparationResult("release.zip", "extracted", "update.ps1", "update.log", false);
-            });
-        var safetyServiceMock = new Mock<ICliUpdateSafetyService>();
-        safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliUpdateSafetyResult(0, []));
-        UpdateProgressViewModel? progressViewModel = null;
-        var progressDialogMock = new Mock<IUpdateProgressDialogService>();
-        progressDialogMock.Setup(d => d.Show(It.IsAny<UpdateProgressViewModel>()))
-            .Callback<UpdateProgressViewModel>(vm =>
-            {
-                progressViewModel = vm;
-                vm.CancelCommand.Execute(null);
-            });
-        var sut = CreateSut(
-            updateService: updateServiceMock.Object,
-            cliUpdateSafetyService: safetyServiceMock.Object,
-            updateProgressDialogService: progressDialogMock.Object,
-            dialogService: _dialogServiceMock.Object);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (DateTime.UtcNow < deadline && !sut.UpdateVerfuegbar)
-            await Task.Delay(50);
-
-        await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
-
-        prepareSawCanceledToken.Should().BeTrue();
-        progressViewModel.Should().NotBeNull();
-        progressViewModel!.CanClose.Should().BeTrue();
-        updateServiceMock.Verify(s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    /// <summary>Der erfolgreiche Update-Start macht den Fortschrittsdialog vor dem App-Shutdown schließbar.</summary>
-    [Fact]
-    public async Task UpdateStartenCommand_ShouldEnableProgressDialogCloseBeforeStartingPreparedUpdate()
-    {
-        var update = new UpdateInfo("1.2.3", "v1.2.3", "release.zip", new Uri("https://example.invalid/release.zip"), null);
-        var preparation = new UpdatePreparationResult("release.zip", "extracted", "update.ps1", "update.log", false);
-        var updateServiceMock = new Mock<IUpdateService>();
-        updateServiceMock.Setup(s => s.CheckForUpdateAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(update));
-        updateServiceMock.Setup(s => s.PrepareUpdateAsync(update, It.IsAny<IProgress<UpdatePreparationProgress>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(preparation);
-        UpdateProgressViewModel? capturedProgressViewModel = null;
-        UpdateProgressViewModel? progressViewModelAtStart = null;
-        updateServiceMock.Setup(s => s.StartPreparedUpdateAsync(preparation, It.IsAny<CancellationToken>()))
-            .Callback(() => progressViewModelAtStart = capturedProgressViewModel)
-            .Returns(Task.CompletedTask);
-        var safetyServiceMock = new Mock<ICliUpdateSafetyService>();
-        safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CliUpdateSafetyResult(0, []));
-        var progressDialogMock = new Mock<IUpdateProgressDialogService>();
-        progressDialogMock.Setup(d => d.Show(It.IsAny<UpdateProgressViewModel>()))
-            .Callback<UpdateProgressViewModel>(vm => capturedProgressViewModel = vm);
-        var sut = CreateSut(
-            updateService: updateServiceMock.Object,
-            cliUpdateSafetyService: safetyServiceMock.Object,
-            updateProgressDialogService: progressDialogMock.Object,
-            dialogService: _dialogServiceMock.Object);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (DateTime.UtcNow < deadline && !sut.UpdateVerfuegbar)
-            await Task.Delay(50);
-
-        await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
-
-        progressViewModelAtStart.Should().NotBeNull();
-        progressViewModelAtStart!.CanClose.Should().BeTrue("der offene Dialog darf Application.Shutdown() nicht abbrechen");
-        progressViewModelAtStart.CanCancel.Should().BeFalse();
     }
 
     /// <summary>Re-Entrancy-Schutz: Ein zweiter, echt gleichzeitiger Aufruf während eine Aktualisierung noch läuft, wird übersprungen, statt erneut auf die Datenquelle zuzugreifen.</summary>

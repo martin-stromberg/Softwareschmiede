@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Softwareschmiede.App.Services;
+using Softwareschmiede.App.Services.Testing;
 using Softwareschmiede.App.ViewModels;
 using Softwareschmiede.App.Views;
 using Softwareschmiede.Application.Services;
@@ -100,6 +101,9 @@ public sealed partial class App : System.Windows.Application
             await promptVorlagenService.EnsureInitialPromptVorlagenAsync();
         }
 
+        _host.Services.GetService<UpdateE2ETestKontext>()
+            ?.Protokoll.Schreibe(UpdateE2EEreignisse.DatabaseInitializationCompleted);
+
         using (var recoveryScope = _host.Services.CreateScope())
         {
             try
@@ -134,6 +138,9 @@ public sealed partial class App : System.Windows.Application
         try
         {
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+            // Explizit vor Show() zuweisen, damit Dialoge (z. B. Update-Fortschritt)
+            // schon bei einer sofortigen Start-Updateprüfung einen Owner haben.
+            System.Windows.Application.Current.MainWindow = mainWindow;
             mainWindow.Show();
         }
         catch (Exception ex)
@@ -193,14 +200,32 @@ public sealed partial class App : System.Windows.Application
 
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
+        var testDatenbankPfad = Environment.GetEnvironmentVariable(UpdateE2ETestConfiguration.TestDatenbankUmgebungsVariable);
         var dbPath = DatenbankPfadResolver.ErmittlePfad(
             AppContext.BaseDirectory,
-            Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_TEST_DB_PATH"));
+            testDatenbankPfad);
+
+        // Die kontrollierte Update-E2E-Umgebung aktiviert sich ausschließlich, wenn beide
+        // Test-Umgebungsvariablen gesetzt sind und die referenzierte Konfiguration valide ist.
+        // Bei gesetzter, aber ungültiger Konfiguration schlägt der Start mit klarer Diagnose fehl;
+        // es wird niemals auf reale Releases, echte Updater-Pfade oder Produktionsquellen zurückgefallen.
+        var updateTestKonfiguration = UpdateE2ETestConfiguration.LadeAusUmgebung(testDatenbankPfad);
+        var updateTestKontext = updateTestKonfiguration is null ? null : new UpdateE2ETestKontext(updateTestKonfiguration);
 
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
         services.AddDbContext<SoftwareschmiededDbContext>(options =>
-            options.UseSqlite($"Data Source={dbPath}"));
+        {
+            options.UseSqlite($"Data Source={dbPath}");
+            if (updateTestKontext is not null)
+                options.AddInterceptors(new UpdateSettingsReadFailureInterceptor(updateTestKontext));
+        });
+
+        if (updateTestKontext is not null)
+        {
+            services.AddSingleton(updateTestKontext);
+            services.AddSingleton<IUpdateVersuchProtokoll>(updateTestKontext);
+        }
 
         services.AddMemoryCache();
         services.Configure<DirectoryStructureOptions>(context.Configuration.GetSection(DirectoryStructureOptions.SectionName));
@@ -295,6 +320,16 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<IUpdatePackageService, UpdatePackageService>();
         services.AddSingleton<IUpdateScriptService, UpdateScriptService>();
         services.AddSingleton<IUpdateProcessLauncher, UpdateProcessLauncher>();
+        services.AddTransient(sp => new MainWindowUpdateDienste(
+            sp.GetService<IUpdateService>(),
+            sp.GetService<ICliUpdateSafetyService>(),
+            sp.GetService<IUpdateProgressDialogService>(),
+            sp.GetService<IUpdateVersuchProtokoll>()));
+        services.AddTransient(sp => new MainWindowOptionaleDienste(
+            DialogService: sp.GetService<IDialogService>(),
+            VersionProvider: sp.GetService<IApplicationVersionProvider>(),
+            LaufdatenChangedNotifier: sp.GetService<AufgabeLaufdatenChangedNotifier>(),
+            UpdateDienste: sp.GetService<MainWindowUpdateDienste>()));
 
         // Plugin Infrastructure
         services.AddSingleton<PluginManager>();
@@ -329,5 +364,37 @@ public sealed partial class App : System.Windows.Application
 
         // Windows
         services.AddTransient<MainWindow>();
+
+        // Update-E2E-Testmodus: Transport, Prozess-, Shutdown- und Sicherheitsgrenzen werden
+        // kontrolliert ersetzt (letzte Registrierung gewinnt). Die Produktionsorchestrierung
+        // (UpdateService, Release-Auswahl, Paket-/Skript-Pipeline, ViewModel-Ablauf) bleibt echt.
+        if (updateTestKontext is not null)
+        {
+            var kontext = updateTestKontext;
+            var testwurzel = kontext.Konfiguration.Testwurzel;
+
+            services.AddSingleton<IApplicationVersionProvider>(sp => new ApplicationVersionProvider(
+                kontext.Konfiguration.InstallationsVerzeichnis,
+                sp.GetRequiredService<ILogger<ApplicationVersionProvider>>()));
+
+            services.AddSingleton(sp => new HttpClient(new UpdateFixtureHttpMessageHandler(kontext)));
+            services.AddSingleton<IUpdateScriptService>(sp => new UpdateScriptService(
+                sp.GetRequiredService<IUpdateProcessLauncher>(),
+                sp.GetRequiredService<IOptions<UpdateOptions>>(),
+                sp.GetRequiredService<ILogger<UpdateScriptService>>(),
+                testwurzel));
+            services.AddSingleton<IUpdatePackageService>(sp => new UpdatePackageService(
+                sp.GetRequiredService<HttpClient>(),
+                sp.GetRequiredService<IUpdateScriptService>(),
+                sp.GetRequiredService<IOptions<UpdateOptions>>(),
+                sp.GetRequiredService<ILogger<UpdatePackageService>>(),
+                testwurzel));
+            services.AddSingleton<IUpdateProcessLauncher>(_ => new RecordingUpdateProcessLauncher(kontext));
+            services.AddSingleton<IApplicationShutdownService>(_ => new RecordingApplicationShutdownService(kontext));
+            services.AddScoped<ICliUpdateSafetyService>(_ => new FixtureCliUpdateSafetyService(kontext));
+            services.AddSingleton<UpdateService>();
+            services.AddSingleton<IUpdateService>(sp => new ProtokollierenderUpdateService(
+                sp.GetRequiredService<UpdateService>(), kontext));
+        }
     }
 }

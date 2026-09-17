@@ -21,7 +21,7 @@ public sealed class PluginSelectionDialogView : DialogView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().ClickInForeground();
         GetDialogWindow();
 
         return this;
@@ -54,13 +54,13 @@ public sealed class PluginSelectionDialogView : DialogView
     public void Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("OK"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("OK"), Short).AsButton().ClickInForeground();
     }
 
     /// <summary>Bricht den Dialog über den "Abbrechen"-Button ab, ohne ein Plugin zu übernehmen.</summary>
     public void Cancel()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().ClickInForeground();
     }
 }

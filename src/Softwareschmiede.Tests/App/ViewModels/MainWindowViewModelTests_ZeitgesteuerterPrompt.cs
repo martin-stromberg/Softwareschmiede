@@ -74,7 +74,7 @@ public sealed class MainWindowViewModelTests_ZeitgesteuerterPrompt : IDisposable
             _promptZeitVersandService,
             NullLogger<MainWindowViewModel>.Instance,
             _runningStatusSourceMock.Object,
-            action => action());
+            new MainWindowOptionaleDienste(DispatcherInvoke: action => action()));
     }
 
     /// <summary>Ist für eine Aufgabe ein zeitgesteuerter Prompt beim PromptZeitVersandService geplant, muss das

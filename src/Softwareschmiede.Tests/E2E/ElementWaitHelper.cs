@@ -142,16 +142,112 @@ internal static class ElementWaitHelper
         Func<AutomationElement, bool>? isVisible = null)
     {
         isVisible ??= static _ => true;
-        var comboBox = comboBoxElement.AsComboBox();
-        comboBox.Click();
+        comboBoxElement.ClickInForeground();
         Thread.Sleep(300);
 
         AutomationElement? item = comboBoxElement.FindFirstDescendant(cf => cf.ByName(itemText));
         if (item is null || !isVisible(item))
             item = WaitForElement(comboBoxElement.Automation.GetDesktop(), cf => cf.ByName(itemText), timeout, isVisible);
 
-        item.Click();
+        item.ClickInForeground();
         Thread.Sleep(200);
+    }
+
+    /// <summary>
+    /// Bringt das Fenster des Elements in den Vordergrund und klickt dann das Element. FlaUI-
+    /// <c>Click()</c> ist ein echter Mausklick an der Bildschirmposition des Elements - ist das
+    /// Zielfenster von einem anderen Fenster verdeckt (z. B. einer parallel laufenden zweiten
+    /// App-Instanz auf demselben Desktop), landet der Klick sonst wirkungslos auf dem falschen
+    /// Fenster. <see cref="AutomationElement.SetForeground"/> aktiviert das zum Element gehörende
+    /// Fenster (WPF-Controls sind fensterlos und melden das Hostfenster) und ist Best-Effort:
+    /// Schlägt das Aktivieren fehl, wird trotzdem geklickt. Liegt der klickbare Punkt anschließend
+    /// auf einem Element eines <em>anderen</em> Fensters (Verdeckung) oder existiert kein
+    /// klickbarer Punkt, wird statt des Mausklicks das positionsunabhängige UIA-Invoke-Muster
+    /// verwendet - so kann ein Klick nie eine fremde Anwendung treffen.
+    /// </summary>
+    /// <param name="element">Das zu klickende Element.</param>
+    internal static void ClickInForeground(this AutomationElement element)
+        => KlickInVordergrund(element, e => e.Click());
+
+    /// <summary>
+    /// Wie <see cref="ClickInForeground"/>, nur als Doppelklick (z. B. zum Öffnen von Listeneinträgen).
+    /// Beim Invoke-Fallback entspricht ein einzelner Invoke dem Aktivieren des Elements.
+    /// </summary>
+    /// <param name="element">Das zu doppelklickende Element.</param>
+    internal static void DoubleClickInForeground(this AutomationElement element)
+        => KlickInVordergrund(element, e => e.DoubleClick());
+
+    private static void KlickInVordergrund(AutomationElement element, Action<AutomationElement> klick)
+    {
+        try
+        {
+            element.SetForeground();
+            Thread.Sleep(100);
+        }
+        catch (Exception)
+        {
+            // Vordergrund-Aktivierung ist Best-Effort - der Klick wird trotzdem ausgeführt.
+        }
+
+        if (HatKlickbarenPunkt(element, out var punkt) && !IstPunktVerdeckt(element, punkt))
+        {
+            klick(element);
+            return;
+        }
+
+        if (element.Patterns.Invoke.IsSupported)
+        {
+            element.Patterns.Invoke.Pattern.Invoke();
+            return;
+        }
+
+        klick(element);
+    }
+
+    private static bool HatKlickbarenPunkt(AutomationElement element, out System.Drawing.Point punkt)
+    {
+        try
+        {
+            punkt = element.GetClickablePoint();
+            return true;
+        }
+        catch (FlaUI.Core.Exceptions.NoClickablePointException)
+        {
+            punkt = default;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Prüft, ob das am klickbaren Punkt oberste UIA-Element zu einem anderen Fenster gehört als
+    /// das Zielelement (Verdeckung durch Fremd- oder eigenes Dialogfenster). Fensterlose
+    /// WPF-Controls melden als <c>NativeWindowHandle</c> das Handle ihres Hostfensters.
+    /// </summary>
+    private static bool IstPunktVerdeckt(AutomationElement element, System.Drawing.Point punkt)
+    {
+        AutomationElement? treffer;
+        try
+        {
+            treffer = element.Automation.FromPoint(punkt);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        if (treffer is null)
+            return false;
+
+        try
+        {
+            var fensterZiel = element.Properties.NativeWindowHandle.ValueOrDefault;
+            var fensterTreffer = treffer.Properties.NativeWindowHandle.ValueOrDefault;
+            return fensterZiel != IntPtr.Zero && fensterTreffer != IntPtr.Zero && fensterZiel != fensterTreffer;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>Wartet, bis eine ComboBox den erwarteten selektierten Eintrag anzeigt.</summary>

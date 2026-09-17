@@ -31,7 +31,7 @@ public sealed class AutonomAufgabeDetailView : BaseWindowView
     /// <exception cref="TimeoutException">Wird geworfen, wenn der "Zurück"-Button nicht rechtzeitig gefunden wird.</exception>
     public override AutonomAufgabeDetailView ForceClose(bool recurseToDashboard)
     {
-        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("EditTitel"), Medium);
 
         if (recurseToDashboard)

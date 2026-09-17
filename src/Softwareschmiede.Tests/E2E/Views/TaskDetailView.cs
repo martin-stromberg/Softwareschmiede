@@ -50,7 +50,7 @@ public sealed class TaskDetailView : BaseWindowView
     public TaskDetailView SetTaskTitle(string title)
     {
         var box = WaitForElement(Window, cf => cf.ByName("EditTitel"), Short);
-        box.Click();
+        box.ClickInForeground();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         Keyboard.Type(title);
 
@@ -61,7 +61,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SaveTask()
     {
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -83,7 +83,7 @@ public sealed class TaskDetailView : BaseWindowView
     {
         WaitForElement(Window, cf => cf.ByName("Starten"), Short);
 
-        WaitForElement(Window, cf => cf.ByName("Löschen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Löschen"), Short).AsButton().ClickInForeground();
         new DeleteConfirmationDialogView(Window).Confirm();
 
         WaitUntilGone(Window, cf => cf.ByName("Starten"), Short);
@@ -101,7 +101,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView GoBack()
     {
-        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().ClickInForeground();
 
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
@@ -151,7 +151,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView ClickStarten()
     {
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -172,7 +172,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView StopCli()
     {
-        WaitForElement(Window, cf => cf.ByName("CliStoppen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("CliStoppen"), Short).AsButton().ClickInForeground();
         WaitUntilGone(Window, cf => cf.ByName("CliStoppen"), Medium);
 
         return this;
@@ -194,7 +194,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView Finish()
     {
-        WaitForElement(Window, cf => cf.ByName("Beenden"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Beenden"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -211,7 +211,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SwitchPanel(string viewButtonName)
     {
-        WaitForElement(Window, cf => cf.ByName(viewButtonName), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName(viewButtonName), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -257,7 +257,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView Restart()
     {
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -268,11 +268,11 @@ public sealed class TaskDetailView : BaseWindowView
     public TaskDetailView SetScheduledPromptTime(int hour, int minute)
     {
         var stundeBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptStunde"), Short);
-        stundeBox.Click();
+        stundeBox.ClickInForeground();
         Keyboard.Type(hour.ToString("00"));
 
         var minuteBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptMinute"), Short);
-        minuteBox.Click();
+        minuteBox.ClickInForeground();
         Keyboard.Type(minute.ToString("00"));
 
         return this;
@@ -292,7 +292,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SendScheduledPrompt()
     {
-        WaitForElement(Window, cf => cf.ByName("ZeitgesteuertSenden"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("ZeitgesteuertSenden"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("ScheduledPromptStatus"), Medium);
         return this;
     }
@@ -301,7 +301,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView OpenIde()
     {
-        WaitForElement(Window, cf => cf.ByName("IdeOeffnen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("IdeOeffnen"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -315,7 +315,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView OpenWorkingDirectory()
     {
-        WaitForElement(Window, cf => cf.ByName("ArbeitsverzeichnisOeffnen"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("ArbeitsverzeichnisOeffnen"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -335,7 +335,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView ExportCliRaw(string? zielPfad)
     {
-        WaitForEnabledElement(Window, "CliRawExport", Medium).AsButton().Click();
+        WaitForEnabledElement(Window, "CliRawExport", Medium).AsButton().ClickInForeground();
         return HandleSaveFileDialog(zielPfad);
     }
 
@@ -379,7 +379,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Der KI-Plugin-Auswahl-Dialog, mit dem aktuellen Plugin vorselektiert.</returns>
     public Dialogs.PluginSelectionDialogView OpenPluginChangeDialog()
     {
-        WaitForElement(Window, cf => cf.ByName("PluginAendern"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("PluginAendern"), Short).AsButton().ClickInForeground();
         return new Dialogs.PluginSelectionDialogView(Window);
     }
 
@@ -500,7 +500,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Der geöffnete Solution-Auswahl-Dialog.</returns>
     public SolutionSelectionDialogView OpenIdeDropdown()
     {
-        WaitForElement(Window, cf => cf.ByName("IdeOeffnenDropdown"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("IdeOeffnenDropdown"), Short).AsButton().ClickInForeground();
 
         var dialog = new SolutionSelectionDialogView(Window);
         dialog.ForceShow();
