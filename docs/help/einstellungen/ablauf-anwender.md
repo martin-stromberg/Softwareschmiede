@@ -36,6 +36,18 @@
 
 > **Hinweis:** Ist die Funktion für autonome Aufgaben deaktiviert, zeigt ein Klick auf „Autonome Aufgabe starten" in der Aufgabendetailansicht statt des Initialisierungsdialogs nur noch die Meldung „Autonome Aufgaben sind in den Einstellungen deaktiviert." an. Das einfache Starten einer Aufgabe mit direkter CLI-Ausführung (Button „Starten") funktioniert unabhängig davon weiterhin wie gewohnt.
 
+### Update-Verhalten einstellen
+
+1. Öffnen Sie die Registerkarte **Allgemein**
+2. Wählen Sie im Abschnitt **Updates** in der Auswahlbox einen Modus:
+   - **Aus** — keine Update-Prüfung
+   - **Nur Pruefen** — prüfen und Update anbieten (Standard)
+   - **Bei Programmstart pruefen und ausfuehren** — beim Programmstart prüfen und ein gefundenes Update automatisch installieren
+3. Aktivieren Sie bei Bedarf die Checkbox **„Prerelease-Versionen laden"**, um auch Vorabversionen zu berücksichtigen
+4. Klicken Sie **Speichern**
+
+> **Hinweis:** Werden die Update-Einstellungen geändert, während ein Update angeboten wird oder ein Update-Vorgang läuft, wird das Angebot zurückgenommen bzw. der Vorgang abgebrochen. Details zum Update-Ablauf finden Sie in der [Programmupdate-Dokumentation](../programmupdate/index.md).
+
 ## Plugins (Registerkarte) — IDE-Plugins
 
 ### IDE-Plugin aktivieren, deaktivieren oder priorisieren

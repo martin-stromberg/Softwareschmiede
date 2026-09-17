@@ -23,13 +23,14 @@ Branch: `task/5c1a753c335f441294221c1e260a87c3-prereleases`
 | [x] | 9 (It. 2) | Code-Review erneut (Unteragent) — 10 Befunde (alle niedrig) | `review-code.2.md` |
 | [x] | 6 (It. 3) | Review-Befunde behoben: IUpdateVersuchProtokoll + MainWindowUpdateDienste-Bundle, UpdateReleaseLookupResult-Vertrag, TestDbContextFactory.CreateSqlite, CreateSut-Bereinigung, MainWindowViewModelUpdateTestBase, geteilte Test-Helpers, Gate-Warte-Dedup, E2E-Cleanup, GetOfferedUpdateVersion (Rohwert korrekt — Befund 10 basierte auf falscher UIA-Annahme), FlaUI-Klick-Occlusion-Fix (ClickInForeground-Sweep ueber ~120 Stellen) | Codeaenderungen |
 | [x] | 7 (It. 3) | Plan-Review uebersprungen — `review.md` traegt bereits `Vollstaendig umgesetzt` | `review.md` |
-| [~] | 8 (It. 3) | Usability-Review erneut (Unteragent) — ausstehend | `review-usability.md` |
-| [~] | 9 (It. 3) | Code-Review erneut (Unteragent) — ausstehend | `review-code.md` |
+| [x] | 8 (It. 3) | Usability-Review erneut (Unteragent) — 5 Befunde (alle minor) | `review-usability.md` |
+| [x] | 9 (It. 3) | Code-Review erneut (Unteragent) — 8 Befunde (alle niedrigschwellig; It.-2-Befunde verifiziert behoben) | `review-code.md` |
 | [x] | 10 | Tests ausgefuehrt und dokumentiert — regulaere Spur gruen (1629/0 Fehler); OsInterface-Spur: 47/50 gruen, RunGeneralTests komplett durchgelaufen (alle Update-Szenarien), einziger Fehler feature-unabhaengiger Clipboard-Ressourcenkonflikt | `test-results.md` |
-| [~] | - | Iteration oder Abschluss entscheiden — wartet auf It.-3-Reviews | - |
-| [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
+| [x] | - | Iteration oder Abschluss entscheiden — Iterationszaehler = 3 erreicht: Schleifenabbruch, offene Punkte in continue.md | - |
+| [x] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) — 9 Code- + 5 Usability-Befunde + 1 Umgebungs-Testfehler | `continue.md` |
 | [ ] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [ ] | 12b | README aktualisieren (Unteragent) | `README.md` |
 | [ ] | 12c | Release Notes aktualisieren (Unteragent) | `docs/RELEASE_NOTES.md` |
+| [ ] | 13 | Nacharbeiten abschliessen (offene Punkte aus `continue.md`) | `continue-done.md` |
 | [ ] | - | Feature-Verzeichnis loeschen | - |
 | [ ] | - | Commit durchfuehren | - |

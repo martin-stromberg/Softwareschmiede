@@ -4,120 +4,149 @@
 
 ## Übersicht
 
-Das Programmupdate wird durch einen Update-Service initiiert, der vorher eine Sicherheitsprüfung durchführt, um zu bestimmen, ob laufende CLI-Aufgaben das Update blockieren würden. Falls keine blockierenden Aufgaben gefunden werden, wird der Fortschritt über ein `UpdateProgressViewModel` an einen WPF-Dialog gemeldet. Der Dialog zeigt die Fortschrittsinformationen mit Bindings an und erlaubt dem Benutzer, den Prozess abzubrechen.
+Der Update-Ablauf wird vom `MainWindowViewModel` orchestriert. Drei Einstiegspunkte — die einmalige Startautomatik, der manuelle Prüfbefehl (`UpdatePruefenCommand`) und der manuelle Installationsbefehl (`UpdateStartenCommand`) — laufen über dasselbe nicht wartende Gate (`_updateGate`) und lesen die gespeicherten Update-Einstellungen jeweils frisch aus der Datenbank. Der `UpdateService` führt Prüfung, Paketvorbereitung und Updater-Start aus; `GitHubReleaseClient`, `UpdatePackageService` und `UpdateScriptService` übernehmen die konkreten Teilschritte.
 
-## Ablauf
+## Update-Einstellungen laden und speichern
 
-### 0. Sicherheitsprüfung (CliUpdateSafetyService)
+### Lesen
 
-Vor dem Start des Update-Prozesses wird überprüft, ob aktive CLI-Aufgaben das Update blockieren würden:
+`AppEinstellungService.GetUpdateSettingsAsync(ct)` liest die beiden Schlüssel `updates.mode` (`UpdateModeKey`) und `updates.includePrereleases` (`IncludePrereleasesKey`) in **einer** gemeinsamen EF-Core-Abfrage (mit `TagWith(UpdateSettingsReadTag)` für gezielte Testinterception) und liefert ein unveränderliches `UpdateSettings`-Record:
 
-Beteiligte Komponenten:
-- `ICliUpdateSafetyService.CheckAsync()` — Ermittelt blockierende Aufgaben
-- `AufgabeService.GetAktiveAufgabenAsync()` — Lädt aktive Aufgaben (Status `Gestartet` oder `Wartend`, max. 20)
-- `Aufgabe.LaufStatus` — Gibt den Laufzeit-Substatus an
+- Fehlender oder ungültiger `updates.mode`-Wert → Default `UpdateMode.NurPruefen`
+- Fehlender oder ungültiger `updates.includePrereleases`-Wert → Default `false`
+- Datenbank-Lesefehler werden **nicht** abgefangen und propagieren an den Aufrufer. Der Aufrufer (`MainWindowViewModel.LeseUpdateSettingsAsync`) bildet daraus `null` und zeigt den Nicht-prüfbar-Hinweis — es erfolgt keine Ersatzfreigabe durch Defaults, Snapshots oder Caches.
 
-**Filterlogik:** Eine Aufgabe blockiert das Update nur dann, wenn beide Bedingungen erfüllt sind:
-1. `AktiveRunId is not null` — Die Aufgabe hat eine aktive CLI-Session
-2. `LaufStatus == AufgabeLaufStatus.Laeuft` — Der CLI-Prozess läuft aktiv (nicht bloß "wartet" oder "bereit")
+Im `MainWindowViewModel` werden die Werte immer in einem frischen DI-Scope gelesen (`_serviceProvider.CreateScope()`), da der `AppEinstellungService` einen scoped `DbContext` nutzt, der Update-Service selbst aber ein Singleton ist.
 
-**Nicht blockierende Zustände:**
-- `LaufStatus == null` — Aufgabe ist bereit oder noch nicht klassifiziert; kein CLI-Prozess läuft
-- `LaufStatus == AufgabeLaufStatus.WartetAufEingabe` — CLI läuft, wartet aber auf Benutzer; ist bereits eingeplant und benötigt nicht zu unterbrechen
+### Speichern und Wirksamwerden
 
-**Ergebnis:** `CliUpdateSafetyResult` enthält die Anzahl riskanter Aufgaben und deren Titel/ID. Falls `RiskyTaskCount > 0`, wird `RequiresConfirmation = true` gesetzt, und der Benutzer erhält eine Warnung mit Optionen.
+`SettingsViewModel.SpeichernAsync` validiert das ausgewählte Label (`TryParseUpdateModus`), schreibt beide Werte gemeinsam über `SetUpdateSettingsAsync` in einem `SaveChangesAsync` und löst direkt danach das Event `UpdateSettingsSaved` mit dem gespeicherten Snapshot aus — auch wenn ein späterer Einstellungsschritt fehlschlägt.
 
-### 1. Update-Dialog initialisieren
+Der `MainWindowViewModel` hat das Event beim ersten `NavigateToSettings` auf das gecachte `SettingsViewModel` abonniert. Der Handler `ApplyGespeicherteUpdateSettings`:
 
-Der Update-Prozess startet durch Aufruf von `WpfUpdateProgressDialogService.Show(UpdateProgressViewModel)`. Der Service führt den Dialog-Aufbau auf dem UI-Thread aus:
+- speichert den neuen Snapshot in `_aktuelleUpdateEinstellungen`,
+- erhöht bei geänderten Werten die Einstellungs-Generation (`_updateSettingsGeneration`),
+- leert `VerfuegbaresUpdate`/`UpdateVerfuegbar`/`UpdateHinweis`,
+- cancelt einen laufenden Update-Ablauf über `_updateAblaufCts`,
+- meldet `CanExecuteChanged` für beide Update-Commands.
 
-Beteiligte Komponenten:
-- `WpfUpdateProgressDialogService.Show()` — Erstellt ein `UpdateProgressDialog`, setzt das ViewModel als `DataContext` und zeigt den Dialog modal an
-- `UpdateProgressDialog.xaml` — Die Dialog-Oberfläche mit Bindings auf ViewModel-Properties
-- `UpdateProgressViewModel` — Das Presentation Model mit Daten und Methoden für Fortschrittsanzeige
+Speichern startet weder eine Prüfung noch eine Installation. Vor dem ersten erfolgreichen Lesen der Einstellungen (`_aktuelleUpdateEinstellungen is null`) sind beide Commands gesperrt.
 
-Die Dialog-Initialisierung ist kritisch: Das XAML-Databinding-System liest und validiert alle gebundenen Properties. Falls eine Property einen `private set` hat, schlägt die Binding-Engine mit `InvalidOperationException` fehl.
+## Einmalige Startautomatik
 
-### 2. Update-Service sendet Fortschrittsmeldungen
+1. `App.StartupAsync` führt die DB-Migration und Startinitialisierung aus, erzeugt das `MainWindow`, weist es **vor** `Show()` explizit `Application.MainWindow` zu (Dialog-Owner) und zeigt es an.
+2. Der `MainWindow`-Konstruktor registriert den `ContentRendered`-Handler. Beim ersten Rendern meldet sich der Handler ab (`ContentRendered -= OnContentRendered`) und ruft `MainWindowViewModel.InitializeUpdatesAfterWindowReadyAsync()` via `SafeFireAndForget` auf.
+3. `InitializeUpdatesAfterWindowReadyAsync` setzt das Einmalkennzeichen `_startInitialisierungErfolgt` per `Interlocked.Exchange` **vor** dem ersten `await`; weitere Aufrufe sind wirkungslos. Anschließend wird das `_updateGate` nicht wartend erworben.
+4. Je nach gelesenem Modus:
+   - `UpdateMode.Aus` → kein Releaseabruf.
+   - `UpdateMode.NurPruefen` → einmal `CheckForUpdateAsync`; bei `UpdateVerfuegbar` wird das Angebot angezeigt, sonst nichts.
+   - `UpdateMode.BeiProgrammstartPruefenUndAusfuehren` → einmal `CheckForUpdateAsync`; bei `UpdateVerfuegbar` geht es direkt in den gemeinsamen Installationspfad `InstalliereUpdateAsync`.
+5. Kein Update, ein nicht prüfbarer Zustand, Sicherheitsablehnung, Abbruch und Fehler beenden den Startversuch ohne Wiederholung. Die Startautomatik installiert ausschließlich mit dem unmittelbar zuvor ermittelten Fund und nur solange die Einstellungs-Generation unverändert ist.
 
-Der externe Update-Service ruft während der Vorbereitung `UpdateProgressViewModel.Apply(UpdatePreparationProgress)` auf mit aktuellen Fortschrittsdaten (Phase, Meldung, Prozentsatz). Das ViewModel aktualisiert seine Properties:
+## Update-Prüfung und Release-Auswahl
 
-Beteiligte Komponenten:
-- `UpdateProgressViewModel.Apply(UpdatePreparationProgress)` — Empfängt Fortschrittsdaten und aktualisiert `PhaseText`, `Message`, `Percent`, `IsIndeterminate`
-- `ViewModelBase.SetProperty<T>()` — Atomare Property-Änderung mit `PropertyChanged`-Notification
-- XAML-Bindings (OneWay) — Aktualisieren Dialog-Elemente nach Property-Änderungen
+### `UpdateService.CheckForUpdateAsync`
 
-### 3. Fehlerbehandlung
+Serialisiert über ein eigenes `SemaphoreSlim` (`_checkGate`):
 
-Tritt während der Vorbereitung ein Fehler auf, wird `UpdateProgressViewModel.SetError(string message)` aufgerufen:
+1. `ApplicationVersionProvider.GetInstalledVersionAsync` liest `version.json` aus dem Programmverzeichnis. Fehlende/ungültige lokale Version → `NichtPruefbar` ohne Releaseabruf.
+2. `IUpdateReleaseClient.GetLatestReleaseAsync(options, ct)` liefert ein `UpdateReleaseLookupResult` (`Erfolg` + `Release`). `!Erfolg` → `NichtPruefbar`; `Release == null` → `KeinUpdate`.
+3. Defensiver Ausschluss: Ein als Prerelease klassifiziertes Ergebnis (`UpdateInfo.IsPrerelease`) bei `options.IncludePrereleases == false` ist eine Vertragsverletzung → `NichtPruefbar`.
+4. `UpdateVersionComparer.IsNewer(installed.Version, latest.Version)` entscheidet zwischen `UpdateVerfuegbar` und `KeinUpdate`.
+5. `OperationCanceledException` propagiert; andere Exceptions werden geloggt und zu `NichtPruefbar`.
 
-Beteiligte Komponenten:
-- `UpdateProgressViewModel.SetError()` — Setzt `HasError = true`, `CanClose = true`, `CanCancel = false`, aktualisiert `Message` mit Fehlermeldung
-- Dialog-Buttons werden durch Property-Bindings aktualisiert: Abbrechen-Button wird deaktiviert, Schließen-Button wird aktiviert
+### `GitHubReleaseClient.GetLatestReleaseAsync` (paginierte Suche)
 
-### 4. Vorbereitung abgeschlossen
+- Start-URL: `GET https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases?per_page=100` (Werte aus `UpdateOptions`).
+- Folgeseiten werden über den `Link`-Antwortheader mit `rel="next"` verfolgt, bis keine Folgeseite mehr gemeldet wird. Folge-URLs müssen HTTPS sein, auf `api.github.com` zeigen und zum selben Repository-Releases-Pfad gehören (`IsAllowedFollowUpUri`); bereits besuchte URLs werden als Fehler gewertet.
+- Ein gemeinsames `CheckTimeout` (Standard 15 s) begrenzt alle Seiten zusammen.
+- Pro Release-Eintrag (`TryCreateCandidate`):
+  - `draft == true`, fehlender/ungültiger Tag (`UpdateVersionComparer.TryParse`) oder fehlendes `release.zip`-Asset (`UpdateOptions.AssetName`, absolute HTTPS-Download-URL) → Eintrag wird übersprungen; ein einzelner unbrauchbarer Eintrag verhindert andere Kandidaten nicht.
+  - Prerelease-Klassifikation: GitHub-Flag `prerelease` **oder** SemVer-Prerelease-Suffix (`SemanticUpdateVersion.IsPrerelease`). Bei `IncludePrereleases == false` werden beide ausgeschlossen.
+  - Gewinner ist die höchste zulässige `SemanticUpdateVersion` über **alle** Seiten — unabhängig von Reihenfolge oder Veröffentlichungsdatum; bei Gleichstand bleibt die erste Fundstelle.
+- Ergebnis: Kein zulässiger Kandidat → `KeinTreffer`. HTTP-, JSON-, Timeout- oder Pagination-Fehler auf **irgendeiner** Seite → `Fehlgeschlagen` (keine Teiltreffer). Caller-Cancellation propagiert als `OperationCanceledException`.
+- Das gelieferte `UpdateInfo` trägt die normalisierte Version (`UpdateVersionComparer.Normalize`), den Original-Tag, Asset-Name, Download-URL, `PublishedAt` und `IsPrerelease`.
 
-Nach erfolgreicher Vorbereitung wird `UpdateProgressViewModel.MarkUpdaterStarting()` aufgerufen, das `CanCancel = false` setzt und die Meldung auf "Update wird gestartet. Die Anwendung wird beendet." ändert. Anschließend startet der externe Updater und die Anwendung wird beendet.
+### SemVer-Vergleich (`SemanticUpdateVersion`, `UpdateVersionComparer`)
+
+`UpdateVersionComparer.TryParse` toleriert führende Leerzeichen und ein führendes `v`/`V`; der Rest muss eine vollständige SemVer-Version `X.Y.Z[-prerelease][+metadaten]` sein. `Normalize` liefert die kanonische Form ohne `v`. Die Präzedenz folgt SemVer 2.0: erst Kernversion, dann Prerelease-Identifier (numerisch < nichtnumerisch, ordinal/case-sensitiv, kürzere identische Folge < Verlängerung, stabil > eigene Prereleases). Build-Metadaten beeinflussen Rangfolge und Gleichheit nicht. Details siehe [Business Rules](business-rules.md).
+
+## Gemeinsamer Installationspfad
+
+Manueller Start (`UpdateStartenAsync`), Startautomatik und der Kern `InstalliereUpdateAsync` teilen denselben Ablauf:
+
+1. **Gate:** `_updateGate.WaitAsync(0)` — weitere Eintritte während eines laufenden Vorgangs werden verworfen. Zusätzlich prüfen die Methodenrümpfe Modus/Status auch bei umgangenem `CanExecute`.
+2. **Einstellungen lesen:** `LeseUpdateSettingsAsync` in frischem Scope. `null` (Lesefehler) → `UpdateEinstellungenLesefehlerAnzeigen` (Angebot entfernt, `UpdateHinweis` = „Die Update-Einstellungen konnten nicht gelesen werden. Eine Update-Prüfung ist nicht möglich."), kein Releaseabruf.
+3. **Modus `Aus`** → `UpdateAngebotEntfernen`, Abbruch vor `CheckForUpdateAsync`, CLI-Sicherheit und Vorbereitung.
+4. **Prüfung:** Der manuelle Installationsstart prüft **erneut** mit den aktuellen Optionen — ein älteres Angebot wird nicht als Installationsargument verwendet. Nur `UpdateCheckStatus.UpdateVerfuegbar` mit nicht-leerem `Update` geht weiter.
+5. **Sicherheitsprüfung:** `ICliUpdateSafetyService.CheckAsync` liefert riskante Aufgaben (`AufgabeLaufAktivitaet.IstAktiv` über `AktiveRunId`/`LastHeartbeatUtc`). Bei `RequiresConfirmation` zeigt `IDialogService.BestaetigenDialog` die Warnung „Update starten?" — Ablehnung beendet den Vorgang. Die Startautomatik umgeht diese Entscheidung nicht.
+6. **Fortschrittsdialog:** `IUpdateProgressDialogService.Show(progressViewModel)` öffnet den modalen `UpdateProgressDialog` mit dem Hauptfenster als Owner.
+7. **Aktualitätsnachweis vor der Vorbereitung:** Einstellungen werden erneut gelesen; Lesefehler oder Abweichung vom Snapshot (`vorVorbereitung != snapshot`) bzw. geänderte Generation beenden den Versuch — im Dialog als Fehler sichtbar, ohne Assetabruf.
+8. **Vorbereitung:** `UpdateService.PrepareUpdateAsync` → `UpdatePackageService.PreparePackageAsync` führt Download (`{AssetName}.download` → umbenannt), Entpacken nach `updates/extracted/{Version}`, Validierung (`Softwareschmiede.exe` + `version.json` im Paket-Root) und Skripterzeugung (`UpdateScriptService.CreateScriptAsync` → `updates/update.ps1`) aus. Fortschritt über `IProgress<UpdatePreparationProgress>`. Fehler räumen die angelegten Dateien/Verzeichnisse wieder auf.
+9. **Letzter Aktualitätsnachweis:** erneutes Lesen unmittelbar vor dem Updater-Start; Lesefehler oder geänderte Werte verhindern `MarkUpdaterStarting`, `StartPreparedUpdateAsync` und damit Prozessstart und Shutdown — auch wenn Paket und Skript bereits vorliegen.
+10. **Start:** `progressViewModel.MarkUpdaterStarting()`, dann `UpdateService.StartPreparedUpdateAsync` → `UpdateScriptService.StartScriptAsync` startet PowerShell mit `update.ps1` (Parameter `AppPid`, `TargetDirectory`, `ExtractedDirectory`, `ExecutablePath`, `LogPath`; optional elevated via `Verb = "runas"`, wenn das Programmverzeichnis nicht beschreibbar ist). Erst nach erfolgreichem Skriptstart ruft der `UpdateService` `IApplicationShutdownService.Shutdown()` — es gibt keinen zweiten Shutdown im ViewModel. Der synchrone Prozessstart ist die Übergabegrenze: Danach werden gespeicherte Änderungen nicht mehr berücksichtigt.
+11. **Abschluss:** Gate, `UpdateCheckLaeuft`/`UpdateWirdVorbereitet` und `_updateAblaufCts` werden im `finally` immer freigegeben; Fehler landen im Dialog (`SetError`) bzw. `UpdateHinweis`.
+
+## Update-Fortschrittsdialog
+
+Der `UpdateProgressDialog` (Titel „Update vorbereiten") bindet `UpdateProgressViewModel`-Properties:
+
+| UI-Element | Binding | Beschreibung |
+|------------|---------|--------------|
+| `TextBlock` (Phase) | `PhaseText` | „Download" / „Entpacken" / „Update-Vorbereitung" / „Vorbereitung" |
+| `TextBlock` (Meldung) | `Message` | Fortschritts- oder Fehlermeldung |
+| `ProgressBar.Value` / `IsIndeterminate` | `Percent` / `IsIndeterminate` | Prozentwert beim Download, sonst unbestimmt |
+| `Button` „Abbrechen" | `CancelCommand` + `CanCancel` | Löst `RequestCancel()` → `_cancelAction` (canceln des verknüpften `CancellationTokenSource`) aus |
+
+`UpdateProgressViewModel.Apply(UpdatePreparationProgress)` übernimmt Meldungen; nachträglich eintreffende Reports werden verworfen, sobald ein Terminalzustand (`HasError` oder `!CanCancel`) erreicht ist. `SetError(message)` zeigt den Fehler, deaktiviert Abbrechen und erlaubt das Schließen (`CanClose`). `MarkUpdaterStarting()` meldet „Update wird gestartet. Die Anwendung wird beendet." Alle Properties haben öffentliche Setter, da die WPF-Binding-Engine Setter auch bei OneWay-Bindings validiert.
 
 ## Diagramm
 
 ```mermaid
 flowchart TD
-    A["Update-Benutzer löst aus"] --> B["CliUpdateSafetyService.CheckAsync aufrufen"]
-    B --> C["Aktive Aufgaben laden"]
-    C --> D{"Laufende CLI-Prozesse?<br/>(LaufStatus == Laeuft)"}
-    D -- Ja --> E["Warnung anzeigen<br/>RequiresConfirmation = true"]
-    E --> F{"Benutzer bestätigt?"}
-    F -- Nein --> G["Abbruch"]
-    D -- Nein --> H["Update-Service startet"]
-    F -- Ja --> H
-    H --> I["Update-Dialog auf UI-Thread initialisieren"]
-    I --> J["XAML-Bindings werden aufgebaut"]
-    J --> K{"Alle Property-Setter öffentlich?"}
-    K -- Nein --> L["InvalidOperationException<br/>Dialog wird nicht angezeigt"]
-    K -- Ja --> M["Dialog wird angezeigt"]
-    M --> N["Update-Service sendet<br/>Fortschrittsmeldungen"]
-    N --> O["ViewModel.Apply aktualisiert Properties"]
-    O --> P["PropertyChanged-Event<br/>auslöst UI-Update"]
-    P --> Q{"Fehler?"}
-    Q -- Ja --> R["ViewModel.SetError aufrufen"]
-    R --> S["Fehler-UI anzeigen"]
-    Q -- Nein --> T{"Abbrechen?"}
-    T -- Ja --> U["ViewModel.RequestCancel aufrufen"]
-    U --> V["CancelAction wird aufgerufen"]
-    T -- Nein --> W["Vorbereitung abgeschlossen"]
-    W --> X["ViewModel.MarkUpdaterStarting aufrufen"]
-    X --> Y["Externes Updater-Skript startet"]
-    Y --> Z["Anwendung wird beendet"]
+    A["Einstieg: Startautomatik /<br/>UpdatePruefenCommand /<br/>UpdateStartenCommand"] --> B{"_updateGate frei?"}
+    B -- Nein --> Z["Verworfen"]
+    B -- Ja --> C["Einstellungen lesen<br/>(frischer Scope)"]
+    C --> D{"Lesefehler?"}
+    D -- Ja --> E["UpdateHinweis: nicht lesbar<br/>Angebot entfernt"]
+    D -- Nein --> F{"Modus == Aus?"}
+    F -- Ja --> G["Angebot entfernen<br/>Ende"]
+    F -- Nein --> H["UpdateService.CheckForUpdateAsync"]
+    H --> I{"Generation<br/>unverändert?"}
+    I -- Nein --> Z
+    I -- Ja --> J{"UpdateVerfuegbar?"}
+    J -- Nein --> K["Hinweis/Angebot aktualisieren<br/>Ende"]
+    J -- Ja --> L{"Automatik bei Start<br/>oder manueller Start?"}
+    L -- "Nur Angebot" --> M["UpdateVerfuegbar = true<br/>⇧ Update sichtbar"]
+    L -- "Installieren" --> N["CliUpdateSafetyService.CheckAsync"]
+    N --> O{"Riskante Aufgaben?"}
+    O -- Ja --> P{"BestaetigenDialog<br/>bestätigt?"}
+    P -- Nein --> K
+    O -- Nein --> Q["Fortschrittsdialog zeigen"]
+    P -- Ja --> Q
+    Q --> R["Einstellungen erneut lesen"]
+    R --> S{"Lesefehler / geändert?"}
+    S -- Ja --> T["Dialog-Fehler<br/>Ende ohne Vorbereitung"]
+    S -- Nein --> U["PrepareUpdateAsync:<br/>Download → Entpacken → Validierung → Skript"]
+    U --> V{"Erfolg?"}
+    V -- Nein --> T
+    V -- Ja --> W["Letzter Einstellungsabgleich"]
+    W --> X{"Lesefehler / geändert?"}
+    X -- Ja --> T
+    X -- Nein --> Y["MarkUpdaterStarting →<br/>StartPreparedUpdateAsync →<br/>Skriptstart → Shutdown"]
 ```
 
 ## Fehlerbehandlung
 
-### InvalidOperationException bei Binding-Aufbau
+| Situation | Verhalten |
+|-----------|-----------|
+| `version.json` fehlt/ungültig | `NichtPruefbar`, kein Releaseabruf, Hinweis „Lokale Version ist nicht prüfbar." |
+| HTTP-/JSON-/Timeout-/Pagination-Fehler | `UpdateReleaseLookupResult.Fehlgeschlagen` → `NichtPruefbar`, Hinweis „GitHub-Release ist nicht prüfbar." |
+| Kein zulässiger Release-Kandidat | `KeinUpdate`, Hinweis „Kein Update verfügbar. …" |
+| Update-Einstellungen nicht lesbar | Angebot invalidiert, `UpdateHinweis`/Dialog-Fehler, kein Releaseabruf, kein Updater-Start |
+| Einstellungen während des Vorgangs geändert | Generationssprung/Snapshot-Abweichung → Abbruch, Hinweis „Die Update-Einstellungen wurden geändert. Der Update-Vorgang wurde abgebrochen." |
+| Benutzer-Abbruch | `OperationCanceledException` → „Update-Vorbereitung wurde abgebrochen." |
+| Vorbereitungs-/Startfehler | `SetError` im Dialog + `UpdateHinweis` „Update konnte nicht vorbereitet werden."; kein Shutdown |
+| InvalidOperationException beim Binding-Aufbau | Alle Properties des `UpdateProgressViewModel` haben öffentliche Setter — siehe Binding-Tabelle oben |
 
-**Ursache**: Eine ViewModel-Property hat einen `private set`, der WPF-Databinding-Engine verbietet daher, die Property zu validieren.
-
-**Lösung**: Alle sieben Properties des `UpdateProgressViewModel` müssen öffentliche Setter haben (`set` statt `private set`), damit die Binding-Engine den Setter validieren kann, auch wenn die Bindung als OneWay konfiguriert ist.
-
-### Benutzer bricht Update ab
-
-Der Benutzer klickt auf den "Abbrechen"-Button, der `CancelCommand` auslöst und `RequestCancel()` aufruft. Dies setzt `CanCancel = false`, aktualisiert die Meldung und ruft die `_cancelAction` auf, falls vorhanden. Der Update-Service sollte daraufhin den Prozess ordnungsgemäß beenden.
-
-### Update-Fehler
-
-Tritt ein Fehler im Update-Service auf, wird `SetError(message)` aufgerufen, das den Dialog in einen Fehler-Zustand versetzt: Buttons werden neu konfiguriert, Fehlermeldung wird angezeigt.
-
-## Bindung-Architektur
-
-Die Dialog-Bindings verwenden folgende Strategien:
-
-| Property | Binding-Modus | Beschreibung |
-|----------|---------------|------------|
-| `ProgressBar.Value` | OneWay | Zeigt `Percent` an, wird vom ViewModel aktualisiert |
-| `TextBlock.Text` (Phase, Meldung) | OneWay | Zeigt `PhaseText` / `Message` an |
-| `ProgressBar.IsIndeterminate` | OneWay | Zeigt `IsIndeterminate` an |
-| `Border.Visibility` (Fehler-Panel) | OneWay | Zeigt Fehler-Panel bei `HasError` an |
-| `Button.IsEnabled` (Abbrechen) | OneWay | Deaktiviert Button bei `!CanCancel` |
-| `Button.IsEnabled` (Schließen) | OneWay | Aktiviert Button bei `CanClose` |
-
-Alle Bindings sind OneWay (ViewModel → UI), daher wird `SetProperty()` für die zwei-Wege-Kommunikation nicht benötigt. Die WPF-Binding-Engine validiert aber dennoch die Setter aller Properties, unabhängig vom Binding-Modus.
+Beim Schließen des Hauptfensters wird ein laufender Vorgang über `Dispose` → `CancelLaufendenUpdateAblauf` gecancelt.

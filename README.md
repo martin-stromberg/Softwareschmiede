@@ -26,7 +26,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
 - **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Monitoring
 - **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
-- **Programmupdate aus der Anwendung** gegen GitHub-Releases
+- **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und optionaler Prerelease-Berücksichtigung
 
 ## Issue-Referenz in der issue.md
 
@@ -65,6 +65,28 @@ Die Aufgabendetailansicht kann die protokollierte CLI-Rohausgabe als Datei expor
 - Das Ziel muss auf `.raw` enden; bei Dialog-Abbruch wird keine Datei geschrieben.
 
 Die Implementierung liegt in `TaskDetailViewModel`, `CliRawExportService`, `IDialogService` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TaskDetailViewModelTests_CliRawExport`, `TaskDetailViewTests` und `E2E_CliRawExport`.
+
+## Programmupdate
+
+Die Anwendung kann sich selbst gegen die GitHub-Releases von `martin-stromberg/Softwareschmiede` prüfen und aktualisieren:
+
+- In der Fußzeile der Navigations-Seitenleiste prüft der Button **„Programmupdate prüfen"** (`⟳ Prüfen`) manuell auf neue Releases. Ein gefundenes Update wird über den Button **„Programmupdate starten"** (`⇧ Update`) angeboten und vorbereitet.
+- Vor der Installation prüft ein Sicherheitsdialog, ob laufende CLI-Aufgaben das Update blockieren würden. Ein Fortschrittsdialog zeigt die Phasen Download, Entpacken und Update-Vorbereitung an und erlaubt den Abbruch.
+- Der eigentliche Austausch der Dateien erfolgt durch ein externes Update-Skript nach dem Beenden der Anwendung.
+
+Der Update-Modus ist in den **Einstellungen** im Tab **„Allgemein"** unter **„Updates"** über die Auswahlbox **„Update-Modus"** konfigurierbar:
+
+| Option | Wirkung |
+|--------|---------|
+| `Aus` | Update-Prüfung und -Installation sind deaktiviert; der Prüf-Button bleibt sichtbar, aber deaktiviert. |
+| `Nur Pruefen` (Standard) | Die Prüfung läuft; ein gefundenes Update wird angeboten, aber nie automatisch installiert. |
+| `Bei Programmstart pruefen und ausfuehren` | Einmalig nach dem ersten Rendern des Hauptfensters wird geprüft und ein gefundenes Update automatisch installiert. |
+
+Zusätzlich aktiviert die Checkbox **„Prerelease-Versionen laden"** die Berücksichtigung von Vorabversionen. Ein Release gilt als Prerelease, wenn das GitHub-Flag `prerelease` gesetzt ist oder der Tag ein SemVer-Prerelease-Suffix (z. B. `-rc.1`) trägt; ist die Option deaktiviert, werden beide Fälle ausgeschlossen. `GitHubReleaseClient` fragt die Releases paginiert ab (`?per_page=100`, `Link`-Header mit `rel=next`), überspringt Drafts, ungültige Tags und Einträge ohne `release.zip`-Asset und wählt die höchste zulässige SemVer-Version über alle Seiten.
+
+Beide Werte werden in der SQLite-Einstellungstabelle unter den Schlüsseln `updates.mode` und `updates.includePrereleases` gespeichert (`AppEinstellungService.GetUpdateSettingsAsync`/`SetUpdateSettingsAsync`). Beim Speichern löst `SettingsViewModel` das Event `UpdateSettingsSaved` aus: `MainWindowViewModel` invalidiert ein bestehendes Update-Angebot und bricht einen noch nicht übergebenen Update-Vorgang ab. Vor jeder Prüfung und vor dem Updater-Start werden die gespeicherten Werte erneut gelesen.
+
+Die Implementierung liegt in `UpdateService`, `GitHubReleaseClient`, `UpdateVersionComparer`/`SemanticUpdateVersion`, `AppEinstellungService`, `SettingsViewModel` und `MainWindowViewModel` (einmalige Startprüfung über `MainWindow.ContentRendered` → `InitializeUpdatesAfterWindowReadyAsync`). Abgedeckt wird das Feature u. a. durch `AppEinstellungServiceTests_UpdateSettings`, `UpdateServiceTests_Options`, `UpdateServiceTests_PrereleaseChain`, `UpdateVersionComparerTests_SemVer`, `GitHubReleaseClientTests_Filters`, `GitHubReleaseClientTests_Pagination`, `MainWindowViewModelTests_UpdateStartup`, `MainWindowViewModelTests_UpdateSettingsReadFailure` und `E2E_UpdateSettings`.
 
 ## Voraussetzungen
 
