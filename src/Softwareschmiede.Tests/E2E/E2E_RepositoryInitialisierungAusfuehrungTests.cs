@@ -102,7 +102,7 @@ public sealed class E2E_RepositoryInitialisierungAusfuehrungTests : WpfTestBase
     private void StoppeCliUndRaeumeAuf(Window mainWindow)
     {
         var stoppenButton = WaitForElement(mainWindow, cf => cf.ByName("CliStoppen"), Short);
-        stoppenButton.AsButton().Click();
+        stoppenButton.AsButton().ClickInForeground();
         WaitUntilGone(mainWindow, cf => cf.ByName("CliStoppen"), Medium);
 
         NavigateBackFromTaskToProject(mainWindow);

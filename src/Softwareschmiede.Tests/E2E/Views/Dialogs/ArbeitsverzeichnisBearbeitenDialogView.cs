@@ -20,7 +20,7 @@ public sealed class ArbeitsverzeichnisBearbeitenDialogView : DialogView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("ArbeitsverzeichnisBearbeiten"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("ArbeitsverzeichnisBearbeiten"), Short).AsButton().ClickInForeground();
         GetDialogWindow();
 
         return this;
@@ -34,7 +34,7 @@ public sealed class ArbeitsverzeichnisBearbeitenDialogView : DialogView
     public ProjectDetailView Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Speichern"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
 
         return new ProjectDetailView(Window);
     }

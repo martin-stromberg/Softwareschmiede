@@ -156,7 +156,8 @@
 
                     <Button Command="{Binding UpdatePruefenCommand}"
                             AutomationProperties.Name="Programmupdate prüfen"
-                            ToolTip="Auf Programmupdate prüfen"
+                            ToolTip="{Binding UpdatePruefenTooltip}"
+                            ToolTipService.ShowOnDisabled="True"
                             Margin="0,2"
                             Padding="8,8"
                             Background="Transparent"
@@ -170,6 +171,16 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+
+                    <!-- Kein AutomationProperties.Name: Für E2E-Tests muss der gebundene Hinweistext
+                         als UIA-Name lesbar bleiben; die Adressierung läuft über die AutomationId. -->
+                    <TextBlock Text="{Binding UpdateHinweis}"
+                               AutomationProperties.AutomationId="UpdateHinweis"
+                               FontSize="11"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="8,4,8,0"
+                               Visibility="{Binding UpdateHinweis, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                 </StackPanel>
             </Grid>
         </Border>

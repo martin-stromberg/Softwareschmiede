@@ -60,4 +60,27 @@ public sealed class UpdateProgressViewModelTests
         sut.CanClose.Should().BeTrue();
         sut.Message.Should().Be("Update wird gestartet. Die Anwendung wird beendet.");
     }
+
+    /// <summary>
+    /// Nachträglich zugestellte Fortschrittsreports (IProgress-Zustellung kann gegenüber dem
+    /// Terminalzustand verzögert sein) dürfen Fehler-, Abbruch- und Startzustand nicht überschreiben.
+    /// </summary>
+    [Fact]
+    public void Apply_ShouldIgnoreLateProgressAfterTerminalState()
+    {
+        var errorVm = new UpdateProgressViewModel();
+        errorVm.SetError("Fehler");
+        errorVm.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Download, 42, "Lädt"));
+        errorVm.Message.Should().Be("Fehler");
+
+        var cancelVm = new UpdateProgressViewModel();
+        cancelVm.CancelCommand.Execute(null);
+        cancelVm.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Download, 42, "Lädt"));
+        cancelVm.Message.Should().Be("Update-Vorbereitung wird abgebrochen.");
+
+        var startVm = new UpdateProgressViewModel();
+        startVm.MarkUpdaterStarting();
+        startVm.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Download, 42, "Lädt"));
+        startVm.Message.Should().Be("Update wird gestartet. Die Anwendung wird beendet.");
+    }
 }

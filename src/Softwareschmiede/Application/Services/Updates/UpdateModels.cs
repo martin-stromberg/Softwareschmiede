@@ -12,17 +12,71 @@ public sealed record InstalledVersionInfo(
     DateTimeOffset? CreatedAtUtc);
 
 /// <summary>Informationen zu einem verfügbaren GitHub-Release-Update.</summary>
-/// <param name="Version">Semantische Release-Version ohne führendes <c>v</c>.</param>
+/// <param name="Version">Semantische Release-Version ohne führendes <c>v</c>, inklusive Prerelease-Suffix und Build-Metadaten.</param>
 /// <param name="TagName">GitHub-Release-Tag.</param>
 /// <param name="AssetName">Name des Release-Assets.</param>
 /// <param name="DownloadUrl">Direkte Download-URL des Release-Assets.</param>
 /// <param name="PublishedAt">Optionaler Veröffentlichungszeitpunkt.</param>
+/// <param name="IsPrerelease">Gibt an, ob das Release als Prerelease klassifiziert ist (GitHub-Flag <c>prerelease</c> oder SemVer-Prerelease-Suffix).</param>
 public sealed record UpdateInfo(
     string Version,
     string TagName,
     string AssetName,
     Uri DownloadUrl,
-    DateTimeOffset? PublishedAt);
+    DateTimeOffset? PublishedAt,
+    bool IsPrerelease);
+
+/// <summary>Persistierter Modus der Update-Prüfung mit festen Speicherwerten.</summary>
+public enum UpdateMode
+{
+    /// <summary>Update-Prüfung und -Installation sind deaktiviert.</summary>
+    Aus = 0,
+
+    /// <summary>Es wird nur auf Updates geprüft; ein gefundenes Update wird angeboten, aber nie automatisch installiert.</summary>
+    NurPruefen = 1,
+
+    /// <summary>Beim Programmstart wird geprüft und ein gefundenes Update automatisch installiert.</summary>
+    BeiProgrammstartPruefenUndAusfuehren = 2
+}
+
+/// <summary>Gemeinsam geladenes, unveränderliches Paar der Update-Einstellungen.</summary>
+/// <param name="Modus">Persistierter Update-Modus.</param>
+/// <param name="IncludePrereleases">Gibt an, ob Prerelease-Versionen bei der Update-Auswahl berücksichtigt werden.</param>
+public sealed record UpdateSettings(UpdateMode Modus, bool IncludePrereleases);
+
+/// <summary>Unveränderlicher Optionsvertrag einer Update-Prüfung für <see cref="IUpdateService"/> und <see cref="IUpdateReleaseClient"/>.</summary>
+/// <param name="IncludePrereleases">Gibt an, ob Prerelease-Versionen bei der Release-Auswahl berücksichtigt werden.</param>
+public sealed record UpdateCheckOptions(bool IncludePrereleases);
+
+/// <summary>
+/// Ergebnis der Release-Abfrage eines <see cref="IUpdateReleaseClient"/>. Unterscheidet eine
+/// fehlgeschlagene Abfrage (HTTP-Fehler, Timeout, ungültige Antwort) von einer erfolgreichen
+/// Abfrage ohne passenden Release-Kandidaten.
+/// </summary>
+public sealed record UpdateReleaseLookupResult
+{
+    private UpdateReleaseLookupResult(bool erfolg, UpdateInfo? release)
+    {
+        Erfolg = erfolg;
+        Release = release;
+    }
+
+    /// <summary>Gibt an, ob die Release-Abfrage technisch erfolgreich war.</summary>
+    public bool Erfolg { get; }
+
+    /// <summary>Das neueste zulässige Release oder <c>null</c>, wenn kein Kandidat gefunden wurde.</summary>
+    public UpdateInfo? Release { get; }
+
+    /// <summary>Die Release-Abfrage ist fehlgeschlagen.</summary>
+    public static UpdateReleaseLookupResult Fehlgeschlagen { get; } = new(false, null);
+
+    /// <summary>Die Release-Abfrage war erfolgreich, lieferte aber keinen passenden Kandidaten.</summary>
+    public static UpdateReleaseLookupResult KeinTreffer { get; } = new(true, null);
+
+    /// <summary>Erzeugt ein erfolgreiches Ergebnis mit dem gefundenen Release.</summary>
+    /// <param name="release">Das neueste zulässige Release.</param>
+    public static UpdateReleaseLookupResult Gefunden(UpdateInfo release) => new(true, release);
+}
 
 /// <summary>Status einer Update-Prüfung.</summary>
 public enum UpdateCheckStatus

@@ -22,7 +22,7 @@ public sealed class FileExplorerView : BaseWindowView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("DateiViewButton"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("DateiViewButton"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("FileExplorerBaum"), Medium);
 
         return this;

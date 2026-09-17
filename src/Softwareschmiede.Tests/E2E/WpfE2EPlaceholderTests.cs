@@ -31,7 +31,7 @@ public sealed class WpfE2ETests : WpfTestBase
         SetLocalDirectoryWorkspaceMode("SeparateWorkingDirectory");
 
         var app = LaunchApp();
-        var mainWindow = app.GetMainWindow(Automation, TimeSpan.FromSeconds(20))!;
+        var mainWindow = WarteAufEchtesHauptfenster(app);
 
         Projekt_ErstellenUndAufgabeAnlegen_ZeigtListeUndStartenButton_E2E(mainWindow);
         Einstellungen_OeffnenAendernUndNavigationBleibtStabil_E2E(mainWindow);

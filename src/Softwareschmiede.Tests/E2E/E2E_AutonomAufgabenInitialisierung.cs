@@ -59,7 +59,7 @@ public partial class End2EndTest
         taskDetail.SaveTask();
 
         var initialisierenButton = WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeInitialisieren"), Short);
-        initialisierenButton.AsButton().Click();
+        initialisierenButton.AsButton().ClickInForeground();
 
         var dialog = WaitForWindow("Autonome Aufgabe initialisieren", Medium);
         // Das zugewiesene LocalDirectoryPlugin-Repository kennt keine Remote-Branches
@@ -76,7 +76,7 @@ public partial class End2EndTest
         var promptBox = WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeInitialPrompt"), Short);
         promptBox.AsTextBox().Text = "Implementiere die Autonome Aufgabe vollständig gemäß Anforderung.";
 
-        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("AutonomAufgabeBestaetigen"), Short).AsButton().ClickInForeground();
 
         // Kein eigenes Detail-Fenster mehr (Folge-Integration zu Issue 205): Die Aufgaben-Detailansicht
         // wechselt selbst zur neuen "Automatisierung"-Registerkarte, die die eingebettete
@@ -93,12 +93,12 @@ public partial class End2EndTest
         // Registerkarten-Umschaltung: zu "Info" wechseln blendet die Automatisierung-Inhalte aus,
         // "Automatisierung" wechselt wieder zurück.
         var infoViewButton = WaitForElement(mainWindow, cf => cf.ByName("InfoCliToggle"), Short);
-        infoViewButton.AsButton().Click();
+        infoViewButton.AsButton().ClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("EditTitel"), Short);
         Assert.Null(mainWindow.FindFirstDescendant(cf => cf.ByName("AutonomAufgabeDetailTabs")));
 
         var automatisierungViewButton = WaitForElement(mainWindow, cf => cf.ByName("AutomatisierungViewButton"), Short);
-        automatisierungViewButton.AsButton().Click();
+        automatisierungViewButton.AsButton().ClickInForeground();
         WaitForElement(mainWindow, cf => cf.ByName("AutonomAufgabeDetailTabs"), Short);
 
         string arbeitsverzeichnisPfad;

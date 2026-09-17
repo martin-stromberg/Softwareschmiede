@@ -12,19 +12,55 @@ public sealed class UpdateServiceTests
     [Fact]
     public async Task CheckForUpdateAsync_ShouldReturnAvailable_WhenRemoteVersionIsNewer()
     {
-        var update = new UpdateInfo("1.2.4", "v1.2.4", "release.zip", new Uri("https://example.invalid/release.zip"), null);
+        var update = new UpdateInfo("1.2.4", "v1.2.4", "release.zip", new Uri("https://example.invalid/release.zip"), null, IsPrerelease: false);
         var versionProvider = new Mock<IApplicationVersionProvider>();
         versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
         var releaseClient = new Mock<IUpdateReleaseClient>();
-        releaseClient.Setup(c => c.GetLatestStableReleaseAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(update);
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UpdateReleaseLookupResult.Gefunden(update));
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync();
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
 
         result.Status.Should().Be(UpdateCheckStatus.UpdateVerfuegbar);
         result.Update.Should().Be(update);
+    }
+
+    /// <summary>Eine erfolgreiche Release-Abfrage ohne passenden Kandidaten meldet KeinUpdate.</summary>
+    [Fact]
+    public async Task CheckForUpdateAsync_ShouldReturnNoUpdate_WhenLookupFindsNoCandidate()
+    {
+        var versionProvider = new Mock<IApplicationVersionProvider>();
+        versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
+        var releaseClient = new Mock<IUpdateReleaseClient>();
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UpdateReleaseLookupResult.KeinTreffer);
+        var sut = CreateSut(versionProvider.Object, releaseClient.Object);
+
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+
+        result.Status.Should().Be(UpdateCheckStatus.KeinUpdate);
+        result.Update.Should().BeNull();
+    }
+
+    /// <summary>Ein technisch fehlgeschlagener Release-Abruf meldet NichtPruefbar statt KeinUpdate.</summary>
+    [Fact]
+    public async Task CheckForUpdateAsync_ShouldReturnNotCheckable_WhenLookupFails()
+    {
+        var versionProvider = new Mock<IApplicationVersionProvider>();
+        versionProvider.Setup(p => p.GetInstalledVersionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InstalledVersionInfo("1.2.3", "v1.2.3", null, null));
+        var releaseClient = new Mock<IUpdateReleaseClient>();
+        releaseClient.Setup(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UpdateReleaseLookupResult.Fehlgeschlagen);
+        var sut = CreateSut(versionProvider.Object, releaseClient.Object);
+
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
+
+        result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
+        result.Update.Should().BeNull();
     }
 
     /// <summary>Gleiche oder nicht prüfbare Versionen zeigen kein verfügbares Update an.</summary>
@@ -37,10 +73,10 @@ public sealed class UpdateServiceTests
         var releaseClient = new Mock<IUpdateReleaseClient>();
         var sut = CreateSut(versionProvider.Object, releaseClient.Object);
 
-        var result = await sut.CheckForUpdateAsync();
+        var result = await sut.CheckForUpdateAsync(new UpdateCheckOptions(IncludePrereleases: false));
 
         result.Status.Should().Be(UpdateCheckStatus.NichtPruefbar);
-        releaseClient.Verify(c => c.GetLatestStableReleaseAsync(It.IsAny<CancellationToken>()), Times.Never);
+        releaseClient.Verify(c => c.GetLatestReleaseAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>Wenn der externe Skriptstart fehlschlägt, wird die App nicht beendet.</summary>

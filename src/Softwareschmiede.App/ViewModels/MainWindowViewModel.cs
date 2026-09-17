@@ -27,9 +27,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly PromptZeitVersandService _promptZeitVersandService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly IRunningAutomationStatusSource _runningStatusSource;
-    private readonly IUpdateService? _updateService;
-    private readonly ICliUpdateSafetyService? _cliUpdateSafetyService;
-    private readonly IUpdateProgressDialogService? _updateProgressDialogService;
+    private readonly MainWindowUpdateFlow _updateFlow;
     private readonly IDialogService? _dialogService;
     private readonly IApplicationVersionProvider? _versionProvider;
     private readonly IPluginManager? _pluginManager;
@@ -41,11 +39,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private ViewModelBase? _currentView;
     private bool _isNavigationExpanded = true;
     private string _title = "Softwareschmiede";
-    private bool _updateVerfuegbar;
-    private UpdateInfo? _verfuegbaresUpdate;
-    private bool _updateCheckLaeuft;
-    private bool _updateWirdVorbereitet;
-    private string? _updateHinweis;
     private string? _currentVersion;
     private bool _disposed;
 
@@ -75,39 +68,22 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob ein neueres Programmupdate verfügbar ist.</summary>
-    public bool UpdateVerfuegbar
-    {
-        get => _updateVerfuegbar;
-        private set => SetProperty(ref _updateVerfuegbar, value, RelayCommand.Refresh);
-    }
+    public bool UpdateVerfuegbar => _updateFlow.UpdateVerfuegbar;
 
     /// <summary>Informationen zum aktuell verfügbaren Update.</summary>
-    public UpdateInfo? VerfuegbaresUpdate
-    {
-        get => _verfuegbaresUpdate;
-        private set => SetProperty(ref _verfuegbaresUpdate, value);
-    }
+    public UpdateInfo? VerfuegbaresUpdate => _updateFlow.VerfuegbaresUpdate;
 
     /// <summary>Gibt an, ob gerade eine Update-Prüfung läuft.</summary>
-    public bool UpdateCheckLaeuft
-    {
-        get => _updateCheckLaeuft;
-        private set => SetProperty(ref _updateCheckLaeuft, value, RelayCommand.Refresh);
-    }
+    public bool UpdateCheckLaeuft => _updateFlow.UpdateCheckLaeuft;
 
     /// <summary>Gibt an, ob gerade ein Update heruntergeladen oder vorbereitet wird.</summary>
-    public bool UpdateWirdVorbereitet
-    {
-        get => _updateWirdVorbereitet;
-        private set => SetProperty(ref _updateWirdVorbereitet, value, RelayCommand.Refresh);
-    }
+    public bool UpdateWirdVorbereitet => _updateFlow.UpdateWirdVorbereitet;
 
     /// <summary>Optionaler Hinweis zur letzten Update-Prüfung.</summary>
-    public string? UpdateHinweis
-    {
-        get => _updateHinweis;
-        private set => SetProperty(ref _updateHinweis, value);
-    }
+    public string? UpdateHinweis => _updateFlow.UpdateHinweis;
+
+    /// <summary>Tooltip der Prüfen-Schaltfläche (begründet eine Deaktivierung im Modus „Aus").</summary>
+    public string UpdatePruefenTooltip => _updateFlow.UpdatePruefenTooltip;
 
     /// <summary>Die aktuell installierte Programmversion als Anzeigetext.</summary>
     public string? CurrentVersion
@@ -155,13 +131,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         PromptZeitVersandService promptZeitVersandService,
         ILogger<MainWindowViewModel> logger,
         IRunningAutomationStatusSource runningStatusSource,
-        Action<Action>? dispatcherInvoke = null,
-        IUpdateService? updateService = null,
-        ICliUpdateSafetyService? cliUpdateSafetyService = null,
-        IUpdateProgressDialogService? updateProgressDialogService = null,
-        IDialogService? dialogService = null,
-        IApplicationVersionProvider? versionProvider = null,
-        AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
+        MainWindowOptionaleDienste? optionaleDienste = null)
     {
         _darkModeService = darkModeService;
         _serviceProvider = serviceProvider;
@@ -170,14 +140,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _promptZeitVersandService = promptZeitVersandService;
         _logger = logger;
         _runningStatusSource = runningStatusSource;
-        _updateService = updateService;
-        _cliUpdateSafetyService = cliUpdateSafetyService;
-        _updateProgressDialogService = updateProgressDialogService;
-        _dialogService = dialogService;
-        _versionProvider = versionProvider;
-        _laufdatenChangedNotifier = laufdatenChangedNotifier;
+        _dialogService = optionaleDienste?.DialogService;
+        _versionProvider = optionaleDienste?.VersionProvider;
+        _laufdatenChangedNotifier = optionaleDienste?.LaufdatenChangedNotifier;
         _pluginManager = serviceProvider.GetService<IPluginManager>();
-        _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
+        _dispatcherInvoke = DispatcherInvokeFactory.Create(optionaleDienste?.DispatcherInvoke);
+        _updateFlow = new MainWindowUpdateFlow(
+            serviceProvider, logger, optionaleDienste?.UpdateDienste, optionaleDienste?.DialogService);
+        _updateFlow.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
 
         NavigateToDashboardCommand = new RelayCommand(NavigateToDashboard);
         NavigateToProjectListCommand = new RelayCommand(NavigateToProjectList);
@@ -186,8 +156,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             await _darkModeService.SetModeAsync(_darkModeService.Current == "Dark" ? "Light" : "Dark", ct));
         ToggleNavigationCommand = new RelayCommand(() => IsNavigationExpanded = !IsNavigationExpanded);
         NavigateZuAufgabeCommand = new RelayCommand<Guid>(NavigateZuAufgabe);
-        UpdatePruefenCommand = new AsyncRelayCommand(UpdatePruefenAsync, () => _updateService is not null && !UpdateCheckLaeuft && !UpdateWirdVorbereitet);
-        UpdateStartenCommand = new AsyncRelayCommand(UpdateStartenAsync, () => _updateService is not null && UpdateVerfuegbar && !UpdateCheckLaeuft && !UpdateWirdVorbereitet);
+        UpdatePruefenCommand = new AsyncRelayCommand(_updateFlow.PruefenAsync, _updateFlow.KannPruefen);
+        UpdateStartenCommand = new AsyncRelayCommand(_updateFlow.StartenAsync, _updateFlow.KannStarten);
 
         _runningStatusSource.RunningCountChanged += OnRunningCountChanged;
         if (_laufdatenChangedNotifier is not null)
@@ -203,7 +173,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _aktualisierungsTimer.Start();
 
         NavigateToDashboard();
-        UpdatePruefenImHintergrund();
         VersionLadenImHintergrund();
     }
 
@@ -260,10 +229,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void NavigateToSettings()
     {
-        _settingsViewModel ??= _serviceProvider.GetRequiredService<SettingsViewModel>();
+        if (_settingsViewModel is null)
+        {
+            _settingsViewModel = _serviceProvider.GetRequiredService<SettingsViewModel>();
+            _settingsViewModel.UpdateSettingsSaved += OnUpdateSettingsSaved;
+        }
         CurrentView = _settingsViewModel;
         Title = "Softwareschmiede – Einstellungen";
     }
+
+    private void OnUpdateSettingsSaved(object? sender, UpdateSettings settings)
+        => _dispatcherInvoke(() => _updateFlow.ApplyGespeicherteUpdateSettings(settings));
 
     /// <summary>Lädt die aktuell aktiven Aufgaben und aktualisiert die Seitenleisten-Anzeige.</summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
@@ -393,100 +369,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         AktiveAufgabenAktualisierenAsync().SafeFireAndForget(_logger, AktiveAufgabenAktualisierenKontext);
     }
 
-    private void UpdatePruefenImHintergrund()
-    {
-        if (_updateService is null)
-            return;
-
-        UpdatePruefenCoreAsync(CancellationToken.None, isManualRefresh: false).SafeFireAndForget(_logger, "MainWindowViewModel.UpdatePruefenAsync");
-    }
-
-    private async Task UpdatePruefenAsync(CancellationToken ct)
-        => await UpdatePruefenCoreAsync(ct, isManualRefresh: true);
-
-    private async Task UpdatePruefenCoreAsync(CancellationToken ct, bool isManualRefresh)
-    {
-        if (_updateService is null)
-            return;
-
-        UpdateCheckLaeuft = true;
-        UpdateHinweis = null;
-        try
-        {
-            var result = await _updateService.CheckForUpdateAsync(ct);
-            ApplyUpdateCheckResult(result, isManualRefresh);
-        }
-        finally
-        {
-            UpdateCheckLaeuft = false;
-        }
-    }
-
-    private async Task UpdateStartenAsync(CancellationToken ct)
-    {
-        if (_updateService is null || _cliUpdateSafetyService is null || _updateProgressDialogService is null || _dialogService is null)
-            return;
-
-        UpdateWirdVorbereitet = true;
-        UpdateHinweis = null;
-        using var updateCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var progressViewModel = new UpdateProgressViewModel(updateCts.Cancel);
-        try
-        {
-            var checkResult = await _updateService.CheckForUpdateAsync(updateCts.Token);
-            ApplyUpdateCheckResult(checkResult, isManualRefresh: false);
-            if (checkResult.Status != UpdateCheckStatus.UpdateVerfuegbar || checkResult.Update is null)
-                return;
-
-            var safety = await _cliUpdateSafetyService.CheckAsync(updateCts.Token);
-            if (safety.RequiresConfirmation && !_dialogService.BestaetigenDialog(BuildSafetyMessage(safety), "Update starten?"))
-                return;
-
-            var progress = new Progress<UpdatePreparationProgress>(progressViewModel.Apply);
-            _updateProgressDialogService.Show(progressViewModel);
-            var preparation = await _updateService.PrepareUpdateAsync(checkResult.Update, progress, updateCts.Token);
-            progressViewModel.MarkUpdaterStarting();
-            await _updateService.StartPreparedUpdateAsync(preparation, updateCts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            progressViewModel.SetError("Update-Vorbereitung wurde abgebrochen.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Update konnte nicht vorbereitet oder gestartet werden.");
-            progressViewModel.SetError($"Update konnte nicht vorbereitet werden: {ex.Message}");
-            UpdateHinweis = "Update konnte nicht vorbereitet werden.";
-        }
-        finally
-        {
-            UpdateWirdVorbereitet = false;
-        }
-    }
-
-    private void ApplyUpdateCheckResult(UpdateCheckResult result, bool isManualRefresh)
-    {
-        if (result.Status == UpdateCheckStatus.UpdateVerfuegbar && result.Update is not null)
-        {
-            VerfuegbaresUpdate = result.Update;
-            UpdateVerfuegbar = true;
-            UpdateHinweis = null;
-            return;
-        }
-
-        VerfuegbaresUpdate = null;
-        UpdateVerfuegbar = false;
-        UpdateHinweis = isManualRefresh ? result.Message : null;
-    }
-
-    private static string BuildSafetyMessage(CliUpdateSafetyResult safety)
-    {
-        var tasks = string.Join(Environment.NewLine, safety.RiskyTasks.Take(5).Select(t => $"- {t}"));
-        var suffix = safety.RiskyTaskCount > 5
-            ? $"{Environment.NewLine}- weitere {safety.RiskyTaskCount - 5} Aufgabe(n)"
-            : string.Empty;
-        return $"Es laufen {safety.RiskyTaskCount} CLI-Aufgabe(n), die nicht auf Eingabe warten.{Environment.NewLine}{Environment.NewLine}{tasks}{suffix}{Environment.NewLine}{Environment.NewLine}Soll das Update trotzdem vorbereitet und die Anwendung beendet werden?";
-    }
+    /// <summary>
+    /// Führt die einmalige Update-Startautomatik aus, sobald das Hauptfenster gerendert ist.
+    /// Das Startkennzeichen wird vor dem ersten <c>await</c> gesetzt; weitere Aufrufe sind wirkungslos.
+    /// Je nach gespeichertem Modus wird nichts, nur geprüft oder geprüft und installiert.
+    /// </summary>
+    /// <param name="ct">Token zum Abbrechen der Operation.</param>
+    public Task InitializeUpdatesAfterWindowReadyAsync(CancellationToken ct = default)
+        => _updateFlow.InitializeAfterWindowReadyAsync(ct);
 
     /// <inheritdoc/>
     public void Dispose()
@@ -502,6 +392,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         {
             _laufdatenChangedNotifier.LaufdatenChanged -= OnLaufdatenChanged;
         }
+
+        if (_settingsViewModel is not null)
+        {
+            _settingsViewModel.UpdateSettingsSaved -= OnUpdateSettingsSaved;
+        }
+
+        _updateFlow.CancelLaufendenUpdateAblauf();
 
         // _refreshGate wird bewusst nicht disposed: Ein noch laufender Fire-and-Forget-Refresh
         // (Timer-Tick oder RunningCountChanged kurz vor dem Schließen) würde in seinem finally-Block

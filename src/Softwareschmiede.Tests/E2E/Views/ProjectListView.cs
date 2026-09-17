@@ -68,7 +68,7 @@ public sealed class ProjectListView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public ProjectListView CreateProject(string name)
     {
-        WaitForElement(Window, cf => cf.ByName("Neu"), Short).AsButton().Click();
+        WaitForElement(Window, cf => cf.ByName("Neu"), Short).AsButton().ClickInForeground();
 
         var projectView = new ProjectDetailView(Window);
         WaitForElement(Window, cf => cf.ByName("ProjektName"), Medium);
@@ -115,7 +115,7 @@ public sealed class ProjectListView : BaseWindowView
     /// <returns>Die Projektdetailansicht des geöffneten Projekts.</returns>
     public ProjectDetailView OpenProject(string name)
     {
-        WaitForElement(GetProjectTilesContainer(), cf => cf.ByName(name), Short).Click();
+        WaitForElement(GetProjectTilesContainer(), cf => cf.ByName(name), Short).ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("Speichern"), Medium);
 
         return new ProjectDetailView(Window);

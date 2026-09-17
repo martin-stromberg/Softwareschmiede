@@ -27,6 +27,8 @@ Bekannte Schlüssel:
 | `NotificationAudioPath` | string | Pfad zur Benachrichtigungs-Audiodatei (MP3/WAV) |
 | `LogLevel` | Enum | Logging-Granularität (`Debug` / `Information`) |
 | `autonomeaufgaben.enabled` | bool | Feature-Flag "Autonome Aufgaben aktivieren" (`AppEinstellungService.AutonomAufgabenEnabledKey`); Standardwert bei fehlendem Eintrag: `true` |
+| `updates.mode` | int | Update-Modus als `UpdateMode`-Wert (`AppEinstellungService.UpdateModeKey`): `0` = Aus, `1` = Nur prüfen, `2` = Bei Programmstart prüfen und ausführen; Standard bei fehlendem/ungültigem Eintrag: `1` |
+| `updates.includePrereleases` | bool | Prerelease-Versionen bei der Update-Prüfung berücksichtigen (`AppEinstellungService.IncludePrereleasesKey`); Standard: `false` |
 | `plugins.sessionlimit.<KiPluginPrefix>` | string | Letzter vom KI-Plugin gemeldeter Session-Limit-Reset-Zeitpunkt (ISO-8601-Roundtrip, UTC). **Laufzeitstatus, keine Anwender-Konfiguration** — wird ausschließlich von `KiPluginLimitService` geschrieben (`SessionLimitKeyPrefix`); abgelaufene oder ungültige Werte werden beim Lesen ignoriert. Details: [Aufgaben — Datenmodell](../aufgaben/datenmodell.md) |
 
 ### `BenachrichtigungsEinstellung`

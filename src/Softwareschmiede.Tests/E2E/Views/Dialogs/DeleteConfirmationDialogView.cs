@@ -18,7 +18,7 @@ public sealed class DeleteConfirmationDialogView : DialogView
     public DeleteConfirmationDialogView Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByAutomationId("6"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByAutomationId("6"), Short).AsButton().ClickInForeground();
 
         return this;
     }
@@ -28,7 +28,7 @@ public sealed class DeleteConfirmationDialogView : DialogView
     public DeleteConfirmationDialogView Cancel()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByAutomationId("7"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByAutomationId("7"), Short).AsButton().ClickInForeground();
 
         return this;
     }

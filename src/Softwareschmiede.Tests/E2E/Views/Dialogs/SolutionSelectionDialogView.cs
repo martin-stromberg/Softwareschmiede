@@ -17,7 +17,7 @@ public sealed class SolutionSelectionDialogView : DialogView
     public void Cancel()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().ClickInForeground();
         WaitUntilGone(Window.Automation.GetDesktop(), DialogWindowCondition, Short);
     }
 
@@ -28,7 +28,7 @@ public sealed class SolutionSelectionDialogView : DialogView
     {
         var dialog = GetDialogWindow();
         var liste = WaitForElement(dialog, cf => cf.ByName("SolutionAuswahl"), Short);
-        WaitForElement(liste, cf => cf.ByName(displayName), Short).Click();
+        WaitForElement(liste, cf => cf.ByName(displayName), Short).ClickInForeground();
         return this;
     }
 
@@ -36,6 +36,6 @@ public sealed class SolutionSelectionDialogView : DialogView
     public void Confirm()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("OK"), Short).AsButton().Click();
+        WaitForElement(dialog, cf => cf.ByName("OK"), Short).AsButton().ClickInForeground();
     }
 }

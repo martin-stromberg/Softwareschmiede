@@ -121,7 +121,7 @@ public partial class End2EndTest
         // darauf gelöscht, um den Fallback-Pfad (fehlgeschlagener Strukturabruf) deterministisch auszulösen.
         var repositoryItem = dialog.WaitForFirstRepositoryItem();
         Directory.Delete(repositoryPath, recursive: true);
-        repositoryItem.Click();
+        repositoryItem.ClickInForeground();
 
         dialog.SetManualWorkingDirectory(@"manual\backend");
         var projectDetailAfterAssign = dialog.Confirm();

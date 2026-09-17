@@ -17,15 +17,36 @@ public partial class End2EndTest
         var codexPath = $@"C:\tools\codex-{Guid.NewGuid():N}.exe";
 
         var settings = new SettingsView(mainWindow).ForceShow();
+        // Das Codex-Einstellungspanel mit "ExecutablePath" existiert erst, nachdem Codex CLI als
+        // Standard-KI-Plugin gewählt wurde (SelectedPluginSettings wird erst dann befüllt).
         settings.SelectDefaultKiPlugin("Codex CLI");
-        settings.SetExecutablePath(codexPath);
-        settings.SaveSettings();
-        settings.Menu.NavigateToDashboard();
+        var oldValue = settings.GetExecutablePath();
+        try
+        {
+            settings.SetExecutablePath(codexPath);
+            settings.SaveSettings();
+            settings.Menu.NavigateToDashboard();
 
-        var settingsReopened = new SettingsView(mainWindow).ForceShow();
-        settingsReopened.SelectDefaultKiPlugin("Codex CLI");
-        Assert.Equal(codexPath, settingsReopened.GetExecutablePath());
+            var settingsReopened = new SettingsView(mainWindow).ForceShow();
+            settingsReopened.SelectDefaultKiPlugin("Codex CLI");
+            Assert.Equal(codexPath, settingsReopened.GetExecutablePath());
 
-        settingsReopened.Menu.NavigateToDashboard();
+            settingsReopened.Menu.NavigateToDashboard();
+        }
+        finally
+        {
+            try
+            {
+                settings.ForceShow();
+                settings.SelectDefaultKiPlugin("Codex CLI");
+                settings.SetExecutablePath(oldValue);
+                settings.SaveSettings();
+                settings.Menu.NavigateToDashboard();
+            }
+            catch
+            {
+                // Cleanup-Fehler dürfen einen bestehenden Testfehler nicht maskieren.
+            }
+        }
     }
 }
