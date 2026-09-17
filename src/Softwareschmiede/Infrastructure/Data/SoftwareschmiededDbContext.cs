@@ -172,6 +172,7 @@ public sealed class SoftwareschmiededDbContext : DbContext
             e.Property(a => a.LetzterCliStartUtc).HasConversion(NullableUnixMillisConverter);
             e.Property(a => a.LaufStatus).HasConversion<string>();
             e.Property(a => a.VorschlagAusfuehrenAbUtc).HasConversion(NullableUnixMillisConverter);
+            e.Property(a => a.PausiertBisUtc).HasConversion(NullableUnixMillisConverter);
             e.Property(a => a.BasisBranchName)
                 .HasMaxLength(255);
             e.Property(a => a.RecoveryVersion)

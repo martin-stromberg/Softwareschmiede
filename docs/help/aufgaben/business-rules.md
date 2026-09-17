@@ -224,20 +224,46 @@
 
 ---
 
-## Rate-Limit-Erkennung und Vorschlag
+## Aufgaben-Pause
 
-**Beschreibung:** Erkennt die KI ein Rate-Limit in der CLI-Ausgabe, wird automatisch ein Prompt-Vorschlag mit Ausführungszeitpunkt gespeichert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync`, das von der automatischen ConPTY-Ausgabeprotokollierung aufgerufen wird.
+**Beschreibung:** Eine reguläre Aufgabe kann bis zu einem frei wählbaren Zeitpunkt pausiert werden. Die Pause ist ein zeitbasiertes Overlay über `Aufgabe.PausiertBisUtc` — es gibt keinen eigenen Status `Pausiert`.
 
 **Bedingungen:**
-- Ausgabezeile beginnt mit `[[SOFTWARESCHMIEDE_RATE_LIMIT]]`.
-- Enthält `resetUtc=<ISO-Zeit>` und optional `prompt=<Text>`.
+- Aufgabe ist keine Autonome Aufgabe (`IstAutonom()` false — deren Pausierung läuft über `AutonomKonfiguration.SessionPauseUtc`).
+- `Status` ist `Neu`, `Gestartet` oder `Wartend`.
+- Beim Setzen muss der gewählte Zeitpunkt in der Zukunft liegen; `null` hebt die Pause auf.
 
 **Verhalten:**
-- Vorschlag und Zeitpunkt werden in `Aufgabe.VorschlagPrompt` / `VorschlagAusfuehrenAbUtc` gespeichert.
-- In der UI erscheint der Vorschlag vorausgefüllt mit dem gespeicherten Ausführungszeitpunkt.
-- Kein automatischer Neustart — der Anwender muss manuell senden oder den Zeitpunkt anpassen.
+- Eine Aufgabe gilt als pausiert, solange `PausiertBisUtc > UtcNow` gilt; abgelaufene Werte wirken nicht mehr (passives Ablaufen, kein Status-Übergang, kein automatischer Restart).
+- Während einer aktiven Pause sind blockiert: Prozessstart, CLI-Neustart (inkl. Plugin-Wechsel-Pfad), automatische und manuelle Recovery, Senden und Planen von Prompts über die Detailansicht.
+- Ein bereits geplanter Prompt wird auf das Pausenende verschoben statt verworfen.
+- Ein laufender CLI-Prozess wird niemals durch die Pause unterbrochen.
+- UI: Buttons werden deaktiviert (`KannPausieren`, `!IstPausiert` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt `⏸ Pausiert (noch …)` mit `Opacity = 0.55`; im Ribbon steht `⏸ Pausiert bis …`.
+- Jede Setzen-/Aufheben-Operation schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag.
 
-**Umsetzung:** `EntwicklungsprozessService.TryParseRateLimitSuggestion`, `AufgabeService.SavePromptVorschlagAsync`.
+**Umsetzung:** `AufgabeService.SetPauseAsync`, `EntwicklungsprozessService.WirfWennPausiert`, `AufgabeRecoveryService`, `PromptZeitVersandService`, `TaskDetailViewModel.PauseEinstellenAsync`, `AufgabePausierenDialogViewModel`, `KiAusfuehrungsStatusConverter`.
+
+---
+
+## Session-Limit-Erkennung und automatische Pause
+
+**Beschreibung:** Meldet ein KI-CLI ein Session-Limit über den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`, wird der Reset-Zeitpunkt pro `KiPluginPrefix` persistiert und alle aktiv laufenden regulären Aufgaben desselben Plugins automatisch pausiert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync` bzw. `CliOutputProtokollWriter` in der automatischen ConPTY-Ausgabeprotokollierung.
+
+**Bedingungen:**
+- Eine CLI-Ausgabezeile enthält den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel.
+- Die auslösende Aufgabe besitzt ein `KiPluginPrefix`.
+- Kandidaten für die automatische Pause: `Status` aktiv oder wartend, `AusfuehrungsStatus == Aktiv`, keine `AutonomKonfiguration`, identisches `KiPluginPrefix` (`OrdinalIgnoreCase`).
+
+**Verhalten:**
+- Der Marker erzeugt an der auslösenden Aufgabe einen `ProtokollTyp.RateLimit`-Eintrag — auch ohne gültigen Zeitstempel.
+- Bei gültigem Zeitstempel wird der Wert als `AppEinstellung` unter `plugins.sessionlimit.<KiPluginPrefix>` (ISO-8601-Roundtrip, UTC) persistiert — Laufzeitstatus, keine Anwender-Konfiguration.
+- Liegt der gemeldete Zeitpunkt in der Vergangenheit, wird er persistiert, löst aber keine Pause aus.
+- Max-Semantik: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine längere manuelle Pause wird nicht verkürzt.
+- Pro pausierter Aufgabe wird ein `SystemMeldung`-Eintrag geschrieben und die Seitenleiste über `AufgabeLaufdatenChangedNotifier` aktualisiert.
+- Laufende CLI-Prozesse werden nicht angefasst; es findet kein automatischer Neustart nach Limit-Ablauf statt.
+- **Update-Sicherheit:** `CliUpdateSafetyService.CheckAsync` behandelt Aufgaben mit zukünftigem Plugin-Session-Limit als nicht riskant — die Heartbeat-Toleranz (`AufgabeLaufAktivitaet.IstAktiv`) entfällt für sie komplett. Aufgaben ohne bekanntes Limit werden wie bisher per Heartbeat bewertet.
+
+**Umsetzung:** `ProtokollService.TryParseRateLimitMarker`/`AddCliOutputAsync`, `CliOutputProtokollWriter.PersistLineAsync`, `KiPluginLimitService.VerarbeiteRateLimitAsync`/`GetAktiveSessionLimitsAsync`, `CliUpdateSafetyService`.
 
 ---
 
@@ -282,18 +308,20 @@
 
 ## Aufgaben-Recovery
 
-**Beschreibung:** Eine Aufgabe im Status `InBearbeitung` oder `KiAktiv` kann manuell wiederhergestellt werden, wenn der Prozess nicht mehr läuft.
+**Beschreibung:** Eine Aufgabe, deren KI-Ausführung hängen geblieben ist (Heartbeat abgelaufen, kein laufender Prozess), kann über das Recovery-Banner auf dem Dashboard wiederhergestellt werden.
 
-**Bedingungen:**
-- Status ist `InBearbeitung` oder `KiAktiv`.
-- Kein aktiver KI-Lauf im `KiAusfuehrungsService`.
-- `LastHeartbeatUtc` ist älter als 5 Minuten oder nicht gesetzt.
+**Bedingungen (Recovery-Kandidat):**
+- `Status` ist `Gestartet` oder `Wartend` und `AusfuehrungsStatus == Aktiv`.
+- Kein aktiver KI-Lauf im `KiAusfuehrungsService` (Laufzeitprüfung).
+- `LastHeartbeatUtc` ist älter als `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (5 Minuten).
+- Keine Autonome Aufgabe (deren Wiederaufnahme steuert der Projektleiter-Agent).
+- Keine aktive Pause: `PausiertBisUtc` ist `null` oder liegt nicht in der Zukunft — pausierte Aufgaben wurden bewusst angehalten und gelten nicht als „festhängend".
 
 **Verhalten:**
-- Wenn alle Bedingungen erfüllt: Button „🩹 Aufgabe wiederherstellen" ist klickbar, Status wird auf `InBearbeitung` zurückgesetzt.
-- Wenn Bedingungen nicht erfüllt: Button deaktiviert mit erklärendem Hinweistext.
+- Wenn alle Bedingungen erfüllt: Die Aufgabe erscheint im Banner „X Aufgabe(n) benötigen Wiederherstellung"; **Wiederherstellen** setzt den Status zurück.
+- Bei der manuellen Recovery wird jede Ablehnung mit `TaskRecoveryRejected`-Logeintrag und `ReasonCode` (`NotFound`, `InvalidState`, `Paused`, `RunningStatusUnavailable`, …) protokolliert; eine aktive Pause führt zu `ReasonCode=Paused` und `InvalidOperationException`.
 
-**Umsetzung:** `AufgabeRecoveryService`, `AufgabeDetail.razor.cs._recoveryAllowed`.
+**Umsetzung:** `AufgabeRecoveryService.ScanForRecoveryCandidatesAsync` und `RecoverManuellAsync`.
 
 ---
 
@@ -346,6 +374,7 @@
 - Liegt die Zielzeit in der Vergangenheit/Gegenwart: Prompt wird sofort versendet (kein Eintrag in der Warteschlange).
 - Liegt die Zielzeit in der Zukunft: Prompt wird gepuffert; ein Timer wird gestartet; bei Fälligkeit wird der Prompt automatisch versendet.
 - Ein bereits geplanter Prompt für dieselbe Aufgabe wird ersetzt (vorheriger Timer wird abgebrochen).
+- Ist die Aufgabe zum Planungs- oder Fälligkeitszeitpunkt pausiert (`PausiertBisUtc` in der Zukunft), wird die Zielzeit auf das Pausenende verschoben — der Prompt bleibt geplant und wird nicht verworfen.
 - Falls die CLI zur Zielzeit nicht mehr aktiv ist, wird der Prompt still verworfen (keine `FehlerMeldung`, nur Log-Warnung).
 - Beim Wechsel der Aufgabendetailansicht, beim `Dispose` des ViewModels oder beim Aufgabenabschluss wird ein geplanter Prompt storniert.
 - Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts.

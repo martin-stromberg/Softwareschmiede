@@ -12,9 +12,12 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
 
 - **Seitenleisten-Anzeige:** Unterhalb der bestehenden Navigationseinträge (Dashboard, Projekte) wird eine neue Sektion „Aktive Aufgaben" angezeigt. Diese Sektion enthält bis zu 20 aktive Aufgaben als gerahmte Kacheln.
 - **Kachel-Inhalte:** Jede Kachel zeigt den Aufgabentitel, den Projektnamen, das SCM-/SCI-Plugin, das KI-Plugin und den aktuellen KI-Ausführungsstatus:
+  - `⏸ Pausiert (noch hh:mm:ss)` — die Aufgabe ist bis zu einem Zeitpunkt pausiert; der Countdown läuft mit (ab 24 Stunden Restzeit mit Tagesangabe, z. B. `1.02:30:00`). Eine aktive Pause überlagert alle übrigen Stati.
+  - `⏳ Prompt in Wartestellung` — ein zeitgesteuerter Prompt ist geplant
   - `▶ Läuft` — `AktiveRunId` ist gesetzt, `LastHeartbeatUtc` ist jünger als 5 Minuten und der Laufstatus ist nicht `WartetAufEingabe`
   - `⏸ Wartet` — die aktive Ausführung wartet auf Eingabe oder die Aufgabe steht im Status `Wartend`
   - `✓ Bereit` — Keine aktive Ausführung erkannt (Fallback)
+- **Abgeblendete Kacheln:** Pausierte Aufgaben werden in der Kachel abgeschwächt (reduzierte Deckkraft) dargestellt, damit sie auf einen Blick von aktiv laufenden Aufgaben unterscheidbar sind.
 - **Aktive Markierung:** Wenn im Inhaltsbereich eine Aufgabe geöffnet ist, wird genau diese Aufgabe in der Seitenleiste hervorgehoben.
 - **Stabile Sortierung:** Die Aufgaben werden absteigend nach `LetzterCliStartUtc` sortiert. Dieser Zeitstempel wird nur beim echten CLI-Prozessstart aktualisiert, nicht beim Anzeigen einer bereits laufenden Hintergrundaufgabe. Für ältere Aufgaben ohne Wert wird auf `ErstellungsDatum`, danach Titel und ID zurückgefallen.
 - **Navigation:** Ein Navigations-Button (→) auf jeder Kachel ermöglicht den direkten Zugriff auf die Aufgabendetailansicht.
@@ -121,7 +124,7 @@ Unter jedem Pull Request zeigt die Ansicht die zugeordneten GitHub-Actions-/Work
 #### Ribbon-Menü
 Aktionsgruppen:
 - **Navigation:** „Zurück"-Button zur Rückkehr zur Projektdetailansicht
-- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Plugin ändern (nur bei laufender CLI)
+- **Aufgabe:** Buttons für Speichern, Löschen, Starten (Status=Neu→Gestartet mit kombiniertem Klone+CLI-Start), Beenden (Status=Gestartet/Wartend→Beendet), Pause einstellen (Status ∈ {Neu, Gestartet, Wartend}, nicht bei Autonomen Aufgaben), Plugin ändern (nur bei laufender CLI). Bei aktiver Pause wird neben den Buttons der Hinweis „⏸ Pausiert bis {Datum Uhrzeit}" angezeigt.
 - **CLI:** „CLI stoppen" Button (nur sichtbar wenn aktiv)
 - **Issue:** „Issue anlegen" wird angeboten, wenn das Repository die Anlage unterstützt und der Aufgabe noch kein Issue zugeordnet ist. „Issue zuweisen" bleibt für die Auswahl eines vorhandenen Issues verfügbar; nach erfolgreicher Anlage zeigt „Issue öffnen" die gespeicherte Referenz.
 - **Pull Request:** „PR erstellen" Button, sobald Branch, verknüpftes Git-Repository und Pull-Request-Unterstützung des Git-Plugins vorhanden sind
@@ -172,13 +175,32 @@ In der Aufgabendetailansicht steht in der Ribbon-Gruppe **CLI** der Button **Roh
 
 Der Export schreibt nur die bereits protokollierten `CliOutput`-Zeilen der Aufgabe in ihrer gespeicherten Reihenfolge in eine `.raw`-Datei. Zusätzliche Metadaten, Formatierungen oder andere Protokolltypen werden nicht ergänzt. Wird der Dialog abgebrochen, bleibt die Aufgabe unverändert.
 
-### Rate-Limit-Vorschlag
+### Aufgabe pausieren
 
-Erkennt die KI ein Rate-Limit (Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601]]` in der Ausgabe), speichert der `ProtokollService` automatisch einen Prompt-Vorschlag mit Ausführungszeitpunkt in der Aufgabe. Der Status wechselt auf `Wartend`.
+Über den Ribbon-Button **Pause einstellen** (Gruppe „Aufgabe") lässt sich eine reguläre Aufgabe bis zu einem frei wählbaren Datum mit Uhrzeit pausieren:
+
+- **Dialog:** Der Dialog „Pause einstellen" fragt Datum und Uhrzeit ab (Datumsauswahl plus Stunden- und Minutenfeld). Beide Felder sind mit der nächsten vollen Minute des aktuellen Zeitpunkts vorbelegt. Ist bereits eine Pause aktiv, wird diese im Dialog angezeigt („Aktuell pausiert bis …").
+- **Validierung:** Der gewählte Zeitpunkt muss in der Zukunft liegen; bei ungültiger Eingabe zeigt der Dialog einen Hinweis und „Übernehmen" bleibt deaktiviert.
+- **Vorzeitiges Aufheben:** Über **Pause aufheben** im selben Dialog wird eine bestehende Pause sofort beendet. Die Schaltfläche ist nur aktiv, solange eine Pause läuft.
+- **Wirkung der Pause:** Solange die Pause läuft, sind **Starten**, **CLI neu starten**, die Wiederherstellung über das Recovery-Banner und das Senden/Planen von Prompts gesperrt. Ein zu diesem Zeitpunkt bereits laufender CLI-Prozess wird dagegen **nicht** unterbrochen und läuft normal weiter. Ein bereits geplanter zeitgesteuerter Prompt wird nicht verworfen, sondern auf das Pausenende verschoben.
+- **Anzeige:** Die Seitenleisten-Kachel zeigt „⏸ Pausiert (noch …)" mit Countdown und ist abgeblendet; im Ribbon erscheint „⏸ Pausiert bis …".
+- **Ende der Pause:** Nach Ablauf des Zeitpunkts endet die Pause von selbst — die Kachel zeigt wieder den normalen Status. Es erfolgt kein automatischer (Neu-)Start; der Anwender startet die Ausführung bei Bedarf manuell.
+
+### Session-Limit-Erkennung und automatische Pause
+
+Meldet die KI-CLI ein Session-Limit (Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:ISO8601]]` in der Ausgabe), wird dies im Aufgabenprotokoll als Rate-Limit-Eintrag festgehalten. Enthält der Marker einen gültigen Reset-Zeitpunkt, geschieht zusätzlich Folgendes:
+
+- Der Reset-Zeitpunkt wird dem betroffenen KI-Plugin zugeordnet und dauerhaft gespeichert.
+- Alle **gerade aktiv laufenden regulären Aufgaben**, die dasselbe KI-Plugin verwenden, werden automatisch bis zu diesem Zeitpunkt pausiert (siehe „Aufgabe pausieren") — die auslösende Aufgabe eingeschlossen. Jede pausierte Aufgabe erhält einen entsprechenden Protokolleintrag.
+- Eine manuell gesetzte, später endende Pause bleibt bestehen und wird durch das Plugin-Limit nicht verkürzt.
+- Liegt der gemeldete Zeitpunkt bereits in der Vergangenheit, wird das Limit zwar vermerkt, aber keine Pause ausgelöst.
+- Laufende CLI-Prozesse werden nicht angehalten; die Pause wirkt erst auf nachfolgende Aktionen.
+
+Aufgaben mit einem bekannten, noch laufenden Session-Limit blockieren außerdem ein anstehendes **Programmupdate nicht**: Sie gelten in der Update-Sicherheitsprüfung als nicht riskant, weil ihr KI-Plugin ohnehin bis zum Reset-Zeitpunkt angehalten ist.
 
 ### Recovery-Mechanismus
 
-Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Gestartet` oder `Wartend`, deren Heartbeat älter als 5 Minuten ist und für die kein aktiver Prozess läuft. Diese werden im `RecoveryBannerControl` angezeigt. Ein Klick auf „Wiederherstellen" setzt den Status auf `Gestartet` und inkrementiert `RecoveryVersion` (optimistic concurrency).
+Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Gestartet` oder `Wartend`, deren Heartbeat älter als 5 Minuten ist und für die kein aktiver Prozess läuft. Diese werden im `RecoveryBannerControl` angezeigt. Ein Klick auf „Wiederherstellen" setzt den Status auf `Gestartet` und inkrementiert `RecoveryVersion` (optimistic concurrency). Pausierte Aufgaben gelten nicht als „festhängend" und werden nicht als Recovery-Kandidaten angeboten; eine manuelle Wiederherstellung wird während einer aktiven Pause mit einem Hinweis abgelehnt.
 
 ## Beispiele
 
@@ -211,6 +233,14 @@ Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Ges
 4. Die Anwendung speichert die bisherigen `CliOutput`-Zeilen der Aufgabe als Textdatei.
 5. Wenn du den Dialog abbrichst, wird keine Datei erzeugt und die Ansicht bleibt unverändert.
 
+### Aufgabe pausieren und wieder freigeben
+
+1. Öffne die Aufgabendetailansicht einer Aufgabe im Status **Neu**, **Gestartet** oder **Wartend**.
+2. Klicke im Ribbon (Gruppe „Aufgabe") auf **Pause einstellen**.
+3. Im Dialog sind Datum und Uhrzeit mit der nächsten vollen Minute vorbelegt; wähle z. B. heute, 18 Uhr, und bestätige mit **Übernehmen**.
+4. Die Kachel in der Seitenleiste zeigt „⏸ Pausiert (noch …)" und ist abgeblendet; **Starten** ist gesperrt.
+5. Um die Pause vorzeitig zu beenden, öffne **Pause einstellen** erneut und klicke auf **Pause aufheben**.
+
 ### To-Do-Liste für Aufgabengliederung und Fortschrittsverfolgung
 
 Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-Do-Liste:
@@ -227,6 +257,10 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
 
 ## Einschränkungen
 
+- Eine Pause kann nur für reguläre Aufgaben im Status `Neu`, `Gestartet` oder `Wartend` gesetzt werden; Autonome Aufgaben nutzen ihren eigenen Pausen-Mechanismus. Beendete oder archivierte Aufgaben können nicht pausiert werden.
+- Die Pause blockiert nur neu ausgelöste Aktionen (Start, CLI-Neustart, Wiederherstellung, Prompt-Versand). Ein laufender CLI-Prozess läuft auch während einer Pause weiter.
+- Nach Ablauf einer Pause erfolgt keine automatische Wiederaufnahme — der Anwender startet bei Bedarf manuell neu.
+- Die automatische Pause bei Session-Limit betrifft nur Aufgaben, deren Ausführung zum Erkennungszeitpunkt läuft. Eine später manuell gestartete Aufgabe mit demselben KI-Plugin wird nicht automatisch blockiert.
 - Für eine Aufgabe kann immer nur ein CLI-Prozess gleichzeitig aktiv sein.
 - Das CLI-Fenster-Einbetten via `SetParent` funktioniert nur auf Windows; bei Scheitern erscheint das Fenster separat.
 - Die Aufgabenwiederherstellung (Recovery) steht nur zur Verfügung, wenn der letzte Heartbeat älter als 5 Minuten ist.

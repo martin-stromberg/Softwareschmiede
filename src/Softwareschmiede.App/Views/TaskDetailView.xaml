@@ -56,6 +56,18 @@
                                                         AutomationName="Beenden"
                                                         ButtonCommand="{Binding AufgabeAbschliessenCommand}"
                                                         Visibility="{Binding IsAutonomAufgabe, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                            <controls:RibbonLargeButton ButtonIcon="⏸"
+                                                        ButtonText="Pause einstellen"
+                                                        AutomationName="PauseEinstellen"
+                                                        ButtonCommand="{Binding PauseEinstellenCommand}"
+                                                        Visibility="{Binding KannPausieren, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            <TextBlock Text="{Binding PauseAnzeigeText}"
+                                       AutomationProperties.Name="PauseAnzeigeText"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0"
+                                       Visibility="{Binding PauseAnzeigeText, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                             <TextBlock Text="{Binding TodoList.OffeneTodoCount, StringFormat='⚠ {0} offen'}"
                                        AutomationProperties.Name="OffeneTodoCountBadge"
                                        AutomationProperties.HelpText="{Binding TodoList.OffeneTodoCount}"

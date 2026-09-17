@@ -20,6 +20,8 @@ Auf der Registerkarte **Allgemein** der Einstellungsseite befindet sich der Absc
 
 Beide Werte werden erst mit einem Klick auf **Speichern** wirksam; die Erfolgsmeldung „Einstellungen gespeichert." bestätigt die Übernahme. Werden die Update-Einstellungen geändert, während ein Update-Angebot angezeigt wird oder ein Update-Vorgang läuft, wird das Angebot zurückgenommen bzw. der laufende Vorgang abgebrochen.
 
+Vor dem Update prüft die Anwendung, ob aktive KI-Aufgaben laufen, und warnt gegebenenfalls. Aufgaben, deren KI-Plugin ein bekanntes, noch laufendes Session-Limit gemeldet hat, gelten dabei nicht als blockierend — sie können ohnehin erst nach dem Limit-Reset fortgesetzt werden.
+
 ## Benutzer-sichtbare Komponenten
 
 ### Schaltflächen in der Seitenleiste

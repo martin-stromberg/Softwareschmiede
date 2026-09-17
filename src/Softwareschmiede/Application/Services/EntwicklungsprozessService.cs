@@ -97,6 +97,7 @@ public sealed class EntwicklungsprozessService
 
         var aufgabe = await _aufgabeService.GetDetailAsync(aufgabeId, ct)
             ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        WirfWennPausiert(aufgabe);
         await ProzessStartenCoreAsync(aufgabeId, aufgabe, repositoryUrl, basisBranchName, selectedScmPluginPrefix, ct);
 
         _logger.LogInformation("Repository-Setup für Aufgabe {AufgabeId} abgeschlossen.", aufgabeId);
@@ -123,6 +124,13 @@ public sealed class EntwicklungsprozessService
         {
             throw new InvalidOperationException("KiAusfuehrungsService ist nicht konfiguriert.");
         }
+
+        // Der Pausen-Guard steht bewusst VOR dem try-Block: Ein InvalidOperationException-Wurf
+        // innerhalb von try würde den Rollback-Pfad auslösen (Klon löschen + Status-Reset), obwohl
+        // die Aufgabe bei aktiver Pause gar nicht angefasst werden soll.
+        var vorabAufgabe = await _aufgabeService.GetByIdAsync(aufgabeId, ct)
+            ?? throw new InvalidOperationException($"Aufgabe {aufgabeId} nicht gefunden.");
+        WirfWennPausiert(vorabAufgabe);
 
         try
         {
@@ -208,6 +216,9 @@ public sealed class EntwicklungsprozessService
         {
             throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
         }
+
+        // Deckt auch den Plugin-Wechsel-Pfad (PluginWechselAsync → CliNeustartenAsync) ab.
+        WirfWennPausiert(aufgabe);
 
         if (string.IsNullOrWhiteSpace(aufgabe.LokalerKlonPfad))
         {
@@ -887,6 +898,15 @@ public sealed class EntwicklungsprozessService
         if (!remoteBranches.Contains(gitRepository.DefaultSourceBranchName, StringComparer.OrdinalIgnoreCase))
         {
             throw new GitBranchNotFoundException(gitRepository.DefaultSourceBranchName);
+        }
+    }
+
+    private static void WirfWennPausiert(Aufgabe aufgabe)
+    {
+        if (aufgabe.PausiertBisUtc is { } pausiertBis && pausiertBis > DateTimeOffset.UtcNow)
+        {
+            throw new InvalidOperationException(
+                $"Die Aufgabe ist bis {pausiertBis.ToLocalTime():dd.MM.yyyy HH:mm:ss} pausiert.");
         }
     }
 }

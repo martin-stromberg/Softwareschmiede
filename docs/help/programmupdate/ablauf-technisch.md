@@ -79,7 +79,7 @@ Manueller Start (`StartenAsync`), Startautomatik und der Kern `InstalliereUpdate
 2. **Einstellungen lesen:** `LeseUpdateSettingsAsync` in frischem Scope. `null` (Lesefehler) → `UpdateEinstellungenLesefehlerAnzeigen` (Angebot entfernt, `UpdateHinweis` = „Die Update-Einstellungen konnten nicht gelesen werden. Eine Update-Prüfung ist nicht möglich."), kein Releaseabruf.
 3. **Modus `Aus`** → `UpdateAngebotEntfernen`, Abbruch vor `CheckForUpdateAsync`, CLI-Sicherheit und Vorbereitung.
 4. **Prüfung:** Der manuelle Installationsstart prüft **erneut** mit den aktuellen Optionen — ein älteres Angebot wird nicht als Installationsargument verwendet. Nur `UpdateCheckStatus.UpdateVerfuegbar` mit nicht-leerem `Update` geht weiter.
-5. **Sicherheitsprüfung:** `ICliUpdateSafetyService.CheckAsync` liefert riskante Aufgaben (`AufgabeLaufAktivitaet.IstAktiv` über `AktiveRunId`/`LastHeartbeatUtc`). Bei `RequiresConfirmation` zeigt `IDialogService.BestaetigenDialog` die Warnung „Update starten?" — Ablehnung beendet den Vorgang. Die Startautomatik umgeht diese Entscheidung nicht.
+5. **Sicherheitsprüfung:** `ICliUpdateSafetyService.CheckAsync` liefert riskante Aufgaben — aktiv sind die, für die `AufgabeLaufAktivitaet.IstAktiv` über `AktiveRunId`/`LastHeartbeatUtc` (jünger als `AufgabeRecoveryService.HeartbeatTimeoutMinutes`, 5 Minuten) greift. Zusätzlich lädt `KiPluginLimitService.GetAktiveSessionLimitsAsync` persistierte, noch zukünftige Session-Limits (`AppEinstellung`-Schlüssel `plugins.sessionlimit.<Prefix>`): Aufgaben eines limitierten `KiPluginPrefix` gelten als nicht riskant — **auch bei frischem Heartbeat**, da das Plugin ohnehin nicht weiterarbeiten kann; für sie entfällt die Heartbeat-Toleranz komplett. Bei `RequiresConfirmation` zeigt `IDialogService.BestaetigenDialog` die Warnung „Update starten?" — Ablehnung beendet den Vorgang. Die Startautomatik umgeht diese Entscheidung nicht.
 6. **Fortschrittsdialog:** `IUpdateProgressDialogService.Show(progressViewModel)` öffnet den modalen `UpdateProgressDialog` mit dem Hauptfenster als Owner.
 7. **Aktualitätsnachweis vor der Vorbereitung:** Einstellungen werden erneut gelesen; Lesefehler oder Abweichung vom Snapshot (`vorVorbereitung != snapshot`) bzw. geänderte Generation beenden den Versuch — im Dialog als Fehler sichtbar, ohne Assetabruf.
 8. **Vorbereitung:** `UpdateService.PrepareUpdateAsync` → `UpdatePackageService.PreparePackageAsync` führt Download (`{AssetName}.download` → umbenannt), Entpacken nach `updates/extracted/{Version}`, Validierung (`Softwareschmiede.exe` + `version.json` im Paket-Root) und Skripterzeugung (`UpdateScriptService.CreateScriptAsync` → `updates/update.ps1`) aus. Fortschritt über `IProgress<UpdatePreparationProgress>`. Fehler räumen die angelegten Dateien/Verzeichnisse wieder auf.
@@ -119,7 +119,7 @@ flowchart TD
     J -- Nein --> K["Hinweis/Angebot aktualisieren<br/>Ende"]
     J -- Ja --> L{"Automatik bei Start<br/>oder manueller Start?"}
     L -- "Nur Angebot" --> M["UpdateVerfuegbar = true<br/>⇧ Update sichtbar"]
-    L -- "Installieren" --> N["CliUpdateSafetyService.CheckAsync"]
+    L -- "Installieren" --> N["CliUpdateSafetyService.CheckAsync<br/>(Session-Limits entlasten)"]
     N --> O{"Riskante Aufgaben?"}
     O -- Ja --> P{"BestaetigenDialog<br/>bestätigt?"}
     P -- Nein --> K

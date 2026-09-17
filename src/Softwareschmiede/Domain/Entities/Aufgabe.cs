@@ -94,6 +94,14 @@ public sealed class Aufgabe
     /// <summary>Geplanter Ausführungszeitpunkt für den nächsten Prompt.</summary>
     public DateTimeOffset? VorschlagAusfuehrenAbUtc { get; set; }
 
+    /// <summary>
+    /// Optionaler UTC-Zeitpunkt, bis zu dem die Aufgabe pausiert ist. Ein Wert in der Zukunft
+    /// blockiert neue Starts, CLI-Neustarts, Recovery und den Versand zeitgesteuerter Prompts;
+    /// ein bereits laufender CLI-Prozess wird dadurch nicht unterbrochen. <c>null</c> oder ein
+    /// vergangener Zeitpunkt bedeutet „nicht pausiert".
+    /// </summary>
+    public DateTimeOffset? PausiertBisUtc { get; set; }
+
     /// <summary>Navigationseigenschaft zur Konfiguration der Autonomen Aufgabe (null für reguläre Aufgaben). Enthält u.a. <see cref="AutonomAufgabeKonfiguration.ProjektleiterAgentId"/>, <see cref="AutonomAufgabeKonfiguration.SessionPauseUtc"/> und <see cref="AutonomAufgabeKonfiguration.AktiveUnteragenten"/>.</summary>
     public AutonomAufgabeKonfiguration? AutonomKonfiguration { get; set; }
 

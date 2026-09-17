@@ -210,7 +210,8 @@ Ablauf:
 3. Der Writer dekodiert die Bytes als UTF-8 und trennt Zeilen auf LF, CRLF und einzelnem CR.
 4. Abgeschlossene Zeilen landen in einer bounded Queue. Bei voller Queue wartet der Output-Reader, bis der Hintergrund-Worker wieder Kapazität schafft.
 5. Der Hintergrund-Worker schreibt Zeilen in Stream-Reihenfolge über `ProtokollService.AddCliOutputAsync`.
-6. Beim Prozessende oder Cleanup wird die Senke idempotent abgeschlossen; `CompleteAsync` wartet begrenzt auf bereits angenommene Queue-Einträge.
+6. Enthält eine Zeile den Session-Limit-Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel, ruft `PersistLineAsync` anschließend `KiPluginLimitService.VerarbeiteRateLimitAsync` auf — siehe „5.5. Automatische Pause bei Session-Limit-Marker".
+7. Beim Prozessende oder Cleanup wird die Senke idempotent abgeschlossen; `CompleteAsync` wartet begrenzt auf bereits angenommene Queue-Einträge.
 
 Die Protokollierung ist UI-unabhängig. Neue `CliOutput`-Einträge müssen nicht live in der Info-Ansicht auftauchen; nach erneutem Laden der Aufgabe werden sie über den normalen Protokollabruf sichtbar.
 
@@ -415,6 +416,57 @@ Ablauf beim Stornieren:
 
 Zusätzlich:
 - `TaskDetailViewModel.OnCliProcessStatusChanged` — Wenn die CLI stoppt (IsCliRunning → false), wird `ScheduledPromptStatus` und `ScheduledPromptTimeDisplay` auf `null` gesetzt. Dadurch wird eine „verwaiste" Wartestellung entfernt, die durch stilles Verwerfen entstanden wäre.
+
+### 5.4. Manuelle Pause setzen und aufheben
+
+Ausgelöst durch den Button **Pause einstellen** (`AutomationName="PauseEinstellen"`) in der Ribbon-Gruppe „Aufgabe" der `TaskDetailView`.
+
+Beteiligte Komponenten:
+- `TaskDetailViewModel.PauseEinstellenCommand` — `AsyncRelayCommand` mit CanExecute `KannPausieren` (`Status` ∈ {`Neu`, `Gestartet`, `Wartend`} ∧ `!IsAutonomAufgabe` ∧ `!IsLoading`); der Button ist über `Visibility`-Binding ausgeblendet, wenn `KannPausieren` nicht gilt
+- `TaskDetailViewModel.PauseEinstellenAsync` — erzeugt das Dialog-ViewModel, ruft den Dialog und übergibt das Ergebnis an den Service
+- `AufgabePausierenDialogViewModel` — Dialog-Zustand: `PausiertDatum`/`PausiertStunde`/`PausiertMinute` (Vorbelegung: `GetLocalNow().AddMinutes(1)`, da die laufende Minute durch den Sekundenabschnitt bereits in der Vergangenheit läge), `AktuellePauseAnzeige`, `IstAktuellPausiert`, `ValidierungsFehler`/`KannBestaetigen`; `Initialize(aktuellePauseUtc)` übernimmt eine bestehende Pause als Vorbelegung
+- `AufgabePausierenErgebnis` — Record mit `PausiertBisUtc` und `Aufheben`
+- `IDialogService.ShowAufgabePausierenDialogAsync` / `WpfDialogService` — zeigt `AufgabePausierenDialog` modal über `ShowDialogAsync`
+- `AufgabeService.SetPauseAsync` — persistiert `Aufgabe.PausiertBisUtc` (oder `null` zum Aufheben) mit Validierung und `ProtokollTyp.SystemMeldung`-Eintrag
+- `AufgabeLaufdatenChangedNotifier` — löst die sofortige Aktualisierung der Seitenleisten-Kachel aus
+
+Ablauf:
+1. `PauseEinstellenAsync` löst `AufgabePausierenDialogViewModel` aus DI auf und initialisiert es mit dem aktuellen `PausiertBisUtc`.
+2. `ShowAufgabePausierenDialogAsync` öffnet den modalen Dialog. Er validiert fortlaufend: Datum gewählt, Stunde 0–23, Minute 0–59, Ergebnis (in lokale Zeit interpretiert, nach UTC normalisiert) muss in der Zukunft liegen — sonst ist `KannBestaetigen == false` und `ValidierungsFehler` wird angezeigt.
+3. Ergebnis-Varianten: **Übernehmen** → `AufgabePausierenErgebnis(pausiertBisUtc, Aufheben: false)`; **Pause aufheben** (nur aktiv bei `IstAktuellPausiert`) → `Ergebnis(null, Aufheben: true)`; **Abbrechen** → `null`, keine Änderung.
+4. Bei `Aufheben` ruft das ViewModel `SetPauseAsync(aufgabeId, null)`, sonst `SetPauseAsync(aufgabeId, ergebnis.PausiertBisUtc)`.
+5. `AufgabeService.SetPauseAsync` lehnt Autonome Aufgaben (`IstAutonom()`), Status außerhalb `Neu`/`Gestartet`/`Wartend` und nicht-zukünftige Zeitpunkte mit `InvalidOperationException` ab; andernfalls wird `PausiertBisUtc` gespeichert und ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben") geschrieben.
+6. `LadenAsync` lädt die Aufgabe neu; `NotifyLaufdatenChanged` stößt den sofortigen Refresh der Seitenleiste an.
+
+### 5.5. Automatische Pause bei Session-Limit-Marker
+
+Ausgelöst durch den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` in einer CLI-Ausgabezeile.
+
+Beteiligte Komponenten:
+- `PseudoConsoleSession` / `CliOutputProtokollWriter.PersistLineAsync` — zeilenbasierter Persistenzpfad; erzeugt pro Zeile einen `IServiceScope`
+- `ProtokollService.AddCliOutputAsync` — speichert den `CliOutput`-Eintrag und bei Marker-Fund den `ProtokollTyp.RateLimit`-Eintrag an der auslösenden Aufgabe
+- `ProtokollService.TryParseRateLimitMarker` — statische, seitenfreie Parsing-Funktion; liefert `resetUtc` auch `null` (Marker ohne gültigen Zeitstempel)
+- `KiPluginLimitService.VerarbeiteRateLimitAsync` — orchestriert Limit-Persistenz und Peer-Pause (scoped; wird via `GetService` aufgelöst, damit Scopes ohne Registrierung fehlertolerant bleiben)
+- `AppEinstellungService.SetSettingAsync` — persistiert den Limit-Zeitpunkt unter `plugins.sessionlimit.<KiPluginPrefix>` (ISO-8601-Roundtrip, UTC)
+- `AufgabeLaufdatenChangedNotifier` — Benachrichtigung pro pausierter Aufgabe
+
+Ablauf:
+1. Nach `AddCliOutputAsync` prüft `PersistLineAsync` die Zeile erneut mit `TryParseRateLimitMarker`. Nur bei `resetUtc.HasValue` wird `KiPluginLimitService.VerarbeiteRateLimitAsync(aufgabeId, resetUtc)` aufgerufen — ein Marker ohne Zeitstempel erzeugt also nur den `RateLimit`-Protokolleintrag.
+2. `VerarbeiteRateLimitAsync` lädt die auslösende Aufgabe; bei fehlendem `KiPluginPrefix` wird ohne Aktion abgebrochen.
+3. Der Zeitpunkt wird als `AppEinstellung` unter `plugins.sessionlimit.<Prefix>` gespeichert. Liegt er in der Vergangenheit, endet der Ablauf hier (kein Pausieren).
+4. Es werden alle Aufgaben mit `Status.IstAktivOderWartend()`, `AusfuehrungsStatus == Aktiv`, ohne `AutonomKonfiguration` und mit gesetztem `KiPluginPrefix` geladen und clientseitig per `StringComparison.OrdinalIgnoreCase` auf dasselbe Prefix gefiltert.
+5. Pro betroffener Aufgabe gilt **Max-Semantik**: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine länger laufende manuelle Pause wird nicht verkürzt. Pro Aufgabe entsteht ein `SystemMeldung`-Eintrag („Aufgabe pausiert bis … (Session-Limit des KI-Plugins '…')").
+6. Nach `SaveChangesAsync` wird pro Aufgabe `NotifyLaufdatenChanged` aufgerufen → die Kacheln zeigen sofort „⏸ Pausiert (noch …)".
+7. Es werden **keine** Methoden von `KiAusfuehrungsService`/`CliProcessManager` aufgerufen — laufende CLI-Prozesse bleiben unangetastet.
+
+### 5.6. Blockade-Pfade bei aktiver Pause
+
+Eine aktive Pause (`PausiertBisUtc > UtcNow`) blockiert neu ausgelöste Aktionen an mehreren Stellen; laufende Prozesse werden nie angefasst:
+
+- **Manueller Start / Neustart:** `EntwicklungsprozessService.ProzessStartenAsync`, `ProzessStartenUndCliStartenAsync` und `CliNeustartenAsync` rufen nach dem Laden der Aufgabe `WirfWennPausiert` auf → `InvalidOperationException` („Die Aufgabe ist bis … pausiert."). Der Guard in `ProzessStartenUndCliStartenAsync` steht bewusst vor dem `try`-Block, damit die Pause nicht den Rollback-Pfad (Klon löschen, Status-Reset) auslöst. `CliNeustartenAsync` deckt auch den Plugin-Wechsel-Pfad (`PluginWechselAsync`) ab. In der UI verhindern `StartenCommand`, `KannCliNeuStarten`, `KannPromptVorlageSenden` und `KannPromptPlanen` die Aktionen bereits über `!IstPausiert`.
+- **Recovery:** `AufgabeRecoveryService.ScanForRecoveryCandidatesAsync` filtert Aufgaben mit zukünftigem `PausiertBisUtc` aus; `RecoverManuellAsync` lehnt mit `TaskRecoveryRejected ReasonCode=Paused` und `InvalidOperationException` ab.
+- **Zeitgesteuerte Prompts:** `PromptZeitVersandService` lädt über die optionale `IServiceScopeFactory` + `AufgabeService` den aktuellen `PausiertBisUtc`-Wert — sowohl in `SchedulePromptAsync` (Verschiebung der Zielzeit auf das Pausenende, falls später) als auch in `HandleTimerElapsedAsync` (Timer wird mit `timer.Change(pausiertBis - now)` neu auf das Pausenende scharf gemacht statt zu senden; die `TargetTime` in `ScheduledPromptInfo` wird mitaktualisiert). Zwischenzeitlich neu geplante Prompts gewinnen (`_scheduledPrompts.ContainsKey`-Prüfung). Ohne Scope-Factory (Unit-Tests) entfällt die Prüfung.
+- **Pausen-Ende:** Rein zeitbasiert — `PausiertBisUtc <= UtcNow` macht alle Guards wirkungslos; der Zeitstempel verbleibt inert in der Datenbank. Es gibt keinen automatischen Restart.
 
 ### 5.1. Aktiver CLI-Name in der Fußzeile
 
@@ -784,18 +836,22 @@ Beteiligte Komponenten:
 
 Konvertierungs-Logik in `Convert()`:
 1. Input-Check: Ist Wert vom Typ `Aufgabe` oder `AktiveAufgabePanelItem`? Sonst `string.Empty` zurückgeben
-2. Wenn für ein Panel-Item ein geplanter Prompt existiert:
+2. Wenn `PausiertBisUtc` gesetzt ist und in der Zukunft liegt (über alle übrigen Stati hinweg):
+   - Output: `"⏸ Pausiert (noch {hh\:mm\:ss})"`; ab einer Restzeit von ≥ 24 Stunden im Format `{d\.hh\:mm\:ss}`
+3. Wenn für ein Panel-Item ein geplanter Prompt existiert:
    - Output: `"⏳ Prompt in Wartestellung"`
-3. Wenn `AusfuehrungsStatus != Aktiv`:
+4. Wenn `AusfuehrungsStatus != Aktiv`:
    - Output: `"✓ Bereit"`
-4. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
+5. Wenn `AktiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
    - Bei `LaufStatus == AufgabeLaufStatus.WartetAufEingabe`: Output `"⏸ Wartet"`
    - Sonst: Output `"▶ Läuft"`
-5. Wenn `Status == AufgabeStatus.Wartend`:
+6. Wenn `Status == AufgabeStatus.Wartend`:
    - Output: `"⏸ Wartet"`
-6. Sonst (Default):
+7. Sonst (Default):
    - Output: `"✓ Bereit"`
-7. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
+8. `ConvertBack()` ist nicht implementiert (Converter ist One-Way)
+
+Der Pausiert-Zweig steht bewusst vor allen übrigen Anzeigen: Eine aktive Pause überlagert den Laufzeitstatus — die Kachel zeigt den Countdown statt `Läuft` oder `Prompt in Wartestellung`. `PausiertBisUtc` wird aus `Aufgabe` übernommen bzw. über `AktiveAufgabePanelItem.PausiertBisUtc` (gemappt in `MainWindowViewModel.MapAktiveAufgabePanelItem`) bereitgestellt; das abgeleitete `AktiveAufgabePanelItem.IstPausiert` steuert zusätzlich die Kachel-Abblendung (`Opacity = 0.55` per `DataTrigger` in `ActiveTasksListControl.xaml`). Der Countdown tickt ohne eigenen Timer, weil der 5-Sekunden-Refresh die Panel-Items neu erzeugt.
 
 ### Navigation zu Aufgabendetail aus aktiver Aufgabe
 
@@ -943,6 +999,12 @@ Ablauf:
 | `SetParent` schlägt fehl | CLI-Fenster bleibt eigenständig; kein Absturz der Anwendung |
 | Prozess beendet sich unerwartet | `Process.Exited`-Event; `IsCliRunning = false`; Heartbeat bleibt als letzter Wert |
 | Heartbeat > 5 Min, kein Prozess | Recovery-Kandidat; Banner auf Dashboard |
+| Start/CLI-Neustart/Recovery bei aktiver Pause | `InvalidOperationException` („Die Aufgabe ist bis … pausiert." / „Wiederherstellung nicht möglich, die Aufgabe ist bis … pausiert."); Recovery-Ablehnung wird mit `TaskRecoveryRejected ReasonCode=Paused` geloggt; in der UI sind die betreffenden Buttons deaktiviert |
+| Pause-Dialog mit Zeitpunkt in Vergangenheit oder ungültiger Eingabe | `KannBestaetigen == false`, `ValidierungsFehler`-Text im Dialog; zusätzlich wirft `AufgabeService.SetPauseAsync` `InvalidOperationException` als Service-Layer-Absicherung |
+| `SetPauseAsync` auf Autonome Aufgabe oder Status `Beendet`/`Archiviert` | `InvalidOperationException`; der Ribbon-Button ist in diesen Fällen ausgeblendet (`KannPausieren`) |
+| Rate-Limit-Marker ohne gültigen Zeitstempel oder ohne `KiPluginPrefix` | Nur `RateLimit`-Protokolleintrag; kein persistiertes Plugin-Limit, keine Pause |
+| Session-Limit-Zeitpunkt liegt in der Vergangenheit | Wert wird als `AppEinstellung` persistiert, löst aber keine Pause aus |
+| `KiPluginLimitService` in Scope nicht registriert | `CliOutputProtokollWriter` löst via `GetService` auf — fehlertolerant, nur der `RateLimit`-Eintrag wird geschrieben |
 | Zweiter CLI-Start für gleiche Aufgabe | `KiAusfuehrungsService` gibt vorhandenes Handle zurück (kein doppelter Start) |
 | Fehler innerhalb des `Process.Exited`-Handlers (z. B. Dispose-Fehler) | `KiAusfuehrungsService.HandleProcessExited` fängt den gesamten Handler-Body ab und loggt; Anwendung stürzt nicht ab (Details: [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
 | Überlappende Heartbeat-Ticks derselben Aufgabe | `CliProcessManager` serialisiert pro Aufgabe über ein eigenes `SemaphoreSlim`; Heartbeats anderer Aufgaben bleiben unbeeinflusst |

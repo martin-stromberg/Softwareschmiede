@@ -151,6 +151,12 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(ShowInfoPanel));
             OnPropertyChanged(nameof(IsPullRequestViewSelected));
             OnPropertyChanged(nameof(KannCliRawExportieren));
+            OnPropertyChanged(nameof(PausiertBisUtc));
+            OnPropertyChanged(nameof(IstPausiert));
+            OnPropertyChanged(nameof(PauseAnzeigeText));
+            OnPropertyChanged(nameof(KannPausieren));
+            OnPropertyChanged(nameof(KannPromptVorlageSenden));
+            OnPropertyChanged(nameof(KannPromptPlanen));
             OnPropertyChanged(nameof(IsAutonomAufgabe));
             OnPropertyChanged(nameof(CanAutonomAufgabeInitialisieren));
             OnPropertyChanged(nameof(ShowAutonomAufgabeRibbonGruppe));
@@ -183,6 +189,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             SetProperty(ref _isLoading, value);
             OnPropertyChanged(nameof(CanCreateIssue));
             OnPropertyChanged(nameof(ShowIssueGroup));
+            OnPropertyChanged(nameof(KannPausieren));
         }
     }
 
@@ -211,6 +218,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(CanCreateIssue));
             OnPropertyChanged(nameof(ShowIssueGroup));
             OnPropertyChanged(nameof(KannPromptPlanen));
+            OnPropertyChanged(nameof(IstPausiert));
+            OnPropertyChanged(nameof(PauseAnzeigeText));
         }
     }
 
@@ -234,7 +243,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann. Fuer Autonome Aufgaben immer false, da diese ueber den Projektleiter-Agenten statt die reguläre CLI-Ansicht gesteuert werden.</summary>
     public bool KannCliNeuStarten => _aufgabe?.AusfuehrungsStatus.SollCliAnzeigen(_aufgabe.Status) == true
         && !_aufgabe.IstAutonom()
-        && !_isCliRunning;
+        && !_isCliRunning
+        && !IstPausiert;
 
     /// <summary>Gibt an, ob die Aufgabe endgueltig abgeschlossen werden kann.</summary>
     public bool KannAufgabeAbschliessen => _aufgabe?.Status.IstAktivOderWartend() == true
@@ -295,7 +305,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob eine Promptvorlage an die laufende CLI gesendet werden kann.</summary>
-    public bool KannPromptVorlageSenden => _isCliRunning && PromptVorlagen.Count > 0;
+    public bool KannPromptVorlageSenden => _isCliRunning && PromptVorlagen.Count > 0 && !IstPausiert;
 
     /// <summary>Bindung Stunde-Eingabefeld für den zeitgesteuerten Prompt-Versand (null bedeutet leer).</summary>
     public int? ScheduledPromptTargetHours
@@ -337,7 +347,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     public bool KannPromptPlanen => _isCliRunning
         && _selectedPromptVorlage is not null
         && !string.IsNullOrWhiteSpace(_selectedPromptVorlage.Prompttext)
-        && (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue);
+        && (_scheduledPromptTargetHours.HasValue || _scheduledPromptTargetMinutes.HasValue)
+        && !IstPausiert;
 
     /// <summary>Steuert die Info-Ansicht als Kompatibilitätsschicht für ältere Tests.</summary>
     public bool IsInfoViewVisible
@@ -540,6 +551,24 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die CLI-Rohausgabe exportiert werden kann.</summary>
     public bool KannCliRawExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
 
+    /// <summary>Der persistierte Pause-Endzeitpunkt der Aufgabe (UTC), oder null.</summary>
+    public DateTimeOffset? PausiertBisUtc => _aufgabe?.PausiertBisUtc;
+
+    /// <summary>true, wenn eine aktive Pause gesetzt ist (Ende liegt in der Zukunft).</summary>
+    public bool IstPausiert => _aufgabe?.PausiertBisUtc > DateTimeOffset.UtcNow;
+
+    /// <summary>Anzeigetext der aktiven Pause für den Ribbon-Bereich, oder null wenn nicht pausiert.</summary>
+    public string? PauseAnzeigeText => IstPausiert
+        ? $"⏸ Pausiert bis {_aufgabe!.PausiertBisUtc!.Value.ToLocalTime():dd.MM.yyyy HH:mm}"
+        : null;
+
+    /// <summary>true, wenn für die Aufgabe eine Pause eingestellt werden kann (Status ∈ {Neu, Gestartet, Wartend}, nicht autonom, nicht am Laden).</summary>
+    public bool KannPausieren => _aufgabe?.Status is Domain.Enums.AufgabeStatus.Neu
+            or Domain.Enums.AufgabeStatus.Gestartet
+            or Domain.Enums.AufgabeStatus.Wartend
+        && !_aufgabe.IstAutonom()
+        && !_isLoading;
+
     /// <summary>Lädt die Aufgabe.</summary>
     public ICommand LadenCommand { get; }
 
@@ -611,6 +640,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
 
     /// <summary>Exportiert die protokollierte CLI-Rohausgabe in eine *.raw-Datei.</summary>
     public ICommand ExportCliRawCommand { get; }
+
+    /// <summary>Öffnet den Pause-Dialog und setzt bzw. hebt die Pause der Aufgabe.</summary>
+    public ICommand PauseEinstellenCommand { get; }
 
     /// <summary>Sendet die gewählte Promptvorlage an die laufende CLI.</summary>
     public ICommand PromptVorlageAuswaehlenCommand { get; }
@@ -708,7 +740,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             StartenAsync,
             () => _aufgabe?.AusfuehrungsStatus.DarfAusfuehrungStarten(_aufgabe.Status) == true
                 && !_aufgabe.IstAutonom()
-                && !_isCliRunning);
+                && !_isCliRunning
+                && !IstPausiert);
         PluginAendernCommand = new AsyncRelayCommand(PluginWechselAsync, () => AufgabeStatus is Domain.Enums.AufgabeStatus.Gestartet or Domain.Enums.AufgabeStatus.Wartend && _isCliRunning);
         AufgabeAbschliessenCommand = new AsyncRelayCommand(AufgabeAbschliessenAsync, () => KannAufgabeAbschliessen);
         SpeichernCommand = new AsyncRelayCommand(SpeichernAsync, () => KannSpeichern);
@@ -739,6 +772,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         // Arbeitsverzeichnis ab. IsAutonomAufgabenEnabled: Feature-Flag für Autonome Aufgaben (Issue 205).
         AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => CanAutonomAufgabeInitialisieren);
         ExportCliRawCommand = new AsyncRelayCommand(ExportCliRawAsync, () => KannCliRawExportieren);
+        PauseEinstellenCommand = new AsyncRelayCommand(PauseEinstellenAsync, () => KannPausieren);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
             vorlage => vorlage is not null && KannPromptVorlageSenden);
@@ -2297,6 +2331,38 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "CLI-Rohausgabe für Aufgabe {AufgabeId} konnte nicht exportiert werden.", _aufgabeId);
             FehlerMeldung = $"CLI-Rohausgabe konnte nicht exportiert werden: {ex.Message}";
+        }
+    }
+
+    private async Task PauseEinstellenAsync(CancellationToken ct)
+    {
+        if (_aufgabeId == Guid.Empty || _aufgabe is null)
+            return;
+
+        FehlerMeldung = null;
+
+        try
+        {
+            var dialogVm = _serviceProvider.GetRequiredService<AufgabePausierenDialogViewModel>();
+            dialogVm.Initialize(_aufgabe.PausiertBisUtc);
+
+            var ergebnis = await _dialogService.ShowAufgabePausierenDialogAsync(dialogVm, ct);
+            if (ergebnis is null)
+                return;
+
+            var pausiertBisUtc = ergebnis.Aufheben ? null : ergebnis.PausiertBisUtc;
+            await _aufgabeService.SetPauseAsync(_aufgabeId, pausiertBisUtc, ct);
+            await LadenAsync(ct);
+            _laufdatenChangedNotifier?.NotifyLaufdatenChanged(_aufgabeId);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Einstellen der Pause für Aufgabe {AufgabeId}.", _aufgabeId);
+            FehlerMeldung = $"Pause konnte nicht gesetzt werden: {ex.Message}";
         }
     }
 
