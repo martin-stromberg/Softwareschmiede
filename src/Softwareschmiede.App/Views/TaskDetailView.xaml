@@ -664,7 +664,7 @@
                            FontSize="12"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center"
-                           AutomationProperties.Name="CliStatusText" />
+                           AutomationProperties.AutomationId="CliStatusText" />
                 <TextBlock Grid.Column="2"
                            Text="{Binding AktiverCliName, StringFormat='CLI: {0}'}"
                            Foreground="{DynamicResource SecondaryTextBrush}"

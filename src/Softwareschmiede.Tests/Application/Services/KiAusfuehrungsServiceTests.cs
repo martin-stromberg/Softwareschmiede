@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Terminal;
 using Softwareschmiede.Tests.Helpers;
 
@@ -22,7 +24,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     public KiAusfuehrungsServiceTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>
@@ -112,11 +114,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         handle.AufgabeId.Should().Be(aufgabeId);
     }
 
-    /// <summary>GetPseudoConsoleSession gibt null zurück wenn keine ConPTY-Session gestartet wurde.</summary>
+    /// <summary>GetTerminalSession gibt null zurück wenn keine ConPTY-Session gestartet wurde.</summary>
     [Fact]
-    public void GetPseudoConsoleSession_GibtNull_OhneSession()
+    public void GetTerminalSession_GibtNull_OhneSession()
     {
-        _sut.GetPseudoConsoleSession(Guid.NewGuid()).Should().BeNull();
+        _sut.GetTerminalSession(Guid.NewGuid()).Should().BeNull();
     }
 
     /// <summary>
@@ -134,7 +136,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             .Setup(f => f.CreateScope())
             .Throws(() => new ObjectDisposedException("IServiceProvider"));
 
-        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
@@ -172,10 +174,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         await using var provider = CreateAufgabeServiceProvider();
         var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
-            provider.GetRequiredService<IServiceScopeFactory>());
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(provider.GetRequiredService<IServiceScopeFactory>());
 
         await StartAndWaitForExitAsync(
             sut,
@@ -202,10 +201,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         await using var provider = CreateAufgabeServiceProvider();
         var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
-            provider.GetRequiredService<IServiceScopeFactory>());
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(provider.GetRequiredService<IServiceScopeFactory>());
 
         await StartAndWaitForExitAsync(
             sut,
@@ -229,10 +225,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         await using var provider = CreateAufgabeServiceProvider();
         var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
-            provider.GetRequiredService<IServiceScopeFactory>());
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(provider.GetRequiredService<IServiceScopeFactory>());
 
         var gestoppt = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
@@ -281,29 +274,29 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Wenn ein Abonnent von CliProcessStatusChanged im ConPTY-Exited-Handler von StartWithPseudoConsoleAsync
+    /// Wenn ein Abonnent von CliProcessStatusChanged im ConPTY-Exited-Handler von StartTerminalSessionAsync
     /// eine Exception wirft, muss diese geloggt werden, ohne die Anwendung zum Absturz zu bringen.
     /// </summary>
     [OsInterfaceFact]
     public async Task ConPtyProcessExited_SubscriberThrows_LogsAndDoesNotCrash()
     {
-        // ConPTY-Pfad: der überwachte Prozess ist die dauerhafte, interaktive äußere cmd.exe-Shell; der
-        // Plugin-Befehl wird lediglich als Text in deren Eingabe getippt (SendCommandDelayedAsync). Ein
-        // getipptes "cmd.exe /c exit 0" würde nur einen verschachtelten Unterprozess starten und beenden,
-        // ohne dass die äußere Shell selbst terminiert. Nur ein direktes "exit"-Kommando beendet die Shell.
+        // Terminal-Pfad: die Session startet den Plugin-Prozess direkt aus der
+        // TerminalSessionStartSpec (keine cmd.exe-Hülle mehr) — "cmd.exe /c exit 0" terminiert
+        // den überwachten Prozess selbst und löst das Exited-Ereignis der Session aus.
         await AssertSubscriberExceptionIsLoggedAsync(
-            (sut, aufgabeId, plugin) => sut.StartWithPseudoConsoleAsync(aufgabeId, plugin, Path.GetTempPath()),
+            (sut, aufgabeId, plugin) => sut.StartTerminalSessionAsync(aufgabeId, plugin, Path.GetTempPath()),
             new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "exit",
-                Arguments = "0",
+                FileName = "cmd.exe",
+                Arguments = "/c exit 0",
                 UseShellExecute = false,
                 CreateNoWindow = true,
             },
             TimeSpan.FromSeconds(15),
             new SimulatedPseudoConsoleProcessLauncher(
                 NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance,
-                NullLoggerFactory.Instance));
+                NullLoggerFactory.Instance,
+                Options.Create(new TerminalSessionOptions())));
     }
 
     /// <summary>
@@ -312,7 +305,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// ScopeFactory und Plugin, registriert einen Subscriber, der im Exited-Handler eine Exception wirft,
     /// ruft den übergebenen Start-Vorgang auf und verifiziert, dass die Exception geloggt wird.
     /// </summary>
-    /// <param name="startAsync">Der auszuführende Start-Aufruf (StartCliAsync oder StartWithPseudoConsoleAsync).</param>
+    /// <param name="startAsync">Der auszuführende Start-Aufruf (StartCliAsync oder StartTerminalSessionAsync).</param>
     /// <param name="pluginProcessStartInfo">Der vom gemockten Plugin gelieferte Befehl, der den überwachten Prozess
     /// (klassisch) bzw. die getippte Konsoleneingabe (ConPTY) tatsächlich beendet.</param>
     /// <param name="timeout">Maximale Wartezeit auf das Logging der Exception.</param>
@@ -326,12 +319,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     {
         var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        using var sut = new KiAusfuehrungsService(loggerMock.Object, NullLoggerFactory.Instance, scopeFactoryMock.Object, pseudoConsoleProcessLauncher);
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, pseudoConsoleProcessLauncher);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(pluginProcessStartInfo);
+        pluginMock.SetupTerminalSpec(pluginProcessStartInfo.FileName, pluginProcessStartInfo.Arguments);
 
         var errorLogged = new TaskCompletionSource();
         loggerMock
@@ -356,29 +350,25 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         finished.Should().Be(errorLogged.Task, "der Exited-Handler muss die Exception des werfenden Subscribers loggen, statt die Anwendung abstürzen zu lassen");
     }
 
-    /// <summary>Beendet der CLI-Prozess einer ConPTY-Sitzung (hier über <see cref="KiAusfuehrungsService.StopCliAsync"/>),
-    /// muss <c>HandleProcessExitedAsync</c> die zugehörige <see cref="PseudoConsoleSession"/>
+    /// <summary>Beendet der CLI-Prozess einer Terminal-Session (hier über <see cref="KiAusfuehrungsService.StopCliAsync"/>),
+    /// muss der Session-<c>Exited</c>-Handler die zugehörige <see cref="PseudoConsoleSession"/>
     /// disposen (Leseschleife wird abgebrochen, Streams werden geschlossen), bevor das Handle aus <c>_handles</c>
-    /// entfernt wird.</summary>
+    /// entfernt wird. Nutzt den Pipe-basierten <see cref="SimulatedPseudoConsoleProcessLauncher"/> mit einem
+    /// echten <c>cmd.exe</c>, damit Kill/Exit auf einem echten Prozess beobachtbar sind.</summary>
     [OsInterfaceFact]
     public async Task KiAusfuehrungsService_HandleProcessExited_DisposesSession()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
-        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
+        pluginMock.SetupTerminalSpec("cmd.exe");
 
-        await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
-        var session = sut.GetPseudoConsoleSession(aufgabeId);
-        session.Should().NotBeNull("StartWithPseudoConsoleAsync muss eine PseudoConsoleSession im Handle hinterlegen");
+        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var session = sut.GetTerminalSession(aufgabeId);
+        session.Should().NotBeNull("StartTerminalSessionAsync muss eine PseudoConsoleSession im Handle hinterlegen");
 
         var gestoppt = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
@@ -393,31 +383,27 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         finished.Should().Be(gestoppt.Task, "StopCliAsync muss letztlich zu HandleProcessExited und damit zum Gestoppt-Status führen");
 
         AssertSessionDisposed(session!, "HandleProcessExited muss die PseudoConsoleSession disposen");
-        sut.GetPseudoConsoleSession(aufgabeId).Should().BeNull("nach HandleProcessExited darf das Handle nicht mehr in _handles vorhanden sein");
+        sut.GetTerminalSession(aufgabeId).Should().BeNull("nach HandleProcessExited darf das Handle nicht mehr in _handles vorhanden sein");
     }
 
-    /// <summary>Ruft man <see cref="KiAusfuehrungsService.Dispose"/> auf, während noch eine ConPTY-Sitzung läuft,
+    /// <summary>Ruft man <see cref="KiAusfuehrungsService.Dispose"/> auf, während noch eine Terminal-Session läuft,
     /// müssen deren Prozess beendet und die zugehörige <see cref="PseudoConsoleSession"/> disposed werden (Leseschleife
-    /// abgebrochen, Streams geschlossen) — keine verwaisten Leseschleifen nach dem Beenden des Service.</summary>
+    /// abgebrochen, Streams geschlossen) — keine verwaisten Leseschleifen nach dem Beenden des Service. Nutzt den
+    /// Pipe-basierten <see cref="SimulatedPseudoConsoleProcessLauncher"/> mit einem echten <c>cmd.exe</c>.</summary>
     [OsInterfaceFact]
     public async Task KiAusfuehrungsService_Dispose_CancelsAllSessions()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
+        var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
-        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
+        pluginMock.SetupTerminalSpec("cmd.exe");
 
-        await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
-        var session = sut.GetPseudoConsoleSession(aufgabeId);
-        session.Should().NotBeNull("StartWithPseudoConsoleAsync muss eine PseudoConsoleSession im Handle hinterlegen");
+        await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var session = sut.GetTerminalSession(aufgabeId);
+        session.Should().NotBeNull("StartTerminalSessionAsync muss eine PseudoConsoleSession im Handle hinterlegen");
 
         sut.Dispose();
 
@@ -429,40 +415,33 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
     /// geschlossen, ein Schreibversuch muss daher eine <see cref="ObjectDisposedException"/> werfen.</summary>
     /// <param name="session">Die Sitzung, deren Dispose-Zustand geprüft wird.</param>
     /// <param name="because">Begründung für die Assertion, falls sie fehlschlägt.</param>
-    private static void AssertSessionDisposed(Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession session, string because)
+    private static void AssertSessionDisposed(Softwareschmiede.Infrastructure.Terminal.ITerminalSession session, string because)
     {
         var act = () => session.InputStream.WriteByte(0);
         act.Should().Throw<ObjectDisposedException>(because);
     }
 
     /// <summary>
-    /// Regressionstest für die Race Condition zwischen dem verzögerten Plugin-Befehlsversand
-    /// (<c>SendCommandDelayedAsync</c>, 300 ms Verzögerung vor dem Schreiben in den ConPTY-Input-Stream) und
-    /// dem Dispose der <see cref="Softwareschmiede.Infrastructure.Terminal.PseudoConsoleSession"/> beim Beenden
-    /// des ConPTY-Kindprozesses: Endet der Prozess (hier deterministisch per <c>Kill</c> erzwungen, statt auf
-    /// das timing-abhängige, nur in bestimmten Umgebungen reproduzierbare frühe ConPTY-Prozessende zu warten),
-    /// bevor die Verzögerung abgelaufen ist, darf kein Zugriff auf den bereits geschlossenen Input-Stream
-    /// erfolgen. Der ausstehende Sendevorgang muss über den mit dem Prozess-Exit verknüpften <c>SendCts</c>
-    /// storniert werden — es darf gar keine <see cref="ObjectDisposedException"/> auftreten (unabhängig vom
-    /// Log-Level, mit dem eine trotzdem auftretende ObjectDisposedException protokolliert würde).
+    /// Regressionstest für frühes Prozessende direkt nach dem Session-Start: Endet der Prozess (hier
+    /// deterministisch per <c>Kill</c> erzwungen) sofort nach <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>,
+    /// muss der Exited-Handler anlaufen und die Session sauber aufräumen — es darf gar keine
+    /// <see cref="ObjectDisposedException"/> auftreten (unabhängig vom Log-Level, mit dem eine trotzdem
+    /// auftretende ObjectDisposedException protokolliert würde). Historisch deckte dieser Test die
+    /// Race Condition zum inzwischen entfernten verzögerten Befehlsversand (<c>SendCommandDelayedAsync</c>)
+    /// ab; seit Issue #271 startet die Session den Prozess direkt und es gibt keinen getippten
+    /// Nachsende-Befehl mehr — die ODE-Regressionsabsicherung bleibt dennoch relevant.
     /// </summary>
     [OsInterfaceFact]
-    public async Task StartWithPseudoConsoleAsync_ProzessEndetVorVerzoegertemSenden_KeineWarnungWegenGeschlossenemStream()
+    public async Task StartTerminalSessionAsync_FruehesProzessende_KeineWarnungWegenGeschlossenemStream()
     {
         var loggerMock = new Mock<ILogger<KiAusfuehrungsService>>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        using var sut = new KiAusfuehrungsService(loggerMock.Object, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, loggerMock.Object, launcher: launcher);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
-        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = "/c echo Test",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
+        pluginMock.SetupTerminalSpec("cmd.exe");
 
         // Bewusst auf jedem Log-Level geprüft (nicht nur Warning): Ziel des Fixes ist, dass die
         // ObjectDisposedException durch die Stornierung gar nicht erst auftritt — nicht nur, dass sie auf
@@ -477,7 +456,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
             .Callback(() => objectDisposedGeloggt.TrySetResult());
 
-        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
 
         var exitStatus = new TaskCompletionSource<CliProcessStatus>();
         sut.CliProcessStatusChanged += (_, status) =>
@@ -486,11 +465,8 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 exitStatus.TrySetResult(status);
         };
 
-        // Prozess deterministisch und sofort beenden, deutlich vor Ablauf der 300ms-Verzögerung in
-        // SendCommandDelayedAsync — reproduziert die Race Condition ohne auf zufälliges, umgebungsabhängiges
-        // frühes ConPTY-Prozessende angewiesen zu sein. In Umgebungen, in denen der ConPTY-Kindprozess
-        // (wie in e2e-timeout-analyse.md dokumentiert) bereits von selbst beendet ist, bevor Kill aufgerufen
-        // wird, ist das Ziel (Prozessende vor Ablauf der Verzögerung) ohnehin schon erreicht.
+        // Prozess deterministisch und sofort beenden — reproduziert das frühe Prozessende ohne auf
+        // zufälliges, umgebungsabhängiges Timing angewiesen zu sein.
         try
         {
             if (!handle.Process.HasExited)
@@ -501,36 +477,29 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         }
 
         var exited = await Task.WhenAny(exitStatus.Task, Task.Delay(TimeSpan.FromSeconds(10)));
-        exited.Should().Be(exitStatus.Task, "der Exited-Handler muss nach dem Kill anlaufen und SendCts stornieren");
+        exited.Should().Be(exitStatus.Task, "der Exited-Handler muss nach dem Kill anlaufen und die Session aufräumen");
 
-        // Über die 300ms-Verzögerung hinaus warten: Ohne den Fix hätte SendCommandDelayedAsync jetzt längst
-        // versucht, in den bereits geschlossenen Input-Stream zu schreiben und eine ObjectDisposedException geloggt.
+        // Kurz warten: kein nachträglicher Zugriff auf geschlossene Streams darf eine
+        // ObjectDisposedException in die Log-Ausgabe schreiben.
         var finished = await Task.WhenAny(objectDisposedGeloggt.Task, Task.Delay(TimeSpan.FromSeconds(1)));
 
         finished.Should().NotBe(objectDisposedGeloggt.Task,
-            "der verzögerte Sendevorgang muss beim Prozess-Exit über SendCts storniert werden, sodass gar keine ObjectDisposedException auftritt");
+            "das Aufräumen beim Prozessende darf keine ObjectDisposedException auslösen oder protokollieren");
     }
 
     /// <summary>Wird ein <see cref="SimulatedPseudoConsoleProcessLauncher"/> injiziert, muss
-    /// <see cref="KiAusfuehrungsService.StartWithPseudoConsoleAsync"/> ohne echtes ConPTY bis zum Status
+    /// <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/> ohne echtes ConPTY bis zum Status
     /// <see cref="CliProcessStatus.Gestartet"/> gelangen (siehe docs/features/e2e-korrektur/requirement.md).</summary>
     [OsInterfaceFact]
-    public async Task StartWithPseudoConsoleAsync_MitInjiziertemFakeLauncher_ErreichtGestartet()
+    public async Task StartTerminalSessionAsync_MitInjiziertemFakeLauncher_ErreichtGestartet()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance);
-        using var sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object, launcher);
+        var launcher = new SimulatedPseudoConsoleProcessLauncher(NullLogger<SimulatedPseudoConsoleProcessLauncher>.Instance, NullLoggerFactory.Instance, Options.Create(new TerminalSessionOptions()));
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object, launcher: launcher);
 
         var aufgabeId = Guid.NewGuid();
         var pluginMock = new Mock<IKiPlugin>();
-        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd",
-                Arguments = "/c echo simuliert",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
+        pluginMock.SetupTerminalSpec("cmd.exe", "/c echo simuliert");
 
         var gestartet = new TaskCompletionSource();
         sut.CliProcessStatusChanged += (_, status) =>
@@ -539,7 +508,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 gestartet.TrySetResult();
         };
 
-        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
 
         var finished = await Task.WhenAny(gestartet.Task, Task.Delay(TimeSpan.FromSeconds(10)));
         finished.Should().Be(gestartet.Task, "der simulierte Launcher muss ohne echtes ConPTY bis zum Status Gestartet gelangen");
@@ -554,31 +523,22 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         }
     }
 
-    /// <summary>StartWithPseudoConsoleAsync persistiert Ausgabe der PseudoConsoleSession automatisch im
+    /// <summary>StartTerminalSessionAsync persistiert Ausgabe der PseudoConsoleSession automatisch im
     /// Aufgabenprotokoll, ohne dass ein TerminalControl gebunden ist.</summary>
     [OsInterfaceFact]
-    public async Task StartWithPseudoConsoleAsync_PersistiertSessionOutputAlsCliOutput()
+    public async Task StartTerminalSessionAsync_PersistiertSessionOutputAlsCliOutput()
     {
         await using var provider = CreateCliOutputServiceProvider();
 
         var aufgabeId = Guid.NewGuid();
         var launcher = new FixedOutputPseudoConsoleProcessLauncher("erste zeile\nzweite zeile\n");
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            launcher);
+            launcher: launcher);
         var pluginMock = new Mock<IKiPlugin>();
-        pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "echo",
-                Arguments = "irrelevant",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
+        pluginMock.SetupTerminalSpec("echo", "irrelevant");
 
-        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath());
 
         var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 2);
         eintraege.Select(e => e.Inhalt).Should().Equal("erste zeile", "zweite zeile");
@@ -596,7 +556,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Zwei parallele ConPTY-Sitzungen schreiben ihre Ausgabe in getrennte Aufgabenprotokolle.</summary>
     [OsInterfaceFact]
-    public async Task StartWithPseudoConsoleAsync_ParalleleAufgaben_TrenntProtokolleNachAufgabeId()
+    public async Task StartTerminalSessionAsync_ParalleleAufgaben_TrenntProtokolleNachAufgabeId()
     {
         await using var provider = CreateCliOutputServiceProvider();
         var aufgabeA = Guid.NewGuid();
@@ -607,15 +567,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             [aufgabeB] = "b-1\nb-2\n"
         };
         var launcher = new OutputByTaskPseudoConsoleProcessLauncher(id => outputs[id], exitImmediately: false);
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            launcher);
+            launcher: launcher);
         var pluginMock = CreateNoOpPlugin();
 
-        var handleA = await sut.StartWithPseudoConsoleAsync(aufgabeA, pluginMock.Object, Path.GetTempPath());
-        var handleB = await sut.StartWithPseudoConsoleAsync(aufgabeB, pluginMock.Object, Path.GetTempPath());
+        var handleA = await sut.StartTerminalSessionAsync(aufgabeA, pluginMock.Object, Path.GetTempPath());
+        var handleB = await sut.StartTerminalSessionAsync(aufgabeB, pluginMock.Object, Path.GetTempPath());
 
         var eintraegeA = await WaitForCliOutputAsync(provider, aufgabeA, expectedCount: 2);
         var eintraegeB = await WaitForCliOutputAsync(provider, aufgabeB, expectedCount: 2);
@@ -635,13 +593,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var aufgabeId = Guid.NewGuid();
         var marker = "[[SOFTWARESCHMIEDE_RATE_LIMIT:2026-06-15T10:00:00Z]]";
         var launcher = new FixedOutputPseudoConsoleProcessLauncher(marker + "\n");
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            launcher);
+            launcher: launcher);
 
-        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
         var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, expectedCount: 2);
         eintraege.Should().Contain(e => e.Typ == ProtokollTyp.CliOutput && e.Inhalt == marker);
@@ -652,18 +608,16 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Eine Restzeile ohne abschliessenden Zeilentrenner wird ueber den Session-/Service-Pfad persistiert.</summary>
     [OsInterfaceFact]
-    public async Task StartWithPseudoConsoleAsync_RestzeileOhneZeilentrenner_PersistiertCliOutput()
+    public async Task StartTerminalSessionAsync_RestzeileOhneZeilentrenner_PersistiertCliOutput()
     {
         await using var provider = CreateCliOutputServiceProvider();
         var aufgabeId = Guid.NewGuid();
         var launcher = new FixedOutputPseudoConsoleProcessLauncher("letzte restzeile");
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            launcher);
+            launcher: launcher);
 
-        var handle = await sut.StartWithPseudoConsoleAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
         var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 1);
         eintraege.Single().Inhalt.Should().Be("letzte restzeile");
@@ -673,18 +627,16 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
     /// <summary>Der kontrollierte Prozessende-Pfad wartet auf den ReadLoop-Drain, bevor der Writer abgeschlossen wird.</summary>
     [OsInterfaceFact]
-    public async Task StartWithPseudoConsoleAsync_ProzessEndeVorReadLoopDrain_VerliertTailOutputNicht()
+    public async Task StartTerminalSessionAsync_ProzessEndeVorReadLoopDrain_VerliertTailOutputNicht()
     {
         await using var provider = CreateCliOutputServiceProvider();
         var aufgabeId = Guid.NewGuid();
         var launcher = new DelayedOutputPseudoConsoleProcessLauncher("tail-output\n", TimeSpan.FromMilliseconds(200));
-        using var sut = new KiAusfuehrungsService(
-            NullLogger<KiAusfuehrungsService>.Instance,
-            NullLoggerFactory.Instance,
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            launcher);
+            launcher: launcher);
 
-        await sut.StartWithPseudoConsoleAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+        await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
 
         var eintraege = await WaitForCliOutputAsync(provider, aufgabeId, expectedCount: 1);
         eintraege.Single().Inhalt.Should().Be("tail-output");
@@ -753,6 +705,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
+        pluginMock.SetupTerminalSpec();
         return pluginMock;
     }
 
@@ -761,6 +714,7 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         var pluginMock = new Mock<IKiPlugin>();
         pluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(processStartInfo);
+        pluginMock.SetupTerminalSpec(processStartInfo.FileName, processStartInfo.Arguments);
         return pluginMock;
     }
 
@@ -870,10 +824,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             _output = output;
         }
 
-        public (System.Diagnostics.Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(
+        public bool IsPseudoTerminal => false;
+
+        public TerminalSessionStartResult Start(
             Guid aufgabeId,
-            string effectiveWorkingDirectory,
-            string pluginCommand,
+            TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
             var process = StartTestProcess(exitImmediately: false);
@@ -883,10 +838,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 process,
                 new MemoryStream(),
                 new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_output)),
-                NullLogger<PseudoConsoleSession>.Instance,
-                outputSink);
+                new PseudoConsoleSessionContext
+                {
+                    Logger = NullLogger<PseudoConsoleSession>.Instance,
+                    OutputSink = outputSink,
+                });
 
-            return (process, session, IntPtr.Zero);
+            return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
         }
     }
 
@@ -901,10 +859,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             _exitImmediately = exitImmediately;
         }
 
-        public (System.Diagnostics.Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(
+        public bool IsPseudoTerminal => false;
+
+        public TerminalSessionStartResult Start(
             Guid aufgabeId,
-            string effectiveWorkingDirectory,
-            string pluginCommand,
+            TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
             var process = StartTestProcess(_exitImmediately);
@@ -913,10 +872,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 process,
                 new MemoryStream(),
                 new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_outputFactory(aufgabeId))),
-                NullLogger<PseudoConsoleSession>.Instance,
-                outputSink);
+                new PseudoConsoleSessionContext
+                {
+                    Logger = NullLogger<PseudoConsoleSession>.Instance,
+                    OutputSink = outputSink,
+                });
 
-            return (process, session, IntPtr.Zero);
+            return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
         }
     }
 
@@ -931,10 +893,11 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             _readDelay = readDelay;
         }
 
-        public (System.Diagnostics.Process Process, PseudoConsoleSession Session, IntPtr NativeProcessHandle) Start(
+        public bool IsPseudoTerminal => false;
+
+        public TerminalSessionStartResult Start(
             Guid aufgabeId,
-            string effectiveWorkingDirectory,
-            string pluginCommand,
+            TerminalSessionStartSpec spec,
             ITerminalOutputSink? outputSink = null)
         {
             var process = StartTestProcess(exitImmediately: true);
@@ -943,10 +906,13 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
                 process,
                 new MemoryStream(),
                 new DelayedContentStream(_output, _readDelay),
-                NullLogger<PseudoConsoleSession>.Instance,
-                outputSink);
+                new PseudoConsoleSessionContext
+                {
+                    Logger = NullLogger<PseudoConsoleSession>.Instance,
+                    OutputSink = outputSink,
+                });
 
-            return (process, session, IntPtr.Zero);
+            return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
         }
     }
 

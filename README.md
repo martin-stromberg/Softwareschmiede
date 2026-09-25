@@ -21,13 +21,24 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 
 - **Projekt- und Aufgabenverwaltung** mit lokalem Aufgabenstatus, Protokollierung und To-Do-Listen
 - **Plugin-basierte SCM-Integration** für GitHub, BitBucket und lokale Arbeitsverzeichnisse
-- **Plugin-basierte KI-Ausführung** über eingebettete CLI-Sitzungen mit ConPTY
+- **Plugin-basierte KI-Ausführung** über eingebettete interaktive CLI-Terminal-Sitzungen (ConPTY mit diagnostiziertem Pipe-Fallback)
 - **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
 - **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Monitoring
 - **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und optionaler Prerelease-Berücksichtigung
+
+## Terminalintegration
+
+KI-CLI-Tools (Claude CLI, GitHub Copilot CLI, Codex CLI, Devin CLI) laufen interaktiv in einem eingebetteten Terminal direkt in der Aufgabendetailansicht:
+
+- Die Anbieter-CLI wird direkt aus der vom Plugin gelieferten Startbeschreibung gestartet — ohne `cmd.exe`-Zwischenschale. `.cmd`/`.bat`-Shims (z. B. npm-Installationen) werden automatisch zu `cmd.exe /d /s /c` normalisiert.
+- Vor jedem Start prüft eine Preflight-Diagnose u. a. PTY-Verfügbarkeit, Executable-Auflösung und CLI-Health. Steht kein Pseudo-Terminal zur Verfügung oder deklariert das Plugin keine PTY-Unterstützung, greift ein diagnostizierter Pipe-Fallback — sichtbar in der Statuszeile als „… (eingeschränkter Modus – kein Pseudo-Terminal)" und als `[Terminal-Diagnose]`-Zeile im Aufgabenprotokoll. CLIs, die zwingend ein Pseudo-Terminal benötigen, schlagen stattdessen mit einer verständlichen Fehlermeldung fehl.
+- Der eigene VT100/ANSI-Renderer unterstützt volle Farben, Alternate Screen (Vollbild-TUIs), Scroll-Regionen und 1000 Zeilen Scrollback; die Terminalgröße folgt Fensteränderungen automatisch.
+- Beim erneuten Öffnen einer Aufgabenseite wird die Terminalanzeige aus einem begrenzten Replay-Puffer (Standard 512 KiB, `Terminal:ReplayBufferByteBudget`) wiederhergestellt.
+
+Details siehe [Terminal-Dokumentation](docs/help/terminal/index.md).
 
 ## Issue-Referenz in der issue.md
 
@@ -196,6 +207,9 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 - `AutonomAufgaben:SkillAutogenerationEnabled`
 - `AutonomAufgaben:MaxClones`
 - `AutonomAufgaben:MaxFeatureBranches`
+- `Terminal:ReplayBufferByteBudget`
+- `Terminal:DefaultCols`
+- `Terminal:DefaultRows`
 
 ### Datenbank und Logs
 

@@ -416,6 +416,17 @@ public sealed class TaskDetailView : BaseWindowView
             + $"Vorhandene Descendants von Window: {DescribeDescendants(Window)}");
     }
 
+    /// <returns>Der aktuell in der Fußzeile angezeigte CLI-Statustext. Das Element trägt die feste
+    /// AutomationId "CliStatusText" — für einen TextBlock (ohne gesetztes AutomationProperties.Name)
+    /// liefert die UIA-Name-Property den Textinhalt (wie bei "AktiverCliName").</returns>
+    public string GetCliStatusText()
+    {
+        var element = WaitForElement(Window, cf => cf.ByAutomationId("CliStatusText"), Short);
+        return element.Patterns.Text.IsSupported
+            ? element.Patterns.Text.Pattern.DocumentRange.GetText(int.MaxValue)
+            : element.Name;
+    }
+
     /// <returns>Der in der Fußzeile angezeigte aktive CLI-Name (ohne das Präfix "CLI: ").</returns>
     public string GetActiveCliName()
     {

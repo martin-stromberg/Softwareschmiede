@@ -30,23 +30,23 @@
 - Task abgebrochen (`IsCanceled`): `LogInformation(...)` mit dem übergebenen `operationName`.
 - In keinem Fall wird die Exception an den ursprünglichen Aufrufer zurückgegeben.
 
-**Umsetzung:** `AsyncTaskExtensions.SafeFireAndForget` (`src/Softwareschmiede/Application/Services/AsyncTaskExtensions.cs`), verwendet u. a. in `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.HandleProcessExited`/`SendCommandDelayedAsync`, den Property-Settern von `MainWindowViewModel.CurrentView`, `ProjectDetailViewModel.ProjektId`, `TaskDetailViewModel.AufgabeId`, `TerminalControl.OnSessionChanged` und `ProjectDetailView.IssueDoubleClick`.
+**Umsetzung:** `AsyncTaskExtensions.SafeFireAndForget` (`src/Softwareschmiede/Application/Services/AsyncTaskExtensions.cs`), verwendet u. a. in `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.HandleSessionEndedAsync`/`HandleSessionFailedAsync`, den Property-Settern von `MainWindowViewModel.CurrentView`, `ProjectDetailViewModel.ProjektId`, `TaskDetailViewModel.AufgabeId`, `TerminalControl.OnSessionChanged` und `ProjectDetailView.IssueDoubleClick`.
 
 ---
 
-## Process.Exited-Handler läuft immer vollständig durch
+## Prozessende-Behandlung läuft immer vollständig durch
 
-**Beschreibung:** Der `Process.Exited`-Handler eines CLI-Prozesses muss alle seine Teilschritte (Handle entfernen, Ressourcen aufräumen, Status ermitteln, Event auslösen) ausführen, auch wenn ein einzelner Teilschritt eine Exception wirft.
+**Beschreibung:** Die Behandlung des Prozessendes eines CLI-Prozesses muss alle ihre Teilschritte (Handle entfernen, Ressourcen aufräumen, Status ermitteln, Event auslösen) ausführen, auch wenn ein einzelner Teilschritt eine Exception wirft.
 
 **Bedingungen:**
-- `Process.Exited` wird ausgelöst (klassischer Start oder ConPTY-Start).
+- `Process.Exited` wird ausgelöst (klassischer Start via `StartCliAsync`) oder die Terminal-Session meldet `Exited`/`Failed` (interaktiver Start via `StartTerminalSessionAsync` — die Session erkennt das Prozessende selbst und liefert den Exit-Code).
 
 **Verhalten:**
-- Der gesamte Handler-Body läuft in einem try-catch.
+- Der gesamte Handler-Body (`HandleExitedCoreAsync`) läuft in einem try-catch.
 - Tritt eine Exception auf (z. B. `ObjectDisposedException` bei `PseudoConsoleSession.Dispose()` durch parallelen Zugriff), wird sie geloggt; der Handler wird **nicht** erneut ausgeführt und die Exception wird **nicht** weitergeworfen.
-- `_handles.TryRemove` stellt sicher, dass jede Aufräum-Aktion pro Aufgabe genau einmal ausgeführt wird, auch wenn der Handler theoretisch mehrfach aufgerufen werden könnte.
+- `_handles.TryRemove` stellt sicher, dass jede Aufräum-Aktion pro Aufgabe genau einmal ausgeführt wird, auch wenn der Handler theoretisch mehrfach aufgerufen werden könnte; entfernt das Event einen zwischenzeitlich neu gestarteten Handle, wird dieser wieder eingetragen und das alte Exit-Event ignoriert.
 
-**Umsetzung:** `KiAusfuehrungsService.HandleProcessExited` (gemeinsame Implementierung für `StartCliAsync` und `StartWithPseudoConsoleAsync`).
+**Umsetzung:** `KiAusfuehrungsService.HandleExitedCoreAsync` (gemeinsame Implementierung; aufgerufen aus `HandleProcessExitedAsync` beim klassischen `StartCliAsync`-Pfad sowie aus `HandleSessionEndedAsync`/`HandleSessionFailedAsync` beim `StartTerminalSessionAsync`-Pfad).
 
 ---
 
@@ -90,6 +90,7 @@
 
 **Verhalten:**
 - Bereits erstellte `FileStream`-Instanzen werden im catch-Block disposed, bevor die Exception erneut geworfen wird.
-- Schlägt der Prozessstart selbst fehl, wird die `PseudoConsole` disposed; schlägt die Ermittlung des `Process`-Objekts fehl, wird zusätzlich das native Win32-Prozess-Handle geschlossen.
+- Schlägt der Prozessstart selbst fehl, wird die `PseudoConsole` disposed; schlägt die Ermittlung des `Process`-Objekts fehl, wird zusätzlich das native Win32-Prozess-Handle geschlossen; schlägt die Session-Erzeugung fehl, wird der bereits laufende Kindprozess per `Kill(entireProcessTree: true)` beendet.
+- Im Erfolgsfall geht das native Prozess-Handle in die Ownership der `PseudoConsoleSession` und wird erst in deren `Dispose()` geschlossen.
 
-**Umsetzung:** `KiAusfuehrungsService.CreatePseudoConsoleSession`, `KiAusfuehrungsService.StartPseudoConsoleProcess`.
+**Umsetzung:** `Win32PseudoConsoleProcessLauncher.CreatePseudoConsoleSession`, `Win32PseudoConsoleProcessLauncher.Start` (analog `SimulatedPseudoConsoleProcessLauncher.Start` auf dem Pipe-Backend).

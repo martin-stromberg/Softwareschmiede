@@ -101,7 +101,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
     /// die interne Leseschleife durch gelesene Bytes selbst <c>MarkOutputActivity()</c> auslöst und damit den
     /// für diesen Test kontrolliert herbeigeführten Statuswechsel überschreibt) und trägt sie über Reflection
     /// in das private <c>_handles</c>-Dictionary von <see cref="KiAusfuehrungsService"/> ein — genau wie es
-    /// <c>StartWithPseudoConsoleAsync</c> in der echten Anwendung tut, nur ohne tatsächlich einen cmd.exe-
+    /// <c>StartTerminalSessionAsync</c> in der echten Anwendung tut, nur ohne tatsächlich einen cmd.exe-
     /// Prozess zu starten.
     /// </summary>
     /// <param name="aufgabeId">ID der Aufgabe, für die eine Fake-Sitzung registriert werden soll.</param>
@@ -119,7 +119,7 @@ public sealed class CliProcessManagerTests_LaufStatus : IDisposable
 
         var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
-        handles[aufgabeId] = new CliProcessHandle(aufgabeId, process) { PseudoConsoleSession = session };
+        handles[aufgabeId] = new CliProcessHandle(aufgabeId, process) { Session = session };
 
         return session;
     }

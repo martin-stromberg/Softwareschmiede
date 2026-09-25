@@ -30,7 +30,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 **Verhalten:**
 
 - Erstellt einen `Protokolleintrag` mit `Typ = ProtokollTyp.CliOutput`.
-- Wird im ConPTY-Pfad automatisch durch `CliOutputProtokollWriter` aufgerufen.
+- Wird im interaktiven Terminal-Pfad (ConPTY oder Pipe-Fallback) automatisch durch `CliOutputProtokollWriter` aufgerufen.
 - Erkennt Rate-Limit-Marker in der Ausgabezeile und speichert dann zusätzlich einen `ProtokollTyp.RateLimit`-Eintrag (`"Rate-Limit erkannt. Weiter ab: …"` bzw. `"(kein Zeitstempel)"`).
 - Speichert pro Aufruf eine Zeile.
 - Der Aufrufer `CliOutputProtokollWriter` reicht Marker mit gültigem Zeitstempel anschließend an `KiPluginLimitService.VerarbeiteRateLimitAsync` weiter.

@@ -171,4 +171,116 @@ public sealed class AnsiSequenceParserTests
         events.Should().ContainSingle(e => e is TextWrittenEvent);
         ((TextWrittenEvent)events[0]).Text.Should().Be("A\r\nB");
     }
+    /// <summary>Ein chunk-übergreifendes UTF-8-Multibyte-Zeichen wird über die Decoder-Pufferung
+    /// korrekt zusammengesetzt, statt in zwei Ersatzzeichen zu zerfallen.</summary>
+    [Fact]
+    public void Parse_Utf8UeberChunkGrenze_WirdKorrektDekodiert()
+    {
+        var sut = new AnsiSequenceParser();
+        var bytes = Encode("€"); // E2 82 AC
+
+        var e1 = sut.Parse(bytes[..2]).ToList();
+        var e2 = sut.Parse(bytes[2..]).ToList();
+
+        var text = string.Concat(
+            e1.OfType<TextWrittenEvent>().Select(e => e.Text)
+                .Concat(e2.OfType<TextWrittenEvent>().Select(e => e.Text)));
+        text.Should().Be("€");
+    }
+
+    /// <summary>CSI L ergibt LinesInsertedEvent.</summary>
+    [Fact]
+    public void Parse_CsiL_ErgibtLinesInsertedEvent()
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode("\x1b[3L")).ToList();
+        events.Should().ContainSingle(e => e is LinesInsertedEvent);
+        ((LinesInsertedEvent)events[0]).Count.Should().Be(3);
+    }
+
+    /// <summary>CSI M ergibt LinesDeletedEvent.</summary>
+    [Fact]
+    public void Parse_CsiM_ErgibtLinesDeletedEvent()
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode("\x1b[2M")).ToList();
+        events.Should().ContainSingle(e => e is LinesDeletedEvent);
+        ((LinesDeletedEvent)events[0]).Count.Should().Be(2);
+    }
+
+    /// <summary>CSI @ ergibt CharsInsertedEvent, CSI P CharsDeletedEvent, CSI X CharsErasedEvent.</summary>
+    [Theory]
+    [InlineData("\x1b[4@", typeof(CharsInsertedEvent), 4)]
+    [InlineData("\x1b[5P", typeof(CharsDeletedEvent), 5)]
+    [InlineData("\x1b[6X", typeof(CharsErasedEvent), 6)]
+    public void Parse_CsiZeichenOperationen_ErgebenKorrekteEvents(string seq, Type expectedType, int expectedCount)
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode(seq)).ToList();
+        var matches = events.Where(e => e.GetType() == expectedType).ToList();
+        matches.Should().ContainSingle();
+        matches[0].GetType().GetProperty("Count")!.GetValue(matches[0]).Should().Be(expectedCount);
+    }
+
+    /// <summary>CSI r ergibt ScrollRegionChangedEvent mit den übergebenen Grenzen.</summary>
+    [Fact]
+    public void Parse_CsiR_ErgibtScrollRegionChangedEvent()
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode("\x1b[2;10r")).ToList();
+        events.Should().ContainSingle(e => e is ScrollRegionChangedEvent);
+        var evt = (ScrollRegionChangedEvent)events[0];
+        evt.Top.Should().Be(1);
+        evt.Bottom.Should().Be(9);
+    }
+
+    /// <summary>CSI ?1049h / ?1047h aktivieren den Alternate Screen, ?1049l kehrt zurück.</summary>
+    [Theory]
+    [InlineData("\x1b[?1049h", true)]
+    [InlineData("\x1b[?1047h", true)]
+    [InlineData("\x1b[?1049l", false)]
+    [InlineData("\x1b[?1047l", false)]
+    public void Parse_AltScreenSequenzen_ErgebenAlternateScreenChangedEvent(string seq, bool expectedActive)
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode(seq)).ToList();
+        var altEvents = events.OfType<AlternateScreenChangedEvent>().ToList();
+        altEvents.Should().ContainSingle();
+        altEvents[0].Enabled.Should().Be(expectedActive);
+    }
+
+    /// <summary>ESC 7 / CSI s speichern, ESC 8 / CSI u stellen den Cursor wieder her.</summary>
+    [Theory]
+    [InlineData("\x1b" + "7", false)]
+    [InlineData("\x1b[s", false)]
+    [InlineData("\x1b" + "8", true)]
+    [InlineData("\x1b[u", true)]
+    public void Parse_SaveRestoreCursor_ErgibtCursorSavedEvent(string seq, bool expectedRestored)
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode(seq)).ToList();
+        events.Should().ContainSingle(e => e is CursorSavedEvent);
+        ((CursorSavedEvent)events[0]).Restored.Should().Be(expectedRestored);
+    }
+
+    /// <summary>ESC c ergibt TerminalResetEvent.</summary>
+    [Fact]
+    public void Parse_EscC_ErgibtTerminalResetEvent()
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode("\x1b" + "c")).ToList();
+        events.Should().ContainSingle(e => e is TerminalResetEvent);
+    }
+
+    /// <summary>CSI S scrollt aufwärts, CSI T abwärts — als ScreenScrolledEvent mit vorzeichenbehafteter Delta.</summary>
+    [Theory]
+    [InlineData("\x1b[3S", 3)]
+    [InlineData("\x1b[2T", -2)]
+    public void Parse_ScrollUpDown_ErgebenScreenScrolledEvent(string seq, int expectedDelta)
+    {
+        var sut = new AnsiSequenceParser();
+        var events = sut.Parse(Encode(seq)).ToList();
+        events.Should().ContainSingle(e => e is ScreenScrolledEvent);
+        ((ScreenScrolledEvent)events[0]).DeltaRows.Should().Be(expectedDelta);
+    }
 }

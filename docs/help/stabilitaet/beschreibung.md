@@ -12,18 +12,18 @@ Drei globale Exception-Handler werden beim Start der Anwendung registriert (`App
 
 Alle bewusst nicht abgewarteten (Fire-and-Forget) asynchronen Aufrufe verwenden die Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget`, die Exceptions des Tasks über einen `ILogger` protokolliert, statt sie unbeobachtet zu lassen oder zum Aufrufer zu propagieren.
 
-Der `Process.Exited`-Handler von `KiAusfuehrungsService` — sowohl für den klassischen als auch den ConPTY-basierten CLI-Start — läuft vollständig in einer zentralen, try-catch-geschützten Methode (`HandleProcessExited`), damit ein Fehler in einem Teilschritt (z. B. beim Dispose einer bereits geschlossenen `PseudoConsoleSession`) nicht die Ausführung der übrigen Schritte oder die Benachrichtigung anderer Event-Abonnenten verhindert.
+Die Prozessende-Behandlung von `KiAusfuehrungsService` — ausgelöst über `Process.Exited` beim klassischen Start bzw. über die Session-Events `Exited`/`Failed` beim Terminal-Session-Start — läuft vollständig in einer zentralen, try-catch-geschützten Methode (`HandleExitedCoreAsync`), damit ein Fehler in einem Teilschritt (z. B. beim Dispose einer bereits geschlossenen `PseudoConsoleSession`) nicht die Ausführung der übrigen Schritte oder die Benachrichtigung anderer Event-Abonnenten verhindert.
 
 Der Heartbeat-Mechanismus, der den Bearbeitungsfortschritt periodisch in der Datenbank aktualisiert, verwendet pro Aufgabe eine eigene Sperre (`SemaphoreSlim`), damit sich überlappende Timer-Ticks nur innerhalb derselben Aufgabe serialisieren — Heartbeats unabhängiger Aufgaben blockieren sich nicht gegenseitig.
 
-Beim Aufbau der ConPTY-Ein-/Ausgabe-Streams (`CreatePseudoConsoleSession`) werden bei einem Fehler bereits erzeugte `FileStream`-Instanzen sauber freigegeben, statt native Handles offen zu lassen.
+Beim Aufbau der ConPTY-Ein-/Ausgabe-Streams (`CreatePseudoConsoleSession` im `Win32PseudoConsoleProcessLauncher`) werden bei einem Fehler bereits erzeugte `FileStream`-Instanzen sauber freigegeben, statt native Handles offen zu lassen.
 
 In `PseudoConsoleSession` wird der Lesevorgang aus dem ConPTY-Output-Stream (`ReadLoopAsync`) zusätzlich von einem generischen `catch (Exception)` abgesichert; der zugehörige Hintergrund-Task wird in `_readLoopTask` gespeichert. Die Leseschleife läuft ab Konstruktion der Session bis zu ihrem `Dispose()` unabhängig davon, ob ein `TerminalControl` gebunden ist (parallele CLI-Ausführungen, Issue-86) — `TerminalControl` ist reiner Renderer und abonniert lediglich das `BufferChanged`-Event der Session.
 
 ## Beispiele
 
 - Eine Exception, die tief in einem Timer-Callback für Heartbeat-Updates auftritt (z. B. eine gesperrte SQLite-Datenbank), wird über `SafeFireAndForget` als `LogError` protokolliert. Die Anwendung läuft weiter, der nächste Timer-Tick versucht es erneut.
-- Wirft `PseudoConsoleSession.Dispose()` beim Beenden eines ConPTY-Prozesses eine `ObjectDisposedException` (z. B. durch gleichzeitigen Zugriff), fängt `HandleProcessExited` diese ab, loggt sie und meldet den Prozess trotzdem korrekt als beendet.
+- Wirft `PseudoConsoleSession.Dispose()` beim Beenden eines ConPTY-Prozesses eine `ObjectDisposedException` (z. B. durch gleichzeitigen Zugriff), fängt `HandleExitedCoreAsync` diese ab, loggt sie und meldet den Prozess trotzdem korrekt als beendet.
 - Schlägt die Initialisierung von `CliProcessManager` beim Anwendungsstart fehl, wird dies geloggt; die Anwendung startet dennoch, allerdings ohne CLI-Funktionalität.
 - Wirft der ANSI-Parser oder das Rendering im Terminal-Lesevorgang eine unerwartete Exception, wird sie geloggt und die Leseschleife endet geordnet, statt die Anwendung abstürzen zu lassen.
 

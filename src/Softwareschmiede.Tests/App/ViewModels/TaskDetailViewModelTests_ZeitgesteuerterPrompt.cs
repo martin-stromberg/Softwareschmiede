@@ -42,7 +42,7 @@ public sealed class TaskDetailViewModelTests_ZeitgesteuerterPrompt : IDisposable
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
         _promptZeitVersandService = new PromptZeitVersandService(_kiService, _timeProvider, NullLogger<PromptZeitVersandService>.Instance);
 
         var pluginManagerMock = new Mock<IPluginManager>();

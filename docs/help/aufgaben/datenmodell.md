@@ -217,7 +217,7 @@ CLI-Ausgaben werden ohne neue Tabelle im bestehenden `Protokolleintrag`-Modell g
 
 | Feld | Wert bei CLI-Ausgabe |
 |------|----------------------|
-| `AufgabeId` | Die Aufgabe, deren ConPTY-Sitzung den Output erzeugt hat |
+| `AufgabeId` | Die Aufgabe, deren Terminal-Sitzung den Output erzeugt hat |
 | `Typ` | `ProtokollTyp.CliOutput` |
 | `Inhalt` | Eine dekodierte Ausgabezeile aus dem Terminal-Output |
 | `Zeitstempel` | Persistenzzeitpunkt des Protokolleintrags |

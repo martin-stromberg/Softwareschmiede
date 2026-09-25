@@ -119,6 +119,7 @@ public sealed class TaskDetailViewModelTests_PluginAktivierung : IDisposable
         mock.SetupGet(p => p.PluginPrefix).Returns(prefix);
         mock.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);
         mock.Setup(p => p.GetSettingGroups()).Returns([]);
+        mock.SetupTerminalSpec();
         return mock;
     }
 

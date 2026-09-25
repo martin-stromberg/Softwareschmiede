@@ -53,4 +53,19 @@ public sealed class KiSimulatorPluginTests
         psi.UseShellExecute.Should().BeFalse();
         psi.CreateNoWindow.Should().BeFalse();
     }
+
+    /// <summary>Der Simulator startet eine interaktive Shell (cmd.exe /k mit Banner), damit stdin-Befehle
+    /// zeilenweise ausgeführt werden — auf PTY wie Pipe-Backend gleichermaßen.</summary>
+    [Fact]
+    public async Task GetTerminalStartSpecAsync_LiefertInteraktiveShellMitBanner()
+    {
+        var spec = await _sut.GetTerminalStartSpecAsync(@"C:\repos\demo");
+
+        spec.FileName.Should().Be("cmd.exe");
+        spec.Arguments.Should().Contain("/k");
+        spec.Arguments.Should().Contain("KI-Simulator läuft...");
+        spec.WorkingDirectory.Should().Be(@"C:\repos\demo");
+        spec.Capabilities.Should().Be(Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty);
+        spec.PluginName.Should().Be("KI Simulator");
+    }
 }

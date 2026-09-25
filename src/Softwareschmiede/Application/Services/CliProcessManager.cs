@@ -20,12 +20,12 @@ public sealed class CliProcessManager : IDisposable
     private readonly ConcurrentDictionary<Guid, Timer> _heartbeatTimers = new();
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
-    // Hält pro Aufgabe die PseudoConsoleSession und den dafür registrierten Event-Handler, damit
+    // Hält pro Aufgabe die ITerminalSession und den dafür registrierten Event-Handler, damit
     // RuntimeStatusChanged beim Stopp/Fehler wieder sauber abgemeldet werden kann (siehe
-    // UnsubscribeRuntimeStatus). Ohne dieses Tracking müsste GetPseudoConsoleSession(aufgabeId) erneut
+    // UnsubscribeRuntimeStatus). Ohne dieses Tracking müsste GetTerminalSession(aufgabeId) erneut
     // abgefragt werden — das Handle ist zu diesem Zeitpunkt aber bereits aus KiAusfuehrungsService._handles
     // entfernt (siehe HandleProcessExited), sodass die Session dort nicht mehr auffindbar wäre.
-    private readonly ConcurrentDictionary<Guid, (PseudoConsoleSession Session, EventHandler<CliRuntimeStatusChangedEventArgs> Handler)> _runtimeStatusSubscriptions = new();
+    private readonly ConcurrentDictionary<Guid, (ITerminalSession Session, EventHandler<CliRuntimeStatusChangedEventArgs> Handler)> _runtimeStatusSubscriptions = new();
 
     // Ein Semaphore pro Aufgabe statt eines einzelnen klassenweiten Semaphores: verhindert nur das
     // Überlappen von Timer-Ticks derselben Aufgabe, ohne die Heartbeat-Updates unabhängiger Aufgaben
@@ -180,12 +180,12 @@ public sealed class CliProcessManager : IDisposable
     }
 
     /// <summary>
-    /// Abonniert <see cref="PseudoConsoleSession.RuntimeStatusChanged"/> für die ConPTY-Sitzung einer
-    /// gerade gestarteten Aufgabe (sofern vorhanden — beim klassischen, nicht-ConPTY-Start existiert keine
+    /// Abonniert <see cref="ITerminalSession.RuntimeStatusChanged"/> für die Terminal-Sitzung einer
+    /// gerade gestarteten Aufgabe (sofern vorhanden — beim klassischen, nicht-interaktiven Start existiert keine
     /// Sitzung), damit Wechsel zwischen "arbeitet" und "wartet auf Eingabe" über
     /// <see cref="AufgabeService.AktualisiereLaufStatusAsync"/> persistiert werden (Issue 108, Folgefehler
     /// des Rückwegs Läuft → Wartet: dieser Substatus wurde vorher ausschließlich lokal in der
-    /// <see cref="PseudoConsoleSession"/> gehalten und nie an die Datenbank weitergereicht).
+    /// <see cref="ITerminalSession"/> gehalten und nie an die Datenbank weitergereicht).
     /// </summary>
     /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess gestartet wurde.</param>
     private void SubscribeRuntimeStatus(Guid aufgabeId)
@@ -195,7 +195,7 @@ public sealed class CliProcessManager : IDisposable
         // Event-Registrierungen und einen dadurch überzähligen Persistierungsaufruf pro Statuswechsel.
         UnsubscribeRuntimeStatus(aufgabeId);
 
-        var session = _kiService.GetPseudoConsoleSession(aufgabeId);
+        var session = _kiService.GetTerminalSession(aufgabeId);
         if (session is null)
         {
             // Klassischer Start ohne ConPTY: keine Sitzung, also kein Laufzeit-Substatus verfügbar.

@@ -142,11 +142,11 @@ Ablauf:
    - Branch wird erstellt oder checked out; ohne `IssueReferenz` wird ein Branch im Format `task/{aufgabe.Id:N}-{slug}` erzeugt, mit Issue-Nummer im Format `task/issue-{nummer}-{aufgabe.Id:N}-{slug}`
    - Status wird auf `Gestartet` gesetzt (nicht zwischendurch auf andere Status)
 8. Bei `Aufgabe.AusfuehrungsStatus == Beendet` wird der vorhandene lokale Klon über `EntwicklungsprozessService.CliNeustartenAsync` weiterverwendet; Repository-Klon und Branch-Erstellung werden nicht erneut ausgeführt.
-9. `KiAusfuehrungsService.StartCliAsync(aufgabeId, kiPluginPrefix)` startet intern den ConPTY-Pfad über `StartWithPseudoConsoleAsync`:
+9. `KiAusfuehrungsService.StartTerminalSessionAsync(aufgabeId, kiPlugin, ...)` startet die interaktive Terminal-Session:
    - KI-Plugin wird geladen
-   - `IKiPlugin.StartCliAsync` liefert `ProcessStartInfo`
+   - `IKiPlugin.GetTerminalStartSpecAsync` liefert die `TerminalSessionStartSpec` (Executable, Argumente, Arbeitsverzeichnis, Umgebung, Capabilities)
    - `KiAusfuehrungsService` erzeugt einen `CliOutputProtokollWriter` für die Aufgabe
-   - `IPseudoConsoleProcessLauncher.Start(..., outputSink)` startet den nativen Prozess und erstellt die `PseudoConsoleSession`
+   - `ITerminalSessionFactory.StartAsync` (`TerminalSessionService`) löst die Executable auf (`TerminalExecutableResolver`), führt die Preflight-Diagnose aus, wählt das Backend (ConPTY oder diagnostizierter Pipe-Fallback) und ruft `IPseudoConsoleProcessLauncher.Start(normalizedSpec, outputSink)` — der Launcher startet den Prozess direkt und erstellt die `PseudoConsoleSession`
    - Die Session meldet gelesene Terminal-Output-Chunks an den Writer; dieser speichert Ausgabezeilen als `ProtokollTyp.CliOutput`
    - Event `CliProcessStatusChanged` → `IsCliRunning = true`
    - `CliProcessManager.OnCliProcessStatusChanged` (ebenfalls auf das Event abonniert) startet den
@@ -197,7 +197,7 @@ Die Dateien `issue.md` und `.gitignore`-Eintrag sind lokale Dateien und gehören
 ### 0.4. CLI-Ausgaben automatisch im Aufgabenprotokoll speichern
 
 Beteiligte Komponenten:
-- `KiAusfuehrungsService.StartWithPseudoConsoleAsync` — erzeugt den aufgabenbezogenen Output-Writer und hält ihn im Prozess-Handle
+- `KiAusfuehrungsService.StartTerminalSessionAsync` — erzeugt den aufgabenbezogenen Output-Writer und hält ihn im Prozess-Handle
 - `IPseudoConsoleProcessLauncher.Start(..., outputSink)` — reicht die optionale Senke an die `PseudoConsoleSession` weiter
 - `PseudoConsoleSession.ReadLoopAsync` — meldet gelesene Output-Bytes vor der ANSI-Verarbeitung an die Senke
 - `CliOutputLineAccumulator` — dekodiert UTF-8 über Chunk-Grenzen und bildet Protokollzeilen
@@ -205,7 +205,7 @@ Beteiligte Komponenten:
 - `ProtokollService.AddCliOutputAsync` — speichert `ProtokollTyp.CliOutput` und erkennt Rate-Limit-Marker
 
 Ablauf:
-1. Beim ConPTY-Start wird ein `CliOutputProtokollWriter` mit der aktuellen `aufgabeId` erstellt.
+1. Beim Terminal-Session-Start wird ein `CliOutputProtokollWriter` mit der aktuellen `aufgabeId` erstellt.
 2. Die `PseudoConsoleSession` liest Output weiter unabhängig vom `TerminalControl`; jeder Chunk wird an `OnOutputChunk` gemeldet.
 3. Der Writer dekodiert die Bytes als UTF-8 und trennt Zeilen auf LF, CRLF und einzelnem CR.
 4. Abgeschlossene Zeilen landen in einer bounded Queue. Bei voller Queue wartet der Output-Reader, bis der Hintergrund-Worker wieder Kapazität schafft.
@@ -271,7 +271,7 @@ Ablauf:
 2. `LadenAsync` wird aufgerufen (registriert in AufgabeId-Property-Setter)
 3. Aufgabe wird mit `AufgabeService.GetDetailAsync` geladen
 4. Prüfung: `Aufgabe.AusfuehrungsStatus == Aktiv`
-5. Falls eine Session läuft: Session wird aus `KiAusfuehrungsService.GetPseudoConsoleSession(aufgabeId)` geholt und eingebettet
+5. Falls eine Session läuft: Session wird aus `KiAusfuehrungsService.GetTerminalSession(aufgabeId)` geholt und eingebettet
 6. Falls keine Session läuft: keine implizite neue CLI wird gestartet; Recovery betrachtet nur aktive, wiederherstellbare Laufdaten
 7. Bei `NichtGestartet` oder `Beendet`: `ShowCliPanel` bleibt aus, `StartenCommand` kann abhängig vom Gesamtstatus aktiv sein
 
@@ -374,7 +374,7 @@ Beteiligte Komponenten:
 - `PromptZeitVersandService.HandleTimerElapsedAsync` — Callback wird bei Fälligkeit aufgerufen (Thread-Pool-Thread)
 - `PromptZeitVersandService.SendPromptAsync` — Schreibt Prompt an Session oder verwerfen
 - `PromptZeitVersandService.PromptSent` — Event, ausgelöst nach erfolgreichem Versand
-- `KiAusfuehrungsService.GetPseudoConsoleSession` — Holt aktive Session für die Aufgabe
+- `KiAusfuehrungsService.GetTerminalSession` — Holt aktive Session für die Aufgabe
 - `PseudoConsoleSession.WritePromptAsync` — Schreibt Prompt mit Encoding und Flushing
 - `TaskDetailViewModel` — abonniert `PromptSent` Event
 
@@ -383,7 +383,7 @@ Ablauf:
 2. `HandleTimerElapsedAsync(aufgabeId)` wird aufgerufen
 3. Lock wird akquiriert; Eintrag wird aus Dictionary entfernt; Info gespeichert; Timer disposed
 4. `SendPromptAsync(aufgabeId, promptText, CancellationToken.None)` wird aufgerufen (außerhalb des Locks)
-5. `_kiService.GetPseudoConsoleSession(aufgabeId)` holt die aktive Session:
+5. `_kiService.GetTerminalSession(aufgabeId)` holt die aktive Session:
    - Session vorhanden: `PseudoConsoleSession.WritePromptAsync(promptText, ct)` wird aufgerufen
      - Prompt wird zu UTF-8-Bytes + Newline konvertiert
      - Bytes werden auf `InputStream` geschrieben, Stream wird geflusht
@@ -1006,7 +1006,7 @@ Ablauf:
 | Session-Limit-Zeitpunkt liegt in der Vergangenheit | Wert wird als `AppEinstellung` persistiert, löst aber keine Pause aus |
 | `KiPluginLimitService` in Scope nicht registriert | `CliOutputProtokollWriter` löst via `GetService` auf — fehlertolerant, nur der `RateLimit`-Eintrag wird geschrieben |
 | Zweiter CLI-Start für gleiche Aufgabe | `KiAusfuehrungsService` gibt vorhandenes Handle zurück (kein doppelter Start) |
-| Fehler innerhalb des `Process.Exited`-Handlers (z. B. Dispose-Fehler) | `KiAusfuehrungsService.HandleProcessExited` fängt den gesamten Handler-Body ab und loggt; Anwendung stürzt nicht ab (Details: [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
+| Fehler innerhalb des `Process.Exited`-Handlers (z. B. Dispose-Fehler) | `KiAusfuehrungsService.HandleExitedCoreAsync` fängt den gesamten Handler-Body ab und loggt; Anwendung stürzt nicht ab (Details: [Stabilität & Fehlerbehandlung](../stabilitaet/index.md)) |
 | Überlappende Heartbeat-Ticks derselben Aufgabe | `CliProcessManager` serialisiert pro Aufgabe über ein eigenes `SemaphoreSlim`; Heartbeats anderer Aufgaben bleiben unbeeinflusst |
 | Event-Handler wird aus dem `Process.Exited`-Hintergrund-Thread ausgelöst | `MainWindowViewModel.OnRunningCountChanged` marshallt via `_dispatcherInvoke` auf den UI-Thread; kein Zugriff auf UI-Elements ohne Marshalling |
 | Überlappende Event- und Timer-Aktualisierungen | `SemaphoreSlim(1,1)` in `AktiveAufgabenAktualisierenAsync()` mit `WaitAsync(0)` (non-blocking) überspringt neue Anfragen während eine Aktualisierung läuft — keine DbContext-Konflikte, aber auch keine "schwebenden" Anfragen-Queue |

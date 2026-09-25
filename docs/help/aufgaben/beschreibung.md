@@ -100,7 +100,7 @@ Eine Aufgabe durchläuft folgende Status:
 Die WPF-Aufgabendetailansicht (`TaskDetailView`) nutzt eine gemeinsame Ansichtsleiste oberhalb des Inhalts. Die verfügbaren Ansichten sind explizit benannt:
 
 #### Info-Ansicht
-Zeigt die Stammdaten der Aufgabe, insbesondere Titel, Status, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Bei neuen Aufgaben enthält sie die bearbeitbaren Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Die Info-Ansicht ist unabhängig vom Aufgabenstatus erreichbar, also auch bei gestarteten, wartenden und beendeten Aufgaben. CLI-Ausgaben laufender ConPTY-Sitzungen werden automatisch als Protokolleinträge gespeichert und sind nach erneutem Laden der Aufgabe über das Aufgabenprotokoll nachvollziehbar.
+Zeigt die Stammdaten der Aufgabe, insbesondere Titel, Status, Beschreibung, optionale Issue-Referenz und Protokollinformationen. Bei neuen Aufgaben enthält sie die bearbeitbaren Felder für Titel und Anforderungsbeschreibung mit „Speichern"-Button im Ribbon. Die Info-Ansicht ist unabhängig vom Aufgabenstatus erreichbar, also auch bei gestarteten, wartenden und beendeten Aufgaben. CLI-Ausgaben laufender Terminal-Sitzungen werden automatisch als Protokolleinträge gespeichert und sind nach erneutem Laden der Aufgabe über das Aufgabenprotokoll nachvollziehbar.
 
 #### CLI-Ansicht
 Zeigt das Terminalfenster des KI-Tools. Das Fenster wird via Win32 `SetParent` direkt in die Ansicht eingebettet (`ProcessWindowHost`). 
@@ -165,7 +165,7 @@ Der `KiAusfuehrungsService` läuft als Singleton. Er startet und stoppt CLI-Proz
 
 ### Automatisches CLI-Ausgabeprotokoll
 
-Für jeden ConPTY-Start erzeugt `KiAusfuehrungsService` einen `CliOutputProtokollWriter`, der an die `PseudoConsoleSession` angebunden wird. Die Session meldet gelesene Output-Bytes unabhängig von der UI an diese Senke. Der Writer dekodiert UTF-8 über Chunk-Grenzen, trennt Ausgabe auf `\n`, `\r\n` und einzelne `\r` und speichert jede abgeschlossene Zeile über `ProtokollService.AddCliOutputAsync` als `ProtokollTyp.CliOutput`.
+Für jeden Terminal-Session-Start (`KiAusfuehrungsService.StartTerminalSessionAsync` — ConPTY oder diagnostizierter Pipe-Fallback) erzeugt `KiAusfuehrungsService` einen `CliOutputProtokollWriter`, der an die `PseudoConsoleSession` angebunden wird. Die Session meldet gelesene Output-Bytes unabhängig von der UI an diese Senke. Der Writer dekodiert UTF-8 über Chunk-Grenzen, trennt Ausgabe auf `\n`, `\r\n` und einzelne `\r` und speichert jede abgeschlossene Zeile über `ProtokollService.AddCliOutputAsync` als `ProtokollTyp.CliOutput`.
 
 Die Protokollierung hängt nicht davon ab, dass die CLI-Ansicht geöffnet ist. Persistenzfehler werden geloggt und unterbrechen den CLI-Prozess nicht. Bei sehr schneller Ausgabe ist die interne Queue begrenzt; wenn sie voll ist, wartet der Output-Reader auf freie Kapazität. Ein bekannter Abschluss-Race bei voller Queue und parallelem Cleanup ist noch als Nacharbeit offen.
 

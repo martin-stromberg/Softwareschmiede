@@ -6,6 +6,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Interfaces;
 
+using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>Tests für die Arbeitsverzeichnis-Auflösung und -Validierung in <see cref="KiAusfuehrungsService"/>.</summary>
@@ -21,7 +22,7 @@ public sealed class KiAusfuehrungsServiceTests_WorkingDirectory : IDisposable
         Directory.CreateDirectory(_tempRoot);
 
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _sut = new KiAusfuehrungsService(NullLogger<KiAusfuehrungsService>.Instance, NullLoggerFactory.Instance, scopeFactoryMock.Object);
+        _sut = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>

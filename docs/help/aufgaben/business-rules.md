@@ -247,7 +247,7 @@
 
 ## Session-Limit-Erkennung und automatische Pause
 
-**Beschreibung:** Meldet ein KI-CLI ein Session-Limit über den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`, wird der Reset-Zeitpunkt pro `KiPluginPrefix` persistiert und alle aktiv laufenden regulären Aufgaben desselben Plugins automatisch pausiert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync` bzw. `CliOutputProtokollWriter` in der automatischen ConPTY-Ausgabeprotokollierung.
+**Beschreibung:** Meldet ein KI-CLI ein Session-Limit über den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`, wird der Reset-Zeitpunkt pro `KiPluginPrefix` persistiert und alle aktiv laufenden regulären Aufgaben desselben Plugins automatisch pausiert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync` bzw. `CliOutputProtokollWriter` in der automatischen Terminal-Ausgabeprotokollierung.
 
 **Bedingungen:**
 - Eine CLI-Ausgabezeile enthält den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel.
@@ -269,14 +269,14 @@
 
 ## Automatische CLI-Ausgabeprotokollierung
 
-**Beschreibung:** CLI-Ausgaben einer ConPTY-Sitzung werden automatisch dem Protokoll der zugehörigen Aufgabe zugeordnet.
+**Beschreibung:** CLI-Ausgaben einer Terminal-Sitzung (ConPTY oder diagnostizierter Pipe-Fallback) werden automatisch dem Protokoll der zugehörigen Aufgabe zugeordnet.
 
 **Bedingungen:**
-- Der CLI-Prozess wird über `KiAusfuehrungsService.StartWithPseudoConsoleAsync` gestartet.
-- Die `PseudoConsoleSession` liefert Output-Bytes aus ihrer internen Leseschleife.
+- Der CLI-Prozess wird über `KiAusfuehrungsService.StartTerminalSessionAsync` gestartet.
+- Die `ITerminalSession` (Implementierung: `PseudoConsoleSession`) liefert Output-Bytes aus ihrer internen Leseschleife.
 
 **Verhalten:**
-- Pro ConPTY-Start wird ein `CliOutputProtokollWriter` für genau eine `aufgabeId` erzeugt.
+- Pro Terminal-Session-Start wird ein `CliOutputProtokollWriter` für genau eine `aufgabeId` erzeugt.
 - Die Ausgabe wird zeilenweise als `ProtokollTyp.CliOutput` gespeichert.
 - Die Reihenfolge innerhalb einer Session bleibt durch einen sequenziellen Hintergrund-Worker erhalten.
 - Die Protokollierung ist UI-unabhängig und läuft weiter, wenn kein `TerminalControl` gebunden ist.
@@ -284,7 +284,7 @@
 - Bei hoher Ausgaberate begrenzt eine bounded Queue den Speicherverbrauch und erzeugt Backpressure.
 - Beim Abschluss wartet die Senke auf die aktive Queue-Phase eines bereits dekodierten Chunks, bevor der Channel geschlossen wird.
 
-**Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputProtokollWriter`, `PseudoConsoleSession.ReadLoopAsync`, `KiAusfuehrungsService.StartWithPseudoConsoleAsync`, `ProtokollService.AddCliOutputAsync`.
+**Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputProtokollWriter`, `PseudoConsoleSession.ReadLoopAsync`, `KiAusfuehrungsService.StartTerminalSessionAsync`, `ProtokollService.AddCliOutputAsync`.
 
 ---
 

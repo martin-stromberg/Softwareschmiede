@@ -72,7 +72,7 @@
 
 **Symptom:** Log-Eintrag „Fehler im Exited-Handler (ConPTY) für Aufgabe {AufgabeId}." mit einer `ObjectDisposedException`.
 
-**Ursache:** `PseudoConsoleSession.Dispose()` wurde für dieselbe Session mehrfach aufgerufen (z. B. durch gleichzeitiges manuelles Stoppen und automatisches Prozessende). Dies wird von `HandleProcessExited` abgefangen und geloggt, statt die Anwendung zu beeinträchtigen.
+**Ursache:** `PseudoConsoleSession.Dispose()` wurde für dieselbe Session mehrfach aufgerufen (z. B. durch gleichzeitiges manuelles Stoppen und automatisches Prozessende). Dies wird von `HandleExitedCoreAsync` abgefangen und geloggt, statt die Anwendung zu beeinträchtigen.
 
 **Lösung:**
 1. In der Regel ist keine Aktion notwendig — der Prozess wurde korrekt als beendet erkannt und alle Handles wurden freigegeben.

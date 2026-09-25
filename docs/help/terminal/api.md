@@ -4,11 +4,11 @@
 
 ## Übersicht
 
-Das Terminal-System exponiert die `PseudoConsoleSession` zum Starten und Steuern von Prozessen, die `TerminalControl` als WPF-Rendering-Component, das `PseudoConsoleSessionGestartet`-Event zum Lifecycle-Management und optionale Output-Senken für die UI-unabhängige Weiterverarbeitung gelesener Terminalausgaben.
+Das Terminal-System exponiert die `ITerminalSession`-Abstraktion zum Steuern von Prozessen (einzige Implementierung: `PseudoConsoleSession` für beide Backends), die `ITerminalSessionFactory` (`TerminalSessionService`) zur zentralen Session-Erzeugung mit Executable-Auflösung, Preflight-Diagnose und Backend-Wahl, das `TerminalControl` als WPF-Rendering-Component, das `TerminalSessionGestartet`-Event zum Lifecycle-Management und optionale Output-Senken für die UI-unabhängige Weiterverarbeitung gelesener Terminalausgaben.
 
-## PseudoConsoleSession
+## ITerminalSession
 
-Koordiniert einen Pseudo Console-Prozess, Input-Pipe und Output-Pipe.
+Gemeinsame Abstraktion einer interaktiven Terminal-Session über beide Backends (ConPTY und Pipe-Fallback); implementiert `IDisposable`. Einzige Implementierung ist `PseudoConsoleSession`, die einen Prozess mit Input-Pipe und Output-Pipe koordiniert.
 
 ### Eigenschaften
 
@@ -19,6 +19,8 @@ Koordiniert einen Pseudo Console-Prozess, Input-Pipe und Output-Pipe.
 | `OutputStream` | `System.IO.Stream` | Pipe zum Lesen der Prozess-Ausgabe (read-only) |
 | `Buffer` | `TerminalBuffer` | Der Terminal-Buffer der Sitzung; wird bereits bei Konstruktion angelegt und von der internen Leseschleife befüllt, unabhängig davon, ob ein `TerminalControl` gebunden ist (read-only) |
 | `RuntimeStatus` | `CliRuntimeStatus` | Der aktuelle Betriebszustand der CLI (`Inaktiv`, `Laeuft`, `WartetAufEingabe`). Wird alle 1 Sekunde neu bewertet basierend auf Prozess-Zustand und I/O-Aktivität (read-only) |
+| `IsPseudoTerminal` | `bool` | `true`, wenn die Session über ein echtes Pseudo-Terminal (ConPTY) läuft; `false` auf dem Pipe-Fallback-Backend — steuert u. a. den „eingeschränkter Modus"-Hinweis in der Statuszeile |
+| `ExitCode` | `int?` | Der Exit-Code des Prozesses nach dessen Beendigung (`null` vor Beendigung oder wenn nicht ermittelbar) |
 
 ### Events
 
@@ -52,17 +54,41 @@ session.RuntimeStatusChanged += (_, args) =>
 };
 ```
 
+#### `OutputChunk`
+
+Wird pro gelesenem Roh-Chunk ausgelöst — **vor** der ANSI-Parser-Verarbeitung und nach der Meldung an die `ITerminalOutputSink`. Trägt die unveränderten Ausgabebytes.
+
+**Typ:** `EventHandler<TerminalOutputChunkEventArgs>`
+
+**EventArgs:** `Data` (`ReadOnlyMemory<byte>` — unveränderter Roh-Chunk; der Lesepuffer wird wiederverwendet, Inhalte ggf. kopieren)
+
+#### `Exited`
+
+Wird bei Beendigung des Prozesses genau einmal ausgelöst. Der Exit-Code wird PID-wiederverwendungs-sicher über `GetExitCodeProcess` auf dem nativen Prozess-Handle (ConPTY-Backend) bzw. `Process.ExitCode` (Pipe-Backend) ermittelt. Ein Ende des Output-Streams bei noch laufendem Prozess löst das Event nicht aus.
+
+**Typ:** `EventHandler<TerminalSessionExitedEventArgs>`
+
+**EventArgs:** `ExitCode` (`int?` — `null`, wenn nicht ermittelbar)
+
+#### `Failed`
+
+Wird bei einem fatalen Laufzeitfehler der Session ausgelöst (z. B. Leseschleifen-Exception, defekte Pipe). `KiAusfuehrungsService` behandelt `Failed` wie einen Exit ohne Code → Status `Fehler`.
+
+**Typ:** `EventHandler<TerminalSessionFailedEventArgs>`
+
+**EventArgs:** `Error` (`Exception`), `Phase` (`string`, z. B. `ReadLoop`, `Write`)
+
 ### Methoden
 
 #### `Resize(int cols, int rows)`
 
-Ändert die Größe der Pseudo Console und des zugrunde liegenden Terminal-Puffers.
+Ändert die Größe der Pseudo Console und des zugrunde liegenden Terminal-Puffers. Identische Dimensionsaufrufe werden dedupliziert und parallele Aufrufe serialisiert — kein doppelter oder konkurrierender PTY-Call. Auf dem Pipe-Backend ist die Größenänderung eine No-Op (`NullPseudoConsoleHandle`).
 
 **Parameter:**
 - `cols`: Neue Spaltenanzahl (muss > 0 sein)
 - `rows`: Neue Zeilenanzahl (muss > 0 sein)
 
-**Rückgabe:** `bool` — `true` wenn erfolgreich, `false` bei Fehler (z.B. ungültige Parameter)
+**Rückgabe:** `bool` — `true` wenn erfolgreich oder bereits dem aktuellen Zustand entsprechend, `false` bei Fehler (z.B. ungültige Parameter)
 
 **Beispiel:**
 ```csharp
@@ -88,9 +114,39 @@ Meldet, dass eine Benutzereingabe versendet wurde. Setzt intern `RuntimeStatus` 
 session.MarkInputActivity();
 ```
 
+#### `WriteInputAsync(ReadOnlyMemory<byte> bytes, CancellationToken ct = default)`
+
+Schreibt bereits kodierte Eingabebytes serialisiert in den Input-Stream der Sitzung. Längere Bytefolgen werden pro Session über `_inputWriteLock` serialisiert, in 4096-Byte-Chunks geschrieben, jeder Chunk abgewartet und abschließend geflusht — Reihenfolge und Vollständigkeit bleiben erhalten, auch wenn Paste, Prompt-Versand und Tastatureingaben zeitnah liegen. Auf dem Pipe-Backend übersetzt `CrSubmittingInputStream` nackte `\r` zu `\r\n`.
+
+**Parameter:**
+- `bytes`: Die zu schreibenden, bereits kodierten Eingabebytes
+- `ct`: Abbruch-Token
+
+#### `WritePromptAsync(string prompt, CancellationToken ct)`
+
+Schreibt einen Prompt als Texteingabe inkl. abschließendem Submit (`\r`) in den Input-Stream, flusht und meldet die Eingabe über `MarkInputActivity`. Zeilenumbrüche werden einheitlich als `\r` übertragen (entspricht der Tastaturkodierung von Enter). Wird u. a. von `PromptZeitVersandService` und `ProjektleiterAgentService` (Initial-Prompt) verwendet.
+
+**Parameter:**
+- `prompt`: Der zu sendende Prompt-Text
+- `ct`: Abbruch-Token
+
+#### `DrainOutputAsync(TimeSpan timeout, CancellationToken ct = default)`
+
+Wartet begrenzt darauf, dass die Leseschleife den Output-Stream bis zum Ende verarbeitet hat (Tail-Output landet noch in der Protokoll-Senke). Wird vor dem `Dispose` der Session im Service-Cleanup aufgerufen.
+
+**Parameter:**
+- `timeout`: Maximale Wartezeit (`<= TimeSpan.Zero` = unbegrenzt bis zum Ende der Schleife bzw. `ct`)
+- `ct`: Abbruch-Token
+
+**Rückgabe:** `Task<bool>` — `true`, wenn die Leseschleife abgeschlossen wurde; `false` bei Timeout/Abbruch
+
+#### `RebuildBufferFromReplay()`
+
+Baut `Buffer` synchron aus den gespeicherten `TerminalReplayBuffer`-Roh-Chunks neu auf: `TerminalBuffer.Reset()` + Neu-Parsen aller Chunks mit einem frischen `AnsiSequenceParser` unter demselben Render-Lock wie die Leseschleife. Wird von `TerminalControl.OnSessionChanged` bei der UI-Neuanbindung aufgerufen — erzeugt deterministisch denselben Endzustand ohne doppelte Ausgaben.
+
 #### `Dispose()`
 
-Schließt alle Ressourcen: HPCON-Handle, Input-Pipe, Output-Pipe. Bricht die interne Leseschleife (`ReadLoopAsync`) ab und schließt danach die Streams. Der Prozess wird **nicht** beendet (muss über `Process.Kill()` manuell beendet werden, falls erforderlich). Eine angebundene Output-Senke wird durch die Leseschleife idempotent abgeschlossen; der Service-Cleanup kann zusätzlich `CompleteAsync(...)` aufrufen, um begrenzt auf Persistenz zu warten.
+Schließt alle Ressourcen: HPCON-Handle, Input-Pipe, Output-Pipe und das native Win32-Prozess-Handle (ConPTY-Pfad). Bricht die interne Leseschleife (`ReadLoopAsync`) ab und schließt danach die Streams. Der Prozess wird **nicht** beendet (muss über `Process.Kill()` manuell beendet werden, falls erforderlich). Eine angebundene Output-Senke wird durch die Leseschleife idempotent abgeschlossen; der Service-Cleanup kann zusätzlich `CompleteAsync(...)` aufrufen, um begrenzt auf Persistenz zu warten.
 
 **Beispiel:**
 ```csharp
@@ -99,7 +155,7 @@ session.Dispose();
 
 ## TerminalControl
 
-WPF-`FrameworkElement` zum Rendern einer `PseudoConsoleSession`.
+WPF-`FrameworkElement` zum Rendern einer `ITerminalSession`.
 
 ### Abhängigkeiten
 
@@ -117,17 +173,17 @@ xmlns:controls="clr-namespace:Softwareschmiede.App.Controls"
 
 #### `Session`
 
-Die aktive `PseudoConsoleSession` zum Rendern.
+Die aktive `ITerminalSession` zum Rendern.
 
-**Typ:** `PseudoConsoleSession?`
+**Typ:** `ITerminalSession?`
 
 **Standard:** `null`
 
-**Beschreibung:** Wenn gesetzt, abonniert `TerminalControl` das `BufferChanged`-Event der Session und rendert deren `Buffer`. Die Leseschleife selbst läuft unabhängig vom Control in `PseudoConsoleSession` — sie startet bei der Konstruktion der Session und läuft weiter, auch wenn keine oder eine andere Session gebunden ist (parallele CLI-Ausführungen, Issue-86). Beim Wechsel zu einer neuen Session wird nur der `BufferChanged`-Handler der alten Session deregistriert, nicht deren Leseschleife.
+**Beschreibung:** Wenn gesetzt, ruft das Control zuerst `session.RebuildBufferFromReplay()` auf (deterministischer Neuaufbau des Buffers aus dem `TerminalReplayBuffer` — kein Datenverlust, keine Doppelausgaben beim Reattach), abonniert dann das `BufferChanged`-Event der Session und rendert deren `Buffer`. Die Leseschleife selbst läuft unabhängig vom Control in `PseudoConsoleSession` — sie startet bei der Konstruktion der Session und läuft weiter, auch wenn keine oder eine andere Session gebunden ist (parallele CLI-Ausführungen, Issue-86). Beim Wechsel zu einer neuen Session wird nur der `BufferChanged`-Handler der alten Session deregistriert, nicht deren Leseschleife.
 
 **Beispiel (Code-Behind):**
 ```csharp
-TerminalConsole.Session = pseudoConsoleSession;
+TerminalConsole.Session = terminalSession; // ITerminalSession
 ```
 
 **Beispiel (Data-Binding):**
@@ -137,7 +193,7 @@ TerminalConsole.Session = pseudoConsoleSession;
 
 ### Ereignisse
 
-Das Control erbt von `FrameworkElement`. Terminal-spezifische Events sind nicht exposiert; das Control abonniert intern lediglich `PseudoConsoleSession.BufferChanged`, dessen Leseschleife im Hintergrund der Session läuft.
+Das Control erbt von `FrameworkElement`. Terminal-spezifische Events sind nicht exposiert; das Control abonniert intern lediglich `ITerminalSession.BufferChanged`, dessen Leseschleife im Hintergrund der Session läuft.
 
 ### Rendering
 
@@ -158,6 +214,7 @@ Unterstütztes Scrollverhalten:
 - Line-Scroll um eine Terminalzeile
 - Page Up/Page Down um ungefähr eine sichtbare Seite
 - Kein horizontaler UI-Scroll; die Terminalbreite bestimmt weiterhin die Spaltenanzahl
+- **Alternate Screen:** Solange `buffer.IsAlternateScreenActive` gesetzt ist (Vollbild-TUI via CSI `?1049h`), meldet `IScrollInfo` keinen Scrollback-Bereich (`ExtentHeight == ViewportHeight`), der Offset wird auf 0 geklemmt und alle Scroll-Operationen sind No-Ops
 
 Wenn der Offset am Ende des Verlaufs steht, folgt das Control neuer Ausgabe automatisch. Nach manuellem Hochscrollen bleibt die Position stabil, bis wieder ans Ende gescrollt wird. Eingabefokus und Tastaturweitergabe bleiben erhalten; Klicks in die Terminalfläche fokussieren `TerminalControl`, Scrollbar-Klicks werden nicht abgefangen.
 
@@ -180,7 +237,7 @@ Unterstützte Tasten:
 
 ### Größenänderungen
 
-Das Control triggert automatisch `Session.ResizeAsync()` bei Layout-Änderungen. Die neuen Spalten- und Zeilenzahlen werden aus verfügbaren Pixeln und Zellengröße berechnet.
+Das Control triggert automatisch `Session.Resize(cols, rows)` bei Layout-Änderungen. Die neuen Spalten- und Zeilenzahlen werden aus verfügbaren Pixeln und Zellengröße berechnet; die Session dedupliziert identische Dimensionen selbst.
 
 ### Clipboard-Paste-Support
 
@@ -271,27 +328,32 @@ Zentrale Service-Klasse für Prozess-Lifecycle.
 
 ### Methoden (öffentlich)
 
-#### `StartWithPseudoConsoleAsync(Guid aufgabeId, IKiPlugin kiPlugin, string localRepoPath, string? parameters, CancellationToken ct)`
+#### `StartTerminalSessionAsync(Guid aufgabeId, IKiPlugin kiPlugin, string localRepoPath, string? optionalParameters = null, CancellationToken ct = default, RepositoryStartKonfiguration? startConfig = null, IGitPlugin? gitPlugin = null)`
 
-Startet einen KI-CLI-Prozess über die Pseudo Console API.
+Startet einen KI-CLI-Prozess als interaktive Terminal-Session — über die Pseudo Console API (ConPTY) oder, diagnostiziert, über das Pipe-Fallback-Backend.
 
 **Parameter:**
 - `aufgabeId`: Eindeutige Aufgaben-ID
-- `kiPlugin`: Plugin-Instanz (muss `IKiPlugin.StartCliAsync` implementieren)
+- `kiPlugin`: Plugin-Instanz (liefert die Spec über `IKiPlugin.GetTerminalStartSpecAsync`; `TerminalCapabilities` steuert die Backend-Eignung)
 - `localRepoPath`: Arbeitsverzeichnis des Prozesses
-- `parameters`: Optionale CLI-Argumente
+- `optionalParameters`: Optionale CLI-Argumente
 - `ct`: Cancellation Token
+- `startConfig`: Optionale Startkonfiguration des Repositories (Arbeitsverzeichnis-Auflösung)
+- `gitPlugin`: Optionales Git-Plugin zur Auflösung des tatsächlichen Repository-Pfads
 
-**Rückgabe:** `Task<CliProcessHandle>`
+**Rückgabe:** `Task<CliProcessHandle>` — `CliProcessHandle.Session` trägt die `ITerminalSession`, `OutputSink` den Protokoll-Writer
 
-**Output-Protokollierung:** Für ConPTY-Starts erzeugt der Service einen `CliOutputProtokollWriter`, reicht ihn als `ITerminalOutputSink` an den Launcher weiter und hält ihn im `CliProcessHandle.OutputSink`. Der Writer speichert Ausgabezeilen über `ProtokollService.AddCliOutputAsync` als `ProtokollTyp.CliOutput`.
+**Interner Ablauf:** Die Spec wird über `kiPlugin.GetTerminalStartSpecAsync` geholt und zusammen mit `kiPlugin.CheckHealthAsync` (als `healthCheck`-Delegate) an `ITerminalSessionFactory.StartAsync` gereicht. `TerminalSessionService` löst die Executable auf (`TerminalExecutableResolver`), führt den Preflight aus (`TerminalSessionDiagnostics`), wählt das Backend und startet den Prozess direkt über den jeweiligen `IPseudoConsoleProcessLauncher` — ohne `cmd.exe`-Zwischenschale. `session.Exited`/`session.Failed` sind auf `HandleSessionEndedAsync`/`HandleSessionFailedAsync` verdrahtet.
+
+**Output-Protokollierung:** Für jeden Session-Start erzeugt der Service einen `CliOutputProtokollWriter`, reicht ihn als `ITerminalOutputSink` an die Factory/den Launcher weiter und hält ihn im `CliProcessHandle.OutputSink`. Der Writer speichert Ausgabezeilen über `ProtokollService.AddCliOutputAsync` als `ProtokollTyp.CliOutput`. Fehler- und Fallback-Fälle schreiben zusätzlich eine `[Terminal-Diagnose]`-Markerzeile mit den Preflight-Ergebnissen in dasselbe Protokoll.
 
 **Exceptions:**
-- `InvalidOperationException`: `CreatePseudoConsole` fehlgeschlagen oder Plugin-Fehler
+- `ArgumentException`: `TerminalSessionStartSpec.FileName` leer
+- `InvalidOperationException`: Executable nicht auffindbar/nicht ausführbar (`NotFound`/`NotExecutable`), `RequiresPty`-Plugin ohne verfügbare PTY, `CreatePseudoConsole` fehlgeschlagen oder Plugin-Fehler
 
 **Beispiel:**
 ```csharp
-var handle = await _kiService.StartWithPseudoConsoleAsync(
+var handle = await _kiService.StartTerminalSessionAsync(
     taskId, 
     codexPlugin, 
     "C:\\repos\\my-project",
@@ -300,21 +362,21 @@ var handle = await _kiService.StartWithPseudoConsoleAsync(
 );
 ```
 
-#### `GetPseudoConsoleSession(Guid aufgabeId)`
+#### `GetTerminalSession(Guid aufgabeId)`
 
-Gibt die aktive `PseudoConsoleSession` für eine Aufgabe zurück, falls eine läuft.
+Gibt die aktive `ITerminalSession` für eine Aufgabe zurück, falls eine läuft.
 
 **Parameter:**
 - `aufgabeId`: Aufgaben-ID
 
-**Rückgabe:** `PseudoConsoleSession?` (null, falls kein Prozess läuft oder kein ConPTY gestartet wurde)
+**Rückgabe:** `ITerminalSession?` (null, falls kein Prozess läuft oder der klassische Pipe-Start ohne Session verwendet wurde)
 
 **Beispiel:**
 ```csharp
-var session = _kiService.GetPseudoConsoleSession(taskId);
+var session = _kiService.GetTerminalSession(taskId);
 if (session != null)
 {
-    await session.ResizeAsync(100, 25);
+    session.Resize(100, 25);
 }
 ```
 
@@ -332,17 +394,17 @@ Beendet den laufenden Prozess für eine Aufgabe.
 
 ## Events
 
-### TaskDetailViewModel.PseudoConsoleSessionGestartet
+### TaskDetailViewModel.TerminalSessionGestartet
 
-Wird gefeuert, nachdem `KiAusfuehrungsService.StartWithPseudoConsoleAsync` erfolgreich abgeschlossen wurde.
+Wird gefeuert, nachdem `KiAusfuehrungsService.StartTerminalSessionAsync` erfolgreich abgeschlossen wurde (oder bei erneutem Binden einer bereits laufenden Session).
 
-**Typ:** `Action<PseudoConsoleSession>?`
+**Typ:** `Action<ITerminalSession>?`
 
-**Parameter:** Die neu erstellte `PseudoConsoleSession`
+**Parameter:** Die neu erstellte bzw. laufende `ITerminalSession`
 
 **Verwendung:**
 ```csharp
-taskViewModel.PseudoConsoleSessionGestartet += session =>
+taskViewModel.TerminalSessionGestartet += session =>
 {
     TerminalConsole.Session = session;
 };
@@ -403,10 +465,10 @@ Zerlegt einen Byte-Block in `TerminalEvent`-Instanzen.
 
 **Rückgabe:** `IEnumerable<TerminalEvent>`
 
-**Zustand:** Der Parser ist zustandsbehaftet; unvollständige Sequenzen über Paket-Grenzen werden korrekt zusammengesetzt.
+**Zustand:** Der Parser ist zustandsbehaftet; unvollständige Sequenzen über Paket-Grenzen werden korrekt zusammengesetzt. Die UTF-8-Dekodierung läuft über einen persistenten `System.Text.Decoder` (`flush: false`) — Mehrbyte-Zeichen, die eine Chunk-Grenze überschreiten, bleiben im Decoder-Zustand und werden mit den Restbytes des nächsten Chunks dekodiert (kein U+FFFD-Ersatzzeichen-Zerfall). `Reset()` setzt die Zustandsmaschine inklusive Decoder-Übertrag zurück (wird beim Replay-Neuaufbau über einen frischen Parser erreicht).
 
 **Unterstützte Sequenzen:**
-- **Plaintext:** Klartext → `TextWrittenEvent`
+- **Plaintext:** Klartext → `TextWrittenEvent`; Steuerzeichen `\r` (Spalte 0), `\n`/`\r\n` (Zeilenvorschub + Spalte 0), `\x08`/`\b` (Cursor links), `\t` (nächster Tab-Stopp à 8 Spalten), BEL (überlesen)
 - **SGR (Select Graphic Rendition):** `\x1b[{codes}m`
   - `0`: Reset (Standard-Farben)
   - `1`: Bold
@@ -420,10 +482,17 @@ Zerlegt einen Byte-Block in `TerminalEvent`-Instanzen.
   - `40-47`: 3-bit Hintergrund-Farben
   - `48;5;{n}`: 8-bit Hintergrund-Farbe
   - `48;2;{r};{g};{b}`: 24-bit Hintergrund-Farbe
-- **Cursor-Bewegung:** `\x1b[{row};{col}H` → `CursorMovedEvent` (1-basiert → 0-basiert)
-  - `\x1b[A`, `\x1b[B`, `\x1b[C`, `\x1b[D`: Relative Bewegung
-- **Clear/Erase:** `\x1b[2J`, `\x1b[K` → `ScreenClearedEvent`, `LineErasedEvent`
-- **Cursor-Sichtbarkeit:** `\x1b[?25h`, `\x1b[?25l` → `CursorVisibilityChangedEvent`
+- **Cursor-Bewegung:** `\x1b[{row};{col}H` / `\x1b[f` → `CursorMovedEvent` (1-basiert → 0-basiert)
+  - `\x1b[A`, `\x1b[B`, `\x1b[C`, `\x1b[D`, `\x1b[e`, `\x1b[a`: Relative Bewegung
+  - `\x1b[E` / `\x1b[F`: CNL/CPL (n Zeilen runter/rauf + Spalte 0)
+  - `\x1b[G` / ``\x1b[` ``: CHA/HPA (absolute Spalte), `\x1b[d`: VPA (absolute Zeile)
+- **Clear/Erase:** `\x1b[{n}J`, `\x1b[{n}K` → `ScreenClearedEvent`, `LineErasedEvent`
+- **Insert/Delete:** `\x1b[{n}L` → `LinesInsertedEvent`, `\x1b[{n}M` → `LinesDeletedEvent`, `\x1b[{n}@` → `CharsInsertedEvent`, `\x1b[{n}P` → `CharsDeletedEvent`, `\x1b[{n}X` → `CharsErasedEvent`
+- **Scrolling:** `\x1b[{n}S`/`T` → `ScreenScrolledEvent` (DeltaRows positiv/negativ); `\x1b[{t};{b}r` → `ScrollRegionChangedEvent` (DECSTBM)
+- **Alternate Screen / private Modi:** `\x1b[?1049h`/`l` → `AlternateScreenChangedEvent` (inkl. Save/Restore-Cursor-Anteil), `\x1b[?1047h`/`l` → `AlternateScreenChangedEvent`, `\x1b[?1048h`/`l` → `CursorSavedEvent`, `\x1b[?25h`/`l` → `CursorVisibilityChangedEvent`
+- **Cursor Save/Restore:** `ESC 7`/`ESC 8`, `\x1b[s`/`\x1b[u` → `CursorSavedEvent(Restored: false/true)`
+- **Reset:** `ESC c` (RIS) → `TerminalResetEvent`
+- **Zeichensatz-Sequenzen** (`ESC (` …) und unbekannte Sequenzen: werden still überlesen
 
 **Beispiel:**
 ```csharp
@@ -461,7 +530,7 @@ buffer.Apply(new TextWrittenEvent("World"));
 
 #### `Resize(int cols, int rows)`
 
-Ändert Grid-Größe. Erhält sichtbare Zeilen; neue Zeilen werden initialisiert.
+Ändert Grid-Größe. Erhält sichtbare Zeilen; neue Zeilen werden initialisiert. Berücksichtigt ein aktives Alternate-Screen-Grid.
 
 **Parameter:**
 - `cols`: Neue Spaltenanzahl
@@ -469,9 +538,13 @@ buffer.Apply(new TextWrittenEvent("World"));
 
 **Thread-Sicherheit:** Intern synchronisiert
 
+#### `Reset()`
+
+Setzt Grid, Scrollback, Cursor und den Alternate-Screen-Zustand vollständig zurück. Wird von `PseudoConsoleSession.RebuildBufferFromReplay()` vor dem Neu-Parsen der Replay-Chunks aufgerufen.
+
 #### `GetSnapshot()`
 
-Erstellt einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock. Wird von Render- und Scroll-Operationen genutzt, um Race Conditions zwischen paralleler Buffer-Aktualisierung und Lesezugriffen zu vermeiden.
+Erstellt einen konsistenten Snapshot des aktuellen Buffer-Zustands unter einem einzigen Lock. Wird von Render- und Scroll-Operationen genutzt, um Race Conditions zwischen paralleler Buffer-Aktualisierung und Lesezugriffen zu vermeiden. Bei aktivem Alternate Screen liefert der Snapshot nur das Alt-Grid — ohne Scrollback-Präfix.
 
 **Rückgabe:** `TerminalBufferSnapshot` (Record mit Grid-Kopie, Scrollback-Zeilen, Rows, Cols, CursorRow, CursorCol, ScrollbackCount und TotalRows)
 
@@ -497,7 +570,112 @@ for (var logicalRow = 0; logicalRow < snapshot.TotalRows; logicalRow++)
 - `Cols`: Aktuelle Spaltenanzahl
 - `CursorRow`: Cursor-Zeile (0-basiert)
 - `CursorCol`: Cursor-Spalte (0-basiert)
+- `IsAlternateScreenActive`: `true`, solange der Alternate Screen aktiv ist (zwischen CSI `?1049h`/`?1047h` und `?1049l`/`?1047l`); das Alt-Grid hat keinen Scrollback
 - `ScrollbackCount` (internal): Anzahl der aktuell im Scrollback-Ringpuffer gehaltenen Zeilen. Diese Eigenschaft ist nur für Tests sichtbar (interne API).
+
+#### Verarbeitete `TerminalEvent`-Records
+
+`TextWrittenEvent`, `CursorMovedEvent`, `CursorMovedRelativeEvent`, `ColorChangedEvent`, `ScreenClearedEvent`, `LineErasedEvent`, `CursorVisibilityChangedEvent`, `AlternateScreenChangedEvent(bool Enabled)`, `LinesInsertedEvent`, `LinesDeletedEvent`, `CharsInsertedEvent`, `CharsDeletedEvent`, `CharsErasedEvent`, `ScrollRegionChangedEvent(int Top, int Bottom)`, `ScreenScrolledEvent(int DeltaRows)`, `CursorSavedEvent(bool Restored)`, `TerminalResetEvent`.
+
+## ITerminalSessionFactory / TerminalSessionService
+
+Zentrale Erzeugung von Terminal-Sessions: löst die vom Plugin gelieferte `TerminalSessionStartSpec` auf (`TerminalExecutableResolver`), führt die Preflight-Diagnose aus (`TerminalSessionDiagnostics`), wählt das Backend (PTY oder diagnostizierter Pipe-Fallback) und delegiert den eigentlichen Start an den jeweiligen `IPseudoConsoleProcessLauncher`. In der DI als `ITerminalSessionFactory` (Singleton) registriert; die Implementierung erhält beide Launcher als konkrete Typen (`Win32PseudoConsoleProcessLauncher` = `ptyLauncher`, `SimulatedPseudoConsoleProcessLauncher` = `pipeLauncher`).
+
+### Methoden
+
+#### `StartAsync(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink, Func<CancellationToken, Task<bool>>? healthCheck, CancellationToken ct)`
+
+Startet eine Terminal-Session aus der gelieferten Spec.
+
+**Parameter:**
+- `aufgabeId`: Aufgaben-ID (Logging/Protokoll)
+- `spec`: Die vom Plugin gelieferte Startbeschreibung (`IKiPlugin.GetTerminalStartSpecAsync`)
+- `outputSink`: Optionale Senke für Terminal-Ausgabe (Protokoll-Pfad); empfängt auch die `[Terminal-Diagnose]`-Markerzeilen
+- `healthCheck`: Optionale Plugin-Health-Probe (`IKiPlugin.CheckHealthAsync` als Delegate); wird im Preflight nur bei erfolgreicher Executable-Auflösung aufgerufen und ist nicht fatal
+- `ct`: Abbruch-Token
+
+**Rückgabe:** `Task<TerminalSessionStartResult>` — Record mit `Process`, `ITerminalSession Session`, `bool IsPseudoTerminal`
+
+**Exceptions:**
+- `ArgumentException`: `spec.FileName` ist leer
+- `ArgumentOutOfRangeException`: `TerminalSessionOptions.ReplayBufferByteBudget <= 0` oder `DefaultCols`/`DefaultRows` außerhalb `1..short.MaxValue`
+- `InvalidOperationException`: Executable `NotFound`/`NotExecutable` bzw. `RequiresPty` ohne verfügbare PTY — jeweils nach dem Schreiben der `[Terminal-Diagnose]`-Markerzeile
+
+## IPseudoConsoleProcessLauncher
+
+Interne Backend-Naht für den eigentlichen Terminal-Prozessstart innerhalb von `TerminalSessionService`. Beide Implementierungen erhalten die bereits normalisierte Spec (keine eigene Auflösungslogik) und einen `IOptions<TerminalSessionOptions>`-Konstruktorparameter.
+
+### Member
+
+| Member | Typ | Beschreibung |
+|--------|-----|--------------|
+| `IsPseudoTerminal` | `bool` | `true` beim ConPTY-Backend (`Win32PseudoConsoleProcessLauncher`), `false` beim Pipe-Backend (`SimulatedPseudoConsoleProcessLauncher`) |
+| `Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink)` | Methode | Startet die Spec direkt (`CreateProcess` mit `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` bzw. `Process.Start` mit Stdin/Stdout/Stderr-Redirects) → `TerminalSessionStartResult` |
+
+## TerminalExecutableResolver
+
+Interne statische Klasse (`Softwareschmiede.Infrastructure.Terminal`): `Resolve(TerminalSessionStartSpec)` → `TerminalExecutableResolution` (`NormalizedSpec`, `TerminalExecutableStatus Status`, `ResolvedPath`, `Detail`).
+
+- **Suchreihenfolge:** `spec.WorkingDirectory` → `PATH`-Einträge (aus `spec.EnvironmentVariables`, sonst Prozess-Umgebung); `FileName` mit Verzeichnisanteil → nur dieses Verzeichnis.
+- **PATHEXT:** `spec.EnvironmentVariables["PATHEXT"]` → Prozess-`PATHEXT` → Default `.COM;.EXE;.BAT;.CMD`; `FileName` mit eigener Erweiterung wird nur literal gesucht.
+- **Status `Direct`:** `.exe`/`.com`- oder endungsloser PE-Image-Treffer → `FileName` wird zum absoluten Pfad.
+- **Status `CmdWrapped`:** `.cmd`/`.bat`-Treffer → `FileName = "cmd.exe"`, `Arguments = "/d /s /c \"<pfad>\" <original-args>"` (`/d` unterdrückt AutoRun).
+- **Status `NotExecutable`:** Treffer mit anderer Erweiterung (z. B. `.ps1`) oder endungsloser Nicht-PE-Treffer (z. B. POSIX-Shell-Shim neben `name.cmd` — wird zugunsten der PATHEXT-Kandidaten übersprungen und nur gemeldet, wenn er der einzige Treffer bleibt).
+- **Status `NotFound`:** kein Treffer.
+
+## TerminalSessionDiagnostics
+
+Führt den Preflight vor einem Session-Start aus (DB-frei — der `Terminal.ForcePtyUnavailable`-Test-Override wird vom `TerminalSessionService` gelesen und als `forcePtyUnavailable`-Parameter hereingereicht).
+
+### `RunPreflightAsync(TerminalSessionStartSpec spec, TerminalExecutableResolution resolution, Func<CancellationToken, Task<bool>>? healthCheck, bool forcePtyUnavailable, CancellationToken ct)` → `TerminalPreflightResult`
+
+Einzelchecks (als `TerminalPreflightCheck(Name, Ok, Detail)` protokolliert):
+
+| Check | Inhalt |
+|-------|--------|
+| `ConPTY-Verfügbarkeit` | Windows + OS-Build ≥ 10.0.17763; bei `forcePtyUnavailable` erzwungen `Ok=false` |
+| `Executable` | Aus dem Auflösungsergebnis: `Direct`/`CmdWrapped` → `Ok` mit `ResolvedPath`; `NotFound`/`NotExecutable` → `Ok=false` mit Detail |
+| `CLI-Health` | `healthCheck`-Delegate, **nur** bei erfolgreicher Executable-Auflösung aufgerufen; `false`/Exception → `Ok=false` (nicht fatal — ohne Einfluss auf `BackendEmpfehlung`); sonst „übersprungen" |
+| `Encoding` | Immer `Ok` (UTF-8) |
+| `Terminalgröße` | `DefaultCols`/`DefaultRows` aus `TerminalSessionOptions` im Bereich `1..short.MaxValue` |
+| `Pluginparameter` | `Ok` mit `spec.OptionalParameters`/`spec.Arguments` als Detail |
+
+`TerminalPreflightResult` trägt `Checks`, `PtyVerfuegbar` und `BackendEmpfehlung` (`TerminalBackendEmpfehlung.Pty`/`Pipe`/`Fehler`): `Fehler` bei nicht auflösbarer Executable oder `RequiresPty` ohne PTY; `Pipe` bei fehlendem `SupportsPty` oder nicht verfügbarer PTY; sonst `Pty`.
+
+## TerminalSessionStartSpec
+
+Record im Contracts-Projekt (`Softwareschmiede.Plugin.Contracts`, `Domain/ValueObjects`) — die Plugin-gelieferte Startbeschreibung für den interaktiven Terminal-Pfad (einziger vertraglicher Spec-Weg: `IKiPlugin.GetTerminalStartSpecAsync`; bei `CliKiPluginBase`-Plugins über `BuildTerminalStartSpec` aus `BuildProcessStartInfo` gemappt).
+
+| Eigenschaft | Typ | Beschreibung |
+|-------------|-----|--------------|
+| `FileName` | `string` | Executable-Name oder -Pfad (nackter Befehlsname, `.cmd`/`.bat`-Shim oder absoluter Pfad); Pflichtfeld |
+| `Arguments` | `string` | Argumente für den Start |
+| `WorkingDirectory` | `string` | Arbeitsverzeichnis des CLI-Prozesses |
+| `EnvironmentVariables` | `IReadOnlyDictionary<string, string?>` | Zusätzliche Umgebungsvariablen (überschreiben die geerbte Umgebung; u. a. `PATH`/`PATHEXT` für die Auflösung) |
+| `Capabilities` | `TerminalProviderCapabilities` | Terminal-Fähigkeiten der CLI (Default `SupportsPty`) |
+| `PluginName` | `string` | Anzeigename des liefernden Plugins (Diagnose/Protokoll) |
+| `OptionalParameters` | `string?` | Die beim Spec-Abruf übergebenen optionalen Parameter (Diagnosezwecke) |
+
+## TerminalReplayBuffer
+
+Begrenzter Ringpuffer roher Ausgabe-Chunks pro Session — Basis für `ITerminalSession.RebuildBufferFromReplay` bei der UI-Neuanbindung. Bewusst vom dauerhaften Sitzungsprotokoll (`CliOutputProtokollWriter`) getrennt.
+
+### Methoden
+
+- `Append(ReadOnlySpan<byte> chunk)` — kopiert den Chunk; bei Budget-Überschreitung werden die ältesten Chunks verworfen (ein Chunk größer als das Budget wird auf die letzten `byteBudget` Bytes gekürzt)
+- `GetChunks()` → `IReadOnlyList<byte[]>` — Momentaufnahme der gehaltenen Chunks in Eingangsreihenfolge
+
+**Konstruktor:** `TerminalReplayBuffer(int byteBudget)` — `byteBudget <= 0` → `ArgumentOutOfRangeException`.
+
+## TerminalSessionOptions
+
+Laufzeitparameter der Terminal-Integration; gebunden aus der `appsettings.json`-Sektion `Terminal` (`TerminalSessionOptions.SectionName`) via `services.Configure<TerminalSessionOptions>(...)` in `App.xaml.cs`; konsumiert über `IOptions<TerminalSessionOptions>` in `TerminalSessionService` und beiden Launcher-Typen.
+
+| Eigenschaft | Typ | Standard | Beschreibung |
+|-------------|-----|----------|--------------|
+| `ReplayBufferByteBudget` | `int` | `524288` (512 KiB) | Byte-Budget des `TerminalReplayBuffer` pro Session |
+| `DefaultCols` | `int` | `220` | Initiale Spaltenanzahl (ConPTY-Erstellung, Preflight-Check) |
+| `DefaultRows` | `int` | `50` | Initiale Zeilenanzahl |
 
 ## Enums
 
@@ -513,11 +691,43 @@ Betriebszustand einer aktiven CLI-Sitzung:
 
 Der Status wird automatisch alle 1 Sekunde neu bewertet und das `RuntimeStatusChanged`-Event wird ausgelöst, falls sich der Status geändert hat.
 
+### `TerminalProviderCapabilities`
+
+`[Flags]`-Enum im Contracts-Projekt (`Softwareschmiede.Domain.Enums`) — deklarativ pro Plugin über `IKiPlugin.TerminalCapabilities` (virtuell in `CliKiPluginBase`, Default `SupportsPty`); steuert die Backend-Wahl im `TerminalSessionService`.
+
+| Wert | Beschreibung |
+|------|--------------|
+| `None = 0` | Keine besonderen Terminal-Fähigkeiten deklariert |
+| `SupportsPty = 1` | Die CLI kann in einer Pseudo Console (ConPTY/PTY) betrieben werden |
+| `RequiresPty = 2` | Die CLI benötigt eine echte Pseudo Console und verweigert/versagt ohne TTY → kein Pipe-Fallback erlaubt (harter Fehler mit Diagnose stattdessen) |
+
+Festgelegte Werte: `ClaudeCliPlugin`, `CodexPlugin`, `GitHubCopilotPlugin`, `DevinPlugin` → `RequiresPty | SupportsPty`; `KiSimulatorPlugin` (E2E-/Test-Anbieter) → Default `SupportsPty`.
+
+### `TerminalExecutableStatus`
+
+Status der Executable-Auflösung (`TerminalExecutableResolution.Status`):
+
+| Wert | Beschreibung |
+|------|--------------|
+| `Direct` | `.exe`/endungsloser PE-Image-Treffer — `FileName` ist der aufgelöste absolute Pfad |
+| `CmdWrapped` | `.cmd`/`.bat`-Ziel — Spec wurde zu `cmd.exe /d /s /c "<pfad>"` normalisiert |
+| `NotFound` | Kein Treffer in `WorkingDirectory`/`PATH` |
+| `NotExecutable` | Treffer gefunden, aber nicht per `CreateProcess` ausführbar (z. B. `.ps1`, endungsloses Shell-Shim) |
+
+### `TerminalBackendEmpfehlung`
+
+Backend-Empfehlung aus dem Preflight: `Pty`, `Pipe`, `Fehler`.
+
 ## Konstanten
 
 | Konstante | Wert | Beschreibung |
 |-----------|------|--------------|
 | `TerminalBuffer.MaxScrollbackLines` | 1000 | Maximale Scrollback-Puffer-Größe in Zeilen |
 | `TerminalControl.FontSize` | 13.0 | Schriftgröße (Punkt) für Rendering |
-| `PseudoConsoleSession.ReadLoopShutdownTimeout` | 5 Sekunden | Maximale Wartezeit beim Beenden der Leseschleife in `Dispose()` |
+| `TerminalSessionOptions.ReplayBufferByteBudget` | 524288 (512 KiB) | Byte-Budget des Replay-Puffers pro Session (`appsettings.json`-Sektion `Terminal`) |
+| `TerminalSessionOptions.DefaultCols`/`DefaultRows` | 220 / 50 | Initiale Terminalgröße beim Session-Start |
+| `TerminalSessionService.ForcePtyUnavailableKey` | `"Terminal.ForcePtyUnavailable"` | `AppEinstellungen`-Schlüssel (Debug-/Test-Hook): `"true"` erzwingt `PtyVerfuegbar=false` im Preflight |
+| `TerminalSessionService.TestDatenbankPfadVariable` | `"SOFTWARESCHMIEDE_TEST_DB_PATH"` | Umgebungsvariable, die den E2E-Testmodus kennzeichnet (erzwingt Pipe-Backend) |
+| `KiAusfuehrungsService.ConPtyOutputDrainTimeout` | 2 Sekunden | Wartezeit auf `DrainOutputAsync` der Session im Cleanup |
+| `KiAusfuehrungsService.CliOutputWriterDrainTimeout` | 2 Sekunden | Wartezeit auf `OutputSink.CompleteAsync` im Cleanup |
 | `AnsiSequenceParser` | — | Kein Schwellenwert; alle Standard-Sequenzen werden geparst |

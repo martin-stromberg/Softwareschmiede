@@ -192,6 +192,85 @@ public sealed partial class TerminalControlTests
         });
     }
 
+    /// <summary>Bei der Neuanbindung einer Session (Weg-/Zurücknavigation) wird der Buffer aus dem
+    /// Replay-Puffer neu aufgebaut — Ausgabe, die während der Trennung eintraf, ist genau einmal
+    /// vorhanden, Live-Chunks erscheinen nicht doppelt.</summary>
+    [Fact]
+    public void OnSessionChanged_ReattachedSession_KeineDoppelteAusgabe()
+    {
+        RunOnSta(() =>
+        {
+            var control = new TerminalControl();
+            using var stream = new ControllableStream();
+            using var session = CreateSession(stream);
+
+            control.Session = session;
+
+            // "A" schieben, solange das Control gebunden ist.
+            var aVerarbeitet = new TaskCompletionSource();
+            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('A')) aVerarbeitet.TrySetResult(); };
+            stream.Push("A");
+            Task.WhenAny(aVerarbeitet.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+            aVerarbeitet.Task.IsCompletedSuccessfully.Should().BeTrue("die gebundene Ausgabe muss verarbeitet werden");
+
+            // Trennen; währenddessen trifft "B" ein (nur im Buffer/Replay der Session, nicht am Control).
+            control.Session = null;
+            var bVerarbeitet = new TaskCompletionSource();
+            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('B')) bVerarbeitet.TrySetResult(); };
+            stream.Push("B");
+            Task.WhenAny(bVerarbeitet.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+            bVerarbeitet.Task.IsCompletedSuccessfully.Should().BeTrue("die Ausgabe während der Trennung muss sessionseitig weiterlaufen");
+
+            // Reattach: RebuildBufferFromReplay stellt "AB" wieder her — ohne Duplikat.
+            control.Session = session;
+
+            var text = BufferText(session);
+            text.IndexOf('A').Should().Be(text.LastIndexOf('A'), "'A' darf nach dem Rebuild nicht doppelt erscheinen");
+            text.IndexOf('B').Should().Be(text.LastIndexOf('B'), "'B' darf nach dem Rebuild nicht doppelt erscheinen");
+            text.IndexOf('A').Should().BeLessThan(text.IndexOf('B'));
+        });
+    }
+
+    /// <summary>Bei aktivem Alternate Screen meldet das Control kein Scrollback: Extent entspricht dem
+    /// sichtbaren Grid, der Offset bleibt auf 0 geklemmt und Line-/Page-Scrollen sind No-Ops.</summary>
+    [Fact]
+    public void ScrollInfo_AlternateScreen_KeinScrollbackKeinOffset()
+    {
+        RunOnSta(() =>
+        {
+            var control = CreateArrangedControl();
+            using var session = CreateSession(new ImmediateEofStream());
+            control.Session = session;
+            WriteLines(session, 20);
+
+            // Alternate Screen aktivieren (Vollbild-TUI): sichtbarer Bereich ohne Scrollback.
+            session.Buffer.Apply(new Softwareschmiede.Domain.Terminal.AlternateScreenChangedEvent(true));
+            WriteLines(session, 3);
+            InvokeUpdateScrollInfo(control);
+
+            var scrollInfo = (IScrollInfo)control;
+            scrollInfo.ExtentHeight.Should().Be(session.Buffer.Rows, "bei Alt-Screen entspricht die Extent dem sichtbaren Grid");
+            scrollInfo.VerticalOffset.Should().Be(0);
+
+            scrollInfo.SetVerticalOffset(5);
+            scrollInfo.VerticalOffset.Should().Be(0, "SetVerticalOffset ist bei aktivem Alt-Screen ein No-Op");
+            scrollInfo.LineUp();
+            scrollInfo.LineDown();
+            scrollInfo.PageUp();
+            scrollInfo.PageDown();
+            scrollInfo.VerticalOffset.Should().Be(0, "Scroll-Navigation ist bei aktivem Alt-Screen ein No-Op");
+        });
+    }
+
+    private static string BufferText(PseudoConsoleSession session)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var row = 0; row < session.Buffer.Rows; row++)
+            foreach (var cell in session.Buffer.GetRow(row))
+                sb.Append(cell.Character);
+        return sb.ToString();
+    }
+
     /// <summary>TerminalControl stellt dem umgebenden ScrollViewer zeilenbasierte Scrollinformationen bereit.</summary>
     [Fact]
     public void ScrollInfo_LangerVerlauf_MeldetExtentGroesserAlsViewport()

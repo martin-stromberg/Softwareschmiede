@@ -187,6 +187,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
+        _kiPluginMock.SetupTerminalSpec("cmd.exe", "/c exit 0");
 
         // Act
         await _sut.ProzessStartenUndCliStartenAsync(aufgabe.Id, "https://github.com/test/repo", null, "Softwareschmiede.TestKi");
@@ -222,7 +223,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
         // Arrange
         var aufgabe = await _aufgabeService.CreateAsync(_projektId, "CLI-Start fehlschlägt", null);
         SetupCloneMocks();
-        _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _kiPluginMock.Setup(p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("CLI-Start fehlgeschlagen"));
 
         // Act
@@ -258,14 +259,12 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
             });
 
         string? usedPath = null;
-        _kiPluginMock.Setup(p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _kiPluginMock.Setup(p => p.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback<string, string?, CancellationToken>((path, _, _) => usedPath = path)
-            .ReturnsAsync(new System.Diagnostics.ProcessStartInfo
+            .ReturnsAsync(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec
             {
                 FileName = "cmd.exe",
                 Arguments = "/c exit 0",
-                UseShellExecute = false,
-                CreateNoWindow = true,
             });
 
         var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
@@ -416,6 +415,7 @@ public sealed class EntwicklungsprozessServiceTests : IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
+        _kiPluginMock.SetupTerminalSpec("cmd.exe", "/c ping 127.0.0.1 -n 5 > nul");
         var projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
         var sut = CreateSut(new EntwicklungsprozessServiceOptions(ProjektService: projektService, KiAusfuehrungsService: _kiAusfuehrungsService));
 

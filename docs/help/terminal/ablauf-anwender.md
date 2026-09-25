@@ -17,11 +17,14 @@ In der Aufgabendetailansicht im Ribbon-Menü das gewünschte KI-Plugin auswähle
 
 Button **Starten** im Ribbon klicken. Die Softwareschmiede:
 
-- Startet das CLI-Programm des Plugins im Aufgabenverzeichnis über die Pseudo Console API.
+- Prüft vorab die Voraussetzungen (Terminal-Unterstützung des Systems, Auffindbarkeit und Erreichbarkeit des CLI-Programms).
+- Startet das CLI-Programm des Plugins direkt im Aufgabenverzeichnis über die Pseudo Console API — oder über das Fallback-Backend, wenn kein Pseudo-Terminal verfügbar ist.
 - Initialisiert das Terminal-Rendering mit der aktuellen Fenster-Größe.
 - Wechselt den Aufgabenstatus auf **Gestartet**.
 
 > **Hinweis:** Das Terminal wird unmittelbar angezeigt. Output erscheint in Echtzeit, während das CLI läuft.
+
+> **Eingeschränkter Modus:** Läuft die CLI ohne echtes Pseudo-Terminal (z. B. auf einem zu alten Windows-Build oder weil das Plugin keine Terminal-Unterstützung deklariert), zeigt die Statuszeile den Hinweis **„ (eingeschränkter Modus – kein Pseudo-Terminal)"** — z. B. „Gestartet (eingeschränkter Modus – kein Pseudo-Terminal)". Die CLI läuft weiter und bleibt bedienbar, einige Funktionen (z. B. Terminal-Größenanpassung oder vollbildartige Darstellungen) können jedoch eingeschränkt sein. Details zum Grund stehen als „[Terminal-Diagnose]"-Eintrag im Aufgabenprotokoll. CLIs, die zwingend ein Pseudo-Terminal benötigen, starten in diesem Fall nicht — stattdessen erscheint eine verständliche Fehlermeldung.
 
 ### 3. Mit dem CLI arbeiten
 
@@ -47,6 +50,8 @@ Wenn die CLI mehr Text ausgibt, als im sichtbaren Terminalbereich Platz hat, ers
 Die CLI-Ansicht folgt neuen Ausgaben automatisch, solange Sie am Ende des Verlaufs stehen. Wenn Sie manuell nach oben scrollen, bleibt diese Leseposition stabil und wird durch neue Ausgabe nicht sofort ans Ende zurückgesetzt. Sobald Sie wieder bis ans Ende scrollen, folgt die Ansicht neuen Ausgaben wieder automatisch.
 
 Der Verlauf umfasst bis zu 1000 Scrollback-Zeilen zusätzlich zum aktuell sichtbaren Terminalbereich. Ältere Zeilen werden verworfen, wenn diese Grenze überschritten wird. Klicks in die Terminalfläche setzen den Fokus weiterhin auf das Terminal, sodass Tastatureingaben und `Ctrl+V` auch nach dem Scrollen direkt an die CLI gehen.
+
+> **Vollbild-Programme:** Wenn die CLI eine Vollbild-Ansicht nutzt (z. B. interaktive Auswahllisten oder Texteditoren), wird sie auf den eigenen Bildschirmbereich der CLI umgeschaltet. In diesem Modus ist der Verlauf bewusst nicht scrollbar — die Anzeige folgt dem Programm; beim Verlassen der Vollbild-Ansicht kehrt das normale Scroll-Verhalten zurück.
 
 ### 4. CLI beenden
 

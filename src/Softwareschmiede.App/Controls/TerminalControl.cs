@@ -12,15 +12,15 @@ using Softwareschmiede.Infrastructure.Terminal;
 
 namespace Softwareschmiede.App.Controls;
 
-/// <summary>WPF-Control, das eine <see cref="PseudoConsoleSession"/> rendert und Tastatureingaben weiterleitet.
-/// Reiner Renderer: Die Leseschleife läuft unabhängig vom Control-Lebenszyklus in der <see cref="PseudoConsoleSession"/>
-/// selbst; das Control abonniert lediglich deren <see cref="PseudoConsoleSession.BufferChanged"/>-Event.</summary>
+/// <summary>WPF-Control, das eine <see cref="ITerminalSession"/> rendert und Tastatureingaben weiterleitet.
+/// Reiner Renderer: Die Leseschleife läuft unabhängig vom Control-Lebenszyklus in der <see cref="ITerminalSession"/>
+/// selbst; das Control abonniert lediglich deren <see cref="ITerminalSession.BufferChanged"/>-Event.</summary>
 public sealed class TerminalControl : FrameworkElement, IScrollInfo
 {
     private readonly ILogger<TerminalControl> _logger =
         App.Services?.GetService<ILogger<TerminalControl>>() ?? NullLogger<TerminalControl>.Instance;
     private TerminalBuffer? _buffer;
-    private PseudoConsoleSession? _currentSession;
+    private ITerminalSession? _currentSession;
     private static readonly Typeface ConsolasTypeface = new("Consolas");
     private const double FontSize = 13.0;
     private const double ScrollEndEpsilon = 0.001;
@@ -36,18 +36,18 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     private static readonly SolidColorBrush CursorBrush = CreateFrozenBrush(Color.FromArgb(180, 255, 255, 255));
     private readonly Dictionary<Color, SolidColorBrush> _brushCache = new();
 
-    /// <summary>Dependency Property für die aktive <see cref="PseudoConsoleSession"/>.</summary>
+    /// <summary>Dependency Property für die aktive <see cref="ITerminalSession"/>.</summary>
     /// <value>Das registrierte <see cref="DependencyProperty"/> für die Session-Eigenschaft.</value>
     public static readonly DependencyProperty SessionProperty = DependencyProperty.Register(
         nameof(Session),
-        typeof(PseudoConsoleSession),
+        typeof(ITerminalSession),
         typeof(TerminalControl),
         new PropertyMetadata(null, OnSessionChanged));
 
     /// <summary>Die aktive Terminal-Sitzung.</summary>
-    public PseudoConsoleSession? Session
+    public ITerminalSession? Session
     {
-        get => (PseudoConsoleSession?)GetValue(SessionProperty);
+        get => (ITerminalSession?)GetValue(SessionProperty);
         set => SetValue(SessionProperty, value);
     }
 
@@ -88,10 +88,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     private static void OnSessionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is TerminalControl control)
-            control.OnSessionChanged((PseudoConsoleSession?)e.NewValue);
+            control.OnSessionChanged((ITerminalSession?)e.NewValue);
     }
 
-    private void OnSessionChanged(PseudoConsoleSession? session)
+    private void OnSessionChanged(ITerminalSession? session)
     {
         if (_currentSession != null)
             _currentSession.BufferChanged -= OnBufferChanged;
@@ -114,14 +114,18 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         var cols = CalculateCols();
         var rows = CalculateRows();
 
-        // Bestehenden Buffer der Sitzung wiederverwenden: Bildschirminhalt bleibt erhalten, wenn der
-        // Anwender zur Aufgabe zurücknavigiert, ohne dass neue Ausgabe eintreffen muss.
+        // Vor dem Rebuild subscribieren: Ein Output-Chunk, der die Leseschleife zwischen
+        // RebuildBufferFromReplay und der Registrierung trifft, läge sonst zwar korrekt im Buffer,
+        // löste aber kein InvalidateVisual aus (Anzeige bliebe einen Chunk zurück).
+        session.BufferChanged += OnBufferChanged;
+
+        // Buffer aus dem gespeicherten Rohdaten-Replay neu aufbauen: deterministisch derselbe
+        // Endzustand wie beim Lösen der Bindung, ohne dass Live-Chunks doppelt erscheinen.
+        session.RebuildBufferFromReplay();
         _buffer = session.Buffer;
         _buffer.Resize(cols, rows);
         _isFollowingEnd = true;
         UpdateScrollInfo(followEndIfNeeded: true);
-
-        session.BufferChanged += OnBufferChanged;
 
         // Sofort rendern, damit vorhandener Bufferinhalt sichtbar wird ohne auf neue Ausgabe warten.
         _ = Dispatcher.InvokeAsync(InvalidateVisual);
@@ -273,19 +277,17 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         base.OnTextInput(e);
     }
 
-    /// <summary>Schreibt Bytes in den Input-Stream der aktuellen Session und protokolliert Schreibfehler statt sie zu verschlucken.</summary>
+    /// <summary>Schreibt Tastatur-Bytes über <see cref="ITerminalSession.WriteInputAsync"/> in die
+    /// aktuelle Session — derselbe serialisierte Weg (Write-Lock + Chunking) wie
+    /// <see cref="ITerminalSession.WritePromptAsync"/>, damit sich Tastatureingaben und zeitgesteuerte
+    /// Prompts nicht byte-genau vermischen. Schreibfehler werden protokolliert statt verschluckt.</summary>
     /// <param name="bytes">Die zu schreibenden Bytes.</param>
     private void WriteToInputStream(byte[] bytes)
     {
-        try
-        {
-            Session!.InputStream!.Write(bytes);
-            Session.MarkInputActivity();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Fehler beim Schreiben in den Terminal-Input-Stream");
-        }
+        var session = Session;
+        if (session?.InputStream is null)
+            return;
+        _ = WriteToInputStreamAsync(session, bytes, "Fehler beim Schreiben in den Terminal-Input-Stream");
     }
 
     /// <inheritdoc/>
@@ -417,6 +419,16 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     /// <inheritdoc/>
     public void SetVerticalOffset(double offset)
     {
+        // Bei aktivem Alternate Screen (Vollbild-TUI) gibt es keinen Scrollback — der vertikale
+        // Offset bleibt auf 0 geklemmt und Line*/Page*/MouseWheel* werden zu No-Ops.
+        if (_buffer?.IsAlternateScreenActive == true)
+        {
+            _verticalOffset = 0;
+            _isFollowingEnd = true;
+            ScrollOwner?.InvalidateScrollInfo();
+            return;
+        }
+
         var clamped = ClampOffset(offset, ScrollableHeight);
         _verticalOffset = clamped;
         _isFollowingEnd = clamped >= ScrollableHeight - ScrollEndEpsilon;
@@ -436,7 +448,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         MeasureCellSize();
         var snapshot = _buffer?.GetSnapshot();
         var visibleRows = CalculateRows();
-        var totalRows = snapshot?.TotalRows ?? 0;
+        // Im Alternate Screen existiert kein Scrollback-Bereich: Extent entspricht dem sichtbaren Grid.
+        var totalRows = _buffer?.IsAlternateScreenActive == true
+            ? (snapshot?.Rows ?? 0)
+            : (snapshot?.TotalRows ?? 0);
 
         _viewportHeight = Math.Min(visibleRows, Math.Max(visibleRows, totalRows));
         _extentHeight = Math.Max(_viewportHeight, totalRows);
@@ -472,16 +487,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     }
 
     /// <summary>Liest den Text aus der Zwischenablage, kodiert ihn für die CLI und schreibt ihn in den
-    /// Input-Stream der aktuellen Session. Fehler beim Zwischenablage-Zugriff, Kodieren oder Schreiben werden
-    /// abgefangen und protokolliert, statt das Control zu beeinträchtigen.</summary>
-    private async Task ReadClipboardAndInsertAsync()
-        => await ReadClipboardAndInsertAsync(Session!).ConfigureAwait(false);
-
-    /// <summary>Liest den Text aus der Zwischenablage, kodiert ihn für die CLI und schreibt ihn in den
     /// Input-Stream der beim Paste-Start aktiven Session. Fehler beim Zwischenablage-Zugriff, Kodieren oder
     /// Schreiben werden abgefangen und protokolliert, statt das Control zu beeinträchtigen.</summary>
     /// <param name="session">Die beim Paste-Start snapshotete Zielsession.</param>
-    private async Task ReadClipboardAndInsertAsync(PseudoConsoleSession session)
+    private async Task ReadClipboardAndInsertAsync(ITerminalSession session)
     {
         var text = GetClipboardText();
         if (string.IsNullOrEmpty(text))
@@ -497,7 +506,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     /// <param name="session">Die Zielsession für den Schreibvorgang.</param>
     /// <param name="bytes">Die zu schreibenden Bytes.</param>
     /// <param name="errorMessage">Die Log-Nachricht bei einem Schreibfehler.</param>
-    private async Task WriteToInputStreamAsync(PseudoConsoleSession session, byte[] bytes, string errorMessage)
+    private async Task WriteToInputStreamAsync(ITerminalSession session, byte[] bytes, string errorMessage)
     {
         try
         {

@@ -4,14 +4,17 @@ using Softwareschmiede.Domain.Terminal;
 
 namespace Softwareschmiede.Infrastructure.Terminal;
 
-/// <summary>Zustandsbehafteter VT100/ANSI-Parser. Verarbeitet Byte-Blöcke und erzeugt <see cref="TerminalEvent"/>-Instanzen.</summary>
+/// <summary>Zustandsbehafteter VT100/ANSI-Parser. Verarbeitet Byte-Blöcke und erzeugt <see cref="TerminalEvent"/>-Instanzen.
+/// UTF-8-Mehrbyte-Sequenzen, die eine Chunk-Grenze überschreiten, bleiben im <see cref="Decoder"/>-Zustand
+/// erhalten und werden beim nächsten <see cref="Parse"/>-Aufruf vollständig dekodiert.</summary>
 public sealed class AnsiSequenceParser
 {
-    private enum State { Normal, Escape, Csi, CsiQuestion, Osc }
+    private enum State { Normal, Escape, Csi, CsiQuestion, Osc, EscapeCharset }
 
     private State _state = State.Normal;
     private readonly StringBuilder _paramBuffer = new();
     private readonly List<byte> _textBuffer = new();
+    private readonly Decoder _utf8Decoder = Encoding.UTF8.GetDecoder();
 
     private static readonly Color[] StandardColors =
     [
@@ -69,10 +72,35 @@ public sealed class AnsiSequenceParser
                         _paramBuffer.Clear();
                         _state = State.Osc;
                     }
+                    else if (b == (byte)'7')
+                    {
+                        events.Add(new CursorSavedEvent(Restored: false));
+                        _state = State.Normal;
+                    }
+                    else if (b == (byte)'8')
+                    {
+                        events.Add(new CursorSavedEvent(Restored: true));
+                        _state = State.Normal;
+                    }
+                    else if (b == (byte)'c')
+                    {
+                        events.Add(new TerminalResetEvent());
+                        _state = State.Normal;
+                    }
+                    else if (b == (byte)'(' || b == (byte)')' || b == (byte)'*' || b == (byte)'#')
+                    {
+                        // Zeichensatz-/Linienzeichnungs-Selektoren (ESC ( B usw.): das folgende Zeichen
+                        // gehört zur Sequenz und wird ebenfalls verworfen.
+                        _state = State.EscapeCharset;
+                    }
                     else
                     {
                         _state = State.Normal;
                     }
+                    break;
+
+                case State.EscapeCharset:
+                    _state = State.Normal;
                     break;
 
                 case State.Csi:
@@ -127,16 +155,39 @@ public sealed class AnsiSequenceParser
         return events;
     }
 
+    /// <summary>Setzt den Parser zurück auf den Ausgangszustand (State-Maschine, Parameterpuffer und
+    /// UTF-8-Decoder-Übertrag — für den deterministischen Replay-Neuaufbau des Terminal-Buffers).</summary>
+    public void Reset()
+    {
+        _state = State.Normal;
+        _paramBuffer.Clear();
+        _textBuffer.Clear();
+        _utf8Decoder.Reset();
+    }
+
     private void FlushText(List<TerminalEvent> events)
     {
         if (_textBuffer.Count == 0)
             return;
 
-        var text = Encoding.UTF8.GetString(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_textBuffer));
-        _textBuffer.Clear();
+        var bytes = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_textBuffer);
+        var charCount = _utf8Decoder.GetCharCount(bytes, flush: false);
+        if (charCount == 0)
+        {
+            // Nur eine unvollständige Mehrbyte-Sequenz: der Decoder hält die Bytes im internen
+            // Zustand (flush:false konsumiert sie ohne Ausgabe) — sie werden beim nächsten Chunk
+            // zusammen mit deren Restbytes dekodiert.
+            _utf8Decoder.Convert(bytes, Span<char>.Empty, flush: false, out var bytesUsed, out _, out _);
+            _textBuffer.RemoveRange(0, bytesUsed);
+            return;
+        }
 
-        if (text.Length > 0)
-            events.Add(new TextWrittenEvent(text));
+        var chars = new char[charCount];
+        _utf8Decoder.Convert(bytes, chars, flush: false, out var consumed, out var charsUsed, out _);
+        _textBuffer.RemoveRange(0, consumed);
+
+        if (charsUsed > 0)
+            events.Add(new TextWrittenEvent(new string(chars, 0, charsUsed)));
     }
 
     private static void ProcessCsiCommand(char command, string paramStr, List<TerminalEvent> events)
@@ -163,11 +214,64 @@ public sealed class AnsiSequenceParser
                 var col = Math.Max(0, GetParam(parts, 1, 1) - 1);
                 events.Add(new CursorMovedEvent(row, col, IsAbsolute: true));
                 break;
+            case 'd':
+                events.Add(new CursorMovedEvent(Math.Max(0, GetParam(parts, 0, 1) - 1), -1, IsAbsolute: true));
+                break;
+            case 'e':
+                events.Add(new CursorMovedRelativeEvent(GetParam(parts, 0, 1), 0));
+                break;
+            case '`':
+            case 'G':
+                events.Add(new CursorMovedEvent(-1, Math.Max(0, GetParam(parts, 0, 1) - 1), IsAbsolute: true));
+                break;
+            case 'a':
+                events.Add(new CursorMovedRelativeEvent(0, GetParam(parts, 0, 1)));
+                break;
+            case 'E':
+                events.Add(new CursorMovedRelativeEvent(GetParam(parts, 0, 1), 0));
+                events.Add(new CursorMovedEvent(-1, 0, IsAbsolute: true));
+                break;
+            case 'F':
+                events.Add(new CursorMovedRelativeEvent(-(GetParam(parts, 0, 1)), 0));
+                events.Add(new CursorMovedEvent(-1, 0, IsAbsolute: true));
+                break;
             case 'J':
                 events.Add(new ScreenClearedEvent(GetParam(parts, 0, 0)));
                 break;
             case 'K':
                 events.Add(new LineErasedEvent(GetParam(parts, 0, 0)));
+                break;
+            case 'L':
+                events.Add(new LinesInsertedEvent(GetParam(parts, 0, 1)));
+                break;
+            case 'M':
+                events.Add(new LinesDeletedEvent(GetParam(parts, 0, 1)));
+                break;
+            case '@':
+                events.Add(new CharsInsertedEvent(GetParam(parts, 0, 1)));
+                break;
+            case 'P':
+                events.Add(new CharsDeletedEvent(GetParam(parts, 0, 1)));
+                break;
+            case 'X':
+                events.Add(new CharsErasedEvent(GetParam(parts, 0, 1)));
+                break;
+            case 'S':
+                events.Add(new ScreenScrolledEvent(GetParam(parts, 0, 1)));
+                break;
+            case 'T':
+                events.Add(new ScreenScrolledEvent(-(GetParam(parts, 0, 1))));
+                break;
+            case 'r':
+                var regionTop = Math.Max(0, GetParam(parts, 0, 1) - 1);
+                var regionBottom = parts.Length > 1 ? parts[1] - 1 : -1;
+                events.Add(new ScrollRegionChangedEvent(regionTop, regionBottom));
+                break;
+            case 's':
+                events.Add(new CursorSavedEvent(Restored: false));
+                break;
+            case 'u':
+                events.Add(new CursorSavedEvent(Restored: true));
                 break;
             case 'm':
                 ParseSgr(parts, events);
@@ -178,11 +282,37 @@ public sealed class AnsiSequenceParser
     private static void ProcessCsiQuestionCommand(char command, string paramStr, List<TerminalEvent> events)
     {
         var parts = ParseParams(paramStr);
-        var p = GetParam(parts, 0, 0);
+        var enable = command == 'h';
 
-        if (p == 25)
+        foreach (var p in parts)
         {
-            events.Add(new CursorVisibilityChangedEvent(command == 'h'));
+            switch (p)
+            {
+                case 25:
+                    events.Add(new CursorVisibilityChangedEvent(enable));
+                    break;
+                case 1048:
+                    events.Add(new CursorSavedEvent(Restored: !enable));
+                    break;
+                case 1049:
+                    // 1049 = DECSC/DECRC + Alternate Screen: beim Eintritt zuerst die Hauptscreen-
+                    // Cursorposition speichern, beim Verlassen nach dem Screen-Wechsel wiederherstellen.
+                    if (enable)
+                    {
+                        events.Add(new CursorSavedEvent(Restored: false));
+                        events.Add(new AlternateScreenChangedEvent(Enabled: true));
+                    }
+                    else
+                    {
+                        events.Add(new AlternateScreenChangedEvent(Enabled: false));
+                        events.Add(new CursorSavedEvent(Restored: true));
+                    }
+                    break;
+                case 47:
+                case 1047:
+                    events.Add(new AlternateScreenChangedEvent(enable));
+                    break;
+            }
         }
     }
 
