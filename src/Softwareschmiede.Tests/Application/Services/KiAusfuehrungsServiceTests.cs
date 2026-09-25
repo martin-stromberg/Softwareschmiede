@@ -642,6 +642,133 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
         eintraege.Single().Inhalt.Should().Be("tail-output");
     }
 
+    /// <summary>Regressionstest für den Early-Exit-Pfad in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>:
+    /// Ist der Prozess bereits vor der Event-Verdrahtung beendet (das Session-<c>Exited</c> feuerte ohne
+    /// Subscriber), muss der Exit-Code denselben Status-Mapping-Pfad wie ein reguläres Exited durchlaufen —
+    /// ExitCode != 0 → <see cref="CliProcessStatus.Fehler"/> inkl. SystemMeldung-Protokolleintrag,
+    /// ExitCode == 0 → <see cref="CliProcessStatus.Gestoppt"/>. Zuvor wurde auf diesem Pfad immer Gestoppt
+    /// gemeldet und weder der Fehlerstatus noch der Fehler-Protokolleintrag erzeugt.</summary>
+    [OsInterfaceTheory]
+    [InlineData(0, CliProcessStatus.Gestoppt)]
+    [InlineData(1, CliProcessStatus.Fehler)]
+    public async Task StartTerminalSessionAsync_ProzessVorVerdrahtungBeendet_MapptExitCodeAufStatus(
+        int exitCode,
+        CliProcessStatus erwarteterStatus)
+    {
+        await using var provider = CreateAufgabeServiceProvider();
+        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var launcher = new AlreadyExitedProcessLauncher(exitCode);
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher: launcher);
+
+        var statusEvents = new List<CliProcessStatus>();
+        sut.CliProcessStatusChanged += (_, status) => statusEvents.Add(status);
+
+        await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+
+        statusEvents.Should().Equal(
+            new[] { erwarteterStatus },
+            "der Early-Exit-Pfad muss denselben Endzustand wie ein reguläres Exited melden — ohne vorheriges Gestartet");
+        sut.GetTerminalSession(aufgabeId).Should().BeNull("das Handle muss im Early-Exit-Pfad entfernt worden sein");
+
+        if (erwarteterStatus == CliProcessStatus.Fehler)
+        {
+            var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, 1, ProtokollTyp.SystemMeldung);
+            eintraege.Should().Contain(
+                e => e.Inhalt.Contains($"ExitCode: {exitCode}"),
+                "der Fehler-Pfad muss den Exit-Code als SystemMeldung-Protokolleintrag persistieren");
+        }
+    }
+
+    /// <summary>Regressionstest für ein <see cref="ITerminalSession.Failed"/>, das zwischen Session-Erzeugung
+    /// und Event-Verdrahtung feuert (Leseschleifen-Fehler bei noch laufendem Prozess): Der Fehlerzustand muss
+    /// über <see cref="ITerminalSession.Failure"/> nachträglich erkannt und wie ein reguläres Failed behandelt
+    /// werden — Status <see cref="CliProcessStatus.Fehler"/>, Handle entfernt, Session disposed. Zuvor blieb
+    /// das Handle mit toter Leseschleife als „Gestartet" hängen.</summary>
+    [OsInterfaceFact]
+    public async Task StartTerminalSessionAsync_FailedVorVerdrahtung_WirdErkanntUndAlsFehlerGemeldet()
+    {
+        await using var provider = CreateAufgabeServiceProvider();
+        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var launcher = new FailingReadSessionLauncher();
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher: launcher);
+
+        var statusEvents = new List<CliProcessStatus>();
+        sut.CliProcessStatusChanged += (_, status) => statusEvents.Add(status);
+
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+
+        try
+        {
+            statusEvents.Should().Equal(
+                new[] { CliProcessStatus.Fehler },
+                "das vor der Verdrahtung ausgelöste Failed muss erkannt und als Fehler gemeldet werden — kein Gestartet");
+            sut.GetTerminalSession(aufgabeId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
+            AssertSessionDisposed(handle.Session!, "der Fehler-Pfad muss die Session-Ressourcen aufräumen");
+
+            var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, 1, ProtokollTyp.SystemMeldung);
+            eintraege.Should().Contain(
+                e => e.Inhalt.Contains("Laufzeitfehler"),
+                "ein fataler Session-Fehler ohne Exit-Code muss als SystemMeldung-Protokolleintrag persistiert werden");
+        }
+        finally
+        {
+            KillIfRunning(handle.Process);
+        }
+    }
+
+    /// <summary>Fehlschlägt die Leseschleife einer Terminal-Session zur Laufzeit (<see cref="ITerminalSession.Failed"/>
+    /// nach der Event-Verdrahtung, Prozess läuft noch), muss der Dienst gemäß Plan
+    /// <see cref="CliProcessStatus.Fehler"/> melden — ein fataler Session-Fehler ist kein reguläres Prozessende
+    /// (zuvor wurde hier fälschlich Gestoppt gemeldet).</summary>
+    [OsInterfaceFact]
+    public async Task StartTerminalSessionAsync_SessionFailed_MeldetFehlerStattGestoppt()
+    {
+        await using var provider = CreateAufgabeServiceProvider();
+        var (aufgabeId, _) = await CreateGestarteteAufgabeMitAktivemLaufAsync(provider);
+        var launcher = new DelayedFailingReadSessionLauncher(TimeSpan.FromMilliseconds(300));
+        using var sut = TestKiAusfuehrungsServiceFactory.Create(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            launcher: launcher);
+
+        var statusEvents = new List<CliProcessStatus>();
+        var fehlerSignal = new TaskCompletionSource();
+        sut.CliProcessStatusChanged += (_, status) =>
+        {
+            statusEvents.Add(status);
+            if (status == CliProcessStatus.Fehler)
+                fehlerSignal.TrySetResult();
+        };
+
+        var handle = await sut.StartTerminalSessionAsync(aufgabeId, CreateNoOpPlugin().Object, Path.GetTempPath());
+
+        try
+        {
+            statusEvents.Should().Equal(
+                new[] { CliProcessStatus.Gestartet },
+                "bei verzögertem Lesefehler ist der Start zunächst erfolgreich");
+
+            var completed = await Task.WhenAny(fehlerSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            completed.Should().Be(fehlerSignal.Task,
+                "ein Laufzeitfehler der Leseschleife muss als Fehler gemeldet werden, nicht als Gestoppt");
+
+            statusEvents.Should().Equal(new[] { CliProcessStatus.Gestartet, CliProcessStatus.Fehler });
+            sut.GetTerminalSession(aufgabeId).Should().BeNull("das Handle muss nach dem Session-Fehler entfernt worden sein");
+
+            var eintraege = await WaitForProtokollEntriesAsync(provider, aufgabeId, 1, ProtokollTyp.SystemMeldung);
+            eintraege.Should().Contain(
+                e => e.Inhalt.Contains("Laufzeitfehler"),
+                "ein fataler Session-Fehler ohne Exit-Code muss als SystemMeldung-Protokolleintrag persistiert werden");
+        }
+        finally
+        {
+            KillIfRunning(handle.Process);
+        }
+    }
+
     private static async Task<IReadOnlyList<Softwareschmiede.Domain.Entities.Protokolleintrag>> WaitForCliOutputAsync(
         ServiceProvider provider,
         Guid aufgabeId,
@@ -815,6 +942,18 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
             CreateNoWindow = true,
         }) ?? throw new InvalidOperationException("Testprozess konnte nicht gestartet werden.");
 
+    /// <summary>Startet einen garantiert ~30 s laufenden Prozess, der nicht von stdin abhängt
+    /// (<c>timeout</c> bricht unter umgeleitetem stdin sofort mit einem Fehlercode ab — <c>ping</c>
+    /// ist dafür immun und bleibt zuverlässig am Leben, bis er gekillt wird).</summary>
+    private static System.Diagnostics.Process StartLongRunningTestProcess()
+        => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = "/c ping -n 31 127.0.0.1 > nul",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        }) ?? throw new InvalidOperationException("Testprozess konnte nicht gestartet werden.");
+
     private sealed class FixedOutputPseudoConsoleProcessLauncher : IPseudoConsoleProcessLauncher
     {
         private readonly string _output;
@@ -914,6 +1053,168 @@ public sealed class KiAusfuehrungsServiceTests : IDisposable
 
             return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
         }
+    }
+
+    /// <summary>Launcher-Double, das einen bereits beendeten Prozess in die Session legt (wartet in
+    /// <see cref="Start"/> synchron auf das Prozessende). Reproduziert deterministisch den Early-Exit-Pfad
+    /// in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>: Der Prozess ist bei der
+    /// Event-Verdrahtung bereits beendet und das Session-Exited feuerte ohne Subscriber.</summary>
+    private sealed class AlreadyExitedProcessLauncher : IPseudoConsoleProcessLauncher
+    {
+        private readonly int _exitCode;
+
+        public AlreadyExitedProcessLauncher(int exitCode)
+        {
+            _exitCode = exitCode;
+        }
+
+        public bool IsPseudoTerminal => false;
+
+        public TerminalSessionStartResult Start(
+            Guid aufgabeId,
+            TerminalSessionStartSpec spec,
+            ITerminalOutputSink? outputSink = null)
+        {
+            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c exit {_exitCode}",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            }) ?? throw new InvalidOperationException("Testprozess konnte nicht gestartet werden.");
+            process.WaitForExit();
+
+            var session = new PseudoConsoleSession(
+                NullPseudoConsoleHandle.Instance,
+                process,
+                new MemoryStream(),
+                new MemoryStream(),
+                new PseudoConsoleSessionContext
+                {
+                    Logger = NullLogger<PseudoConsoleSession>.Instance,
+                    OutputSink = outputSink,
+                });
+
+            return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
+        }
+    }
+
+    /// <summary>Launcher-Double, dessen Session-Leseschleife sofort mit einem IOException aussteigt, während
+    /// der Prozess weiterläuft — reproduziert ein <see cref="ITerminalSession.Failed"/>, das bereits vor der
+    /// Event-Verdrahtung in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/> ausgelöst wurde.
+    /// <see cref="Start"/> wartet deterministisch auf <see cref="ITerminalSession.Failure"/>, damit das
+    /// Timing garantiert ist und der Test nicht von zufälliger Scheduling-Reihenfolge abhängt.</summary>
+    private sealed class FailingReadSessionLauncher : IPseudoConsoleProcessLauncher
+    {
+        public bool IsPseudoTerminal => false;
+
+        public TerminalSessionStartResult Start(
+            Guid aufgabeId,
+            TerminalSessionStartSpec spec,
+            ITerminalOutputSink? outputSink = null)
+        {
+            var process = StartLongRunningTestProcess();
+            var session = new PseudoConsoleSession(
+                NullPseudoConsoleHandle.Instance,
+                process,
+                new MemoryStream(),
+                new ThrowingReadStream(),
+                new PseudoConsoleSessionContext
+                {
+                    Logger = NullLogger<PseudoConsoleSession>.Instance,
+                    OutputSink = outputSink,
+                });
+
+            if (!System.Threading.SpinWait.SpinUntil(() => session.Failure is not null, TimeSpan.FromSeconds(5)))
+                throw new InvalidOperationException("Die Leseschleife der Testsession hat den simulierten Fehler nicht innerhalb des Timeouts gemeldet.");
+
+            return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
+        }
+    }
+
+    /// <summary>Launcher-Double wie <see cref="FailingReadSessionLauncher"/>, bei dem der Lesefehler erst
+    /// nach einer Verzögerung ausgelöst wird — damit das <see cref="ITerminalSession.Failed"/> erst
+    /// <em>nach</em> der Event-Verdrahtung in <see cref="KiAusfuehrungsService.StartTerminalSessionAsync"/>
+    /// feuert und der reguläre Failed-Ereignis-Pfad (statt des Failure-Rechecks) getroffen wird.</summary>
+    private sealed class DelayedFailingReadSessionLauncher : IPseudoConsoleProcessLauncher
+    {
+        private readonly TimeSpan _delay;
+
+        public DelayedFailingReadSessionLauncher(TimeSpan delay)
+        {
+            _delay = delay;
+        }
+
+        public bool IsPseudoTerminal => false;
+
+        public TerminalSessionStartResult Start(
+            Guid aufgabeId,
+            TerminalSessionStartSpec spec,
+            ITerminalOutputSink? outputSink = null)
+        {
+            var process = StartLongRunningTestProcess();
+            var session = new PseudoConsoleSession(
+                NullPseudoConsoleHandle.Instance,
+                process,
+                new MemoryStream(),
+                new DelayedThrowingReadStream(_delay),
+                new PseudoConsoleSessionContext
+                {
+                    Logger = NullLogger<PseudoConsoleSession>.Instance,
+                    OutputSink = outputSink,
+                });
+
+            return new TerminalSessionStartResult(process, session, IsPseudoTerminal: false);
+        }
+    }
+
+    /// <summary>Stream, dessen Lesevorgang sofort eine Exception wirft (simulierter Leseschleifen-Fehler).</summary>
+    private sealed class ThrowingReadStream : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => 0;
+        public override long Position { get; set; }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            => throw new IOException("Simulierter Lesefehler des Terminal-Output-Streams");
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    /// <summary>Stream, dessen Lesevorgang erst nach einer Verzögerung eine Exception wirft — simuliert einen
+    /// Leseschleifen-Fehler zur Laufzeit (nach der Event-Verdrahtung des Aufrufers).</summary>
+    private sealed class DelayedThrowingReadStream : Stream
+    {
+        private readonly TimeSpan _delay;
+
+        public DelayedThrowingReadStream(TimeSpan delay)
+        {
+            _delay = delay;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => 0;
+        public override long Position { get; set; }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(_delay, cancellationToken);
+            throw new IOException("Simulierter Lesefehler des Terminal-Output-Streams");
+        }
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class DelayedContentStream : Stream

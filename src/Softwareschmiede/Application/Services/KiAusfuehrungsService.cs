@@ -241,15 +241,27 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             session.Exited += (_, e) => HandleSessionEndedAsync(aufgabeId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionEndedAsync");
             session.Failed += (_, e) => HandleSessionFailedAsync(aufgabeId, handle, e).SafeFireAndForget(_logger, "KiAusfuehrungsService.HandleSessionFailedAsync");
 
-            // Wenn der Prozess bereits vor der Event-Verdrahtung beendet wurde, hat die Session ihr Exited
-            // eventuell schon vor der Registrierung ausgelöst — dann hier manuell bereinigen (kein
-            // Gestartet-Event für einen bereits beendeten Prozess).
-            if (process.HasExited && _handles.TryRemove(aufgabeId, out var earlyExitHandle))
+            // Ein vor der Verdrahtung ausgelöstes Failed (z. B. Leseschleifen-Fehler bei noch
+            // laufendem Prozess) ist ohne Subscriber verlorengegangen — über den auf der Session
+            // sichtbaren Fehlerzustand nachträglich wie ein reguläres Failed behandeln. Der Check
+            // steht vor dem HasExited-Recheck: Ein fataler Session-Fehler ist der schwerwiegendere
+            // Zustand und führt gemäß Plan auf CliProcessStatus.Fehler (der Exit-Code wird dabei
+            // mitgeführt, sofern er bereits bekannt ist).
+            if (session.Failure is { } preWiringFailure)
             {
-                await DisposeSessionResourcesAsync(earlyExitHandle).ConfigureAwait(false);
-                RaiseRunningCountChanged();
-                await PersistAusfuehrungBeendetAsync(aufgabeId).ConfigureAwait(false);
-                CliProcessStatusChanged?.Invoke(aufgabeId, CliProcessStatus.Gestoppt);
+                await HandleSessionFailedAsync(aufgabeId, handle, preWiringFailure).ConfigureAwait(false);
+                return handle;
+            }
+
+            // Wenn der Prozess bereits vor der Event-Verdrahtung beendet wurde, hat die Session ihr
+            // Exited eventuell schon vor der Registrierung ausgelöst — dann hier über denselben Pfad
+            // wie ein reguläres Exited-Event bereinigen: HandleExitedCoreAsync entfernt das Handle
+            // atomar (Genau-einmal-Semantik auch gegen ein parallel zugestelltes Exited) und bildet
+            // den Exit-Code korrekt auf Gestoppt/Fehler inkl. Fehler-Protokolleintrag ab (kein
+            // Gestartet-Event für einen bereits beendeten Prozess).
+            if (process.HasExited)
+            {
+                await HandleSessionEndedAsync(aufgabeId, handle, session.ExitCode ?? TryGetExitCode(process), "Terminal").ConfigureAwait(false);
                 return handle;
             }
 
@@ -368,7 +380,7 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         _startLock.Dispose();
     }
 
-    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId, int exitCode)
+    private async Task PersistFehlgeschlagenAsync(Guid aufgabeId, int? exitCode)
     {
         if (_isDisposed)
         {
@@ -394,7 +406,9 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             await protokollService.AddEintragAsync(
                 aufgabeId,
                 ProtokollTyp.SystemMeldung,
-                $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode}). Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden.").ConfigureAwait(false);
+                exitCode is not null and not 0
+                    ? $"CLI-Prozess mit Fehler beendet (ExitCode: {exitCode.Value}). Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden."
+                    : "Terminal-Session mit einem Laufzeitfehler beendet. Aufgabe bleibt im Status Gestartet — CLI-Start kann erneut versucht werden.").ConfigureAwait(false);
 
             _logger.LogInformation("Aufgabe {AufgabeId}: CLI-Prozess mit Fehler beendet (ExitCode: {ExitCode}), Status bleibt unverändert.", aufgabeId, exitCode);
         }
@@ -428,20 +442,29 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <summary>Behandelt das <see cref="ITerminalSession.Exited"/>-Ereignis einer Terminal-Session:
     /// Exit-Code kommt aus <see cref="TerminalSessionExitedEventArgs"/>, die Session-Ressourcen werden
     /// über <see cref="DisposeSessionResourcesAsync"/> aufgeräumt.</summary>
-    private async Task HandleSessionEndedAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext)
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <param name="handle">Das zugehörige <see cref="CliProcessHandle"/>.</param>
+    /// <param name="exitCode">Der ermittelte Exit-Code, oder <c>null</c>, wenn keiner bekannt ist.</param>
+    /// <param name="logKontext">Bezeichnung des Kontexts für die Log-Ausgabe (z. B. "Terminal").</param>
+    /// <param name="istFehlerhaftesEnde"><c>true</c>, wenn das Ende auf einem fatalen
+    /// Laufzeitfehler der Session beruht (<see cref="ITerminalSession.Failed"/>) — dann wird auch ohne
+    /// bekannten Exit-Code der Status <see cref="CliProcessStatus.Fehler"/> gemeldet.</param>
+    private async Task HandleSessionEndedAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, bool istFehlerhaftesEnde = false)
     {
-        await HandleExitedCoreAsync(aufgabeId, handle, exitCode, logKontext, () => DisposeSessionResourcesAsync(handle)).ConfigureAwait(false);
+        await HandleExitedCoreAsync(aufgabeId, handle, exitCode, logKontext, () => DisposeSessionResourcesAsync(handle), istFehlerhaftesEnde).ConfigureAwait(false);
     }
 
     /// <summary>Behandelt das <see cref="ITerminalSession.Failed"/>-Ereignis einer Terminal-Session:
-    /// ein fataler Laufzeitfehler wird wie ein Exit ohne Code behandelt (Status <see cref="CliProcessStatus.Fehler"/>).</summary>
+    /// ein fataler Laufzeitfehler wird wie ein Exit mit Fehlercode behandelt (Status
+    /// <see cref="CliProcessStatus.Fehler"/> inkl. Fehler-Protokolleintrag; ein bekannt gewordener
+    /// Exit-Code wird dabei mitgeführt).</summary>
     private async Task HandleSessionFailedAsync(Guid aufgabeId, CliProcessHandle handle, TerminalSessionFailedEventArgs args)
     {
         _logger.LogError(args.Error, "Terminal-Session für Aufgabe {AufgabeId} fehlgeschlagen (Phase: {Phase}).", aufgabeId, args.Phase);
-        await HandleSessionEndedAsync(aufgabeId, handle, null, "Terminal-Fehler").ConfigureAwait(false);
+        await HandleSessionEndedAsync(aufgabeId, handle, handle.Session?.ExitCode ?? TryGetExitCode(handle.Process), "Terminal-Fehler", istFehlerhaftesEnde: true).ConfigureAwait(false);
     }
 
-    private async Task HandleExitedCoreAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync)
+    private async Task HandleExitedCoreAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync, bool istFehlerhaftesEnde = false)
     {
         try
         {
@@ -477,10 +500,10 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             {
                 status = CliProcessStatus.Gestoppt;
             }
-            else if (exitCode.HasValue && exitCode.Value != 0)
+            else if (istFehlerhaftesEnde || (exitCode.HasValue && exitCode.Value != 0))
             {
                 status = CliProcessStatus.Fehler;
-                PersistFehlgeschlagenAsync(aufgabeId, exitCode.Value).SafeFireAndForget(_logger, "KiAusfuehrungsService.PersistFehlgeschlagenAsync");
+                PersistFehlgeschlagenAsync(aufgabeId, exitCode).SafeFireAndForget(_logger, "KiAusfuehrungsService.PersistFehlgeschlagenAsync");
             }
             else
             {

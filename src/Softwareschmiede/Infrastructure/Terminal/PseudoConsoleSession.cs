@@ -89,6 +89,11 @@ public sealed class PseudoConsoleSession : ITerminalSession
     /// <inheritdoc/>
     public int? ExitCode { get; private set; }
 
+    private TerminalSessionFailedEventArgs? _failure;
+
+    /// <inheritdoc/>
+    public TerminalSessionFailedEventArgs? Failure => Volatile.Read(ref _failure);
+
     /// <summary>Erstellt eine neue <see cref="PseudoConsoleSession"/> und startet sofort die Leseschleife.</summary>
     /// <param name="pseudoConsole">Die zugehörige Pseudo Console.</param>
     /// <param name="process">Der gestartete Prozess.</param>
@@ -413,9 +418,16 @@ public sealed class PseudoConsoleSession : ITerminalSession
         if (Volatile.Read(ref _disposed) != 0)
             return;
 
+        var args = new TerminalSessionFailedEventArgs(error, phase);
+        // Fehlerzustand vor dem Event festhalten: Ein Failed, das ohne Subscriber ausläuft (z. B. ein
+        // Leseschleifen-Fehler zwischen Session-Erzeugung und Event-Verdrahtung im Aufrufer), bleibt
+        // sonst für immer undetektiert. Der erste Fehler gewinnt — er ist die übliche Fehlerursache,
+        // spätere Fehler sind meist Folgeeffekte derselben Störung.
+        Interlocked.CompareExchange(ref _failure, args, null);
+
         try
         {
-            Failed?.Invoke(this, new TerminalSessionFailedEventArgs(error, phase));
+            Failed?.Invoke(this, args);
         }
         catch (Exception ex)
         {

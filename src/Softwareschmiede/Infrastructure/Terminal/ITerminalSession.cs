@@ -29,6 +29,12 @@ public interface ITerminalSession : IDisposable
     /// <summary>Der Exit-Code des Prozesses nach dessen Beendigung, oder <c>null</c>.</summary>
     int? ExitCode { get; }
 
+    /// <summary>Der erste fatale Laufzeitfehler der Session (z. B. Leseschleifen-/Schreibfehler), oder
+    /// <c>null</c>, solange kein Fehler aufgetreten ist. Wird gesetzt, <em>bevor</em> <see cref="Failed"/>
+    /// ausgelöst wird, damit ein Fehler, der vor der Registrierung eines <see cref="Failed"/>-Handlers
+    /// auftrat, nachträglich erkannt werden kann.</summary>
+    TerminalSessionFailedEventArgs? Failure { get; }
+
     /// <summary>Schreibt bereits kodierte Eingabebytes serialisiert in den Input-Stream der Sitzung.</summary>
     Task WriteInputAsync(ReadOnlyMemory<byte> bytes, CancellationToken ct = default);
 

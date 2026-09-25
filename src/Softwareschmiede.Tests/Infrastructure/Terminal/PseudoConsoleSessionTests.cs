@@ -325,6 +325,40 @@ public sealed class PseudoConsoleSessionTests
         pipeSession.IsPseudoTerminal.Should().BeFalse();
     }
 
+    /// <summary>Ein Leseschleifen-Fehler muss über <see cref="ITerminalSession.Failure"/> sichtbar bleiben —
+    /// auch dann, wenn zum Fehlerzeitpunkt noch kein <see cref="ITerminalSession.Failed"/>-Handler registriert
+    /// war. Das ist die Grundlage des Fehler-Rechecks in
+    /// <c>KiAusfuehrungsService.StartTerminalSessionAsync</c> (Failed vor der Event-Verdrahtung).</summary>
+    [Fact]
+    public async Task ReadLoopAsync_Lesefehler_SetztFailureZustand()
+    {
+        using var session = CreateSession(new ThrowingStream());
+
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+
+        session.Failure.Should().NotBeNull("ein Leseschleifen-Fehler muss über Failure dauerhaft sichtbar bleiben");
+        session.Failure!.Phase.Should().Be("ReadLoop");
+        session.Failure.Error.Should().BeOfType<IOException>();
+    }
+
+    /// <summary>Ein Schreibfehler in <see cref="PseudoConsoleSession.WriteInputAsync"/> muss
+    /// <see cref="ITerminalSession.Failure"/> setzen und <see cref="ITerminalSession.Failed"/> mit demselben
+    /// Argument-Objekt auslösen (Konsistenz zwischen beobachtbarem Zustand und Event).</summary>
+    [Fact]
+    public async Task WriteInputAsync_Schreibfehler_SetztFailureUndFeiertFailed()
+    {
+        using var session = TestPseudoConsoleSessionFactory.Create(new ThrowingWriteStream(), new MemoryStream());
+        TerminalSessionFailedEventArgs? failedArgs = null;
+        session.Failed += (_, e) => failedArgs = e;
+
+        var act = () => session.WriteInputAsync(new byte[] { 0x41 });
+        await act.Should().ThrowAsync<IOException>();
+
+        failedArgs.Should().NotBeNull("ein Schreibfehler muss das Failed-Event auslösen");
+        failedArgs!.Phase.Should().Be("Write");
+        session.Failure.Should().BeSameAs(failedArgs, "Failure muss exakt das gemeldete Fehler-Ereignis tragen");
+    }
+
     private static Task GetReadLoopTask(PseudoConsoleSession session)
     {
         var field = typeof(PseudoConsoleSession).GetField("_readLoopTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -355,6 +389,26 @@ public sealed class PseudoConsoleSessionTests
             Complete();
             return Task.CompletedTask;
         }
+    }
+
+    /// <summary>Stream, der beim Schreibvorgang eine Exception wirft (z. B. simulierter Pipe-Fehler auf
+    /// dem Input-Pfad).</summary>
+    private sealed class ThrowingWriteStream : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => 0;
+        public override long Position { get; set; }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+            => throw new IOException("Simulierter Schreibfehler des Terminal-Input-Streams");
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new IOException("Simulierter Schreibfehler des Terminal-Input-Streams");
     }
 
     /// <summary>Stream, der beim Lesevorgang eine Exception wirft (z. B. simulierter Pipe-Fehler).</summary>
