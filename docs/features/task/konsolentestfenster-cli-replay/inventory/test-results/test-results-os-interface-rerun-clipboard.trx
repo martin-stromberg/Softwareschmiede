@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="bdf850d7-d7e0-44e8-8638-b94ee5f308ce" name="Martin@DESKTOP-CM8OBSG 2026-09-26 14:25:35" runUser="DESKTOP-CM8OBSG\Martin" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-26T14:25:35.5986595+02:00" queuing="2026-09-26T14:25:35.5986597+02:00" start="2026-09-26T14:25:34.5672162+02:00" finish="2026-09-26T14:25:35.6023363+02:00" />
+  <TestSettings name="default" id="44cb3254-9845-4ec1-8754-66511cf9a98a">
+    <Deployment runDeploymentRoot="Martin_DESKTOP-CM8OBSG_2026-09-26_14_25_35" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="de1ae6a2-240f-442f-9e7c-047bc4c3ae1e" testId="ad83f3d8-33a0-688e-a643-c2f581305af7" testName="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2174773" startTime="2026-09-26T14:25:35.2782435+02:00" endTime="2026-09-26T14:25:35.5001464+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="de1ae6a2-240f-442f-9e7c-047bc4c3ae1e" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Softwareschmiede.Tests.App.Controls.TerminalControlTests.ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.tests\bin\debug\net10.0-windows10.0.17763.0\softwareschmiede.tests.dll" id="ad83f3d8-33a0-688e-a643-c2f581305af7">
+      <Execution id="de1ae6a2-240f-442f-9e7c-047bc4c3ae1e" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.Tests\bin\Debug\net10.0-windows10.0.17763.0\Softwareschmiede.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.Tests.App.Controls.TerminalControlTests" name="ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="ad83f3d8-33a0-688e-a643-c2f581305af7" executionId="de1ae6a2-240f-442f-9e7c-047bc4c3ae1e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Ergebnisse nicht in einer Liste" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="Alle geladenen Ergebnisse" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="1" executed="1" passed="1" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.13]   Discovering: Softwareschmiede.Tests&#xD;
+[xUnit.net 00:00:00.30]   Discovered:  Softwareschmiede.Tests&#xD;
+[xUnit.net 00:00:00.33]   Starting:    Softwareschmiede.Tests&#xD;
+     Warning:&#xD;
+     The component "Fluent Assertions" is governed by the rules defined in the Xceed License Agreement and&#xD;
+     the Xceed Fluent Assertions Community License. You may use Fluent Assertions free of charge for&#xD;
+     non-commercial use only. An active subscription is required to use Fluent Assertions for commercial use.&#xD;
+     Please contact Xceed Sales mailto:sales@xceed.com to acquire a subscription at a very low cost.&#xD;
+     A paid commercial license supports the development and continued increasing support of&#xD;
+     Fluent Assertions users under both commercial and community licenses. Help us&#xD;
+     keep Fluent Assertions at the forefront of unit testing.&#xD;
+     For more information, visit https://xceed.com/products/unit-testing/fluent-assertions/&#xD;
+[xUnit.net 00:00:00.57]   Finished:    Softwareschmiede.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

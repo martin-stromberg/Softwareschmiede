@@ -1,0 +1,91 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="484baaaf-d837-4898-8640-8052c49ddf9a" name="Martin@DESKTOP-CM8OBSG 2026-09-26 14:25:47" runUser="DESKTOP-CM8OBSG\Martin" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-26T14:25:47.7395177+02:00" queuing="2026-09-26T14:25:47.7395179+02:00" start="2026-09-26T14:25:45.9278243+02:00" finish="2026-09-26T14:25:49.8905268+02:00" />
+  <TestSettings name="default" id="35cf67f4-0252-4d30-a009-5f2d0808c421">
+    <Deployment runDeploymentRoot="Martin_DESKTOP-CM8OBSG_2026-09-26_14_25_47" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="5bd3110a-a207-493c-8349-684aad3794ea" testId="5b9fc206-ab96-2935-9758-561dbff53a94" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldUseProjectProfile_WhenHttpProfileIsInvalidButProjectProfileExists" computerName="DESKTOP-CM8OBSG" duration="00:00:00.3815542" startTime="2026-09-26T14:25:48.8374877+02:00" endTime="2026-09-26T14:25:49.2190834+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5bd3110a-a207-493c-8349-684aad3794ea" />
+    <UnitTestResult executionId="40529476-aef8-409e-911f-85a020fed5a1" testId="ca2fc618-aa29-dc38-bdc6-9f3e57d0ea34" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldReturnExit11_PerTarget_WhenHttpProfileIsNotObject" computerName="DESKTOP-CM8OBSG" duration="00:00:00.4095619" startTime="2026-09-26T14:25:48.0487360+02:00" endTime="2026-09-26T14:25:48.4583413+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="40529476-aef8-409e-911f-85a020fed5a1" />
+    <UnitTestResult executionId="39d74fb3-203c-46cb-87ac-9f6c409fc425" testId="318a6a46-2c2c-3ebf-d692-2560f91c3826" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldFailWithExit11_WhenLaunchSettingsContainsInvalidJson" computerName="DESKTOP-CM8OBSG" duration="00:00:00.3133383" startTime="2026-09-26T14:25:46.9580348+02:00" endTime="2026-09-26T14:25:47.2658279+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="39d74fb3-203c-46cb-87ac-9f6c409fc425" />
+    <UnitTestResult executionId="0dc3fdde-8632-45f3-b570-33c9a8f29fa3" testId="b7d7f866-161e-bedf-dea1-9477495945cb" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldAggregateExitCodePriority_WhenProjectsHaveMixedResults" computerName="DESKTOP-CM8OBSG" duration="00:00:00.4064915" startTime="2026-09-26T14:25:47.2664002+02:00" endTime="2026-09-26T14:25:47.6727484+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0dc3fdde-8632-45f3-b570-33c9a8f29fa3" />
+    <UnitTestResult executionId="86c15252-b7ff-4b0f-8532-c6e83f8002f4" testId="fc0eb365-1449-0c20-8c27-8625f096c373" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldFailWithExit10_WhenNoTargetLaunchSettingsExists" computerName="DESKTOP-CM8OBSG" duration="00:00:00.2536246" startTime="2026-09-26T14:25:49.5921871+02:00" endTime="2026-09-26T14:25:49.8459844+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="86c15252-b7ff-4b0f-8532-c6e83f8002f4" />
+    <UnitTestResult executionId="ae5328bf-df6f-4b08-b706-890a327c63d9" testId="b7df1e7d-a2a9-89ad-a173-d8807693096b" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldUseProjectProfile_WhenHttpProfileIsMissing" computerName="DESKTOP-CM8OBSG" duration="00:00:00.3726209" startTime="2026-09-26T14:25:49.2205423+02:00" endTime="2026-09-26T14:25:49.5920315+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ae5328bf-df6f-4b08-b706-890a327c63d9" />
+    <UnitTestResult executionId="5e1a6256-240c-4639-940c-fb44075cae65" testId="ccdada5f-5481-69c3-c522-d33d2b3ed1b1" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldDiscoverAndUpdateMultipleProjects_WhenRunWithoutParameters" computerName="DESKTOP-CM8OBSG" duration="00:00:00.5939979" startTime="2026-09-26T14:25:46.3513787+02:00" endTime="2026-09-26T14:25:46.9510732+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5e1a6256-240c-4639-940c-fb44075cae65" />
+    <UnitTestResult executionId="259ed683-f2f2-4fd0-884f-7cf06ef96119" testId="76c0c193-b8fe-b0df-4492-97db2db24c61" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldWriteCorrelatableDiagnostics_WhenProcessingProjects" computerName="DESKTOP-CM8OBSG" duration="00:00:00.3785263" startTime="2026-09-26T14:25:48.4585038+02:00" endTime="2026-09-26T14:25:48.8372425+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="259ed683-f2f2-4fd0-884f-7cf06ef96119" />
+    <UnitTestResult executionId="f8397ba7-9ecf-433d-beee-e4c365c42290" testId="5d57aa13-8d27-2498-fd55-f6c9bfd21985" testName="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldFailWithExit13AndCleanupTempFile_WhenLaunchSettingsWriteFails" computerName="DESKTOP-CM8OBSG" duration="00:00:00.3753612" startTime="2026-09-26T14:25:47.6729463+02:00" endTime="2026-09-26T14:25:48.0483984+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f8397ba7-9ecf-433d-beee-e4c365c42290" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldUseProjectProfile_WhenHttpProfileIsInvalidButProjectProfileExists" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="5b9fc206-ab96-2935-9758-561dbff53a94">
+      <Execution id="5bd3110a-a207-493c-8349-684aad3794ea" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldUseProjectProfile_WhenHttpProfileIsInvalidButProjectProfileExists" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldWriteCorrelatableDiagnostics_WhenProcessingProjects" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="76c0c193-b8fe-b0df-4492-97db2db24c61">
+      <Execution id="259ed683-f2f2-4fd0-884f-7cf06ef96119" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldWriteCorrelatableDiagnostics_WhenProcessingProjects" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldFailWithExit11_WhenLaunchSettingsContainsInvalidJson" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="318a6a46-2c2c-3ebf-d692-2560f91c3826">
+      <Execution id="39d74fb3-203c-46cb-87ac-9f6c409fc425" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldFailWithExit11_WhenLaunchSettingsContainsInvalidJson" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldDiscoverAndUpdateMultipleProjects_WhenRunWithoutParameters" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="ccdada5f-5481-69c3-c522-d33d2b3ed1b1">
+      <Execution id="5e1a6256-240c-4639-940c-fb44075cae65" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldDiscoverAndUpdateMultipleProjects_WhenRunWithoutParameters" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldFailWithExit10_WhenNoTargetLaunchSettingsExists" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="fc0eb365-1449-0c20-8c27-8625f096c373">
+      <Execution id="86c15252-b7ff-4b0f-8532-c6e83f8002f4" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldFailWithExit10_WhenNoTargetLaunchSettingsExists" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldFailWithExit13AndCleanupTempFile_WhenLaunchSettingsWriteFails" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="5d57aa13-8d27-2498-fd55-f6c9bfd21985">
+      <Execution id="f8397ba7-9ecf-433d-beee-e4c365c42290" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldFailWithExit13AndCleanupTempFile_WhenLaunchSettingsWriteFails" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldAggregateExitCodePriority_WhenProjectsHaveMixedResults" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="b7d7f866-161e-bedf-dea1-9477495945cb">
+      <Execution id="0dc3fdde-8632-45f3-b570-33c9a8f29fa3" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldAggregateExitCodePriority_WhenProjectsHaveMixedResults" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldReturnExit11_PerTarget_WhenHttpProfileIsNotObject" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="ca2fc618-aa29-dc38-bdc6-9f3e57d0ea34">
+      <Execution id="40529476-aef8-409e-911f-85a020fed5a1" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldReturnExit11_PerTarget_WhenHttpProfileIsNotObject" />
+    </UnitTest>
+    <UnitTest name="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests.StartScript_ShouldUseProjectProfile_WhenHttpProfileIsMissing" storage="d:\repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\softwareschmiede.integrationtests\bin\debug\net10.0\softwareschmiede.integrationtests.dll" id="b7df1e7d-a2a9-89ad-a173-d8807693096b">
+      <Execution id="ae5328bf-df6f-4b08-b706-890a327c63d9" />
+      <TestMethod codeBase="D:\Repositories\softwareschmiede\077f09dc-f2fb-4f5d-8c36-59df3d5d530a\src\Softwareschmiede.IntegrationTests\bin\Debug\net10.0\Softwareschmiede.IntegrationTests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Softwareschmiede.IntegrationTests.Scripts.StartPs1IntegrationTests" name="StartScript_ShouldUseProjectProfile_WhenHttpProfileIsMissing" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="5b9fc206-ab96-2935-9758-561dbff53a94" executionId="5bd3110a-a207-493c-8349-684aad3794ea" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ca2fc618-aa29-dc38-bdc6-9f3e57d0ea34" executionId="40529476-aef8-409e-911f-85a020fed5a1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="318a6a46-2c2c-3ebf-d692-2560f91c3826" executionId="39d74fb3-203c-46cb-87ac-9f6c409fc425" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b7d7f866-161e-bedf-dea1-9477495945cb" executionId="0dc3fdde-8632-45f3-b570-33c9a8f29fa3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fc0eb365-1449-0c20-8c27-8625f096c373" executionId="86c15252-b7ff-4b0f-8532-c6e83f8002f4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b7df1e7d-a2a9-89ad-a173-d8807693096b" executionId="ae5328bf-df6f-4b08-b706-890a327c63d9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ccdada5f-5481-69c3-c522-d33d2b3ed1b1" executionId="5e1a6256-240c-4639-940c-fb44075cae65" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="76c0c193-b8fe-b0df-4492-97db2db24c61" executionId="259ed683-f2f2-4fd0-884f-7cf06ef96119" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5d57aa13-8d27-2498-fd55-f6c9bfd21985" executionId="f8397ba7-9ecf-433d-beee-e4c365c42290" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Ergebnisse nicht in einer Liste" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="Alle geladenen Ergebnisse" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="9" executed="9" passed="9" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.06]   Discovering: Softwareschmiede.IntegrationTests&#xD;
+[xUnit.net 00:00:00.10]   Discovered:  Softwareschmiede.IntegrationTests&#xD;
+[xUnit.net 00:00:00.11]   Starting:    Softwareschmiede.IntegrationTests&#xD;
+     Warning:&#xD;
+     The component "Fluent Assertions" is governed by the rules defined in the Xceed License Agreement and&#xD;
+     the Xceed Fluent Assertions Community License. You may use Fluent Assertions free of charge for&#xD;
+     non-commercial use only. An active subscription is required to use Fluent Assertions for commercial use.&#xD;
+     Please contact Xceed Sales mailto:sales@xceed.com to acquire a subscription at a very low cost.&#xD;
+     A paid commercial license supports the development and continued increasing support of&#xD;
+     Fluent Assertions users under both commercial and community licenses. Help us&#xD;
+     keep Fluent Assertions at the forefront of unit testing.&#xD;
+     For more information, visit https://xceed.com/products/unit-testing/fluent-assertions/&#xD;
+[xUnit.net 00:00:03.63]   Finished:    Softwareschmiede.IntegrationTests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
