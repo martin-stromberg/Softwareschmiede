@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Infrastructure.Terminal;
@@ -22,13 +23,20 @@ public static class TestKiAusfuehrungsServiceFactory
     /// <param name="logger">Optionaler Logger für den Service.</param>
     /// <param name="launcher">Optionaler Launcher für den Terminal-Session-Pfad; Default ist der
     /// deterministische In-Memory-Launcher.</param>
+    /// <param name="terminalOptions">Optionale <see cref="TerminalSessionOptions"/> (z. B. zum
+    /// Deaktivieren der Rohbyte-Aufzeichnung via <c>AufzeichnungByteBudget</c>); Default: <c>new()</c>.</param>
+    /// <param name="timeProvider">Optionale Zeitquelle für die Aufzeichnungs-Zeitstempel; Default: <see cref="TimeProvider.System"/>.</param>
     public static KiAusfuehrungsService Create(
         IServiceScopeFactory scopeFactory,
         ILogger<KiAusfuehrungsService>? logger = null,
-        IPseudoConsoleProcessLauncher? launcher = null)
+        IPseudoConsoleProcessLauncher? launcher = null,
+        TerminalSessionOptions? terminalOptions = null,
+        TimeProvider? timeProvider = null)
         => new(
             logger ?? NullLogger<KiAusfuehrungsService>.Instance,
             NullLoggerFactory.Instance,
             scopeFactory,
-            new TestTerminalSessionFactory(launcher));
+            new TestTerminalSessionFactory(launcher),
+            Options.Create(terminalOptions ?? new TerminalSessionOptions()),
+            timeProvider ?? TimeProvider.System);
 }

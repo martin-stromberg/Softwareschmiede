@@ -172,10 +172,67 @@ public sealed class WpfDialogService : IDialogService
             if (!string.IsNullOrWhiteSpace(initialDirectory))
                 dialog.InitialDirectory = initialDirectory;
 
-            var result = dialog.ShowDialog(System.Windows.Application.Current.MainWindow);
+            var result = dialog.ShowDialog(AktivesDialogOwnerFenster());
             return result == true ? dialog.FileName : null;
         }).Task;
     }
+
+    /// <inheritdoc/>
+    public Task<string?> ShowOpenFileDialogAsync(
+        string title,
+        string filter,
+        string? initialDirectory = null,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var dialog = new OpenFileDialog
+            {
+                Title = title,
+                Filter = filter
+            };
+
+            if (!string.IsNullOrWhiteSpace(initialDirectory))
+                dialog.InitialDirectory = initialDirectory;
+
+            var result = dialog.ShowDialog(AktivesDialogOwnerFenster());
+            return result == true ? dialog.FileName : null;
+        }).Task;
+    }
+
+    /// <inheritdoc/>
+    public Task ShowKonsolenTestDialogAsync(
+        KonsolenTestViewModel viewModel,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+            // Nicht-modal: das Diagnose-Fenster bleibt parallel zur Live-Ansicht nutzbar
+            // (Vergleich Replay ↔ laufende Ausgabe). Der Lebenszyklus des ViewModels wird
+            // über den Closed-Handler des Fensters disponiert.
+            var dialog = new KonsolenTestDialog(viewModel)
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+            dialog.Show();
+        }).Task;
+    }
+
+    /// <summary>Liefert das aktuell aktive Fenster als Dialog-Owner — bei Aufrufen aus einem
+    /// nicht-modalen Fenster (z. B. dem Konsolentestfenster) ist das modal geöffnete
+    /// Datei-Dialogfenster sonst falsch zugeordnet (Owner=MainWindow liegt hinter dem
+    /// geöffneten Owned-Window) und erhält keinen zuverlässigen Fokus.</summary>
+    private static Window AktivesDialogOwnerFenster()
+        => System.Windows.Application.Current.Windows
+            .OfType<Window>()
+            .FirstOrDefault(w => w.IsActive)
+            ?? System.Windows.Application.Current.MainWindow;
 
     /// <summary>Erzeugt über <paramref name="dialogFactory"/> ein Dialogfenster, zeigt es modal an und liefert das über <paramref name="resultSelector"/> bestimmte Ergebnis.</summary>
     private static Task<TResult?> ShowDialogAsync<TResult>(Func<Window> dialogFactory, Func<TResult?> resultSelector)

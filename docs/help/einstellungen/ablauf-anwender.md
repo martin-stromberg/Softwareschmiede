@@ -48,6 +48,15 @@
 
 > **Hinweis:** Werden die Update-Einstellungen geändert, während ein Update angeboten wird oder ein Update-Vorgang läuft, wird das Angebot zurückgenommen bzw. der Vorgang abgebrochen. Details zum Update-Ablauf finden Sie in der [Programmupdate-Dokumentation](../programmupdate/index.md).
 
+### Konsolentestfenster öffnen (Diagnose)
+
+1. Öffnen Sie die Registerkarte **Allgemein**
+2. Klicken Sie im Abschnitt **Diagnose** auf **Konsolentestfenster öffnen**
+3. Das Fenster „Konsolentest" öffnet sich als eigenes Fenster — die Anwendung bleibt parallel bedienbar
+4. Laden Sie darin eine zuvor exportierte `.clireplay`-Aufzeichnung und spielen Sie sie zur Analyse der Terminal-Ausgabe ab
+
+> **Hinweis:** Die Aufzeichnung exportieren Sie zuvor in der Aufgabendetailansicht über den Button **Aufzeichnung exportieren** (Ribbon-Gruppe „CLI"). Details zur Bedienung des Fensters finden Sie im [Ablauf für Anwender der Terminal-Integration](../terminal/ablauf-anwender.md).
+
 ## Plugins (Registerkarte) — IDE-Plugins
 
 ### IDE-Plugin aktivieren, deaktivieren oder priorisieren

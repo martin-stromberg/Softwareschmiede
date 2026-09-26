@@ -50,9 +50,66 @@ public partial class End2EndTest
         ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(mainWindow, taskDetail);
         ConPtyProcessEnd_NachExitBefehl_IsCliRunningFalse_E2E(mainWindow, taskDetail);
 
+        await ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(mainWindow, taskDetail);
+
         taskDetail.ForceClose(recurseToDashboard: false);
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
         projectDetail.DeleteProject();
+    }
+
+    /// <summary>
+    /// Szenario: Nach dem Prozessende steht die vollständige Rohbyte-Aufzeichnung noch zur Verfügung.
+    /// Zuerst wird der Save-Dialog des Exports per ESC abgebrochen (keine Datei, kein
+    /// Fehlerbanner); danach erzeugt der bestätigte Export eine gültige .clireplay-Datei
+    /// (Magic "SWCLRPLY"), die im Konsolentestfenster geladen und mit maximaler Geschwindigkeit
+    /// vollständig über den echten Renderpfad abgespielt wird. Anschließend wird über die
+    /// Seitenleiste zur Aufgabe zurücknavigiert.
+    /// </summary>
+    /// <param name="mainWindow">Das Hauptfenster.</param>
+    /// <param name="taskDetail">Die Aufgabendetailansicht der beendeten ConPTY-Session.</param>
+    private async Task ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(Window mainWindow, TaskDetailView taskDetail)
+    {
+        var taskTitle = taskDetail.GetTaskTitle();
+        var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        try
+        {
+            // Abbruch-Subphase: Save-Dialog per ESC schließen — keine Datei, kein Fehlerbanner.
+            taskDetail.ExportCliReplay(null);
+            Assert.False(File.Exists(pfad), "Der abgebrochene Export darf keine Datei erzeugen.");
+            Assert.False(new ErrorView(mainWindow).IsVisible);
+
+            taskDetail.ExportCliReplay(pfad);
+
+            Assert.True(File.Exists(pfad), "Die .clireplay-Exportdatei wurde nicht erzeugt.");
+
+            var magic = new byte[8];
+            await using (var stream = File.OpenRead(pfad))
+            {
+                await stream.ReadExactlyAsync(magic);
+            }
+            Assert.Equal("SWCLRPLY", System.Text.Encoding.ASCII.GetString(magic));
+
+            // Konsolentestfenster über Einstellungen öffnen, Export laden und abspielen.
+            var settings = new Views.SettingsView(mainWindow).ForceShow();
+            var dialog = settings.OpenKonsolenTestDialog();
+            dialog.SetZeitrafferSchwelle("0");
+            dialog.OeffneAufzeichnung(pfad);
+            dialog.WarteAufQuellEintraege(1);
+
+            dialog.StartWiedergabe();
+            dialog.WarteAufStatus("Wiedergabe beendet.");
+            dialog.Schliessen();
+
+            settings.ForceClose(recurseToDashboard: false);
+
+            // Über die Seitenleiste zur Aufgabe zurückkehren (ForceShow ist ohne Titel nicht möglich).
+            new Views.MenuView(mainWindow).NavigateToTask(taskTitle);
+        }
+        finally
+        {
+            if (File.Exists(pfad))
+                File.Delete(pfad);
+        }
     }
 
     /// <summary>

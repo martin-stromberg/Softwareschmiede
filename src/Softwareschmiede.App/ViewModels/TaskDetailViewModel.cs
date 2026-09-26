@@ -62,6 +62,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private readonly ILogger<TaskDetailViewModel> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly ICliRawExportService _cliRawExportService;
+    private readonly ICliReplayExportService _cliReplayExportService;
     private readonly AufgabeLaufdatenChangedNotifier? _laufdatenChangedNotifier;
     private readonly Action<Action> _dispatcherInvoke;
 
@@ -556,6 +557,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Gibt an, ob die CLI-Rohausgabe exportiert werden kann.</summary>
     public bool KannCliRawExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
 
+    /// <summary>Gibt an, ob die CLI-Aufzeichnung exportiert werden kann.</summary>
+    public bool KannCliReplayExportieren => _aufgabe is not null && _aufgabeId != Guid.Empty;
+
     /// <summary>Der persistierte Pause-Endzeitpunkt der Aufgabe (UTC), oder null.</summary>
     public DateTimeOffset? PausiertBisUtc => _aufgabe?.PausiertBisUtc;
 
@@ -646,6 +650,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>Exportiert die protokollierte CLI-Rohausgabe in eine *.raw-Datei.</summary>
     public ICommand ExportCliRawCommand { get; }
 
+    /// <summary>Exportiert den Rohbyte-Mitschnitt der CLI-Session in eine *.clireplay-Datei.</summary>
+    public ICommand ExportCliReplayCommand { get; }
+
     /// <summary>Öffnet den Pause-Dialog und setzt bzw. hebt die Pause der Aufgabe.</summary>
     public ICommand PauseEinstellenCommand { get; }
 
@@ -705,6 +712,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         IOptions<AutonomAufgabenOptions> autonomAufgabenOptions,
         Action<Action>? dispatcherInvoke = null,
         ICliRawExportService? cliRawExportService = null,
+        ICliReplayExportService? cliReplayExportService = null,
         AufgabeLaufdatenChangedNotifier? laufdatenChangedNotifier = null)
     {
         _aufgabeService = aufgabeService;
@@ -727,6 +735,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _autonomAufgabenOptions = autonomAufgabenOptions;
         _timeProvider = timeProvider;
         _cliRawExportService = cliRawExportService ?? new CliRawExportService(protokollService, NullLogger<CliRawExportService>.Instance);
+        _cliReplayExportService = cliReplayExportService ?? new CliReplayExportService(kiService, new CliReplayAufzeichnungStore(), NullLogger<CliReplayExportService>.Instance);
         _laufdatenChangedNotifier = laufdatenChangedNotifier;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
         // Synchroner Default vor dem ersten Laden einer Aufgabe: LadenAsync ermittelt den DB-Wert
@@ -777,6 +786,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         // Arbeitsverzeichnis ab. IsAutonomAufgabenEnabled: Feature-Flag für Autonome Aufgaben (Issue 205).
         AutonomAufgabeInitialisierenCommand = new AsyncRelayCommand(AutonomAufgabeInitialisierenAsync, () => CanAutonomAufgabeInitialisieren);
         ExportCliRawCommand = new AsyncRelayCommand(ExportCliRawAsync, () => KannCliRawExportieren);
+        ExportCliReplayCommand = new AsyncRelayCommand(ExportCliReplayAsync, () => KannCliReplayExportieren);
         PauseEinstellenCommand = new AsyncRelayCommand(PauseEinstellenAsync, () => KannPausieren);
         PromptVorlageAuswaehlenCommand = new AsyncRelayCommand<PromptVorlage>(
             PromptVorlageAuswaehlenAsync,
@@ -2342,6 +2352,53 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         {
             _logger.LogError(ex, "CLI-Rohausgabe für Aufgabe {AufgabeId} konnte nicht exportiert werden.", _aufgabeId);
             FehlerMeldung = $"CLI-Rohausgabe konnte nicht exportiert werden: {ex.Message}";
+        }
+    }
+
+    private async Task ExportCliReplayAsync(CancellationToken ct)
+    {
+        if (!KannCliReplayExportieren)
+            return;
+
+        // Vorab prüfen, ob überhaupt ein Mitschnitt existiert — der Speicherdialog darf
+        // nicht umsonst geöffnet werden.
+        if (!_cliReplayExportService.HatAufzeichnung(_aufgabeId))
+        {
+            FehlerMeldung = "Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten.";
+            return;
+        }
+
+        var defaultDateiname = $"cli-replay-{_aufgabeId:N}.clireplay";
+        var zielPfad = await _dialogService.ShowSaveFileDialogAsync(
+            "CLI-Aufzeichnung exportieren",
+            "CLI-Replay-Dateien (*.clireplay)|*.clireplay",
+            defaultDateiname,
+            null,
+            ct);
+
+        if (string.IsNullOrWhiteSpace(zielPfad))
+            return;
+
+        if (!zielPfad.EndsWith(".clireplay", StringComparison.OrdinalIgnoreCase))
+        {
+            FehlerMeldung = "Export-Zielpfad muss auf .clireplay enden.";
+            return;
+        }
+
+        FehlerMeldung = null;
+
+        try
+        {
+            await _cliReplayExportService.ExportCliReplayAsync(_aufgabeId, zielPfad, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CLI-Aufzeichnung für Aufgabe {AufgabeId} konnte nicht exportiert werden.", _aufgabeId);
+            FehlerMeldung = $"CLI-Aufzeichnung konnte nicht exportiert werden: {ex.Message}";
         }
     }
 

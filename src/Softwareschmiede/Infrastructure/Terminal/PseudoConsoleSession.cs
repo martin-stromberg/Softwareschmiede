@@ -304,16 +304,16 @@ public sealed class PseudoConsoleSession : ITerminalSession
 
                 MarkOutputActivity();
 
-                _replayBuffer.Append(data.AsSpan(0, bytesRead));
-
                 _outputSink?.OnOutputChunk(data.AsSpan(0, bytesRead));
 
                 OutputChunk?.Invoke(this, new TerminalOutputChunkEventArgs(data.AsMemory(0, bytesRead)));
 
-                // Render-Lock: Parse+Apply müssen gegenüber RebuildBufferFromReplay serialisiert werden,
-                // damit sich Live-Chunks und Replay-Neuaufbau nicht überlagern.
+                // Render-Lock: Replay-Append, Parse+Apply müssen gegenüber RebuildBufferFromReplay
+                // serialisiert werden — ein gleichzeitiger Neuaufbau darf den Chunk nicht sehen, bevor
+                // er hier angewendet wurde (sonst wird er doppelt angewendet → doppelte Ausgabe).
                 lock (_renderLock)
                 {
+                    _replayBuffer.Append(data.AsSpan(0, bytesRead));
                     foreach (var evt in _parser.Parse(data.AsSpan(0, bytesRead)))
                         Buffer.Apply(evt);
                 }

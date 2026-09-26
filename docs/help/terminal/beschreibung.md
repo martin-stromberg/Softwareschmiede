@@ -77,6 +77,20 @@ Die Terminalintegration wurde auf eine gemeinsame Session-Abstraktion umgestellt
 
 5. **Erweiterter VT-Renderer:** Der Parser dekodiert UTF-8 jetzt chunk-übergreifend (kein Ersatzzeichen-Zerfall bei Mehrbyte-Zeichen an Chunk-Grenzen) und verarbeitet zusätzlich Alternate Screen (`?1049`/`?1047`/`?1048`), Insert/Delete Line/Char, Scroll-Regionen (DECSTBM), Scroll Up/Down, Save/Restore-Cursor, Tab-Stops, Backspace und RIS-Reset. Vollbild-TUIs (Alternate Screen) sind dabei bewusst nicht scrollbar — der Verlauf bleibt dem Hauptscreen vorbehalten.
 
+### Neuerungen: CLI-Aufzeichnung und Konsolentestfenster
+
+Zur Diagnose von Rendering- und Streaming-Fehlern wurde das Terminal-System um einen byte-exakten Mitschnitt mit zeitgesteuerter Wiedergabe erweitert:
+
+1. **Automatischer Rohbyte-Mitschnitt:** Jede Terminal-Session wird zusätzlich zum zeilenbasierten Aufgabenprotokoll als Rohbyte-Aufzeichnung mit Zeitstempel pro Ausgabe-Chunk mitgeschrieben (`CliOutputRecorder`, läuft über die `CompositeTerminalOutputSink` parallel zum `CliOutputProtokollWriter` und erfasst dadurch auch die ersten Chunks einer Session). Der Mitschnitt ist auf `Terminal:AufzeichnungByteBudget` (Standard 8 MB) begrenzt; bei Überschreitung bleibt das intakte Anfangsstück erhalten und die Aufzeichnung wird als unvollständig markiert. Vorgehalten werden die Aufzeichnungen der letzten 8 gestarteten Aufgaben.
+
+2. **Export als `.clireplay`:** In der Ribbon-Gruppe **CLI** der Aufgabendetailansicht exportiert der neue Button **„Aufzeichnung exportieren"** den Mitschnitt als `.clireplay`-Binärdatei (Vorschlagsname `cli-replay-<AufgabenId>.clireplay`). Der bisherige zeilenbasierte **„Rohausgabe exportieren"** (`.raw`) bleibt parallel bestehen — beide Exporte erfüllen unterschiedliche Zwecke.
+
+3. **Konsolentestfenster:** Über **Einstellungen → Allgemein → Abschnitt „Diagnose" → „Konsolentestfenster öffnen"** lässt sich ein nicht-modales Diagnosefenster öffnen. Es lädt eine `.clireplay`-Datei und spielt sie über eine eigene Replay-Session (`TerminalReplaySession`) zeitgesteuert durch denselben echten Renderpfad wie die Live-Ausgabe ab (`AnsiSequenceParser` → `TerminalBuffer` → `TerminalControl`) — es gibt keinen separaten oder abweichenden Renderer.
+
+4. **Wiedergabesteuerung und Quell-Ansicht:** Das Fenster zeigt links das gerenderte Terminal und rechts eine Liste aller aufgezeichneten Chunks mit Index, Zeit-Offset, Länge und Quelltext, in dem Steuersequenzen sichtbar gemacht sind (ESC als `␛`, CR als `\r`, LF als `\n` u. a.). Der gerade wiedergegebene Chunk wird in der Liste synchron markiert. Die Steuerung bietet **Abspielen**, **Neu starten** (bricht den laufenden Durchlauf ab und beginnt sofort wieder vorn), **Pausieren/Fortsetzen** sowie eine jederzeit änderbare **Zeitraffer-Schwelle** in Sekunden: Pausen zwischen Ausgabe-Blöcken, die länger als die Schwelle sind, werden auf sie verkürzt — `0` spielt mit maximaler Geschwindigkeit ab. Bei einer unvollständigen Aufzeichnung erscheint ein Hinweisband.
+
+5. **Behobene Defekte:** Mit dem Werkzeug nachgestellte Fehler wurden direkt behoben — eine Race-Bedingung zwischen Live-Ausgabe und Buffer-Neuaufbau (mögliche Doppelausgabe), fehlerhafte Behandlung von Escape-Zeichen mitten in unvollständigen Steuersequenzen sowie das Fehlen der String-Sequenzen DCS/SOS/PM/APC, deren Inhalte zuvor irrtümlich als Text ausgegeben wurden.
+
 ## Einschränkungen
 
 - `CreatePseudoConsole` ist erst ab Windows 10 Build 17763 verfügbar. Das Projekt zielt auf `net10.0-windows10.0.17763.0`, daher ist das kein praktisches Risiko; auf älteren Builds läuft der diagnostizierte Pipe-Fallback (eingeschränkter Modus), `RequiresPty`-CLIs schlagen mit Fehlermeldung fehl.
@@ -85,7 +99,9 @@ Die Terminalintegration wurde auf eine gemeinsame Session-Abstraktion umgestellt
 - Executables, die weder `.exe`/endungsloses PE-Image noch `.cmd`/`.bat` sind (z. B. `.ps1`-Skripte), können nicht gestartet werden — der Start schlägt mit einer verständlichen Fehlermeldung fehl.
 - Bei `.cmd`/`.bat`-Shims (z. B. npm-Installationen) löst `Ctrl+C` die cmd.exe-Rückfrage „Batchdatei abbrechen (J/N)?" aus statt eines direkten Signals — bekanntes Verhalten von Batch-Shims.
 - Mouse-Tracking-Sequenzen werden nicht unterstützt (nicht erforderlich für Standard-CLI-Verwendung).
-- OSC-Sequenzen (z. B. Fenstertitel-Setzung) werden verworfen.
+- OSC-Sequenzen (z. B. Fenstertitel-Setzung) sowie die String-Sequenzen DCS, SOS, PM und APC werden verworfen — ihre Inhalte erscheinen nicht als Text.
 - Clipboard-Paste ist auf System.Windows.Clipboard beschränkt (WPF-Standard) — andere Quellen von Zwischenablage-Daten werden nicht unterstützt.
 - Das Aufgabenprotokoll speichert dekodierte Ausgabezeilen nahe am Rohstream. ANSI- und Control-Sequenzen können daher im Protokollinhalt enthalten sein.
 - Bei gleichzeitigem Abschluss der Output-Senke und starker Backpressure gibt es eine bekannte Nacharbeit: Ein bereits dekodierter, aber noch nicht vollständig in die bounded Queue geschriebener Chunk kann im Race-Fall teilweise verloren gehen. Der drainbare Abschluss schützt bereits angenommene Queue-Einträge.
+- Die Rohbyte-Aufzeichnung ist speicherbasiert und budgetbegrenzt (`Terminal:AufzeichnungByteBudget`, Standard 8 MB): Bei Überschreitung stoppt der Mitschnitt — die exportierte `.clireplay`-Datei enthält dann nur den Anfang der Session und wird als unvollständig gekennzeichnet. Es werden nur die Aufzeichnungen der letzten 8 gestarteten Aufgaben vorgehalten; ältere Mitschnitte sowie alle Aufzeichnungen beim Anwendungsende gehen verloren.
+- Die Aufzeichnung enthält ausschließlich echte CLI-Ausgabe-Bytes — interne `[Terminal-Diagnose]`-Markerzeilen sind nicht Teil des Mitschnitts. Terminal-Größenänderungen während einer Session werden nicht aufgezeichnet; die Wiedergabe nutzt die aktuelle Fenstergröße des Konsolentestfensters.

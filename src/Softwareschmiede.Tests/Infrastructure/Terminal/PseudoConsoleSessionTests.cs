@@ -272,6 +272,50 @@ public sealed class PseudoConsoleSessionTests
         await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
     }
 
+    /// <summary>Regression: Ruft ein <see cref="ITerminalOutputSink"/>-Aufruf (vor dem Parse/Apply des
+    /// Chunks) synchron <see cref="PseudoConsoleSession.RebuildBufferFromReplay"/> auf, darf der laufende
+    /// Chunk nicht doppelt angewendet werden — Replay-Append und Parse/Apply stehen unter demselben
+    /// <c>_renderLock</c>, damit der Rebuild den Chunk entweder ganz oder gar nicht sieht.</summary>
+    [Fact]
+    public async Task ReadLoopAsync_RebuildAusOutputSink_WendetChunkNichtDoppeltAn()
+    {
+        var sink = new RebuildCallingSink();
+        using var session = TestPseudoConsoleSessionFactory.Create(
+            new MemoryStream(),
+            new FixedContentStream("AB"),
+            outputSink: sink);
+        sink.Session = session;
+
+        await GetReadLoopTask(session).WaitAsync(TimeSpan.FromSeconds(5));
+
+        var zeile = new string(session.Buffer.GetRow(0).Select(c => c.Character).ToArray()).TrimEnd();
+        zeile.Should().Be("AB",
+            "der Chunk darf nur einmal angewendet werden — ein Rebuild vor dem Live-Apply darf ihn nicht doppelt einspielen");
+    }
+
+    /// <summary>Senke, die im <see cref="ITerminalOutputSink.OnOutputChunk"/>-Aufruf synchron einen
+    /// Buffer-Rebuild auslöst — reproduziert den Race aus <c>TerminalControl.OnSessionChanged</c>
+    /// (Rebuild gegen noch nicht angewendeten Chunk).</summary>
+    private sealed class RebuildCallingSink : ITerminalOutputSink
+    {
+        private int _rebuildAufrufe;
+
+        public PseudoConsoleSession? Session { get; set; }
+
+        public void OnOutputChunk(ReadOnlySpan<byte> bytes)
+        {
+            if (Interlocked.Increment(ref _rebuildAufrufe) == 1)
+                Session?.RebuildBufferFromReplay();
+        }
+
+        public void Complete()
+        {
+        }
+
+        public Task CompleteAsync(TimeSpan timeout, CancellationToken ct = default)
+            => Task.CompletedTask;
+    }
+
     /// <summary>Der Buffer kann jederzeit aus den aufgezeichneten Replay-Rohdaten komplett neu aufgebaut
     /// werden — deterministisch derselbe Endzustand wie zur Laufzeit.</summary>
     [Fact]

@@ -40,6 +40,7 @@ Die Sektion `Terminal` in `src/Softwareschmiede/appsettings.json` steuert die La
 | `Terminal:ReplayBufferByteBudget` | `int` (Bytes) | `524288` (512 KiB) | Größe des Replay-Puffers pro Session — begrenzt, wie viel Rohoutput für den Neuaufbau der Anzeige beim erneuten Öffnen einer Aufgabenseite vorgehalten wird |
 | `Terminal:DefaultCols` | `int` | `220` | Initiale Spaltenanzahl beim Session-Start (muss zwischen 1 und 32767 liegen) |
 | `Terminal:DefaultRows` | `int` | `50` | Initiale Zeilenanzahl beim Session-Start (muss zwischen 1 und 32767 liegen) |
+| `Terminal:AufzeichnungByteBudget` | `int` (Bytes) | `8388608` (8 MB) | Byte-Budget der Rohbyte-Aufzeichnung (`CliOutputRecorder`) pro Session für den `.clireplay`-Export; `<= 0` deaktiviert den Mitschnitt vollständig |
 
 ### Test-/Debug-Hook (nicht für den Produktivbetrieb)
 
@@ -92,3 +93,6 @@ public override TerminalProviderCapabilities TerminalCapabilities =>
 | `Ctrl+C` löst „Batchdatei abbrechen (J/N)?" aus | CLI wurde über einen `.cmd`/`.bat`-Shim gestartet (z. B. npm-Installation) | Bekanntes Verhalten von Batch-Shims — die Rückfrage mit `J` bestätigen oder die CLI normal beenden |
 | Größenänderung verursacht Fehler | `ResizePseudoConsole` schlägt fehl | Seltener Windows-Fehler; Prozess beenden und neu starten |
 | Tastatureingaben funktionieren nicht | Focus nicht im Terminal | Terminal-Bereich klicken um Focus zu setzen |
+| „Aufzeichnung exportieren" meldet „Für diese Aufgabe liegt noch keine Aufzeichnung vor" | Für die Aufgabe wurde noch keine Terminal-Session gestartet, die Aufzeichnung wurde über `Terminal:AufzeichnungByteBudget <= 0` deaktiviert oder der Mitschnitt gehört zu einer älteren als den letzten 8 Aufgaben (verworfen) | CLI der Aufgabe starten; Budget-Konfiguration prüfen |
+| Konsolentestfenster meldet „Die Aufzeichnung konnte nicht geladen werden" | Die Datei ist keine gültige `.clireplay`-Datei (falsches Format, beschädigt, abgeschnitten) | Datei erneut aus der Aufgabendetailansicht exportieren; Fremdformate werden nicht unterstützt |
+| Konsolentestfenster zeigt „Aufzeichnung unvollständig" | Das Aufzeichnungs-Budget wurde während der Session erreicht — nur der Anfang der Ausgabe ist enthalten | `Terminal:AufzeichnungByteBudget` erhöhen und die Session erneut aufzeichnen |

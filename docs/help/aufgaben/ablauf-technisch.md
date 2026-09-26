@@ -239,6 +239,28 @@ Ablauf:
 9. Die resultierende Textdatei wird mit UTF-8 ohne BOM geschrieben.
 10. Schlägt der Schreibvorgang fehl, wird die Ausnahme im ViewModel geloggt und als Benutzerfehler angezeigt; der restliche UI-Zustand bleibt unverändert.
 
+### 0.4.2. CLI-Aufzeichnung exportieren (.clireplay)
+
+Ausgelöst durch den Button **Aufzeichnung exportieren** in der CLI-Ribbon-Gruppe der `TaskDetailView` — parallel zum `.raw`-Export.
+
+Beteiligte Komponenten:
+- `TaskDetailView.xaml` — Export-Button mit `AutomationName="CliReplayExport"`
+- `TaskDetailViewModel.ExportCliReplayCommand` / `ExportCliReplayAsync` — orchestriert Vorab-Prüfung, Dialog, Validierung und Export
+- `IDialogService.ShowSaveFileDialogAsync` — liefert den Zielpfad oder `null` bei Abbruch (Filter `CLI-Replay-Dateien (*.clireplay)|*.clireplay`)
+- `ICliReplayExportService` / `CliReplayExportService` — `HatAufzeichnung` (Vorab-Prüfung) und `ExportCliReplayAsync` (schreibt via `CliReplayAufzeichnungStore`)
+- `KiAusfuehrungsService.GetCliAufzeichnung` — liefert den im Speicher gehaltenen `CliOutputAufzeichnung`-Mitschnitt der letzten Terminal-Session der Aufgabe (Registry: letzte 8 Aufgaben)
+- `CliReplayAufzeichnungStore` — `.clireplay`-Binärformat: Header (Magic `SWCLRPLY`, Version, Aufgabe/Plugin/Geometrie/`IstVollstaendig`) + Chunk-Records `[OffsetTicks][Length][Bytes]`
+
+Ablauf:
+1. Nutzer klickt auf **Aufzeichnung exportieren**.
+2. `ExportCliReplayAsync(ct)` prüft `KannCliReplayExportieren` und ruft `HatAufzeichnung(aufgabeId)` auf — ohne Mitschnitt endet der Ablauf mit `FehlerMeldung` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." (der Speicherdialog wird nicht geöffnet).
+3. Save-Dialog mit Default-Dateiname `cli-replay-{aufgabeId:N}.clireplay`; Abbruch → kein Export, kein Fehler.
+4. Endungsprüfung `.clireplay` → sonst `FehlerMeldung` „Export-Zielpfad muss auf .clireplay enden."
+5. `CliReplayExportService.ExportCliReplayAsync` holt die Aufzeichnung über `GetCliAufzeichnung` (`null` → `InvalidOperationException`) und schreibt Header + Records via `CliReplayAufzeichnungStore.SpeichernAsync`.
+6. Schreibfehler werden im ViewModel geloggt und als `FehlerMeldung` angezeigt.
+
+Der Mitschnitt selbst entsteht beim Session-Start im `KiAusfuehrungsService` über den `CliOutputRecorder` (als zweite Senke der `CompositeTerminalOutputSink`) — Details im [technischen Ablauf der Terminal-Integration](../terminal/ablauf-technisch.md).
+
 ### 0.5. Aufgabe anlegen und bearbeiten (Status: Neu)
 
 Ausgelöst durch den „Speichern"-Button in der Info-Ansicht.

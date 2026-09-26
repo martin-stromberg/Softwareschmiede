@@ -39,6 +39,18 @@
 
 > **Hinweis:** Die bisher gespeicherten Protokolle bleiben dabei unverändert erhalten.
 
+## „Aufzeichnung exportieren" meldet „Für diese Aufgabe liegt noch keine Aufzeichnung vor"
+
+**Symptom:** Nach Klick auf **Aufzeichnung exportieren** erscheint eine Meldung statt des Speicherdialogs.
+
+**Ursache:** Die Rohbyte-Aufzeichnung läuft erst während einer CLI-Ausführung automatisch mit — für die Aufgabe wurde noch keine Terminal-Session gestartet, die Aufzeichnung wurde per Konfiguration deaktiviert, oder der Mitschnitt gehört zu einer älteren als den letzten 8 Aufgaben und wurde bereits verworfen.
+
+**Lösung:**
+1. Starte die CLI der Aufgabe (über **Starten** bzw. **CLI starten** im Ribbon) — ab dann läuft der Mitschnitt mit.
+2. Wiederhole den Export nach der Ausführung.
+
+> **Hinweis:** Die Aufzeichnung ist flüchtig — sie liegt nur im Arbeitsspeicher, wird für die letzten 8 Aufgaben vorgehalten und geht beim Anwendungsende verloren. Ein frühzeitiger Export ist empfehlenswert, wenn der Mitschnitt später noch gebraucht wird.
+
 ## Aufgabe lässt sich nicht starten („pausiert")
 
 **Symptom:** **Starten**, **CLI neu starten** oder **Wiederherstellen** sind deaktiviert bzw. schlagen mit „Die Aufgabe ist bis … pausiert." fehl; die Kachel in der Seitenleiste zeigt „⏸ Pausiert (noch …)".

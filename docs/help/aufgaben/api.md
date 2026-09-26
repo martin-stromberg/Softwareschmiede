@@ -361,6 +361,33 @@ var info = new ScheduledPromptInfo(
 - Schreibt die Datei mit UTF-8 ohne BOM.
 - Abbruch und Schreibfehler werden an den Aufrufer weitergereicht.
 
+## CliReplayExportService — CLI-Aufzeichnung (.clireplay)
+
+Exportiert den im `KiAusfuehrungsService` gehaltenen Rohbyte-Mitschnitt einer Aufgabe als `.clireplay`-Binärdatei (Interface `ICliReplayExportService`).
+
+### `ExportCliReplayAsync(Guid aufgabeId, string zielPfad, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Schreibt die aufgezeichnete CLI-Ausgabe einer Aufgabe (Header + zeitgestempelte Chunk-Records) über `CliReplayAufzeichnungStore` in die angegebene `.clireplay`-Datei.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `aufgabeId` | `Guid` | ID der Aufgabe, deren Aufzeichnung exportiert werden soll. |
+| `zielPfad` | `string` | Zielpfad der zu erzeugenden `.clireplay`-Datei. |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Exceptions:**
+
+| Exception | Ursache |
+|-----------|---------|
+| `ArgumentException` | `zielPfad` leer. |
+| `InvalidOperationException` | „Für diese Aufgabe liegt keine Aufzeichnung vor." — `KiAusfuehrungsService.GetCliAufzeichnung` liefert `null`. |
+
+### `HatAufzeichnung(Guid aufgabeId) : bool`
+
+**Beschreibung:** Prüft, ob für die Aufgabe ein Mitschnitt vorliegt — Vorab-Prüfung im `TaskDetailViewModel`, bevor der Speicherdialog geöffnet wird.
+
 ## IDialogService — Dialoge
 
 ### `ShowAufgabePausierenDialogAsync(AufgabePausierenDialogViewModel viewModel, CancellationToken ct = default) : Task<AufgabePausierenErgebnis?>`
@@ -408,6 +435,33 @@ var info = new ScheduledPromptInfo(
 - Wird von `TaskDetailViewModel.ExportCliRawAsync` verwendet, um den Zielpfad für den Export abzufragen.
 - Bei Dialogabbruch wird `null` zurückgegeben; es erfolgt kein Schreibvorgang.
 - Die konkrete WPF-Implementierung öffnet `SaveFileDialog` auf dem UI-Dispatcher.
+
+### `ShowOpenFileDialogAsync(string title, string filter, string? initialDirectory = null, CancellationToken ct = default) : Task<string?>`
+
+**Beschreibung:** Öffnet einen nativen Öffnen-Dialog und gibt den gewählten Dateipfad zurück, oder `null` wenn der Benutzer abbricht.
+
+**Parameter:**
+
+| Name | Typ | Beschreibung |
+|------|-----|--------------|
+| `title` | `string` | Fenstertitel des Dialogs. |
+| `filter` | `string` | Dateifilter, z. B. `CLI-Replay-Dateien (*.clireplay)|*.clireplay`. |
+| `initialDirectory` | `string?` | Optionales Startverzeichnis. |
+| `ct` | `CancellationToken` | Optionales Abbruch-Token. |
+
+**Verhalten:**
+
+- Wird vom `KonsolenTestViewModel` verwendet, um eine `.clireplay`-Aufzeichnung zum Laden auszuwählen.
+- Die WPF-Implementierung öffnet `OpenFileDialog` auf dem UI-Dispatcher mit dem jeweils aktiven Fenster als Owner (relevant für Aufrufe aus dem nicht-modalen Konsolentestfenster).
+
+### `ShowKonsolenTestDialogAsync(KonsolenTestViewModel viewModel, CancellationToken ct = default) : Task`
+
+**Beschreibung:** Zeigt das Konsolentestfenster (`KonsolenTestDialog`, Titel „Konsolentest") **nicht-modal** an und kehrt nach dem Anzeigen zurück — das Fenster bleibt parallel zur Anwendung nutzbar.
+
+**Verhalten:**
+
+- Wird von `SettingsViewModel.KonsolenTestOeffnenCommand` (Einstellungen → Allgemein → Diagnose) aufgerufen.
+- `Owner` ist das Hauptfenster; der Lebenszyklus des ViewModels wird über den `Closed`-Handler des Fensters disponiert.
 
 ## Thread-Sicherheit
 

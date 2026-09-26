@@ -28,6 +28,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und optionaler Prerelease-Berücksichtigung
+- **CLI-Aufzeichnung mit Konsolentestfenster** zur Diagnose des Terminal-Renderpfads — byte-exakter Mitschnitt, `.clireplay`-Export und zeitgesteuerte Wiedergabe
 
 ## Terminalintegration
 
@@ -37,6 +38,8 @@ KI-CLI-Tools (Claude CLI, GitHub Copilot CLI, Codex CLI, Devin CLI) laufen inter
 - Vor jedem Start prüft eine Preflight-Diagnose u. a. PTY-Verfügbarkeit, Executable-Auflösung und CLI-Health. Steht kein Pseudo-Terminal zur Verfügung oder deklariert das Plugin keine PTY-Unterstützung, greift ein diagnostizierter Pipe-Fallback — sichtbar in der Statuszeile als „… (eingeschränkter Modus – kein Pseudo-Terminal)" und als `[Terminal-Diagnose]`-Zeile im Aufgabenprotokoll. CLIs, die zwingend ein Pseudo-Terminal benötigen, schlagen stattdessen mit einer verständlichen Fehlermeldung fehl.
 - Der eigene VT100/ANSI-Renderer unterstützt volle Farben, Alternate Screen (Vollbild-TUIs), Scroll-Regionen und 1000 Zeilen Scrollback; die Terminalgröße folgt Fensteränderungen automatisch.
 - Beim erneuten Öffnen einer Aufgabenseite wird die Terminalanzeige aus einem begrenzten Replay-Puffer (Standard 512 KiB, `Terminal:ReplayBufferByteBudget`) wiederhergestellt.
+- Jede Session wird automatisch als byte-exakter Mitschnitt mit Zeitstempel pro Ausgabe-Chunk aufgezeichnet (`CliOutputRecorder` neben `CliOutputProtokollWriter` über `CompositeTerminalOutputSink`; Budget `Terminal:AufzeichnungByteBudget`, Standard 8 MiB — `<= 0` deaktiviert den Mitschnitt). `[Terminal-Diagnose]`-Markerzeilen gelangen dabei nicht in den Mitschnitt.
+- Der Mitschnitt lässt sich als `.clireplay`-Datei exportieren und im **Konsolentestfenster** (Einstellungen → Allgemein → Diagnose) zeitgesteuert durch denselben Renderpfad wieder abspielen — ein Diagnose-Werkzeug für Rendering- und Streaming-Fehler.
 
 Details siehe [Terminal-Dokumentation](docs/help/terminal/index.md).
 
@@ -65,18 +68,32 @@ Beim Start einer Aufgabe erzeugt `EntwicklungsprozessService.CreateIssueFileAsyn
 - Fehlt die Referenz oder ist die Nummer nicht gesetzt, entfällt der Block; die restliche `issue.md` bleibt unverändert.
 - Keine Datenmodell- oder Datenbankänderung notwendig — die `IssueReferenz` wird per Eager Loading bereits in `AufgabeService.GetDetailAsync()` mitgeladen.
 
-## CLI-Rohausgabe exportieren
+## CLI-Rohausgabe und -Aufzeichnung exportieren
 
-Die Aufgabendetailansicht kann die protokollierte CLI-Rohausgabe als Datei exportieren:
+Die Aufgabendetailansicht bietet in der Ribbon-Gruppe **CLI** zwei Exporte an:
 
-- In der Ribbon-Gruppe **CLI** gibt es den Button **„Rohausgabe exportieren“**.
-- Der Dialogtitel lautet **„CLI-Rohausgabe exportieren“**.
-- Als Vorschlagsname wird `cli-output-{AufgabeId}.raw` verwendet.
-- Exportiert werden ausschließlich persistierte Protokolleinträge vom Typ `ProtokollTyp.CliOutput`.
-- Die Reihenfolge der exportierten Zeilen entspricht der chronologischen Protokollreihenfolge.
-- Das Ziel muss auf `.raw` enden; bei Dialog-Abbruch wird keine Datei geschrieben.
+- **„Rohausgabe exportieren"** schreibt die persistierten Protokolleinträge vom Typ `ProtokollTyp.CliOutput` zeilenweise in eine `.raw`-Datei:
+  - Der Dialogtitel lautet **„CLI-Rohausgabe exportieren"**, der Vorschlagsname `cli-output-{AufgabeId}.raw`.
+  - Die Reihenfolge der exportierten Zeilen entspricht der chronologischen Protokollreihenfolge.
+  - Das Ziel muss auf `.raw` enden; bei Dialog-Abbruch wird keine Datei geschrieben.
+- **„Aufzeichnung exportieren"** (`CliReplayExport`) schreibt den byte-exakten Mitschnitt der Session als `.clireplay`-Binärdatei für das Konsolentestfenster:
+  - Der Dialogtitel lautet **„CLI-Aufzeichnung exportieren"**, der Vorschlagsname `cli-replay-{AufgabeId}.clireplay`; das Ziel muss auf `.clireplay` enden.
+  - Der Mitschnitt läuft automatisch während jeder CLI-Session mit und enthält die rohen `OutputChunk`-Bytes mit Zeitstempel pro Chunk. Im Speicher bleiben die Mitschnitte der letzten acht Aufgaben (auch nach dem Session-Ende exportierbar); das Byte-Budget pro Session steuert `Terminal:AufzeichnungByteBudget` (Standard 8 MiB, `<= 0` deaktiviert den Mitschnitt). Bei Budget-Überschreitung bleibt das intakte Präfix als unvollständige Aufzeichnung erhalten.
+  - Die `.clireplay`-Datei enthält neben den Chunk-Records Metadaten wie Aufgaben-ID, Plugin-Name, Start-/Endzeitpunkt, initiale Terminalgröße und das `IstVollstaendig`-Flag (`CliReplayAufzeichnungStore`).
+  - Liegt für die Aufgabe keine Aufzeichnung vor (kein Session-Start oder deaktivierter Mitschnitt), erscheint ein entsprechender Fehlerhinweis.
 
-Die Implementierung liegt in `TaskDetailViewModel`, `CliRawExportService`, `IDialogService` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TaskDetailViewModelTests_CliRawExport`, `TaskDetailViewTests` und `E2E_CliRawExport`.
+Die Implementierung liegt in `TaskDetailViewModel`, `CliRawExportService`, `CliReplayExportService`, `CliOutputRecorder`, `CompositeTerminalOutputSink`, `CliReplayAufzeichnungStore`, `KiAusfuehrungsService` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TaskDetailViewModelTests_CliRawExport`, `TaskDetailViewModelTests_CliReplayExport`, `CliReplayExportServiceTests`, `CliOutputRecorderTests`, `CliReplayAufzeichnungStoreTests`, `CompositeTerminalOutputSinkTests`, `KiAusfuehrungsServiceCliAufzeichnungTests`, `TaskDetailViewTests` und `E2E_CliRawExport`.
+
+## Konsolentestfenster
+
+Zur Diagnose von Rendering- und Streaming-Fehlern im Terminal-Pfad (`AnsiSequenceParser` → `TerminalBuffer` → `TerminalControl`) existiert ein eigenes Diagnose-Werkzeug:
+
+- Der Einstieg liegt in den **Einstellungen** im Tab **„Allgemein"** im Abschnitt **„Diagnose"** über die Schaltfläche **„Konsolentestfenster öffnen"** (`KonsolenTestOeffnen`). Das Fenster (Titel „Konsolentest") ist nicht modal und bleibt parallel zur Live-Ansicht nutzbar.
+- **„Aufzeichnung öffnen…"** lädt eine exportierte `.clireplay`-Datei. Die `TerminalReplaySession` (eine `ITerminalSession`-Implementierung) spielt die aufgezeichneten Chunks zeitgesteuert durch denselben echten Renderpfad wie eine Live-Session — es gibt keinen separaten Replay-Renderer.
+- Die Wiedergabe wird über **„Abspielen"**, **„Neu starten"** und **„Pausieren/Fortsetzen"** gesteuert. Die einstellbare **Zeitraffer-Schwelle** (Sekunden) deckelt die Wartezeit vor jedem Chunk auf diesen Wert — kürzere Pausen bleiben zeitreal, `0` bedeutet maximale Geschwindigkeit.
+- Rechts zeigt eine Quell-Ansicht die aufgezeichneten Chunks synchron zur Wiedergabeposition (Index, Offset, Byteanzahl und Quelltext mit sichtbar gemachten Steuersequenzen wie `␛`, `\r`, `\n`). Bei einer unvollständigen Aufzeichnung (Budget überschritten) blendet das Fenster einen entsprechenden Hinweis ein.
+
+Die Implementierung liegt in `KonsolenTestViewModel`, `KonsolenTestDialog`, `TerminalReplaySession`, `CliChunkQuelltextFormatter`, `CliChunkAnzeigeEintrag`, `SettingsViewModel` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TerminalReplaySessionTests`, `KonsolenTestViewModelTests`, `CliChunkQuelltextFormatterTests` und den E2E-Test `E2E_KonsolenTestfenster`.
 
 ## Programmupdate
 
@@ -168,7 +185,7 @@ Beim Build kopiert `CopyPluginsToOutput` die Plugin-DLLs nach `bin/<Configuratio
 2. Aufgabe anlegen oder aus externen Quellen übernehmen.
 3. KI-Plugin auswählen und den Entwicklungsprozess starten.
 4. CLI-Ausgabe in der Aufgabendetailansicht verfolgen.
-5. Optional über **„Rohausgabe exportieren“** die bisherige CLI-Ausgabe als `*.raw` sichern.
+5. Optional die bisherige CLI-Ausgabe als `*.raw` (**„Rohausgabe exportieren“**) oder den byte-exakten Mitschnitt als `*.clireplay` (**„Aufzeichnung exportieren“**) sichern.
 6. Änderungen prüfen, To-Dos abschließen und optional einen Pull Request erstellen.
 
 ## Konfiguration
@@ -210,6 +227,7 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 - `Terminal:ReplayBufferByteBudget`
 - `Terminal:DefaultCols`
 - `Terminal:DefaultRows`
+- `Terminal:AufzeichnungByteBudget`
 
 ### Datenbank und Logs
 

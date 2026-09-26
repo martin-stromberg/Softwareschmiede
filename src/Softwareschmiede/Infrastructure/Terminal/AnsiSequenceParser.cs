@@ -72,6 +72,13 @@ public sealed class AnsiSequenceParser
                         _paramBuffer.Clear();
                         _state = State.Osc;
                     }
+                    else if (b is (byte)'P' or (byte)'X' or (byte)'^' or (byte)'_')
+                    {
+                        // DCS/SOS/PM/APC: String-Sequenzen wie OSC — bis BEL oder ST (ESC \)
+                        // überspringen, sonst wird der Payload als Text ausgegeben.
+                        _paramBuffer.Clear();
+                        _state = State.Osc;
+                    }
                     else if (b == (byte)'7')
                     {
                         events.Add(new CursorSavedEvent(Restored: false));
@@ -104,7 +111,16 @@ public sealed class AnsiSequenceParser
                     break;
 
                 case State.Csi:
-                    if (b == (byte)'?')
+                    if (b == 0x1B)
+                    {
+                        // ESC mitten in einer CSI-Sequenz: die unvollständige Sequenz wird abgebrochen
+                        // und das ESC beginnt eine neue Sequenz. Ohne diesen Abbruch würde das ESC in
+                        // den Parameter-Puffer laufen, das folgende '[' als Final-Byte interpretiert
+                        // und der Rest der echten Sequenz als Text ausgegeben.
+                        _state = State.Escape;
+                        _paramBuffer.Clear();
+                    }
+                    else if (b == (byte)'?')
                     {
                         _state = State.CsiQuestion;
                     }
@@ -121,7 +137,12 @@ public sealed class AnsiSequenceParser
                     break;
 
                 case State.CsiQuestion:
-                    if (b >= 0x40 && b <= 0x7E)
+                    if (b == 0x1B)
+                    {
+                        _state = State.Escape;
+                        _paramBuffer.Clear();
+                    }
+                    else if (b >= 0x40 && b <= 0x7E)
                     {
                         ProcessCsiQuestionCommand((char)b, _paramBuffer.ToString(), events);
                         _state = State.Normal;
@@ -141,10 +162,11 @@ public sealed class AnsiSequenceParser
                     }
                     else if (b == 0x1B)
                     {
-                        // Zweistelliger String-Terminator ESC \: das nachfolgende \ überspringen.
-                        if (i + 1 < data.Length && data[i + 1] == 0x5C)
-                            i++;
-                        _state = State.Normal;
+                        // ESC innerhalb eines Strings: in den Escape-State wechseln, ohne das Folge-Byte
+                        // vorwegzunehmen. An einer Chunk-Grenze wird das \ im nächsten Chunk korrekt als
+                        // ST-Rest verworfen statt als Text ausgegeben, und unmittelbar nachfolgende
+                        // Escape-Sequenzen werden regulär geparst.
+                        _state = State.Escape;
                         _paramBuffer.Clear();
                     }
                     break;

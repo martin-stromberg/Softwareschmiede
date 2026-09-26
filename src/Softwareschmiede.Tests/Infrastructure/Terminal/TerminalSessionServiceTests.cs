@@ -184,6 +184,27 @@ public sealed class TerminalSessionServiceTests : IDisposable
         _pipeLauncher.Aufrufe.Should().Be(0);
     }
 
+    /// <summary>Diagnose-Marker gehen an <see cref="ITerminalDiagnoseSink"/>-Senken über
+    /// <c>OnDiagnoseChunk</c> — nicht über <c>OnOutputChunk</c> — damit byte-exakte
+    /// Mitschnitt-Pfade frei von Artefakt-Zeilen bleiben.</summary>
+    [Fact]
+    public async Task StartAsync_DiagnoseFaehigeSenke_ErhaeltMarkerUeberDiagnoseKanal()
+    {
+        var sink = new CollectingDiagnoseSink();
+
+        var act = () => _sut.StartAsync(
+            Guid.NewGuid(),
+            CreateSpec(fileName: "gibtes-garantiert-nicht-0815.exe"),
+            sink,
+            null,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        sink.DiagnoseText.Should().Contain("[Terminal-Diagnose]");
+        sink.Text.Should().BeEmpty(
+            "der Marker darf bei diagnose-fähigen Senken nicht als normaler Output-Chunk ankommen");
+    }
+
     /// <summary>Ein negatives Replay-Budget ist eine ungültige Konfiguration und schlägt mit ArgumentOutOfRangeException fehl.</summary>
     [Fact]
     public async Task StartAsync_ReplayBudgetUngueltig_WirftArgumentOutOfRange()
@@ -293,5 +314,43 @@ public sealed class TerminalSessionServiceTests : IDisposable
             Complete();
             return Task.CompletedTask;
         }
+    }
+
+    /// <summary>Output-Senke mit <see cref="ITerminalDiagnoseSink"/>: sammelt normale Chunks und
+    /// Diagnose-Marker getrennt voneinander.</summary>
+    private sealed class CollectingDiagnoseSink : ITerminalOutputSink, ITerminalDiagnoseSink
+    {
+        private readonly StringBuilder _text = new();
+        private readonly StringBuilder _diagnoseText = new();
+        private readonly object _lock = new();
+
+        public string Text
+        {
+            get { lock (_lock) return _text.ToString(); }
+        }
+
+        public string DiagnoseText
+        {
+            get { lock (_lock) return _diagnoseText.ToString(); }
+        }
+
+        public void OnOutputChunk(ReadOnlySpan<byte> data)
+        {
+            lock (_lock)
+                _text.Append(Encoding.UTF8.GetString(data));
+        }
+
+        public void OnDiagnoseChunk(ReadOnlySpan<byte> bytes)
+        {
+            lock (_lock)
+                _diagnoseText.Append(Encoding.UTF8.GetString(bytes));
+        }
+
+        public void Complete()
+        {
+        }
+
+        public Task CompleteAsync(TimeSpan timeout, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }

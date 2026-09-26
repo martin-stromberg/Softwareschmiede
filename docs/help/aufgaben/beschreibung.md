@@ -175,6 +175,12 @@ In der Aufgabendetailansicht steht in der Ribbon-Gruppe **CLI** der Button **Roh
 
 Der Export schreibt nur die bereits protokollierten `CliOutput`-Zeilen der Aufgabe in ihrer gespeicherten Reihenfolge in eine `.raw`-Datei. Zusätzliche Metadaten, Formatierungen oder andere Protokolltypen werden nicht ergänzt. Wird der Dialog abgebrochen, bleibt die Aufgabe unverändert.
 
+### CLI-Aufzeichnung exportieren
+
+Daneben steht in derselben Ribbon-Gruppe **CLI** der Button **Aufzeichnung exportieren** zur Verfügung. Er exportiert den automatisch mitgeschriebenen Rohbyte-Mitschnitt der letzten Terminal-Session der Aufgabe als `.clireplay`-Binärdatei (Vorschlagsname `cli-replay-<AufgabenId>.clireplay`) — inklusive Zeitstempel pro Ausgabe-Chunk, die der zeilenbasierte `.raw`-Export verliert.
+
+Die Aufzeichnung läuft während jeder CLI-Ausführung automatisch mit und überlebt das Session-Ende; sie ist speicherbegrenzt (Standard 8 MB — bei Überschreitung bleibt nur der Anfang erhalten) und wird nur für die letzten 8 gestarteten Aufgaben vorgehalten. Liegt keine Aufzeichnung vor, erscheint statt des Speicherdialogs eine verständliche Meldung. Die Datei dient der Wiedergabe im Konsolentestfenster (Einstellungen → Allgemein → Diagnose); Details siehe [Terminal-Integration](../terminal/index.md).
+
 ### Aufgabe pausieren
 
 Über den Ribbon-Button **Pause einstellen** (Gruppe „Aufgabe") lässt sich eine reguläre Aufgabe bis zu einem frei wählbaren Datum mit Uhrzeit pausieren:
@@ -268,3 +274,4 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
 - Zeitgesteuerter Prompt-Versand: Pro Aufgabe kann maximal ein Prompt gleichzeitig geplant sein; erneutes Planen ersetzt den vorhandenen Eintrag. Die Planung ist rein sitzungsgebunden und wird nicht persistiert — ein App-Neustart löscht alle geplanten Prompts. Ist die CLI zur Zielzeit nicht mehr aktiv, wird der Prompt still verworfen.
 - Das CLI-Ausgabeprotokoll speichert dekodierte Zeilen aus dem Terminal-Rohstream. ANSI- und Control-Sequenzen werden nicht bereinigt und können im Protokoll sichtbar sein.
 - Der CLI-Rohausgabe-Export enthält ausschließlich gespeicherte `CliOutput`-Zeilen; andere Protokolltypen oder Zusatzinformationen werden nicht exportiert.
+- Der CLI-Aufzeichnungs-Export (`.clireplay`) benötigt einen Mitschnitt der letzten Terminal-Session der Aufgabe: Ohne vorherigen CLI-Lauf (oder bei deaktiviertem Aufzeichnungs-Budget) liegt keine Aufzeichnung vor. Es werden nur die letzten 8 Aufgaben mit Mitschnitt vorgehalten — ältere sowie nicht exportierte Aufzeichnungen gehen beim Anwendungsende verloren.

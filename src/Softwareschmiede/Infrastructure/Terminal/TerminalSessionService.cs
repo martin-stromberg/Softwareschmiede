@@ -140,7 +140,13 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
 
         try
         {
-            outputSink?.OnOutputChunk(Encoding.UTF8.GetBytes(message + "\r\n"));
+            var markerBytes = Encoding.UTF8.GetBytes(message + "\r\n");
+            // Diagnose-Marker gehen über den eigenen Kanal an Senken, die ihn explizit verstehen —
+            // byte-exakte Mitschnitt-Senken (CliOutputRecorder) bleiben frei von Artefakt-Zeilen.
+            if (outputSink is ITerminalDiagnoseSink diagnoseSink)
+                diagnoseSink.OnDiagnoseChunk(markerBytes);
+            else
+                outputSink?.OnOutputChunk(markerBytes);
         }
         catch (Exception ex)
         {

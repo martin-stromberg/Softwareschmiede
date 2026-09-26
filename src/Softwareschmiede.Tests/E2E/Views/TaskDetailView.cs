@@ -339,6 +339,15 @@ public sealed class TaskDetailView : BaseWindowView
         return HandleSaveFileDialog(zielPfad);
     }
 
+    /// <summary>Klickt den "Aufzeichnung exportieren"-Button (CLI-Replay) und bedient den nativen Save-Dialog.</summary>
+    /// <param name="zielPfad">Der Zielpfad der zu speichernden *.clireplay-Datei oder null/leer für Abbruch.</param>
+    /// <returns>Diese Instanz.</returns>
+    public TaskDetailView ExportCliReplay(string? zielPfad)
+    {
+        WaitForEnabledElement(Window, "CliReplayExport", Medium).AsButton().ClickInForeground();
+        return HandleSaveFileDialog(zielPfad);
+    }
+
     /// <summary>Bedient den nativen Save-Dialog: schreibt den Zielpfad und bestätigt, oder bricht per ESC ab.</summary>
     /// <param name="zielPfad">Der Zielpfad oder null/leer zum Abbrechen.</param>
     /// <returns>Diese Instanz.</returns>

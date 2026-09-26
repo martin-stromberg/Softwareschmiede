@@ -14,4 +14,8 @@ public sealed class TerminalSessionOptions
 
     /// <summary>Initiale Zeilenanzahl beim Session-Start.</summary>
     public int DefaultRows { get; set; } = 50;
+
+    /// <summary>Byte-Budget der Rohbyte-Aufzeichnung (<see cref="CliOutputRecorder"/>) pro Session
+    /// (Default: 8 MB). Werte <c>&lt;= 0</c> deaktivieren den Mitschnitt.</summary>
+    public int AufzeichnungByteBudget { get; set; } = 8 * 1024 * 1024;
 }

@@ -283,4 +283,101 @@ public sealed class AnsiSequenceParserTests
         events.Should().ContainSingle(e => e is ScreenScrolledEvent);
         ((ScreenScrolledEvent)events[0]).DeltaRows.Should().Be(expectedDelta);
     }
+
+    /// <summary>Regression: Ein ESC mitten in einer CSI-Sequenz bricht die unvollständige Sequenz ab —
+    /// das ESC beginnt die nächste Sequenz, statt dass das folgende '[' fälschlich als Final-Byte
+    /// interpretiert und der Rest der echten Sequenz als Text ausgegeben wird.</summary>
+    [Fact]
+    public void Parse_EscInCsi_BrichtUnvollstaendigeSequenzAb()
+    {
+        var sut = new AnsiSequenceParser();
+
+        var events = sut.Parse(Encode("\x1b[1;2\x1b[3;4H")).ToList();
+
+        events.Should().ContainSingle(e => e is CursorMovedEvent,
+            "die vollständige Folgesequenz ESC[3;4H muss als Cursor-Move erkannt werden");
+        var cursorEvt = (CursorMovedEvent)events.Single(e => e is CursorMovedEvent);
+        cursorEvt.Row.Should().Be(2);
+        cursorEvt.Col.Should().Be(3);
+        events.Should().NotContain(e => e is TextWrittenEvent,
+            "kein Parameter-Rest (z. B. '3;4H') darf als Text durchschlagen");
+    }
+
+    /// <summary>Regression: ESC mitten in einer CSI ?-Sequenz bricht ebenfalls ab.</summary>
+    [Fact]
+    public void Parse_EscInCsiQuestion_BrichtUnvollstaendigeSequenzAb()
+    {
+        var sut = new AnsiSequenceParser();
+
+        var events = sut.Parse(Encode("\x1b[?25\x1b[2Jrest")).ToList();
+
+        events.Should().ContainSingle(e => e is ScreenClearedEvent);
+        var texts = events.OfType<TextWrittenEvent>().ToList();
+        texts.Should().ContainSingle();
+        texts[0].Text.Should().Be("rest");
+    }
+
+    /// <summary>Regression: DCS/SOS/PM/APC-String-Sequenzen (ESC P / X / ^ / _) werden bis zum
+    /// Terminator (ESC \ oder BEL) übersprungen — ihr Payload darf nicht als Text erscheinen.</summary>
+    [Theory]
+    [InlineData("\x1bPpayload\x1b\\X", "X")]
+    [InlineData("\x1bXdaten\x1b\\Y", "Y")]
+    [InlineData("\x1b^msg\x1b\\Z", "Z")]
+    [InlineData("\x1b_hint\x1b\\W", "W")]
+    [InlineData("\x1bPpayload\x07Q", "Q")]
+    public void Parse_StringSequenzen_WerdenUebersprungen(string seq, string expectedText)
+    {
+        var sut = new AnsiSequenceParser();
+
+        var events = sut.Parse(Encode(seq)).ToList();
+
+        var texts = events.OfType<TextWrittenEvent>().ToList();
+        texts.Should().ContainSingle("nur das Zeichen nach dem Terminator darf als Text erscheinen");
+        texts[0].Text.Should().Be(expectedText);
+    }
+
+    /// <summary>Regression: Ein OSC-Terminator (ESC \), dessen zweites Byte an einer Chunk-Grenze
+    /// liegt, darf nicht als Text-Backslash durchschlagen — der Escape-State überlebt die Grenze.</summary>
+    [Fact]
+    public void Parse_OscStAnChunkGrenze_WirdKorrektTerminiert()
+    {
+        var sut = new AnsiSequenceParser();
+
+        _ = sut.Parse(Encode("vor\x1b]0;Titel\x1b")).ToList();
+        var chunk2 = sut.Parse(Encode("\\nach")).ToList();
+
+        chunk2.OfType<TextWrittenEvent>().Select(e => e.Text).ToList()
+            .Should().Equal(new[] { "nach" },
+                "das \\ des über die Chunk-Grenze verteilten ST darf nicht als Text erscheinen");
+    }
+
+    /// <summary>OSC mit String-Terminator im selben Chunk bleibt weiterhin funktionsfähig —
+    /// und eine direkt anschließende Escape-Sequenz wird regulär geparst.</summary>
+    [Fact]
+    public void Parse_OscMitStImSelbenChunk_TerminiertUndParsetFolgesequenz()
+    {
+        var sut = new AnsiSequenceParser();
+
+        var events = sut.Parse(Encode("\x1b]0;Titel\x1b\\\x1b[2Jtext")).ToList();
+
+        events.Should().ContainSingle(e => e is ScreenClearedEvent);
+        var texts = events.OfType<TextWrittenEvent>().ToList();
+        texts.Should().ContainSingle();
+        texts[0].Text.Should().Be("text");
+    }
+
+    /// <summary>Regression: Ein zweiter OSC-String, der direkt nach einem unvollständig beendeten
+    /// ersten beginnt (ESC ] mitten im String), wird als neue String-Sequenz interpretiert.</summary>
+    [Fact]
+    public void Parse_EscInOsc_BeginntNeueSequenz()
+    {
+        var sut = new AnsiSequenceParser();
+
+        var events = sut.Parse(Encode("\x1b]8;;http://x\x1b]0;T\adone")).ToList();
+
+        var texts = events.OfType<TextWrittenEvent>().ToList();
+        texts.Should().ContainSingle();
+        texts[0].Text.Should().Be("done",
+            "der String-Payload des zweiten OSC darf nicht als Text erscheinen");
+    }
 }

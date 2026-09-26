@@ -382,6 +382,26 @@ public void Cancel()
 
 Bricht die Löschung ab.
 
+#### KonsolenTestDialogView
+
+Nicht-modales Konsolentestfenster (`DialogTitle = "Konsolentest"`) für das CLI-Ausgabe-Replay.
+
+##### `OeffneAufzeichnung(string pfad)`
+
+```csharp
+public KonsolenTestDialogView OeffneAufzeichnung(string pfad)
+```
+
+Klickt „Aufzeichnung öffnen…" und bedient den nativen Öffnen-Dialog per Tastatur (Dateiname eintippen, Autocomplete-Liste per ESC schließen, dann Enter — die eigene `OpenDialogCondition` erkennt „Öffnen"/„Open"/„CLI-Aufzeichnung öffnen").
+
+##### `StartWiedergabe()` / `NeustartWiedergabe()` / `PausierenToggle()` / `SetZeitrafferSchwelle(string text)` / `Schliessen()`
+
+Steuern die Wiedergabe (Abspielen, Neu starten, Pausieren/Fortsetzen, Zeitraffer-Schwelle, Schließen); Button-Klicks warten jeweils auf die CanExecute-Aktivierung, `Schliessen` nutzt das Invoke-Pattern.
+
+##### `WarteAufStatus(...)` / `WarteAufPosition(...)` / `WarteAufQuellEintraege(...)` / `WarteAufFehlerSichtbar(...)`
+
+Polling-Warten auf async Status-, Positions-, Listen- und Fehlerzustände; `GetQuellEintraegeCount()`/`GetQuellEintragText(index)` lesen die Quell-Chunk-Liste, `GetFehlerMeldung()` das Fehlerbanner auf dem Dialogfenster.
+
 ## Erweiterungsmethoden
 
 ### WindowExtensions

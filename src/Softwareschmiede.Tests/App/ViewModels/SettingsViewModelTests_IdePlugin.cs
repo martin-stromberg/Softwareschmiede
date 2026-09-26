@@ -62,7 +62,9 @@ public sealed class SettingsViewModelTests_IdePlugin : IDisposable
             _pluginSettingsService,
             _promptVorlagenService,
             NullLogger<SettingsViewModel>.Instance,
-            Options.Create(new AutonomAufgabenOptions()));
+            Options.Create(new AutonomAufgabenOptions()),
+            new Mock<IDialogService>().Object,
+            new Mock<IServiceProvider>().Object);
 
     private static IIdePlugin CreateIdePlugin(string pluginName, string pluginPrefix)
     {

@@ -205,6 +205,25 @@ Lösch-Bestätigungs-Dialog (native Windows MessageBox).
 | `Confirm()` | void | Bestätigt Löschung |
 | `Cancel()` | void | Bricht Löschung ab |
 
+#### KonsolenTestDialogView : DialogView
+
+Nicht-modales Konsolentestfenster (`DialogTitle = "Konsolentest"`) für das CLI-Ausgabe-Replay.
+
+| Methode | Rückgabe | Beschreibung |
+|---------|----------|-------------|
+| `ForceShow()` | `KonsolenTestDialogView` | Wartet auf das Dialogfenster |
+| `OeffneAufzeichnung(pfad)` | `KonsolenTestDialogView` | Klickt „Aufzeichnung öffnen…" und bedient den nativen Öffnen-Dialog (Tastatur-only wegen Autocomplete-Liste; eigene `OpenDialogCondition` auf „Öffnen"/„Open"/„CLI-Aufzeichnung öffnen") |
+| `OeffneAufzeichnungAbbrechen()` | `KonsolenTestDialogView` | Öffnet den Datei-Dialog und bricht ihn per ESC ab |
+| `StartWiedergabe()` | `KonsolenTestDialogView` | Klickt „Abspielen" (wartet auf CanExecute-Aktivierung) |
+| `NeustartWiedergabe()` | `KonsolenTestDialogView` | Klickt „Neu starten" (wartet auf Aktivierung) |
+| `PausierenToggle()` | `KonsolenTestDialogView` | Klickt „Pausieren/Fortsetzen" (wartet auf Aktivierung) |
+| `SetZeitrafferSchwelle(text)` | `KonsolenTestDialogView` | Setzt die Zeitraffer-Schwelle (Sekunden-Text) |
+| `GetStatusText()` / `GetPositionsText()` | string | Status- bzw. Positionstext (aus `HelpText` gelesen) |
+| `WarteAufStatus(...)` / `WarteAufPosition(...)` / `WarteAufQuellEintraege(...)` / `WarteAufFehlerSichtbar(...)` | `KonsolenTestDialogView` | Polling-Warten auf async Status-/Positions-/Listen-/Fehlerzustände |
+| `GetQuellEintraegeCount()` / `GetQuellEintragText(index)` | int / string | Quell-Chunk-Liste: Zeilenzahl und Quelltext-Zelle |
+| `IstFehlerSichtbar()` / `GetFehlerMeldung()` | bool / string? | Fehlerbanner auf dem **Dialogfenster** suchen (nicht auf `Window` — `ErrorView` durchsucht nur das Hauptfenster) |
+| `Schliessen()` | `KonsolenTestDialogView` | „Schließen" per Invoke-Pattern + `WaitUntilGone` |
+
 ## Klassenhierarchie-Diagramm
 
 ```mermaid
@@ -234,6 +253,7 @@ graph TD
     L -->|erbt| V["SolutionSelectionDialogView"]
     L -->|erbt| W["UpdateProgressDialogView"]
     L -->|erbt| X["DeleteConfirmationDialogView"]
+    L -->|erbt| Y["KonsolenTestDialogView"]
 ```
 
 ## Verwendungsbeziehungen
@@ -274,5 +294,6 @@ src/Softwareschmiede.Tests/E2E/Views/
     ├── HelpTextDialogView.cs
     ├── SolutionSelectionDialogView.cs
     ├── UpdateProgressDialogView.cs
-    └── DeleteConfirmationDialogView.cs
+    ├── DeleteConfirmationDialogView.cs
+    └── KonsolenTestDialogView.cs
 ```

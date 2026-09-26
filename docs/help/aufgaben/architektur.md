@@ -6,13 +6,16 @@
 
 | Komponente | Typ | Rolle |
 |------------|-----|-------|
-| `TaskDetailView.xaml` | WPF-View | Stellt den Ribbon-Button **Rohausgabe exportieren** bereit. |
+| `TaskDetailView.xaml` | WPF-View | Stellt die Ribbon-Buttons **Rohausgabe exportieren** und **Aufzeichnung exportieren** bereit. |
 | `TaskDetailViewModel` | ViewModel | Orchestriert Dialog, Validierung und Exportaufruf. |
 | `IDialogService` / `WpfDialogService` | UI-Abstraktion | Öffnet den nativen Speichern-Dialog für den Zielpfad. |
 | `ICliRawExportService` / `CliRawExportService` | Application Service | Liest die gespeicherten CLI-Protokolle und schreibt die `.raw`-Datei. |
+| `ICliReplayExportService` / `CliReplayExportService` | Application Service | Schreibt den Rohbyte-Mitschnitt der letzten Terminal-Session als `.clireplay`-Datei (`HatAufzeichnung`-Vorab-Prüfung). |
+| `KiAusfuehrungsService` / `CliOutputRecorder` | Application Service / Output-Senke | Hält die Rohbyte-Aufzeichnung der letzten 8 Aufgaben im Speicher (`GetCliAufzeichnung`); der Mitschnitt entsteht beim Session-Start über die `CompositeTerminalOutputSink`. |
+| `CliReplayAufzeichnungStore` | Infrastruktur | Serialisiert die `CliOutputAufzeichnung` im `.clireplay`-Binärformat. |
 | `ProtokollService` | Persistenzservice | Liefert den kompletten Protokoll-Snapshot einer Aufgabe. |
 | `Protokolleintrag` | Domain-Entity | Quelle der exportierten `CliOutput`-Zeilen. |
-| Dateisystem | Betriebssystem | Ziel für die erzeugte `.raw`-Datei. |
+| Dateisystem | Betriebssystem | Ziel für die erzeugte `.raw`- bzw. `.clireplay`-Datei. |
 
 ## Abhängigkeiten
 
@@ -30,6 +33,8 @@
 5. Aus den geladenen Einträgen werden nur `ProtokollTyp.CliOutput`-Zeilen übernommen.
 6. Die Zeilen werden in ihrer gespeicherten Reihenfolge zusammengeführt und als UTF-8-Datei ohne BOM geschrieben.
 7. Fehler beim Schreiben werden im ViewModel sichtbar gemacht; der restliche UI-Zustand bleibt unverändert.
+
+Der `.clireplay`-Export folgt demselben Dialogmuster, greift aber nicht auf persistierte Protokolle zu: `ExportCliReplayAsync` prüft vorab `CliReplayExportService.HatAufzeichnung(aufgabeId)`, ruft nach der Pfadwahl `ExportCliReplayAsync` auf, das den flüchtigen Mitschnitt über `KiAusfuehrungsService.GetCliAufzeichnung` holt und via `CliReplayAufzeichnungStore` als Binärdatei schreibt. Die Aufzeichnung selbst entsteht bereits beim Session-Start (`CliOutputRecorder` als zweite Senke der `CompositeTerminalOutputSink`) — Details siehe [Terminal-Architektur](../terminal/architektur.md).
 
 ## Diagramm
 

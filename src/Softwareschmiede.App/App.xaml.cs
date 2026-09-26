@@ -322,6 +322,8 @@ public sealed partial class App : System.Windows.Application
         services.AddSingleton<DarkModeService>();
         services.AddSingleton<IDialogService, WpfDialogService>();
         services.AddSingleton<ICliRawExportService, CliRawExportService>();
+        services.AddSingleton<CliReplayAufzeichnungStore>();
+        services.AddSingleton<ICliReplayExportService, CliReplayExportService>();
         services.AddSingleton<IUpdateProgressDialogService, WpfUpdateProgressDialogService>();
         services.AddSingleton<IApplicationShutdownService, WpfApplicationShutdownService>();
         services.AddSingleton<PluginSelectionDialogService>();
@@ -372,6 +374,7 @@ public sealed partial class App : System.Windows.Application
         services.AddTransient<OpenTodosDialogViewModel>();
         services.AddTransient<AutonomAufgabeInitialisierungsDialogViewModel>();
         services.AddTransient<AufgabePausierenDialogViewModel>();
+        services.AddTransient<KonsolenTestViewModel>();
 
         // Windows
         services.AddTransient<MainWindow>();

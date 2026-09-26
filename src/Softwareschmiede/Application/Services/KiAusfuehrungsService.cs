@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
@@ -18,11 +19,19 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     private static readonly TimeSpan ConPtyOutputDrainTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan CliOutputWriterDrainTimeout = TimeSpan.FromSeconds(2);
 
+    /// <summary>Maximale Anzahl gleichzeitig vorgehaltener CLI-Aufzeichnungen (ältere werden verworfen).</summary>
+    internal const int MaxAufzeichnungenAnzahl = 8;
+
     private readonly ConcurrentDictionary<Guid, CliProcessHandle> _handles = new();
+    private readonly ConcurrentDictionary<Guid, CliOutputRecorder> _aufzeichnungen = new();
+    private readonly LinkedList<Guid> _aufzeichnungsReihenfolge = new();
+    private readonly object _aufzeichnungenLock = new();
     private readonly ILogger<KiAusfuehrungsService> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ITerminalSessionFactory _sessionFactory;
+    private readonly IOptions<TerminalSessionOptions> _terminalOptions;
+    private readonly TimeProvider _timeProvider;
     private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="KiAusfuehrungsService"/>.</summary>
@@ -30,12 +39,22 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
     /// <param name="loggerFactory">Factory zum Erzeugen kategoriespezifischer Logger (z. B. für <see cref="PseudoConsoleSession"/>).</param>
     /// <param name="scopeFactory">Factory für DI-Scopes (wird für Fehler-Persistierung verwendet).</param>
     /// <param name="sessionFactory">Zentrale Erzeugung der interaktiven Terminal-Session (Auflösung, Preflight, Backend-Wahl).</param>
-    public KiAusfuehrungsService(ILogger<KiAusfuehrungsService> logger, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory, ITerminalSessionFactory sessionFactory)
+    /// <param name="terminalOptions">Terminal-Laufzeitparameter (u. a. <see cref="TerminalSessionOptions.AufzeichnungByteBudget"/>).</param>
+    /// <param name="timeProvider">Zeitquelle für die Aufzeichnungs-Zeitstempel.</param>
+    public KiAusfuehrungsService(
+        ILogger<KiAusfuehrungsService> logger,
+        ILoggerFactory loggerFactory,
+        IServiceScopeFactory scopeFactory,
+        ITerminalSessionFactory sessionFactory,
+        IOptions<TerminalSessionOptions> terminalOptions,
+        TimeProvider timeProvider)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         _scopeFactory = scopeFactory;
         _sessionFactory = sessionFactory;
+        _terminalOptions = terminalOptions;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
@@ -213,14 +232,32 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
                 _scopeFactory,
                 _loggerFactory.CreateLogger<CliOutputProtokollWriter>());
 
+            // Rohbyte-Mitschnitt (Diagnose-Werkzeug): läuft ab Session-Erzeugung mit und erfasst
+            // damit auch frühe Chunks ohne Race-Bedingung. Bei deaktiviertem Budget wird der
+            // Protokoll-Writer direkt übergeben (keine einelementige Composite).
+            var options = _terminalOptions.Value;
+            CliOutputRecorder? recorder = options.AufzeichnungByteBudget > 0
+                ? new CliOutputRecorder(
+                    aufgabeId,
+                    spec.PluginName,
+                    options.DefaultCols,
+                    options.DefaultRows,
+                    options.AufzeichnungByteBudget,
+                    _timeProvider,
+                    _loggerFactory.CreateLogger<CliOutputRecorder>())
+                : null;
+            ITerminalOutputSink outputSink = recorder is not null
+                ? new CompositeTerminalOutputSink(outputWriter, recorder)
+                : outputWriter;
+
             TerminalSessionStartResult startResult;
             try
             {
-                startResult = await _sessionFactory.StartAsync(aufgabeId, spec, outputWriter, kiPlugin.CheckHealthAsync, ct).ConfigureAwait(false);
+                startResult = await _sessionFactory.StartAsync(aufgabeId, spec, outputSink, kiPlugin.CheckHealthAsync, ct).ConfigureAwait(false);
             }
             catch
             {
-                await outputWriter.CompleteAsync(CliOutputWriterDrainTimeout, ct).ConfigureAwait(false);
+                await outputSink.CompleteAsync(CliOutputWriterDrainTimeout, ct).ConfigureAwait(false);
                 throw;
             }
 
@@ -229,8 +266,13 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
             var handle = new CliProcessHandle(aufgabeId, process)
             {
                 Session = session,
-                OutputSink = outputWriter
+                OutputSink = outputSink
             };
+
+            // Der Recorder-Eintrag überlebt das Session-Ende (der CliProcessHandle wird bei Exited
+            // entfernt) und wird beim nächsten Start derselben Aufgabe ersetzt.
+            if (recorder is not null)
+                RegistriereAufzeichnung(aufgabeId, recorder);
 
             // Exit-/Fehlerbehandlung läuft über die Session — sie besitzt das native Prozess-Handle und
             // erkennt das Prozessende selbst (Process.Exited bzw. Ende des Output-Streams). Das Handle wird
@@ -292,6 +334,34 @@ public sealed class KiAusfuehrungsService : IRunningAutomationStatusSource, IDis
         if (!_handles.TryGetValue(aufgabeId, out var handle))
             return null;
         return handle.Session;
+    }
+
+    /// <summary>Gibt die Rohbyte-Aufzeichnung der letzten Terminal-Session einer Aufgabe zurück —
+    /// auch nach dem Session-Ende abrufbar (der Eintrag überlebt das Handle).</summary>
+    /// <param name="aufgabeId">ID der Aufgabe.</param>
+    /// <returns>Ein Snapshot der <see cref="CliOutputAufzeichnung"/>, oder null wenn keine Aufzeichnung
+    /// existiert (kein Session-Start oder Aufzeichnung via <c>AufzeichnungByteBudget</c> deaktiviert).</returns>
+    public CliOutputAufzeichnung? GetCliAufzeichnung(Guid aufgabeId)
+        => _aufzeichnungen.TryGetValue(aufgabeId, out var recorder) ? recorder.GetAufzeichnung() : null;
+
+    /// <summary>Registriert einen Recorder für den Export. Die Registry ist auf die letzten
+    /// <see cref="MaxAufzeichnungenAnzahl"/> Aufgaben begrenzt — ältere Mitschnitte werden
+    /// verworfen, damit der Speicherverbrauch nicht unbegrenzt mit der Zahl gestarteter
+    /// Sessions wächst (ein Eintrag kann bis zu <c>AufzeichnungByteBudget</c> Bytes halten).
+    /// Ein Neustart derselben Aufgabe zählt als jüngster Eintrag.</summary>
+    private void RegistriereAufzeichnung(Guid aufgabeId, CliOutputRecorder recorder)
+    {
+        lock (_aufzeichnungenLock)
+        {
+            _aufzeichnungen[aufgabeId] = recorder;
+            _aufzeichnungsReihenfolge.Remove(aufgabeId);
+            _aufzeichnungsReihenfolge.AddLast(aufgabeId);
+            while (_aufzeichnungsReihenfolge.Count > MaxAufzeichnungenAnzahl)
+            {
+                _aufzeichnungen.TryRemove(_aufzeichnungsReihenfolge.First!.Value, out _);
+                _aufzeichnungsReihenfolge.RemoveFirst();
+            }
+        }
     }
 
     /// <summary>Stoppt den laufenden CLI-Prozess für eine Aufgabe (SIGTERM → 5s → Kill).</summary>

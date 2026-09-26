@@ -317,6 +317,23 @@
                                    TextWrapping="Wrap"
                                    Margin="22,4,0,0" />
                     </StackPanel>
+
+                    <!-- Diagnose -->
+                    <StackPanel Margin="0,0,0,16" MaxWidth="600" HorizontalAlignment="Left">
+                        <TextBlock Text="Diagnose"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                   Margin="0,0,0,4" />
+                        <TextBlock Text="Öffnet das Konsolentestfenster, mit dem eine exportierte CLI-Aufzeichnung (.clireplay) zeitgesteuert durch den echten Terminal-Renderpfad abgespielt werden kann."
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,8" />
+                        <Button Content="Konsolentestfenster öffnen"
+                                AutomationProperties.Name="KonsolenTestOeffnen"
+                                Command="{Binding KonsolenTestOeffnenCommand}"
+                                Padding="12,6"
+                                HorizontalAlignment="Left" />
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
             <TabItem>

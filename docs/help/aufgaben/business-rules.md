@@ -306,6 +306,26 @@
 
 ---
 
+## CLI-Aufzeichnungs-Export (.clireplay)
+
+**Beschreibung:** Der Export-Button **Aufzeichnung exportieren** schreibt den automatisch mitgeschnittenen Rohbyte-Mitschnitt der letzten Terminal-Session der Aufgabe als `.clireplay`-Binärdatei. Er setzt einen vorhandenen Mitschnitt voraus — der Mitschnitt läuft beim Session-Start im `KiAusfuehrungsService` mit, nicht erst beim Export.
+
+**Bedingungen:**
+- Der Export wird aus der Aufgabendetailansicht gestartet (`KannCliReplayExportieren` = Aufgabe geladen).
+- Für die Aufgabe liegt ein Mitschnitt vor (`CliReplayExportService.HatAufzeichnung`): mindestens ein Terminal-Session-Start mit aktivem `AufzeichnungByteBudget`, und die Aufgabe gehört zu den letzten 8 mit Mitschnitt.
+
+**Verhalten:**
+- Wenn keine Aufzeichnung vorliegt: `FehlerMeldung` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." — der Speicherdialog wird nicht geöffnet.
+- Wenn der Speichern-Dialog abgebrochen wird: kein Export, keine Fehlermeldung.
+- Wenn der Zielpfad nicht auf `.clireplay` endet: `FehlerMeldung` „Export-Zielpfad muss auf .clireplay enden."
+- Wenn der Schreibvorgang fehlschlägt: der Fehler wird geloggt und als Exportfehler angezeigt.
+- Der Mitschnitt ist flüchtig: Budget-Überschreitung kürzt ihn auf das Präfix (`IstVollstaendig = false` im Datei-Header), nur die letzten 8 Aufgaben behalten einen Mitschnitt, App-Ende verwirft alle.
+- `.raw`- und `.clireplay`-Export bestehen parallel und decken unterschiedliche Zwecke ab (zeilennormalisierte Sicht vs. byte-exaktes, zeitreales Replay).
+
+**Umsetzung:** `TaskDetailViewModel.ExportCliReplayAsync` (Vorab-Prüfung, Dialog, Endungsvalidierung), `CliReplayExportService` (`HatAufzeichnung`/`ExportCliReplayAsync` über `KiAusfuehrungsService.GetCliAufzeichnung` + `CliReplayAufzeichnungStore`), `CliOutputRecorder` (Mitschnitt beim Session-Start).
+
+---
+
 ## Aufgaben-Recovery
 
 **Beschreibung:** Eine Aufgabe, deren KI-Ausführung hängen geblieben ist (Heartbeat abgelaufen, kein laufender Prozess), kann über das Recovery-Banner auf dem Dashboard wiederhergestellt werden.
