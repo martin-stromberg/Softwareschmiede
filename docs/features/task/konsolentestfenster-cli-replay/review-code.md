@@ -2,56 +2,56 @@
 
 ## Ergebnis
 
-**Status:** Befunde vorhanden
+**Status:** Keine Befunde
 
-## Verifikation der Runde-2-Befunde
+## Verifikation der Nacharbeit-Befunde (aus `review-code.3.md`)
 
-Alle 6 Befunde aus `review-code.2.md` wurden am echten Code verifiziert als behoben:
+Alle 3 Befunde wurden am echten Code verifiziert als behoben:
 
-- **`TryParseZeitrafferSchwelle`-Overflow:** Behoben — Zeilen 388–392: `sekunden > TimeSpan.MaxValue.TotalSeconds` liefert `false` statt `OverflowException`; Theory-Test `[InlineData("1e13")]` (`ZeitrafferSchwelleText_UngueltigeWerte_WerdenAbgewiesen`) belegt es.
-- **Toter `effektiv`-Fallback / `IOptions<TerminalSessionOptions>`-Dep:** Behoben — `LadeAufzeichnung` (Zeilen 210–213) nutzt `aufzeichnung` direkt mit erläuterndem Kommentar; die `IOptions`-Dep ist aus dem Konstruktor entfernt, DI-Registrierung (`AddTransient<KonsolenTestViewModel>`, App.xaml.cs:377) passt.
-- **`_replaySession`/`Session` nach Dispose auf null:** Behoben — `EntsorgeReplaySession` setzt Zeilen 273–274 beide Referenzen auf `null`; `SchliessenCommand`-Test assertiert `Session == null` + `CanExecute == false`.
-- **Lock-Splitting `_istPausiert`:** Behoben — `Pausieren` (Zeilen 137–142) setzt Flag und Gate-Swap jetzt unter `_pauseLock` wie `Fortsetzen` (Zeilen 155–159); `_renderLock` wird nur noch kurz als Fence genommen. Invariante „`_istPausiert` ⇒ Gate geschlossen" ist atomar, kein Busy-Loop-Szenario mehr. Lock-Reihenfolge geprüft: keine verschachtelten Lock-Akquisitionen → kein Deadlock.
-- **Racy Assert:** Behoben — `Wiedergabe_LaeuftBisEnde_UndSynchronisiertQuellAnsicht` (Zeile 170) akzeptiert beide gültigen Zustände (`BeOneOf`) und assertiert nur noch den Endzustand über `WarteBisAsync`.
-- **„modal" im SettingsViewModel-Doc:** Behoben — `KonsolenTestOeffnenCommand`-Doc sagt jetzt „nicht-modale" (SettingsViewModel.cs:247).
+- **`WiedergabeLoopAsync` — ct-Check bei `delay == 0`:** Behoben — `TerminalReplaySession.cs` Z. 239
+  `ct.ThrowIfCancellationRequested()` am Schleifenanfang und Z. 263 nach dem Gate-Wait im
+  In-Flight-Retry. Damit terminiert die Schleife nach `Dispose` auch dann prompt, wenn
+  `WartePauseGateAsync` einen bereits erfüllten Task liefert (WaitAsync wertet den Token nicht
+  aus) und `Task.Delay` bei `ZeitrafferSchwelle = 0` entfällt. `OperationCanceledException` wird
+  wie bisher vom äußeren `catch` geschluckt, `RaiseExited` bleibt bei Abbruch unterdrückt
+  (`!ct.IsCancellationRequested`-Guard) — konsistent zum bisherigen Verhalten.
+- **`ErzeugeReplaySession` — letzte gültige Schwelle statt `TimeSpan.MaxValue`:** Behoben —
+  `KonsolenTestViewModel.cs` Z. 33–37 `_zeitrafferSchwelle`-Feld (Initialwert `1 s` = passend zum
+  Initialtext `"1"`), wird im Setter nur bei erfolgreichem Parse aktualisiert (Z. 148) und in
+  `ErzeugeReplaySession` (Z. 262) immer angewendet. Eine frische Session (Neustart/Neuladen)
+  übernimmt die zuletzt gültige Schwelle statt still auf Echtzeit zurückzufallen.
+- **`ConPtyCliReplayExport_...` — Dialog-Cleanup im `finally`:** Behoben — `E2E_ConPtyLifecycle.cs`
+  Z. 75–76 `settings`/`dialog` außerhalb des `try` deklariert, Z. 116
+  `TryCloseKonsolenTestfenster(dialog, settings)` im `finally` — identisches Muster wie der
+  Schwester-Test in `E2E_KonsolenTestfenster.cs` (gleiche Partial-Class `End2EndTest`, Helper
+  direkt wiederverwendet).
 
-## Befunde
+## Neue Befunde
 
-### TerminalReplaySession.cs (TerminalReplaySession)
+Keine. Die Änderungen sind lokal und minimalinvasiv:
 
-- **Concurrency / Cancellation-Responsivität** — `WiedergabeLoopAsync` (Zeilen 233–271) beachtet `ct` nur an den `await`-Punkten, die den Token tatsächlich prüfen: `WartePauseGateAsync` ruft `warteTask.WaitAsync(ct)` auf — `Task.WaitAsync` liefert für einen **bereits erfüllten** Task den Task selbst zurück, ohne den Token zu evaluieren. Nach `Dispose()` öffnet `Fortsetzen()` das Gate dauerhaft; bei `ZeitrafferSchwelle = 0` oder aufgezeichneten Bursts mit `Offset`-Differenz 0 wird `Task.Delay` übersprungen (Zeile 244). Ergebnis: Die Schleife „drain-t" nach dem Abbruch **alle restlichen Chunks** — sie wendet sie unter `_renderLock` an, aktualisiert `_aktuellerChunkIndex` und feuert `OutputChunk`/`BufferChanged` auf der disposed Session weiter, bis die Aufzeichnung zu Ende ist. Zustandskorruption wird aktuell nur durch die äußeren Schutzschichten verhindert (Event-Abmeldung in `EntsorgeReplaySession`, `ReferenceEquals`-Guard im ViewModel, `Session`-Rebind am TerminalControl) — der Loop selbst verletzt aber die Abbruch-Erwartung von `Dispose` und brennt bei großen Aufzeichnungen (bis 8 MB / tausende Chunks) spürbar CPU im Neustart-Pfad (`ErsetzeReplaySessionDurchFrische` → `EntsorgeReplaySession` → `Dispose` mitten im Lauf).
+- `TerminalReplaySession.cs`: nur zwei `ThrowIfCancellationRequested`-Aufrufe; keine Lock-/Zustandsänderung.
+- `KonsolenTestViewModel.cs`: ein neues `TimeSpan`-Feld + zwei Zuweisungen; der Setter aktualisiert das Feld nur im Erfolgszweig, `ErzeugeReplaySession` liest es — kein Threading-Risiko (UI-Thread-gebunden wie der Rest des ViewModels).
+- `KonsolenTestDialog.xaml`: `MaxWidth="320"` + `TextTrimming="CharacterEllipsis"` + `ToolTip`/`HelpText` auf `DateiPfad`; keine E2E-Assertion liest den `AufzeichnungPfad`-Text (geprüft — kein Verweis in Tests), Trimmen ist daher testseitig unproblematisch.
+- `TaskDetailViewModel.cs`: nur Meldungstext; der Unit-Test assertiert `Contain("keine Aufzeichnung")` — Substring weiterhin enthalten.
+- `E2E_ConPtyLifecycle.cs`: `using Softwareschmiede.Tests.E2E.Views.Dialogs;` ergänzt; `SettingsView?`-Deklaration löst über das bereits vorhandene `using Softwareschmiede.Tests.E2E.Views` auf.
+- Neue Tests: `Dispose_MitZeitrafferNull_BrichtAbStattChunksZuDraenen` blockiert die Schleife deterministisch über den `OutputChunk`-Handler (feuert unter `_renderLock`) — `freigabe.Set()` + `Dispose` im `finally` verhindern einen geparkten Thread bei Assert-Fehler; `ZeitrafferSchwelleText_Ungueltig_...` prüft die Übernahme der letzten gültigen Schwelle über den Neulade-Pfad.
 
-  Empfehlung: Am Anfang jeder `for`-Iteration `ct.ThrowIfCancellationRequested()` (alternativ `Volatile.Read(ref _disposed) != 0 → break`) einbauen — dann terminiert die Schleife auch ohne wartendes Delay/Gate prompt.
+## Eigenständige Verifikation
 
-### KonsolenTestViewModel.cs (KonsolenTestViewModel)
-
-- **Zustandskonsistenz** — `ErzeugeReplaySession` (Zeilen 252–254) übernimmt die Zeitraffer-Schwelle aus `_zeitrafferSchwelleText`. Steht dort gerade ein ungültiger Text (Fehlerbanner sichtbar), schlägt `TryParseZeitrafferSchwelle` fehl und die **frische** Session behält ihren Default `TimeSpan.MaxValue` — also Echtzeit-Wiedergabe statt der zuletzt gültigen Schwelle. Der Setter-Kommentar (Zeile 150) verspricht „die zuletzt gültige Schwelle der Session bleibt wirksam" — für die Session-Instanz stimmt das, aber ein Neustart (`ErsetzeReplaySessionDurchFrische`) oder Neuladen mit stehengelassenem Fehlertext wechselt still von der letzten gültigen Schwelle auf Echtzeit. Beispiel: „0" eingegeben → „abc" getippt → „Neu starten" → Wiedergabe läuft plötzlich in Echtzeit statt mit maximaler Geschwindigkeit.
-
-  Empfehlung: Die zuletzt gültige Schwelle zusätzlich in einem `TimeSpan`-Feld (z. B. `_zeitrafferSchwelle`) halten — bei erfolgreichem Parse im Setter und in `ErzeugeReplaySession` aktualisieren bzw. verwenden, statt den Text jedes Mal neu zu parsen.
-
-### E2E_ConPtyLifecycle.cs (End2EndTest)
-
-- **Testqualität / Robustheit** — `ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E` (Zeilen 67–113): Im `finally` wird nur die Exportdatei gelöscht. Schlägt ein Assert zwischen `OpenKonsolenTestDialog()` und `NavigateToTask(taskTitle)` fehl, bleiben Konsolentestfenster und Einstellungsansicht offen und die Rücknavigation zur Aufgabe entfällt — die Folge-Phasen der Methode (bzw. `taskDetail.ForceClose`/`DeleteProject` im Aufrufer) laufen dann gegen einen unerwarteten Fenster-/View-Zustand. Genau dafür wurde in derselben Iteration in `E2E_KonsolenTestfenster` das `TryCloseKonsolenTestfenster`-Muster (Zeilen 163–169, 182–200) eingeführt — hier fehlt es.
-
-  Empfehlung: `settings`/`dialog` außerhalb des `try` deklarieren und im `finally` `TryCloseKonsolenTestfenster(dialog, settings)` (oder ein lokales Äquivalent) aufrufen — konsistent zum Schwester-Test.
+- `dotnet build Softwareschmiede.slnx` — 0 Fehler (1 pre-existing Warnung CS8602 in `CliOutputProtokollWriterTests.cs:151`, unverändert aus früheren Runden).
+- `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~TerminalReplaySessionTests|FullyQualifiedName~KonsolenTestViewModelTests|FullyQualifiedName~TaskDetailViewModelTests_CliReplayExport"` (mit `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`) — 30/30 grün inkl. beider neuer Regressionstests.
 
 ## Geprüfte Dateien
 
-- `src/Softwareschmiede.App/ViewModels/KonsolenTestViewModel.cs` (vollständig)
-- `src/Softwareschmiede/Infrastructure/Terminal/TerminalReplaySession.cs` (vollständig)
-- `src/Softwareschmiede.Tests/App/ViewModels/KonsolenTestViewModelTests.cs` (vollständig)
-- `src/Softwareschmiede.Tests/Infrastructure/Terminal/TerminalReplaySessionTests.cs` (vollständig)
-- `src/Softwareschmiede.Tests/E2E/E2E_KonsolenTestfenster.cs` (vollständig)
+- `src/Softwareschmiede/Infrastructure/Terminal/TerminalReplaySession.cs` (Diff, vollständiger Kontext der Schleife)
+- `src/Softwareschmiede.App/ViewModels/KonsolenTestViewModel.cs` (Diff)
+- `src/Softwareschmiede.App/ViewModels/TaskDetailViewModel.cs` (Diff)
+- `src/Softwareschmiede.App/Views/KonsolenTestDialog.xaml` (Diff)
 - `src/Softwareschmiede.Tests/E2E/E2E_ConPtyLifecycle.cs` (Diff)
-- `src/Softwareschmiede.Tests/E2E/Views/Dialogs/KonsolenTestDialogView.cs` (vollständig)
-- `src/Softwareschmiede.Tests/E2E/Views/TaskDetailView.cs` (Querverweis `ExportCliReplay`/`HandleSaveFileDialog`)
-- `src/Softwareschmiede.Tests/E2E/Views/SettingsView.cs` (Diff)
-- `src/Softwareschmiede.Tests/E2E/Views/WindowExtensions.cs` (Diff)
-- `src/Softwareschmiede.Tests/E2E/MainTest.cs` (Diff)
-- `src/Softwareschmiede.App/ViewModels/SettingsViewModel.cs` (Diff)
-- `src/Softwareschmiede.App/Services/WpfDialogService.cs` (Diff)
-- `src/Softwareschmiede.App/Services/IDialogService.cs` (Diff)
-- `src/Softwareschmiede.App/App.xaml.cs` (Diff)
-- `src/Softwareschmiede.App/Views/KonsolenTestDialog.xaml` (vollständig)
-- `src/Softwareschmiede.App/Views/KonsolenTestDialog.xaml.cs` (vollständig)
-- `src/Softwareschmiede.App/Controls/TerminalControl.cs` (Querverweis `OnSessionChanged`, null-Handling)
+- `src/Softwareschmiede.Tests/E2E/E2E_KonsolenTestfenster.cs` (Querverweis `TryCloseKonsolenTestfenster`)
+- `src/Softwareschmiede.Tests/Infrastructure/Terminal/TerminalReplaySessionTests.cs` (Diff)
+- `src/Softwareschmiede.Tests/App/ViewModels/KonsolenTestViewModelTests.cs` (Diff)
+- `src/Softwareschmiede.Tests/App/ViewModels/TaskDetailViewModelTests_CliReplayExport.cs` (Querverweis Meldungs-Assertion)
+- `src/Softwareschmiede.App/Services/CliReplayExportService.cs` (Querverweis `HatAufzeichnung`)
+- `src/Softwareschmiede/Application/Services/KiAusfuehrungsService.cs` (Querverweis Aufzeichnungs-Retention)

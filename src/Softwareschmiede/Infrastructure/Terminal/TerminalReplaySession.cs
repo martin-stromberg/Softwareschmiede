@@ -232,6 +232,11 @@ public sealed class TerminalReplaySession : ITerminalSession
             var chunks = _aufzeichnung.Chunks;
             for (var i = 0; i < chunks.Count; i++)
             {
+                // Expliziter Abbruch-Check am Schleifenanfang: WartePauseGateAsync liefert für ein
+                // bereits offenes Gate einen erfüllten Task (WaitAsync wertet den Token dann nicht
+                // aus) und bei delay == 0 wird Task.Delay übersprungen — ohne diese Prüfung würde
+                // die Schleife nach Dispose() alle restlichen Chunks drain-en.
+                ct.ThrowIfCancellationRequested();
                 await WartePauseGateAsync(ct).ConfigureAwait(false);
 
                 var chunk = chunks[i];
@@ -253,6 +258,9 @@ public sealed class TerminalReplaySession : ITerminalSession
                 while (!angewendet)
                 {
                     await WartePauseGateAsync(ct).ConfigureAwait(false);
+                    // Öffnet Dispose() das Gate (Fortsetzen) während hier gewartet wird, würde der
+                    // in-flight Chunk sonst noch auf der disposed Session angewendet.
+                    ct.ThrowIfCancellationRequested();
                     lock (_renderLock)
                     {
                         if (_istPausiert)

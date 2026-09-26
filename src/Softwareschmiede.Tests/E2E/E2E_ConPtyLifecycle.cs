@@ -3,6 +3,7 @@ using FlaUI.Core.Input;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.E2E.Views.Dialogs;
 
 namespace Softwareschmiede.Tests.E2E;
 
@@ -71,6 +72,8 @@ public partial class End2EndTest
     {
         var taskTitle = taskDetail.GetTaskTitle();
         var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        SettingsView? settings = null;
+        KonsolenTestDialogView? dialog = null;
         try
         {
             // Abbruch-Subphase: Save-Dialog per ESC schließen — keine Datei, kein Fehlerbanner.
@@ -90,8 +93,8 @@ public partial class End2EndTest
             Assert.Equal("SWCLRPLY", System.Text.Encoding.ASCII.GetString(magic));
 
             // Konsolentestfenster über Einstellungen öffnen, Export laden und abspielen.
-            var settings = new Views.SettingsView(mainWindow).ForceShow();
-            var dialog = settings.OpenKonsolenTestDialog();
+            settings = new Views.SettingsView(mainWindow).ForceShow();
+            dialog = settings.OpenKonsolenTestDialog();
             dialog.SetZeitrafferSchwelle("0");
             dialog.OeffneAufzeichnung(pfad);
             dialog.WarteAufQuellEintraege(1);
@@ -107,6 +110,11 @@ public partial class End2EndTest
         }
         finally
         {
+            // TryClose-Muster wie in E2E_KonsolenTestfenster: bei einem Assert-Fehler dürfen
+            // das nicht-modale Konsolentestfenster und die Einstellungsansicht nicht offen
+            // bleiben — sonst laufen Folge-Phasen gegen einen unerwarteten Fensterzustand.
+            TryCloseKonsolenTestfenster(dialog, settings);
+
             if (File.Exists(pfad))
                 File.Delete(pfad);
         }

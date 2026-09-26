@@ -267,6 +267,58 @@ public sealed class TerminalReplaySessionTests
         session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv);
     }
 
+    /// <summary>Nach <see cref="TerminalReplaySession.Dispose"/> darf die Wiedergabe-Schleife bei
+    /// <c>ZeitrafferSchwelle = 0</c> (alle Delays entfallen und das offene Pause-Gate liefert einen
+    /// bereits erfüllten Task, dessen WaitAsync den Token nicht auswertet) nicht alle restlichen
+    /// Chunks auf der disposed Session drain-en — der Abbruch muss zwischen den Chunks beachtet werden.</summary>
+    [Fact]
+    public async Task Dispose_MitZeitrafferNull_BrichtAbStattChunksZuDraenen()
+    {
+        const int chunkCount = 10;
+        var timeProvider = new FakeTimeProvider();
+        var aufzeichnung = CreateAufzeichnung(
+            Enumerable.Range(0, chunkCount).Select(i => Encoding.UTF8.GetBytes($"chunk-{i}")).ToArray(),
+            TimeSpan.Zero);
+        var session = new TerminalReplaySession(aufzeichnung, timeProvider)
+        {
+            ZeitrafferSchwelle = TimeSpan.Zero,
+        };
+
+        // Die Schleife wird mitten im ersten Chunk-Apply blockiert (OutputChunk feuert unter dem
+        // Render-Lock): Dispose() trifft sie so garantiert mitten im Lauf bei offenem Gate.
+        var ersterChunkErreicht = new ManualResetEventSlim();
+        var freigabe = new ManualResetEventSlim();
+        var ersterAufruf = true;
+        session.OutputChunk += (_, _) =>
+        {
+            if (ersterAufruf)
+            {
+                ersterAufruf = false;
+                ersterChunkErreicht.Set();
+                freigabe.Wait();
+            }
+        };
+
+        try
+        {
+            session.WiedergabeStarten();
+            ersterChunkErreicht.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue(
+                "die Wiedergabe-Schleife muss den ersten Chunk erreicht haben");
+            session.Dispose();
+        }
+        finally
+        {
+            // Freigabe in jedem Fall — ein fehlschlagender Assert darf den blockierten
+            // Schleifen-Thread nicht dauerhaft parken.
+            freigabe.Set();
+            session.Dispose();
+        }
+
+        await Task.Delay(200);
+        session.AktuellerChunkIndex.Should().BeLessThan(chunkCount,
+            "nach dem Abbruch dürfen die restlichen Chunks nicht mehr angewendet werden");
+    }
+
     private static Task GetReadLoopTask(PseudoConsoleSession session)
     {
         var field = typeof(PseudoConsoleSession).GetField("_readLoopTask", BindingFlags.NonPublic | BindingFlags.Instance)!;

@@ -2364,7 +2364,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         // nicht umsonst geöffnet werden.
         if (!_cliReplayExportService.HatAufzeichnung(_aufgabeId))
         {
-            FehlerMeldung = "Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten.";
+            FehlerMeldung = "Für diese Aufgabe liegt keine Aufzeichnung vor — der Mitschnitt wird während einer CLI-Ausführung automatisch erstellt, aber nur flüchtig im Arbeitsspeicher gehalten (maximal die letzten 8 Aufgaben) und geht bei einem Neustart der Anwendung oder durch neuere Ausführungen verloren.";
             return;
         }
 

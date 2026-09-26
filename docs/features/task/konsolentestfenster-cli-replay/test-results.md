@@ -1,55 +1,45 @@
 # Test-Ergebnisse
 
-Testrunde 3 (nach Iteration 3: ANSI-Sequenzen im E2E, finally-Cleanup, Abbruch-Subphase im ConPTY-Export, „Neu starten"-Button, Overflow-Check, Lock-Splitting-Fix).
+Nacharbeit-Lauf (`continue.md`): Fixes für 3 Code-Befunde (Replay-Loop ct-Check, Zeitraffer-Schwellen-Fallback, E2E-finally-Cleanup) und 2 Usability-Befunde (Pfad-Überlauf, „keine Aufzeichnung"-Meldung) + 2 neue Regressionstests.
 
 Ausgeführte Befehle (jeweils synchron, mit `SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`):
 
-1. `dotnet build Softwareschmiede.slnx` — erfolgreich, 0 Warnungen, 0 Fehler
-2. `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"` — 1857 Tests, 1856 bestanden, 1 übersprungen, 0 fehlgeschlagen (~1,3 min)
-3. `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface"` — 55 Tests, 53 bestanden, 2 übersprungen, 0 fehlgeschlagen (~9,6 min)
-4. `dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category!=OsInterface"` — 69 Tests, 69 bestanden (~9 s)
-5. `dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category=OsInterface"` — 9 Tests, 9 bestanden (~4 s)
+1. `dotnet build Softwareschmiede.slnx` — erfolgreich, 1 pre-existing Warnung (CS8602, `CliOutputProtokollWriterTests.cs:151`), 0 Fehler
+2. `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "FullyQualifiedName~TerminalReplaySessionTests|FullyQualifiedName~KonsolenTestViewModelTests|FullyQualifiedName~TaskDetailViewModelTests_CliReplayExport"` — 30 Tests, 30 bestanden (inkl. beider neuer Regressionstests)
+3. `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category!=OsInterface"` — 1859 Tests, 1858 bestanden, 1 übersprungen, 0 fehlgeschlagen (~1,3 min)
+4. `dotnet test src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --filter "Category=OsInterface"` — 55 Tests, 51 bestanden, 2 übersprungen, 2 fehlgeschlagen (~10,3 min); **Retry der 2 Fehlschläge einzeln: beide bestanden (49 s)** — siehe unten
+5. `dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category!=OsInterface"` — 69 Tests, 69 bestanden (~14 s)
+6. `dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --filter "Category=OsInterface"` — 9 Tests, 9 bestanden (~3 s)
+7. `dotnet format Softwareschmiede.slnx --verify-no-changes` — sauber (Exit 0)
 
 ## Ergebnis
 
 **Status:** Keine Fehler
 
-`RunGeneralTests` ist vollständig durchgelaufen (8 m 5 s) — einschließlich des erweiterten `KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E` mit den neuen Phasen (ANSI-Steuersequenzen in der Quell-Ansicht, echtes erneutes Abspielen nach Ende, Neustart aus dem Pausiert-Zustand, Formatfehler-Banner, OpenFileDialog-Abbruch) und dem `finally`-Cleanup (`TryCloseKonsolenTestfenster`).
+`RunGeneralTests` ist vollständig durchgelaufen — inklusive `KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E` mit dem Pfad-/Zeitraffer-/Neustart-Ablauf des Konsolentestfensters.
+
+## Zu den 2 E2E-Fehlschlägen im OsInterface-Lauf
+
+- `ProjectDetailE2ETests.ProjektDetailSzenarien` — `TimeoutException` (Element nicht in 15 s gefunden) in `ProjectListView.OpenProject`
+- `E2E_RepositoryManagementTests.BasisBranchVerwaltung` — `TimeoutException` (Element nicht in 20 s gefunden) in `ProjectDetailView.SetBaseBranch`
+
+Bewertung als **Umgebungs-Flake, keine Feature-Regression**: (a) das App-Log der Test-Instanz
+(`src/Softwareschmiede.App/bin/Debug/net10.0-windows10.0.17763.0/logs/softwareschmiede-20260926.log`)
+enthält **keine** Start-Ausnahme (`MainWindow konnte nicht angezeigt werden`, `XamlParseException`) —
+Fenster und Prozess starteten sauber; (b) beide Szenarien betreffen Projektliste/-detail und
+Basis-Branch-Verwaltung — fachlich und code-seitig unabhängig vom Diff dieses Laufs
+(Replay-Session-Loop, Konsolentest-ViewModel/-Dialog, eine Meldungstext-Zeile, ein E2E-`finally`);
+(c) der isolierte Re-Run beider Tests war ohne Änderung sofort grün. Die Fehlschläge traten in den
+ersten ~80 s des Laufs auf (Cold-Start der ersten App-Instanzen in der Sandbox).
 
 ## E2E-Abdeckung
 
-| Szenario | Test / Testklasse | Ergebnis |
-|----------|-------------------|----------|
-| Einstellungen → „Diagnose" → Konsolentestfenster öffnen → `.clireplay` über nativen OpenFileDialog laden → Quell-Liste mit sichtbaren ANSI-Steuersequenzen (`ESC` → `␛`) → Abspielen → Position/Status → Pausieren (keine neuen Chunks) → Fortsetzen → Zeitraffer-Schwelle → „Wiedergabe beendet."; im selben Szenario: korrupte Datei → `FehlerMeldung`-Banner, OpenFileDialog-Abbruch (ESC) → kein Zustandswechsel; zusätzlich Iteration 3: erneutes Abspielen nach Ende + Neustart aus dem Pausiert-Zustand; Dialog-Schließen im `finally` | `KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E` (`src/Softwareschmiede.Tests/E2E/E2E_KonsolenTestfenster.cs`, aufgerufen in `End2EndTest.RunGeneralTests`, `MainTest.cs` Z. 36) | Bestanden |
-| Aufgabe mit laufender CLI → „Aufzeichnung exportieren" → Save-Dialog-Abbruch + bestätigter Export → `.clireplay` lesbar; anschließend Konsolentestfenster öffnen und exportierte Datei abspielen (Abbruch-Subphase aus Iteration 3) | `ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E` (`src/Softwareschmiede.Tests/E2E/E2E_ConPtyLifecycle.cs` Z. 70, konsolidiert in `ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E`, aufgerufen in `End2EndTest.RunConPtyTests`, `MainTest.cs` Z. 92) | Nicht ausgeführt — ConPTY-Tests sind in dieser Sandbox nicht ausführbar (`SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`, dokumentierte Sandbox-Limitation, kein Code-Defekt); in einer interaktiven Session/VS auszuführen |
+Geplante Benutzerfluss-E2E-Szenarien und ihr Stand in diesem Lauf:
 
-## Zusammenfassung
+- `End2EndTest.RunGeneralTests` → Phase `KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E` (Dialog öffnen, defekte Datei/Fehlerbanner, Öffnen-Dialog-Abbruch, Pause/Fortsetzen, erneutes Abspielen, Neustart aus Pausiert, Zeitraffer 0, Quell-Liste mit ␛-Sequenzen) — **bestanden**
+- `End2EndTest.RunConPtyTests` inkl. Phase `ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E` (Echt-Session-Export + Öffnen + Abspielen) — **übersprungen** (`SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`, bestätigte Sandbox-Limitation — kein Code-Defekt; in interaktiver Session/Visual Studio nachzuholen)
+- `E2E_RepositoryInitialisierungAusfuehrungTests.InitialisierungsskriptAusfuehrung` — **übersprungen** (gleiche ConPTY-Limitation)
 
-- Gesamt: 1990
-- Bestanden: 1987
-- Fehlgeschlagen: 0
-- Übersprungen: 3
-  - `End2EndTest.RunConPtyTests` — ConPTY-Sandbox-Limitation (`SOFTWARESCHMIEDE_SKIP_CONPTY_TESTS=1`)
-  - `E2E_RepositoryInitialisierungAusfuehrungTests.InitialisierungsskriptAusfuehrung` — ConPTY-Sandbox-Limitation (gleiche Variable)
-  - `ArbeitsverzeichnisOeffnenServiceTests.Oeffne_AufNichtWindows_WirftPlatformNotSupportedException` — plattformbedingter Skip (nicht feature-bezogen)
+## Fehlgeschlagene Tests
 
-## Testabdeckung
-
-**Abdeckung:** Nicht messbar (kein Coverage-Collector im Testlauf verwendet; Fallback: Dateinamen-Konvention)
-
-## Fehlende Tests
-
-Quelle: `Dateinamen-Konvention`
-
-Keine — alle neuen Quelldateien des Features haben korrespondierende Testabdeckung:
-
-- `CliOutputRecorder.cs` → `CliOutputRecorderTests.cs`
-- `CompositeTerminalOutputSink.cs` → `CompositeTerminalOutputSinkTests.cs`
-- `CliReplayAufzeichnungStore.cs` → `CliReplayAufzeichnungStoreTests.cs`
-- `TerminalReplaySession.cs` → `TerminalReplaySessionTests.cs`
-- `CliChunkQuelltextFormatter.cs` → `CliChunkQuelltextFormatterTests.cs`
-- `CliReplayExportService.cs` → `CliReplayExportServiceTests.cs`
-- `KonsolenTestViewModel.cs` → `KonsolenTestViewModelTests.cs`
-- Export-ViewModel-Pfad → `TaskDetailViewModelTests_CliReplayExport.cs`
-- `KonsolenTestDialog.xaml(.cs)` / UI-Fluss → `E2E_KonsolenTestfenster.cs` (+ `KonsolenTestDialogView.cs`-Wrapper)
-- Datenmodelle ohne eigenen Code (`CliOutputChunkRecord`, `CliOutputAufzeichnung`, `CliChunkAnzeigeEintrag`, `ITerminalDiagnoseSink`) — indirekt über die obigen Tests abgedeckt
+Keine — nach dem erfolgreichen Re-Run der beiden E2E-Flakes stehen alle ausführbaren Tests auf grün.

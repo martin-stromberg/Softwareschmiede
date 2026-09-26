@@ -300,6 +300,30 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         session.ZeitrafferSchwelle.Should().Be(TimeSpan.FromSeconds(1));
     }
 
+    /// <summary>Steht im Zeitraffer-Feld ein ungültiger Text, muss eine frisch erzeugte
+    /// Replay-Session (erneutes Laden oder Neustart) die zuletzt gültige Schwelle übernehmen
+    /// statt still auf ihren Echtzeit-Default zurückzufallen.</summary>
+    [Fact]
+    public async Task ZeitrafferSchwelleText_Ungueltig_UebernimmtLetzteGueltigeSchwelleAufFrischeSession()
+    {
+        var pfad = await ErstelleAufzeichnungsDateiAsync();
+        SetupOpenDialog(pfad);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+
+        sut.ZeitrafferSchwelleText = "0"; // maximale Geschwindigkeit
+        sut.ZeitrafferSchwelleText = "ungueltig"; // Fehlerbanner — letzte gültige Schwelle bleibt 0
+        sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
+
+        // Erneutes Laden erzeugt eine frische Session — sie muss die zuletzt gültige
+        // Schwelle übernehmen, nicht ihren Default (TimeSpan.MaxValue = Echtzeit).
+        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+
+        var session = (TerminalReplaySession)sut.Session!;
+        session.ZeitrafferSchwelle.Should().Be(TimeSpan.Zero,
+            "die frische Session muss die zuletzt gültige Schwelle übernehmen, nicht den Echtzeit-Default");
+    }
+
     /// <summary>„Neu starten" bricht eine pausierte Wiedergabe ab und spielt dieselbe
     /// Aufzeichnung sofort wieder ab Position 0 ab — eine frische Replay-Session ersetzt
     /// die verworfene.</summary>

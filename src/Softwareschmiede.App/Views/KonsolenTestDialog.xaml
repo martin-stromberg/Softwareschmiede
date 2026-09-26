@@ -28,9 +28,13 @@
                         Padding="10,4" />
                 <TextBlock Text="{Binding DateiPfad}"
                            AutomationProperties.Name="AufzeichnungPfad"
+                           AutomationProperties.HelpText="{Binding DateiPfad}"
+                           ToolTip="{Binding DateiPfad}"
                            FontSize="11"
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            VerticalAlignment="Center"
+                           MaxWidth="320"
+                           TextTrimming="CharacterEllipsis"
                            Margin="8,0,16,0" />
                 <Button Content="Abspielen"
                         AutomationProperties.Name="WiedergabeStarten"

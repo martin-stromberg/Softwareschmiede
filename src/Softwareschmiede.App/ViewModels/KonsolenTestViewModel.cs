@@ -30,6 +30,11 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     private bool _istPausiert;
     private bool _wiedergabeBeendet;
     private string _zeitrafferSchwelleText = "1";
+    // Zuletzt gültige Zeitraffer-Schwelle — muss zum Initialwert von _zeitrafferSchwelleText
+    // passen. Bleibt bei ungültiger Eingabe unverändert, damit eine neu erzeugte Replay-Session
+    // (Neustart/neues Laden) dieselbe Schwelle übernimmt statt still auf ihren Default
+    // (Echtzeit) zurückzufallen.
+    private TimeSpan _zeitrafferSchwelle = TimeSpan.FromSeconds(1);
     private string? _fehlerMeldung;
     private string? _unvollstaendigHinweis;
     private CliChunkAnzeigeEintrag? _aktuellerQuellEintrag;
@@ -140,6 +145,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
             if (TryParseZeitrafferSchwelle(value, out var schwelle))
             {
+                _zeitrafferSchwelle = schwelle;
                 if (_replaySession is not null)
                     _replaySession.ZeitrafferSchwelle = schwelle;
                 if (FehlerMeldung == ZeitrafferValidierungsFehler)
@@ -250,8 +256,10 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     private TerminalReplaySession ErzeugeReplaySession(CliOutputAufzeichnung aufzeichnung)
     {
         var session = new TerminalReplaySession(aufzeichnung, _timeProvider);
-        if (TryParseZeitrafferSchwelle(_zeitrafferSchwelleText, out var schwelle))
-            session.ZeitrafferSchwelle = schwelle;
+        // Immer die zuletzt gültige Schwelle übernehmen — steht im Textfeld gerade ein
+        // ungültiger Wert (Fehlerbanner), darf die frische Session nicht still auf ihren
+        // Default (Echtzeit-Wiedergabe) zurückfallen.
+        session.ZeitrafferSchwelle = _zeitrafferSchwelle;
         session.BufferChanged += OnReplayBufferChanged;
         session.Exited += OnReplayExited;
         return session;
