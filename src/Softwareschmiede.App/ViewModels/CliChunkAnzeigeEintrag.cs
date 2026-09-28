@@ -3,7 +3,9 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>Zeilenmodell der Quell-Ansicht im Konsolentestfenster (ein Eintrag pro aufgezeichnetem Chunk).</summary>
 public sealed class CliChunkAnzeigeEintrag
 {
-    /// <summary>Index des Chunks in der Aufzeichnung (0-basiert).</summary>
+    /// <summary>Laufende Nummer des Chunks in der Aufzeichnung (1-basiert, Spalte „#") —
+    /// stimmt mit der Positionszählung des PositionsText („Chunk n/y" = n angewendete
+    /// Chunks, Zeile „#n" ist der zuletzt angewendete) überein.</summary>
     public required int Index { get; init; }
 
     /// <summary>Zeitlicher Offset des Chunks seit Aufzeichnungsbeginn.</summary>

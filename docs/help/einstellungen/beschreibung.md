@@ -83,7 +83,7 @@ Die Checkbox **„Prerelease-Versionen laden"** legt fest, ob bei der Prüfung a
 
 ### Diagnose
 
-Im Abschnitt **Diagnose** der Registerkarte „Allgemein" öffnet die Schaltfläche **„Konsolentestfenster öffnen"** das Diagnosewerkzeug für die Terminal-Ausgabe: ein nicht-modales Fenster, in dem eine zuvor aus der Aufgabendetailansicht exportierte CLI-Aufzeichnung (`.clireplay`) zeitgesteuert durch den echten Terminal-Renderpfad abgespielt werden kann — mit Quell-Ansicht der aufgezeichneten Ausgabe-Blöcke, Pausieren/Fortsetzen, Neu starten und einstellbarer Zeitraffer-Schwelle. Details siehe [Terminal-Integration](../terminal/index.md). Der Abschnitt enthält keine speicherbaren Einstellungen — ein **Speichern** ist dafür nicht nötig.
+Im Abschnitt **Diagnose** der Registerkarte „Allgemein" öffnet die Schaltfläche **„Konsolentestfenster öffnen"** das Diagnosewerkzeug für die Terminal-Ausgabe: ein nicht-modales Fenster, in dem eine zuvor aus der Aufgabendetailansicht exportierte CLI-Aufzeichnung (`.clireplay`) zeitgesteuert durch den echten Terminal-Renderpfad abgespielt werden kann — mit Quell-Ansicht der aufgezeichneten Ausgabe-Blöcke, Pausieren/Fortsetzen, Einzelschritt-Wiedergabe vorwärts/rückwärts („Schritt vor"/„Schritt zurück"), Neu starten und einstellbarer Zeitraffer-Schwelle. Details siehe [Terminal-Integration](../terminal/index.md). Der Abschnitt enthält keine speicherbaren Einstellungen — ein **Speichern** ist dafür nicht nötig.
 
 ### IDE-Verhalten
 

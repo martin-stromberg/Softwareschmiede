@@ -820,7 +820,7 @@ Serialisiert/Deserialisiert `CliOutputAufzeichnung` im `.clireplay`-Binärformat
 
 ## TerminalReplaySession
 
-Zweite `ITerminalSession`-Implementierung (`Softwareschmiede.Infrastructure.Terminal`): spielt eine `CliOutputAufzeichnung` zeitgesteuert durch denselben Renderpfad wie `PseudoConsoleSession` ab (`AnsiSequenceParser` → `TerminalBuffer` → `BufferChanged`). Zusätzlich zur Schnittstelle steuert sie die Wiedergabe.
+Zweite `ITerminalSession`-Implementierung (`Softwareschmiede.Infrastructure.Terminal`): spielt eine `CliOutputAufzeichnung` zeitgesteuert durch denselben Renderpfad wie `PseudoConsoleSession` ab (`AnsiSequenceParser` → `TerminalBuffer` → `BufferChanged`). Zusätzlich zur Schnittstelle steuert sie die Wiedergabe — zeitgesteuert (`WiedergabeStarten`/`Pausieren`/`Fortsetzen`/`ZeitrafferSchwelle`) und als Einzelschritte (`SchrittVor`/`SchrittZurueck`).
 
 **Konstruktor:** `TerminalReplaySession(CliOutputAufzeichnung aufzeichnung, TimeProvider timeProvider, ILogger<TerminalReplaySession>? logger = null)` — legt `Buffer` mit `Math.Max(1, Cols)`/`Rows` aus dem Aufzeichnungs-Header an.
 
@@ -828,12 +828,14 @@ Zweite `ITerminalSession`-Implementierung (`Softwareschmiede.Infrastructure.Term
 
 || Member | Typ | Beschreibung |
 ||--------|-----|--------------|
-|| `WiedergabeStarten()` | Methode | Startet den Wiedergabe-Task (idempotent — ein gestarteter/beendeter Durchlauf startet nicht erneut); setzt `RuntimeStatus = Laeuft` |
+|| `WiedergabeStarten()` | Methode | Startet die zeitgesteuerte Wiedergabe ab der aktuellen Position (idempotent, solange eine Wiedergabe-Schleife lebt; nach einem beendeten Durchlauf re-armierbar über das Lauf-Flag `_wiedergabeLoopAktiv` — z. B. für „beendet → `SchrittZurueck` → ab Position fortsetzen"); setzt `RuntimeStatus = Laeuft` |
 || `Pausieren()` | Methode | Hält die Wiedergabe an; ein kurzer Render-Lock dient als Fence — nach Rückkehr wird garantiert kein Chunk mehr angewendet |
 || `Fortsetzen()` | Methode | Setzt eine pausierte Wiedergabe exakt an der Position fort |
+|| `SchrittVor()` | `bool` | Wendet genau den nächsten aufgezeichneten Chunk an — zeitstempel-unabhängig (keine Inter-Chunk-Pause, keine `ZeitrafferSchwelle`-Wirkung); feuert `OutputChunk` und `BufferChanged`. Am Ende der Aufzeichnung: `Exited` (wie am Schleifenende) plus Termination einer evtl. pausiert parkenden Schleife. `false` = No-Op am Ende oder nach `Dispose` |
+|| `SchrittZurueck()` | `bool` | Stellt den Zustand vor dem zuletzt angewendeten Chunk wieder her — deterministischer Neuaufbau aus dem verbleibenden Präfix (`Buffer.Reset()` + `_parser.Reset()` + Re-Parse über `BaueBufferUndParserAusPraefixNeuAuf`); feuert nur `BufferChanged`, kein `OutputChunk`. `false` = No-Op an Position 0 oder nach `Dispose` |
 || `IstPausiert` | `bool` | `true` solange pausiert |
 || `ZeitrafferSchwelle` | `TimeSpan` | Obere Grenze der Wartezeit vor jedem Chunk: `min(realePause, ZeitrafferSchwelle)`; `Zero` = maximale Geschwindigkeit; jederzeit änderbar, wirkt auf folgende Pausen |
-|| `AktuellerChunkIndex` | `int` | Anzahl bereits abgespielter Chunks |
+|| `AktuellerChunkIndex` | `int` | Anzahl bereits abgespielter Chunks — einzige Positionsquelle ist `_abgespielteChunks.Count` (unter `_renderLock`); Schleife und Einzelschritte mutieren denselben Zustand |
 
 ### Stub-Member der Schnittstelle
 
@@ -847,11 +849,13 @@ Zweite `ITerminalSession`-Implementierung (`Softwareschmiede.Infrastructure.Term
 || `Failure` | `null` (`Failed` wird nie ausgelöst) |
 || `ExitCode` | `null` |
 || `DrainOutputAsync` | `true` |
-|| `RuntimeStatus` | `Laeuft` während der Wiedergabe (inkl. Pause), `Inaktiv` vor dem Start und nach dem Ende |
-|| `RebuildBufferFromReplay` | Baut `Buffer` synchron aus den **bis dahin abgespielten** Chunks neu auf (gleiches `_renderLock` wie die Wiedergabe-Schleife) |
-|| `Exited` | Feuert nach dem letzten Chunk mit `ExitCode = null` |
+|| `RuntimeStatus` | `Laeuft` solange eine Wiedergabe-Schleife lebt (inkl. Pause), `Inaktiv` vor dem Start, nach dem Ende und im reinen Schrittmodus ohne gestartete Schleife |
+|| `RebuildBufferFromReplay` | Baut `Buffer` synchron aus den **bis dahin abgespielten** Chunks neu auf (gleiches `_renderLock` wie die Wiedergabe-Schleife); setzt dabei auch den `_parser`-Zustand zurück — Buffer und Parser bleiben kohärent |
+|| `Exited` | Feuert nach dem letzten Chunk mit `ExitCode = null` — Flanken-Ereignis („Ende wurde erreicht", kein Positions-Snapshot); kann über die Session-Lebensdauer mehrfach feuern (z. B. beendet → `SchrittZurueck` → neuer Durchlauf) |
 
 **Pause-Gate:** Die Pausierung läuft über ein asynchrones `TaskCompletionSource`-Gate (`RunContinuationsAsynchronously`) statt eines synchronen Waits — `Task.Delay`-Fortsetzungen können zeitprovider-bedingt synchron auf fremden Threads laufen (z. B. `FakeTimeProvider.Advance`), ein blockierendes Wait würde dort deadlocked parken.
+
+**Schrittmodus / Positionsführung:** `WiedergabeLoopAsync` liest die Position pro Iteration unter `_renderLock` aus `_abgespielteChunks.Count` (statt schleifenlokalem Index) und prüft sie vor dem Anwenden erneut — Einzelschritte verändern damit auch die Fortsetzposition der Schleife, und ein `Fortsetzen` nach `SchrittZurueck` wartet die aufgezeichnete Pause des zurückgenommenen Chunks regulär erneut ab. Die Chunk-Anwendung läuft in Schleife und `SchrittVor` über denselben Helper `WendeChunkAnUnterLock(position)` (`OutputChunk` → Add → Parse/Apply → Index-Write). Setzt `SchrittVor` die Position ans Ende, wird zusätzlich `_schleifeBeendenAngefordert` gesetzt — die aufgeweckte Schleife terminiert dann deterministisch, selbst wenn die Position zwischenzeitlich wieder unter dem Ende liegt. `RaiseExited(nurAmEnde: true)` verbindet die Positions-Prüfung mit dem Signal-Flag atomar unter `_renderLock`; das Event selbst feuert nach Lock-Freigabe.
 
 ## ICliReplayExportService / CliReplayExportService
 
@@ -888,14 +892,15 @@ ViewModel und Fenster des Konsolentestfensters (`Softwareschmiede.App.ViewModels
 || Member | Beschreibung |
 ||--------|--------------|
 || `AufzeichnungOeffnenCommand` | Öffnen-Dialog → `LadeAsync` → Session erzeugen; Formatfehler → `FehlerMeldung` |
-|| `WiedergabeStartenCommand` | Startet die Wiedergabe; nach beendetem Durchlauf wird eine frische `TerminalReplaySession` erzeugt (Rebind über `Session` → `RebuildBufferFromReplay`) |
-|| `WiedergabeNeustartenCommand` | Bricht eine laufende/pausierte Wiedergabe ab und spielt sofort wieder ab Position 0 (frische Session) |
+|| `WiedergabeStartenCommand` | Startet die Wiedergabe ab der aktuellen Position; bei beendetem Durchlauf (`_wiedergabeBeendet`) wird eine frische `TerminalReplaySession` erzeugt (Rebind über `Session` → `RebuildBufferFromReplay`) — nach einem `SchrittZurueck` vom Ende wird stattdessen dieselbe Session re-armiert und läuft an der Position weiter |
+|| `WiedergabeNeustartenCommand` | Bricht eine laufende/pausierte Wiedergabe ab und spielt sofort wieder ab Position 0 (frische Session); zusätzlich im reinen Schrittmodus aktiv (`AktuellerChunkIndex > 0` ohne laufende Wiedergabe) als direkter Rückweg zum Anfang |
 || `WiedergabePausierenCommand` | Toggle `Pausieren`/`Fortsetzen` |
+|| `SchrittVorCommand` / `SchrittZurueckCommand` | Einzelschritt vorwärts/rückwärts über `TerminalReplaySession.SchrittVor`/`SchrittZurueck`; CanExecute: Session geladen, nicht unpausiert laufende Wiedergabe (`!IstWiedergabeAktiv \|\| IstPausiert`) und Positionsgrenze (`AktuellerChunkIndex < QuellEintraege.Count` bzw. `> 0`). Die Handler ziehen den Wiedergabe-Zustandsteil der Sperre intern nach (RelayCommand wertet CanExecute bei `Execute` nicht aus) und setzen eigene `StatusText`-Meldungen; `SchrittZurueck` löscht `_wiedergabeBeendet` |
 || `SchliessenCommand` | `CloseRequested`-Event → Fenster schließt |
 || `Session` | `ITerminalSession?` — Bindung ans `TerminalControl` (`AutomationName="ReplayTerminal"`) |
-|| `QuellEintraege` / `AktuellerQuellEintrag` | `ObservableCollection<CliChunkAnzeigeEintrag>` (`Index`, `Offset`, `Laenge`, `Quelltext`) für die `ListView` `QuellChunkListe`; der aktuelle Eintrag folgt `AktuellerChunkIndex` über `BufferChanged` und wird per `ScrollIntoView` sichtbar gehalten |
+|| `QuellEintraege` / `AktuellerQuellEintrag` | `ObservableCollection<CliChunkAnzeigeEintrag>` (`Index` 1-basiert — die „#"-Spalte zählt wie der PositionsText die angewendeten Chunks, `Offset`, `Laenge`, `Quelltext`) für die `ListView` `QuellChunkListe`; der aktuelle Eintrag folgt `AktuellerChunkIndex` über `BufferChanged` (`null` an Position 0) und wird per `ScrollIntoView` sichtbar gehalten |
 || `ZeitrafferSchwelleText` | Sekunden als Dezimalzahl ≥ 0 (`0` = maximale Geschwindigkeit); validiert — ungültige Eingabe → `FehlerMeldung`, letzte gültige Schwelle bleibt aktiv |
-|| `StatusText` / `PositionsText` | Statuszeile („Wiedergabe läuft.", „Pausiert.", „Wiedergabe beendet.") und Position („Chunk x/y") |
+|| `StatusText` / `PositionsText` | Statuszeile („Wiedergabe läuft.", „Pausiert.", „Wiedergabe beendet.", „Einzelschritt — Chunk n/y angewendet.", „Schritt zurück — Chunk n/y zurückgenommen.") und Position („Chunk x/y") |
 || `UnvollstaendigHinweis` | Hinweistext bei `IstVollstaendig = false` der geladenen Aufzeichnung |
 || `FehlerMeldung` | Fehlertext des Dialogs |
 

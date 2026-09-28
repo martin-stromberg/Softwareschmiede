@@ -394,9 +394,18 @@ public KonsolenTestDialogView OeffneAufzeichnung(string pfad)
 
 Klickt „Aufzeichnung öffnen…" und bedient den nativen Öffnen-Dialog per Tastatur (Dateiname eintippen, Autocomplete-Liste per ESC schließen, dann Enter — die eigene `OpenDialogCondition` erkennt „Öffnen"/„Open"/„CLI-Aufzeichnung öffnen").
 
-##### `StartWiedergabe()` / `NeustartWiedergabe()` / `PausierenToggle()` / `SetZeitrafferSchwelle(string text)` / `Schliessen()`
+##### `StartWiedergabe()` / `NeustartWiedergabe()` / `PausierenToggle()` / `SchrittVor()` / `SchrittZurueck()` / `SetZeitrafferSchwelle(string text)` / `Schliessen()`
 
-Steuern die Wiedergabe (Abspielen, Neu starten, Pausieren/Fortsetzen, Zeitraffer-Schwelle, Schließen); Button-Klicks warten jeweils auf die CanExecute-Aktivierung, `Schliessen` nutzt das Invoke-Pattern.
+Steuern die Wiedergabe (Abspielen, Neu starten, Pausieren/Fortsetzen, Einzelschritt vorwärts/rückwärts, Zeitraffer-Schwelle, Schließen); Button-Klicks warten jeweils auf die CanExecute-Aktivierung, `Schliessen` nutzt das Invoke-Pattern.
+
+##### `IstSchaltflaecheAktiviert(string automationName)` / `GetSelektierterQuellEintragIndex()`
+
+```csharp
+public bool IstSchaltflaecheAktiviert(string automationName)
+public int GetSelektierterQuellEintragIndex()
+```
+
+`IstSchaltflaecheAktiviert` liefert `true`, wenn die Schaltfläche mit dem Automation-Namen existiert und aktiviert ist — Nachweis der Rand-Deaktivierung (z. B. `SchrittZurueck` an Position 0 oder beide Schritt-Buttons während unpausierter Wiedergabe). `GetSelektierterQuellEintragIndex` liefert den 0-basierten Index der selektierten Zeile der `QuellChunkListe` über das SelectionItem-Pattern (Selektion = zuletzt angewendeter Chunk) bzw. `-1` bei leerer Selektion.
 
 ##### `WarteAufStatus(...)` / `WarteAufPosition(...)` / `WarteAufQuellEintraege(...)` / `WarteAufFehlerSichtbar(...)`
 

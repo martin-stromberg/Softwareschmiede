@@ -9,7 +9,8 @@ namespace Softwareschmiede.Tests.E2E;
 /// <summary>
 /// E2E-Abdeckung des Konsolentestfensters (CLI-Replay-Diagnose): Öffnen über die Einstellungen,
 /// Laden von synthetisch erzeugten .clireplay-Dateien über den nativen Öffnen-Dialog, Zeitraffer-,
-/// Pause-/Fortsetzen- und Neustart-Steuerung sowie Nachweis der Quell-Chunk-Liste (ohne
+/// Pause-/Fortsetzen-, Schrittmodus- (vorwärts/rückwärts) und Neustart-Steuerung sowie Nachweis
+/// der Quell-Chunk-Liste (ohne
 /// ConPTY-Abhängigkeit — die Aufzeichnungen werden direkt über <see cref="CliReplayAufzeichnungStore"/>
 /// erzeugt).
 /// </summary>
@@ -30,6 +31,7 @@ public partial class End2EndTest
     {
         var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         var pausePfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        var schrittPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         var defektPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         SettingsView? settings = null;
         KonsolenTestDialogView? dialog = null;
@@ -80,6 +82,29 @@ public partial class End2EndTest
                 });
             }
 
+            // Dritte Aufzeichnung für den Schrittmodus: drei inhaltlich unterscheidbare Chunks
+            // mit minimalen Offsets (Schritte sind zeitstempel-unabhängig; das Fortsetzen nach
+            // einem Rückwärtsschritt läuft unter Zeitraffer-Schwelle 0 ohne realen Delay ab).
+            await using (var stream = File.Create(schrittPfad))
+            {
+                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                {
+                    AufgabeId = Guid.NewGuid(),
+                    PluginName = "E2E-Schritt",
+                    StartUtc = DateTimeOffset.UtcNow,
+                    EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(100),
+                    Cols = 80,
+                    Rows = 24,
+                    IstVollstaendig = true,
+                    Chunks =
+                    [
+                        new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("schritt-chunk-1")),
+                        new CliOutputChunkRecord(TimeSpan.FromMilliseconds(50), Encoding.UTF8.GetBytes(" -> schritt-chunk-2")),
+                        new CliOutputChunkRecord(TimeSpan.FromMilliseconds(100), Encoding.UTF8.GetBytes(" -> schritt-chunk-3")),
+                    ],
+                });
+            }
+
             // Defekte Datei: falsches Magic → Formatfehler muss im Dialog sichtbar werden.
             await File.WriteAllBytesAsync(defektPfad, Encoding.ASCII.GetBytes("KEINCLIREPLAY-FORMAT"));
 
@@ -96,6 +121,59 @@ public partial class End2EndTest
             dialog.OeffneAufzeichnung(defektPfad);
             dialog.WarteAufFehlerSichtbar();
             Assert.Contains("geladen", dialog.GetFehlerMeldung(), StringComparison.Ordinal);
+
+            // Schrittmodus-Phase 1: Einzelschritte ohne gestartete Wiedergabe — Positionsanzeige
+            // und Quell-Selektion folgen der Schrittposition; an Position 0 ist "Schritt zurück"
+            // deaktiviert. (Der gerenderte Terminalinhalt ist über UI-Automation nicht lesbar —
+            // kein TextPattern am custom gerenderten TerminalControl; der deterministische
+            // Buffer-Neuaufbau ist per Unit-Test in TerminalReplaySessionTests nachgewiesen.)
+            dialog.SetZeitrafferSchwelle("0");
+            dialog.OeffneAufzeichnung(schrittPfad);
+            dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Schritt, 3 Chunks) — bereit.");
+            Assert.Equal("Chunk 0/3", dialog.GetPositionsText());
+            Assert.Equal(-1, dialog.GetSelektierterQuellEintragIndex());
+            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittZurueck"),
+                "an Position 0 muss 'Schritt zurück' deaktiviert sein");
+
+            dialog.SchrittVor();
+            dialog.SchrittVor();
+            dialog.WarteAufPosition("Chunk 2/3");
+            dialog.WarteAufStatus("Einzelschritt — Chunk 2/3 angewendet.");
+            // Die Quell-Selektion muss den zuletzt angewendeten Chunk markieren.
+            Assert.Equal(1, dialog.GetSelektierterQuellEintragIndex());
+            Assert.True(dialog.IstSchaltflaecheAktiviert("WiedergabeNeustarten"),
+                "aus dem Schrittmodus muss 'Neu starten' als direkter Rückweg zu Position 0 erreichbar sein");
+
+            dialog.SchrittZurueck();
+            dialog.WarteAufPosition("Chunk 1/3");
+            dialog.WarteAufStatus("Schritt zurück — Chunk 2/3 zurückgenommen.");
+            Assert.Equal(0, dialog.GetSelektierterQuellEintragIndex());
+            dialog.SchrittZurueck();
+            dialog.WarteAufPosition("Chunk 0/3");
+            // An Position 0 darf kein Quell-Eintrag selektiert sein.
+            Assert.Equal(-1, dialog.GetSelektierterQuellEintragIndex());
+            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittZurueck"),
+                "an Position 0 muss 'Schritt zurück' deaktiviert sein");
+            Assert.False(dialog.IstSchaltflaecheAktiviert("WiedergabeNeustarten"),
+                "an Position 0 ohne laufende Wiedergabe muss 'Neu starten' deaktiviert sein");
+
+            // Schrittmodus-Phase 2: bis ans Ende schreiten feuert die Ende-Semantik; danach
+            // zurückschreiten und "Abspielen" setzt an der Schrittposition fort (Re-Arm).
+            dialog.SchrittVor();
+            dialog.SchrittVor();
+            dialog.SchrittVor();
+            dialog.WarteAufStatus("Wiedergabe beendet.");
+            Assert.Equal("Chunk 3/3", dialog.GetPositionsText());
+            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittVor"),
+                "am Ende der Aufzeichnung muss 'Schritt vor' deaktiviert sein");
+
+            dialog.SchrittZurueck();
+            dialog.WarteAufPosition("Chunk 2/3");
+            Assert.Equal(1, dialog.GetSelektierterQuellEintragIndex());
+
+            dialog.StartWiedergabe();
+            dialog.WarteAufStatus("Wiedergabe beendet.");
+            Assert.Equal("Chunk 3/3", dialog.GetPositionsText());
 
             // Pause-Phase: großzügige Zeitraffer-Schwelle, damit die reale 3-s-Pause des zweiten
             // Chunks nicht verkürzt wird und die Pausierung deterministisch darin landet.
@@ -137,6 +215,33 @@ public partial class End2EndTest
             dialog.WarteAufStatus("Wiedergabe beendet.");
             Assert.Equal("Chunk 2/2", dialog.GetPositionsText());
 
+            // Schrittmodus-Phase 3 (pausiert → Schritt zurück → fortsetzen): die Schleife setzt
+            // an der durch den Schritt veränderten Position fort, wartet die aufgezeichnete
+            // 3-s-Pause des zurückgenommenen Chunks erneut ab und wendet ihn erneut an.
+            dialog.OeffneAufzeichnung(pausePfad);
+            dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Pause, 2 Chunks) — bereit.");
+            dialog.StartWiedergabe();
+            dialog.WarteAufPosition("Chunk 1/2");
+            dialog.PausierenToggle();
+            dialog.WarteAufStatus("Pausiert.");
+
+            dialog.SchrittZurueck();
+            dialog.WarteAufPosition("Chunk 0/2");
+            Assert.Equal(-1, dialog.GetSelektierterQuellEintragIndex());
+
+            dialog.PausierenToggle();
+            dialog.WarteAufStatus("Wiedergabe läuft.");
+            dialog.WarteAufPosition("Chunk 1/2");
+            // Während der erneut abgewarteten 3-s-Pause (unpausiert laufende Wiedergabe)
+            // müssen beide Schritt-Buttons deaktiviert sein.
+            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittVor"),
+                "während unpausierter Wiedergabe muss 'Schritt vor' deaktiviert sein");
+            Assert.False(dialog.IstSchaltflaecheAktiviert("SchrittZurueck"),
+                "während unpausierter Wiedergabe muss 'Schritt zurück' deaktiviert sein");
+
+            dialog.WarteAufStatus("Wiedergabe beendet.");
+            Assert.Equal("Chunk 2/2", dialog.GetPositionsText());
+
             // Maximale Geschwindigkeit: Inter-Chunk-Pausen der Aufzeichnung ignorieren.
             dialog.SetZeitrafferSchwelle("0");
             dialog.OeffneAufzeichnung(pfad);
@@ -172,6 +277,8 @@ public partial class End2EndTest
                 File.Delete(pfad);
             if (File.Exists(pausePfad))
                 File.Delete(pausePfad);
+            if (File.Exists(schrittPfad))
+                File.Delete(schrittPfad);
             if (File.Exists(defektPfad))
                 File.Delete(defektPfad);
         }

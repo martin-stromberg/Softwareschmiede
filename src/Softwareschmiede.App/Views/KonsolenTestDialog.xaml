@@ -21,7 +21,9 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="8">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- WrapPanel statt StackPanel: die Leiste übersteigt die Standard-Fensterbreite —
+                 ohne Umbruch würden PositionsText und "Schließen" unsichtbar abgeschnitten. -->
+            <WrapPanel VerticalAlignment="Center">
                 <Button Content="Aufzeichnung öffnen…"
                         AutomationProperties.Name="AufzeichnungOeffnen"
                         Command="{Binding AufzeichnungOeffnenCommand}"
@@ -49,6 +51,18 @@
                 <Button Content="Pausieren/Fortsetzen"
                         AutomationProperties.Name="WiedergabePausieren"
                         Command="{Binding WiedergabePausierenCommand}"
+                        Padding="10,4"
+                        Margin="8,0,0,0" />
+                <Button Content="Schritt zurück"
+                        AutomationProperties.Name="SchrittZurueck"
+                        Command="{Binding SchrittZurueckCommand}"
+                        ToolTip="Zustand vor dem zuletzt angewendeten Chunk wiederherstellen"
+                        Padding="10,4"
+                        Margin="8,0,0,0" />
+                <Button Content="Schritt vor"
+                        AutomationProperties.Name="SchrittVor"
+                        Command="{Binding SchrittVorCommand}"
+                        ToolTip="Nächsten aufgezeichneten Chunk anwenden"
                         Padding="10,4"
                         Margin="8,0,0,0" />
                 <TextBlock Text="Zeitraffer-Schwelle (s):"
@@ -80,7 +94,7 @@
                         Padding="10,4"
                         Margin="16,0,0,0"
                         HorizontalAlignment="Right" />
-            </StackPanel>
+            </WrapPanel>
         </Border>
 
         <!-- Hinweis bei unvollständiger Aufzeichnung -->

@@ -166,6 +166,53 @@ public sealed class KonsolenTestDialogView : DialogView
         return this;
     }
 
+    /// <summary>Klickt "Schritt vor" (wartet auf Aktivierung — die Schaltfläche ist nur bei
+    /// geladener Aufzeichnung, nicht unpausiert laufender Wiedergabe und Position &lt; Ende aktiv)
+    /// und wendet den nächsten aufgezeichneten Chunk als Einzelschritt an.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public KonsolenTestDialogView SchrittVor()
+    {
+        WaitForEnabledElement(GetDialogWindow(), "SchrittVor", Medium).AsButton().ClickInForeground();
+        return this;
+    }
+
+    /// <summary>Klickt "Schritt zurück" (wartet auf Aktivierung — die Schaltfläche ist nur bei
+    /// geladener Aufzeichnung, nicht unpausiert laufender Wiedergabe und Position &gt; 0 aktiv)
+    /// und stellt den Zustand vor dem zuletzt angewendeten Chunk wieder her.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public KonsolenTestDialogView SchrittZurueck()
+    {
+        WaitForEnabledElement(GetDialogWindow(), "SchrittZurueck", Medium).AsButton().ClickInForeground();
+        return this;
+    }
+
+    /// <returns><c>true</c>, wenn die Schaltfläche mit dem angegebenen Automation-Namen existiert
+    /// und aktiviert ist — Nachweis der Rand-Deaktivierung (z. B. <c>SchrittZurueck</c> an
+    /// Position 0 oder beide Schritt-Buttons während unpausierter Wiedergabe).</returns>
+    /// <param name="automationName">Der Automation-Name der Schaltfläche.</param>
+    public bool IstSchaltflaecheAktiviert(string automationName)
+    {
+        var element = GetDialogWindow().FindFirstDescendant(cf => cf.ByName(automationName));
+        return element is not null && element.IsEnabled;
+    }
+
+    /// <returns>Den 0-basierten Index der selektierten Zeile der Quell-Chunk-Liste
+    /// (Selektion = zuletzt angewendeter Chunk), oder <c>-1</c> bei leerer Selektion.</returns>
+    public int GetSelektierterQuellEintragIndex()
+    {
+        var liste = WaitForElement(GetDialogWindow(), cf => cf.ByName("QuellChunkListe"), Short);
+        var zeilen = liste.FindAllChildren(cf => cf.ByControlType(ControlType.DataItem)
+            .Or(cf.ByControlType(ControlType.ListItem)));
+        for (var i = 0; i < zeilen.Length; i++)
+        {
+            var item = zeilen[i].Patterns.SelectionItem.PatternOrDefault;
+            if (item is not null && item.IsSelected.TryGetValue(out var selected) && selected)
+                return i;
+        }
+
+        return -1;
+    }
+
     /// <returns>Der aktuelle Wiedergabe-Statustext (z. B. "Wiedergabe beendet.") — gelesen aus dem
     /// HelpText, da der Automation-Name das statische Element-Kennzeichen "WiedergabeStatus" ist.</returns>
     public string GetStatusText()

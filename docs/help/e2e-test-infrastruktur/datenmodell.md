@@ -217,8 +217,11 @@ Nicht-modales Konsolentestfenster (`DialogTitle = "Konsolentest"`) für das CLI-
 | `StartWiedergabe()` | `KonsolenTestDialogView` | Klickt „Abspielen" (wartet auf CanExecute-Aktivierung) |
 | `NeustartWiedergabe()` | `KonsolenTestDialogView` | Klickt „Neu starten" (wartet auf Aktivierung) |
 | `PausierenToggle()` | `KonsolenTestDialogView` | Klickt „Pausieren/Fortsetzen" (wartet auf Aktivierung) |
+| `SchrittVor()` / `SchrittZurueck()` | `KonsolenTestDialogView` | Klickt „Schritt vor"/„Schritt zurück" (wartet auf CanExecute-Aktivierung — nur bei geladener Aufzeichnung, nicht unpausiert laufender Wiedergabe und innerhalb der Positionsgrenzen) |
+| `IstSchaltflaecheAktiviert(automationName)` | bool | Element per Automation-Name suchen und `IsEnabled` lesen — Nachweis der Rand-Deaktivierung (z. B. „Schritt zurück" an Position 0) |
 | `SetZeitrafferSchwelle(text)` | `KonsolenTestDialogView` | Setzt die Zeitraffer-Schwelle (Sekunden-Text) |
 | `GetStatusText()` / `GetPositionsText()` | string | Status- bzw. Positionstext (aus `HelpText` gelesen) |
+| `GetSelektierterQuellEintragIndex()` | int | 0-basierter Index der selektierten Zeile der `QuellChunkListe` (Selektion = zuletzt angewendeter Chunk) über das SelectionItem-Pattern, `-1` bei leerer Selektion |
 | `WarteAufStatus(...)` / `WarteAufPosition(...)` / `WarteAufQuellEintraege(...)` / `WarteAufFehlerSichtbar(...)` | `KonsolenTestDialogView` | Polling-Warten auf async Status-/Positions-/Listen-/Fehlerzustände |
 | `GetQuellEintraegeCount()` / `GetQuellEintragText(index)` | int / string | Quell-Chunk-Liste: Zeilenzahl und Quelltext-Zelle |
 | `IstFehlerSichtbar()` / `GetFehlerMeldung()` | bool / string? | Fehlerbanner auf dem **Dialogfenster** suchen (nicht auf `Window` — `ErrorView` durchsucht nur das Hauptfenster) |

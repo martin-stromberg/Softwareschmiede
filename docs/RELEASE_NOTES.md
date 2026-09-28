@@ -7,6 +7,10 @@
 
 ## What's New
 
+- Single-step playback in the console test window: the new "Step back"/"Step forward" buttons apply a loaded recording chunk by chunk, independent of the recorded timestamps; "Step back" deterministically restores the rendered state before the last applied chunk.
+- Stepping and playback interact seamlessly: resuming or starting playback continues at the position changed by stepping, and "Restart" is now also available from pure step mode as a direct way back to the beginning.
+- The console test window's source list is consistently synchronized with the playback position: 1-based chunk numbering matching the "Chunk n/y" display, with the last applied chunk highlighted.
+- Fixed: in the console test window the toolbar could cut off the position display and the "Close" button at the default window width — the toolbar now wraps.
 - New diagnostic tool "console test window" (Konsolentestfenster): plays an exported CLI recording (.clireplay) time-controlled through the real terminal render path — opened non-modally via Settings → General → Diagnostics.
 - CLI sessions are now recorded automatically: raw output bytes with a timestamp per chunk (budget-limited, the last 8 sessions are kept) and can be exported as a .clireplay file via the new "Export recording" button in the task view.
 - The console test window shows the source chunks with visible control sequences next to the rendered output, synchronized to the playback position; playback supports pause/resume, restart and a time-lapse threshold that shortens long idle gaps.
@@ -26,6 +30,10 @@
 
 ## Neuerungen
 
+- Einzelschritt-Wiedergabe im Konsolentestfenster: Die neuen Schaltflächen „Schritt zurück"/„Schritt vor" spielen eine geladene Aufzeichnung Chunk für Chunk ab, unabhängig von den aufgezeichneten Zeitstempeln; „Schritt zurück" stellt den gerenderten Zustand vor dem zuletzt angewendeten Chunk deterministisch wieder her.
+- Schrittmodus und Wiedergabe greifen nahtlos ineinander: Fortsetzen oder Starten der Wiedergabe läuft an der durch Schritte veränderten Position weiter, und „Neu starten" ist auch aus dem reinen Schrittmodus als direkter Rückweg zum Anfang verfügbar.
+- Die Quell-Liste des Konsolentestfensters ist jetzt konsistent zur Wiedergabeposition synchronisiert: 1-basierte Chunk-Nummerierung passend zur Anzeige „Chunk n/y", der zuletzt angewendete Chunk ist markiert.
+- Behoben: Im Konsolentestfenster konnte die Werkzeugleiste bei der Standard-Fensterbreite die Positionsanzeige und die Schaltfläche „Schließen" abschneiden — die Leiste bricht jetzt um.
 - Neues Diagnose-Werkzeug „Konsolentestfenster": spielt eine exportierte CLI-Aufzeichnung (.clireplay) zeitgesteuert durch den echten Terminal-Renderpfad ab — nicht-modal über Einstellungen → Allgemein → Diagnose erreichbar.
 - CLI-Sitzungen werden jetzt automatisch aufgezeichnet: rohe Ausgabe-Bytes mit Zeitstempel pro Chunk (budgetbegrenzt, die letzten 8 Sitzungen werden vorgehalten) und lassen sich über die neue Schaltfläche „Aufzeichnung exportieren" in der Aufgabenansicht als .clireplay-Datei exportieren.
 - Das Konsolentestfenster zeigt die Quell-Chunks mit sichtbar gemachten Steuersequenzen neben der gerenderten Ausgabe, synchron zur Wiedergabeposition; die Wiedergabe unterstützt Pause/Fortsetzen, Neu starten und eine Zeitraffer-Schwelle, die lange Leerzeiten verkürzt.

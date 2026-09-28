@@ -84,7 +84,25 @@
 **Verhalten:**
 - Gleiche Event-Sequenz wie der Live-Pfad → ein Replay reproduziert den tatsächlichen Anzeigezustand, inkl. aller (damaligen) Parser-Verhaltensweisen.
 - `RebuildBufferFromReplay` baut den Buffer aus den **bis dahin abgespielten** Chunks neu auf — die Control-Bindung beim Laden/Neustart zeigt den korrekten Zwischenstand, keinen vermischten Zustand.
-- Nach dem letzten Chunk: `RuntimeStatus = Inaktiv`, `Exited` mit `ExitCode = null`; erneutes Abspielen erzeugt eine frische Session ab Position 0 (`WiedergabeStarten` einer Session ist idempotent).
+- Nach dem letzten Chunk: `RuntimeStatus = Inaktiv`, `Exited` mit `ExitCode = null`; erneutes Abspielen erzeugt über das ViewModel eine frische Session ab Position 0 — solange der Beendet-Zustand gilt (`_wiedergabeBeendet`). `WiedergabeStarten` der Session selbst ist re-armierbar (Lauf-Flag `_wiedergabeLoopAktiv`, Rücksetzen im Schleifen-`finally`): Wurde das Ende per `SchrittZurueck` verlassen, startet dieselbe Session einen neuen Durchlauf ab der aktuellen Position und feuert `Exited` erneut.
 - Terminal-Geometrie: die Header-Werte `Cols`/`Rows` bestimmen nur die initiale Buffer-Größe; die Wiedergabe nutzt die aktuelle Fenstergröße (Resize-Ereignisse werden nicht aufgezeichnet und nicht reproduziert).
 
 **Umsetzung:** `TerminalReplaySession`, `KonsolenTestViewModel.ErsetzeReplaySessionDurchFrische` (Neustart durch frische Session statt Zustands-Reset der laufenden).
+
+## Einzelschritt-Wiedergabe und deterministischer Rückwärts-Rebuild
+
+**Beschreibung:** Das Konsolentestfenster erlaubt Einzelschritte durch die Aufzeichnung — vorwärts ohne Zeitbezug, rückwärts über einen vollständigen Neuaufbau aus dem verbleibenden Chunk-Präfix. Damit lässt sich exakt lokalisieren, welcher aufgezeichnete Block einen Darstellungsfehler erzeugt.
+
+**Bedingungen:**
+- `SchrittVor`/`SchrittZurueck` stehen nur bei geladener Aufzeichnung und nicht unpausiert laufender Wiedergabe zur Verfügung (UI-CanExecute plus interne Guards — `RelayCommand.Execute` wertet `CanExecute` nicht aus); die Session-Methoden selbst sind zusätzlich race-sicher unter `_renderLock`.
+- An den Positionsgrenzen (0 bzw. `Chunks.Count`) und nach `Dispose` liefern beide `false` (No-Op).
+
+**Verhalten:**
+- `SchrittVor` wendet exakt einen Chunk an — ohne Inter-Chunk-Pause und ohne `ZeitrafferSchwelle`-Wirkung — und feuert `OutputChunk` + `BufferChanged` in derselben Reihenfolge wie die Wiedergabe-Schleife (`WendeChunkAnUnterLock`).
+- `SchrittZurueck` kürzt die abgespielten Chunks um einen und baut Buffer **und** Parser-Zustand aus dem Präfix neu auf (`BaueBufferUndParserAusPraefixNeuAuf`: `Buffer.Reset()` + `_parser.Reset()` + Re-Parse). Der Neuaufbau ist deterministisch, weil das Rendering eine reine Funktion der Chunk-Sequenz ist — O(n) pro Schritt ist für budgetbegrenzte Mitschnitte akzeptabel (Diagnosewerkzeug).
+- Position ist `_abgespielteChunks.Count` unter `_renderLock` — die Wiedergabe-Schleife liest dieselbe Quelle, daher setzen „Fortsetzen"/„Abspielen" exakt an der Schrittposition fort und warten die aufgezeichnete Pause eines zurückgenommenen Chunks regulär erneut ab.
+- `SchrittVor` auf dem letzten Chunk feuert `Exited` (gleiche Ende-Semantik wie das Schleifenende) und beendet eine evtl. pausiert parkende Schleife über das Terminations-Flag `_schleifeBeendenAngefordert` — nicht positionsbasiert, damit kein „Geister-Replay" entsteht, wenn ein `SchrittZurueck` die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt.
+- `SchrittZurueck` setzt `_exitedSignaled` zurück (das Ende wurde verlassen → `Exited` darf erneut feuern), löscht im ViewModel `_wiedergabeBeendet` (→ „Abspielen" setzt an der Position fort statt eine frische Session zu erzeugen) und feuert kein `OutputChunk`.
+- Reines Schreiten ohne gestartete Schleife lässt `RuntimeStatus = Inaktiv` — es gibt keinen eigenen Schritt-Status.
+
+**Umsetzung:** `TerminalReplaySession.SchrittVor`/`SchrittZurueck`/`BaueBufferUndParserAusPraefixNeuAuf`/`WendeChunkAnUnterLock`, `RaiseExited(nurAmEnde)` (atomare Positions-Prüfung + Signal unter `_renderLock`, Event-Invoke nach Lock-Freigabe), `KonsolenTestViewModel.SchrittVor`/`SchrittZurueck` (StatusText `„Einzelschritt — Chunk n/y angewendet."` / `„Schritt zurück — Chunk n/y zurückgenommen."`).

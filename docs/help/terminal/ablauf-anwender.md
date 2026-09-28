@@ -108,8 +108,12 @@ Zur Analyse von Darstellungsfehlern in der Terminal-Ausgabe zeichnet die Softwar
 ### 4. Wiedergabe steuern
 
 - **Pausieren/Fortsetzen** hält die Wiedergabe an und setzt sie an derselben Stelle fort.
-- **Neu starten** bricht den laufenden Durchlauf ab und spielt sofort wieder von vorn.
+- **Schritt vor** wendet den nächsten Ausgabe-Block einzeln an — ohne Wartezeit, unabhängig von Zeitstempel und Zeitraffer-Schwelle.
+- **Schritt zurück** stellt den Bildschirmzustand vor dem zuletzt angewendeten Block wieder her — die Anzeige wird aus den verbleibenden Blöcken exakt neu aufgebaut, sodass auch Wirkungen von Steuersequenzen (Farben, Löschungen) korrekt zurückgenommen werden.
+- **Neu starten** bricht den laufenden Durchlauf ab und spielt sofort wieder von vorn. Im Schrittmodus (Position > 0 ohne laufende Wiedergabe) ist **Neu starten** ebenfalls aktiv und springt direkt zum Anfang zurück.
 - **Zeitraffer-Schwelle (s)** legt fest, wie lange die Wiedergabe bei längeren Ausgabe-Pausen maximal wartet: Steht dort z. B. `1`, werden Denkpausen der CLI auf eine Sekunde verkürzt; `0` spielt so schnell wie möglich ab. Der Wert kann jederzeit geändert werden.
+
+> **Hinweis Schrittmodus:** **Schritt vor** und **Schritt zurück** funktionieren auch ohne gestartete Wiedergabe (ab Position 0), im pausierten Zustand und nach einem beendeten Durchlauf — nur während eine Wiedergabe unpausiert läuft, sind beide Buttons deaktiviert. Nach jedem Schritt zeigt die Statuszeile die Aktion („Einzelschritt — Chunk n/y angewendet." bzw. „Schritt zurück — Chunk n/y zurückgenommen."), und in der rechten Liste bleibt die Zeile mit der „#"-Nummer des zuletzt angewendeten Blocks markiert. Ein anschließendes **Abspielen** oder **Fortsetzen** läuft ab der erreichten Schrittposition weiter; ein zurückgenommener Block wird dabei regulär erneut wiedergegeben.
 
 > **Hinweis:** Zeigt das Fenster das Band „Aufzeichnung unvollständig", wurde das Speicher-Limit der Aufzeichnung erreicht — die Wiedergabe endet dann vor dem tatsächlichen Ende der Sitzung.
 

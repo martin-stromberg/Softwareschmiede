@@ -55,8 +55,17 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
         AufzeichnungOeffnenCommand = new AsyncRelayCommand(OeffneAufzeichnungAsync);
         WiedergabeStartenCommand = new RelayCommand(WiedergabeStarten, () => _replaySession is not null && !IstWiedergabeAktiv);
-        WiedergabeNeustartenCommand = new RelayCommand(WiedergabeNeustarten, () => _replaySession is not null && IstWiedergabeAktiv);
+        // Aktiv während laufender Wiedergabe — und im reinen Schrittmodus (Position > 0
+        // ohne gestartete Wiedergabe) als direkter Rückweg zu Position 0.
+        WiedergabeNeustartenCommand = new RelayCommand(WiedergabeNeustarten,
+            () => _replaySession is not null && (IstWiedergabeAktiv || _replaySession.AktuellerChunkIndex > 0));
         WiedergabePausierenCommand = new RelayCommand(WiedergabePausierenToggle, () => IstWiedergabeAktiv);
+        SchrittVorCommand = new RelayCommand(SchrittVor,
+            () => _replaySession is not null && (!IstWiedergabeAktiv || IstPausiert)
+                && _replaySession.AktuellerChunkIndex < QuellEintraege.Count);
+        SchrittZurueckCommand = new RelayCommand(SchrittZurueck,
+            () => _replaySession is not null && (!IstWiedergabeAktiv || IstPausiert)
+                && _replaySession.AktuellerChunkIndex > 0);
         SchliessenCommand = new RelayCommand(Schliessen);
     }
 
@@ -70,11 +79,18 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     public ICommand WiedergabeStartenCommand { get; }
 
     /// <summary>Bricht eine laufende/pausierte Wiedergabe ab und spielt die geladene
-    /// Aufzeichnung sofort wieder ab Position 0 ab.</summary>
+    /// Aufzeichnung sofort wieder ab Position 0 ab — aus dem reinen Schrittmodus
+    /// (Position &gt; 0 ohne laufende Wiedergabe) der direkte Rückweg zum Anfang.</summary>
     public ICommand WiedergabeNeustartenCommand { get; }
 
     /// <summary>Hält die Wiedergabe an bzw. setzt sie fort (Toggle).</summary>
     public ICommand WiedergabePausierenCommand { get; }
+
+    /// <summary>Wendet den nächsten aufgezeichneten Chunk als Einzelschritt an (zeitstempel-unabhängig).</summary>
+    public ICommand SchrittVorCommand { get; }
+
+    /// <summary>Stellt den Zustand vor dem zuletzt angewendeten Chunk wieder her.</summary>
+    public ICommand SchrittZurueckCommand { get; }
 
     /// <summary>Schließt den Dialog.</summary>
     public ICommand SchliessenCommand { get; }
@@ -131,7 +147,10 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     public bool IstPausiert
     {
         get => _istPausiert;
-        private set => SetProperty(ref _istPausiert, value);
+        // Der Pausiert-Wechsel steuert die CanExecute der Schritt-Buttons (Schritte sind nur
+        // bei nicht unpausiert laufender Wiedergabe erlaubt) — daher wie IstWiedergabeAktiv
+        // einen Refresh-Impuls auslösen.
+        private set => SetProperty(ref _istPausiert, value, RelayCommand.Refresh);
     }
 
     /// <summary>Eingabe der Zeitraffer-Schwelle in Sekunden (Dezimalzahl ≥ 0; 0 = maximale Geschwindigkeit).</summary>
@@ -244,7 +263,9 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
             var chunk = aufzeichnung.Chunks[i];
             eintraege.Add(new CliChunkAnzeigeEintrag
             {
-                Index = i,
+                // 1-basiert: die #-Spalte zählt wie der PositionsText die angewendeten
+                // Chunks — „Chunk n/y" selektiert die Zeile „#n".
+                Index = i + 1,
                 Offset = chunk.Offset,
                 Laenge = chunk.Data.Length,
                 Quelltext = CliChunkQuelltextFormatter.Formatiere(chunk.Data),
@@ -301,13 +322,16 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
     private void WiedergabeNeustarten()
     {
-        if (_replaySession is null || _aufzeichnung is null || !IstWiedergabeAktiv)
+        if (_replaySession is null || _aufzeichnung is null
+            || (!IstWiedergabeAktiv && _replaySession.AktuellerChunkIndex == 0))
             return;
 
-        // Neustart mitten im Lauf (auch aus dem Pausiert-Zustand): die laufende Session
-        // verwerfen und dieselbe geladene Aufzeichnung sofort wieder ab Position 0 abspielen.
+        // Neustart mitten im Lauf (auch aus dem Pausiert-Zustand) oder aus dem
+        // Schrittmodus: die Session verwerfen und dieselbe geladene Aufzeichnung
+        // sofort wieder ab Position 0 abspielen.
         ErsetzeReplaySessionDurchFrische();
         _replaySession.WiedergabeStarten();
+        IstWiedergabeAktiv = true;
         IstPausiert = false;
         StatusText = "Wiedergabe läuft.";
     }
@@ -341,6 +365,41 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void SchrittVor()
+    {
+        // RelayCommand.Execute wertet CanExecute nicht aus — der Wiedergabe-Zustandsteil
+        // der Sperre muss hier intern nachgezogen werden, damit ein programmatischer
+        // Aufruf die Position nicht mitten im unpausierten Lauf mutiert (die
+        // Positionsgrenzen meldet die Session über ihren Rückgabewert).
+        if (_replaySession is null || (IstWiedergabeAktiv && !IstPausiert)
+            || !_replaySession.SchrittVor())
+            return;
+
+        // Am Ende gilt der aus OnReplayExited gesetzte Text „Wiedergabe beendet." —
+        // das Exited-Event läuft synchron über _dispatcherInvoke bereits durch.
+        if (_replaySession.AktuellerChunkIndex < QuellEintraege.Count)
+            StatusText = $"Einzelschritt — Chunk {_replaySession.AktuellerChunkIndex}/{QuellEintraege.Count} angewendet.";
+    }
+
+    private void SchrittZurueck()
+    {
+        // Interner Guard wie in SchrittVor (CanExecute wird von RelayCommand.Execute
+        // nicht ausgewertet).
+        if (_replaySession is null || (IstWiedergabeAktiv && !IstPausiert))
+            return;
+
+        var vorherigePosition = _replaySession.AktuellerChunkIndex;
+        if (!_replaySession.SchrittZurueck())
+            return;
+
+        // Die Position hat das Ende verlassen — „Abspielen" darf die Session nicht mehr
+        // durch eine frische ersetzen, sondern setzt an der Schrittposition fort.
+        _wiedergabeBeendet = false;
+        // Der zurückgenommene Chunk hat die Nummer der alten Position — identisch zur
+        // 1-basierten #-Spalte der Quell-Liste.
+        StatusText = $"Schritt zurück — Chunk {vorherigePosition}/{QuellEintraege.Count} zurückgenommen.";
+    }
+
     private void Schliessen()
     {
         EntsorgeReplaySession();
@@ -361,8 +420,12 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
 
             var index = session.AktuellerChunkIndex;
             PositionsText = $"Chunk {index}/{QuellEintraege.Count}";
-            if (index > 0 && index <= QuellEintraege.Count)
-                AktuellerQuellEintrag = QuellEintraege[index - 1];
+            AktuellerQuellEintrag = index > 0 && index <= QuellEintraege.Count
+                ? QuellEintraege[index - 1]
+                : null;
+            // Positionsgrenzen der Schritt-Commands (0/Ende) ändern sich auch ohne
+            // Zustandswechsel — CanExecute neu auswerten lassen.
+            RelayCommand.Refresh();
         });
     }
 

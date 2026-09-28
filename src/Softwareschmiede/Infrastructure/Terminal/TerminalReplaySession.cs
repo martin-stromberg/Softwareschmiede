@@ -32,8 +32,16 @@ public sealed class TerminalReplaySession : ITerminalSession
     private Task? _playbackTask;
     private long _zeitrafferTicks = TimeSpan.MaxValue.Ticks;
     private volatile bool _istPausiert;
+    // Terminations-Flag für die Wiedergabe-Schleife: SchrittVor setzt es beim Erreichen des
+    // Endes, damit eine aufgeweckte parkende Schleife deterministisch endet — auch wenn ein
+    // SchrittZurueck die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt
+    // (rein positionsbasierte Termination würde dann eine zeitgesteuerte „Geister-Wiedergabe"
+    // starten, obwohl Exited bereits gefeuert hat). Zugriff nur unter _renderLock; Reset in
+    // WiedergabeStarten, bewusst NICHT in SchrittZurueck — das Fortsetzen ist Aufgabe eines
+    // neuen Durchlaufs, nicht des Rückwärtsschritts.
+    private bool _schleifeBeendenAngefordert;
     private int _aktuellerChunkIndex;
-    private int _wiedergabeGestartet;
+    private int _wiedergabeLoopAktiv;
     private int _exitedSignaled;
     private int _disposed;
     private CliRuntimeStatus _runtimeStatus = CliRuntimeStatus.Inaktiv;
@@ -103,6 +111,10 @@ public sealed class TerminalReplaySession : ITerminalSession
     public event EventHandler<TerminalOutputChunkEventArgs>? OutputChunk;
 
     /// <inheritdoc/>
+    /// <remarks>Flanken-Ereignis: signalisiert, dass ein Durchlauf das Ende der Aufzeichnung
+    /// <b>erreicht hat</b> — nicht, dass die Position zum Zeitpunkt des Handlers noch am Ende
+    /// steht (ein nebenläufiger <see cref="SchrittZurueck"/> kann sie bereits wieder verlassen
+    /// haben; Handler dürfen daher keinen Positions-Snapshot erwarten).</remarks>
     public event EventHandler<TerminalSessionExitedEventArgs>? Exited;
 
     /// <inheritdoc/>
@@ -116,15 +128,26 @@ public sealed class TerminalReplaySession : ITerminalSession
     /// <inheritdoc/>
     public event EventHandler<CliRuntimeStatusChangedEventArgs>? RuntimeStatusChanged;
 
-    /// <summary>Startet die Wiedergabe der Aufzeichnung (idempotent — ein bereits gestarteter oder
-    /// beendeter Durchlauf wird nicht erneut gestartet).</summary>
+    /// <summary>Startet die zeitgesteuerte Wiedergabe ab der aktuellen Position (idempotent, solange
+    /// eine Wiedergabe-Schleife lebt — nach einem beendeten Durchlauf re-armierbar, z. B. für
+    /// „beendet → <see cref="SchrittZurueck"/> → ab Position fortsetzen").</summary>
     public void WiedergabeStarten()
     {
         if (Volatile.Read(ref _disposed) != 0)
             return;
-        if (Interlocked.CompareExchange(ref _wiedergabeGestartet, 1, 0) != 0)
+        if (Interlocked.CompareExchange(ref _wiedergabeLoopAktiv, 1, 0) != 0)
             return;
 
+        // Neuer Durchlauf: das Ende-Signal darf am Schleifenende erneut feuern. Der Reset
+        // läuft unter _renderLock, damit er gegen die Positions-Prüfung + das CAS in
+        // RaiseExited(nurAmEnde: true) und den Reset in SchrittZurueck serialisiert ist —
+        // lock-frei könnte er ein gerade gesetztes Signal eines nebenläufigen
+        // SchrittVor-End-RaiseExited wieder löschen (doppeltes Exited).
+        lock (_renderLock)
+        {
+            Interlocked.Exchange(ref _exitedSignaled, 0);
+            _schleifeBeendenAngefordert = false;
+        }
         SetRuntimeStatus(CliRuntimeStatus.Laeuft);
         _playbackTask = Task.Run(() => WiedergabeLoopAsync(_playbackCts.Token));
     }
@@ -159,6 +182,71 @@ public sealed class TerminalReplaySession : ITerminalSession
         }
     }
 
+    /// <summary>Wendet genau den nächsten aufgezeichneten Chunk an — zeitstempel-unabhängig
+    /// (keine Inter-Chunk-Pause, keine <see cref="ZeitrafferSchwelle"/>-Wirkung). Am Ende der
+    /// Aufzeichnung feuert die Session <see cref="Exited"/> wie am Schleifenende.</summary>
+    /// <returns><c>true</c>, wenn ein Chunk angewendet wurde; <c>false</c> am Ende der
+    /// Aufzeichnung oder nach <see cref="Dispose"/>.</returns>
+    public bool SchrittVor()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return false;
+
+        bool endeErreicht;
+        lock (_renderLock)
+        {
+            var position = _abgespielteChunks.Count;
+            if (position >= _aufzeichnung.Chunks.Count)
+                return false;
+
+            WendeChunkAnUnterLock(position);
+            endeErreicht = _abgespielteChunks.Count >= _aufzeichnung.Chunks.Count;
+            if (endeErreicht)
+                _schleifeBeendenAngefordert = true;
+        }
+
+        BufferChanged?.Invoke(this, EventArgs.Empty);
+
+        if (endeErreicht)
+        {
+            RaiseExited(nurAmEnde: true);
+            // Volle Fortsetzen-Semantik (Flag + Gate): eine evtl. pausiert parkende
+            // Wiedergabe-Schleife wacht auf und terminiert am gesetzten
+            // _schleifeBeendenAngefordert deterministisch — selbst wenn ein SchrittZurueck
+            // die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt —
+            // statt bis zum Dispose geparkt zu bleiben oder zeitgesteuert weiterzuspielen.
+            Fortsetzen();
+        }
+
+        return true;
+    }
+
+    /// <summary>Stellt den gerenderten Zustand vor dem zuletzt angewendeten Chunk wieder her —
+    /// deterministischer Neuaufbau des Buffers aus dem verbleibenden Präfix der abgespielten
+    /// Chunks (das Rendering ist eine reine Funktion der Chunk-Sequenz).</summary>
+    /// <returns><c>true</c>, wenn ein Schritt ausgeführt wurde; <c>false</c> an Position 0
+    /// oder nach <see cref="Dispose"/>.</returns>
+    public bool SchrittZurueck()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return false;
+
+        lock (_renderLock)
+        {
+            if (_abgespielteChunks.Count == 0)
+                return false;
+
+            _abgespielteChunks.RemoveAt(_abgespielteChunks.Count - 1);
+            Volatile.Write(ref _aktuellerChunkIndex, _abgespielteChunks.Count);
+            // Das Ende wurde verlassen — ein späterer Durchlauf darf wieder Exited feuern.
+            Interlocked.Exchange(ref _exitedSignaled, 0);
+            BaueBufferUndParserAusPraefixNeuAuf();
+        }
+
+        BufferChanged?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
     /// <inheritdoc/>
     public bool Resize(int cols, int rows) => true;
 
@@ -188,11 +276,7 @@ public sealed class TerminalReplaySession : ITerminalSession
     {
         lock (_renderLock)
         {
-            Buffer.Reset();
-            var parser = new AnsiSequenceParser();
-            foreach (var chunk in _abgespielteChunks)
-                foreach (var evt in parser.Parse(chunk))
-                    Buffer.Apply(evt);
+            BaueBufferUndParserAusPraefixNeuAuf();
         }
     }
 
@@ -226,11 +310,14 @@ public sealed class TerminalReplaySession : ITerminalSession
     /// dem Render-Lock an — dieselbe Reihenfolge wie <see cref="PseudoConsoleSession.ReadLoopAsync"/>.</summary>
     private async Task WiedergabeLoopAsync(CancellationToken ct)
     {
-        var vorherigerOffset = TimeSpan.Zero;
+        var fehler = false;
         try
         {
             var chunks = _aufzeichnung.Chunks;
-            for (var i = 0; i < chunks.Count; i++)
+            // Die Position ist _abgespielteChunks.Count — dieselbe Quelle, die SchrittVor/
+            // SchrittZurueck mutieren: Einzelschritte verändern damit auch die Fortsetzposition
+            // dieser Schleife.
+            while (true)
             {
                 // Expliziter Abbruch-Check am Schleifenanfang: WartePauseGateAsync liefert für ein
                 // bereits offenes Gate einen erfüllten Task (WaitAsync wertet den Token dann nicht
@@ -239,9 +326,20 @@ public sealed class TerminalReplaySession : ITerminalSession
                 ct.ThrowIfCancellationRequested();
                 await WartePauseGateAsync(ct).ConfigureAwait(false);
 
-                var chunk = chunks[i];
-                var realePause = chunk.Offset - vorherigerOffset;
-                vorherigerOffset = chunk.Offset;
+                int i;
+                bool beendenAngefordert;
+                lock (_renderLock)
+                {
+                    // Flag atomar mit der Position prüfen: ein SchrittVor-Endpfad hat diese
+                    // Schleife aufgeweckt — die Position kann seitdem wieder unter Count
+                    // liegen (SchrittZurueck), trotzdem muss die Schleife enden.
+                    i = _abgespielteChunks.Count;
+                    beendenAngefordert = _schleifeBeendenAngefordert;
+                }
+                if (beendenAngefordert || i >= chunks.Count)
+                    break;
+
+                var realePause = chunks[i].Offset - (i > 0 ? chunks[i - 1].Offset : TimeSpan.Zero);
                 var delay = realePause <= TimeSpan.Zero
                     ? TimeSpan.Zero
                     : realePause < ZeitrafferSchwelle ? realePause : ZeitrafferSchwelle;
@@ -266,15 +364,24 @@ public sealed class TerminalReplaySession : ITerminalSession
                         if (_istPausiert)
                             continue;
 
-                        OutputChunk?.Invoke(this, new TerminalOutputChunkEventArgs(chunk.Data));
-                        _abgespielteChunks.Add(chunk.Data);
-                        foreach (var evt in _parser.Parse(chunk.Data))
-                            Buffer.Apply(evt);
+                        // Positions-Re-Check: hat ein Einzelschritt die Position seit
+                        // Iterationsbeginn verändert, wird nichts angewendet und die Iteration
+                        // neu begonnen — das Delay für die neue Position wird frisch berechnet
+                        // (die aufgezeichnete Pause des zurückgenommenen Chunks gilt erneut).
+                        // Das Beenden-Flag wird hier ebenfalls geprüft, damit kein Chunk mehr
+                        // angewendet wird, nachdem der SchrittVor-Endpfad die Termination
+                        // angefordert hat.
+                        if (_schleifeBeendenAngefordert || _abgespielteChunks.Count != i)
+                            break;
+
+                        WendeChunkAnUnterLock(i);
                         angewendet = true;
                     }
                 }
 
-                Interlocked.Exchange(ref _aktuellerChunkIndex, i + 1);
+                if (!angewendet)
+                    continue;
+
                 BufferChanged?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -283,13 +390,45 @@ public sealed class TerminalReplaySession : ITerminalSession
         }
         catch (Exception ex)
         {
+            fehler = true;
             _logger.LogWarning(ex, "Fehler in der Wiedergabe-Schleife der Terminal-Replay-Session.");
         }
         finally
         {
+            // Reguläres Schleifenende: Exited nur signalisieren, wenn die Position auch jetzt
+            // noch am Ende steht — ein Rückwärtsschritt kann das Ende zwischen dem Verlassen
+            // der Schleife und diesem finally bereits wieder verlassen haben.
             if (!ct.IsCancellationRequested)
-                RaiseExited();
+                RaiseExited(nurAmEnde: !fehler);
+            // Lauf-Flag zurücksetzen — WiedergabeStarten ist danach wieder armiert
+            // (Re-Armierung für „beendet → SchrittZurueck → ab Position fortsetzen").
+            Interlocked.Exchange(ref _wiedergabeLoopAktiv, 0);
         }
+    }
+
+    /// <summary>Wendet den Chunk an Position <paramref name="position"/> in der
+    /// korrektheitsrelevanten Reihenfolge an: <see cref="OutputChunk"/> → Add →
+    /// Parse/Apply → Index-Write. Muss unter <see cref="_renderLock"/> aufgerufen werden.</summary>
+    private void WendeChunkAnUnterLock(int position)
+    {
+        var chunk = _aufzeichnung.Chunks[position];
+        OutputChunk?.Invoke(this, new TerminalOutputChunkEventArgs(chunk.Data));
+        _abgespielteChunks.Add(chunk.Data);
+        foreach (var evt in _parser.Parse(chunk.Data))
+            Buffer.Apply(evt);
+        Volatile.Write(ref _aktuellerChunkIndex, _abgespielteChunks.Count);
+    }
+
+    /// <summary>Baut <see cref="Buffer"/> und den Parser-Zustand deterministisch aus dem Präfix
+    /// der abgespielten Chunks neu auf (Buffer-Reset + Parser-Reset + Re-Parse über
+    /// <see cref="_parser"/>). Muss unter <see cref="_renderLock"/> aufgerufen werden.</summary>
+    private void BaueBufferUndParserAusPraefixNeuAuf()
+    {
+        Buffer.Reset();
+        _parser.Reset();
+        foreach (var chunk in _abgespielteChunks)
+            foreach (var evt in _parser.Parse(chunk))
+                Buffer.Apply(evt);
     }
 
     /// <summary>Wartet asynchron auf das Ende einer Pausierung (sofort erfüllt, wenn nicht pausiert).</summary>
@@ -308,12 +447,35 @@ public sealed class TerminalReplaySession : ITerminalSession
         return tcs;
     }
 
-    private void RaiseExited()
+    /// <param name="nurAmEnde"><c>true</c>: Das Signal wird nur gesetzt, wenn die Position
+    /// aktuell am Ende der Aufzeichnung steht — Positions-Prüfung und Signal-Flag werden dazu
+    /// atomar unter <see cref="_renderLock"/> geprüft/gesetzt (Serialisierung gegen
+    /// <see cref="SchrittZurueck"/> und den Flag-Reset in <see cref="WiedergabeStarten"/>).
+    /// Das <see cref="Exited"/>-Event selbst feuert bewusst erst nach Lock-Freigabe: Es ist
+    /// ein Flanken-Ereignis („Ende wurde erreicht"), kein Positions-Snapshot — ein in die
+    /// Lücke fallender <see cref="SchrittZurueck"/> zieht das bereits gesetzte Signal nicht
+    /// zurück. Ein Invoke unter dem Lock hätte Deadlock-Risiko gegenüber Handlern, die
+    /// synchron auf einen anderen Thread marshaln (z. B. <c>Dispatcher.Invoke</c>, während
+    /// der UI-Thread selbst in <see cref="SchrittZurueck"/> auf <see cref="_renderLock"/>
+    /// wartet).</param>
+    private void RaiseExited(bool nurAmEnde = false)
     {
         if (Volatile.Read(ref _disposed) != 0)
             return;
-        if (Interlocked.CompareExchange(ref _exitedSignaled, 1, 0) != 0)
+        if (nurAmEnde)
+        {
+            lock (_renderLock)
+            {
+                if (_abgespielteChunks.Count < _aufzeichnung.Chunks.Count)
+                    return;
+                if (Interlocked.CompareExchange(ref _exitedSignaled, 1, 0) != 0)
+                    return;
+            }
+        }
+        else if (Interlocked.CompareExchange(ref _exitedSignaled, 1, 0) != 0)
+        {
             return;
+        }
 
         SetRuntimeStatus(CliRuntimeStatus.Inaktiv);
         try
