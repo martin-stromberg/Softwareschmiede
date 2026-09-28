@@ -664,6 +664,59 @@ public sealed class TerminalReplaySessionTests
         empfangen[3].Should().Equal(chunkC);
     }
 
+    /// <summary>Rest-Race-Regression: trifft <see cref="TerminalReplaySession.WiedergabeStarten"/>
+    /// auf eine noch lebende, aber vom SchrittVor-Endpfad zum Abbruch verurteilte Schleife (CAS
+    /// schlägt fehl, Terminations-Flag gesetzt), darf der Aufruf nicht wirkungslos returnen —
+    /// die sterbende Schleife feuert bei Position &lt; Count kein Exited und der Aufrufer bliebe
+    /// dauerhaft im Glauben einer laufenden Wiedergabe (UI-Sequenz: pausiert → SchrittVor bis
+    /// Ende → SchrittZurueck → „Abspielen" → dauerhaft „Wiedergabe läuft." ohne Fortschritt).
+    /// Hier parkt die Schleife garantiert im FakeTimeProvider-Delay, kann das Flag also vor dem
+    /// CAS-Fail nicht konsumieren — der Start widerruft die Termination und die Wiedergabe
+    /// setzt an der Schrittposition fort.</summary>
+    [Fact]
+    public async Task WiedergabeStarten_GegenVerurteilteSchleife_SetztAnSchrittpositionFort()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var aufzeichnung = CreateAufzeichnung(
+            [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B"), Encoding.UTF8.GetBytes("C")],
+            TimeSpan.FromSeconds(30));
+        using var session = new TerminalReplaySession(aufzeichnung, timeProvider);
+        var exitedCount = 0;
+        session.Exited += (_, _) => Interlocked.Increment(ref exitedCount);
+
+        session.WiedergabeStarten();
+        await WarteBisAsync(() => session.AktuellerChunkIndex >= 1);
+        // Der Schleife Zeit geben, im 30-s-Fake-Delay des zweiten Chunks zu parken — bis zum
+        // nächsten Advance kann sie das Terminations-Flag nicht lesen (Delays sind nicht
+        // ge-gatet; das Fenster entspricht dem realen bis zur ZeitrafferSchwelle).
+        await Task.Delay(150);
+        session.Pausieren();
+
+        // Pausiert bis ans Ende schreiten: setzt das Terminations-Flag und feuert Exited;
+        // danach ein Schritt zurück — Position < Count bei noch gesetztem Flag.
+        session.SchrittVor().Should().BeTrue();
+        session.SchrittVor().Should().BeTrue();
+        await WarteBisAsync(() => exitedCount == 1);
+        session.SchrittZurueck().Should().BeTrue();
+        session.AktuellerChunkIndex.Should().Be(2);
+
+        // „Abspielen": die Schleife schläft noch im Fake-Delay — der CAS schlägt garantiert
+        // fehl. Ohne Widerruf/Neustart stürbe die Schleife beim nächsten Advance lautlos.
+        session.WiedergabeStarten();
+        await WarteBisAsync(() => session.RuntimeStatus == CliRuntimeStatus.Laeuft);
+
+        // Nach Zeitsprüngen muss die Wiedergabe an der Schrittposition fortsetzen — über die
+        // widerrufene Schleife oder einen ans Task-Ende gehängten Neustart: der letzte Chunk
+        // wird angewendet und Exited feuert für diesen Durchlauf erneut.
+        await WarteBisAsync(() =>
+        {
+            timeProvider.Advance(TimeSpan.FromSeconds(30));
+            return exitedCount == 2;
+        });
+        session.AktuellerChunkIndex.Should().Be(3);
+        session.RuntimeStatus.Should().Be(CliRuntimeStatus.Inaktiv);
+    }
+
     /// <summary>Nach <see cref="TerminalReplaySession.Dispose"/> sind beide Schritt-Methoden
     /// No-Ops (<c>false</c>, keine Events, kein Wurf).</summary>
     [Fact]

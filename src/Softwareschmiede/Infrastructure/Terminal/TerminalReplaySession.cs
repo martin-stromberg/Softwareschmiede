@@ -40,6 +40,12 @@ public sealed class TerminalReplaySession : ITerminalSession
     // WiedergabeStarten, bewusst NICHT in SchrittZurueck — das Fortsetzen ist Aufgabe eines
     // neuen Durchlaufs, nicht des Rückwärtsschritts.
     private bool _schleifeBeendenAngefordert;
+    // Konsum-Merkmal zu _schleifeBeendenAngefordert: die Schleife setzt es unter _renderLock
+    // in dem Moment, in dem sie das Flag gelesen und sich zum Abbruch entschieden hat (sie
+    // liest das Flag danach nicht erneut). Ein CAS-fehlschlagendes WiedergabeStarten kann so
+    // „Flag noch ungelesen — Termination widerrufbar" von „Schleife rettungslos im Sterben —
+    // Neustart an ihren Task-Abschluss hängen" unterscheiden. Zugriff nur unter _renderLock.
+    private bool _schleifeBeendenKonsumiert;
     private int _aktuellerChunkIndex;
     private int _wiedergabeLoopAktiv;
     private int _exitedSignaled;
@@ -136,7 +142,63 @@ public sealed class TerminalReplaySession : ITerminalSession
         if (Volatile.Read(ref _disposed) != 0)
             return;
         if (Interlocked.CompareExchange(ref _wiedergabeLoopAktiv, 1, 0) != 0)
+        {
+            // CAS-Fail: eine Schleife lebt noch — sie kann aber bereits zum Abbruch
+            // verurteilt sein (_schleifeBeendenAngefordert aus dem SchrittVor-Endpfad).
+            // Ein blinder Return würde die angeforderte Wiedergabe dann lautlos verwerfen:
+            // die sterbende Schleife feuert bei Position < Count kein Exited mehr und der
+            // Aufrufer bliebe im Glauben einer laufenden Wiedergabe. Da Flag-Setzen
+            // (SchrittVor), Flag-Konsum (Schleife) und dieser Pfad unter _renderLock
+            // serialisiert sind, ist dort eine atomare Drei-Wege-Entscheidung möglich.
+            Task? sterbendeSchleife = null;
+            var terminationWiderrufen = false;
+            lock (_renderLock)
+            {
+                if (_schleifeBeendenKonsumiert)
+                {
+                    // Die Schleife hat das Flag bereits gelesen und sich zum Abbruch
+                    // entschieden — sie liest es nicht erneut und ist unrettbar im
+                    // Sterben: den Start an ihren Task-Abschluss hängen. Der Retry-CAS
+                    // greift garantiert erst nach dem finally der alten Schleife. Ein
+                    // zwischenzeitlich erneut gesetztes Flag wird mitgeräumt — es gehört
+                    // zur sterbenden Schleife, nicht zum neuen Durchlauf.
+                    _schleifeBeendenKonsumiert = false;
+                    _schleifeBeendenAngefordert = false;
+                    sterbendeSchleife = _playbackTask;
+                }
+                else if (_schleifeBeendenAngefordert)
+                {
+                    // Das Flag wurde noch nicht konsumiert: Termination widerrufen —
+                    // die Schleife setzt die Wiedergabe an der aktuellen Position fort.
+                    // Das Ende dieses fortgesetzten Durchlaufs darf erneut Exited feuern.
+                    _schleifeBeendenAngefordert = false;
+                    Interlocked.Exchange(ref _exitedSignaled, 0);
+                    terminationWiderrufen = true;
+                }
+                // Sonst: gesunde laufende Wiedergabe — der Aufruf bleibt idempotent.
+            }
+
+            if (terminationWiderrufen)
+                SetRuntimeStatus(CliRuntimeStatus.Laeuft);
+            sterbendeSchleife?.ContinueWith(
+                // Der Retry prüft den Disposed-Zustand erneut; ein zwischenzeitliches
+                // Dispose() kann dennoch das CTS schon entsorgt haben — dann ist der
+                // Start obsolet und die Continuation darf nicht fehlschlagen.
+                _ =>
+                {
+                    try
+                    {
+                        WiedergabeStarten();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
             return;
+        }
 
         // Neuer Durchlauf: das Ende-Signal darf am Schleifenende erneut feuern. Der Reset
         // läuft unter _renderLock, damit er gegen die Positions-Prüfung + das CAS in
@@ -147,6 +209,7 @@ public sealed class TerminalReplaySession : ITerminalSession
         {
             Interlocked.Exchange(ref _exitedSignaled, 0);
             _schleifeBeendenAngefordert = false;
+            _schleifeBeendenKonsumiert = false;
         }
         SetRuntimeStatus(CliRuntimeStatus.Laeuft);
         _playbackTask = Task.Run(() => WiedergabeLoopAsync(_playbackCts.Token));
@@ -335,6 +398,12 @@ public sealed class TerminalReplaySession : ITerminalSession
                     // liegen (SchrittZurueck), trotzdem muss die Schleife enden.
                     i = _abgespielteChunks.Count;
                     beendenAngefordert = _schleifeBeendenAngefordert;
+                    if (beendenAngefordert)
+                        // Konsum unter demselben Lock vermerken: ab hier ist die
+                        // Termination unwiderruflich beschlossen — ein CAS-fehlschlagendes
+                        // WiedergabeStarten erkennt das und hängt einen Neustart an den
+                        // Task-Abschluss statt wirkungslos zu returnen.
+                        _schleifeBeendenKonsumiert = true;
                 }
                 if (beendenAngefordert || i >= chunks.Count)
                     break;
