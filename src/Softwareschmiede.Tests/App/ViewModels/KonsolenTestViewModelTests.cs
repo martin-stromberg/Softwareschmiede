@@ -109,6 +109,28 @@ public sealed class KonsolenTestViewModelTests : IDisposable
         sut.IstWiedergabeAktiv.Should().BeFalse();
     }
 
+    /// <summary>Nach dem Laden zeigt <see cref="KonsolenTestViewModel.GeometrieText"/> die
+    /// aufgezeichnete Geometrie an; beim Schließen wird der Text wieder geleert.</summary>
+    [Fact]
+    public async Task AufzeichnungOeffnen_SetztGeometrieText()
+    {
+        var pfad = await ErstelleAufzeichnungsDateiAsync();
+        SetupOpenDialog(pfad);
+        var sut = CreateSut();
+
+        sut.GeometrieText.Should().BeEmpty("ohne geladene Aufzeichnung ist der Geometrie-Text leer");
+
+        await ((AsyncRelayCommand)sut.AufzeichnungOeffnenCommand).ExecuteAsync();
+
+        sut.GeometrieText.Should().Be("Aufzeichnung: 80×24",
+            "die Fixture-Aufzeichnung hat die Geometrie 80×24");
+
+        sut.SchliessenCommand.Execute(null);
+
+        sut.GeometrieText.Should().BeEmpty(
+            "beim Schließen wird die Aufzeichnung entsorgt und der Geometrie-Text geleert");
+    }
+
     /// <summary>Eine als unvollständig markierte Aufzeichnung erzeugt den Hinweis.</summary>
     [Fact]
     public async Task AufzeichnungOeffnen_UnvollstaendigeAufzeichnung_ZeigtHinweis()

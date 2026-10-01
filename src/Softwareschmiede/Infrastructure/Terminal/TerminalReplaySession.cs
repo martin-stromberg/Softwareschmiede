@@ -9,9 +9,10 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 /// zeitreal durch denselben Renderpfad wie <see cref="PseudoConsoleSession"/> abspielt
 /// (<see cref="AnsiSequenceParser"/> → <see cref="TerminalBuffer"/> → <see cref="BufferChanged"/>).
 /// Zusätzlich zur Schnittstelle steuert sie die Wiedergabe (Start, Pause/Fortsetzen, Zeitraffer).
-/// Die im Header der Aufzeichnung gespeicherte Geometrie dient nur der initialen Buffer-Größe —
-/// die Wiedergabe nutzt die aktuelle Control-Geometrie (<c>TerminalControl</c> resized den Buffer
-/// beim Binden); Resize-Ereignisse werden nicht aufgezeichnet und nicht reproduziert.</summary>
+/// Die im Header der Aufzeichnung gespeicherte Geometrie ist die dauerhafte Buffer-Geometrie
+/// (<see cref="SupportsResize"/> ist <c>false</c> — das anzeigende <c>TerminalControl</c> resized
+/// Replay-Sessions nicht; überschüssige Breite wird dort per <c>IScrollInfo</c> horizontal
+/// scrollbar). Resize-Ereignisse werden nicht aufgezeichnet und nicht reproduziert.</summary>
 public sealed class TerminalReplaySession : ITerminalSession
 {
     private readonly CliOutputAufzeichnung _aufzeichnung;
@@ -91,6 +92,9 @@ public sealed class TerminalReplaySession : ITerminalSession
 
     /// <inheritdoc/>
     public bool IsPseudoTerminal => false;
+
+    /// <inheritdoc/>
+    public bool SupportsResize => false;
 
     /// <inheritdoc/>
     public int? ExitCode { get; private set; }
@@ -311,6 +315,9 @@ public sealed class TerminalReplaySession : ITerminalSession
     }
 
     /// <inheritdoc/>
+    /// <remarks>No-Op, der immer <c>true</c> meldet („nichts zu tun") — ab
+    /// <see cref="SupportsResize"/> <c>== false</c> wird der Aufruf vom <c>TerminalControl</c>
+    /// nicht mehr aufgerufen; das <c>true</c> dokumentiert die harmlose Stub-Semantik.</remarks>
     public bool Resize(int cols, int rows) => true;
 
     /// <inheritdoc/>

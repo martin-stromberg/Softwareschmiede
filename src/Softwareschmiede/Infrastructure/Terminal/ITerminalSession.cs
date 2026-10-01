@@ -26,6 +26,13 @@ public interface ITerminalSession : IDisposable
     /// <summary>Gibt an, ob die Session über ein echtes Pseudo-Terminal (ConPTY) läuft.</summary>
     bool IsPseudoTerminal { get; }
 
+    /// <summary>Gibt an, ob die Session-Geometrie zur Laufzeit geändert werden darf.
+    /// <c>true</c>: ein anzeigendes Control darf <see cref="TerminalBuffer.Resize"/> auf dem
+    /// <see cref="Buffer"/> aufrufen und Größenänderungen über <see cref="Resize"/> melden.
+    /// <c>false</c> bei fixierter Geometrie (z. B. Wiedergabe einer Aufzeichnung): dann darf der
+    /// Aufrufer weder <see cref="Resize"/> noch <see cref="TerminalBuffer.Resize"/> aufrufen.</summary>
+    bool SupportsResize { get; }
+
     /// <summary>Der Exit-Code des Prozesses nach dessen Beendigung, oder <c>null</c>.</summary>
     int? ExitCode { get; }
 

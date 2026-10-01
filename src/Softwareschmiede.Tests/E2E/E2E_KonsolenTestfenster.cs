@@ -1,5 +1,6 @@
 using System.Text;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.WindowsAPI;
 using Softwareschmiede.Infrastructure.Terminal;
 using Softwareschmiede.Tests.E2E.Views;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
@@ -33,6 +34,8 @@ public partial class End2EndTest
         var pausePfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         var schrittPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         var defektPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        var breitPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        var schmalPfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         SettingsView? settings = null;
         KonsolenTestDialogView? dialog = null;
         try
@@ -101,6 +104,47 @@ public partial class End2EndTest
                         new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("schritt-chunk-1")),
                         new CliOutputChunkRecord(TimeSpan.FromMilliseconds(50), Encoding.UTF8.GetBytes(" -> schritt-chunk-2")),
                         new CliOutputChunkRecord(TimeSpan.FromMilliseconds(100), Encoding.UTF8.GetBytes(" -> schritt-chunk-3")),
+                    ],
+                });
+            }
+
+            // Aufzeichnung mit fixierter Geometrie 220×50 — deutlich breiter als der sichtbare
+            // Bereich des Dialogs: der Replay-Buffer behält die Aufzeichnungsbreite, der
+            // überschüssige Inhalt muss horizontal scrollbar werden.
+            await using (var stream = File.Create(breitPfad))
+            {
+                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                {
+                    AufgabeId = Guid.NewGuid(),
+                    PluginName = "E2E-Breit",
+                    StartUtc = DateTimeOffset.UtcNow,
+                    EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
+                    Cols = 220,
+                    Rows = 50,
+                    IstVollstaendig = true,
+                    Chunks =
+                    [
+                        new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("e2e-breit")),
+                    ],
+                });
+            }
+
+            // Schmale Aufzeichnung (60×20): passt vollständig in den sichtbaren Bereich —
+            // es darf keine horizontale Scrollbar entstehen.
+            await using (var stream = File.Create(schmalPfad))
+            {
+                await store.SpeichernAsync(stream, new CliOutputAufzeichnung
+                {
+                    AufgabeId = Guid.NewGuid(),
+                    PluginName = "E2E-Schmal",
+                    StartUtc = DateTimeOffset.UtcNow,
+                    EndeUtc = DateTimeOffset.UtcNow.AddMilliseconds(10),
+                    Cols = 60,
+                    Rows = 20,
+                    IstVollstaendig = true,
+                    Chunks =
+                    [
+                        new CliOutputChunkRecord(TimeSpan.Zero, Encoding.UTF8.GetBytes("e2e-schmal")),
                     ],
                 });
             }
@@ -259,6 +303,77 @@ public partial class End2EndTest
             dialog.WarteAufStatus("Wiedergabe beendet.");
             Assert.Equal("Chunk 2/2", dialog.GetPositionsText());
 
+            // Geometrie-Phase: die Wiedergabe rendert in der aufgezeichneten Geometrie statt
+            // der Fenstergröße. Funktionaler Nachweis über den ReplayTerminalScrollViewer —
+            // der gerenderte Terminalinhalt ist per UI-Automation nicht lesbar; ein
+            // HorizontallyScrollable == true impliziert ExtentWidth > ViewportWidth und damit
+            // einen nicht auf die Fensterbreite verkleinerten Buffer.
+            dialog.OeffneAufzeichnung(breitPfad);
+            dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Breit, 1 Chunks) — bereit.");
+            Assert.Equal("Aufzeichnung: 220×50", dialog.GetGeometrieText());
+            dialog.WarteAufHorizontalScrollFaellig();
+            Assert.True(dialog.IstHorizontalScrollbar(),
+                "eine 220×50-Aufzeichnung übersteigt die Dialogbreite — der Inhalt muss horizontal scrollbar sein");
+            Assert.True(dialog.GetHorizontalViewSize() < 100,
+                "der sichtbare Ausschnitt muss kleiner als der Gesamtinhalt sein");
+
+            dialog.SetzeHorizontalScrollProzent(50);
+            var horizontalGescrollt = false;
+            var scrollDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < scrollDeadline)
+            {
+                if (dialog.GetHorizontalScrollPercent() > 0)
+                {
+                    horizontalGescrollt = true;
+                    break;
+                }
+
+                Thread.Sleep(200);
+            }
+            Assert.True(horizontalGescrollt,
+                "SetScrollPercent muss den horizontalen Offset des ReplayTerminal-ScrollViewers verschieben");
+
+            // Tastatur-Scrolling: das Replay-Terminal besitzt keinen Eingabekanal — die
+            // Ende-Taste darf vom VT100-Encoder nicht verschluckt werden, sondern muss zum
+            // umschließenden ScrollViewer bubbeln (horizontal ans rechte Ende scrollen).
+            var prozentVorTaste = dialog.GetHorizontalScrollPercent();
+            dialog.DrueckeTasteImReplayTerminal(VirtualKeyShort.END);
+            var tastaturGescrollt = false;
+            var tastaturDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < tastaturDeadline)
+            {
+                if (dialog.GetHorizontalScrollPercent() > prozentVorTaste)
+                {
+                    tastaturGescrollt = true;
+                    break;
+                }
+
+                Thread.Sleep(200);
+            }
+            Assert.True(tastaturGescrollt,
+                "die Ende-Taste im fokussierten Replay-Terminal muss den ScrollViewer horizontal weiter nach rechts scrollen");
+
+            // Schmale Aufzeichnung (60×20): passt in den Viewport — kein horizontaler Scrollbalken.
+            // Das Polling auf „nicht scrollbar" überbrückt die asynchrone Extent-Aktualisierung
+            // nach dem Session-Wechsel (die zuvor breite Extent darf nicht transient greifen).
+            dialog.OeffneAufzeichnung(schmalPfad);
+            dialog.WarteAufStatus("Aufzeichnung geladen (E2E-Schmal, 1 Chunks) — bereit.");
+            Assert.Equal("Aufzeichnung: 60×20", dialog.GetGeometrieText());
+            var schmalNichtScrollbar = false;
+            var schmalDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < schmalDeadline)
+            {
+                if (!dialog.IstHorizontalScrollbar())
+                {
+                    schmalNichtScrollbar = true;
+                    break;
+                }
+
+                Thread.Sleep(200);
+            }
+            Assert.True(schmalNichtScrollbar,
+                "eine 60×20-Aufzeichnung passt in den Viewport — es darf keine horizontale Scrollbar geben");
+
             dialog.Schliessen();
             Assert.False(dialog.IsVisible);
 
@@ -281,6 +396,10 @@ public partial class End2EndTest
                 File.Delete(schrittPfad);
             if (File.Exists(defektPfad))
                 File.Delete(defektPfad);
+            if (File.Exists(breitPfad))
+                File.Delete(breitPfad);
+            if (File.Exists(schmalPfad))
+                File.Delete(schmalPfad);
         }
     }
 

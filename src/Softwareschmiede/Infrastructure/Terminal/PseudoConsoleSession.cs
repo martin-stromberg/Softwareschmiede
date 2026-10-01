@@ -87,6 +87,9 @@ public sealed class PseudoConsoleSession : ITerminalSession
     public bool IsPseudoTerminal { get; }
 
     /// <inheritdoc/>
+    public bool SupportsResize => true;
+
+    /// <inheritdoc/>
     public int? ExitCode { get; private set; }
 
     private TerminalSessionFailedEventArgs? _failure;

@@ -88,6 +88,13 @@
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            VerticalAlignment="Center"
                            Margin="12,0,0,0" />
+                <TextBlock Text="{Binding GeometrieText}"
+                           AutomationProperties.Name="AufzeichnungGeometrie"
+                           AutomationProperties.HelpText="{Binding GeometrieText}"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0" />
                 <Button Content="Schließen"
                         AutomationProperties.Name="KonsolenTestSchliessen"
                         Command="{Binding SchliessenCommand}"
@@ -133,9 +140,11 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <ScrollViewer Grid.Column="0"
+            <ScrollViewer x:Name="ReplayTerminalScrollViewer"
+                          Grid.Column="0"
+                          AutomationProperties.Name="ReplayTerminalScrollViewer"
                           VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
+                          HorizontalScrollBarVisibility="Auto"
                           CanContentScroll="True">
                 <controls:TerminalControl x:Name="ReplayTerminal"
                                           AutomationProperties.Name="ReplayTerminal"

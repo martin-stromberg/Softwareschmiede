@@ -26,6 +26,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     private string? _dateiPfad;
     private string _statusText = "Keine Aufzeichnung geladen.";
     private string _positionsText = "Chunk 0/0";
+    private string _geometrieText = "";
     private bool _istWiedergabeAktiv;
     private bool _istPausiert;
     private bool _wiedergabeBeendet;
@@ -131,6 +132,14 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
     {
         get => _positionsText;
         private set => SetProperty(ref _positionsText, value);
+    }
+
+    /// <summary>Anzeigetext der aufgezeichneten Terminal-Geometrie („Aufzeichnung: {Cols}×{Rows}");
+    /// leer, solange keine Aufzeichnung geladen ist.</summary>
+    public string GeometrieText
+    {
+        get => _geometrieText;
+        private set => SetProperty(ref _geometrieText, value);
     }
 
     /// <summary>true, solange eine Wiedergabe läuft (inkl. Pausiert-Zustand).</summary>
@@ -251,6 +260,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
             ? null
             : "Aufzeichnung unvollständig — das Speicher-Limit wurde erreicht; die Wiedergabe endet vor dem tatsächlichen Ende der Session.";
         PositionsText = $"Chunk 0/{aufzeichnung.Chunks.Count}";
+        SetzeGeometrieText(aufzeichnung);
         StatusText = $"Aufzeichnung geladen ({aufzeichnung.PluginName}, {aufzeichnung.Chunks.Count} Chunks) — bereit.";
         Session = _replaySession;
     }
@@ -301,7 +311,11 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         // gebundene TerminalControl einen Dead-State abbilden.
         _replaySession = null;
         Session = null;
+        GeometrieText = "";
     }
+
+    private void SetzeGeometrieText(CliOutputAufzeichnung aufzeichnung)
+        => GeometrieText = $"Aufzeichnung: {aufzeichnung.Cols}×{aufzeichnung.Rows}";
 
     private void WiedergabeStarten()
     {
@@ -342,6 +356,7 @@ public sealed class KonsolenTestViewModel : ViewModelBase, IDisposable
         _replaySession = ErzeugeReplaySession(_aufzeichnung!);
         AktuellerQuellEintrag = null;
         PositionsText = $"Chunk 0/{_aufzeichnung!.Chunks.Count}";
+        SetzeGeometrieText(_aufzeichnung);
         Session = _replaySession;
         _wiedergabeBeendet = false;
     }

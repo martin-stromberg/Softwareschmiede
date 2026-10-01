@@ -28,7 +28,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **Autonome Aufgaben** mit Projektleiter-Agent und Unteragenten-Orchestrierung
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und optionaler Prerelease-Berücksichtigung
-- **CLI-Aufzeichnung mit Konsolentestfenster** zur Diagnose des Terminal-Renderpfads — byte-exakter Mitschnitt, `.clireplay`-Export, zeitgesteuerte Wiedergabe und Einzelschritt-Modus (vor/zurück)
+- **CLI-Aufzeichnung mit Konsolentestfenster** zur Diagnose des Terminal-Renderpfads — byte-exakter Mitschnitt, `.clireplay`-Export, zeitgesteuerte Wiedergabe in der aufgezeichneten Terminal-Geometrie und Einzelschritt-Modus (vor/zurück)
 
 ## Terminalintegration
 
@@ -39,7 +39,7 @@ KI-CLI-Tools (Claude CLI, GitHub Copilot CLI, Codex CLI, Devin CLI) laufen inter
 - Der eigene VT100/ANSI-Renderer unterstützt volle Farben, Alternate Screen (Vollbild-TUIs), Scroll-Regionen und 1000 Zeilen Scrollback; die Terminalgröße folgt Fensteränderungen automatisch.
 - Beim erneuten Öffnen einer Aufgabenseite wird die Terminalanzeige aus einem begrenzten Replay-Puffer (Standard 512 KiB, `Terminal:ReplayBufferByteBudget`) wiederhergestellt.
 - Jede Session wird automatisch als byte-exakter Mitschnitt mit Zeitstempel pro Ausgabe-Chunk aufgezeichnet (`CliOutputRecorder` neben `CliOutputProtokollWriter` über `CompositeTerminalOutputSink`; Budget `Terminal:AufzeichnungByteBudget`, Standard 8 MiB — `<= 0` deaktiviert den Mitschnitt). `[Terminal-Diagnose]`-Markerzeilen gelangen dabei nicht in den Mitschnitt.
-- Der Mitschnitt lässt sich als `.clireplay`-Datei exportieren und im **Konsolentestfenster** (Einstellungen → Allgemein → Diagnose) zeitgesteuert oder Chunk für Chunk im Einzelschritt-Modus durch denselben Renderpfad wieder abspielen — ein Diagnose-Werkzeug für Rendering- und Streaming-Fehler.
+- Der Mitschnitt lässt sich als `.clireplay`-Datei exportieren und im **Konsolentestfenster** (Einstellungen → Allgemein → Diagnose) zeitgesteuert oder Chunk für Chunk im Einzelschritt-Modus durch denselben Renderpfad wieder abspielen — gerendert in der im Mitschnitt-Header gespeicherten Terminal-Geometrie; ein Diagnose-Werkzeug für Rendering- und Streaming-Fehler.
 
 Details siehe [Terminal-Dokumentation](docs/help/terminal/index.md).
 
@@ -90,11 +90,12 @@ Zur Diagnose von Rendering- und Streaming-Fehlern im Terminal-Pfad (`AnsiSequenc
 
 - Der Einstieg liegt in den **Einstellungen** im Tab **„Allgemein"** im Abschnitt **„Diagnose"** über die Schaltfläche **„Konsolentestfenster öffnen"** (`KonsolenTestOeffnen`). Das Fenster (Titel „Konsolentest") ist nicht modal und bleibt parallel zur Live-Ansicht nutzbar.
 - **„Aufzeichnung öffnen…"** lädt eine exportierte `.clireplay`-Datei. Die `TerminalReplaySession` (eine `ITerminalSession`-Implementierung) spielt die aufgezeichneten Chunks zeitgesteuert durch denselben echten Renderpfad wie eine Live-Session — es gibt keinen separaten Replay-Renderer.
+- Die Wiedergabe rendert in der im Aufzeichnungs-Header gespeicherten Terminal-Geometrie (`Cols`×`Rows`), nicht in der Fenstergröße: die `TerminalReplaySession` meldet `SupportsResize == false`, sodass der Buffer seine aufgezeichnete Größe behält und Zeilenumbruch sowie absolute Cursorpositionen exakt wie zur Aufzeichnungszeit wirken. Übersteigt die aufgezeichnete Breite den sichtbaren Bereich, wird der Rest über eine horizontale Scrollbar erreichbar (Terminal-Semantik: abschneiden statt umbrechen); ein Hinweis „Aufzeichnung: {Cols}×{Rows}" in der Werkzeugleiste zeigt die aktive Geometrie an. Da die Replay-Session keinen Eingabekanal besitzt, scrollen Pfeiltasten, Bild auf/ab sowie Pos1/Ende die Ansicht direkt — vertikal in den Scrollback, horizontal über die Fensterbreite hinaus.
 - Die Wiedergabe wird über **„Abspielen"**, **„Neu starten"** und **„Pausieren/Fortsetzen"** gesteuert. Die einstellbare **Zeitraffer-Schwelle** (Sekunden) deckelt die Wartezeit vor jedem Chunk auf diesen Wert — kürzere Pausen bleiben zeitreal, `0` bedeutet maximale Geschwindigkeit.
 - Zusätzlich erlaubt ein **Einzelschritt-Modus** die Wiedergabe Chunk für Chunk: **„Schritt vor"** (`SchrittVor`) wendet den nächsten aufgezeichneten Chunk zeitstempel-unabhängig an (keine Inter-Chunk-Pause, keine Zeitraffer-Wirkung), **„Schritt zurück"** (`SchrittZurueck`) stellt den gerenderten Zustand vor dem zuletzt angewendeten Chunk über einen deterministischen Neuaufbau aus dem verbleibenden Chunk-Präfix wieder her. Die Schritte sind ohne gestartete Wiedergabe ebenso nutzbar wie im pausierten und beendeten Zustand — nur während einer unpausiert laufenden Wiedergabe sind sie deaktiviert. „Abspielen" bzw. „Fortsetzen" setzt die zeitgesteuerte Wiedergabe anschließend an der Schrittposition fort, und **„Neu starten"** ist auch im Schrittmodus (Position > 0) aktiv und führt zurück an den Anfang.
 - Rechts zeigt eine Quell-Ansicht die aufgezeichneten Chunks synchron zur Wiedergabeposition (Index, Offset, Byteanzahl und Quelltext mit sichtbar gemachten Steuersequenzen wie `␛`, `\r`, `\n`). Bei einer unvollständigen Aufzeichnung (Budget überschritten) blendet das Fenster einen entsprechenden Hinweis ein.
 
-Die Implementierung liegt in `KonsolenTestViewModel`, `KonsolenTestDialog`, `TerminalReplaySession`, `CliChunkQuelltextFormatter`, `CliChunkAnzeigeEintrag`, `SettingsViewModel` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TerminalReplaySessionTests`, `KonsolenTestViewModelTests`, `CliChunkQuelltextFormatterTests` und den E2E-Test `E2E_KonsolenTestfenster`.
+Die Implementierung liegt in `KonsolenTestViewModel`, `KonsolenTestDialog`, `TerminalControl` (fixe Buffer-Geometrie und horizontale `IScrollInfo`-Achse bei `SupportsResize == false`), `TerminalReplaySession`, `CliChunkQuelltextFormatter`, `CliChunkAnzeigeEintrag`, `SettingsViewModel` und `WpfDialogService`. Abgedeckt wird das Feature u. a. durch `TerminalReplaySessionTests`, `TerminalControlTests`, `KonsolenTestViewModelTests`, `CliChunkQuelltextFormatterTests` und den E2E-Test `E2E_KonsolenTestfenster`.
 
 ## Programmupdate
 

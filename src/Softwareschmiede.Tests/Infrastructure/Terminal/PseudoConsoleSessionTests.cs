@@ -369,6 +369,16 @@ public sealed class PseudoConsoleSessionTests
         pipeSession.IsPseudoTerminal.Should().BeFalse();
     }
 
+    /// <summary>Live-Sessions melden über <see cref="ITerminalSession.SupportsResize"/> <c>true</c> —
+    /// der Gegenpol zum fixierten <c>false</c> der <c>TerminalReplaySession</c>, damit ein gebundenes
+    /// <c>TerminalControl</c> weiterhin Buffer- und PTY-Resize ausführt.</summary>
+    [Fact]
+    public void SupportsResize_LiveTrue()
+    {
+        using var session = CreateSession(new MemoryStream());
+        session.SupportsResize.Should().BeTrue();
+    }
+
     /// <summary>Ein Leseschleifen-Fehler muss über <see cref="ITerminalSession.Failure"/> sichtbar bleiben —
     /// auch dann, wenn zum Fehlerzeitpunkt noch kein <see cref="ITerminalSession.Failed"/>-Handler registriert
     /// war. Das ist die Grundlage des Fehler-Rechecks in

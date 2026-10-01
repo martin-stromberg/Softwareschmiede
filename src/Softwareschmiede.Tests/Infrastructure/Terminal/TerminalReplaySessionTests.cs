@@ -191,8 +191,9 @@ public sealed class TerminalReplaySessionTests
     }
 
     /// <summary>Die <see cref="ITerminalSession"/>-Stubs sind unschädlich: ungestarteter Prozess,
-    /// Null-Streams, No-op-Eingaben und immer erfolgreiche Resize-/Drain-Aufrufe (Voraussetzung für
-    /// <c>TerminalControl.OnSessionChanged</c>).</summary>
+    /// Null-Streams, No-op-Eingaben und immer erfolgreiche Resize-/Drain-Aufrufe. Zusätzlich meldet
+    /// die Session über <see cref="ITerminalSession.SupportsResize"/> ihre fixierte Geometrie —
+    /// das <c>TerminalControl</c> ruft <c>Resize</c>/<c>Buffer.Resize</c> dann gar nicht erst auf.</summary>
     [Fact]
     public async Task Stubs_SindUnschaedlich()
     {
@@ -217,6 +218,8 @@ public sealed class TerminalReplaySessionTests
             session.MarkOutputActivity();
         };
         await act.Should().NotThrowAsync();
+        session.SupportsResize.Should().BeFalse(
+            "die Geometrie einer Replay-Session ist auf die Aufzeichnungs-Header-Werte fixiert");
         session.Resize(10, 10).Should().BeTrue();
         session.Resize(0, -3).Should().BeTrue("Resize ist ein Stub und darf nie fehlschlagen");
         (await session.DrainOutputAsync(TimeSpan.FromSeconds(1))).Should().BeTrue();
@@ -742,6 +745,36 @@ public sealed class TerminalReplaySessionTests
         events.Should().Be(0, "nach Dispose dürfen keine Events mehr feuern");
     }
 
+    /// <summary>Die Buffer-Geometrie bleibt über die gesamte Session-Lebensdauer auf den
+    /// Aufzeichnungs-Header-Werten fixiert — auch über Einzelschritte und den Präfix-Rebuild
+    /// hinweg (<c>TerminalBuffer.Reset()</c> erhält die Dimensionen).</summary>
+    [Fact]
+    public void Geometrie_BleibtUeberSchritteUndRebuild_Fixiert()
+    {
+        var aufzeichnung = CreateAufzeichnung(
+            [Encoding.UTF8.GetBytes("A"), Encoding.UTF8.GetBytes("B")],
+            TimeSpan.Zero,
+            cols: 220,
+            rows: 50);
+        using var session = new TerminalReplaySession(aufzeichnung, new FakeTimeProvider());
+
+        session.Buffer.Cols.Should().Be(220);
+        session.Buffer.Rows.Should().Be(50);
+
+        session.SchrittVor();
+        session.Buffer.Cols.Should().Be(220, "SchrittVor darf die Buffer-Geometrie nicht ändern");
+        session.Buffer.Rows.Should().Be(50);
+
+        session.SchrittVor();
+        session.SchrittZurueck();
+        session.Buffer.Cols.Should().Be(220, "der Präfix-Rebuild (Buffer.Reset) erhält die Dimensionen");
+        session.Buffer.Rows.Should().Be(50);
+
+        session.RebuildBufferFromReplay();
+        session.Buffer.Cols.Should().Be(220);
+        session.Buffer.Rows.Should().Be(50);
+    }
+
     private static Task GetReadLoopTask(PseudoConsoleSession session)
     {
         var field = typeof(PseudoConsoleSession).GetField("_readLoopTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -788,7 +821,7 @@ public sealed class TerminalReplaySessionTests
         return sb.ToString();
     }
 
-    private static CliOutputAufzeichnung CreateAufzeichnung(IReadOnlyList<byte[]> chunks, TimeSpan intervall)
+    private static CliOutputAufzeichnung CreateAufzeichnung(IReadOnlyList<byte[]> chunks, TimeSpan intervall, int cols = 80, int rows = 24)
     {
         var records = chunks
             .Select((data, i) => new CliOutputChunkRecord(intervall * i, data))
@@ -798,8 +831,8 @@ public sealed class TerminalReplaySessionTests
             AufgabeId = Guid.NewGuid(),
             PluginName = "TestPlugin",
             StartUtc = DateTimeOffset.UtcNow,
-            Cols = 80,
-            Rows = 24,
+            Cols = cols,
+            Rows = rows,
             IstVollstaendig = true,
             Chunks = records,
         };

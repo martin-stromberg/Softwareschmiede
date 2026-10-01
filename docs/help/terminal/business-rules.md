@@ -85,7 +85,7 @@
 - Gleiche Event-Sequenz wie der Live-Pfad → ein Replay reproduziert den tatsächlichen Anzeigezustand, inkl. aller (damaligen) Parser-Verhaltensweisen.
 - `RebuildBufferFromReplay` baut den Buffer aus den **bis dahin abgespielten** Chunks neu auf — die Control-Bindung beim Laden/Neustart zeigt den korrekten Zwischenstand, keinen vermischten Zustand.
 - Nach dem letzten Chunk: `RuntimeStatus = Inaktiv`, `Exited` mit `ExitCode = null`; erneutes Abspielen erzeugt über das ViewModel eine frische Session ab Position 0 — solange der Beendet-Zustand gilt (`_wiedergabeBeendet`). `WiedergabeStarten` der Session selbst ist re-armierbar (Lauf-Flag `_wiedergabeLoopAktiv`, Rücksetzen im Schleifen-`finally`): Wurde das Ende per `SchrittZurueck` verlassen, startet dieselbe Session einen neuen Durchlauf ab der aktuellen Position und feuert `Exited` erneut.
-- Terminal-Geometrie: die Header-Werte `Cols`/`Rows` bestimmen nur die initiale Buffer-Größe; die Wiedergabe nutzt die aktuelle Fenstergröße (Resize-Ereignisse werden nicht aufgezeichnet und nicht reproduziert).
+- Terminal-Geometrie: die Header-Werte `Cols`/`Rows` sind die dauerhafte Buffer-Geometrie der Wiedergabe (`TerminalReplaySession.SupportsResize == false` — das `TerminalControl` resized den Replay-Buffer nicht); Resize-Ereignisse werden nicht aufgezeichnet und nicht reproduziert. Übersteigt die aufgezeichnete Breite den sichtbaren Bereich, wird der Inhalt horizontal scrollbar (statt umzubrechen).
 
 **Umsetzung:** `TerminalReplaySession`, `KonsolenTestViewModel.ErsetzeReplaySessionDurchFrische` (Neustart durch frische Session statt Zustands-Reset der laufenden).
 

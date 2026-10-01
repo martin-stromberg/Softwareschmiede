@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
@@ -30,6 +31,8 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     private double _extentHeight;
     private double _viewportHeight;
     private double _verticalOffset;
+    private double _horizontalOffset;
+    private bool _canHorizontallyScroll;
     private bool _isFollowingEnd = true;
 
     private static readonly SolidColorBrush BlackBrush = CreateFrozenBrush(Colors.Black);
@@ -55,10 +58,27 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     public bool CanVerticallyScroll { get; set; } = true;
 
     /// <inheritdoc/>
-    public bool CanHorizontallyScroll { get; set; }
+    /// <remarks>Der Toggle ändert den meldebaren <see cref="ExtentWidth"/> (kollabiert auf
+    /// <see cref="ViewportWidth"/>, wenn der Host das horizontale Scrollen abschaltet) — der
+    /// horizontale Offset wird daher sofort gegen den neuen Scrollbereich re-geklemmt, statt bis
+    /// zum nächsten <c>UpdateScrollInfo</c> verschoben zu bleiben.</remarks>
+    public bool CanHorizontallyScroll
+    {
+        get => _canHorizontallyScroll;
+        set
+        {
+            if (_canHorizontallyScroll == value)
+                return;
+
+            _canHorizontallyScroll = value;
+            SetHorizontalOffset(_horizontalOffset);
+        }
+    }
 
     /// <inheritdoc/>
-    public double ExtentWidth => ViewportWidth;
+    public double ExtentWidth => CanHorizontallyScroll && _buffer != null
+        ? Math.Max(ViewportWidth, _buffer.Cols * _cellWidth)
+        : ViewportWidth;
 
     /// <inheritdoc/>
     public double ExtentHeight => _extentHeight;
@@ -70,7 +90,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     public double ViewportHeight => _viewportHeight;
 
     /// <inheritdoc/>
-    public double HorizontalOffset => 0;
+    public double HorizontalOffset => _horizontalOffset;
 
     /// <inheritdoc/>
     public double VerticalOffset => _verticalOffset;
@@ -102,6 +122,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         {
             _buffer = null;
             _verticalOffset = 0;
+            _horizontalOffset = 0;
             _extentHeight = 0;
             _viewportHeight = 0;
             _isFollowingEnd = true;
@@ -111,8 +132,6 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         }
 
         MeasureCellSize();
-        var cols = CalculateCols();
-        var rows = CalculateRows();
 
         // Vor dem Rebuild subscribieren: Ein Output-Chunk, der die Leseschleife zwischen
         // RebuildBufferFromReplay und der Registrierung trifft, läge sonst zwar korrekt im Buffer,
@@ -123,7 +142,14 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         // Endzustand wie beim Lösen der Bindung, ohne dass Live-Chunks doppelt erscheinen.
         session.RebuildBufferFromReplay();
         _buffer = session.Buffer;
-        _buffer.Resize(cols, rows);
+        if (session.SupportsResize)
+        {
+            // Sessions mit fixierter Geometrie (SupportsResize == false, z. B. Replay) behalten
+            // ihre Buffer-Größe; überschüssige Breite wird über den horizontalen Offset erreichbar.
+            _buffer.Resize(CalculateCols(), CalculateRows());
+        }
+
+        _horizontalOffset = 0;
         _isFollowingEnd = true;
         UpdateScrollInfo(followEndIfNeeded: true);
 
@@ -168,17 +194,28 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             ? Math.Max(0, totalRows - visibleRows)
             : Clamp((int)Math.Round(_verticalOffset), 0, Math.Max(0, totalRows - visibleRows));
 
+        // Sichtbarer Spaltenbereich bei horizontalem Scroll-Offset (Pixel-Einheiten):
+        // nur diese Spalten werden gezeichnet — bei breiten fixierten Buffern (Replay)
+        // bleibt der FormattedText-Aufbau auf den sichtbaren Ausschnitt begrenzt.
+        var firstVisibleCol = Clamp((int)(_horizontalOffset / _cellWidth), 0, cols);
+        var lastVisibleCol = Clamp((int)Math.Ceiling((_horizontalOffset + ActualWidth) / _cellWidth), 0, cols);
+
+        // Clip auf die Control-Bounds + Verschiebung des Inhalts um den horizontalen
+        // Scroll-Offset: Bei _horizontalOffset == 0 ist die Transform eine Identität.
+        dc.PushClip(new RectangleGeometry(new Rect(0, 0, ActualWidth, ActualHeight)));
+        dc.PushTransform(new TranslateTransform(-_horizontalOffset, 0));
+
         for (var r = 0; r < visibleRows; r++)
         {
             var y = r * _cellHeight;
             var logicalRow = visibleStart + r;
 
-            var bgStart = 0;
-            while (bgStart < cols)
+            var bgStart = firstVisibleCol;
+            while (bgStart < lastVisibleCol)
             {
                 var bgColor = GetSnapshotCell(snapshot, logicalRow, bgStart).Background;
                 var bgEnd = bgStart + 1;
-                while (bgEnd < cols && GetSnapshotCell(snapshot, logicalRow, bgEnd).Background == bgColor)
+                while (bgEnd < lastVisibleCol && GetSnapshotCell(snapshot, logicalRow, bgEnd).Background == bgColor)
                     bgEnd++;
 
                 if (bgColor != System.Drawing.Color.Black)
@@ -190,7 +227,7 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
                 bgStart = bgEnd;
             }
 
-            for (var c = 0; c < cols; c++)
+            for (var c = firstVisibleCol; c < lastVisibleCol; c++)
             {
                 var cell = GetSnapshotCell(snapshot, logicalRow, c);
                 if (cell.Character == ' ' || cell.Character == '\0')
@@ -213,12 +250,16 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
 
         var cursorLogicalRow = snapshot.ScrollbackCount + snapshot.CursorRow;
         var cursorRenderRow = cursorLogicalRow - visibleStart;
-        if (cursorRenderRow >= 0 && cursorRenderRow < visibleRows)
+        if (cursorRenderRow >= 0 && cursorRenderRow < visibleRows
+            && cursorCol >= firstVisibleCol && cursorCol < lastVisibleCol)
         {
             var cursorX = cursorCol * _cellWidth;
             var cursorY = cursorRenderRow * _cellHeight;
             dc.DrawRectangle(CursorBrush, null, new Rect(cursorX, cursorY, _cellWidth, _cellHeight));
         }
+
+        dc.Pop();
+        dc.Pop();
     }
 
     private SolidColorBrush GetBrush(Color color)
@@ -242,9 +283,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     /// <inheritdoc/>
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        var session = Session;
+
         if (e.Key == Key.V && (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0)
         {
-            var session = Session;
             if (session?.InputStream != null)
             {
                 e.Handled = true;
@@ -254,8 +296,18 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             return;
         }
 
+        // Sessions ohne realen Eingabekanal (Wiedergabe: InputStream == Stream.Null) können mit
+        // Tastaturbytes nichts anfangen — Navigationstasten werden nicht kodiert und nicht als
+        // behandelt markiert, damit sie zum umschließenden ScrollViewer bubbeln und dessen
+        // Standard-Tastatur-Scrollen (Line*/Page*/Home/End) greift.
+        if (!HasInputChannel(session) && IsNavigationKey(e.Key))
+        {
+            base.OnPreviewKeyDown(e);
+            return;
+        }
+
         var bytes = KeyToVt100Encoder.Encode(e);
-        if (bytes != null && Session?.InputStream != null)
+        if (bytes != null && session?.InputStream != null)
         {
             WriteToInputStream(bytes);
             e.Handled = true;
@@ -290,6 +342,19 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         _ = WriteToInputStreamAsync(session, bytes, "Fehler beim Schreiben in den Terminal-Input-Stream");
     }
 
+    /// <summary>Ob die Session einen realen Eingabekanal besitzt — Sessions mit fixierter Geometrie
+    /// (Wiedergabe) melden <see cref="Stream.Null"/>: dorthin geschriebene Bytes gingen ins Leere.</summary>
+    /// <param name="session">Die zu prüfende Session (oder <c>null</c>).</param>
+    private static bool HasInputChannel(ITerminalSession? session)
+        => session?.InputStream is { } input && !ReferenceEquals(input, Stream.Null);
+
+    /// <summary>Ob die Taste eine reine Navigations-/Scrolltaste ist (Pfeile, Bild auf/ab, Pos1/Ende) —
+    /// Sessions ohne Eingabekanal reichen sie zum Scrollen an den umschließenden ScrollViewer durch.</summary>
+    /// <param name="key">Die gedrückte Taste.</param>
+    private static bool IsNavigationKey(Key key) => key is
+        Key.Left or Key.Right or Key.Up or Key.Down
+        or Key.PageUp or Key.PageDown or Key.Home or Key.End;
+
     /// <inheritdoc/>
     protected override void OnMouseDown(MouseButtonEventArgs e)
     {
@@ -305,10 +370,14 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
         if (session != null && buffer != null)
         {
             MeasureCellSize();
-            var cols = CalculateCols();
-            var rows = CalculateRows();
-            buffer.Resize(cols, rows);
-            session.Resize(cols, rows);
+            if (session.SupportsResize)
+            {
+                var cols = CalculateCols();
+                var rows = CalculateRows();
+                buffer.Resize(cols, rows);
+                session.Resize(cols, rows);
+            }
+
             UpdateScrollInfo(followEndIfNeeded: true);
             InvalidateVisual();
         }
@@ -350,7 +419,12 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     protected override Size MeasureOverride(Size availableSize)
     {
         MeasureCellSize();
-        var width = double.IsInfinity(availableSize.Width) ? CalculateCols() * _cellWidth : availableSize.Width;
+        // Bei unendlicher verfügbarer Breite (scrollender Host) ist die gewünschte Breite die
+        // Buffer-Geometrie — bei fixierten Replay-Buffern bleibt der Inhalt so breiter als der
+        // Viewport und der ScrollViewer kann horizontal scrollen.
+        var width = double.IsInfinity(availableSize.Width)
+            ? (_buffer?.Cols ?? CalculateCols()) * _cellWidth
+            : availableSize.Width;
         var height = double.IsInfinity(availableSize.Height) ? CalculateRows() * _cellHeight : availableSize.Height;
         return new Size(width, height);
     }
@@ -370,14 +444,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     public void LineDown() => SetVerticalOffset(_verticalOffset + 1);
 
     /// <inheritdoc/>
-    public void LineLeft()
-    {
-    }
+    public void LineLeft() => SetHorizontalOffset(_horizontalOffset - _cellWidth);
 
     /// <inheritdoc/>
-    public void LineRight()
-    {
-    }
+    public void LineRight() => SetHorizontalOffset(_horizontalOffset + _cellWidth);
 
     /// <inheritdoc/>
     public void PageUp() => SetVerticalOffset(_verticalOffset - GetPageScrollRows());
@@ -386,14 +456,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     public void PageDown() => SetVerticalOffset(_verticalOffset + GetPageScrollRows());
 
     /// <inheritdoc/>
-    public void PageLeft()
-    {
-    }
+    public void PageLeft() => SetHorizontalOffset(_horizontalOffset - GetPageScrollPixels());
 
     /// <inheritdoc/>
-    public void PageRight()
-    {
-    }
+    public void PageRight() => SetHorizontalOffset(_horizontalOffset + GetPageScrollPixels());
 
     /// <inheritdoc/>
     public void MouseWheelUp() => SetVerticalOffset(_verticalOffset - MouseWheelScrollLines);
@@ -402,18 +468,17 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
     public void MouseWheelDown() => SetVerticalOffset(_verticalOffset + MouseWheelScrollLines);
 
     /// <inheritdoc/>
-    public void MouseWheelLeft()
-    {
-    }
+    public void MouseWheelLeft() => SetHorizontalOffset(_horizontalOffset - MouseWheelScrollLines * _cellWidth);
 
     /// <inheritdoc/>
-    public void MouseWheelRight()
-    {
-    }
+    public void MouseWheelRight() => SetHorizontalOffset(_horizontalOffset + MouseWheelScrollLines * _cellWidth);
 
     /// <inheritdoc/>
     public void SetHorizontalOffset(double offset)
     {
+        _horizontalOffset = ClampOffset(offset, ScrollableWidth);
+        ScrollOwner?.InvalidateScrollInfo();
+        InvalidateVisual();
     }
 
     /// <inheritdoc/>
@@ -441,7 +506,15 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
 
     private double ScrollableHeight => Math.Max(0, _extentHeight - _viewportHeight);
 
+    private double ScrollableWidth => Math.Max(0, ExtentWidth - ViewportWidth);
+
     private int GetPageScrollRows() => Math.Max(1, CalculateRows() - 1);
+
+    /// <summary>Seiten-Scrollweite der horizontalen Achse (Viewport minus eine Zelle, analog
+    /// <see cref="GetPageScrollRows"/>). Nach unten auf eine Zelle geklemmt: bei einem Viewport
+    /// schmaler als eine Zelle (z. B. vor dem ersten Arrange) würde die Distanz sonst negativ
+    /// und damit die Scrollrichtung invertieren.</summary>
+    private double GetPageScrollPixels() => Math.Max(_cellWidth, ViewportWidth - _cellWidth);
 
     private void UpdateScrollInfo(bool followEndIfNeeded)
     {
@@ -461,6 +534,10 @@ public sealed class TerminalControl : FrameworkElement, IScrollInfo
             ? scrollableHeight
             : ClampOffset(_verticalOffset, scrollableHeight);
         _isFollowingEnd = _verticalOffset >= scrollableHeight - ScrollEndEpsilon;
+
+        // Verbreitert sich der Viewport, wird der horizontale Offset auf den neuen
+        // ScrollableWidth-Bereich zurückgeklemmt.
+        _horizontalOffset = ClampOffset(_horizontalOffset, ScrollableWidth);
 
         ScrollOwner?.InvalidateScrollInfo();
     }

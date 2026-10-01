@@ -7,6 +7,10 @@
 
 ## What's New
 
+- The console test window now plays `.clireplay` recordings back in the terminal geometry stored in the recording header (Cols×Rows) instead of the window size — fixed: line-wrap and offset artifacts in recordings wider than the window, where absolute cursor positioning landed in the wrong places.
+- Recordings wider than the window are reachable via a horizontal scrollbar (clip/scroll instead of wrap); live sessions in the task view keep resizing to the window as before.
+- Keyboard navigation in the replay: arrow keys, Page Up/Down and Home/End scroll the replay view instead of being encoded as input bytes that went nowhere.
+- The console test window's toolbar shows the geometry of the loaded recording (e.g. "Recording: 220×50").
 - Single-step playback in the console test window: the new "Step back"/"Step forward" buttons apply a loaded recording chunk by chunk, independent of the recorded timestamps; "Step back" deterministically restores the rendered state before the last applied chunk.
 - Stepping and playback interact seamlessly: resuming or starting playback continues at the position changed by stepping, and "Restart" is now also available from pure step mode as a direct way back to the beginning.
 - The console test window's source list is consistently synchronized with the playback position: 1-based chunk numbering matching the "Chunk n/y" display, with the last applied chunk highlighted.
@@ -30,6 +34,10 @@
 
 ## Neuerungen
 
+- Das Konsolentestfenster spielt `.clireplay`-Aufzeichnungen jetzt in der im Aufzeichnungs-Header gespeicherten Terminal-Geometrie (Cols×Rows) ab statt in der Fenstergröße — behoben: Zeilenumbruch- und Versatz-Artefakte bei Aufzeichnungen, die breiter als das Fenster sind, bei denen absolute Cursorpositionierungen an falschen Stellen landeten.
+- Aufzeichnungen, die breiter als das Fenster sind, sind über eine horizontale Scrollbar erreichbar (abschneiden/scrollen statt umbrechen); Live-Sitzungen in der Aufgabenansicht passen sich weiterhin an die Fenstergröße an.
+- Tastatur-Navigation in der Wiedergabe: Pfeiltasten, Bild auf/ab und Pos1/Ende scrollen die Wiedergabe-Ansicht, statt als Eingabe-Bytes kodiert ins Leere zu laufen.
+- Die Werkzeugleiste des Konsolentestfensters zeigt die Geometrie der geladenen Aufzeichnung (z. B. „Aufzeichnung: 220×50").
 - Einzelschritt-Wiedergabe im Konsolentestfenster: Die neuen Schaltflächen „Schritt zurück"/„Schritt vor" spielen eine geladene Aufzeichnung Chunk für Chunk ab, unabhängig von den aufgezeichneten Zeitstempeln; „Schritt zurück" stellt den gerenderten Zustand vor dem zuletzt angewendeten Chunk deterministisch wieder her.
 - Schrittmodus und Wiedergabe greifen nahtlos ineinander: Fortsetzen oder Starten der Wiedergabe läuft an der durch Schritte veränderten Position weiter, und „Neu starten" ist auch aus dem reinen Schrittmodus als direkter Rückweg zum Anfang verfügbar.
 - Die Quell-Liste des Konsolentestfensters ist jetzt konsistent zur Wiedergabeposition synchronisiert: 1-basierte Chunk-Nummerierung passend zur Anzeige „Chunk n/y", der zuletzt angewendete Chunk ist markiert.

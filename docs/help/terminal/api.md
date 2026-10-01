@@ -20,6 +20,7 @@ Gemeinsame Abstraktion einer Terminal-Session; implementiert `IDisposable`. Zwei
 | `Buffer` | `TerminalBuffer` | Der Terminal-Buffer der Sitzung; wird bereits bei Konstruktion angelegt und von der internen Leseschleife befüllt, unabhängig davon, ob ein `TerminalControl` gebunden ist (read-only) |
 | `RuntimeStatus` | `CliRuntimeStatus` | Der aktuelle Betriebszustand der CLI (`Inaktiv`, `Laeuft`, `WartetAufEingabe`). Wird alle 1 Sekunde neu bewertet basierend auf Prozess-Zustand und I/O-Aktivität (read-only) |
 | `IsPseudoTerminal` | `bool` | `true`, wenn die Session über ein echtes Pseudo-Terminal (ConPTY) läuft; `false` auf dem Pipe-Fallback-Backend — steuert u. a. den „eingeschränkter Modus"-Hinweis in der Statuszeile |
+| `SupportsResize` | `bool` | `true`, wenn die Session-Geometrie zur Laufzeit geändert werden darf (Live-Sessions); `false` bei fixierter Geometrie (`TerminalReplaySession`) — dann darf ein Aufrufer weder `Resize` noch `Buffer.Resize` aufrufen |
 | `ExitCode` | `int?` | Der Exit-Code des Prozesses nach dessen Beendigung (`null` vor Beendigung oder wenn nicht ermittelbar) |
 
 ### Events
@@ -213,7 +214,7 @@ Unterstütztes Scrollverhalten:
 - Mausrad-Scroll um mehrere Terminalzeilen
 - Line-Scroll um eine Terminalzeile
 - Page Up/Page Down um ungefähr eine sichtbare Seite
-- Kein horizontaler UI-Scroll; die Terminalbreite bestimmt weiterhin die Spaltenanzahl
+- Horizontaler UI-Scroll nur bei Sessions mit fixierter Geometrie (`SupportsResize == false`, z. B. `TerminalReplaySession`): `ExtentWidth` beträgt dann `Buffer.Cols × Zellbreite` (Pixel-Einheiten), `SetHorizontalOffset`/`Line*`/`Page*`/`MouseWheel*` verschieben den horizontalen Offset und `OnRender` zeichnet via Clip+TranslateTransform nur den sichtbaren Spaltenbereich. Bei Live-Sessions liegt `Cols × Zellbreite` per `floor(ActualWidth/Zellbreite)`-Arithmetik nie über dem Viewport — dort bleibt der Extent deckungsgleich und kein horizontaler Balken entsteht (in `TaskDetailView` ist die horizontale Scrollbar zusätzlich `Disabled`).
 - **Alternate Screen:** Solange `buffer.IsAlternateScreenActive` gesetzt ist (Vollbild-TUI via CSI `?1049h`), meldet `IScrollInfo` keinen Scrollback-Bereich (`ExtentHeight == ViewportHeight`), der Offset wird auf 0 geklemmt und alle Scroll-Operationen sind No-Ops
 
 Wenn der Offset am Ende des Verlaufs steht, folgt das Control neuer Ausgabe automatisch. Nach manuellem Hochscrollen bleibt die Position stabil, bis wieder ans Ende gescrollt wird. Eingabefokus und Tastaturweitergabe bleiben erhalten; Klicks in die Terminalfläche fokussieren `TerminalControl`, Scrollbar-Klicks werden nicht abgefangen.
@@ -237,7 +238,7 @@ Unterstützte Tasten:
 
 ### Größenänderungen
 
-Das Control triggert automatisch `Session.Resize(cols, rows)` bei Layout-Änderungen. Die neuen Spalten- und Zeilenzahlen werden aus verfügbaren Pixeln und Zellengröße berechnet; die Session dedupliziert identische Dimensionen selbst.
+Das Control triggert automatisch `Session.Resize(cols, rows)` bei Layout-Änderungen — nur bei `Session.SupportsResize == true`. Bei fixierter Geometrie (`false`) bleiben Buffer und Session in ihrer Geometrie; das Control aktualisiert dann lediglich Scrollinfo (Viewport/Extent, Klemmung des horizontalen Offsets) und Darstellung. Die neuen Spalten- und Zeilenzahlen werden aus verfügbaren Pixeln und Zellengröße berechnet; die Session dedupliziert identische Dimensionen selbst.
 
 ### Clipboard-Paste-Support
 
@@ -844,7 +845,8 @@ Zweite `ITerminalSession`-Implementierung (`Softwareschmiede.Infrastructure.Term
 || `Process` | Nicht gestartetes `new Process()` — `Id`/`HasExited` werfen `InvalidOperationException` (von `TaskDetailView.TryGetProcessId` bereits abgefangen) |
 || `InputStream`/`OutputStream` | `Stream.Null` |
 || `IsPseudoTerminal` | `false` |
-|| `Resize` | `true` (Buffer-Anpassung übernimmt das Control direkt) |
+|| `SupportsResize` | `false` — die Geometrie ist auf die Aufzeichnungs-Header-Werte fixiert; das `TerminalControl` resized Replay-Sessions nicht (überschüssige Breite wird horizontal scrollbar) |
+|| `Resize` | `true` — harmloser No-Op; mit `SupportsResize == false` vom Control nicht mehr aufgerufen |
 || `WriteInputAsync`/`WritePromptAsync`/`MarkInputActivity`/`MarkOutputActivity` | No-Op |
 || `Failure` | `null` (`Failed` wird nie ausgelöst) |
 || `ExitCode` | `null` |
@@ -901,6 +903,7 @@ ViewModel und Fenster des Konsolentestfensters (`Softwareschmiede.App.ViewModels
 || `QuellEintraege` / `AktuellerQuellEintrag` | `ObservableCollection<CliChunkAnzeigeEintrag>` (`Index` 1-basiert — die „#"-Spalte zählt wie der PositionsText die angewendeten Chunks, `Offset`, `Laenge`, `Quelltext`) für die `ListView` `QuellChunkListe`; der aktuelle Eintrag folgt `AktuellerChunkIndex` über `BufferChanged` (`null` an Position 0) und wird per `ScrollIntoView` sichtbar gehalten |
 || `ZeitrafferSchwelleText` | Sekunden als Dezimalzahl ≥ 0 (`0` = maximale Geschwindigkeit); validiert — ungültige Eingabe → `FehlerMeldung`, letzte gültige Schwelle bleibt aktiv |
 || `StatusText` / `PositionsText` | Statuszeile („Wiedergabe läuft.", „Pausiert.", „Wiedergabe beendet.", „Einzelschritt — Chunk n/y angewendet.", „Schritt zurück — Chunk n/y zurückgenommen.") und Position („Chunk x/y") |
+|| `GeometrieText` | Anzeigetext der aufgezeichneten Terminal-Geometrie („Aufzeichnung: {Cols}×{Rows}") — wird beim Laden gesetzt und beim Entsorgen der Session geleert |
 || `UnvollstaendigHinweis` | Hinweistext bei `IstVollstaendig = false` der geladenen Aufzeichnung |
 || `FehlerMeldung` | Fehlertext des Dialogs |
 

@@ -1,6 +1,7 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
+using FlaUI.Core.Patterns;
 using FlaUI.Core.WindowsAPI;
 
 namespace Softwareschmiede.Tests.E2E.Views.Dialogs;
@@ -222,6 +223,89 @@ public sealed class KonsolenTestDialogView : DialogView
     /// da der Automation-Name das statische Element-Kennzeichen "WiedergabePosition" ist.</returns>
     public string GetPositionsText()
         => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("WiedergabePosition"), Short));
+
+    /// <returns>Der aktuelle Geometrie-Text der geladenen Aufzeichnung (z. B. "Aufzeichnung: 220×50")
+    /// — gelesen aus dem HelpText, da der Automation-Name das statische Element-Kennzeichen
+    /// "AufzeichnungGeometrie" ist.</returns>
+    public string GetGeometrieText()
+        => GetHelpTextOrName(WaitForElement(GetDialogWindow(), cf => cf.ByName("AufzeichnungGeometrie"), Short));
+
+    /// <returns>Das <see cref="IScrollPattern"/> des "ReplayTerminalScrollViewer" (der ScrollViewer
+    /// um das Replay-Terminal), oder <c>null</c>, wenn das Element das Pattern nicht unterstützt.</returns>
+    public IScrollPattern? GetReplayScrollPattern()
+        => WaitForElement(GetDialogWindow(), cf => cf.ByName("ReplayTerminalScrollViewer"), Short)
+            .Patterns.Scroll.PatternOrDefault;
+
+    /// <returns><c>true</c>, wenn der ReplayTerminal-ScrollViewer aktuell horizontal scrollbar ist
+    /// (<c>HorizontallyScrollable</c> — die Buffer-Breite der Aufzeichnung übersteigt den sichtbaren
+    /// Bereich), sonst <c>false</c>.</returns>
+    public bool IstHorizontalScrollbar()
+    {
+        var pattern = GetReplayScrollPattern();
+        return pattern is not null
+            && pattern.HorizontallyScrollable.TryGetValue(out var scrollbar)
+            && scrollbar;
+    }
+
+    /// <returns>Die horizontale View-Size des ReplayTerminal-ScrollViewers in Prozent des Extents
+    /// (&lt; 100 = der Inhalt ist breiter als der sichtbare Bereich), oder <c>-1</c> ohne Pattern.</returns>
+    public double GetHorizontalViewSize()
+    {
+        var pattern = GetReplayScrollPattern();
+        return pattern is not null && pattern.HorizontalViewSize.TryGetValue(out var viewSize) ? viewSize : -1;
+    }
+
+    /// <returns>Der aktuelle horizontale Scroll-Stand des ReplayTerminal-ScrollViewers in Prozent,
+    /// oder <c>-1</c> ohne Pattern.</returns>
+    public double GetHorizontalScrollPercent()
+    {
+        var pattern = GetReplayScrollPattern();
+        return pattern is not null && pattern.HorizontalScrollPercent.TryGetValue(out var percent) ? percent : -1;
+    }
+
+    /// <summary>Setzt die horizontale Scroll-Position des ReplayTerminal-ScrollViewers per
+    /// ScrollPattern; die vertikale Achse bleibt unverändert (<see cref="ScrollPatternConstants.NoScroll"/>).</summary>
+    /// <param name="prozent">Der horizontale Ziel-Scrollstand in Prozent (0–100).</param>
+    /// <returns>Diese Instanz.</returns>
+    public KonsolenTestDialogView SetzeHorizontalScrollProzent(double prozent)
+    {
+        GetReplayScrollPattern()?.SetScrollPercent(prozent, ScrollPatternConstants.NoScroll);
+        return this;
+    }
+
+    /// <summary>Klickt in das Replay-Terminal (ein echter Mausklick setzt über
+    /// <c>TerminalControl.OnMouseDown</c> den Tastaturfokus auf das Control) und sendet
+    /// anschließend die angegebene Taste über den realen Eingabepfad — so lässt sich das
+    /// Tastatur-Scrollen des umschließenden ScrollViewers in der Wiedergabe nachweisen:
+    /// Die Replay-Session besitzt keinen Eingabekanal, daher müssen Navigationstasten zum
+    /// ScrollViewer durchbubbeln statt vom VT100-Encoder verschluckt zu werden.</summary>
+    /// <param name="taste">Die zu sendende Taste (z. B. <see cref="VirtualKeyShort.END"/>).</param>
+    /// <returns>Diese Instanz.</returns>
+    public KonsolenTestDialogView DrueckeTasteImReplayTerminal(VirtualKeyShort taste)
+    {
+        WaitForElement(GetDialogWindow(), cf => cf.ByName("ReplayTerminal"), Short).ClickInForeground();
+        Keyboard.Press(taste);
+        return this;
+    }
+
+    /// <summary>Wartet, bis der ReplayTerminal-ScrollViewer horizontal scrollbar wird — das
+    /// Extent-/Scrollbar-Layout entsteht asynchron nach dem Binden der Session.</summary>
+    /// <param name="timeout">Maximale Wartezeit.</param>
+    /// <returns>Diese Instanz.</returns>
+    /// <exception cref="TimeoutException">Der ScrollViewer wurde nicht rechtzeitig horizontal scrollbar.</exception>
+    public KonsolenTestDialogView WarteAufHorizontalScrollFaellig(TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? Medium);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (IstHorizontalScrollbar())
+                return this;
+
+            Thread.Sleep(200);
+        }
+
+        throw new TimeoutException("Der ReplayTerminalScrollViewer wurde nicht rechtzeitig horizontal scrollbar.");
+    }
 
     /// <summary>Wartet, bis der Wiedergabe-Statustext den erwarteten Wert annimmt.</summary>
     /// <param name="erwarteterStatus">Der erwartete Statustext.</param>
